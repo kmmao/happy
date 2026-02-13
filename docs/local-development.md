@@ -117,7 +117,33 @@ HAPPY_SERVER_URL=http://localhost:3005 yarn workspace happy-coder dev  # 连本�
 yarn workspace happy-coder dev:local-server        # 连本地（用 .env.dev-local-server）
 ```
 
-### 4. 守护进程
+### 4. 本地安装为全局命令（在任意项目目录使用）
+
+若希望在**其他项目目录**（如 `~/gas`）下直接运行 `happy`，而不是在 happy 仓库根目录执行 `yarn workspace happy-coder dev:local-server`，可将本仓库的 CLI 安装为全局命令：
+
+**方式 A：从本地路径安装（装的是当前仓库 build 结果）**
+
+```bash
+cd /path/to/happy   # 进入本仓库根目录
+yarn workspace happy-coder build
+npm install -g ./packages/happy-cli
+```
+
+之后在任意目录执行 `happy claude` 即可，会话的工作目录为**当前目录**。环境变量可在 `.zshrc` 等中配置（如 `HAPPY_SERVER_URL`、`ANTHROPIC_MODEL`）。
+
+**方式 B：npm link（改本地代码后重新 build 即生效）**
+
+```bash
+cd /path/to/happy/packages/happy-cli
+yarn build
+npm link
+```
+
+全局 `happy` 会链到本地包，修改代码后在该目录执行 `yarn build` 即可用新逻辑。
+
+**说明**：`npm install -g happy-coder` 安装的是 **npm 上的发布版**，不是本仓库代码。要使用本仓库的 CLI，需用上述方式 A 或 B。
+
+### 5. 守护进程
 
 - 先 build 再起 daemon：`yarn workspace happy-coder build`，然后 `yarn workspace happy-coder dev:daemon:start`。
 - 日志：`~/.happy-dev/logs/`（或 `$HAPPY_HOME_DIR/logs/`）。
