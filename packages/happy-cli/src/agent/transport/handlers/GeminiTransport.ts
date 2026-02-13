@@ -18,9 +18,9 @@ import type {
   StderrContext,
   StderrResult,
   ToolNameContext,
-} from '../TransportHandler';
-import type { AgentMessage } from '../../core';
-import { logger } from '@/ui/logger';
+} from "../TransportHandler";
+import type { AgentMessage } from "../../core";
+import { logger } from "@/ui/logger";
 
 /**
  * Gemini-specific timeout values (in milliseconds)
@@ -57,20 +57,25 @@ interface ExtendedToolPattern extends ToolPattern {
 
 const GEMINI_TOOL_PATTERNS: ExtendedToolPattern[] = [
   {
-    name: 'change_title',
-    patterns: ['change_title', 'change-title', 'happy__change_title', 'mcp__happy__change_title'],
-    inputFields: ['title'],
+    name: "change_title",
+    patterns: [
+      "change_title",
+      "change-title",
+      "happy__change_title",
+      "mcp__happy__change_title",
+    ],
+    inputFields: ["title"],
     emptyInputDefault: true, // change_title often has empty input (title extracted from context)
   },
   {
-    name: 'save_memory',
-    patterns: ['save_memory', 'save-memory'],
-    inputFields: ['memory', 'content'],
+    name: "save_memory",
+    patterns: ["save_memory", "save-memory"],
+    inputFields: ["memory", "content"],
   },
   {
-    name: 'think',
-    patterns: ['think'],
-    inputFields: ['thought', 'thinking'],
+    name: "think",
+    patterns: ["think"],
+    inputFields: ["thought", "thinking"],
   },
 ];
 
@@ -78,9 +83,11 @@ const GEMINI_TOOL_PATTERNS: ExtendedToolPattern[] = [
  * Available Gemini models for error messages
  */
 const AVAILABLE_MODELS = [
-  'gemini-2.5-pro',
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
+  "gemini-3-pro-preview",
+  "gemini-3-flash-preview",
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
 ];
 
 /**
@@ -92,7 +99,7 @@ const AVAILABLE_MODELS = [
  * - Tool name extraction from toolCallId
  */
 export class GeminiTransport implements TransportHandler {
-  readonly agentName = 'gemini';
+  readonly agentName = "gemini";
 
   /**
    * Gemini CLI needs 2 minutes for first start (model download, warm-up)
@@ -116,7 +123,7 @@ export class GeminiTransport implements TransportHandler {
     }
 
     // Must start with { or [ to be valid JSON-RPC
-    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
       return null;
     }
 
@@ -125,7 +132,7 @@ export class GeminiTransport implements TransportHandler {
     try {
       const parsed = JSON.parse(trimmed);
       // Must be an object or array (for batched requests), not a primitive
-      if (typeof parsed !== 'object' || parsed === null) {
+      if (typeof parsed !== "object" || parsed === null) {
         return null;
       }
       return line;
@@ -150,10 +157,10 @@ export class GeminiTransport implements TransportHandler {
 
     // Rate limit error (429) - Gemini CLI handles retries internally
     if (
-      trimmed.includes('status 429') ||
+      trimmed.includes("status 429") ||
       trimmed.includes('code":429') ||
-      trimmed.includes('rateLimitExceeded') ||
-      trimmed.includes('RESOURCE_EXHAUSTED')
+      trimmed.includes("rateLimitExceeded") ||
+      trimmed.includes("RESOURCE_EXHAUSTED")
     ) {
       return {
         message: null,
@@ -162,11 +169,11 @@ export class GeminiTransport implements TransportHandler {
     }
 
     // Model not found (404) - show error with available models
-    if (trimmed.includes('status 404') || trimmed.includes('code":404')) {
+    if (trimmed.includes("status 404") || trimmed.includes('code":404')) {
       const errorMessage: AgentMessage = {
-        type: 'status',
-        status: 'error',
-        detail: `Model not found. Available models: ${AVAILABLE_MODELS.join(', ')}`,
+        type: "status",
+        status: "error",
+        detail: `Model not found. Available models: ${AVAILABLE_MODELS.join(", ")}`,
       };
       return { message: errorMessage };
     }
@@ -174,12 +181,12 @@ export class GeminiTransport implements TransportHandler {
     // During investigation tools, log any errors/timeouts for debugging
     if (context.hasActiveInvestigation) {
       const hasError =
-        trimmed.includes('timeout') ||
-        trimmed.includes('Timeout') ||
-        trimmed.includes('failed') ||
-        trimmed.includes('Failed') ||
-        trimmed.includes('error') ||
-        trimmed.includes('Error');
+        trimmed.includes("timeout") ||
+        trimmed.includes("Timeout") ||
+        trimmed.includes("failed") ||
+        trimmed.includes("Failed") ||
+        trimmed.includes("error") ||
+        trimmed.includes("Error");
 
       if (hasError) {
         // Just log, don't emit - investigation might recover
@@ -203,9 +210,9 @@ export class GeminiTransport implements TransportHandler {
   isInvestigationTool(toolCallId: string, toolKind?: string): boolean {
     const lowerId = toolCallId.toLowerCase();
     return (
-      lowerId.includes('codebase_investigator') ||
-      lowerId.includes('investigator') ||
-      (typeof toolKind === 'string' && toolKind.includes('investigator'))
+      lowerId.includes("codebase_investigator") ||
+      lowerId.includes("investigator") ||
+      (typeof toolKind === "string" && toolKind.includes("investigator"))
     );
   }
 
@@ -216,7 +223,7 @@ export class GeminiTransport implements TransportHandler {
     if (this.isInvestigationTool(toolCallId, toolKind)) {
       return GEMINI_TIMEOUTS.investigation;
     }
-    if (toolKind === 'think') {
+    if (toolKind === "think") {
       return GEMINI_TIMEOUTS.think;
     }
     return GEMINI_TIMEOUTS.toolCall;
@@ -251,10 +258,12 @@ export class GeminiTransport implements TransportHandler {
   /**
    * Check if input is effectively empty
    */
-  private isEmptyInput(input: Record<string, unknown> | undefined | null): boolean {
+  private isEmptyInput(
+    input: Record<string, unknown> | undefined | null,
+  ): boolean {
     if (!input) return true;
     if (Array.isArray(input)) return input.length === 0;
-    if (typeof input === 'object') return Object.keys(input).length === 0;
+    if (typeof input === "object") return Object.keys(input).length === 0;
     return false;
   }
 
@@ -273,10 +282,10 @@ export class GeminiTransport implements TransportHandler {
     toolName: string,
     toolCallId: string,
     input: Record<string, unknown>,
-    _context: ToolNameContext
+    _context: ToolNameContext,
   ): string {
     // If tool name is already known, return it
-    if (toolName !== 'other' && toolName !== 'Unknown tool') {
+    if (toolName !== "other" && toolName !== "Unknown tool") {
       return toolName;
     }
 
@@ -288,14 +297,14 @@ export class GeminiTransport implements TransportHandler {
     }
 
     // 2. Check input fields for tool-specific signatures
-    if (input && typeof input === 'object' && !Array.isArray(input)) {
+    if (input && typeof input === "object" && !Array.isArray(input)) {
       const inputKeys = Object.keys(input);
 
       for (const toolPattern of GEMINI_TOOL_PATTERNS) {
         if (toolPattern.inputFields) {
           // Check if any input field matches this tool's signature
           const hasMatchingField = toolPattern.inputFields.some((field) =>
-            inputKeys.some((key) => key.toLowerCase() === field.toLowerCase())
+            inputKeys.some((key) => key.toLowerCase() === field.toLowerCase()),
           );
           if (hasMatchingField) {
             return toolPattern.name;
@@ -306,7 +315,7 @@ export class GeminiTransport implements TransportHandler {
 
     // 3. For empty input, use the default tool (if configured)
     // This handles cases like change_title where the title is extracted from context
-    if (this.isEmptyInput(input) && toolName === 'other') {
+    if (this.isEmptyInput(input) && toolName === "other") {
       const defaultTool = GEMINI_TOOL_PATTERNS.find((p) => p.emptyInputDefault);
       if (defaultTool) {
         return defaultTool.name;
@@ -315,12 +324,13 @@ export class GeminiTransport implements TransportHandler {
 
     // Return original tool name if we couldn't determine it
     // Log unknown patterns so developers can add them to GEMINI_TOOL_PATTERNS
-    if (toolName === 'other' || toolName === 'Unknown tool') {
-      const inputKeys = input && typeof input === 'object' ? Object.keys(input) : [];
+    if (toolName === "other" || toolName === "Unknown tool") {
+      const inputKeys =
+        input && typeof input === "object" ? Object.keys(input) : [];
       logger.debug(
         `[GeminiTransport] Unknown tool pattern - toolCallId: "${toolCallId}", ` +
-        `toolName: "${toolName}", inputKeys: [${inputKeys.join(', ')}]. ` +
-        `Consider adding a new pattern to GEMINI_TOOL_PATTERNS if this tool appears frequently.`
+          `toolName: "${toolName}", inputKeys: [${inputKeys.join(", ")}]. ` +
+          `Consider adding a new pattern to GEMINI_TOOL_PATTERNS if this tool appears frequently.`,
       );
     }
 
