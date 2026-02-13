@@ -101,19 +101,24 @@ We're engineers scattered across Bay Area coffee shops and hacker houses, consta
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development setup including iOS, Android, and macOS desktop variant builds
 - **[Edit docs at github.com/slopus/slopus.github.io](https://github.com/slopus/slopus.github.io)** - Help improve our documentation and guides
 
-### 通过 Tailscale 访问本地 Web 开发环境（HTTPS）
+### 通过 Tailscale 访问本地开发环境（HTTPS）
 
-本地跑 `yarn workspace happy-app start` 后，若要从其他设备用浏览器打开 Web 端，需 **HTTPS**（否则加密 API 不可用）。可用 **Tailscale Serve** 把 Metro（8081）暴露为 HTTPS：
+从其他设备访问本地 **App Web 端**或 **Server API** 时，需 **HTTPS**。可用 **Tailscale Serve** 暴露为 HTTPS：
 
 - 查看当前 Serve，避免冲突：`tailscale serve status`
-- 为 Expo 开单独端口（若 443 已被占用）：**不要用子路径**，让 8443 端口根路径直接代理到 8081，否则前端资源会 404、页面空白。命令：
-  ```bash
-  tailscale serve --https=8443 8081
-  ```
-- 后台运行：`tailscale serve --bg --https=8443 8081`
-- 关闭：`tailscale serve --https=8443 8081 off`
 
-访问地址形如：`https://<机器名>.<tailnet>.ts.net:8443/`（根路径）。详见 [docs/local-development.md](docs/local-development.md)。
+**App（Metro 8081）** — 若 443 已被占用，用 8443 端口根路径代理到 8081（不要用子路径，否则页面空白）：
+- 前台：`tailscale serve --https=8443 8081`
+- 后台：`tailscale serve --bg --https=8443 8081`
+- 关闭：`tailscale serve --https=8443 8081 off`
+- 访问：`https://<机器名>.<tailnet>.ts.net:8443/`
+
+**Server（3005）** — 例如用 8444 端口暴露本地 Happy Server：
+- 后台：`tailscale serve --bg --https=8444 3005`
+- 关闭：`tailscale serve --https=8444 3005 off`
+- 访问：`https://<机器名>.<tailnet>.ts.net:8444/`；App 内自定义 Server URL 填该地址即可。
+
+详见 [docs/local-development.md](docs/local-development.md)。
 
 ## License
 
