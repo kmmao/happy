@@ -112,6 +112,11 @@ We're engineers scattered across Bay Area coffee shops and hacker houses, consta
 - 后台：`tailscale serve --bg --https=8443 8081`
 - 关闭：`tailscale serve --https=8443 8081 off`
 - 访问：`https://<机器名>.<tailnet>.ts.net:8443/`
+- **若 Tailscale 地址能打开但页面空白/无内容**：Expo 默认把 script 和资源写成 localhost:8081，其他设备会加载失败。启动 App 前设置 `EXPO_PACKAGER_PROXY_URL` 为你的 Tailscale HTTPS 地址，例如：
+  ```bash
+  EXPO_PACKAGER_PROXY_URL=https://home-macmini.tail8d4b5.ts.net:8443 yarn workspace happy-app start
+  ```
+  再通过该 HTTPS 地址访问即可正常显示。
 
 **Server（3005）** — 例如用 8444 端口暴露本地 Happy Server：
 - 后台：`tailscale serve --bg --https=8444 3005`
