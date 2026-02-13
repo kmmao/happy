@@ -122,6 +122,7 @@ We're engineers scattered across Bay Area coffee shops and hacker houses, consta
 - 后台：`tailscale serve --bg --https=8444 3005`
 - 关闭：`tailscale serve --https=8444 3005 off`
 - 访问：`https://<机器名>.<tailnet>.ts.net:8444/`；App 内自定义 Server URL 填该地址即可。
+- 若要在 Web 里使用「连接 GitHub 账户」，需在 Server 的 `.env` 中配置 `GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET`、`GITHUB_REDIRECT_URL`、`APP_URL`（OAuth 完成后跳回的前端地址）；修改后 Docker 需执行 `docker compose build --no-cache server && docker compose up -d --force-recreate server`。详见 [packages/happy-server/README.md](packages/happy-server/README.md)。
 
 详见 [docs/local-development.md](docs/local-development.md)。
 

@@ -54,10 +54,14 @@ services:
       echo 'MinIO bucket handy ready';
       "
 
+  # Server 的 APP_URL、GITHUB_* 从 packages/happy-server/.env 注入（路径相对本 compose 文件）。
+  # 修改该 .env 后需执行：docker compose up -d --force-recreate server
   server:
     build:
       context: .
       dockerfile: Dockerfile.server
+    env_file:
+      - packages/happy-server/.env
     environment:
       NODE_ENV: production
       PORT: "3005"

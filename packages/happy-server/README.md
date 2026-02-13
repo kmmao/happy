@@ -72,6 +72,19 @@ To use external Postgres or Redis instead of the embedded defaults, set:
 | `REDIS_URL` | Redis connection URL |
 | `S3_HOST` | S3/MinIO host (bypasses local file storage) |
 
+## GitHub OAuth
+
+To enable "Connect GitHub Account" in the Web/App, configure the following environment variables (e.g. in `.env` or your deployment environment):
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_CLIENT_ID` | Client ID from [GitHub OAuth Apps](https://github.com/settings/developers) |
+| `GITHUB_CLIENT_SECRET` | Client Secret from the same app |
+| `GITHUB_REDIRECT_URL` | OAuth callback URL, must exactly match the **Authorization callback URL** in GitHub app settings, e.g. `https://your-api-domain/v1/connect/github/callback` |
+| `APP_URL` or `HAPPY_APP_URL` | Frontend URL the browser redirects to after OAuth completes (no trailing slash). Returns 500 if not configured |
+
+When using **Docker Compose**, `docker-compose.yml` injects env via `env_file: packages/happy-server/.env`. After modifying `.env` or code, run: `docker compose build --no-cache server && docker compose up -d --force-recreate server`.
+
 ## License
 
 MIT - Use it, modify it, deploy it anywhere.
