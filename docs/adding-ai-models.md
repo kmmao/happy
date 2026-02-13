@@ -2,6 +2,16 @@
 
 本文说明在本仓库中追加或更新 AI 模型（Claude、Codex、Gemini 等）时需要在哪些地方修改，以及推荐的追加顺序。
 
+## 如何引用本文档（下次更新模型时）
+
+**可直接对 AI 或执行者说：**
+
+> 按 `docs/adding-ai-models.md` 追加/更新最新 [Claude | Gemini | Codex] 模型：先查官方文档拿到最新模型 ID 与定价，再按文档里的表格依次改 CLI 和 App 各处，保持 ID 一致。
+
+执行时：先查当前最新的 API 模型 ID（如 [Anthropic](https://docs.anthropic.com/en/docs/about-claude/models)、[Gemini](https://ai.google.dev/gemini-api/docs/models)），再按下文「1. Claude」「2. Codex」「3. Gemini」对应表格逐项修改即可。
+
+---
+
 ## 结论概览
 
 仓库**没有**统一的「模型注册表」或单一配置文件。新模型需要在下述多处**分别追加**，并保持 ID/名称一致。
