@@ -39,7 +39,8 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-.claude/settings.local.json
+.claude/
+logs/
 .plan
 
 CLAUDE.local.md
