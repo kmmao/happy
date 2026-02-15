@@ -53,6 +53,7 @@ import * as React from "react";
 import { useMemo } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   Platform,
   Pressable,
   Text,
@@ -462,6 +463,7 @@ function SessionViewLoaded({
         }}
         onSend={() => {
           if (message.trim()) {
+            Keyboard.dismiss();
             setMessage("");
             clearDraft();
             sync.sendMessage(sessionId, message);
