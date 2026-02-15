@@ -5,9 +5,11 @@ import { ChatHeaderView } from "@/components/ChatHeaderView";
 import { ChatList, ChatListHandle } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
 import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
+import { FloatingOptions } from "@/components/FloatingOptions";
 import { EmptyMessages } from "@/components/EmptyMessages";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
+import { useLatestOptions } from "@/hooks/useLatestOptions";
 import { Modal } from "@/modal";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import {
@@ -269,6 +271,19 @@ function SessionViewLoaded({
   const chatListRef = React.useRef<ChatListHandle>(null);
   const [showScrollToBottom, setShowScrollToBottom] = React.useState(false);
 
+  // Navigation anchor for user message jumping (-1 = latest)
+  const [navigatedIndex, setNavigatedIndex] = React.useState(-1);
+
+  // Floating options from AI reply at navigated position (or latest)
+  const latestOptions = useLatestOptions(messages, navigatedIndex);
+  const handleFloatingOptionPress = React.useCallback(
+    (option: string) => {
+      sync.sendMessage(sessionId, option);
+      trackMessageSent();
+    },
+    [sessionId],
+  );
+
   // Use draft hook for auto-saving message drafts
   const { clearDraft } = useDraft(sessionId, message, setMessage);
 
@@ -388,7 +403,19 @@ function SessionViewLoaded({
       </Deferred>
       <ScrollToBottomButton
         visible={showScrollToBottom && messages.length > 0}
-        onPress={() => chatListRef.current?.scrollToBottom()}
+        onPress={() => {
+          chatListRef.current?.scrollToBottom();
+          setNavigatedIndex(-1);
+        }}
+        onPrevUserMessage={() => {
+          const idx = chatListRef.current?.scrollToUserMessage("next") ?? -1;
+          setNavigatedIndex(idx);
+        }}
+        onNextUserMessage={() => {
+          const idx = chatListRef.current?.scrollToUserMessage("prev") ?? -1;
+          setNavigatedIndex(idx);
+        }}
+        hasUserMessages={(chatListRef.current?.getUserMessageCount() ?? 0) > 0}
       />
     </>
   );
@@ -404,65 +431,72 @@ function SessionViewLoaded({
     ) : null;
 
   const input = (
-    <AgentInput
-      placeholder={t("session.inputPlaceholder")}
-      value={message}
-      onChangeText={setMessage}
-      sessionId={sessionId}
-      permissionMode={permissionMode}
-      onPermissionModeChange={updatePermissionMode}
-      modelMode={modelMode as any}
-      onModelModeChange={updateModelMode as any}
-      metadata={session.metadata}
-      connectionStatus={{
-        text: sessionStatus.statusText,
-        color: sessionStatus.statusColor,
-        dotColor: sessionStatus.statusDotColor,
-        isPulsing: sessionStatus.isPulsing,
-      }}
-      onSend={() => {
-        if (message.trim()) {
-          setMessage("");
-          clearDraft();
-          sync.sendMessage(sessionId, message);
-          trackMessageSent();
+    <>
+      <FloatingOptions
+        options={showScrollToBottom ? latestOptions : []}
+        onOptionPress={handleFloatingOptionPress}
+      />
+      <AgentInput
+        placeholder={t("session.inputPlaceholder")}
+        value={message}
+        onChangeText={setMessage}
+        sessionId={sessionId}
+        permissionMode={permissionMode}
+        onPermissionModeChange={updatePermissionMode}
+        modelMode={modelMode as any}
+        onModelModeChange={updateModelMode as any}
+        metadata={session.metadata}
+        connectionStatus={{
+          text: sessionStatus.statusText,
+          color: sessionStatus.statusColor,
+          dotColor: sessionStatus.statusDotColor,
+          isPulsing: sessionStatus.isPulsing,
+        }}
+        onSend={() => {
+          if (message.trim()) {
+            setMessage("");
+            clearDraft();
+            sync.sendMessage(sessionId, message);
+            trackMessageSent();
+          }
+        }}
+        onMicPress={micButtonState.onMicPress}
+        isMicActive={micButtonState.isMicActive}
+        onAbort={() => sessionAbort(sessionId)}
+        showAbortButton={
+          sessionStatus.state === "thinking" ||
+          sessionStatus.state === "waiting"
         }
-      }}
-      onMicPress={micButtonState.onMicPress}
-      isMicActive={micButtonState.isMicActive}
-      onAbort={() => sessionAbort(sessionId)}
-      showAbortButton={
-        sessionStatus.state === "thinking" || sessionStatus.state === "waiting"
-      }
-      onFileViewerPress={
-        experiments
-          ? () => router.push(`/session/${sessionId}/files`)
-          : undefined
-      }
-      // Autocomplete configuration
-      autocompletePrefixes={["@", "/"]}
-      autocompleteSuggestions={(query) => getSuggestions(sessionId, query)}
-      usageData={
-        sessionUsage
-          ? {
-              inputTokens: sessionUsage.inputTokens,
-              outputTokens: sessionUsage.outputTokens,
-              cacheCreation: sessionUsage.cacheCreation,
-              cacheRead: sessionUsage.cacheRead,
-              contextSize: sessionUsage.contextSize,
-            }
-          : session.latestUsage
-            ? {
-                inputTokens: session.latestUsage.inputTokens,
-                outputTokens: session.latestUsage.outputTokens,
-                cacheCreation: session.latestUsage.cacheCreation,
-                cacheRead: session.latestUsage.cacheRead,
-                contextSize: session.latestUsage.contextSize,
-              }
+        onFileViewerPress={
+          experiments
+            ? () => router.push(`/session/${sessionId}/files`)
             : undefined
-      }
-      alwaysShowContextSize={alwaysShowContextSize}
-    />
+        }
+        // Autocomplete configuration
+        autocompletePrefixes={["@", "/"]}
+        autocompleteSuggestions={(query) => getSuggestions(sessionId, query)}
+        usageData={
+          sessionUsage
+            ? {
+                inputTokens: sessionUsage.inputTokens,
+                outputTokens: sessionUsage.outputTokens,
+                cacheCreation: sessionUsage.cacheCreation,
+                cacheRead: sessionUsage.cacheRead,
+                contextSize: sessionUsage.contextSize,
+              }
+            : session.latestUsage
+              ? {
+                  inputTokens: session.latestUsage.inputTokens,
+                  outputTokens: session.latestUsage.outputTokens,
+                  cacheCreation: session.latestUsage.cacheCreation,
+                  cacheRead: session.latestUsage.cacheRead,
+                  contextSize: session.latestUsage.contextSize,
+                }
+              : undefined
+        }
+        alwaysShowContextSize={alwaysShowContextSize}
+      />
+    </>
   );
 
   return (

@@ -9,8 +9,18 @@ const stylesheet = StyleSheet.create((theme) => ({
     bottom: 8,
     left: 0,
     right: 0,
-    alignItems: "center" as const,
     zIndex: 10,
+  },
+  scrollBtnWrapper: {
+    alignItems: "center" as const,
+  },
+  navColumn: {
+    position: "absolute",
+    right: 12,
+    bottom: 0,
+    flexDirection: "column" as const,
+    alignItems: "center" as const,
+    gap: 8,
   },
   button: {
     width: 36,
@@ -32,58 +42,89 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
 }));
 
+interface ScrollToBottomButtonProps {
+  visible: boolean;
+  onPress: () => void;
+  onPrevUserMessage?: () => void;
+  onNextUserMessage?: () => void;
+  hasUserMessages?: boolean;
+}
+
 export const ScrollToBottomButton = React.memo(
-  ({ visible, onPress }: { visible: boolean; onPress: () => void }) => {
+  ({
+    visible,
+    onPress,
+    onPrevUserMessage,
+    onNextUserMessage,
+    hasUserMessages,
+  }: ScrollToBottomButtonProps) => {
     const { theme } = useUnistyles();
     const styles = stylesheet;
-    const opacity = React.useRef(new Animated.Value(0)).current;
-    const [shouldRender, setShouldRender] = React.useState(false);
+    const scrollBtnOpacity = React.useRef(new Animated.Value(0)).current;
+    const [shouldRenderScrollBtn, setShouldRenderScrollBtn] =
+      React.useState(false);
 
     React.useEffect(() => {
       if (visible) {
-        setShouldRender(true);
-        Animated.timing(opacity, {
+        setShouldRenderScrollBtn(true);
+        Animated.timing(scrollBtnOpacity, {
           toValue: 1,
           duration: 200,
           useNativeDriver: true,
         }).start();
       } else {
-        Animated.timing(opacity, {
+        Animated.timing(scrollBtnOpacity, {
           toValue: 0,
           duration: 150,
           useNativeDriver: true,
         }).start(({ finished }) => {
           if (finished) {
-            setShouldRender(false);
+            setShouldRenderScrollBtn(false);
           }
         });
       }
     }, [visible]);
 
-    if (!shouldRender) {
+    const showNavButtons =
+      hasUserMessages && onPrevUserMessage && onNextUserMessage;
+
+    if (!shouldRenderScrollBtn && !showNavButtons) {
       return null;
     }
 
-    return (
-      <Animated.View
-        style={[styles.container, { opacity }]}
-        pointerEvents="box-none"
+    const renderButton = (
+      icon: React.ComponentProps<typeof Ionicons>["name"],
+      onButtonPress: () => void,
+      size = 20,
+    ) => (
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          pressed ? styles.buttonPressed : styles.buttonDefault,
+        ]}
+        onPress={onButtonPress}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            pressed ? styles.buttonPressed : styles.buttonDefault,
-          ]}
-          onPress={onPress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons
-            name="chevron-down"
-            size={20}
-            color={theme.colors.fab.icon}
-          />
-        </Pressable>
-      </Animated.View>
+        <Ionicons name={icon} size={size} color={theme.colors.fab.icon} />
+      </Pressable>
+    );
+
+    return (
+      <View style={styles.container} pointerEvents="box-none">
+        {shouldRenderScrollBtn && (
+          <Animated.View
+            style={[styles.scrollBtnWrapper, { opacity: scrollBtnOpacity }]}
+          >
+            {renderButton("chevron-down", onPress)}
+          </Animated.View>
+        )}
+        {showNavButtons && (
+          <View style={styles.navColumn}>
+            {renderButton("arrow-up", onPrevUserMessage, 18)}
+            {renderButton("arrow-down", onNextUserMessage, 18)}
+          </View>
+        )}
+      </View>
     );
   },
 );

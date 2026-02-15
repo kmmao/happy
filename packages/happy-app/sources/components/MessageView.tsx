@@ -1,22 +1,29 @@
 import * as React from "react";
 import { View, Text } from "react-native";
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet } from "react-native-unistyles";
 import { MarkdownView } from "./markdown/MarkdownView";
-import { t } from '@/text';
-import { Message, UserTextMessage, AgentTextMessage, ToolCallMessage } from "@/sync/typesMessage";
+import { t } from "@/text";
+import {
+  Message,
+  UserTextMessage,
+  AgentTextMessage,
+  ToolCallMessage,
+} from "@/sync/typesMessage";
 import { Metadata } from "@/sync/storageTypes";
 import { layout } from "./layout";
 import { ToolView } from "./tools/ToolView";
 import { AgentEvent } from "@/sync/typesRaw";
-import { sync } from '@/sync/sync';
-import { Option } from './markdown/MarkdownView';
+import { sync } from "@/sync/sync";
+import { Option } from "./markdown/MarkdownView";
 import { useSetting } from "@/sync/storage";
+import { FlavorIcon } from "./FlavorIcon";
 
 export const MessageView = (props: {
   message: Message;
   metadata: Metadata | null;
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
+  showAvatar?: boolean;
 }) => {
   return (
     <View style={styles.messageContainer} renderToHardwareTextureAndroid={true}>
@@ -26,6 +33,7 @@ export const MessageView = (props: {
           metadata={props.metadata}
           sessionId={props.sessionId}
           getMessageById={props.getMessageById}
+          showAvatar={props.showAvatar}
         />
       </View>
     </View>
@@ -38,25 +46,41 @@ function RenderBlock(props: {
   metadata: Metadata | null;
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
+  showAvatar?: boolean;
 }): React.ReactElement {
   switch (props.message.kind) {
-    case 'user-text':
-      return <UserTextBlock message={props.message} sessionId={props.sessionId} />;
+    case "user-text":
+      return (
+        <UserTextBlock message={props.message} sessionId={props.sessionId} />
+      );
 
-    case 'agent-text':
-      return <AgentTextBlock message={props.message} sessionId={props.sessionId} />;
+    case "agent-text":
+      return (
+        <AgentTextBlock
+          message={props.message}
+          sessionId={props.sessionId}
+          showAvatar={props.showAvatar}
+          flavor={props.metadata?.flavor}
+        />
+      );
 
-    case 'tool-call':
-      return <ToolCallBlock
-        message={props.message}
-        metadata={props.metadata}
-        sessionId={props.sessionId}
-        getMessageById={props.getMessageById}
-      />;
+    case "tool-call":
+      return (
+        <ToolCallBlock
+          message={props.message}
+          metadata={props.metadata}
+          sessionId={props.sessionId}
+          getMessageById={props.getMessageById}
+        />
+      );
 
-    case 'agent-event':
-      return <AgentEventBlock event={props.message.event} metadata={props.metadata} />;
-
+    case "agent-event":
+      return (
+        <AgentEventBlock
+          event={props.message.event}
+          metadata={props.metadata}
+        />
+      );
 
     default:
       // Exhaustive check - TypeScript will error if we miss a case
@@ -65,18 +89,21 @@ function RenderBlock(props: {
   }
 }
 
-function UserTextBlock(props: {
-  message: UserTextMessage;
-  sessionId: string;
-}) {
-  const handleOptionPress = React.useCallback((option: Option) => {
-    sync.sendMessage(props.sessionId, option.title);
-  }, [props.sessionId]);
+function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
+  const handleOptionPress = React.useCallback(
+    (option: Option) => {
+      sync.sendMessage(props.sessionId, option.title);
+    },
+    [props.sessionId],
+  );
 
   return (
     <View style={styles.userMessageContainer}>
       <View style={styles.userMessageBubble}>
-        <MarkdownView markdown={props.message.displayText || props.message.text} onOptionPress={handleOptionPress} />
+        <MarkdownView
+          markdown={props.message.displayText || props.message.text}
+          onOptionPress={handleOptionPress}
+        />
         {/* {__DEV__ && (
           <Text style={styles.debugText}>{JSON.stringify(props.message.meta)}</Text>
         )} */}
@@ -88,11 +115,16 @@ function UserTextBlock(props: {
 function AgentTextBlock(props: {
   message: AgentTextMessage;
   sessionId: string;
+  showAvatar?: boolean;
+  flavor?: string | null;
 }) {
-  const experiments = useSetting('experiments');
-  const handleOptionPress = React.useCallback((option: Option) => {
-    sync.sendMessage(props.sessionId, option.title);
-  }, [props.sessionId]);
+  const experiments = useSetting("experiments");
+  const handleOptionPress = React.useCallback(
+    (option: Option) => {
+      sync.sendMessage(props.sessionId, option.title);
+    },
+    [props.sessionId],
+  );
 
   // Hide thinking messages unless experiments is enabled
   if (props.message.isThinking && !experiments) {
@@ -100,8 +132,16 @@ function AgentTextBlock(props: {
   }
 
   return (
-    <View style={styles.agentMessageContainer}>
-      <MarkdownView markdown={props.message.text} onOptionPress={handleOptionPress} />
+    <View style={styles.agentMessageRow}>
+      <View style={styles.avatarSlot}>
+        {props.showAvatar && <FlavorIcon flavor={props.flavor} size={24} />}
+      </View>
+      <View style={styles.agentMessageContainer}>
+        <MarkdownView
+          markdown={props.message.text}
+          onOptionPress={handleOptionPress}
+        />
+      </View>
     </View>
   );
 }
@@ -110,41 +150,48 @@ function AgentEventBlock(props: {
   event: AgentEvent;
   metadata: Metadata | null;
 }) {
-  if (props.event.type === 'switch') {
+  if (props.event.type === "switch") {
     return (
       <View style={styles.agentEventContainer}>
-        <Text style={styles.agentEventText}>{t('message.switchedToMode', { mode: props.event.mode })}</Text>
+        <Text style={styles.agentEventText}>
+          {t("message.switchedToMode", { mode: props.event.mode })}
+        </Text>
       </View>
     );
   }
-  if (props.event.type === 'message') {
+  if (props.event.type === "message") {
     return (
       <View style={styles.agentEventContainer}>
         <Text style={styles.agentEventText}>{props.event.message}</Text>
       </View>
     );
   }
-  if (props.event.type === 'limit-reached') {
+  if (props.event.type === "limit-reached") {
     const formatTime = (timestamp: number): string => {
       try {
         const date = new Date(timestamp * 1000); // Convert from Unix timestamp
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
       } catch {
-        return t('message.unknownTime');
+        return t("message.unknownTime");
       }
     };
 
     return (
       <View style={styles.agentEventContainer}>
         <Text style={styles.agentEventText}>
-          {t('message.usageLimitUntil', { time: formatTime(props.event.endsAt) })}
+          {t("message.usageLimitUntil", {
+            time: formatTime(props.event.endsAt),
+          })}
         </Text>
       </View>
     );
   }
   return (
     <View style={styles.agentEventContainer}>
-      <Text style={styles.agentEventText}>{t('message.unknownEvent')}</Text>
+      <Text style={styles.agentEventText}>{t("message.unknownEvent")}</Text>
     </View>
   );
 }
@@ -173,20 +220,20 @@ function ToolCallBlock(props: {
 
 const styles = StyleSheet.create((theme) => ({
   messageContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
   },
   messageContent: {
-    flexDirection: 'column',
+    flexDirection: "column",
     flexGrow: 1,
     flexBasis: 0,
     maxWidth: layout.maxWidth,
   },
   userMessageContainer: {
-    maxWidth: '100%',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    justifyContent: 'flex-end',
+    maxWidth: "100%",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
     paddingHorizontal: 16,
   },
   userMessageBubble: {
@@ -195,17 +242,28 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: 4,
     borderRadius: 12,
     marginBottom: 12,
-    maxWidth: '100%',
+    maxWidth: "100%",
+  },
+  agentMessageRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingLeft: 8,
+  },
+  avatarSlot: {
+    width: 32,
+    paddingTop: 8,
+    alignItems: "center",
+    flexShrink: 0,
   },
   agentMessageContainer: {
-    marginHorizontal: 16,
+    marginRight: 16,
     marginBottom: 12,
     borderRadius: 16,
-    alignSelf: 'flex-start',
+    flex: 1,
   },
   agentEventContainer: {
     marginHorizontal: 8,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 8,
   },
   agentEventText: {
