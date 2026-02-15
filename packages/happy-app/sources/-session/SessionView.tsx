@@ -6,6 +6,7 @@ import { ChatList, ChatListHandle } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
 import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
 import { FloatingOptions } from "@/components/FloatingOptions";
+import { OptionsPopover } from "@/components/OptionsPopover";
 import { EmptyMessages } from "@/components/EmptyMessages";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
@@ -276,8 +277,10 @@ function SessionViewLoaded({
 
   // Floating options from AI reply at navigated position (or latest)
   const latestOptions = useLatestOptions(messages, navigatedIndex);
+  const [showOptionsPopover, setShowOptionsPopover] = React.useState(false);
   const handleFloatingOptionPress = React.useCallback(
     (option: string) => {
+      setShowOptionsPopover(false);
       sync.sendMessage(sessionId, option);
       trackMessageSent();
     },
@@ -416,6 +419,8 @@ function SessionViewLoaded({
           setNavigatedIndex(idx);
         }}
         hasUserMessages={(chatListRef.current?.getUserMessageCount() ?? 0) > 0}
+        optionCount={latestOptions.length}
+        onOptionsPress={() => setShowOptionsPopover(true)}
       />
     </>
   );
@@ -433,7 +438,7 @@ function SessionViewLoaded({
   const input = (
     <>
       <FloatingOptions
-        options={showScrollToBottom ? latestOptions : []}
+        options={showScrollToBottom ? [] : latestOptions}
         onOptionPress={handleFloatingOptionPress}
       />
       <AgentInput
@@ -561,6 +566,14 @@ function SessionViewLoaded({
           content={content}
           input={input}
           placeholder={placeholder}
+        />
+        <OptionsPopover
+          visible={
+            showOptionsPopover && showScrollToBottom && latestOptions.length > 0
+          }
+          options={latestOptions}
+          onOptionPress={handleFloatingOptionPress}
+          onClose={() => setShowOptionsPopover(false)}
         />
       </View>
 

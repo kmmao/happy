@@ -14,6 +14,20 @@ const stylesheet = StyleSheet.create((theme) => ({
   scrollBtnWrapper: {
     alignItems: "center" as const,
   },
+  scrollBtnRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
+  badge: {
+    position: "absolute" as const,
+    top: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.radio.dot,
+  },
   navColumn: {
     position: "absolute",
     right: 12,
@@ -48,6 +62,8 @@ interface ScrollToBottomButtonProps {
   onPrevUserMessage?: () => void;
   onNextUserMessage?: () => void;
   hasUserMessages?: boolean;
+  optionCount?: number;
+  onOptionsPress?: () => void;
 }
 
 export const ScrollToBottomButton = React.memo(
@@ -57,6 +73,8 @@ export const ScrollToBottomButton = React.memo(
     onPrevUserMessage,
     onNextUserMessage,
     hasUserMessages,
+    optionCount = 0,
+    onOptionsPress,
   }: ScrollToBottomButtonProps) => {
     const { theme } = useUnistyles();
     const styles = stylesheet;
@@ -109,13 +127,23 @@ export const ScrollToBottomButton = React.memo(
       </Pressable>
     );
 
+    const showOptionsButton = optionCount > 0 && onOptionsPress;
+
     return (
       <View style={styles.container} pointerEvents="box-none">
         {shouldRenderScrollBtn && (
           <Animated.View
             style={[styles.scrollBtnWrapper, { opacity: scrollBtnOpacity }]}
           >
-            {renderButton("chevron-down", onPress)}
+            <View style={styles.scrollBtnRow}>
+              {showOptionsButton && (
+                <View>
+                  {renderButton("sparkles", onOptionsPress, 18)}
+                  <View style={styles.badge} />
+                </View>
+              )}
+              {renderButton("chevron-down", onPress)}
+            </View>
           </Animated.View>
         )}
         {showNavButtons && (
