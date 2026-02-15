@@ -48,9 +48,7 @@ export const CommandListPopover = React.memo(
           toValue: 1,
           duration: 200,
           useNativeDriver: true,
-        }).start(() => {
-          inputRef.current?.focus();
-        });
+        }).start();
       } else {
         Animated.timing(opacity, {
           toValue: 0,
