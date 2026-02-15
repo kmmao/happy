@@ -2,8 +2,9 @@ import { AgentContentView } from "@/components/AgentContentView";
 import { AgentInput } from "@/components/AgentInput";
 import { getSuggestions } from "@/components/autocomplete/suggestions";
 import { ChatHeaderView } from "@/components/ChatHeaderView";
-import { ChatList } from "@/components/ChatList";
+import { ChatList, ChatListHandle } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
+import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
 import { EmptyMessages } from "@/components/EmptyMessages";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
@@ -264,6 +265,10 @@ function SessionViewLoaded({
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
   const experiments = useSetting("experiments");
 
+  // Scroll-to-bottom state
+  const chatListRef = React.useRef<ChatListHandle>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = React.useState(false);
+
   // Use draft hook for auto-saving message drafts
   const { clearDraft } = useDraft(sessionId, message, setMessage);
 
@@ -373,8 +378,18 @@ function SessionViewLoaded({
   let content = (
     <>
       <Deferred>
-        {messages.length > 0 && <ChatList session={session} />}
+        {messages.length > 0 && (
+          <ChatList
+            ref={chatListRef}
+            session={session}
+            onScrollAwayFromBottom={setShowScrollToBottom}
+          />
+        )}
       </Deferred>
+      <ScrollToBottomButton
+        visible={showScrollToBottom && messages.length > 0}
+        onPress={() => chatListRef.current?.scrollToBottom()}
+      />
     </>
   );
   const placeholder =
