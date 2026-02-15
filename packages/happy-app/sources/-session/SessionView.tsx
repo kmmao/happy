@@ -5,7 +5,6 @@ import { ChatHeaderView } from "@/components/ChatHeaderView";
 import { ChatList, ChatListHandle } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
 import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
-import { FloatingOptions } from "@/components/FloatingOptions";
 import { OptionsPopover } from "@/components/OptionsPopover";
 import { EmptyMessages } from "@/components/EmptyMessages";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
@@ -437,10 +436,6 @@ function SessionViewLoaded({
 
   const input = (
     <>
-      <FloatingOptions
-        options={showScrollToBottom ? [] : latestOptions}
-        onOptionPress={handleFloatingOptionPress}
-      />
       <AgentInput
         placeholder={t("session.inputPlaceholder")}
         value={message}
@@ -568,9 +563,7 @@ function SessionViewLoaded({
           placeholder={placeholder}
         />
         <OptionsPopover
-          visible={
-            showOptionsPopover && showScrollToBottom && latestOptions.length > 0
-          }
+          visible={showOptionsPopover && latestOptions.length > 0}
           options={latestOptions}
           onOptionPress={handleFloatingOptionPress}
           onClose={() => setShowOptionsPopover(false)}

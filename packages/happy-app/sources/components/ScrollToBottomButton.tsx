@@ -105,8 +105,9 @@ export const ScrollToBottomButton = React.memo(
 
     const showNavButtons =
       hasUserMessages && onPrevUserMessage && onNextUserMessage;
+    const showOptionsButton = optionCount > 0 && onOptionsPress;
 
-    if (!shouldRenderScrollBtn && !showNavButtons) {
+    if (!shouldRenderScrollBtn && !showNavButtons && !showOptionsButton) {
       return null;
     }
 
@@ -127,25 +128,23 @@ export const ScrollToBottomButton = React.memo(
       </Pressable>
     );
 
-    const showOptionsButton = optionCount > 0 && onOptionsPress;
-
     return (
       <View style={styles.container} pointerEvents="box-none">
-        {shouldRenderScrollBtn && (
-          <Animated.View
-            style={[styles.scrollBtnWrapper, { opacity: scrollBtnOpacity }]}
-          >
-            <View style={styles.scrollBtnRow}>
-              {showOptionsButton && (
-                <View>
-                  {renderButton("sparkles", onOptionsPress, 18)}
-                  <View style={styles.badge} />
-                </View>
-              )}
-              {renderButton("chevron-down", onPress)}
-            </View>
-          </Animated.View>
-        )}
+        <View style={styles.scrollBtnWrapper}>
+          <View style={styles.scrollBtnRow}>
+            {showOptionsButton && (
+              <View>
+                {renderButton("sparkles", onOptionsPress, 18)}
+                <View style={styles.badge} />
+              </View>
+            )}
+            {shouldRenderScrollBtn && (
+              <Animated.View style={{ opacity: scrollBtnOpacity }}>
+                {renderButton("chevron-down", onPress)}
+              </Animated.View>
+            )}
+          </View>
+        </View>
         {showNavButtons && (
           <View style={styles.navColumn}>
             {renderButton("arrow-up", onPrevUserMessage, 18)}
