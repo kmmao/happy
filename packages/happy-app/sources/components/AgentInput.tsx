@@ -89,6 +89,7 @@ interface AgentInputProps {
   minHeight?: number;
   profileId?: string | null;
   onProfileClick?: () => void;
+  onSlashCommandPress?: () => void;
 }
 
 const MAX_CONTEXT_SIZE = 190000;
@@ -1458,6 +1459,36 @@ export const AgentInput = React.memo(
                           )}
                         </Pressable>
                       </Shaker>
+                    )}
+
+                    {/* Slash command button */}
+                    {props.onSlashCommandPress && (
+                      <Pressable
+                        onPress={() => {
+                          hapticsLight();
+                          props.onSlashCommandPress?.();
+                        }}
+                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                        style={(p) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          borderRadius: Platform.select({
+                            default: 16,
+                            android: 20,
+                          }),
+                          paddingHorizontal: 8,
+                          paddingVertical: 6,
+                          justifyContent: "center",
+                          height: 32,
+                          opacity: p.pressed ? 0.7 : 1,
+                        })}
+                      >
+                        <Octicons
+                          name="command-palette"
+                          size={16}
+                          color={theme.colors.button.secondary.tint}
+                        />
+                      </Pressable>
                     )}
 
                     {/* Git Status Badge */}

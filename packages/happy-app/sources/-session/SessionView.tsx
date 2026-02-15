@@ -6,6 +6,7 @@ import { ChatList, ChatListHandle } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
 import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
 import { OptionsPopover } from "@/components/OptionsPopover";
+import { CommandListPopover } from "@/components/CommandListPopover";
 import { EmptyMessages } from "@/components/EmptyMessages";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
@@ -286,6 +287,13 @@ function SessionViewLoaded({
     [sessionId],
   );
 
+  // Slash command popover
+  const [showCommandList, setShowCommandList] = React.useState(false);
+  const handleCommandSelect = React.useCallback((command: string) => {
+    setShowCommandList(false);
+    setMessage(`/${command} `);
+  }, []);
+
   // Use draft hook for auto-saving message drafts
   const { clearDraft } = useDraft(sessionId, message, setMessage);
 
@@ -495,6 +503,7 @@ function SessionViewLoaded({
               : undefined
         }
         alwaysShowContextSize={alwaysShowContextSize}
+        onSlashCommandPress={() => setShowCommandList(true)}
       />
     </>
   );
@@ -567,6 +576,12 @@ function SessionViewLoaded({
           options={latestOptions}
           onOptionPress={handleFloatingOptionPress}
           onClose={() => setShowOptionsPopover(false)}
+        />
+        <CommandListPopover
+          visible={showCommandList}
+          sessionId={sessionId}
+          onCommandSelect={handleCommandSelect}
+          onClose={() => setShowCommandList(false)}
         />
       </View>
 
