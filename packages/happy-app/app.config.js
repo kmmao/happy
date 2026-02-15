@@ -9,6 +9,11 @@ const bundleId = {
   preview: "com.slopus.happy.preview",
   production: "com.ex3ndr.happy",
 }[variant];
+const channel = {
+  development: "development",
+  preview: "preview",
+  production: "production",
+}[variant];
 
 export default {
   expo: {
@@ -161,9 +166,9 @@ export default {
       ],
     ],
     updates: {
-      url: "https://u.expo.dev/4558dd3d-cd5a-47cd-bad9-e591a241cc06",
+      url: "https://u.expo.dev/36bfbbc6-0e4d-45c0-8e5f-1ed50a9c7931",
       requestHeaders: {
-        "expo-channel-name": "production",
+        "expo-channel-name": channel,
       },
     },
     experiments: {
