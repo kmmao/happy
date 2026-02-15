@@ -12,7 +12,7 @@ Yarn v1.22.22 workspaces with 4 packages:
 
 | Package | Path | Purpose | Published As |
 |---------|------|---------|-------------|
-| **happy-cli** | `packages/happy-cli` | CLI wrapper for Claude Code/Codex with daemon | `happy-coder` on npm |
+| **happy-cli** | `packages/happy-cli` | CLI wrapper for Claude Code/Codex with daemon | `@kmmao/happy-coder` on npm |
 | **happy-server** | `packages/happy-server` | Fastify backend with Prisma/PostgreSQL/Redis | Private |
 | **happy-app** | `packages/happy-app` | React Native + Expo mobile/web client | App stores |
 | **happy-agent** | `packages/happy-agent` | Remote-only CLI for controlling agents | `happy-agent` |
@@ -24,9 +24,9 @@ Yarn v1.22.22 workspaces with 4 packages:
 yarn install
 
 # Per-package commands (run from monorepo root)
-yarn workspace happy-coder build        # CLI: build (rm dist → tsc → pkgroll)
-yarn workspace happy-coder test         # CLI: build then vitest run
-yarn workspace happy-coder dev          # CLI: dev mode via tsx
+yarn workspace @kmmao/happy-coder build        # CLI: build (rm dist → tsc → pkgroll)
+yarn workspace @kmmao/happy-coder test         # CLI: build then vitest run
+yarn workspace @kmmao/happy-coder dev          # CLI: dev mode via tsx
 
 yarn workspace happy-server build       # Server: tsc --noEmit
 yarn workspace happy-server test        # Server: vitest run

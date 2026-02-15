@@ -1,13 +1,13 @@
 {
-  "name": "happy-coder",
-  "version": "0.14.0-0",
+  "name": "@kmmao/happy-coder",
+  "version": "0.14.0",
   "description": "Mobile and Web client for Claude Code and Codex",
-  "author": "Kirill Dubovitskiy",
+  "author": "kmmao",
   "license": "MIT",
   "type": "module",
-  "homepage": "https://github.com/slopus/happy-cli",
-  "bugs": "https://github.com/slopus/happy-cli/issues",
-  "repository": "slopus/happy-cli",
+  "homepage": "https://github.com/kmmao/happy",
+  "bugs": "https://github.com/kmmao/happy/issues",
+  "repository": "kmmao/happy",
   "bin": {
     "happy": "./bin/happy.mjs",
     "happy-mcp": "./bin/happy-mcp.mjs"

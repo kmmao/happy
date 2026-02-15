@@ -102,30 +102,30 @@ yarn workspace happy-server dev
 ### 1. 开发数据目录
 
 - 开发用：`HAPPY_HOME_DIR=~/.happy-dev`。
-- 可运行：`yarn workspace happy-coder run setup:dev`；或使用 direnv + `.envrc.example`（复制为 `.envrc` 后 `direnv allow`）。
+- 可运行：`yarn workspace @kmmao/happy-coder run setup:dev`；或使用 direnv + `.envrc.example`（复制为 `.envrc` 后 `direnv allow`）。
 
 ### 2. 指向本地 Server
 
 - 环境变量：`HAPPY_SERVER_URL=http://localhost:3005`
-- 或：`yarn workspace happy-coder dev:local-server`（会读 `.env.dev-local-server`，需在其中配置 `HAPPY_SERVER_URL=http://localhost:3005`）。
+- 或：`yarn workspace @kmmao/happy-coder dev:local-server`（会读 `.env.dev-local-server`，需在其中配置 `HAPPY_SERVER_URL=http://localhost:3005`）。
 
 ### 3. 启动
 
 ```bash
-yarn workspace happy-coder dev                    # 直接跑源码
-HAPPY_SERVER_URL=http://localhost:3005 yarn workspace happy-coder dev  # 连本地
-yarn workspace happy-coder dev:local-server        # 连本地（用 .env.dev-local-server）
+yarn workspace @kmmao/happy-coder dev                    # 直接跑源码
+HAPPY_SERVER_URL=http://localhost:3005 yarn workspace @kmmao/happy-coder dev  # 连本地
+yarn workspace @kmmao/happy-coder dev:local-server        # 连本地（用 .env.dev-local-server）
 ```
 
 ### 4. 本地安装为全局命令（在任意项目目录使用）
 
-若希望在**其他项目目录**（如 `~/gas`）下直接运行 `happy`，而不是在 happy 仓库根目录执行 `yarn workspace happy-coder dev:local-server`，可将本仓库的 CLI 安装为全局命令：
+若希望在**其他项目目录**（如 `~/gas`）下直接运行 `happy`，而不是在 happy 仓库根目录执行 `yarn workspace @kmmao/happy-coder dev:local-server`，可将本仓库的 CLI 安装为全局命令：
 
 **方式 A：从本地路径安装（装的是当前仓库 build 结果）**
 
 ```bash
 cd /path/to/happy   # 进入本仓库根目录
-yarn workspace happy-coder build
+yarn workspace @kmmao/happy-coder build
 npm install -g ./packages/happy-cli
 ```
 
@@ -141,11 +141,31 @@ npm link
 
 全局 `happy` 会链到本地包，修改代码后在该目录执行 `yarn build` 即可用新逻辑。
 
-**说明**：`npm install -g happy-coder` 安装的是 **npm 上的发布版**，不是本仓库代码。要使用本仓库的 CLI，需用上述方式 A 或 B。
+**方式 C：从 npm 安装 fork 发布版（在其他机器上快速部署）**
+
+```bash
+npm install -g @kmmao/happy-coder
+```
+
+安装后在任意目录执行 `happy` 即可。
+
+发布新版本流程：
+
+```bash
+# 1. 修改 packages/happy-cli/package.json 中的 version
+# 2. 构建
+yarn workspace @kmmao/happy-coder build
+# 3. 发布（需要 npm 登录 + 2FA）
+cd packages/happy-cli && npm publish --access public --ignore-scripts
+# 4. 其他机器更新
+npm update -g @kmmao/happy-coder
+```
+
+**说明**：`npm install -g happy-coder` 安装的是**原作者的发布版**；`npm install -g @kmmao/happy-coder` 安装的是**本 fork 的发布版**。要使用本仓库未发布的最新代码，需用上述方式 A 或 B。
 
 ### 5. 守护进程
 
-- 先 build 再起 daemon：`yarn workspace happy-coder build`，然后 `yarn workspace happy-coder dev:daemon:start`。
+- 先 build 再起 daemon：`yarn workspace @kmmao/happy-coder build`，然后 `yarn workspace @kmmao/happy-coder dev:daemon:start`。
 - 日志：`~/.happy-dev/logs/`（或 `$HAPPY_HOME_DIR/logs/`）。
 
 ---
@@ -172,7 +192,7 @@ yarn workspace happy-app web     # 浏览器
 
 1. 起基础设施：PostgreSQL、Redis（需要时 MinIO + `s3:init`）。
 2. 起 Server：`yarn workspace happy-server dev`，确认 3005 正常、迁移已跑。
-3. 起 CLI：`HAPPY_SERVER_URL=http://localhost:3005 yarn workspace happy-coder dev` 或 `dev:local-server`；要 daemon 时先 build 再 `dev:daemon:start`。
+3. 起 CLI：`HAPPY_SERVER_URL=http://localhost:3005 yarn workspace @kmmao/happy-coder dev` 或 `dev:local-server`；要 daemon 时先 build 再 `dev:daemon:start`。
 4. 起 App：`yarn workspace happy-app start`，在设置里填本地 Server URL 或设 `EXPO_PUBLIC_HAPPY_SERVER_URL`。
 
 这样 **App / CLI ↔ Server ↔ 本地 DB/Redis** 就在本机打通。
