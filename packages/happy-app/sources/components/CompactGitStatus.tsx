@@ -1,14 +1,21 @@
-import React from 'react';
-import { View, Text } from 'react-native';
-import { useSessionGitStatus, useSessionProjectGitStatus } from '@/sync/storage';
-import { GitStatus } from '@/sync/storageTypes';
-import { StyleSheet } from 'react-native-unistyles';
-import { Ionicons } from '@expo/vector-icons';
+import React from "react";
+import { View, Text } from "react-native";
+import {
+    useSessionGitStatus,
+    useSessionProjectGitStatus,
+    useSessionProjectSubmodules,
+} from "@/sync/storage";
+import {
+    aggregateLineChanges,
+    hasMeaningfulLineChanges,
+} from "@/utils/gitStatusUtils";
+import { StyleSheet } from "react-native-unistyles";
+import { Ionicons } from "@expo/vector-icons";
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        flexDirection: "row",
+        alignItems: "center",
         backgroundColor: theme.colors.surfaceHighest,
         paddingHorizontal: 6,
         height: 16,
@@ -16,22 +23,22 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
     fileCountText: {
         fontSize: 10,
-        fontWeight: '500',
+        fontWeight: "500",
         color: theme.colors.textSecondary,
     },
     lineChanges: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        flexDirection: "row",
+        alignItems: "center",
         gap: 2,
     },
     addedText: {
         fontSize: 10,
-        fontWeight: '600',
+        fontWeight: "600",
         color: theme.colors.gitAddedText,
     },
     removedText: {
         fontSize: 10,
-        fontWeight: '600',
+        fontWeight: "600",
         color: theme.colors.gitRemovedText,
     },
 }));
@@ -46,13 +53,19 @@ export function CompactGitStatus({ sessionId }: CompactGitStatusProps) {
     const projectGitStatus = useSessionProjectGitStatus(sessionId);
     const sessionGitStatus = useSessionGitStatus(sessionId);
     const gitStatus = projectGitStatus || sessionGitStatus;
+    const submodules = useSessionProjectSubmodules(sessionId);
 
-    // Don't render if no git status or no meaningful changes
-    if (!gitStatus || !hasMeaningfulChanges(gitStatus)) {
+    // Don't render if no git status or no meaningful changes (including submodules)
+    if (!gitStatus || !hasMeaningfulLineChanges(gitStatus, submodules)) {
         return null;
     }
 
-    const hasLineChanges = gitStatus.unstagedLinesAdded > 0 || gitStatus.unstagedLinesRemoved > 0;
+    // Aggregate line changes from main repo + submodules
+    const { totalAdded, totalRemoved } = aggregateLineChanges(
+        gitStatus,
+        submodules,
+    );
+    const hasLineChanges = totalAdded > 0 || totalRemoved > 0;
 
     return (
         <View style={styles.container}>
@@ -62,30 +75,18 @@ export function CompactGitStatus({ sessionId }: CompactGitStatusProps) {
                 color={styles.fileCountText.color}
                 style={{ marginRight: 2 }}
             />
-            
+
             {/* Show line changes in compact format */}
             {hasLineChanges && (
                 <View style={styles.lineChanges}>
-                    {gitStatus.unstagedLinesAdded > 0 && (
-                        <Text style={styles.addedText}>
-                            +{gitStatus.unstagedLinesAdded}
-                        </Text>
+                    {totalAdded > 0 && (
+                        <Text style={styles.addedText}>+{totalAdded}</Text>
                     )}
-                    {gitStatus.unstagedLinesRemoved > 0 && (
-                        <Text style={styles.removedText}>
-                            -{gitStatus.unstagedLinesRemoved}
-                        </Text>
+                    {totalRemoved > 0 && (
+                        <Text style={styles.removedText}>-{totalRemoved}</Text>
                     )}
                 </View>
             )}
         </View>
-    );
-}
-
-function hasMeaningfulChanges(status: GitStatus): boolean {
-    // Only show when there are actual line changes
-    return status.lastUpdatedAt > 0 && status.isDirty && (
-        status.unstagedLinesAdded > 0 ||
-        status.unstagedLinesRemoved > 0
     );
 }

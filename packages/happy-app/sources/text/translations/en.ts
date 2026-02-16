@@ -644,6 +644,10 @@ export const en: TranslationStructure = {
     file: "File",
     fileEmpty: "File is empty",
     noChanges: "No changes to display",
+    submodule: "Submodule",
+    submoduleNotInitialized: "Not initialized",
+    childReposSummary: ({ count }) =>
+      `${count} Git ${count === 1 ? "repository" : "repositories"}`,
   },
 
   settingsVoice: {

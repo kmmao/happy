@@ -643,6 +643,10 @@ export const pt: TranslationStructure = {
     file: "Arquivo",
     fileEmpty: "Arquivo está vazio",
     noChanges: "Nenhuma alteração para exibir",
+    submodule: "Submódulo",
+    submoduleNotInitialized: "Não inicializado",
+    childReposSummary: ({ count }) =>
+      `${count} ${count === 1 ? "repositório" : "repositórios"} Git`,
   },
 
   settingsVoice: {

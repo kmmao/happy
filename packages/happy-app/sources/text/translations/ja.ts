@@ -662,6 +662,10 @@ export const ja: TranslationStructure = {
     file: "ファイル",
     fileEmpty: "ファイルは空です",
     noChanges: "表示する変更はありません",
+    submodule: "サブモジュール",
+    submoduleNotInitialized: "未初期化",
+    childReposSummary: ({ count }: { count: number }) =>
+      `${count} 個の Git リポジトリ`,
   },
 
   settingsVoice: {

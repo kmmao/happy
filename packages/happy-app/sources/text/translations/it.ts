@@ -675,6 +675,10 @@ export const it: TranslationStructure = {
     file: "File",
     fileEmpty: "File vuoto",
     noChanges: "Nessuna modifica da mostrare",
+    submodule: "Sottomodulo",
+    submoduleNotInitialized: "Non inizializzato",
+    childReposSummary: ({ count }: { count: number }) =>
+      `${count} repository Git`,
   },
 
   settingsVoice: {

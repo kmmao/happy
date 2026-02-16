@@ -12,6 +12,7 @@ This folder documents how Happy works internally, with a focus on protocol, back
 - session-protocol.md: Unified encrypted chat event protocol.
 - session-protocol-claude.md: Claude-specific session-protocol flow (local vs remote launchers, dedupe/restarts).
 - permission-resolution.md: State-based permission mode resolution across app and CLI (including sandbox behavior).
+- monorepo.md: Monorepo architecture, Yarn Workspaces configuration, dependency management, and cross-package conventions.
 - local-development.md: Local development setup and debugging for Server / CLI / App, including Docker Compose workflow.
 - adding-ai-models.md: Guide for adding or updating AI model definitions and pricing across the codebase.
 

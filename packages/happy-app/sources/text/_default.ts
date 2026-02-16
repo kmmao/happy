@@ -629,6 +629,10 @@ export const en = {
     file: "File",
     fileEmpty: "File is empty",
     noChanges: "No changes to display",
+    submodule: "Submodule",
+    submoduleNotInitialized: "Not initialized",
+    childReposSummary: ({ count }: { count: number }) =>
+      `${count} Git ${count === 1 ? "repository" : "repositories"}`,
   },
 
   settingsVoice: {

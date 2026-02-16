@@ -644,6 +644,10 @@ export const ca: TranslationStructure = {
     file: "Fitxer",
     fileEmpty: "El fitxer està buit",
     noChanges: "No hi ha canvis a mostrar",
+    submodule: "Submòdul",
+    submoduleNotInitialized: "No inicialitzat",
+    childReposSummary: ({ count }) =>
+      `${count} ${count === 1 ? "repositori" : "repositoris"} Git`,
   },
 
   settingsVoice: {

@@ -655,6 +655,10 @@ export const ru: TranslationStructure = {
     file: "Файл",
     fileEmpty: "Файл пустой",
     noChanges: "Нет изменений для отображения",
+    submodule: "Подмодуль",
+    submoduleNotInitialized: "Не инициализирован",
+    childReposSummary: ({ count }) =>
+      `${count} Git ${count === 1 ? "репозиторий" : "репозиториев"}`,
   },
 
   settingsVoice: {

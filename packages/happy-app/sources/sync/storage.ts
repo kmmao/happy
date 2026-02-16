@@ -201,6 +201,10 @@ interface StorageState {
     sessionId: string,
     status: import("./storageTypes").GitStatus | null,
   ) => void;
+  // Project submodule methods
+  getSessionProjectSubmodules: (
+    sessionId: string,
+  ) => import("./projectManager").SubmoduleInfo[] | undefined;
   // Friend management methods
   applyFriends: (friends: UserProfile[]) => void;
   applyRelationshipUpdate: (event: RelationshipUpdatedEvent) => void;
@@ -1032,6 +1036,9 @@ export const storage = create<StorageState>()((set, get) => {
       // Trigger a state update to notify hooks
       set((state) => ({ ...state }));
     },
+    // Project submodule methods
+    getSessionProjectSubmodules: (sessionId: string) =>
+      projectManager.getSessionProjectSubmodules(sessionId),
     applyMachines: (machines: Machine[], replace: boolean = false) =>
       set((state) => {
         // Either replace all machines or merge updates
@@ -1442,6 +1449,14 @@ export function useSessionProjectGitStatus(sessionId: string | null) {
   return storage(
     useShallow((state) =>
       sessionId ? state.getSessionProjectGitStatus(sessionId) : null,
+    ),
+  );
+}
+
+export function useSessionProjectSubmodules(sessionId: string | null) {
+  return storage(
+    useShallow((state) =>
+      sessionId ? state.getSessionProjectSubmodules(sessionId) : undefined,
     ),
   );
 }
