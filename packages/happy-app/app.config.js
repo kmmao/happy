@@ -20,7 +20,7 @@ export default {
     name,
     slug: "happy",
     version: "1.6.2",
-    runtimeVersion: "18",
+    runtimeVersion: "20",
     orientation: "default",
     icon: "./sources/assets/images/icon.png",
     scheme: "happy",

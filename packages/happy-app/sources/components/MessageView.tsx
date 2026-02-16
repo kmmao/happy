@@ -136,7 +136,12 @@ function AgentTextBlock(props: {
       <View style={styles.avatarSlot}>
         {props.showAvatar && <FlavorIcon flavor={props.flavor} size={24} />}
       </View>
-      <View style={styles.agentMessageContainer}>
+      <View
+        style={[
+          styles.agentMessageContainer,
+          props.message.isThinking && { opacity: 0.3 },
+        ]}
+      >
         <MarkdownView
           markdown={props.message.text}
           onOptionPress={handleOptionPress}

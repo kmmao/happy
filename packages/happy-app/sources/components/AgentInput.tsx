@@ -28,6 +28,7 @@ import { applySuggestion } from "./autocomplete/applySuggestion";
 import { GitStatusBadge, useHasMeaningfulGitStatus } from "./GitStatusBadge";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useSetting } from "@/sync/storage";
+import { hackMode, hackModes } from "@/sync/modeHacks";
 import { Theme } from "@/theme";
 import { t } from "@/text";
 import { Metadata } from "@/sync/storageTypes";
@@ -47,9 +48,11 @@ interface AgentInputProps {
   sendIcon?: React.ReactNode;
   onMicPress?: () => void;
   isMicActive?: boolean;
-  permissionMode?: PermissionMode;
+  permissionMode?: PermissionMode | null;
+  availableModes?: PermissionMode[];
   onPermissionModeChange?: (mode: PermissionMode) => void;
-  modelMode?: ModelMode;
+  modelMode?: ModelMode | null;
+  availableModels?: ModelMode[];
   onModelModeChange?: (mode: ModelMode) => void;
   metadata?: Metadata | null;
   onAbort?: () => void | Promise<void>;
@@ -342,6 +345,16 @@ export const AgentInput = React.memo(
       props.metadata?.flavor === "codex" || props.agentType === "codex";
     const isGemini =
       props.metadata?.flavor === "gemini" || props.agentType === "gemini";
+    const displayPermissionMode = React.useMemo(
+      () => (props.permissionMode ? hackMode(props.permissionMode) : null),
+      [props.permissionMode],
+    );
+    const permissionModeKey = displayPermissionMode?.key ?? "default";
+    const availableModes = React.useMemo(
+      () => hackModes(props.availableModes ?? []),
+      [props.availableModes],
+    );
+    const availableModels = props.availableModels ?? [];
     const isSandboxEnabled = React.useMemo(() => {
       const sandbox = props.metadata?.sandbox as unknown;
       if (!sandbox) {
@@ -358,15 +371,15 @@ export const AgentInput = React.memo(
     }, [props.metadata?.sandbox]);
     const isSandboxedYoloMode =
       isSandboxEnabled &&
-      (props.permissionMode === "bypassPermissions" ||
-        props.permissionMode === "yolo");
+      (permissionModeKey === "bypassPermissions" ||
+        permissionModeKey === "yolo");
 
     const withSandboxSuffix = React.useCallback(
-      (label: string, mode: PermissionMode | undefined) => {
+      (label: string, modeKey?: string) => {
         if (!isSandboxEnabled) {
           return label;
         }
-        if (mode === "bypassPermissions" || mode === "yolo") {
+        if (modeKey === "bypassPermissions" || modeKey === "yolo") {
           return `${label} (sandboxed)`;
         }
         return label;
@@ -579,16 +592,16 @@ export const AgentInput = React.memo(
           if (
             event.key === "Tab" &&
             event.shiftKey &&
-            props.onPermissionModeChange
+            props.onPermissionModeChange &&
+            availableModes.length > 0
           ) {
-            const modeOrder: PermissionMode[] = isCodex
-              ? ["default", "read-only", "safe-yolo", "yolo"]
-              : ["default", "acceptEdits", "plan", "bypassPermissions"]; // Claude and Gemini share same modes
-            const currentIndex = modeOrder.indexOf(
-              props.permissionMode || "default",
+            const currentIndex = availableModes.findIndex(
+              (mode) => mode.key === permissionModeKey,
             );
-            const nextIndex = (currentIndex + 1) % modeOrder.length;
-            props.onPermissionModeChange(modeOrder[nextIndex]);
+            const nextIndex =
+              ((currentIndex >= 0 ? currentIndex : 0) + 1) %
+              availableModes.length;
+            props.onPermissionModeChange(availableModes[nextIndex]);
             hapticsLight();
             return true; // Key was handled, prevent default tab behavior
           }
@@ -608,8 +621,9 @@ export const AgentInput = React.memo(
         agentInputEnterToSend,
         props.value,
         props.onSend,
-        props.permissionMode,
         props.onPermissionModeChange,
+        availableModes,
+        permissionModeKey,
       ],
     );
 
@@ -666,85 +680,12 @@ export const AgentInput = React.memo(
                           ? t("agentInput.geminiPermissionMode.title")
                           : t("agentInput.permissionMode.title")}
                     </Text>
-                    {(isCodex || isGemini
-                      ? (["default", "read-only", "safe-yolo", "yolo"] as const)
-                      : ([
-                          "default",
-                          "acceptEdits",
-                          "plan",
-                          "bypassPermissions",
-                        ] as const)
-                    ).map((mode) => {
-                      const modeConfig = isCodex
-                        ? {
-                            default: {
-                              label: t(
-                                "agentInput.codexPermissionMode.default",
-                              ),
-                            },
-                            "read-only": {
-                              label: t(
-                                "agentInput.codexPermissionMode.readOnly",
-                              ),
-                            },
-                            "safe-yolo": {
-                              label: t(
-                                "agentInput.codexPermissionMode.safeYolo",
-                              ),
-                            },
-                            yolo: {
-                              label: t("agentInput.codexPermissionMode.yolo"),
-                            },
-                          }
-                        : isGemini
-                          ? {
-                              default: {
-                                label: t(
-                                  "agentInput.geminiPermissionMode.default",
-                                ),
-                              },
-                              "read-only": {
-                                label: t(
-                                  "agentInput.geminiPermissionMode.readOnly",
-                                ),
-                              },
-                              "safe-yolo": {
-                                label: t(
-                                  "agentInput.geminiPermissionMode.safeYolo",
-                                ),
-                              },
-                              yolo: {
-                                label: t(
-                                  "agentInput.geminiPermissionMode.yolo",
-                                ),
-                              },
-                            }
-                          : {
-                              default: {
-                                label: t("agentInput.permissionMode.default"),
-                              },
-                              acceptEdits: {
-                                label: t(
-                                  "agentInput.permissionMode.acceptEdits",
-                                ),
-                              },
-                              plan: {
-                                label: t("agentInput.permissionMode.plan"),
-                              },
-                              bypassPermissions: {
-                                label: t(
-                                  "agentInput.permissionMode.bypassPermissions",
-                                ),
-                              },
-                            };
-                      const config =
-                        modeConfig[mode as keyof typeof modeConfig];
-                      if (!config) return null;
-                      const isSelected = props.permissionMode === mode;
+                    {availableModes.map((mode) => {
+                      const isSelected = permissionModeKey === mode.key;
 
                       return (
                         <Pressable
-                          key={mode}
+                          key={mode.key}
                           onPress={() => handleSettingsSelect(mode)}
                           style={({ pressed }) => ({
                             flexDirection: "row",
@@ -781,20 +722,30 @@ export const AgentInput = React.memo(
                               />
                             )}
                           </View>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              color: isSelected
-                                ? theme.colors.radio.active
-                                : theme.colors.text,
-                              ...Typography.default(),
-                            }}
-                          >
-                            {withSandboxSuffix(
-                              config.label,
-                              mode as PermissionMode,
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                color: isSelected
+                                  ? theme.colors.radio.active
+                                  : theme.colors.text,
+                                ...Typography.default(),
+                              }}
+                            >
+                              {withSandboxSuffix(mode.name, mode.key)}
+                            </Text>
+                            {!!mode.description && (
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  color: theme.colors.textSecondary,
+                                  ...Typography.default(),
+                                }}
+                              >
+                                {mode.description}
+                              </Text>
                             )}
-                          </Text>
+                          </View>
                         </Pressable>
                       );
                     })}
@@ -823,45 +774,13 @@ export const AgentInput = React.memo(
                     >
                       {t("agentInput.model.title")}
                     </Text>
-                    {isGemini ? (
-                      // Gemini model selector
-                      (
-                        [
-                          "gemini-3-pro-preview",
-                          "gemini-3-flash-preview",
-                          "gemini-2.5-pro",
-                          "gemini-2.5-flash",
-                          "gemini-2.5-flash-lite",
-                        ] as const
-                      ).map((model) => {
-                        const modelConfig = {
-                          "gemini-3-pro-preview": {
-                            label: "Gemini 3 Pro",
-                            description: "Latest & most capable",
-                          },
-                          "gemini-3-flash-preview": {
-                            label: "Gemini 3 Flash",
-                            description: "Latest & fast",
-                          },
-                          "gemini-2.5-pro": {
-                            label: "Gemini 2.5 Pro",
-                            description: "Most capable",
-                          },
-                          "gemini-2.5-flash": {
-                            label: "Gemini 2.5 Flash",
-                            description: "Fast & efficient",
-                          },
-                          "gemini-2.5-flash-lite": {
-                            label: "Gemini 2.5 Flash Lite",
-                            description: "Fastest",
-                          },
-                        };
-                        const config = modelConfig[model];
-                        const isSelected = props.modelMode === model;
+                    {availableModels.length > 0 ? (
+                      availableModels.map((model) => {
+                        const isSelected = props.modelMode?.key === model.key;
 
                         return (
                           <Pressable
-                            key={model}
+                            key={model.key}
                             onPress={() => {
                               hapticsLight();
                               props.onModelModeChange?.(model);
@@ -911,17 +830,19 @@ export const AgentInput = React.memo(
                                   ...Typography.default(),
                                 }}
                               >
-                                {config.label}
+                                {model.name}
                               </Text>
-                              <Text
-                                style={{
-                                  fontSize: 11,
-                                  color: theme.colors.textSecondary,
-                                  ...Typography.default(),
-                                }}
-                              >
-                                {config.description}
-                              </Text>
+                              {!!model.description && (
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    color: theme.colors.textSecondary,
+                                    ...Typography.default(),
+                                  }}
+                                >
+                                  {model.description}
+                                </Text>
+                              )}
                             </View>
                           </Pressable>
                         );
@@ -948,7 +869,8 @@ export const AgentInput = React.memo(
           {/* Connection status, context warning, and permission mode */}
           {(props.connectionStatus ||
             contextWarning ||
-            props.permissionMode) && (
+            displayPermissionMode ||
+            props.modelMode) && (
             <View
               style={{
                 flexDirection: "row",
@@ -1116,72 +1038,43 @@ export const AgentInput = React.memo(
                   minWidth: 150, // Fixed minimum width to prevent layout shift
                 }}
               >
-                {props.permissionMode && (
+                {displayPermissionMode && (
                   <Text
                     style={{
                       fontSize: 11,
                       color: isSandboxedYoloMode
                         ? "#4169E1"
-                        : props.permissionMode === "acceptEdits"
+                        : permissionModeKey === "acceptEdits"
                           ? theme.colors.permission.acceptEdits
-                          : props.permissionMode === "bypassPermissions"
+                          : permissionModeKey === "bypassPermissions"
                             ? theme.colors.permission.bypass
-                            : props.permissionMode === "plan"
+                            : permissionModeKey === "plan"
                               ? theme.colors.permission.plan
-                              : props.permissionMode === "read-only"
+                              : permissionModeKey === "read-only"
                                 ? theme.colors.permission.readOnly
-                                : props.permissionMode === "safe-yolo"
+                                : permissionModeKey === "safe-yolo"
                                   ? theme.colors.permission.safeYolo
-                                  : props.permissionMode === "yolo"
+                                  : permissionModeKey === "yolo"
                                     ? theme.colors.permission.yolo
                                     : theme.colors.textSecondary, // Use secondary text color for default
                       ...Typography.default(),
                     }}
                   >
                     {withSandboxSuffix(
-                      isCodex
-                        ? props.permissionMode === "default"
-                          ? t("agentInput.codexPermissionMode.default")
-                          : props.permissionMode === "read-only"
-                            ? t("agentInput.codexPermissionMode.badgeReadOnly")
-                            : props.permissionMode === "safe-yolo"
-                              ? t(
-                                  "agentInput.codexPermissionMode.badgeSafeYolo",
-                                )
-                              : props.permissionMode === "yolo"
-                                ? t("agentInput.codexPermissionMode.badgeYolo")
-                                : ""
-                        : isGemini
-                          ? props.permissionMode === "default"
-                            ? t("agentInput.geminiPermissionMode.default")
-                            : props.permissionMode === "read-only"
-                              ? t(
-                                  "agentInput.geminiPermissionMode.badgeReadOnly",
-                                )
-                              : props.permissionMode === "safe-yolo"
-                                ? t(
-                                    "agentInput.geminiPermissionMode.badgeSafeYolo",
-                                  )
-                                : props.permissionMode === "yolo"
-                                  ? t(
-                                      "agentInput.geminiPermissionMode.badgeYolo",
-                                    )
-                                  : ""
-                          : props.permissionMode === "default"
-                            ? t("agentInput.permissionMode.default")
-                            : props.permissionMode === "acceptEdits"
-                              ? t(
-                                  "agentInput.permissionMode.badgeAcceptAllEdits",
-                                )
-                              : props.permissionMode === "bypassPermissions"
-                                ? t(
-                                    "agentInput.permissionMode.badgeBypassAllPermissions",
-                                  )
-                                : props.permissionMode === "plan"
-                                  ? t("agentInput.permissionMode.badgePlanMode")
-                                  : "",
-                      props.permissionMode,
+                      displayPermissionMode.name,
+                      permissionModeKey,
                     )}
+                  </Text>
+                )}
+                {props.modelMode && (
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: theme.colors.textSecondary,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {props.modelMode.name}
                   </Text>
                 )}
               </View>

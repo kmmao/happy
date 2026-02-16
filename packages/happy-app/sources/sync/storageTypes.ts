@@ -5,6 +5,36 @@ import { z } from "zod";
 //
 
 export const MetadataSchema = z.object({
+  models: z
+    .array(
+      z.object({
+        code: z.string(),
+        value: z.string(),
+        description: z.string().nullish(),
+      }),
+    )
+    .optional(),
+  currentModelCode: z.string().optional(),
+  operatingModes: z
+    .array(
+      z.object({
+        code: z.string(),
+        value: z.string(),
+        description: z.string().nullish(),
+      }),
+    )
+    .optional(),
+  currentOperatingModeCode: z.string().optional(),
+  thoughtLevels: z
+    .array(
+      z.object({
+        code: z.string(),
+        value: z.string(),
+        description: z.string().nullish(),
+      }),
+    )
+    .optional(),
+  currentThoughtLevelCode: z.string().optional(),
   path: z.string(),
   host: z.string(),
   version: z.string().optional(),
@@ -85,21 +115,8 @@ export interface Session {
     id: string;
   }>;
   draft?: string | null; // Local draft message, not synced to server
-  permissionMode?:
-    | "default"
-    | "acceptEdits"
-    | "bypassPermissions"
-    | "plan"
-    | "read-only"
-    | "safe-yolo"
-    | "yolo"
-    | null; // Local permission mode, not synced to server
-  modelMode?:
-    | "default"
-    | "gemini-2.5-pro"
-    | "gemini-2.5-flash"
-    | "gemini-2.5-flash-lite"
-    | null; // Local model mode, not synced to server
+  permissionMode?: string | null; // Local permission mode key, not synced to server
+  modelMode?: string | null; // Local model key, not synced to server
   // IMPORTANT: latestUsage is extracted from reducerState.latestUsage after message processing.
   // We store it directly on Session to ensure it's available immediately on load.
   // Do NOT store reducerState itself on Session - it's mutable and should only exist in SessionMessages.

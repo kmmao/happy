@@ -15,6 +15,7 @@ This folder documents how Happy works internally, with a focus on protocol, back
 - monorepo.md: Monorepo architecture, Yarn Workspaces configuration, dependency management, and cross-package conventions.
 - local-development.md: Local development setup and debugging for Server / CLI / App, including Docker Compose workflow.
 - adding-ai-models.md: Guide for adding or updating AI model definitions and pricing across the codebase.
+- happy-wire.md: Shared wire schemas/types package and migration notes.
 
 ## Conventions
 - Paths and field names reflect the current implementation in `packages/happy-server`.

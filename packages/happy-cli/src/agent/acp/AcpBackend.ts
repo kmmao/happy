@@ -18,6 +18,7 @@ import {
   type RequestPermissionResponse,
   type InitializeRequest,
   type NewSessionRequest,
+  type NewSessionResponse,
   type PromptRequest,
   type ContentBlock,
 } from '@agentclientprotocol/sdk';
@@ -45,6 +46,48 @@ const RETRY_CONFIG = {
   /** Maximum delay between retries in ms */
   maxDelayMs: 5000,
 } as const;
+const ACP_MUTED_COLOR = '\u001b[90m';
+const ACP_COLOR_RESET = '\u001b[0m';
+
+function formatAcpTime(date: Date = new Date()): string {
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function logAcpBackendMuted(message: string): void {
+  const line = `[${formatAcpTime()}] ${message}`;
+  const forceColor = process.env.FORCE_COLOR;
+  if (forceColor === '0') {
+    console.log(line);
+    return;
+  }
+  const useColor = forceColor !== undefined || process.stdout.isTTY === true || process.stderr.isTTY === true;
+  if (useColor) {
+    console.log(`${ACP_MUTED_COLOR}${line}${ACP_COLOR_RESET}`);
+    return;
+  }
+  console.log(line);
+}
+
+function summarizeSessionMetadataPayload(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') {
+    return 'invalid payload';
+  }
+  const asRecord = payload as Record<string, unknown>;
+  const configOptions = Array.isArray(asRecord.configOptions) ? asRecord.configOptions.length : 0;
+  const modes = asRecord.modes && typeof asRecord.modes === 'object'
+    ? (Array.isArray((asRecord.modes as { availableModes?: unknown }).availableModes)
+        ? ((asRecord.modes as { availableModes: unknown[] }).availableModes.length)
+        : 0)
+    : 0;
+  const models = asRecord.models && typeof asRecord.models === 'object'
+    ? (Array.isArray((asRecord.models as { availableModels?: unknown }).availableModels)
+        ? ((asRecord.models as { availableModels: unknown[] }).availableModels.length)
+        : 0)
+    : 0;
+  return `configOptions=${configOptions} modes=${modes} models=${models}`;
+}
 import {
   type TransportHandler,
   type StderrContext,
@@ -160,6 +203,9 @@ export interface AcpBackendOptions {
 
   /** Optional callback to check if prompt has change_title instruction */
   hasChangeTitleInstruction?: (prompt: string) => boolean;
+
+  /** Log raw session updates to console */
+  verbose?: boolean;
 }
 
 /**
@@ -232,6 +278,7 @@ async function withRetry<T>(
     maxAttempts: number;
     baseDelayMs: number;
     maxDelayMs: number;
+    shouldRetry?: (error: Error) => boolean;
     onRetry?: (attempt: number, error: Error) => void;
   }
 ): Promise<T> {
@@ -243,7 +290,8 @@ async function withRetry<T>(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
-      if (attempt < options.maxAttempts) {
+      const shouldRetry = options.shouldRetry ? options.shouldRetry(lastError) : true;
+      if (attempt < options.maxAttempts && shouldRetry) {
         // Calculate delay with exponential backoff
         const delayMs = Math.min(
           options.baseDelayMs * Math.pow(2, attempt - 1),
@@ -254,6 +302,8 @@ async function withRetry<T>(
         options.onRetry?.(attempt, lastError);
 
         await delay(delayMs);
+      } else {
+        break;
       }
     }
   }
@@ -328,6 +378,7 @@ export class AcpBackend implements AgentBackend {
 
     const sessionId = randomUUID();
     this.emit({ type: 'status', status: 'starting' });
+    let startupStatusErrorEmitted = false;
 
     try {
       logger.debug(`[AcpBackend] Starting session: ${sessionId}`);
@@ -365,6 +416,23 @@ export class AcpBackend implements AgentBackend {
         throw new Error('Failed to create stdio pipes');
       }
 
+      let startupFailure: Error | null = null;
+      let startupFailureSettled = false;
+      let rejectStartupFailure: ((error: Error) => void) | null = null;
+      const startupFailurePromise = new Promise<never>((_, reject) => {
+        rejectStartupFailure = (error: Error) => {
+          if (startupFailureSettled) {
+            return;
+          }
+          startupFailureSettled = true;
+          startupFailure = error;
+          reject(error);
+        };
+      });
+      const signalStartupFailure = (error: Error) => {
+        rejectStartupFailure?.(error);
+      };
+
       // Handle stderr output via transport handler
       this.process.stderr.on('data', (data: Buffer) => {
         const text = data.toString();
@@ -397,13 +465,16 @@ export class AcpBackend implements AgentBackend {
       });
 
       this.process.on('error', (err) => {
+        signalStartupFailure(err);
         // Log to file only, not console
         logger.debug(`[AcpBackend] Process error:`, err);
+        startupStatusErrorEmitted = true;
         this.emit({ type: 'status', status: 'error', detail: err.message });
       });
 
       this.process.on('exit', (code, signal) => {
         if (!this.disposed && code !== 0 && code !== null) {
+          signalStartupFailure(new Error(`Exit code: ${code}`));
           logger.debug(`[AcpBackend] Process exited with code ${code}, signal ${signal}`);
           this.emit({ type: 'status', status: 'stopped', detail: `Exit code: ${code}` });
         }
@@ -657,12 +728,20 @@ export class AcpBackend implements AgentBackend {
 
       const initTimeout = this.transport.getInitTimeout();
       logger.debug(`[AcpBackend] Initializing connection (timeout: ${initTimeout}ms)...`);
+      const isNonRetryableStartupError = (error: Error): boolean => {
+        const maybeErr = error as NodeJS.ErrnoException;
+        if (startupFailure && error === startupFailure) {
+          return true;
+        }
+        return maybeErr.code === 'ENOENT' || maybeErr.code === 'EACCES' || maybeErr.code === 'EPIPE';
+      };
 
-      await withRetry(
+      const initializeResponse = await withRetry(
         async () => {
           let timeoutHandle: NodeJS.Timeout | null = null;
           try {
             const result = await Promise.race([
+              startupFailurePromise,
               this.connection!.initialize(initRequest).then((res) => {
                 if (timeoutHandle) {
                   clearTimeout(timeoutHandle);
@@ -688,9 +767,15 @@ export class AcpBackend implements AgentBackend {
           maxAttempts: RETRY_CONFIG.maxAttempts,
           baseDelayMs: RETRY_CONFIG.baseDelayMs,
           maxDelayMs: RETRY_CONFIG.maxDelayMs,
+          shouldRetry: (error) => !isNonRetryableStartupError(error),
         }
       );
       logger.debug(`[AcpBackend] Initialize completed`);
+      if (this.options.verbose) {
+        logAcpBackendMuted(
+          `Incoming initialize response from ${this.options.agentName}: ${summarizeSessionMetadataPayload(initializeResponse)}`,
+        );
+      }
 
       // Create a new session with retry
       const mcpServers = this.options.mcpServers
@@ -716,6 +801,7 @@ export class AcpBackend implements AgentBackend {
           let timeoutHandle: NodeJS.Timeout | null = null;
           try {
             const result = await Promise.race([
+              startupFailurePromise,
               this.connection!.newSession(newSessionRequest).then((res) => {
                 if (timeoutHandle) {
                   clearTimeout(timeoutHandle);
@@ -741,10 +827,17 @@ export class AcpBackend implements AgentBackend {
           maxAttempts: RETRY_CONFIG.maxAttempts,
           baseDelayMs: RETRY_CONFIG.baseDelayMs,
           maxDelayMs: RETRY_CONFIG.maxDelayMs,
+          shouldRetry: (error) => !isNonRetryableStartupError(error),
         }
       );
       this.acpSessionId = sessionResponse.sessionId;
       logger.debug(`[AcpBackend] Session created: ${this.acpSessionId}`);
+      if (this.options.verbose) {
+        logAcpBackendMuted(
+          `Incoming newSession response from ${this.options.agentName}: ${summarizeSessionMetadataPayload(sessionResponse)}`,
+        );
+      }
+      this.emitInitialSessionMetadata(sessionResponse);
 
       this.emitIdleStatus();
 
@@ -762,11 +855,13 @@ export class AcpBackend implements AgentBackend {
     } catch (error) {
       // Log to file only, not console
       logger.debug('[AcpBackend] Error starting session:', error);
-      this.emit({ 
-        type: 'status', 
-        status: 'error', 
-        detail: error instanceof Error ? error.message : String(error) 
-      });
+      if (!startupStatusErrorEmitted) {
+        this.emit({ 
+          type: 'status', 
+          status: 'error', 
+          detail: error instanceof Error ? error.message : String(error) 
+        });
+      }
       throw error;
     }
   }
@@ -800,6 +895,37 @@ export class AcpBackend implements AgentBackend {
     };
   }
 
+  private emitInitialSessionMetadata(sessionResponse: NewSessionResponse): void {
+    if (Array.isArray(sessionResponse.configOptions)) {
+      this.emit({
+        type: 'event',
+        name: 'config_options_update',
+        payload: { configOptions: sessionResponse.configOptions },
+      });
+    }
+
+    if (sessionResponse.modes) {
+      this.emit({
+        type: 'event',
+        name: 'modes_update',
+        payload: sessionResponse.modes,
+      });
+      this.emit({
+        type: 'event',
+        name: 'current_mode_update',
+        payload: { currentModeId: sessionResponse.modes.currentModeId },
+      });
+    }
+
+    if (sessionResponse.models) {
+      this.emit({
+        type: 'event',
+        name: 'models_update',
+        payload: sessionResponse.models,
+      });
+    }
+  }
+
   private handleSessionUpdate(params: SessionNotification): void {
     const notification = params as ExtendedSessionNotification;
     const update = notification.update;
@@ -810,17 +936,13 @@ export class AcpBackend implements AgentBackend {
     }
 
     const sessionUpdateType = update.sessionUpdate;
+    const updateType = sessionUpdateType as string | undefined;
 
-    // Log session updates for debugging (but not every chunk to avoid log spam)
-    if (sessionUpdateType !== 'agent_message_chunk') {
-      logger.debug(`[AcpBackend] Received session update: ${sessionUpdateType}`, JSON.stringify({
-        sessionUpdate: sessionUpdateType,
-        toolCallId: update.toolCallId,
-        status: update.status,
-        kind: update.kind,
-        hasContent: !!update.content,
-        hasLocations: !!update.locations,
-      }, null, 2));
+    logger.debug(`[AcpBackend] sessionUpdate: ${sessionUpdateType}`, JSON.stringify(update));
+    if (this.options.verbose) {
+      logAcpBackendMuted(
+        `Incoming raw session update from ${this.options.agentName}: ${JSON.stringify(update)}`,
+      );
     }
 
     const ctx = this.createHandlerContext();
@@ -849,6 +971,42 @@ export class AcpBackend implements AgentBackend {
       return;
     }
 
+    if (sessionUpdateType === 'available_commands_update') {
+      const commands = (update as { availableCommands?: { name: string; description?: string }[] }).availableCommands;
+      if (Array.isArray(commands)) {
+        this.emit({
+          type: 'event',
+          name: 'available_commands',
+          payload: commands,
+        });
+      }
+      return;
+    }
+
+    if (updateType === 'config_option_update' || updateType === 'config_options_update') {
+      const configOptions = (update as { configOptions?: unknown }).configOptions;
+      if (Array.isArray(configOptions)) {
+        this.emit({
+          type: 'event',
+          name: 'config_options_update',
+          payload: { configOptions },
+        });
+      }
+      return;
+    }
+
+    if (updateType === 'current_mode_update') {
+      const currentModeId = (update as { currentModeId?: unknown }).currentModeId;
+      if (typeof currentModeId === 'string' && currentModeId.length > 0) {
+        this.emit({
+          type: 'event',
+          name: 'current_mode_update',
+          payload: { currentModeId },
+        });
+      }
+      return;
+    }
+
     // Handle legacy and auxiliary update types
     handleLegacyMessageChunk(update as SessionUpdate, ctx);
     handlePlanUpdate(update as SessionUpdate, ctx);
@@ -856,14 +1014,22 @@ export class AcpBackend implements AgentBackend {
 
     // Log unhandled session update types for debugging
     // Cast to string to avoid TypeScript errors (SDK types don't include all Gemini-specific update types)
-    const updateTypeStr = sessionUpdateType as string;
-    const handledTypes = ['agent_message_chunk', 'tool_call_update', 'agent_thought_chunk', 'tool_call'];
-    if (updateTypeStr &&
-        !handledTypes.includes(updateTypeStr) &&
+    const handledTypes = [
+      'agent_message_chunk',
+      'tool_call_update',
+      'agent_thought_chunk',
+      'tool_call',
+      'available_commands_update',
+      'config_option_update',
+      'config_options_update',
+      'current_mode_update',
+    ];
+    if (updateType &&
+        !handledTypes.includes(updateType) &&
         !update.messageChunk &&
         !update.plan &&
         !update.thinking) {
-      logger.debug(`[AcpBackend] Unhandled session update type: ${updateTypeStr}`, JSON.stringify(update, null, 2));
+      logger.debug(`[AcpBackend] Unhandled session update type: ${updateType}`, JSON.stringify(update, null, 2));
     }
   }
 
@@ -943,6 +1109,94 @@ export class AcpBackend implements AgentBackend {
         detail: errorDetail
       });
       throw error;
+    }
+  }
+
+  /**
+   * Set a session config option value.
+   * Returns false when unsupported or when the update fails.
+   */
+  async setSessionConfigOption(configId: string, value: string): Promise<boolean> {
+    if (this.disposed || !this.connection || !this.acpSessionId) {
+      return false;
+    }
+
+    try {
+      const response = await this.connection.setSessionConfigOption({
+        sessionId: this.acpSessionId,
+        configId,
+        value,
+      });
+
+      if (Array.isArray(response.configOptions)) {
+        this.emit({
+          type: 'event',
+          name: 'config_options_update',
+          payload: { configOptions: response.configOptions },
+        });
+      }
+
+      return true;
+    } catch (error) {
+      logger.debug('[AcpBackend] Failed to set session config option:', {
+        configId,
+        value,
+        error,
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Set the current ACP session mode.
+   * Returns false when unsupported or when the update fails.
+   */
+  async setSessionMode(modeId: string): Promise<boolean> {
+    if (this.disposed || !this.connection || !this.acpSessionId) {
+      return false;
+    }
+
+    try {
+      await this.connection.setSessionMode({
+        sessionId: this.acpSessionId,
+        modeId,
+      });
+
+      this.emit({
+        type: 'event',
+        name: 'current_mode_update',
+        payload: { currentModeId: modeId },
+      });
+
+      return true;
+    } catch (error) {
+      logger.debug('[AcpBackend] Failed to set session mode:', { modeId, error });
+      return false;
+    }
+  }
+
+  /**
+   * Set the current ACP session model (UNSTABLE ACP capability).
+   * Returns false when unsupported or when the update fails.
+   */
+  async setSessionModel(modelId: string): Promise<boolean> {
+    if (this.disposed || !this.connection || !this.acpSessionId) {
+      return false;
+    }
+
+    if (typeof this.connection.unstable_setSessionModel !== 'function') {
+      return false;
+    }
+
+    try {
+      await this.connection.unstable_setSessionModel({
+        sessionId: this.acpSessionId,
+        modelId,
+      });
+      return true;
+    } catch (error) {
+      logger.debug('[AcpBackend] Failed to set session model:', { modelId, error });
+      return false;
     }
   }
 

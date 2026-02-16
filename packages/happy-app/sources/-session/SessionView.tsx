@@ -1,5 +1,13 @@
 import { AgentContentView } from "@/components/AgentContentView";
 import { AgentInput } from "@/components/AgentInput";
+import {
+  getAvailableModels,
+  getAvailablePermissionModes,
+  getDefaultModelKey,
+  getDefaultPermissionModeKey,
+  resolveCurrentOption,
+} from "@/components/modelModeOptions";
+import type { ModelMode, PermissionMode } from "@/components/modelModeOptions";
 import { getSuggestions } from "@/components/autocomplete/suggestions";
 import { ChatHeaderView } from "@/components/ChatHeaderView";
 import { ChatList, ChatListHandle } from "@/components/ChatList";
@@ -258,12 +266,48 @@ function SessionViewLoaded({
   const isAcknowledged =
     machineId && acknowledgedCliVersions[machineId] === cliVersion;
   const shouldShowCliWarning = isCliOutdated && !isAcknowledged;
-  // Get permission mode from session object, default to 'default'
-  const permissionMode = session.permissionMode || "default";
-  // Get model mode from session object - for Gemini sessions use explicit model, default to gemini-3-pro-preview
-  const isGeminiSession = session.metadata?.flavor === "gemini";
-  const modelMode =
-    session.modelMode || (isGeminiSession ? "gemini-3-pro-preview" : "default");
+
+  // Metadata-driven mode/model selection
+  const flavor = session.metadata?.flavor;
+  const availableModels = React.useMemo(
+    () => getAvailableModels(flavor, session.metadata, t),
+    [flavor, session.metadata],
+  );
+  const availableModes = React.useMemo(
+    () => getAvailablePermissionModes(flavor, session.metadata, t),
+    [flavor, session.metadata],
+  );
+
+  const permissionMode = React.useMemo<PermissionMode | null>(
+    () =>
+      resolveCurrentOption(availableModes, [
+        session.permissionMode,
+        session.metadata?.currentOperatingModeCode,
+        getDefaultPermissionModeKey(flavor),
+      ]),
+    [
+      availableModes,
+      session.permissionMode,
+      session.metadata?.currentOperatingModeCode,
+      flavor,
+    ],
+  );
+
+  const modelMode = React.useMemo<ModelMode | null>(
+    () =>
+      resolveCurrentOption(availableModels, [
+        session.modelMode,
+        session.metadata?.currentModelCode,
+        getDefaultModelKey(flavor),
+      ]),
+    [
+      availableModels,
+      session.modelMode,
+      session.metadata?.currentModelCode,
+      flavor,
+    ],
+  );
+
   const sessionStatus = useSessionStatus(session);
   const sessionUsage = useSessionUsage(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
@@ -311,33 +355,15 @@ function SessionViewLoaded({
 
   // Function to update permission mode
   const updatePermissionMode = React.useCallback(
-    (
-      mode:
-        | "default"
-        | "acceptEdits"
-        | "bypassPermissions"
-        | "plan"
-        | "read-only"
-        | "safe-yolo"
-        | "yolo",
-    ) => {
-      storage.getState().updateSessionPermissionMode(sessionId, mode);
+    (mode: PermissionMode) => {
+      storage.getState().updateSessionPermissionMode(sessionId, mode.key);
     },
     [sessionId],
   );
 
-  // Function to update model mode (for Gemini sessions)
   const updateModelMode = React.useCallback(
-    (
-      mode:
-        | "default"
-        | "gemini-3-pro-preview"
-        | "gemini-3-flash-preview"
-        | "gemini-2.5-pro"
-        | "gemini-2.5-flash"
-        | "gemini-2.5-flash-lite",
-    ) => {
-      storage.getState().updateSessionModelMode(sessionId, mode);
+    (mode: ModelMode) => {
+      storage.getState().updateSessionModelMode(sessionId, mode.key);
     },
     [sessionId],
   );
@@ -451,8 +477,10 @@ function SessionViewLoaded({
         sessionId={sessionId}
         permissionMode={permissionMode}
         onPermissionModeChange={updatePermissionMode}
-        modelMode={modelMode as any}
-        onModelModeChange={updateModelMode as any}
+        availableModes={availableModes}
+        modelMode={modelMode}
+        availableModels={availableModels}
+        onModelModeChange={updateModelMode}
         metadata={session.metadata}
         connectionStatus={{
           text: sessionStatus.statusText,
