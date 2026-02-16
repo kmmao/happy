@@ -9,7 +9,14 @@ import { Typography } from "@/constants/Typography";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
-import { fetchGitBranches, GitBranch, GitBranchList } from "@/sync/gitBranches";
+import { Modal } from "@/modal";
+import {
+  fetchGitBranches,
+  checkoutBranch,
+  createBranch,
+  GitBranch,
+  GitBranchList,
+} from "@/sync/gitBranches";
 
 interface GitBranchesTabProps {
   readonly sessionId: string;
@@ -23,6 +30,10 @@ export const GitBranchesTab = React.memo<GitBranchesTabProps>(
     const [isLoading, setIsLoading] = React.useState(true);
     const [localCollapsed, setLocalCollapsed] = React.useState(false);
     const [remoteCollapsed, setRemoteCollapsed] = React.useState(false);
+    const [operatingBranch, setOperatingBranch] = React.useState<string | null>(
+      null,
+    );
+    const [isCreating, setIsCreating] = React.useState(false);
 
     const loadBranches = React.useCallback(async () => {
       try {
@@ -47,6 +58,89 @@ export const GitBranchesTab = React.memo<GitBranchesTabProps>(
         loadBranches();
       }, [loadBranches]),
     );
+
+    const handleCheckout = React.useCallback(
+      async (branch: GitBranch) => {
+        if (branch.isCurrent || operatingBranch !== null) return;
+
+        setOperatingBranch(branch.name);
+        try {
+          const result = await checkoutBranch(
+            sessionId,
+            branch.name,
+            branch.type,
+            repoPath,
+          );
+
+          if (!result.success) {
+            const errorMessage =
+              result.error === "dirty_working_tree"
+                ? t("git.dirtyWorkingTree")
+                : t("git.branchSwitchFailed");
+            Modal.alert(t("common.error"), errorMessage);
+            return;
+          }
+
+          const displayName =
+            branch.type === "remote"
+              ? branch.name.replace(/^[^/]+\//, "")
+              : branch.name;
+          Modal.alert(
+            t("common.success"),
+            t("git.switchBranchSuccess", { name: displayName }),
+          );
+          await loadBranches();
+        } catch {
+          Modal.alert(t("common.error"), t("git.branchSwitchFailed"));
+        } finally {
+          setOperatingBranch(null);
+        }
+      },
+      [sessionId, repoPath, operatingBranch, loadBranches],
+    );
+
+    const handleCreateBranch = React.useCallback(async () => {
+      if (isCreating) return;
+
+      const branchName = await Modal.prompt(
+        t("git.createBranch"),
+        t("git.enterBranchName"),
+        {
+          placeholder: t("git.branchNamePlaceholder"),
+          confirmText: t("git.createBranch"),
+        },
+      );
+
+      if (!branchName) return;
+
+      setIsCreating(true);
+      try {
+        const result = await createBranch(sessionId, branchName, repoPath);
+
+        if (!result.success) {
+          let errorMessage: string;
+          if (result.error === "invalid_branch_name") {
+            errorMessage = t("git.invalidBranchName");
+          } else if (result.error === "branch_already_exists") {
+            errorMessage = t("git.branchAlreadyExists", { name: branchName });
+          } else {
+            errorMessage = t("git.branchCreateFailed");
+          }
+          Modal.alert(t("common.error"), errorMessage);
+          return;
+        }
+
+        Modal.alert(
+          t("common.success"),
+          t("git.createBranchSuccess", { name: branchName }),
+        );
+        await loadBranches();
+      } catch {
+        Modal.alert(t("common.error"), t("git.branchCreateFailed"));
+      } finally {
+        setIsCreating(false);
+      }
+    }, [sessionId, repoPath, isCreating, loadBranches]);
 
     const renderTrackingInfo = React.useCallback(
       (branch: GitBranch) => {
@@ -225,11 +319,42 @@ export const GitBranchesTab = React.memo<GitBranchesTabProps>(
                     >
                       {`${t("git.localBranches")} (${branches.local.length})`}
                     </Text>
-                    <Ionicons
-                      name={localCollapsed ? "chevron-forward" : "chevron-down"}
-                      size={16}
-                      color={theme.colors.textSecondary}
-                    />
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleCreateBranch();
+                        }}
+                        hitSlop={8}
+                        disabled={isCreating}
+                      >
+                        {isCreating ? (
+                          <ActivityIndicator
+                            size="small"
+                            color={theme.colors.textLink}
+                          />
+                        ) : (
+                          <Ionicons
+                            name="add-circle-outline"
+                            size={20}
+                            color={theme.colors.textLink}
+                          />
+                        )}
+                      </Pressable>
+                      <Ionicons
+                        name={
+                          localCollapsed ? "chevron-forward" : "chevron-down"
+                        }
+                        size={16}
+                        color={theme.colors.textSecondary}
+                      />
+                    </View>
                   </Pressable>
                   {!localCollapsed &&
                     branches.local.map((branch, index) => (
@@ -240,6 +365,14 @@ export const GitBranchesTab = React.memo<GitBranchesTabProps>(
                         icon={renderBranchIcon(branch)}
                         rightElement={renderBranchRightElement(branch)}
                         showDivider={index < branches.local.length - 1}
+                        onPress={
+                          branch.isCurrent
+                            ? undefined
+                            : () => handleCheckout(branch)
+                        }
+                        disabled={branch.isCurrent}
+                        loading={operatingBranch === branch.name}
+                        showChevron={!branch.isCurrent}
                       />
                     ))}
                 </>
@@ -291,6 +424,9 @@ export const GitBranchesTab = React.memo<GitBranchesTabProps>(
                         icon={renderBranchIcon(branch)}
                         rightElement={renderTrackingInfo(branch)}
                         showDivider={index < branches.remote.length - 1}
+                        onPress={() => handleCheckout(branch)}
+                        loading={operatingBranch === branch.name}
+                        showChevron={true}
                       />
                     ))}
                 </>

@@ -1060,6 +1060,20 @@ export const en: TranslationStructure = {
     currentBranch: "Current",
     noBranches: "No branches found",
     noUpstream: "No upstream",
+    createBranch: "Create Branch",
+    enterBranchName: "Enter branch name",
+    branchNamePlaceholder: "feature/my-branch",
+    switchBranchSuccess: ({ name }: { name: string }) =>
+      `Switched to '${name}'`,
+    createBranchSuccess: ({ name }: { name: string }) =>
+      `Branch '${name}' created`,
+    dirtyWorkingTree:
+      "Please commit or stash your changes before switching branches",
+    branchSwitchFailed: "Failed to switch branch",
+    branchCreateFailed: "Failed to create branch",
+    invalidBranchName: "Invalid branch name",
+    branchAlreadyExists: ({ name }: { name: string }) =>
+      `Branch '${name}' already exists`,
     stashEmpty: "No stashed changes",
     stashFiles: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "file" : "files"} changed`,

@@ -1043,6 +1043,20 @@ export const ja: TranslationStructure = {
     currentBranch: "現在",
     noBranches: "ブランチが見つかりません",
     noUpstream: "アップストリームなし",
+    createBranch: "ブランチを作成",
+    enterBranchName: "ブランチ名を入力",
+    branchNamePlaceholder: "feature/my-branch",
+    switchBranchSuccess: ({ name }: { name: string }) =>
+      `'${name}' に切り替えました`,
+    createBranchSuccess: ({ name }: { name: string }) =>
+      `ブランチ '${name}' を作成しました`,
+    dirtyWorkingTree:
+      "ブランチを切り替える前に変更をコミットまたはスタッシュしてください",
+    branchSwitchFailed: "ブランチの切り替えに失敗しました",
+    branchCreateFailed: "ブランチの作成に失敗しました",
+    invalidBranchName: "無効なブランチ名",
+    branchAlreadyExists: ({ name }: { name: string }) =>
+      `ブランチ '${name}' はすでに存在します`,
     stashEmpty: "スタッシュされた変更はありません",
     stashFiles: ({ count }: { count: number }) => `${count}ファイル変更`,
     // Repo selector

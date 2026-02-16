@@ -1061,6 +1061,19 @@ export const it: TranslationStructure = {
     currentBranch: "Corrente",
     noBranches: "Nessun branch trovato",
     noUpstream: "Nessun upstream",
+    createBranch: "Crea ramo",
+    enterBranchName: "Inserisci il nome del ramo",
+    branchNamePlaceholder: "feature/my-branch",
+    switchBranchSuccess: ({ name }: { name: string }) => `Passato a '${name}'`,
+    createBranchSuccess: ({ name }: { name: string }) =>
+      `Ramo '${name}' creato`,
+    dirtyWorkingTree:
+      "Per favore, conferma o metti da parte le modifiche prima di cambiare ramo",
+    branchSwitchFailed: "Impossibile cambiare ramo",
+    branchCreateFailed: "Impossibile creare il ramo",
+    invalidBranchName: "Nome del ramo non valido",
+    branchAlreadyExists: ({ name }: { name: string }) =>
+      `Il ramo '${name}' esiste già`,
     stashEmpty: "Nessuna modifica salvata",
     stashFiles: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "file modificato" : "file modificati"}`,

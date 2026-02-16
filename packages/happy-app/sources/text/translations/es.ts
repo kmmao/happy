@@ -1064,6 +1064,19 @@ export const es: TranslationStructure = {
     currentBranch: "Actual",
     noBranches: "No se encontraron ramas",
     noUpstream: "Sin upstream",
+    createBranch: "Crear rama",
+    enterBranchName: "Introduce el nombre de la rama",
+    branchNamePlaceholder: "feature/my-branch",
+    switchBranchSuccess: ({ name }: { name: string }) => `Cambiado a '${name}'`,
+    createBranchSuccess: ({ name }: { name: string }) =>
+      `Rama '${name}' creada`,
+    dirtyWorkingTree:
+      "Por favor, confirma o guarda tus cambios antes de cambiar de rama",
+    branchSwitchFailed: "Error al cambiar de rama",
+    branchCreateFailed: "Error al crear la rama",
+    invalidBranchName: "Nombre de rama no válido",
+    branchAlreadyExists: ({ name }: { name: string }) =>
+      `La rama '${name}' ya existe`,
     stashEmpty: "No hay cambios guardados",
     stashFiles: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "archivo modificado" : "archivos modificados"}`,

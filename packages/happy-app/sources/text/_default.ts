@@ -1047,6 +1047,21 @@ export const en = {
     currentBranch: "Current",
     noBranches: "No branches found",
     noUpstream: "No upstream",
+    // Branch operations
+    createBranch: "Create Branch",
+    enterBranchName: "Enter branch name",
+    branchNamePlaceholder: "feature/my-branch",
+    switchBranchSuccess: ({ name }: { name: string }) =>
+      `Switched to '${name}'`,
+    createBranchSuccess: ({ name }: { name: string }) =>
+      `Branch '${name}' created`,
+    dirtyWorkingTree:
+      "Please commit or stash your changes before switching branches",
+    branchSwitchFailed: "Failed to switch branch",
+    branchCreateFailed: "Failed to create branch",
+    invalidBranchName: "Invalid branch name",
+    branchAlreadyExists: ({ name }: { name: string }) =>
+      `Branch '${name}' already exists`,
     // Stash
     stashEmpty: "No stashed changes",
     stashFiles: ({ count }: { count: number }) =>

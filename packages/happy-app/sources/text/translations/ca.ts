@@ -1064,6 +1064,19 @@ export const ca: TranslationStructure = {
     currentBranch: "Actual",
     noBranches: "No s'han trobat branques",
     noUpstream: "Sense upstream",
+    createBranch: "Crear branca",
+    enterBranchName: "Introdueix el nom de la branca",
+    branchNamePlaceholder: "feature/my-branch",
+    switchBranchSuccess: ({ name }: { name: string }) => `Canviat a '${name}'`,
+    createBranchSuccess: ({ name }: { name: string }) =>
+      `Branca '${name}' creada`,
+    dirtyWorkingTree:
+      "Si us plau, confirmeu o deseu els canvis abans de canviar de branca",
+    branchSwitchFailed: "Error en canviar de branca",
+    branchCreateFailed: "Error en crear la branca",
+    invalidBranchName: "Nom de branca no vàlid",
+    branchAlreadyExists: ({ name }: { name: string }) =>
+      `La branca '${name}' ja existeix`,
     stashEmpty: "No hi ha canvis desats",
     stashFiles: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "fitxer modificat" : "fitxers modificats"}`,

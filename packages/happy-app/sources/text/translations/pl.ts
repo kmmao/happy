@@ -1086,6 +1086,20 @@ export const pl: TranslationStructure = {
     currentBranch: "Bieżąca",
     noBranches: "Nie znaleziono gałęzi",
     noUpstream: "Brak upstream",
+    createBranch: "Utwórz gałąź",
+    enterBranchName: "Wprowadź nazwę gałęzi",
+    branchNamePlaceholder: "feature/my-branch",
+    switchBranchSuccess: ({ name }: { name: string }) =>
+      `Przełączono na '${name}'`,
+    createBranchSuccess: ({ name }: { name: string }) =>
+      `Gałąź '${name}' utworzona`,
+    dirtyWorkingTree:
+      "Proszę zatwierdzić lub schować zmiany przed przełączeniem gałęzi",
+    branchSwitchFailed: "Nie udało się przełączyć gałęzi",
+    branchCreateFailed: "Nie udało się utworzyć gałęzi",
+    invalidBranchName: "Nieprawidłowa nazwa gałęzi",
+    branchAlreadyExists: ({ name }: { name: string }) =>
+      `Gałąź '${name}' już istnieje`,
     stashEmpty: "Brak odłożonych zmian",
     stashFiles: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "plik zmieniony" : "plików zmienionych"}`,

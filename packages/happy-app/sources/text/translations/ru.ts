@@ -1085,6 +1085,20 @@ export const ru: TranslationStructure = {
     currentBranch: "Текущая",
     noBranches: "Ветки не найдены",
     noUpstream: "Нет upstream",
+    createBranch: "Создать ветку",
+    enterBranchName: "Введите имя ветки",
+    branchNamePlaceholder: "feature/my-branch",
+    switchBranchSuccess: ({ name }: { name: string }) =>
+      `Переключено на '${name}'`,
+    createBranchSuccess: ({ name }: { name: string }) =>
+      `Ветка '${name}' создана`,
+    dirtyWorkingTree:
+      "Пожалуйста, зафиксируйте или спрячьте изменения перед переключением веток",
+    branchSwitchFailed: "Не удалось переключить ветку",
+    branchCreateFailed: "Не удалось создать ветку",
+    invalidBranchName: "Недопустимое имя ветки",
+    branchAlreadyExists: ({ name }: { name: string }) =>
+      `Ветка '${name}' уже существует`,
     stashEmpty: "Нет отложенных изменений",
     stashFiles: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "файл изменён" : "файлов изменено"}`,

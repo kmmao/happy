@@ -151,6 +151,105 @@ function parseBranchVerbose(output: string): GitBranchList {
   return { local, remote, current };
 }
 
+export interface BranchOperationResult {
+  readonly success: boolean;
+  readonly error?: string;
+}
+
+async function isWorkingTreeClean(
+  sessionId: string,
+  cwd: string,
+): Promise<boolean> {
+  const result = await sessionBash(sessionId, {
+    command: "git status --porcelain",
+    cwd,
+    timeout: 10000,
+  });
+  return result.success && result.stdout.trim() === "";
+}
+
+function stripRemotePrefix(branchName: string): string {
+  // Remove origin/, upstream/, or other remote prefixes
+  const match = branchName.match(/^[^/]+\/(.+)$/);
+  return match ? match[1] : branchName;
+}
+
+export async function checkoutBranch(
+  sessionId: string,
+  branchName: string,
+  branchType: BranchType,
+  repoPath?: string,
+): Promise<BranchOperationResult> {
+  const cwd = resolveRepoPath(sessionId, repoPath);
+  if (!cwd) {
+    return { success: false, error: "Session path not found" };
+  }
+
+  const clean = await isWorkingTreeClean(sessionId, cwd);
+  if (!clean) {
+    return { success: false, error: "dirty_working_tree" };
+  }
+
+  const targetName =
+    branchType === "remote" ? stripRemotePrefix(branchName) : branchName;
+
+  const result = await sessionBash(sessionId, {
+    command: `git checkout ${targetName}`,
+    cwd,
+    timeout: 15000,
+  });
+
+  if (!result.success) {
+    return {
+      success: false,
+      error: result.stderr.trim() || result.error || "Checkout failed",
+    };
+  }
+
+  return { success: true };
+}
+
+export async function createBranch(
+  sessionId: string,
+  branchName: string,
+  repoPath?: string,
+): Promise<BranchOperationResult> {
+  const cwd = resolveRepoPath(sessionId, repoPath);
+  if (!cwd) {
+    return { success: false, error: "Session path not found" };
+  }
+
+  // Validate branch name
+  const validate = await sessionBash(sessionId, {
+    command: `git check-ref-format --branch "${branchName.replace(/"/g, '\\"')}"`,
+    cwd,
+    timeout: 5000,
+  });
+
+  if (!validate.success) {
+    return { success: false, error: "invalid_branch_name" };
+  }
+
+  const result = await sessionBash(sessionId, {
+    command: `git checkout -b "${branchName.replace(/"/g, '\\"')}"`,
+    cwd,
+    timeout: 15000,
+  });
+
+  if (!result.success) {
+    const stderr = result.stderr.trim();
+    if (stderr.includes("already exists")) {
+      return { success: false, error: "branch_already_exists" };
+    }
+    return {
+      success: false,
+      error: stderr || result.error || "Failed to create branch",
+    };
+  }
+
+  return { success: true };
+}
+
 export async function fetchGitBranches(
   sessionId: string,
   repoPath?: string,

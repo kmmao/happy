@@ -1014,6 +1014,18 @@ export const zhHant: TranslationStructure = {
     currentBranch: "目前",
     noBranches: "未找到分支",
     noUpstream: "無上游",
+    createBranch: "建立分支",
+    enterBranchName: "輸入分支名稱",
+    branchNamePlaceholder: "feature/my-branch",
+    switchBranchSuccess: ({ name }: { name: string }) => `已切換到 '${name}'`,
+    createBranchSuccess: ({ name }: { name: string }) =>
+      `分支 '${name}' 已建立`,
+    dirtyWorkingTree: "請先提交或暫存更改後再切換分支",
+    branchSwitchFailed: "切換分支失敗",
+    branchCreateFailed: "建立分支失敗",
+    invalidBranchName: "無效的分支名稱",
+    branchAlreadyExists: ({ name }: { name: string }) =>
+      `分支 '${name}' 已存在`,
     stashEmpty: "沒有暫存的變更",
     stashFiles: ({ count }: { count: number }) => `${count} 個檔案變更`,
     // Repo selector

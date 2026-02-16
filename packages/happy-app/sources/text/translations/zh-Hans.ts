@@ -1012,6 +1012,18 @@ export const zhHans: TranslationStructure = {
     currentBranch: "当前",
     noBranches: "未找到分支",
     noUpstream: "无上游",
+    createBranch: "创建分支",
+    enterBranchName: "输入分支名称",
+    branchNamePlaceholder: "feature/my-branch",
+    switchBranchSuccess: ({ name }: { name: string }) => `已切换到 '${name}'`,
+    createBranchSuccess: ({ name }: { name: string }) =>
+      `分支 '${name}' 已创建`,
+    dirtyWorkingTree: "请先提交或暂存更改后再切换分支",
+    branchSwitchFailed: "切换分支失败",
+    branchCreateFailed: "创建分支失败",
+    invalidBranchName: "无效的分支名称",
+    branchAlreadyExists: ({ name }: { name: string }) =>
+      `分支 '${name}' 已存在`,
     stashEmpty: "没有暂存的更改",
     stashFiles: ({ count }: { count: number }) => `${count} 个文件更改`,
     // Repo selector
