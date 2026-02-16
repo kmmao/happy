@@ -334,14 +334,22 @@ export async function runClaude(
       );
     }
 
-    // Resolve model - use message.meta.model if provided, otherwise use current model
+    // Resolve model - only update currentModel when an explicit non-null model is provided.
+    // When model is null/undefined (App sends null for "default"), keep the current model
+    // to preserve the initial model from CLI startup (e.g. ANTHROPIC_MODEL env var).
     let messageModel = currentModel;
     if (message.meta?.hasOwnProperty("model")) {
-      messageModel = message.meta.model || undefined; // null becomes undefined
-      currentModel = messageModel;
-      logger.debug(
-        `[loop] Model updated from user message: ${messageModel || "reset to default"}`,
-      );
+      if (message.meta.model) {
+        // Explicit model specified — update current model
+        messageModel = message.meta.model;
+        currentModel = messageModel;
+        logger.debug(`[loop] Model updated from user message: ${messageModel}`);
+      } else {
+        // model is null/undefined — use current model (don't reset)
+        logger.debug(
+          `[loop] User message has null model, keeping current: ${currentModel || "default"}`,
+        );
+      }
     } else {
       logger.debug(
         `[loop] User message received with no model override, using current: ${currentModel || "default"}`,

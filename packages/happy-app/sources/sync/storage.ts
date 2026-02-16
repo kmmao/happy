@@ -23,6 +23,8 @@ import {
   saveSessionDrafts,
   loadSessionPermissionModes,
   saveSessionPermissionModes,
+  loadSessionModelModes,
+  saveSessionModelModes,
   loadSessionNeedsAttention,
   saveSessionNeedsAttention,
 } from "./persistence";
@@ -313,6 +315,7 @@ export const storage = create<StorageState>()((set, get) => {
   let profile = loadProfile();
   let sessionDrafts = loadSessionDrafts();
   let sessionPermissionModes = loadSessionPermissionModes();
+  let sessionModelModes = loadSessionModelModes();
   let sessionNeedsAttention = loadSessionNeedsAttention();
   return {
     settings,
@@ -376,6 +379,7 @@ export const storage = create<StorageState>()((set, get) => {
         const savedPermissionModes = isInitialLoad
           ? sessionPermissionModes
           : {};
+        const savedModelModes = isInitialLoad ? sessionModelModes : {};
         const savedNeedsAttention = isInitialLoad ? sessionNeedsAttention : {};
 
         // Merge new sessions with existing ones
@@ -409,6 +413,21 @@ export const storage = create<StorageState>()((set, get) => {
               : undefined) ||
             defaultPermissionMode;
 
+          // Resolve modelMode: same priority as permissionMode
+          const existingModelMode = state.sessions[session.id]?.modelMode;
+          const savedModelMode = savedModelModes[session.id];
+          const resolvedModelMode: string =
+            (existingModelMode && existingModelMode !== "default"
+              ? existingModelMode
+              : undefined) ||
+            (savedModelMode && savedModelMode !== "default"
+              ? savedModelMode
+              : undefined) ||
+            (session.modelMode && session.modelMode !== "default"
+              ? session.modelMode
+              : undefined) ||
+            "default";
+
           // Resolve needsAttention: prefer explicit value from update, then existing, then saved
           const existingNeedsAttention =
             state.sessions[session.id]?.needsAttention;
@@ -423,6 +442,7 @@ export const storage = create<StorageState>()((set, get) => {
             presence,
             draft: existingDraft || savedDraft || session.draft || null,
             permissionMode: resolvedPermissionMode,
+            modelMode: resolvedModelMode,
             needsAttention: resolvedNeedsAttention,
           };
         });
@@ -975,6 +995,15 @@ export const storage = create<StorageState>()((set, get) => {
             modelMode: mode,
           },
         };
+
+        // Persist model modes (only non-default values to save space)
+        const allModelModes: Record<string, string> = {};
+        Object.entries(updatedSessions).forEach(([id, sess]) => {
+          if (sess.modelMode && sess.modelMode !== "default") {
+            allModelModes[id] = sess.modelMode;
+          }
+        });
+        saveSessionModelModes(allModelModes);
 
         // No need to rebuild sessionListViewData since model mode doesn't affect the list display
         return {
