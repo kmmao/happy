@@ -4,12 +4,11 @@ import {
   View,
   Platform,
   useWindowDimensions,
-  ViewStyle,
   Text,
   ActivityIndicator,
   TouchableWithoutFeedback,
-  Image as RNImage,
   Pressable,
+  ScrollView,
 } from "react-native";
 import { Image } from "expo-image";
 import { layout } from "./layout";
@@ -38,6 +37,7 @@ import {
   validateProfileForAgent,
 } from "@/sync/settings";
 import { getBuiltInProfile } from "@/sync/profileUtils";
+import { MAX_IMAGES } from "@/utils/imageUpload";
 
 interface AgentInputProps {
   value: string;
@@ -93,6 +93,11 @@ interface AgentInputProps {
   profileId?: string | null;
   onProfileClick?: () => void;
   onSlashCommandPress?: () => void;
+  onImagePaste?: (blob: Blob) => void;
+  onImagePickPress?: () => void;
+  isPickingImage?: boolean;
+  imagePaths?: string[];
+  onImageRemove?: (path: string) => void;
 }
 
 const MAX_CONTEXT_SIZE = 190000;
@@ -338,6 +343,8 @@ export const AgentInput = React.memo(
     const screenWidth = useWindowDimensions().width;
 
     const hasText = props.value.trim().length > 0;
+    const hasImages = (props.imagePaths?.length ?? 0) > 0;
+    const canSend = hasText || hasImages;
 
     // Check if this is a Codex or Gemini session
     // Use metadata.flavor for existing sessions, agentType prop for new sessions
@@ -583,7 +590,7 @@ export const AgentInput = React.memo(
             event.key === "Enter" &&
             !event.shiftKey
           ) {
-            if (props.value.trim()) {
+            if (canSend) {
               props.onSend();
               return true; // Key was handled
             }
@@ -619,7 +626,7 @@ export const AgentInput = React.memo(
         isAborting,
         handleAbortPress,
         agentInputEnterToSend,
-        props.value,
+        canSend,
         props.onSend,
         props.onPermissionModeChange,
         availableModes,
@@ -1172,6 +1179,87 @@ export const AgentInput = React.memo(
 
           {/* Box 2: Action Area (Input + Send) */}
           <View style={styles.unifiedPanel}>
+            {/* Image attachment chips */}
+            {hasImages && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: 8,
+                  paddingTop: 10,
+                  paddingBottom: 4,
+                  gap: 8,
+                }}
+              >
+                {(props.imagePaths ?? []).map((path, index) => (
+                  <View
+                    key={path}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: theme.colors.surfacePressed,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: theme.colors.divider,
+                      paddingLeft: 8,
+                      paddingRight: 6,
+                      paddingVertical: 6,
+                      gap: 6,
+                      height: 36,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 5,
+                        backgroundColor: `${theme.colors.success}18`,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons
+                        name="image"
+                        size={13}
+                        color={theme.colors.success}
+                      />
+                    </View>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: theme.colors.text,
+                        ...Typography.default("semiBold"),
+                      }}
+                      numberOfLines={1}
+                    >
+                      {(props.imagePaths ?? []).length === 1
+                        ? t("session.imageAttached")
+                        : t("session.imageLabel", { index: index + 1 })}
+                    </Text>
+                    {props.onImageRemove && (
+                      <Pressable
+                        onPress={() => {
+                          hapticsLight();
+                          props.onImageRemove?.(path);
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                        style={(p) => ({
+                          opacity: p.pressed ? 0.4 : 0.7,
+                          padding: 2,
+                        })}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={17}
+                          color={theme.colors.textSecondary}
+                        />
+                      </Pressable>
+                    )}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
             {/* Input field */}
             <View
               style={[
@@ -1189,6 +1277,7 @@ export const AgentInput = React.memo(
                 onKeyPress={handleKeyPress}
                 onStateChange={handleInputStateChange}
                 maxHeight={120}
+                onImagePaste={props.onImagePaste}
               />
             </View>
 
@@ -1384,6 +1473,15 @@ export const AgentInput = React.memo(
                       </Pressable>
                     )}
 
+                    {/* Image pick button */}
+                    {props.onImagePickPress && (
+                      <ImagePickButton
+                        onPress={props.onImagePickPress}
+                        isPickingImage={props.isPickingImage}
+                        imagePaths={props.imagePaths}
+                      />
+                    )}
+
                     {/* Git Status Badge */}
                     <GitStatusButton
                       sessionId={props.sessionId}
@@ -1395,7 +1493,7 @@ export const AgentInput = React.memo(
                   <View
                     style={[
                       styles.sendButton,
-                      hasText ||
+                      canSend ||
                       props.isSending ||
                       (props.onMicPress && !props.isMicActive)
                         ? styles.sendButtonActive
@@ -1413,7 +1511,7 @@ export const AgentInput = React.memo(
                       hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                       onPress={() => {
                         hapticsLight();
-                        if (hasText) {
+                        if (canSend) {
                           props.onSend();
                         } else {
                           props.onMicPress?.();
@@ -1422,7 +1520,7 @@ export const AgentInput = React.memo(
                       disabled={
                         props.isSendDisabled ||
                         props.isSending ||
-                        (!hasText && !props.onMicPress)
+                        (!canSend && !props.onMicPress)
                       }
                     >
                       {props.isSending ? (
@@ -1430,7 +1528,7 @@ export const AgentInput = React.memo(
                           size="small"
                           color={theme.colors.button.primary.tint}
                         />
-                      ) : hasText ? (
+                      ) : canSend ? (
                         <Octicons
                           name="arrow-up"
                           size={16}
@@ -1471,6 +1569,80 @@ export const AgentInput = React.memo(
     );
   }),
 );
+
+// Image Pick Button Component
+const ImagePickButton = React.memo(function ImagePickButton({
+  onPress,
+  isPickingImage,
+  imagePaths,
+}: {
+  onPress: () => void;
+  isPickingImage?: boolean;
+  imagePaths?: string[];
+}) {
+  const { theme } = useUnistyles();
+  const hasImages = (imagePaths?.length ?? 0) > 0;
+  const atMax = (imagePaths?.length ?? 0) >= MAX_IMAGES;
+  const isDisabled = isPickingImage || atMax;
+
+  return (
+    <Pressable
+      onPress={() => {
+        hapticsLight();
+        onPress();
+      }}
+      disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityLabel="Attach image"
+      accessibilityState={{
+        disabled: isDisabled,
+        busy: isPickingImage,
+      }}
+      hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+      style={(p) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        borderRadius: Platform.select({ default: 16, android: 20 }),
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        justifyContent: "center",
+        height: 32,
+        opacity: isDisabled ? 0.4 : p.pressed ? 0.6 : 1,
+        backgroundColor: hasImages
+          ? `${theme.colors.success}14`
+          : "transparent",
+      })}
+    >
+      {isPickingImage ? (
+        <ActivityIndicator size="small" color={theme.colors.success} />
+      ) : (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons
+            name={hasImages ? "image" : "image-outline"}
+            size={18}
+            color={
+              hasImages
+                ? theme.colors.success
+                : theme.colors.button.secondary.tint
+            }
+          />
+          {hasImages && (
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "700",
+                color: theme.colors.success,
+                ...Typography.default("semiBold"),
+              }}
+            >
+              {imagePaths?.length}
+            </Text>
+          )}
+        </View>
+      )}
+    </Pressable>
+  );
+});
 
 // Git Status Button Component
 function GitStatusButton({

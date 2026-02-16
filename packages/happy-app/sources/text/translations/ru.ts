@@ -461,6 +461,14 @@ export const ru: TranslationStructure = {
 
   session: {
     inputPlaceholder: "Введите сообщение...",
+    sentImage: "Отправлено изображение",
+    sentImages: ({ count }: { count: number }) =>
+      `Отправлено ${count} изображений`,
+    imageAttached: "Изображение прикреплено",
+    imageLabel: ({ index }: { index: number }) => `Изображение ${index}`,
+    imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${failed} из ${total} изображений не удалось загрузить`,
+    couldNotAttachFile: "Не удалось прикрепить этот файл",
   },
 
   commandPalette: {

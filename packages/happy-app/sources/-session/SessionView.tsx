@@ -41,6 +41,7 @@ import { Session } from "@/sync/storageTypes";
 import { sync } from "@/sync/sync";
 import { t } from "@/text";
 import { tracking, trackMessageSent } from "@/track";
+import { useImageUpload } from "@/hooks/useImageUpload";
 import { isRunningOnMac } from "@/utils/platform";
 import {
   useDeviceType,
@@ -341,6 +342,21 @@ function SessionViewLoaded({
   // Use draft hook for auto-saving message drafts
   const { clearDraft } = useDraft(sessionId, message, setMessage);
 
+  // Image sending state (pick, paste, pending paths)
+  const {
+    pendingImagePaths,
+    isPickingImage,
+    isProcessingImage,
+    pendingImagePathsRef,
+    doPickImage,
+    handleImagePaste,
+    setPendingImagePaths,
+  } = useImageUpload(sessionId);
+
+  // Guard against double-tap send — 300ms debounce covers the realistic fat-finger window.
+  // queueMicrotask was insufficient because RN bridge batching can deliver two taps in separate frames.
+  const sendingRef = React.useRef(false);
+
   // Handle dismissing CLI version warning
   const handleDismissCliWarning = React.useCallback(() => {
     if (machineId && cliVersion) {
@@ -366,19 +382,6 @@ function SessionViewLoaded({
       storage.getState().updateSessionModelMode(sessionId, mode.key);
     },
     [sessionId],
-  );
-
-  // Memoize header-dependent styles to prevent re-renders
-  const headerDependentStyles = React.useMemo(
-    () => ({
-      contentContainer: {
-        flex: 1,
-      },
-      flatListStyle: {
-        marginTop: 0, // No marginTop needed since header is handled by parent
-      },
-    }),
-    [],
   );
 
   // Handle microphone button press - memoized to prevent button flashing
@@ -489,13 +492,41 @@ function SessionViewLoaded({
           isPulsing: sessionStatus.isPulsing,
         }}
         onSend={() => {
-          if (message.trim()) {
-            Keyboard.dismiss();
-            setMessage("");
-            clearDraft();
-            sync.sendMessage(sessionId, message);
-            trackMessageSent();
-          }
+          // Prevent double-tap sending duplicate messages
+          if (sendingRef.current) return;
+          sendingRef.current = true;
+          // Reset after 300ms — covers the realistic double-tap window on all platforms
+          setTimeout(() => {
+            sendingRef.current = false;
+          }, 300);
+
+          const text = message.trim();
+          // Special commands (/compact, /clear) don't support images — send command only
+          const isSpecialCommand = /^\/(compact|clear)\b/.test(text);
+
+          // Read from ref to avoid stale closure — the ref is always current
+          const currentPaths = isSpecialCommand
+            ? []
+            : pendingImagePathsRef.current;
+          const imageRefs = currentPaths.map((p) => `[image: ${p}]`).join("\n");
+          const finalMessage = [text, imageRefs].filter(Boolean).join("\n");
+
+          if (!finalMessage) return;
+
+          Keyboard.dismiss();
+          setMessage("");
+          clearDraft();
+          setPendingImagePaths([]);
+          const imageCount = currentPaths.length;
+          const displayText =
+            imageCount > 0
+              ? text ||
+                (imageCount === 1
+                  ? t("session.sentImage")
+                  : t("session.sentImages", { count: imageCount }))
+              : undefined;
+          sync.sendMessage(sessionId, finalMessage, displayText);
+          trackMessageSent();
         }}
         onMicPress={micButtonState.onMicPress}
         isMicActive={micButtonState.isMicActive}
@@ -528,6 +559,13 @@ function SessionViewLoaded({
               : undefined
         }
         alwaysShowContextSize={alwaysShowContextSize}
+        onImagePaste={handleImagePaste}
+        onImagePickPress={doPickImage}
+        isPickingImage={isPickingImage || isProcessingImage}
+        imagePaths={pendingImagePaths}
+        onImageRemove={(path: string) =>
+          setPendingImagePaths((prev) => prev.filter((p) => p !== path))
+        }
         onSlashCommandPress={() => setShowCommandList(true)}
       />
     </>

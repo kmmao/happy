@@ -337,6 +337,13 @@ export const zhHant: TranslationStructure = {
 
   session: {
     inputPlaceholder: "輸入訊息...",
+    sentImage: "已傳送一張圖片",
+    sentImages: ({ count }: { count: number }) => `已傳送 ${count} 張圖片`,
+    imageAttached: "已附加圖片",
+    imageLabel: ({ index }: { index: number }) => `圖片 ${index}`,
+    imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${total} 張圖片中有 ${failed} 張上傳失敗`,
+    couldNotAttachFile: "無法附加此檔案",
   },
 
   commandPalette: {

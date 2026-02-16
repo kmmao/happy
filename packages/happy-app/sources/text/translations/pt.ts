@@ -358,6 +358,13 @@ export const pt: TranslationStructure = {
 
   session: {
     inputPlaceholder: "Digite uma mensagem ...",
+    sentImage: "Imagem enviada",
+    sentImages: ({ count }: { count: number }) => `${count} imagens enviadas`,
+    imageAttached: "Imagem anexada",
+    imageLabel: ({ index }: { index: number }) => `Imagem ${index}`,
+    imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${failed} de ${total} imagens falharam ao carregar`,
+    couldNotAttachFile: "Não foi possível anexar este arquivo",
   },
 
   commandPalette: {

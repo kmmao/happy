@@ -381,6 +381,14 @@ export const ja: TranslationStructure = {
 
   session: {
     inputPlaceholder: "メッセージを入力...",
+    sentImage: "画像を送信しました",
+    sentImages: ({ count }: { count: number }) =>
+      `${count}枚の画像を送信しました`,
+    imageAttached: "画像が添付されました",
+    imageLabel: ({ index }: { index: number }) => `画像 ${index}`,
+    imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${total}枚中${failed}枚の画像のアップロードに失敗しました`,
+    couldNotAttachFile: "このファイルを添付できませんでした",
   },
 
   commandPalette: {
