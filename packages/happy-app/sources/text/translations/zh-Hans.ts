@@ -995,4 +995,26 @@ export const zhHans: TranslationStructure = {
       `您现在与 ${name} 成为了好友`,
     friendAcceptedGeneric: "好友请求已接受",
   },
+
+  git: {
+    title: "Git",
+    tabChanges: "更改",
+    tabHistory: "历史",
+    tabBranches: "分支",
+    tabStash: "暂存",
+    historyEmpty: "暂无提交记录",
+    historyLoading: "正在加载提交...",
+    historyLoadMore: "加载更多...",
+    historyNoMore: "已加载全部提交",
+    commitFiles: ({ count }: { count: number }) => `${count} 个文件更改`,
+    localBranches: "本地分支",
+    remoteBranches: "远程分支",
+    currentBranch: "当前",
+    noBranches: "未找到分支",
+    noUpstream: "无上游",
+    stashEmpty: "没有暂存的更改",
+    stashFiles: ({ count }: { count: number }) => `${count} 个文件更改`,
+    // Repo selector
+    rootRepo: "根仓库",
+  },
 } as const;

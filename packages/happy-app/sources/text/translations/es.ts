@@ -1046,6 +1046,30 @@ export const es: TranslationStructure = {
       cancel: "Cancelar",
     },
   },
+
+  git: {
+    title: "Git",
+    tabChanges: "Cambios",
+    tabHistory: "Historial",
+    tabBranches: "Ramas",
+    tabStash: "Stash",
+    historyEmpty: "Sin commits aún",
+    historyLoading: "Cargando commits...",
+    historyLoadMore: "Cargando más...",
+    historyNoMore: "Todos los commits cargados",
+    commitFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "archivo modificado" : "archivos modificados"}`,
+    localBranches: "Ramas locales",
+    remoteBranches: "Ramas remotas",
+    currentBranch: "Actual",
+    noBranches: "No se encontraron ramas",
+    noUpstream: "Sin upstream",
+    stashEmpty: "No hay cambios guardados",
+    stashFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "archivo modificado" : "archivos modificados"}`,
+    // Repo selector
+    rootRepo: "Raíz",
+  },
 } as const;
 
 export type TranslationsEs = typeof es;

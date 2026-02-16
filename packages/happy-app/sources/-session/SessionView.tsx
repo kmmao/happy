@@ -267,7 +267,6 @@ function SessionViewLoaded({
   const sessionStatus = useSessionStatus(session);
   const sessionUsage = useSessionUsage(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
-  const experiments = useSetting("experiments");
 
   // Scroll-to-bottom state
   const chatListRef = React.useRef<ChatListHandle>(null);
@@ -477,11 +476,7 @@ function SessionViewLoaded({
           sessionStatus.state === "thinking" ||
           sessionStatus.state === "waiting"
         }
-        onFileViewerPress={
-          experiments
-            ? () => router.push(`/session/${sessionId}/files`)
-            : undefined
-        }
+        onFileViewerPress={() => router.push(`/session/${sessionId}/git`)}
         // Autocomplete configuration
         autocompletePrefixes={["@", "/"]}
         autocompleteSuggestions={(query) => getSuggestions(sessionId, query)}

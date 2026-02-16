@@ -1046,6 +1046,30 @@ export const ca: TranslationStructure = {
     friendAccepted: ({ name }: { name: string }) => `Ara ets amic de ${name}`,
     friendAcceptedGeneric: "Sol·licitud d'amistat acceptada",
   },
+
+  git: {
+    title: "Git",
+    tabChanges: "Canvis",
+    tabHistory: "Historial",
+    tabBranches: "Branques",
+    tabStash: "Stash",
+    historyEmpty: "Encara no hi ha commits",
+    historyLoading: "Carregant commits...",
+    historyLoadMore: "Carregant més...",
+    historyNoMore: "Tots els commits carregats",
+    commitFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "fitxer modificat" : "fitxers modificats"}`,
+    localBranches: "Branques locals",
+    remoteBranches: "Branques remotes",
+    currentBranch: "Actual",
+    noBranches: "No s'han trobat branques",
+    noUpstream: "Sense upstream",
+    stashEmpty: "No hi ha canvis desats",
+    stashFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "fitxer modificat" : "fitxers modificats"}`,
+    // Repo selector
+    rootRepo: "Principal",
+  },
 } as const;
 
 export type TranslationsCa = typeof ca;

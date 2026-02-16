@@ -997,4 +997,26 @@ export const zhHant: TranslationStructure = {
       cancel: "取消",
     },
   },
+
+  git: {
+    title: "Git",
+    tabChanges: "變更",
+    tabHistory: "歷史",
+    tabBranches: "分支",
+    tabStash: "暫存",
+    historyEmpty: "尚無提交記錄",
+    historyLoading: "正在載入提交...",
+    historyLoadMore: "載入更多...",
+    historyNoMore: "已載入全部提交",
+    commitFiles: ({ count }: { count: number }) => `${count} 個檔案變更`,
+    localBranches: "本地分支",
+    remoteBranches: "遠端分支",
+    currentBranch: "目前",
+    noBranches: "未找到分支",
+    noUpstream: "無上游",
+    stashEmpty: "沒有暫存的變更",
+    stashFiles: ({ count }: { count: number }) => `${count} 個檔案變更`,
+    // Repo selector
+    rootRepo: "根倉庫",
+  },
 } as const;

@@ -1068,6 +1068,30 @@ export const pl: TranslationStructure = {
       cancel: "Anuluj",
     },
   },
+
+  git: {
+    title: "Git",
+    tabChanges: "Zmiany",
+    tabHistory: "Historia",
+    tabBranches: "Gałęzie",
+    tabStash: "Schowek",
+    historyEmpty: "Brak commitów",
+    historyLoading: "Ładowanie commitów...",
+    historyLoadMore: "Ładowanie...",
+    historyNoMore: "Załadowano wszystkie commity",
+    commitFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "plik zmieniony" : "plików zmienionych"}`,
+    localBranches: "Lokalne gałęzie",
+    remoteBranches: "Zdalne gałęzie",
+    currentBranch: "Bieżąca",
+    noBranches: "Nie znaleziono gałęzi",
+    noUpstream: "Brak upstream",
+    stashEmpty: "Brak odłożonych zmian",
+    stashFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "plik zmieniony" : "plików zmienionych"}`,
+    // Repo selector
+    rootRepo: "Główne",
+  },
 } as const;
 
 export type TranslationsPl = typeof pl;

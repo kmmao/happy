@@ -1044,6 +1044,30 @@ export const pt: TranslationStructure = {
       `Agora você é amigo de ${name}`,
     friendAcceptedGeneric: "Pedido de amizade aceito",
   },
+
+  git: {
+    title: "Git",
+    tabChanges: "Alterações",
+    tabHistory: "Histórico",
+    tabBranches: "Branches",
+    tabStash: "Stash",
+    historyEmpty: "Nenhum commit ainda",
+    historyLoading: "Carregando commits...",
+    historyLoadMore: "Carregando mais...",
+    historyNoMore: "Todos os commits carregados",
+    commitFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "arquivo modificado" : "arquivos modificados"}`,
+    localBranches: "Branches locais",
+    remoteBranches: "Branches remotos",
+    currentBranch: "Atual",
+    noBranches: "Nenhum branch encontrado",
+    noUpstream: "Sem upstream",
+    stashEmpty: "Nenhuma alteração guardada",
+    stashFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "arquivo modificado" : "arquivos modificados"}`,
+    // Repo selector
+    rootRepo: "Raiz",
+  },
 } as const;
 
 export type TranslationsPt = typeof pt;

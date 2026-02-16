@@ -1026,4 +1026,26 @@ export const ja: TranslationStructure = {
       `${name}さんと友達になりました`,
     friendAcceptedGeneric: "友達リクエストが承認されました",
   },
+
+  git: {
+    title: "Git",
+    tabChanges: "変更",
+    tabHistory: "履歴",
+    tabBranches: "ブランチ",
+    tabStash: "スタッシュ",
+    historyEmpty: "コミットはまだありません",
+    historyLoading: "コミットを読み込み中...",
+    historyLoadMore: "さらに読み込み中...",
+    historyNoMore: "すべてのコミットを読み込みました",
+    commitFiles: ({ count }: { count: number }) => `${count}ファイル変更`,
+    localBranches: "ローカルブランチ",
+    remoteBranches: "リモートブランチ",
+    currentBranch: "現在",
+    noBranches: "ブランチが見つかりません",
+    noUpstream: "アップストリームなし",
+    stashEmpty: "スタッシュされた変更はありません",
+    stashFiles: ({ count }: { count: number }) => `${count}ファイル変更`,
+    // Repo selector
+    rootRepo: "ルート",
+  },
 } as const;

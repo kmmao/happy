@@ -1067,6 +1067,30 @@ export const ru: TranslationStructure = {
       cancel: "Отмена",
     },
   },
+
+  git: {
+    title: "Git",
+    tabChanges: "Изменения",
+    tabHistory: "История",
+    tabBranches: "Ветки",
+    tabStash: "Тайник",
+    historyEmpty: "Коммитов пока нет",
+    historyLoading: "Загрузка коммитов...",
+    historyLoadMore: "Загрузка...",
+    historyNoMore: "Все коммиты загружены",
+    commitFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "файл изменён" : "файлов изменено"}`,
+    localBranches: "Локальные ветки",
+    remoteBranches: "Удалённые ветки",
+    currentBranch: "Текущая",
+    noBranches: "Ветки не найдены",
+    noUpstream: "Нет upstream",
+    stashEmpty: "Нет отложенных изменений",
+    stashFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "файл изменён" : "файлов изменено"}`,
+    // Repo selector
+    rootRepo: "Корень",
+  },
 } as const;
 
 export type TranslationsRu = typeof ru;

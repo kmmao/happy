@@ -1043,6 +1043,30 @@ export const it: TranslationStructure = {
     friendAccepted: ({ name }: { name: string }) => `Ora sei amico di ${name}`,
     friendAcceptedGeneric: "Richiesta di amicizia accettata",
   },
+
+  git: {
+    title: "Git",
+    tabChanges: "Modifiche",
+    tabHistory: "Cronologia",
+    tabBranches: "Branch",
+    tabStash: "Stash",
+    historyEmpty: "Nessun commit ancora",
+    historyLoading: "Caricamento commit...",
+    historyLoadMore: "Caricamento...",
+    historyNoMore: "Tutti i commit caricati",
+    commitFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "file modificato" : "file modificati"}`,
+    localBranches: "Branch locali",
+    remoteBranches: "Branch remoti",
+    currentBranch: "Corrente",
+    noBranches: "Nessun branch trovato",
+    noUpstream: "Nessun upstream",
+    stashEmpty: "Nessuna modifica salvata",
+    stashFiles: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "file modificato" : "file modificati"}`,
+    // Repo selector
+    rootRepo: "Principale",
+  },
 } as const;
 
 export type TranslationsIt = typeof it;

@@ -1,0 +1,320 @@
+import * as React from "react";
+import { View, ActivityIndicator, Pressable, Platform } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons, Octicons } from "@expo/vector-icons";
+import { Text } from "@/components/StyledText";
+import { Item } from "@/components/Item";
+import { ItemList } from "@/components/ItemList";
+import { Typography } from "@/constants/Typography";
+import { useUnistyles, StyleSheet } from "react-native-unistyles";
+import { layout } from "@/components/layout";
+import { t } from "@/text";
+import { fetchGitBranches, GitBranch, GitBranchList } from "@/sync/gitBranches";
+
+interface GitBranchesTabProps {
+  readonly sessionId: string;
+  readonly repoPath?: string;
+}
+
+export const GitBranchesTab = React.memo<GitBranchesTabProps>(
+  function GitBranchesTab({ sessionId, repoPath }) {
+    const { theme } = useUnistyles();
+    const [branches, setBranches] = React.useState<GitBranchList | null>(null);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [localCollapsed, setLocalCollapsed] = React.useState(false);
+    const [remoteCollapsed, setRemoteCollapsed] = React.useState(false);
+
+    const loadBranches = React.useCallback(async () => {
+      try {
+        setIsLoading(true);
+        const result = await fetchGitBranches(sessionId, repoPath);
+        setBranches(result);
+      } catch {
+        setBranches(null);
+      } finally {
+        setIsLoading(false);
+      }
+    }, [sessionId, repoPath]);
+
+    // Load on mount
+    React.useEffect(() => {
+      loadBranches();
+    }, [loadBranches]);
+
+    // Refresh when screen is focused
+    useFocusEffect(
+      React.useCallback(() => {
+        loadBranches();
+      }, [loadBranches]),
+    );
+
+    const renderTrackingInfo = React.useCallback(
+      (branch: GitBranch) => {
+        if (!branch.upstream) {
+          return null;
+        }
+        const parts: string[] = [];
+        if (branch.aheadCount > 0) {
+          parts.push(`\u2191${branch.aheadCount}`);
+        }
+        if (branch.behindCount > 0) {
+          parts.push(`\u2193${branch.behindCount}`);
+        }
+        if (parts.length === 0) {
+          return null;
+        }
+        return (
+          <Text
+            style={{
+              fontSize: 13,
+              color: theme.colors.textSecondary,
+              ...Typography.mono(),
+            }}
+          >
+            {parts.join(" ")}
+          </Text>
+        );
+      },
+      [theme],
+    );
+
+    const renderCurrentBadge = React.useCallback(() => {
+      return (
+        <View
+          style={{
+            backgroundColor: theme.colors.success + "20",
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 4,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "600",
+              color: theme.colors.success,
+              ...Typography.default(),
+            }}
+          >
+            {t("git.currentBranch")}
+          </Text>
+        </View>
+      );
+    }, [theme]);
+
+    const renderBranchRightElement = React.useCallback(
+      (branch: GitBranch) => {
+        if (branch.isCurrent) {
+          const tracking = renderTrackingInfo(branch);
+          if (tracking) {
+            return (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                {tracking}
+                {renderCurrentBadge()}
+              </View>
+            );
+          }
+          return renderCurrentBadge();
+        }
+        return renderTrackingInfo(branch);
+      },
+      [renderTrackingInfo, renderCurrentBadge],
+    );
+
+    const renderBranchIcon = React.useCallback(
+      (branch: GitBranch) => {
+        if (branch.isCurrent) {
+          return (
+            <Ionicons
+              name="checkmark-circle"
+              size={22}
+              color={theme.colors.success}
+            />
+          );
+        }
+        if (branch.type === "remote") {
+          return (
+            <Octicons
+              name="globe"
+              size={20}
+              color={theme.colors.textSecondary}
+            />
+          );
+        }
+        return (
+          <Octicons
+            name="git-branch"
+            size={20}
+            color={theme.colors.textSecondary}
+          />
+        );
+      },
+      [theme],
+    );
+
+    const hasNoBranches =
+      branches !== null &&
+      branches.local.length === 0 &&
+      branches.remote.length === 0;
+
+    return (
+      <View
+        style={[styles.container, { backgroundColor: theme.colors.surface }]}
+      >
+        <ItemList style={{ flex: 1 }}>
+          {isLoading ? (
+            <View style={styles.centerState}>
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.textSecondary}
+              />
+            </View>
+          ) : hasNoBranches ? (
+            <View style={styles.centerState}>
+              <Octicons
+                name="git-branch"
+                size={48}
+                color={theme.colors.textSecondary}
+              />
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: theme.colors.textSecondary,
+                  textAlign: "center",
+                  marginTop: 16,
+                  ...Typography.default(),
+                }}
+              >
+                {t("git.noBranches")}
+              </Text>
+            </View>
+          ) : (
+            <>
+              {/* Local Branches Section */}
+              {branches !== null && branches.local.length > 0 && (
+                <>
+                  <Pressable
+                    onPress={() => setLocalCollapsed((v) => !v)}
+                    style={{
+                      backgroundColor: theme.colors.surfaceHigh,
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderBottomWidth: Platform.select({
+                        ios: 0.33,
+                        default: 1,
+                      }),
+                      borderBottomColor: theme.colors.divider,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "600",
+                        color: theme.colors.text,
+                        ...Typography.default(),
+                      }}
+                    >
+                      {`${t("git.localBranches")} (${branches.local.length})`}
+                    </Text>
+                    <Ionicons
+                      name={localCollapsed ? "chevron-forward" : "chevron-down"}
+                      size={16}
+                      color={theme.colors.textSecondary}
+                    />
+                  </Pressable>
+                  {!localCollapsed &&
+                    branches.local.map((branch, index) => (
+                      <Item
+                        key={`local-${branch.name}`}
+                        title={branch.name}
+                        subtitle={branch.shortHash}
+                        icon={renderBranchIcon(branch)}
+                        rightElement={renderBranchRightElement(branch)}
+                        showDivider={index < branches.local.length - 1}
+                      />
+                    ))}
+                </>
+              )}
+
+              {/* Remote Branches Section */}
+              {branches !== null && branches.remote.length > 0 && (
+                <>
+                  <Pressable
+                    onPress={() => setRemoteCollapsed((v) => !v)}
+                    style={{
+                      backgroundColor: theme.colors.surfaceHigh,
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderBottomWidth: Platform.select({
+                        ios: 0.33,
+                        default: 1,
+                      }),
+                      borderBottomColor: theme.colors.divider,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "600",
+                        color: theme.colors.text,
+                        ...Typography.default(),
+                      }}
+                    >
+                      {`${t("git.remoteBranches")} (${branches.remote.length})`}
+                    </Text>
+                    <Ionicons
+                      name={
+                        remoteCollapsed ? "chevron-forward" : "chevron-down"
+                      }
+                      size={16}
+                      color={theme.colors.textSecondary}
+                    />
+                  </Pressable>
+                  {!remoteCollapsed &&
+                    branches.remote.map((branch, index) => (
+                      <Item
+                        key={`remote-${branch.name}`}
+                        title={branch.name}
+                        subtitle={branch.shortHash}
+                        icon={renderBranchIcon(branch)}
+                        rightElement={renderTrackingInfo(branch)}
+                        showDivider={index < branches.remote.length - 1}
+                      />
+                    ))}
+                </>
+              )}
+            </>
+          )}
+        </ItemList>
+      </View>
+    );
+  },
+);
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    flex: 1,
+    maxWidth: layout.maxWidth,
+    alignSelf: "center",
+    width: "100%",
+  },
+  centerState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 40,
+    paddingHorizontal: 20,
+  },
+}));
