@@ -517,12 +517,13 @@ export const AgentInput = React.memo(
         isScript: boolean;
       }> = [];
 
-      // Add package.json scripts (npm/yarn run X)
+      // Add package.json scripts
+      // Key = display label, Value = shell command to execute
       if (props.packageScripts) {
-        for (const name of Object.keys(props.packageScripts)) {
+        for (const [label, command] of Object.entries(props.packageScripts)) {
           commands.push({
-            label: name,
-            command: `npm run ${name}`,
+            label,
+            command,
             isScript: true,
           });
         }

@@ -2,8 +2,8 @@ import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { exec, type ExecOptions } from "node:child_process";
 import { promisify } from "node:util";
-import { readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, readdir, rm } from "node:fs/promises";
+import { join, basename } from "node:path";
 
 const execAsync = promisify(exec);
 
@@ -130,18 +130,8 @@ export async function runClaude(
     metadata: initialMachineMetadata,
   });
 
-  // Read package.json scripts from working directory
-  let packageScripts: Record<string, string> | undefined;
-  try {
-    const pkgPath = join(workingDirectory, "package.json");
-    const pkgContent = await readFile(pkgPath, "utf-8");
-    const pkg = JSON.parse(pkgContent);
-    if (pkg.scripts && typeof pkg.scripts === "object") {
-      packageScripts = pkg.scripts;
-    }
-  } catch {
-    // No package.json or invalid - that's fine
-  }
+  // Read package.json scripts from working directory (including monorepo sub-packages)
+  const packageScripts = await readPackageScripts(workingDirectory);
 
   let metadata: Metadata = {
     path: workingDirectory,
@@ -731,4 +721,149 @@ function formatShellOutput(
     output += `\n\n*Exit code: ${exitCode}*`;
   }
   return output;
+}
+
+/**
+ * Read package.json scripts from working directory,
+ * including monorepo sub-packages if workspaces are defined.
+ *
+ * Returns scripts keyed as:
+ * - Root scripts: "scriptName" → "description"
+ * - Sub-package scripts: "packageName:scriptName" → "description"
+ */
+async function readPackageScripts(
+  workingDirectory: string,
+): Promise<Record<string, string> | undefined> {
+  const scripts: Record<string, string> = {};
+
+  // Read root package.json
+  let rootPkg:
+    | {
+        scripts?: Record<string, string>;
+        workspaces?: string[] | { packages: string[] };
+      }
+    | undefined;
+  try {
+    const pkgPath = join(workingDirectory, "package.json");
+    const pkgContent = await readFile(pkgPath, "utf-8");
+    rootPkg = JSON.parse(pkgContent);
+    if (rootPkg?.scripts && typeof rootPkg.scripts === "object") {
+      for (const name of Object.keys(rootPkg.scripts)) {
+        if (!name.startsWith("//")) {
+          // Key = display label, Value = shell command to execute
+          scripts[name] = `npm run ${name}`;
+        }
+      }
+    }
+  } catch {
+    // No package.json or invalid - return undefined
+    return undefined;
+  }
+
+  // Check for monorepo workspaces
+  const workspacePatterns = Array.isArray(rootPkg?.workspaces)
+    ? rootPkg.workspaces
+    : rootPkg?.workspaces?.packages;
+
+  if (!workspacePatterns || workspacePatterns.length === 0) {
+    return Object.keys(scripts).length > 0 ? scripts : undefined;
+  }
+
+  // Resolve workspace patterns to actual package directories
+  const packageDirs = await resolveWorkspacePatterns(
+    workingDirectory,
+    workspacePatterns,
+  );
+
+  // Read each sub-package's scripts
+  const readPromises = packageDirs.map(async (dir) => {
+    try {
+      const pkgPath = join(dir, "package.json");
+      const pkgContent = await readFile(pkgPath, "utf-8");
+      const pkg = JSON.parse(pkgContent);
+      const pkgName = pkg.name || basename(dir);
+      // Use short name: strip org scope if present (e.g., "@org/foo" → "foo")
+      const shortName =
+        pkgName.startsWith("@") && pkgName.includes("/")
+          ? pkgName.split("/")[1]
+          : pkgName;
+
+      if (pkg.scripts && typeof pkg.scripts === "object") {
+        for (const name of Object.keys(pkg.scripts)) {
+          if (!name.startsWith("//")) {
+            // Key = "pkg:script" display label, Value = yarn workspace command
+            scripts[`${shortName}:${name}`] =
+              `yarn workspace ${pkgName} ${name}`;
+          }
+        }
+      }
+    } catch {
+      // Skip packages with invalid or missing package.json
+    }
+  });
+
+  await Promise.all(readPromises);
+
+  return Object.keys(scripts).length > 0 ? scripts : undefined;
+}
+
+/**
+ * Resolve yarn/npm workspace glob patterns to actual directories.
+ * Handles simple patterns like "packages/*" without needing a glob library.
+ */
+async function resolveWorkspacePatterns(
+  rootDir: string,
+  patterns: string[],
+): Promise<string[]> {
+  const dirs: string[] = [];
+
+  for (const pattern of patterns) {
+    // Handle "packages/*" style patterns (most common)
+    if (pattern.endsWith("/*")) {
+      const parentDir = resolve(rootDir, pattern.slice(0, -2));
+      try {
+        const entries = await readdir(parentDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory() && !entry.name.startsWith(".")) {
+            dirs.push(join(parentDir, entry.name));
+          }
+        }
+      } catch {
+        // Directory doesn't exist - skip
+      }
+    } else if (pattern.includes("*")) {
+      // Handle deeper globs like "packages/*/sub/*" - split at first wildcard
+      const parts = pattern.split("*");
+      const prefix = resolve(rootDir, parts[0]);
+      try {
+        const entries = await readdir(prefix, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory() && !entry.name.startsWith(".")) {
+            const subPath = join(prefix, entry.name);
+            if (parts.length > 2) {
+              // Nested wildcard - recurse one level
+              const suffix = parts.slice(1).join("*").replace(/^\//, "");
+              const subDirs = await resolveWorkspacePatterns(subPath, [suffix]);
+              dirs.push(...subDirs);
+            } else {
+              dirs.push(subPath);
+            }
+          }
+        }
+      } catch {
+        // Directory doesn't exist - skip
+      }
+    } else {
+      // Exact path like "apps/web"
+      const exactDir = resolve(rootDir, pattern);
+      try {
+        await readdir(exactDir);
+        dirs.push(exactDir);
+      } catch {
+        // Directory doesn't exist - skip
+      }
+    }
+  }
+
+  return dirs;
 }
