@@ -453,13 +453,14 @@ export async function claudeRemoteLauncher(
             message: "Aborted by user",
           });
         }
-      } catch (e) {
-        logger.debug("[remote]: launch error", e);
+      } catch (e: unknown) {
+        const err = e instanceof Error ? e : new Error(String(e));
+        logger.debug("[remote]: launch error", err.message, err.stack, e);
         if (!exitReason) {
           session.client.closeClaudeSessionTurn("failed");
           session.client.sendSessionEvent({
             type: "message",
-            message: "Process exited unexpectedly",
+            message: `Process exited unexpectedly: ${err.message}`,
           });
           continue;
         }
