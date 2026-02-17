@@ -12,6 +12,7 @@ import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { join, resolve } from "node:path";
 import { projectPath } from "@/projectPath";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
+import { executeShellCommand } from "@/utils/shellCommand";
 import { logger } from "@/lib";
 import { PushableAsyncIterable } from "@/utils/PushableAsyncIterable";
 import { getProjectPath } from "./utils/path";
@@ -50,6 +51,7 @@ export async function claudeRemote(opts: {
   onThinkingChange?: (thinking: boolean) => void;
   onMessage: (message: SDKMessage) => void;
   onCompletionEvent?: (message: string) => void;
+  onShellResult?: (output: string) => void;
   onSessionReset?: () => void;
 }) {
   // Check if session is valid
@@ -114,6 +116,22 @@ export async function claudeRemote(opts: {
     }
     if (opts.onSessionReset) {
       opts.onSessionReset();
+    }
+    return;
+  }
+
+  // Handle shell command ($ or ! prefix) - execute directly without Claude
+  if (specialCommand.type === "shell" && specialCommand.shellCommand) {
+    logger.debug(
+      "[claudeRemote] Detected $ shell command:",
+      specialCommand.shellCommand,
+    );
+    const output = await executeShellCommand(
+      specialCommand.shellCommand,
+      opts.path,
+    );
+    if (opts.onShellResult) {
+      opts.onShellResult(output);
     }
     return;
   }
@@ -254,6 +272,29 @@ export async function claudeRemote(opts: {
           messages.end();
           return;
         }
+
+        // Check for shell command in follow-up messages
+        const nextSpecialCommand = parseSpecialCommand(next.message);
+        if (
+          nextSpecialCommand.type === "shell" &&
+          nextSpecialCommand.shellCommand
+        ) {
+          logger.debug(
+            "[claudeRemote] Detected $ shell command in follow-up:",
+            nextSpecialCommand.shellCommand,
+          );
+          const output = await executeShellCommand(
+            nextSpecialCommand.shellCommand,
+            opts.path,
+          );
+          if (opts.onShellResult) {
+            opts.onShellResult(output);
+          }
+          // Don't push to Claude, wait for next user message
+          opts.onReady();
+          continue;
+        }
+
         mode = next.mode;
         messages.push({
           type: "user",

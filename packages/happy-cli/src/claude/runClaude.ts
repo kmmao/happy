@@ -1,11 +1,7 @@
 import os from "node:os";
 import { randomUUID } from "node:crypto";
-import { exec, type ExecOptions } from "node:child_process";
-import { promisify } from "node:util";
 import { readFile, readdir, rm } from "node:fs/promises";
 import { join, basename } from "node:path";
-
-const execAsync = promisify(exec);
 
 import { ApiClient } from "@/api/api";
 import { logger } from "@/ui/logger";
@@ -19,6 +15,7 @@ import { hashObject } from "@/utils/deterministicJson";
 import { startCaffeinate, stopCaffeinate } from "@/utils/caffeinate";
 import { extractSDKMetadataAsync } from "@/claude/sdk/metadataExtractor";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
+import { executeShellCommand } from "@/utils/shellCommand";
 import { getEnvironmentInfo } from "@/ui/doctor";
 import { configuration } from "@/configuration";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
@@ -447,54 +444,10 @@ export async function runClaude(
 
       const shellCmd = specialCommand.shellCommand;
       (async () => {
-        try {
-          const execOptions: ExecOptions = {
-            cwd: workingDirectory,
-            timeout: 30000,
-            maxBuffer: 1024 * 1024,
-          };
-
-          const { stdout, stderr } = await execAsync(shellCmd, execOptions);
-
-          const stdoutStr = stdout ? stdout.toString() : "";
-          const stderrStr = stderr ? stderr.toString() : "";
-          const output = formatShellOutput(shellCmd, stdoutStr, stderrStr, 0);
-          const envelope = createEnvelope("agent", { t: "text", text: output });
-          session.sendSessionProtocolMessage(envelope);
-
-          logger.debug("[start] Shell command executed successfully");
-        } catch (error: unknown) {
-          const execError = error as NodeJS.ErrnoException & {
-            stdout?: string;
-            stderr?: string;
-            code?: number | string;
-            killed?: boolean;
-          };
-
-          let errorMessage =
-            execError.stderr || execError.message || "Command failed";
-          let exitCode =
-            typeof execError.code === "number" ? execError.code : 1;
-
-          if (execError.killed || execError.code === "ETIMEDOUT") {
-            errorMessage = "Command timed out (30s limit)";
-            exitCode = -1;
-          }
-
-          const errorStdout = execError.stdout
-            ? execError.stdout.toString()
-            : "";
-          const output = formatShellOutput(
-            shellCmd,
-            errorStdout,
-            errorMessage,
-            exitCode,
-          );
-          const envelope = createEnvelope("agent", { t: "text", text: output });
-          session.sendSessionProtocolMessage(envelope);
-
-          logger.debug("[start] Shell command failed:", errorMessage);
-        }
+        const output = await executeShellCommand(shellCmd, workingDirectory);
+        const envelope = createEnvelope("agent", { t: "text", text: output });
+        session.sendSessionProtocolMessage(envelope);
+        logger.debug("[start] Shell command executed");
       })();
 
       return;
@@ -691,36 +644,6 @@ export async function runClaude(
 
   // Exit with the code from Claude
   process.exit(exitCode);
-}
-
-/**
- * Format shell command output for display in mobile app
- * Shows the command in a code block with stdout/stderr and exit code
- */
-function formatShellOutput(
-  command: string,
-  stdout: string,
-  stderr: string,
-  exitCode: number,
-): string {
-  let output = `\`\`\`bash\n$ ${command}\n`;
-  if (stdout) {
-    output += stdout;
-    if (!stdout.endsWith("\n")) {
-      output += "\n";
-    }
-  }
-  if (stderr) {
-    output += stderr;
-    if (!stderr.endsWith("\n")) {
-      output += "\n";
-    }
-  }
-  output += "```";
-  if (exitCode !== 0) {
-    output += `\n\n*Exit code: ${exitCode}*`;
-  }
-  return output;
 }
 
 /**
