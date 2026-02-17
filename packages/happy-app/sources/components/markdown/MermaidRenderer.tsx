@@ -1,110 +1,147 @@
-import * as React from 'react';
-import { View, Platform, Text } from 'react-native';
-import { WebView } from 'react-native-webview';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { Typography } from '@/constants/Typography';
-import { t } from '@/text';
+import * as React from "react";
+import { View, Platform, Text, Pressable } from "react-native";
+import { WebView } from "react-native-webview";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { Typography } from "@/constants/Typography";
+import { t } from "@/text";
+import * as Clipboard from "expo-clipboard";
+import { Modal } from "@/modal";
 
 // Style for Web platform
 const webStyle: any = {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
-    padding: 16,
-    overflow: 'auto',
+  backgroundColor: "#1a1a1a",
+  borderRadius: 8,
+  padding: 16,
+  overflow: "auto",
 };
 
 // Mermaid render component that works on all platforms
-export const MermaidRenderer = React.memo((props: {
-    content: string;
-}) => {
-    const { theme } = useUnistyles();
-    const [dimensions, setDimensions] = React.useState({ width: 0, height: 200 });
-    const [svgContent, setSvgContent] = React.useState<string | null>(null);
+export const MermaidRenderer = React.memo((props: { content: string }) => {
+  const { theme } = useUnistyles();
+  const [dimensions, setDimensions] = React.useState({ width: 0, height: 200 });
+  const [svgContent, setSvgContent] = React.useState<string | null>(null);
+  const [isHovered, setIsHovered] = React.useState(false);
 
-    const onLayout = React.useCallback((event: any) => {
-        const { width } = event.nativeEvent.layout;
-        setDimensions(prev => ({ ...prev, width }));
-    }, []);
+  const copyMermaidSource = React.useCallback(async () => {
+    try {
+      await Clipboard.setStringAsync(props.content);
+      Modal.alert(t("common.success"), t("markdown.mermaidCopied"), [
+        { text: t("common.ok"), style: "cancel" },
+      ]);
+    } catch (error) {
+      console.error("Failed to copy mermaid source:", error);
+      Modal.alert(t("common.error"), t("markdown.copyFailed"), [
+        { text: t("common.ok"), style: "cancel" },
+      ]);
+    }
+  }, [props.content]);
 
-    // Web platform uses direct SVG rendering for better performance and native DOM integration
-    if (Platform.OS === 'web') {
-        const [hasError, setHasError] = React.useState(false);
+  const renderCopyButton = (visible: boolean) => (
+    <View
+      style={[
+        style.copyButtonWrapper,
+        visible && style.copyButtonWrapperVisible,
+      ]}
+    >
+      <Pressable style={style.copyButton} onPress={copyMermaidSource}>
+        <Text style={style.copyButtonText}>{t("common.copy")}</Text>
+      </Pressable>
+    </View>
+  );
 
-        React.useEffect(() => {
-            let isMounted = true;
-            setHasError(false);
+  const onLayout = React.useCallback((event: any) => {
+    const { width } = event.nativeEvent.layout;
+    setDimensions((prev) => ({ ...prev, width }));
+  }, []);
 
-            const renderMermaid = async () => {
-                try {
-                    const mermaidModule: any = await import('mermaid');
-                    const mermaid = mermaidModule.default || mermaidModule;
+  // Web platform uses direct SVG rendering for better performance and native DOM integration
+  if (Platform.OS === "web") {
+    const [hasError, setHasError] = React.useState(false);
 
-                    if (mermaid.initialize) {
-                        mermaid.initialize({
-                            startOnLoad: false,
-                            theme: 'dark'
-                        });
-                    }
+    React.useEffect(() => {
+      let isMounted = true;
+      setHasError(false);
 
-                    if (mermaid.render) {
-                        const { svg } = await mermaid.render(
-                            `mermaid-${Date.now()}`,
-                            props.content
-                        );
+      const renderMermaid = async () => {
+        try {
+          const mermaidModule: any = await import("mermaid");
+          const mermaid = mermaidModule.default || mermaidModule;
 
-                        if (isMounted) {
-                            setSvgContent(svg);
-                        }
-                    }
-                } catch (error) {
-                    if (isMounted) {
-                        console.warn(`[Mermaid] ${t('markdown.mermaidRenderFailed')}: ${error instanceof Error ? error.message : String(error)}`);
-                        setHasError(true);
-                    }
-                }
-            };
+          if (mermaid.initialize) {
+            mermaid.initialize({
+              startOnLoad: false,
+              theme: "dark",
+            });
+          }
 
-            renderMermaid();
-
-            return () => {
-                isMounted = false;
-            };
-        }, [props.content]);
-
-        if (hasError) {
-            return (
-                <View style={[style.container, style.errorContainer]}>
-                    <View style={style.errorContent}>
-                        <Text style={style.errorText}>Mermaid diagram syntax error</Text>
-                        <View style={style.codeBlock}>
-                            <Text style={style.codeText}>{props.content}</Text>
-                        </View>
-                    </View>
-                </View>
+          if (mermaid.render) {
+            const { svg } = await mermaid.render(
+              `mermaid-${Date.now()}`,
+              props.content,
             );
-        }
 
-        if (!svgContent) {
-            return (
-                <View style={[style.container, style.loadingContainer]}>
-                    <View style={style.loadingPlaceholder} />
-                </View>
+            if (isMounted) {
+              setSvgContent(svg);
+            }
+          }
+        } catch (error) {
+          if (isMounted) {
+            console.warn(
+              `[Mermaid] ${t("markdown.mermaidRenderFailed")}: ${error instanceof Error ? error.message : String(error)}`,
             );
+            setHasError(true);
+          }
         }
+      };
 
-        return (
-            <View style={style.container}>
-                {/* @ts-ignore - Web only */}
-                <div
-                    style={webStyle}
-                    dangerouslySetInnerHTML={{ __html: svgContent }}
-                />
+      renderMermaid();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [props.content]);
+
+    if (hasError) {
+      return (
+        <View style={[style.container, style.errorContainer]}>
+          <View style={style.errorContent}>
+            <Text style={style.errorText}>Mermaid diagram syntax error</Text>
+            <View style={style.codeBlock}>
+              <Text style={style.codeText}>{props.content}</Text>
             </View>
-        );
+          </View>
+        </View>
+      );
     }
 
-    // For iOS/Android, use WebView
-    const html = `
+    if (!svgContent) {
+      return (
+        <View style={[style.container, style.loadingContainer]}>
+          <View style={style.loadingPlaceholder} />
+        </View>
+      );
+    }
+
+    return (
+      <View
+        style={style.container}
+        // @ts-ignore - Web only events
+        onMouseEnter={() => setIsHovered(true)}
+        // @ts-ignore - Web only events
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* @ts-ignore - Web only */}
+        <div
+          style={webStyle}
+          dangerouslySetInnerHTML={{ __html: svgContent }}
+        />
+        {renderCopyButton(isHovered)}
+      </View>
+    );
+  }
+
+  // For iOS/Android, use WebView
+  const html = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -147,72 +184,103 @@ export const MermaidRenderer = React.memo((props: {
         </html>
     `;
 
-    return (
-        <View style={style.container} onLayout={onLayout}>
-            <View style={[style.innerContainer, { height: dimensions.height }]}>
-                <WebView
-                    source={{ html }}
-                    style={{ flex: 1 }}
-                    scrollEnabled={false}
-                    onMessage={(event) => {
-                        const data = JSON.parse(event.nativeEvent.data);
-                        if (data.type === 'dimensions') {
-                            setDimensions(prev => ({
-                                ...prev,
-                                height: Math.max(prev.height, data.height)
-                            }));
-                        }
-                    }}
-                />
-            </View>
-        </View>
-    );
+  return (
+    <View style={style.container} onLayout={onLayout}>
+      <View style={[style.innerContainer, { height: dimensions.height }]}>
+        <WebView
+          source={{ html }}
+          style={{ flex: 1 }}
+          scrollEnabled={false}
+          onMessage={(event) => {
+            const data = JSON.parse(event.nativeEvent.data);
+            if (data.type === "dimensions") {
+              setDimensions((prev) => ({
+                ...prev,
+                height: Math.max(prev.height, data.height),
+              }));
+            }
+          }}
+        />
+        {renderCopyButton(true)}
+      </View>
+    </View>
+  );
 });
 
 const style = StyleSheet.create((theme) => ({
-    container: {
-        marginVertical: 8,
-        width: '100%',
-    },
-    innerContainer: {
-        width: '100%',
-        backgroundColor: theme.colors.surfaceHighest,
-        borderRadius: 8,
-    },
-    loadingContainer: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: 100,
-    },
-    loadingPlaceholder: {
-        width: 200,
-        height: 20,
-        backgroundColor: theme.colors.divider,
-        borderRadius: 4,
-    },
-    errorContainer: {
-        backgroundColor: theme.colors.surfaceHighest,
-        borderRadius: 8,
-        padding: 16,
-    },
-    errorContent: {
-        flexDirection: 'column',
-        gap: 12,
-    },
-    errorText: {
-        ...Typography.default('semiBold'),
-        color: theme.colors.text,
-        fontSize: 16,
-    },
-    codeBlock: {
-        backgroundColor: theme.colors.surfaceHigh,
-        borderRadius: 4,
-        padding: 12,
-    },
-    codeText: {
-        ...Typography.mono(),
-        color: theme.colors.text,
-        fontSize: 14,
-        lineHeight: 20,
-    },
+  container: {
+    marginVertical: 8,
+    width: "100%",
+    position: "relative",
+  },
+  innerContainer: {
+    width: "100%",
+    backgroundColor: theme.colors.surfaceHighest,
+    borderRadius: 8,
+    position: "relative",
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    height: 100,
+  },
+  loadingPlaceholder: {
+    width: 200,
+    height: 20,
+    backgroundColor: theme.colors.divider,
+    borderRadius: 4,
+  },
+  errorContainer: {
+    backgroundColor: theme.colors.surfaceHighest,
+    borderRadius: 8,
+    padding: 16,
+  },
+  errorContent: {
+    flexDirection: "column",
+    gap: 12,
+  },
+  errorText: {
+    ...Typography.default("semiBold"),
+    color: theme.colors.text,
+    fontSize: 16,
+  },
+  codeBlock: {
+    backgroundColor: theme.colors.surfaceHigh,
+    borderRadius: 4,
+    padding: 12,
+  },
+  codeText: {
+    ...Typography.mono(),
+    color: theme.colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  copyButtonWrapper: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    opacity: 0,
+    zIndex: 10,
+    elevation: 10,
+    pointerEvents: "none",
+  },
+  copyButtonWrapperVisible: {
+    opacity: 1,
+    pointerEvents: "auto",
+  },
+  copyButton: {
+    backgroundColor: theme.colors.surfaceHighest,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.divider,
+    cursor: "pointer",
+  },
+  copyButtonText: {
+    ...Typography.default(),
+    color: theme.colors.text,
+    fontSize: 12,
+    lineHeight: 16,
+  },
 }));

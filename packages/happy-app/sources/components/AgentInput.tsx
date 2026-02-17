@@ -696,6 +696,20 @@ export const AgentInput = React.memo(
       ],
     );
 
+    // Auto-focus input when window regains focus (web only)
+    React.useEffect(() => {
+      if (Platform.OS !== "web") return;
+
+      const handleWindowFocus = () => {
+        inputRef.current?.focus();
+      };
+
+      window.addEventListener("focus", handleWindowFocus);
+      return () => {
+        window.removeEventListener("focus", handleWindowFocus);
+      };
+    }, []);
+
     return (
       <View
         style={[

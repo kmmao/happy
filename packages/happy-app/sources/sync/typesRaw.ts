@@ -173,10 +173,7 @@ const rawToolResultContentSchema = z
     tool_use_id: z.string(),
     content: z.union([
       z.array(
-        z.discriminatedUnion("type", [
-          z.object({ type: z.literal("text"), text: z.string() }).passthrough(),
-          z.object({ type: z.literal("image") }).passthrough(),
-        ]),
+        z.object({ type: z.string() }).passthrough(), // ROBUST: Accept any content type (text, image, audio, etc.)
       ),
       z.string(),
     ]),

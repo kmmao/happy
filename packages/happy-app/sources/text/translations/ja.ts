@@ -923,6 +923,7 @@ export const ja: TranslationStructure = {
     // Markdown copy functionality
     codeCopied: "コードをコピーしました",
     copyFailed: "コピーに失敗しました",
+    mermaidCopied: "Mermaidソースコードをコピーしました",
     mermaidRenderFailed: "Mermaidダイアグラムのレンダリングに失敗しました",
   },
 

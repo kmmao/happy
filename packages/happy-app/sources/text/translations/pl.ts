@@ -920,6 +920,7 @@ export const pl: TranslationStructure = {
     // Markdown copy functionality
     codeCopied: "Kod skopiowany",
     copyFailed: "Błąd kopiowania",
+    mermaidCopied: "Kod źródłowy Mermaid skopiowany",
     mermaidRenderFailed: "Nie udało się wyświetlić diagramu mermaid",
   },
 

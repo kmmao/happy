@@ -65,8 +65,8 @@ class ApiSocket {
       },
       transports: ["websocket"],
       reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionDelay: 500, // Reduced from 1000ms for faster recovery
+      reconnectionDelayMax: 3000, // Reduced from 5000ms for faster recovery
       reconnectionAttempts: Infinity,
     });
 

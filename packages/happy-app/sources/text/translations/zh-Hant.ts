@@ -866,6 +866,7 @@ export const zhHant: TranslationStructure = {
     // Markdown copy functionality
     codeCopied: "程式碼已複製",
     copyFailed: "複製失敗",
+    mermaidCopied: "Mermaid 原始碼已複製",
     mermaidRenderFailed: "渲染 mermaid 圖表失敗",
   },
 
