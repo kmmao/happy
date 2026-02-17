@@ -56,6 +56,7 @@ export const MetadataSchema = z.object({
   flavor: z.string().nullish(), // Session flavor/variant identifier
   sandbox: z.any().nullish(), // Sandbox config metadata from CLI (or null when disabled)
   dangerouslySkipPermissions: z.boolean().nullish(), // Claude --dangerously-skip-permissions mode (or null when unknown)
+  packageScripts: z.record(z.string(), z.string()).optional(), // package.json scripts from working directory
 });
 
 export type Metadata = z.infer<typeof MetadataSchema>;

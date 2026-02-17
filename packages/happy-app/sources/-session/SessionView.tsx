@@ -566,6 +566,10 @@ function SessionViewLoaded({
         onImageRemove={(path: string) =>
           setPendingImagePaths((prev) => prev.filter((p) => p !== path))
         }
+        onShellCommand={(command) => {
+          sync.sendMessage(sessionId, `$ ${command}`);
+        }}
+        packageScripts={session.metadata?.packageScripts}
         onSlashCommandPress={() => setShowCommandList(true)}
       />
     </>

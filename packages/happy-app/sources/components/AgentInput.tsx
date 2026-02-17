@@ -98,7 +98,17 @@ interface AgentInputProps {
   isPickingImage?: boolean;
   imagePaths?: string[];
   onImageRemove?: (path: string) => void;
+  onShellCommand?: (command: string) => void;
+  packageScripts?: Record<string, string>;
 }
+
+const FALLBACK_SHELL_COMMANDS = [
+  "git status",
+  "git diff",
+  "git log --oneline -5",
+  "ls -la",
+  "pwd",
+];
 
 const MAX_CONTEXT_SIZE = 190000;
 
@@ -497,6 +507,34 @@ export const AgentInput = React.memo(
 
     // Settings modal state
     const [showSettings, setShowSettings] = React.useState(false);
+    const [showQuickCommands, setShowQuickCommands] = React.useState(false);
+
+    // Build quick command list: project scripts first, then fallback shell commands
+    const quickCommands = React.useMemo(() => {
+      const commands: Array<{
+        label: string;
+        command: string;
+        isScript: boolean;
+      }> = [];
+
+      // Add package.json scripts (npm/yarn run X)
+      if (props.packageScripts) {
+        for (const name of Object.keys(props.packageScripts)) {
+          commands.push({
+            label: name,
+            command: `npm run ${name}`,
+            isScript: true,
+          });
+        }
+      }
+
+      // Add fallback shell commands
+      for (const cmd of FALLBACK_SHELL_COMMANDS) {
+        commands.push({ label: cmd, command: cmd, isScript: false });
+      }
+
+      return commands;
+    }, [props.packageScripts]);
 
     // Handle settings button press
     const handleSettingsPress = React.useCallback(() => {
@@ -1260,6 +1298,75 @@ export const AgentInput = React.memo(
               </ScrollView>
             )}
 
+            {/* Shell quick command chips - toggled by terminal button */}
+            {props.onShellCommand && showQuickCommands && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: 8,
+                  paddingTop: hasImages ? 4 : 10,
+                  paddingBottom: 4,
+                  gap: 8,
+                }}
+              >
+                {quickCommands.map((item) => (
+                  <Pressable
+                    key={item.command}
+                    onPress={() => {
+                      hapticsLight();
+                      props.onShellCommand?.(item.command);
+                      setShowQuickCommands(false);
+                    }}
+                    style={(p) => ({
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: item.isScript
+                        ? `${theme.colors.success}12`
+                        : theme.colors.surfacePressed,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: item.isScript
+                        ? `${theme.colors.success}30`
+                        : theme.colors.divider,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      height: 36,
+                      gap: 5,
+                      opacity: p.pressed ? 0.6 : 1,
+                    })}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: item.isScript
+                          ? theme.colors.success
+                          : theme.colors.textSecondary,
+                        fontWeight: "700",
+                        fontFamily: Platform.select({
+                          ios: "Menlo",
+                          android: "monospace",
+                          web: "monospace",
+                        }),
+                      }}
+                    >
+                      {item.isScript ? "\u25B6" : "$"}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: theme.colors.text,
+                        ...Typography.default("semiBold"),
+                      }}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+
             {/* Input field */}
             <View
               style={[
@@ -1469,6 +1576,40 @@ export const AgentInput = React.memo(
                           name="command-palette"
                           size={16}
                           color={theme.colors.button.secondary.tint}
+                        />
+                      </Pressable>
+                    )}
+
+                    {/* Terminal quick commands button */}
+                    {props.onShellCommand && (
+                      <Pressable
+                        onPress={() => {
+                          hapticsLight();
+                          setShowQuickCommands((prev) => !prev);
+                        }}
+                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                        style={(p) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          borderRadius: Platform.select({
+                            default: 16,
+                            android: 20,
+                          }),
+                          paddingHorizontal: 8,
+                          paddingVertical: 6,
+                          justifyContent: "center",
+                          height: 32,
+                          opacity: p.pressed ? 0.7 : 1,
+                        })}
+                      >
+                        <Octicons
+                          name="terminal"
+                          size={16}
+                          color={
+                            showQuickCommands
+                              ? theme.colors.success
+                              : theme.colors.button.secondary.tint
+                          }
                         />
                       </Pressable>
                     )}
