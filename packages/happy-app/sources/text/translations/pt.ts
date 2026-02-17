@@ -1029,11 +1029,44 @@ export const pt: TranslationStructure = {
     enterToken: "Digite o token de autenticação",
     model: "Modelo",
     defaultModel: "Modelo padrão",
+    setupInstructions: "Instruções de configuração",
+    viewSetupGuide: "Ver guia oficial de configuração",
+    defaultSessionType: "Tipo de sessão padrão",
+    defaultPermissionMode: "Modo de permissões padrão",
+    permissionDefault: "Padrão",
+    permissionDefaultDesc: "Solicitar permissões",
+    permissionAcceptEdits: "Aceitar edições",
+    permissionAcceptEditsDesc: "Aprovar edições automaticamente",
+    permissionPlan: "Planejar",
+    permissionPlanDesc: "Planejar antes de executar",
+    permissionYolo: "Yolo",
+    permissionYoloDesc: "Ignorar todas as permissões",
+    spawnInTmux: "Iniciar sessões no Tmux",
+    tmuxEnabledDesc:
+      "As sessões iniciam em novas janelas do tmux. Configure o nome da sessão e diretório temporário abaixo.",
+    tmuxDisabledDesc:
+      "As sessões iniciam no shell normal (sem integração com tmux)",
     tmuxSession: "Sessão tmux",
+    tmuxSessionName: "Nome da sessão Tmux",
     enterTmuxSession: "Digite o nome da sessão tmux",
+    tmuxSessionHint:
+      'Deixe vazio para usar a primeira sessão tmux existente (ou criar "happy" se não houver nenhuma). Especifique um nome (ex. "my-work") para uma sessão específica.',
+    tmuxSessionPlaceholder: "Vazio = primeira sessão existente",
+    tmuxDisabledPlaceholder: "Desativado - tmux não habilitado",
     tmuxTempDir: "Diretório temporário tmux",
     enterTmuxTempDir: "Digite o diretório temporário tmux",
+    tmuxTempDirHint:
+      "Diretório temporário para arquivos de sessão tmux. Deixe vazio para o padrão do sistema.",
+    tmuxTempDirPlaceholder: "/tmp (opcional)",
     tmuxUpdateEnvironment: "Atualizar ambiente tmux",
+    startupBashScript: "Script de inicialização Bash",
+    startupScriptEnabledDesc:
+      "Executado antes de cada sessão. Para configuração dinâmica, verificação do ambiente ou inicialização personalizada.",
+    startupScriptDisabledDesc:
+      "Sem script de inicialização - sessões iniciam diretamente",
+    startupScriptPlaceholder:
+      "#!/bin/bash\necho 'Inicializando...'\n# Seu script aqui",
+    disabled: "Desativado",
     deleteConfirm: "Tem certeza de que deseja excluir este perfil?",
     nameRequired: "O nome do perfil é obrigatório",
     delete: {

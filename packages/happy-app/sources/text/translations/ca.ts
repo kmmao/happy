@@ -1032,11 +1032,44 @@ export const ca: TranslationStructure = {
     enterToken: "Introdueix el token d'autenticació",
     model: "Model",
     defaultModel: "Model per defecte",
+    setupInstructions: "Instruccions de configuració",
+    viewSetupGuide: "Veure guia oficial de configuració",
+    defaultSessionType: "Tipus de sessió predeterminat",
+    defaultPermissionMode: "Mode de permisos predeterminat",
+    permissionDefault: "Predeterminat",
+    permissionDefaultDesc: "Sol·licitar permisos",
+    permissionAcceptEdits: "Acceptar edicions",
+    permissionAcceptEditsDesc: "Aprovar edicions automàticament",
+    permissionPlan: "Planificar",
+    permissionPlanDesc: "Planificar abans d'executar",
+    permissionYolo: "Yolo",
+    permissionYoloDesc: "Ometre tots els permisos",
+    spawnInTmux: "Iniciar sessions a Tmux",
+    tmuxEnabledDesc:
+      "Les sessions s'inicien en noves finestres de tmux. Configureu el nom de sessió i directori temporal a continuació.",
+    tmuxDisabledDesc:
+      "Les sessions s'inicien en shell normal (sense integració tmux)",
     tmuxSession: "Sessió tmux",
+    tmuxSessionName: "Nom de sessió Tmux",
     enterTmuxSession: "Introdueix el nom de la sessió tmux",
+    tmuxSessionHint:
+      'Deixeu buit per usar la primera sessió tmux existent (o crear "happy" si no n\'hi ha cap). Especifiqueu un nom (ex. "my-work") per a una sessió específica.',
+    tmuxSessionPlaceholder: "Buit = primera sessió existent",
+    tmuxDisabledPlaceholder: "Desactivat - tmux no habilitat",
     tmuxTempDir: "Directori temporal tmux",
     enterTmuxTempDir: "Introdueix el directori temporal tmux",
+    tmuxTempDirHint:
+      "Directori temporal per als fitxers de sessió tmux. Deixeu buit per al valor predeterminat del sistema.",
+    tmuxTempDirPlaceholder: "/tmp (opcional)",
     tmuxUpdateEnvironment: "Actualitza l'entorn tmux",
+    startupBashScript: "Script d'inici Bash",
+    startupScriptEnabledDesc:
+      "S'executa abans de cada sessió. Per a configuració dinàmica, verificació de l'entorn o inicialització personalitzada.",
+    startupScriptDisabledDesc:
+      "Sense script d'inici - les sessions s'inicien directament",
+    startupScriptPlaceholder:
+      "#!/bin/bash\necho 'Inicialitzant...'\n# El vostre script aquí",
+    disabled: "Desactivat",
     deleteConfirm: "Segur que vols eliminar aquest perfil?",
     nameRequired: "El nom del perfil és obligatori",
     delete: {
