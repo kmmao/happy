@@ -47,31 +47,9 @@ yarn workspace happy-agent test         # Agent: build then vitest run
 
 ## Architecture
 
-### System Flow
-```
-Mobile App / Web ←→ Server (Fastify + Socket.IO) ←→ CLI Daemon ←→ Claude Code/Codex
-                         ↕
-                    PostgreSQL + Redis + S3
-```
+See `/docs/` for detailed architecture — key docs: `cli-architecture.md`, `protocol.md`, `encryption.md`, `backend-architecture.md`.
 
-### End-to-End Encryption
-All user content is encrypted client-side before transmission. The server stores encrypted blobs blindly (never decrypts user content). Encryption uses AES-256-GCM (new) and NaCl secretbox (legacy compatibility).
-
-### CLI Daemon Architecture
-The CLI runs a persistent background daemon that:
-- Manages multiple Claude sessions via spawned child processes
-- Connects to the server via Socket.IO (machine-scoped connection)
-- Exposes a local HTTP control server on 127.0.0.1 (random port)
-- Handles RPC calls from mobile (spawn/stop sessions)
-- Auto-updates when `npm upgrade happy-coder` is detected via heartbeat
-
-Data isolation: `~/.happy` (stable) vs `~/.happy-dev` (development) can run in parallel.
-
-### Real-time Sync Protocol
-- Persistent updates use `update` events with monotonically increasing `seq` numbers
-- Ephemeral events for presence/usage data
-- Connection scopes: user-scoped, session-scoped, machine-scoped
-- Optimistic concurrency with `expectedVersion` + version-mismatch responses
+System: `Mobile/Web ←→ Server (Fastify+Socket.IO) ←→ CLI Daemon ←→ Claude Code/Codex` with PostgreSQL+Redis+S3. All content E2E encrypted (AES-256-GCM / NaCl secretbox). Data isolation: `~/.happy` (stable) vs `~/.happy-dev` (dev).
 
 ## Code Style (All Packages)
 
@@ -119,11 +97,6 @@ Data isolation: `~/.happy` (stable) vs `~/.happy-dev` (development) can run in p
 
 ## Key Documentation
 
-Detailed architecture docs live in `/docs/`:
-- `protocol.md` — Network protocol specification
-- `encryption.md` — Encryption protocol with binary layouts
-- `cli-architecture.md` — CLI daemon, IPC, RPC details
-- `backend-architecture.md` — Server architecture with Mermaid diagrams
-- `api.md` — HTTP API endpoint catalog
+Detailed docs in `/docs/`: `protocol.md`, `encryption.md`, `cli-architecture.md`, `backend-architecture.md`, `api.md`.
 
-Each package has its own `CLAUDE.md` with package-specific guidance — **read the relevant package CLAUDE.md before working on that package**.
+Each package has its own `CLAUDE.md` with package-specific rules — read it before working on that package.
