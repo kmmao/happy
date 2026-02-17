@@ -244,6 +244,9 @@ export const pt: TranslationStructure = {
     enhancedSessionWizard: "Assistente de sessão aprimorado",
     enhancedSessionWizardEnabled: "Lançador de sessão com perfil ativo",
     enhancedSessionWizardDisabled: "Usando o lançador de sessão padrão",
+    showAgentActivity: "Atividade do agente",
+    showAgentActivityEnabled: "Mostrar atividade do agente em tempo real",
+    showAgentActivityDisabled: "Detalhes da atividade do agente ocultos",
   },
 
   errors: {
@@ -557,6 +560,8 @@ export const pt: TranslationStructure = {
       initializing: "Inicializando agente...",
       moreTools: ({ count }: { count: number }) =>
         `+${count} mais ${plural({ count, singular: "ferramenta", plural: "ferramentas" })}`,
+      agentThinking: "Pensando...",
+      subagentRunning: ({ type }: { type: string }) => `Executando ${type}...`,
     },
     multiEdit: {
       editNumber: ({ index, total }: { index: number; total: number }) =>

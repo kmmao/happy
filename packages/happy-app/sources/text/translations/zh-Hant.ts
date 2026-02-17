@@ -231,6 +231,9 @@ export const zhHant: TranslationStructure = {
     enhancedSessionWizard: "增強工作階段精靈",
     enhancedSessionWizardEnabled: "設定檔優先的工作階段啟動器已啟用",
     enhancedSessionWizardDisabled: "使用標準工作階段啟動器",
+    showAgentActivity: "Agent 活動",
+    showAgentActivityEnabled: "在聊天中顯示即時 Agent 活動",
+    showAgentActivityDisabled: "隱藏 Agent 活動詳情",
   },
 
   errors: {
@@ -532,6 +535,8 @@ export const zhHant: TranslationStructure = {
       initializing: "正在初始化 agent...",
       moreTools: ({ count }: { count: number }) =>
         `+${count} 個更多${plural({ count, singular: "工具", plural: "工具" })}`,
+      agentThinking: "思考中...",
+      subagentRunning: ({ type }: { type: string }) => `正在執行 ${type}...`,
     },
     multiEdit: {
       editNumber: ({ index, total }: { index: number; total: number }) =>

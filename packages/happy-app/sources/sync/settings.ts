@@ -335,6 +335,11 @@ export const SettingsSchema = z.object({
     .boolean()
     .describe("Whether to opt out of anonymous analytics"),
   experiments: z.boolean().describe("Whether to enable experimental features"),
+  showAgentActivity: z
+    .boolean()
+    .describe(
+      "Show real-time agent activity details in chat (thinking state, subagent info, tool descriptions)",
+    ),
   useEnhancedSessionWizard: z
     .boolean()
     .describe("A/B test flag: Use enhanced profile-based session wizard UI"),
@@ -473,6 +478,7 @@ export const settingsDefaults: Settings = {
   wrapLinesInDiffs: false,
   analyticsOptOut: false,
   experiments: false,
+  showAgentActivity: false,
   useEnhancedSessionWizard: false,
   alwaysShowContextSize: false,
   agentInputEnterToSend: true,

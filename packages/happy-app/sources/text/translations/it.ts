@@ -308,6 +308,9 @@ export const it: TranslationStructure = {
     enhancedSessionWizard: "Wizard sessione avanzato",
     enhancedSessionWizardEnabled: "Avvio sessioni con profili attivo",
     enhancedSessionWizardDisabled: "Usando avvio sessioni standard",
+    showAgentActivity: "Attività dell'agente",
+    showAgentActivityEnabled: "Mostra l'attività dell'agente in tempo reale",
+    showAgentActivityDisabled: "Dettagli dell'attività dell'agente nascosti",
   },
 
   errors: {
@@ -621,6 +624,9 @@ export const it: TranslationStructure = {
       initializing: "Inizializzazione agente...",
       moreTools: ({ count }: { count: number }) =>
         `+${count} altri ${plural({ count, singular: "strumento", plural: "strumenti" })}`,
+      agentThinking: "Sta pensando...",
+      subagentRunning: ({ type }: { type: string }) =>
+        `Esecuzione di ${type}...`,
     },
     askUserQuestion: {
       submit: "Invia risposta",

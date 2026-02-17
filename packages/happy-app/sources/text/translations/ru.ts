@@ -225,6 +225,9 @@ export const ru: TranslationStructure = {
     enhancedSessionWizard: "Улучшенный мастер сессий",
     enhancedSessionWizardEnabled: "Лаунчер с профилем активен",
     enhancedSessionWizardDisabled: "Используется стандартный лаунчер",
+    showAgentActivity: "Активность агента",
+    showAgentActivityEnabled: "Показывать активность агента в чате",
+    showAgentActivityDisabled: "Детали активности агента скрыты",
   },
 
   errors: {
@@ -569,6 +572,8 @@ export const ru: TranslationStructure = {
       initializing: "Инициализация агента...",
       moreTools: ({ count }: { count: number }) =>
         `+${count} ещё ${plural({ count, one: "инструмент", few: "инструмента", many: "инструментов" })}`,
+      agentThinking: "Думает...",
+      subagentRunning: ({ type }: { type: string }) => `Запуск ${type}...`,
     },
     multiEdit: {
       editNumber: ({ index, total }: { index: number; total: number }) =>

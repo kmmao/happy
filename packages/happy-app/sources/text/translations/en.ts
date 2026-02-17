@@ -251,6 +251,9 @@ export const en: TranslationStructure = {
     enhancedSessionWizard: "Enhanced Session Wizard",
     enhancedSessionWizardEnabled: "Profile-first session launcher active",
     enhancedSessionWizardDisabled: "Using standard session launcher",
+    showAgentActivity: "Agent Activity",
+    showAgentActivityEnabled: "Show real-time agent activity in chat",
+    showAgentActivityDisabled: "Agent activity details hidden",
   },
 
   errors: {
@@ -559,6 +562,8 @@ export const en: TranslationStructure = {
       initializing: "Initializing agent...",
       moreTools: ({ count }: { count: number }) =>
         `+${count} more ${plural({ count, singular: "tool", plural: "tools" })}`,
+      agentThinking: "Thinking...",
+      subagentRunning: ({ type }: { type: string }) => `Running ${type}...`,
     },
     multiEdit: {
       editNumber: ({ index, total }: { index: number; total: number }) =>

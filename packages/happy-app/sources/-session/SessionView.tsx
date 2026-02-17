@@ -84,6 +84,8 @@ export const SessionView = React.memo((props: { id: string }) => {
   const realtimeStatus = useRealtimeStatus();
   const isTablet = useIsTablet();
 
+  const showAgentActivity = useSetting("showAgentActivity");
+
   // Compute header props based on session state
   const headerProps = useMemo(() => {
     if (!isDataReady) {
@@ -112,21 +114,29 @@ export const SessionView = React.memo((props: { id: string }) => {
 
     // Normal state - show session info
     const isConnected = session.presence === "online";
+
+    // When showAgentActivity is enabled and agent is thinking, show thinking indicator
+    const pathSubtitle = session.metadata?.path
+      ? formatPathRelativeToHome(
+          session.metadata.path,
+          session.metadata?.homeDir,
+        )
+      : undefined;
+    const subtitle =
+      showAgentActivity && session.thinking
+        ? t("tools.taskView.agentThinking")
+        : pathSubtitle;
+
     return {
       title: getSessionName(session),
-      subtitle: session.metadata?.path
-        ? formatPathRelativeToHome(
-            session.metadata.path,
-            session.metadata?.homeDir,
-          )
-        : undefined,
+      subtitle,
       avatarId: getSessionAvatarId(session),
       onAvatarPress: () => router.push(`/session/${sessionId}/info`),
       isConnected: isConnected,
       flavor: session.metadata?.flavor || null,
       tintColor: isConnected ? "#000" : "#8E8E93",
     };
-  }, [session, isDataReady, sessionId, router]);
+  }, [session, isDataReady, sessionId, router, showAgentActivity]);
 
   return (
     <>

@@ -300,6 +300,9 @@ export const ja: TranslationStructure = {
     enhancedSessionWizard: "拡張セッションウィザード",
     enhancedSessionWizardEnabled: "プロファイル優先セッションランチャーが有効",
     enhancedSessionWizardDisabled: "標準セッションランチャーを使用",
+    showAgentActivity: "エージェント アクティビティ",
+    showAgentActivityEnabled: "チャットでリアルタイムのエージェント活動を表示",
+    showAgentActivityDisabled: "エージェント活動の詳細を非表示",
   },
 
   errors: {
@@ -610,6 +613,8 @@ export const ja: TranslationStructure = {
     taskView: {
       initializing: "エージェントを初期化中...",
       moreTools: ({ count }: { count: number }) => `+${count} 個のツール`,
+      agentThinking: "思考中...",
+      subagentRunning: ({ type }: { type: string }) => `${type} を実行中...`,
     },
     askUserQuestion: {
       submit: "回答を送信",

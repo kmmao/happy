@@ -231,6 +231,9 @@ export const zhHans: TranslationStructure = {
     enhancedSessionWizard: "增强会话向导",
     enhancedSessionWizardEnabled: "配置文件优先启动器已激活",
     enhancedSessionWizardDisabled: "使用标准会话启动器",
+    showAgentActivity: "Agent 活动",
+    showAgentActivityEnabled: "在聊天中显示实时 Agent 活动",
+    showAgentActivityDisabled: "隐藏 Agent 活动详情",
   },
 
   errors: {
@@ -532,6 +535,8 @@ export const zhHans: TranslationStructure = {
       initializing: "正在初始化 agent...",
       moreTools: ({ count }: { count: number }) =>
         `+${count} 个更多${plural({ count, singular: "工具", plural: "工具" })}`,
+      agentThinking: "思考中...",
+      subagentRunning: ({ type }: { type: string }) => `正在运行 ${type}...`,
     },
     multiEdit: {
       editNumber: ({ index, total }: { index: number; total: number }) =>
