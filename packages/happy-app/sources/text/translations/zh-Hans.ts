@@ -337,6 +337,7 @@ export const zhHans: TranslationStructure = {
 
   session: {
     inputPlaceholder: "输入消息...",
+    startedByDaemon: "守护进程",
     sentImage: "已发送一张图片",
     sentImages: ({ count }: { count: number }) => `已发送 ${count} 张图片`,
     imageAttached: "已附加图片",

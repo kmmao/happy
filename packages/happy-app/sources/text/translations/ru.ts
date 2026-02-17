@@ -461,6 +461,7 @@ export const ru: TranslationStructure = {
 
   session: {
     inputPlaceholder: "Введите сообщение...",
+    startedByDaemon: "демон",
     sentImage: "Отправлено изображение",
     sentImages: ({ count }: { count: number }) =>
       `Отправлено ${count} изображений`,

@@ -167,10 +167,14 @@ export function formatPathRelativeToHome(
  */
 export function getSessionSubtitle(session: Session): string {
   if (session.metadata) {
-    return formatPathRelativeToHome(
+    const path = formatPathRelativeToHome(
       session.metadata.path,
       session.metadata.homeDir,
     );
+    if (session.metadata.startedBy === "daemon") {
+      return `${path} · ${t("session.startedByDaemon")}`;
+    }
+    return path;
   }
   return t("status.unknown");
 }

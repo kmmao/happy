@@ -391,6 +391,7 @@ export const it: TranslationStructure = {
 
   session: {
     inputPlaceholder: "Scrivi un messaggio ...",
+    startedByDaemon: "daemon",
     sentImage: "Immagine inviata",
     sentImages: ({ count }: { count: number }) => `${count} immagini inviate`,
     imageAttached: "Immagine allegata",

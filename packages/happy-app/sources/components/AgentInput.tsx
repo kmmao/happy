@@ -26,6 +26,7 @@ import { QuickCommandsPanel } from "./QuickCommandsPanel";
 import { TextInputState, MultiTextInputHandle } from "./MultiTextInput";
 import { applySuggestion } from "./autocomplete/applySuggestion";
 import { GitStatusBadge, useHasMeaningfulGitStatus } from "./GitStatusBadge";
+import { useUserMessageHistory } from "@/hooks/useUserMessageHistory";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useSetting, useSettingMutable } from "@/sync/storage";
 import { hackMode, hackModes } from "@/sync/modeHacks";
@@ -464,6 +465,9 @@ export const AgentInput = React.memo(
       { clampSelection: true, wrapAround: true },
     );
 
+    // User message history navigation
+    const messageHistory = useUserMessageHistory();
+
     // Debug logging
     // React.useEffect(() => {
     //     console.log('🔍 Autocomplete Debug:', JSON.stringify({
@@ -598,6 +602,34 @@ export const AgentInput = React.memo(
           }
         }
 
+        // Handle history navigation when no autocomplete suggestions
+        if (suggestions.length === 0) {
+          if (event.key === "ArrowUp") {
+            const historyText = messageHistory.navigateUp(props.value);
+            if (historyText !== null) {
+              props.onChangeText(historyText);
+              // Move cursor to end
+              inputRef.current?.setTextAndSelection(historyText, {
+                start: historyText.length,
+                end: historyText.length,
+              });
+              return true;
+            }
+          } else if (event.key === "ArrowDown") {
+            const historyText = messageHistory.navigateDown();
+            if (historyText !== null) {
+              props.onChangeText(historyText);
+              if (historyText.length > 0) {
+                inputRef.current?.setTextAndSelection(historyText, {
+                  start: historyText.length,
+                  end: historyText.length,
+                });
+              }
+              return true;
+            }
+          }
+        }
+
         // Handle Escape for abort when no suggestions are visible
         if (
           event.key === "Escape" &&
@@ -617,6 +649,7 @@ export const AgentInput = React.memo(
             !event.shiftKey
           ) {
             if (canSend) {
+              messageHistory.reset();
               props.onSend();
               return true; // Key was handled
             }
@@ -647,12 +680,15 @@ export const AgentInput = React.memo(
         moveDown,
         selected,
         handleSuggestionSelect,
+        messageHistory,
         props.showAbortButton,
         props.onAbort,
         isAborting,
         handleAbortPress,
         agentInputEnterToSend,
         canSend,
+        props.value,
+        props.onChangeText,
         props.onSend,
         props.onPermissionModeChange,
         availableModes,
@@ -1604,6 +1640,7 @@ export const AgentInput = React.memo(
                       onPress={() => {
                         hapticsLight();
                         if (canSend) {
+                          messageHistory.reset();
                           props.onSend();
                         } else {
                           props.onMicPress?.();

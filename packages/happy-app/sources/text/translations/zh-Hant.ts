@@ -337,6 +337,7 @@ export const zhHant: TranslationStructure = {
 
   session: {
     inputPlaceholder: "輸入訊息...",
+    startedByDaemon: "守護程序",
     sentImage: "已傳送一張圖片",
     sentImages: ({ count }: { count: number }) => `已傳送 ${count} 張圖片`,
     imageAttached: "已附加圖片",
