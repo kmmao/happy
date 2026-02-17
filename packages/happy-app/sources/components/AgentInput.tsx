@@ -22,11 +22,12 @@ import { useActiveWord } from "./autocomplete/useActiveWord";
 import { useActiveSuggestions } from "./autocomplete/useActiveSuggestions";
 import { AgentInputAutocomplete } from "./AgentInputAutocomplete";
 import { FloatingOverlay } from "./FloatingOverlay";
+import { QuickCommandsPanel } from "./QuickCommandsPanel";
 import { TextInputState, MultiTextInputHandle } from "./MultiTextInput";
 import { applySuggestion } from "./autocomplete/applySuggestion";
 import { GitStatusBadge, useHasMeaningfulGitStatus } from "./GitStatusBadge";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { useSetting } from "@/sync/storage";
+import { useSetting, useSettingMutable } from "@/sync/storage";
 import { hackMode, hackModes } from "@/sync/modeHacks";
 import { Theme } from "@/theme";
 import { t } from "@/text";
@@ -102,14 +103,6 @@ interface AgentInputProps {
   packageScripts?: Record<string, string>;
 }
 
-const FALLBACK_SHELL_COMMANDS = [
-  "git status",
-  "git diff",
-  "git log --oneline -5",
-  "ls -la",
-  "pwd",
-];
-
 const MAX_CONTEXT_SIZE = 190000;
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
@@ -150,6 +143,14 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     zIndex: 1000,
   },
   settingsOverlay: {
+    position: "absolute",
+    bottom: "100%",
+    left: 0,
+    right: 0,
+    marginBottom: 8,
+    zIndex: 1000,
+  },
+  commandsOverlay: {
     position: "absolute",
     bottom: "100%",
     left: 0,
@@ -509,33 +510,19 @@ export const AgentInput = React.memo(
     const [showSettings, setShowSettings] = React.useState(false);
     const [showQuickCommands, setShowQuickCommands] = React.useState(false);
 
-    // Build quick command list: project scripts first, then fallback shell commands
-    const quickCommands = React.useMemo(() => {
-      const commands: Array<{
-        label: string;
-        command: string;
-        isScript: boolean;
-      }> = [];
-
-      // Add package.json scripts
-      // Key = display label, Value = shell command to execute
-      if (props.packageScripts) {
-        for (const [label, command] of Object.entries(props.packageScripts)) {
-          commands.push({
-            label,
-            command,
-            isScript: true,
-          });
-        }
-      }
-
-      // Add fallback shell commands
-      for (const cmd of FALLBACK_SHELL_COMMANDS) {
-        commands.push({ label: cmd, command: cmd, isScript: false });
-      }
-
-      return commands;
-    }, [props.packageScripts]);
+    // Favorite commands
+    const [favoriteCommands, setFavoriteCommands] =
+      useSettingMutable("favoriteCommands");
+    const handleToggleFavorite = React.useCallback(
+      (command: string) => {
+        const current = favoriteCommands ?? [];
+        const next = current.includes(command)
+          ? current.filter((c) => c !== command)
+          : [...current, command];
+        setFavoriteCommands(next);
+      },
+      [favoriteCommands, setFavoriteCommands],
+    );
 
     // Handle settings button press
     const handleSettingsPress = React.useCallback(() => {
@@ -907,6 +894,38 @@ export const AgentInput = React.memo(
                       </Text>
                     )}
                   </View>
+                </FloatingOverlay>
+              </View>
+            </>
+          )}
+
+          {/* Quick Commands Panel - toggled by terminal button */}
+          {props.onShellCommand && showQuickCommands && (
+            <>
+              <TouchableWithoutFeedback
+                onPress={() => setShowQuickCommands(false)}
+              >
+                <View style={styles.overlayBackdrop} />
+              </TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.commandsOverlay,
+                  { paddingHorizontal: screenWidth > 700 ? 0 : 8 },
+                ]}
+              >
+                <FloatingOverlay
+                  maxHeight={400}
+                  keyboardShouldPersistTaps="always"
+                >
+                  <QuickCommandsPanel
+                    packageScripts={props.packageScripts}
+                    favoriteCommands={favoriteCommands ?? []}
+                    onCommandSelect={(command) => {
+                      props.onChangeText(`$ ${command}`);
+                      setShowQuickCommands(false);
+                    }}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
                 </FloatingOverlay>
               </View>
             </>
@@ -1295,75 +1314,6 @@ export const AgentInput = React.memo(
                       </Pressable>
                     )}
                   </View>
-                ))}
-              </ScrollView>
-            )}
-
-            {/* Shell quick command chips - toggled by terminal button */}
-            {props.onShellCommand && showQuickCommands && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingHorizontal: 8,
-                  paddingTop: hasImages ? 4 : 10,
-                  paddingBottom: 4,
-                  gap: 8,
-                }}
-              >
-                {quickCommands.map((item) => (
-                  <Pressable
-                    key={item.command}
-                    onPress={() => {
-                      hapticsLight();
-                      props.onShellCommand?.(item.command);
-                      setShowQuickCommands(false);
-                    }}
-                    style={(p) => ({
-                      flexDirection: "row",
-                      alignItems: "center",
-                      backgroundColor: item.isScript
-                        ? `${theme.colors.success}12`
-                        : theme.colors.surfacePressed,
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: item.isScript
-                        ? `${theme.colors.success}30`
-                        : theme.colors.divider,
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      height: 36,
-                      gap: 5,
-                      opacity: p.pressed ? 0.6 : 1,
-                    })}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: item.isScript
-                          ? theme.colors.success
-                          : theme.colors.textSecondary,
-                        fontWeight: "700",
-                        fontFamily: Platform.select({
-                          ios: "Menlo",
-                          android: "monospace",
-                          web: "monospace",
-                        }),
-                      }}
-                    >
-                      {item.isScript ? "\u25B6" : "$"}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: theme.colors.text,
-                        ...Typography.default("semiBold"),
-                      }}
-                      numberOfLines={1}
-                    >
-                      {item.label}
-                    </Text>
-                  </Pressable>
                 ))}
               </ScrollView>
             )}
