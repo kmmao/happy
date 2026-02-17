@@ -1037,4 +1037,14 @@ export const zhHans: TranslationStructure = {
     // Repo selector
     rootRepo: "根仓库",
   },
+
+  quickCommands: {
+    searchPlaceholder: "搜索命令...",
+    noResults: "未找到命令",
+    groups: {
+      favorites: "收藏",
+      root: "项目脚本",
+      shell: "Shell 命令",
+    },
+  },
 } as const;

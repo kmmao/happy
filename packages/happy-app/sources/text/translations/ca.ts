@@ -1091,6 +1091,16 @@ export const ca: TranslationStructure = {
     // Repo selector
     rootRepo: "Principal",
   },
+
+  quickCommands: {
+    searchPlaceholder: "Cerca comandes...",
+    noResults: "No s'han trobat comandes",
+    groups: {
+      favorites: "Preferits",
+      root: "Scripts del projecte",
+      shell: "Comandes Shell",
+    },
+  },
 } as const;
 
 export type TranslationsCa = typeof ca;

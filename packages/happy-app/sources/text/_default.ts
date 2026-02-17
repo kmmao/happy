@@ -1077,6 +1077,16 @@ export const en = {
     // Repo selector
     rootRepo: "Root",
   },
+
+  quickCommands: {
+    searchPlaceholder: "Search commands...",
+    noResults: "No commands found",
+    groups: {
+      favorites: "Favorites",
+      root: "Project Scripts",
+      shell: "Shell Commands",
+    },
+  },
 } as const;
 
 export type Translations = typeof en;

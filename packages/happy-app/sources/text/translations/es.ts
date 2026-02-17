@@ -1091,6 +1091,16 @@ export const es: TranslationStructure = {
     // Repo selector
     rootRepo: "Raíz",
   },
+
+  quickCommands: {
+    searchPlaceholder: "Buscar comandos...",
+    noResults: "No se encontraron comandos",
+    groups: {
+      favorites: "Favoritos",
+      root: "Scripts del proyecto",
+      shell: "Comandos Shell",
+    },
+  },
 } as const;
 
 export type TranslationsEs = typeof es;

@@ -1088,6 +1088,16 @@ export const it: TranslationStructure = {
     // Repo selector
     rootRepo: "Principale",
   },
+
+  quickCommands: {
+    searchPlaceholder: "Cerca comandi...",
+    noResults: "Nessun comando trovato",
+    groups: {
+      favorites: "Preferiti",
+      root: "Script del progetto",
+      shell: "Comandi Shell",
+    },
+  },
 } as const;
 
 export type TranslationsIt = typeof it;

@@ -1039,4 +1039,14 @@ export const zhHant: TranslationStructure = {
     // Repo selector
     rootRepo: "根倉庫",
   },
+
+  quickCommands: {
+    searchPlaceholder: "搜尋指令...",
+    noResults: "未找到指令",
+    groups: {
+      favorites: "收藏",
+      root: "專案腳本",
+      shell: "Shell 指令",
+    },
+  },
 } as const;

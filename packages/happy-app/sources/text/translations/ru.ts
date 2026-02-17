@@ -1114,6 +1114,16 @@ export const ru: TranslationStructure = {
     // Repo selector
     rootRepo: "Корень",
   },
+
+  quickCommands: {
+    searchPlaceholder: "Поиск команд...",
+    noResults: "Команды не найдены",
+    groups: {
+      favorites: "Избранное",
+      root: "Скрипты проекта",
+      shell: "Команды Shell",
+    },
+  },
 } as const;
 
 export type TranslationsRu = typeof ru;

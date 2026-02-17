@@ -1114,6 +1114,16 @@ export const pl: TranslationStructure = {
     // Repo selector
     rootRepo: "Główne",
   },
+
+  quickCommands: {
+    searchPlaceholder: "Szukaj poleceń...",
+    noResults: "Nie znaleziono poleceń",
+    groups: {
+      favorites: "Ulubione",
+      root: "Skrypty projektu",
+      shell: "Polecenia Shell",
+    },
+  },
 } as const;
 
 export type TranslationsPl = typeof pl;

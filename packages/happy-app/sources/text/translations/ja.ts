@@ -1071,4 +1071,14 @@ export const ja: TranslationStructure = {
     // Repo selector
     rootRepo: "ルート",
   },
+
+  quickCommands: {
+    searchPlaceholder: "コマンドを検索...",
+    noResults: "コマンドが見つかりません",
+    groups: {
+      favorites: "お気に入り",
+      root: "プロジェクトスクリプト",
+      shell: "シェルコマンド",
+    },
+  },
 } as const;
