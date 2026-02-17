@@ -2552,6 +2552,33 @@ class Sync {
       }
     }
 
+    // Handle usage updates
+    if (updateData.type === "usage") {
+      const session = storage.getState().sessions[updateData.id];
+      if (session) {
+        const prevUsage = session.latestUsage;
+        const updatedSession: Session = {
+          ...session,
+          latestUsage: {
+            inputTokens: updateData.tokens.input,
+            outputTokens: updateData.tokens.output,
+            cacheCreation: updateData.tokens.cache_creation,
+            cacheRead: updateData.tokens.cache_read,
+            contextSize:
+              updateData.tokens.input +
+              updateData.tokens.cache_creation +
+              updateData.tokens.cache_read,
+            totalInputTokens:
+              (prevUsage?.totalInputTokens ?? 0) + updateData.tokens.input,
+            totalOutputTokens:
+              (prevUsage?.totalOutputTokens ?? 0) + updateData.tokens.output,
+            timestamp: updateData.timestamp,
+          },
+        };
+        this.applySessions([updatedSession]);
+      }
+    }
+
     // daemon-status ephemeral updates are deprecated, machine status is handled via machine-activity
   };
 

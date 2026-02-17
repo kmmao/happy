@@ -165,6 +165,8 @@ export type ReducerState = {
     cacheCreation: number;
     cacheRead: number;
     contextSize: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
     timestamp: number;
   };
   latestAgentTextTime: number;
@@ -200,6 +202,8 @@ export type ReducerResult = {
     cacheCreation: number;
     cacheRead: number;
     contextSize: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
   };
   hasReadyEvent?: boolean;
 };
@@ -293,6 +297,8 @@ export function reducer(
         cacheCreation: 0,
         cacheRead: 0,
         contextSize: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
         timestamp: msg.createdAt, // Use message timestamp to avoid blocking older usage data
       };
       // Don't continue - let the event be processed normally to create a message
@@ -311,6 +317,8 @@ export function reducer(
         cacheCreation: 0,
         cacheRead: 0,
         contextSize: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
         timestamp: msg.createdAt, // Use message timestamp to avoid blocking older usage data
       };
       // Don't continue - let the event be processed normally to create a message
@@ -1217,6 +1225,8 @@ export function reducer(
           cacheCreation: state.latestUsage.cacheCreation,
           cacheRead: state.latestUsage.cacheRead,
           contextSize: state.latestUsage.contextSize,
+          totalInputTokens: state.latestUsage.totalInputTokens,
+          totalOutputTokens: state.latestUsage.totalOutputTokens,
         }
       : undefined,
     hasReadyEvent: hasReadyEvent || undefined,
@@ -1238,6 +1248,10 @@ function processUsageData(
 ) {
   // Only update if this is newer than the current latest usage
   if (!state.latestUsage || timestamp > state.latestUsage.timestamp) {
+    const prevTotal = state.latestUsage ?? {
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+    };
     state.latestUsage = {
       inputTokens: usage.input_tokens,
       outputTokens: usage.output_tokens,
@@ -1247,6 +1261,8 @@ function processUsageData(
         (usage.cache_creation_input_tokens || 0) +
         (usage.cache_read_input_tokens || 0) +
         usage.input_tokens,
+      totalInputTokens: prevTotal.totalInputTokens + usage.input_tokens,
+      totalOutputTokens: prevTotal.totalOutputTokens + usage.output_tokens,
       timestamp: timestamp,
     };
   }

@@ -80,6 +80,8 @@ interface AgentInputProps {
     cacheCreation: number;
     cacheRead: number;
     contextSize: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
   };
   alwaysShowContextSize?: boolean;
   onFileViewerPress?: () => void;
@@ -314,35 +316,44 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
 }));
 
+const formatTokenCount = (tokens: number): string => {
+  if (tokens >= 1_000_000) {
+    return `${(tokens / 1_000_000).toFixed(1)}M tokens`;
+  } else if (tokens >= 1_000) {
+    return `${(tokens / 1_000).toFixed(1)}K tokens`;
+  }
+  return `${tokens} tokens`;
+};
+
 const getContextWarning = (
   contextSize: number,
   alwaysShow: boolean = false,
   theme: Theme,
+  totalTokens?: number,
 ) => {
   const percentageUsed = (contextSize / MAX_CONTEXT_SIZE) * 100;
   const percentageRemaining = Math.max(0, Math.min(100, 100 - percentageUsed));
 
+  const contextText = t("agentInput.context.remaining", {
+    percent: Math.round(percentageRemaining),
+  });
+  const tokenSuffix =
+    alwaysShow && totalTokens ? ` · ${formatTokenCount(totalTokens)}` : "";
+
   if (percentageRemaining <= 5) {
     return {
-      text: t("agentInput.context.remaining", {
-        percent: Math.round(percentageRemaining),
-      }),
+      text: contextText + tokenSuffix,
       color: theme.colors.warningCritical,
     };
   } else if (percentageRemaining <= 10) {
     return {
-      text: t("agentInput.context.remaining", {
-        percent: Math.round(percentageRemaining),
-      }),
+      text: contextText + tokenSuffix,
       color: theme.colors.warning,
     };
   } else if (alwaysShow) {
-    // Show context remaining in neutral color when not near limit
     return {
-      text: t("agentInput.context.remaining", {
-        percent: Math.round(percentageRemaining),
-      }),
-      color: theme.colors.warning,
+      text: contextText + tokenSuffix,
+      color: theme.colors.textSecondary,
     };
   }
   return null; // No display needed
@@ -423,6 +434,7 @@ export const AgentInput = React.memo(
           props.usageData.contextSize,
           props.alwaysShowContextSize ?? false,
           theme,
+          props.usageData.totalInputTokens + props.usageData.totalOutputTokens,
         )
       : null;
 

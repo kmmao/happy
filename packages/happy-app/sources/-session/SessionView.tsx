@@ -557,6 +557,8 @@ function SessionViewLoaded({
                 cacheCreation: sessionUsage.cacheCreation,
                 cacheRead: sessionUsage.cacheRead,
                 contextSize: sessionUsage.contextSize,
+                totalInputTokens: sessionUsage.totalInputTokens ?? 0,
+                totalOutputTokens: sessionUsage.totalOutputTokens ?? 0,
               }
             : session.latestUsage
               ? {
@@ -565,6 +567,8 @@ function SessionViewLoaded({
                   cacheCreation: session.latestUsage.cacheCreation,
                   cacheRead: session.latestUsage.cacheRead,
                   contextSize: session.latestUsage.contextSize,
+                  totalInputTokens: session.latestUsage.totalInputTokens ?? 0,
+                  totalOutputTokens: session.latestUsage.totalOutputTokens ?? 0,
                 }
               : undefined
         }
