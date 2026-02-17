@@ -469,6 +469,7 @@ export const ru: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} из ${total} изображений не удалось загрузить`,
     couldNotAttachFile: "Не удалось прикрепить этот файл",
+    imageLoadFailed: "Не удалось загрузить изображение",
   },
 
   commandPalette: {

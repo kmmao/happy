@@ -366,6 +366,7 @@ export const ca: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} de ${total} imatges no s'han pogut pujar`,
     couldNotAttachFile: "No s'ha pogut adjuntar aquest fitxer",
+    imageLoadFailed: "No s'ha pogut carregar la imatge",
   },
 
   commandPalette: {

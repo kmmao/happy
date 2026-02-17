@@ -17,6 +17,8 @@ import { sync } from "@/sync/sync";
 import { Option } from "./markdown/MarkdownView";
 import { useSetting } from "@/sync/storage";
 import { FlavorIcon } from "./FlavorIcon";
+import { MessageImage } from "./MessageImage";
+import { parseImageRefs } from "@/utils/parseImageRefs";
 
 export const MessageView = (props: {
   message: Message;
@@ -97,17 +99,37 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
     [props.sessionId],
   );
 
+  const parsed = React.useMemo(
+    () => parseImageRefs(props.message.text),
+    [props.message.text],
+  );
+
+  const displayText =
+    parsed.imagePaths.length > 0
+      ? parsed.text
+      : props.message.displayText || props.message.text;
+
   return (
     <View style={styles.userMessageContainer}>
-      <View style={styles.userMessageBubble}>
-        <MarkdownView
-          markdown={props.message.displayText || props.message.text}
-          onOptionPress={handleOptionPress}
-        />
-        {/* {__DEV__ && (
-          <Text style={styles.debugText}>{JSON.stringify(props.message.meta)}</Text>
-        )} */}
-      </View>
+      {parsed.imagePaths.length > 0 && (
+        <View style={styles.userImageContainer}>
+          {parsed.imagePaths.map((path) => (
+            <MessageImage
+              key={path}
+              sessionId={props.sessionId}
+              imagePath={path}
+            />
+          ))}
+        </View>
+      )}
+      {displayText.length > 0 && (
+        <View style={styles.userMessageBubble}>
+          <MarkdownView
+            markdown={displayText}
+            onOptionPress={handleOptionPress}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -240,6 +262,15 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "flex-end",
     justifyContent: "flex-end",
     paddingHorizontal: 16,
+  },
+  userImageContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: 4,
+    marginBottom: 4,
+    borderRadius: 12,
+    overflow: "hidden",
   },
   userMessageBubble: {
     backgroundColor: theme.colors.userMessageBackground,

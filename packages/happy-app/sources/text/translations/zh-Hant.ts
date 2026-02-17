@@ -344,6 +344,7 @@ export const zhHant: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${total} 張圖片中有 ${failed} 張上傳失敗`,
     couldNotAttachFile: "無法附加此檔案",
+    imageLoadFailed: "圖片載入失敗",
   },
 
   commandPalette: {

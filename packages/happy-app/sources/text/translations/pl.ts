@@ -378,6 +378,7 @@ export const pl: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} z ${total} obrazów nie udało się przesłać`,
     couldNotAttachFile: "Nie można załączyć tego pliku",
+    imageLoadFailed: "Nie udało się załadować obrazu",
   },
 
   commandPalette: {

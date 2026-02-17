@@ -398,6 +398,7 @@ export const it: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} di ${total} immagini non caricate`,
     couldNotAttachFile: "Impossibile allegare questo file",
+    imageLoadFailed: "Impossibile caricare l'immagine",
   },
 
   commandPalette: {
