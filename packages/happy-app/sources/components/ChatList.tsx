@@ -117,15 +117,38 @@ const ChatListInternal = React.memo(
           }
         }
 
-        flatListRef.current?.scrollToIndex({
-          index: currentUserMsgIndexRef.current,
-          animated: true,
-          viewPosition: 0.5,
-        });
-        return currentUserMsgIndexRef.current;
+        const targetIndex = currentUserMsgIndexRef.current;
+        if (targetIndex >= 0 && targetIndex < props.messages.length) {
+          flatListRef.current?.scrollToIndex({
+            index: targetIndex,
+            animated: true,
+            viewPosition: 0.5,
+          });
+        }
+        return targetIndex;
       },
       getUserMessageCount: () => userMessageIndices.length,
     }));
+
+    const handleScrollToIndexFailed = useCallback(
+      (info: { index: number; averageItemLength: number }) => {
+        // Scroll to approximate offset, then retry after layout settles
+        flatListRef.current?.scrollToOffset({
+          offset: info.averageItemLength * info.index,
+          animated: true,
+        });
+        setTimeout(() => {
+          if (info.index >= 0 && info.index < props.messages.length) {
+            flatListRef.current?.scrollToIndex({
+              index: info.index,
+              animated: true,
+              viewPosition: 0.5,
+            });
+          }
+        }, 200);
+      },
+      [props.messages.length],
+    );
 
     const handleScroll = useCallback(
       (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -179,6 +202,7 @@ const ChatListInternal = React.memo(
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
         renderItem={renderItem}
+        onScrollToIndexFailed={handleScrollToIndexFailed}
         onScroll={handleScroll}
         scrollEventThrottle={400}
         ListHeaderComponent={<ListFooter sessionId={props.sessionId} />}
