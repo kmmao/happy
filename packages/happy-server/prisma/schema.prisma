@@ -192,9 +192,9 @@ model UsageReport {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    @@unique([accountId, sessionId, key])
     @@index([accountId])
     @@index([sessionId])
+    @@index([accountId, sessionId, key])
 }
 
 //
