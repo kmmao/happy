@@ -303,6 +303,9 @@ export const ja: TranslationStructure = {
     showAgentActivity: "エージェント アクティビティ",
     showAgentActivityEnabled: "チャットでリアルタイムのエージェント活動を表示",
     showAgentActivityDisabled: "エージェント活動の詳細を非表示",
+    autoApprovePlan: "プランの自動承認",
+    autoApprovePlanEnabled: "プランは確認なしで自動承認されます",
+    autoApprovePlanDisabled: "プランには手動承認が必要です",
   },
 
   errors: {

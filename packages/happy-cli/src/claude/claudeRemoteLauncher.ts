@@ -491,6 +491,17 @@ export async function claudeRemoteLauncher(
         messageQueue.destroy();
         logger.debug("[remote]: message queue flushed");
 
+        // Abort old controller to terminate the previous Claude child process
+        // This is critical for ExitPlanMode: claudeRemote returns via isAborted
+        // but without aborting the controller, the old child process keeps running
+        // and conflicts with the new one that resumes the same session.
+        if (controller && !controller.signal.aborted) {
+          logger.debug(
+            "[remote]: aborting previous controller to kill old child process",
+          );
+          controller.abort();
+        }
+
         // Reset abort controller and future
         abortController = null;
         abortFuture?.resolve(undefined);

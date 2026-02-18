@@ -321,6 +321,7 @@ export async function runClaude(
   let currentAppendSystemPrompt: string | undefined = undefined; // Track current append system prompt
   let currentAllowedTools: string[] | undefined = undefined; // Track current allowed tools
   let currentDisallowedTools: string[] | undefined = undefined; // Track current disallowed tools
+  let currentAutoApprovePlan = false; // Track auto-approve plan setting
   session.onUserMessage((message) => {
     // Resolve permission mode from meta - pass through as-is, mapping happens at SDK boundary
     let messagePermissionMode: PermissionMode | undefined =
@@ -432,6 +433,16 @@ export async function runClaude(
       );
     }
 
+    // Resolve auto-approve plan setting
+    let messageAutoApprovePlan = currentAutoApprovePlan;
+    if (message.meta?.hasOwnProperty("autoApprovePlan")) {
+      messageAutoApprovePlan = !!message.meta.autoApprovePlan;
+      currentAutoApprovePlan = messageAutoApprovePlan;
+      logger.debug(
+        `[loop] Auto-approve plan updated from user message: ${messageAutoApprovePlan}`,
+      );
+    }
+
     // Check for special commands before processing
     const specialCommand = parseSpecialCommand(message.content.text);
 
@@ -463,6 +474,7 @@ export async function runClaude(
         appendSystemPrompt: messageAppendSystemPrompt,
         allowedTools: messageAllowedTools,
         disallowedTools: messageDisallowedTools,
+        autoApprovePlan: messageAutoApprovePlan,
       };
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
@@ -485,6 +497,7 @@ export async function runClaude(
         appendSystemPrompt: messageAppendSystemPrompt,
         allowedTools: messageAllowedTools,
         disallowedTools: messageDisallowedTools,
+        autoApprovePlan: messageAutoApprovePlan,
       };
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
@@ -506,6 +519,7 @@ export async function runClaude(
       appendSystemPrompt: messageAppendSystemPrompt,
       allowedTools: messageAllowedTools,
       disallowedTools: messageDisallowedTools,
+      autoApprovePlan: messageAutoApprovePlan,
     };
     messageQueue.push(message.content.text, enhancedMode);
     logger.debugLargeJson("User message pushed to queue:", message);

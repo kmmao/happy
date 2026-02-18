@@ -340,6 +340,11 @@ export const SettingsSchema = z.object({
     .describe(
       "Show real-time agent activity details in chat (thinking state, subagent info, tool descriptions)",
     ),
+  autoApprovePlan: z
+    .boolean()
+    .describe(
+      "Auto-approve plan proposals (ExitPlanMode) without showing confirmation buttons",
+    ),
   useEnhancedSessionWizard: z
     .boolean()
     .describe("A/B test flag: Use enhanced profile-based session wizard UI"),
@@ -479,6 +484,7 @@ export const settingsDefaults: Settings = {
   analyticsOptOut: false,
   experiments: false,
   showAgentActivity: false,
+  autoApprovePlan: false,
   useEnhancedSessionWizard: false,
   alwaysShowContextSize: true,
   agentInputEnterToSend: true,

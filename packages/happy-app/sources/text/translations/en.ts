@@ -254,6 +254,9 @@ export const en: TranslationStructure = {
     showAgentActivity: "Agent Activity",
     showAgentActivityEnabled: "Show real-time agent activity in chat",
     showAgentActivityDisabled: "Agent activity details hidden",
+    autoApprovePlan: "Auto-approve Plans",
+    autoApprovePlanEnabled: "Plans are auto-approved without confirmation",
+    autoApprovePlanDisabled: "Plans require manual approval",
   },
 
   errors: {

@@ -23,6 +23,8 @@ export default function FeaturesSettingsScreen() {
     useSettingMutable("useEnhancedSessionWizard");
   const [showAgentActivity, setShowAgentActivity] =
     useSettingMutable("showAgentActivity");
+  const [autoApprovePlan, setAutoApprovePlan] =
+    useSettingMutable("autoApprovePlan");
 
   return (
     <ItemList style={{ paddingTop: 0 }}>
@@ -93,6 +95,24 @@ export default function FeaturesSettingsScreen() {
             <Switch
               value={showAgentActivity}
               onValueChange={setShowAgentActivity}
+            />
+          }
+          showChevron={false}
+        />
+        <Item
+          title={t("settingsFeatures.autoApprovePlan")}
+          subtitle={
+            autoApprovePlan
+              ? t("settingsFeatures.autoApprovePlanEnabled")
+              : t("settingsFeatures.autoApprovePlanDisabled")
+          }
+          icon={
+            <Ionicons name="checkmark-done-outline" size={29} color="#FF3B30" />
+          }
+          rightElement={
+            <Switch
+              value={autoApprovePlan}
+              onValueChange={setAutoApprovePlan}
             />
           }
           showChevron={false}

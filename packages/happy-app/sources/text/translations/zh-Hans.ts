@@ -234,6 +234,9 @@ export const zhHans: TranslationStructure = {
     showAgentActivity: "Agent 活动",
     showAgentActivityEnabled: "在聊天中显示实时 Agent 活动",
     showAgentActivityDisabled: "隐藏 Agent 活动详情",
+    autoApprovePlan: "自动批准计划",
+    autoApprovePlanEnabled: "计划将自动批准，无需手动确认",
+    autoApprovePlanDisabled: "计划需要手动确认",
   },
 
   errors: {

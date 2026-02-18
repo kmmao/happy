@@ -228,6 +228,10 @@ export const ru: TranslationStructure = {
     showAgentActivity: "Активность агента",
     showAgentActivityEnabled: "Показывать активность агента в чате",
     showAgentActivityDisabled: "Детали активности агента скрыты",
+    autoApprovePlan: "Автоутверждение планов",
+    autoApprovePlanEnabled:
+      "Планы утверждаются автоматически без подтверждения",
+    autoApprovePlanDisabled: "Планы требуют ручного подтверждения",
   },
 
   errors: {

@@ -514,6 +514,8 @@ class Sync {
     }
 
     const { permissionMode, model } = resolveMessageModeMeta(session);
+    const autoApprovePlan =
+      storage.getState().settings.autoApprovePlan || false;
 
     // Generate local ID
     const localId = randomUUID();
@@ -550,6 +552,7 @@ class Sync {
         model,
         fallbackModel,
         appendSystemPrompt: systemPrompt,
+        ...(autoApprovePlan && { autoApprovePlan }),
         ...(displayText && { displayText }), // Add displayText if provided
       },
     };

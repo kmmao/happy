@@ -234,6 +234,9 @@ export const zhHant: TranslationStructure = {
     showAgentActivity: "Agent 活動",
     showAgentActivityEnabled: "在聊天中顯示即時 Agent 活動",
     showAgentActivityDisabled: "隱藏 Agent 活動詳情",
+    autoApprovePlan: "自動批准計劃",
+    autoApprovePlanEnabled: "計劃將自動批准，無需手動確認",
+    autoApprovePlanDisabled: "計劃需要手動確認",
   },
 
   errors: {

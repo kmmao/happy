@@ -247,6 +247,10 @@ export const pt: TranslationStructure = {
     showAgentActivity: "Atividade do agente",
     showAgentActivityEnabled: "Mostrar atividade do agente em tempo real",
     showAgentActivityDisabled: "Detalhes da atividade do agente ocultos",
+    autoApprovePlan: "Aprovar planos automaticamente",
+    autoApprovePlanEnabled:
+      "Planos são aprovados automaticamente sem confirmação",
+    autoApprovePlanDisabled: "Planos requerem aprovação manual",
   },
 
   errors: {

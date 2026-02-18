@@ -130,6 +130,7 @@ describe("settings", () => {
         favoriteMachines: [],
         favoriteCommands: [],
         showAgentActivity: false,
+        autoApprovePlan: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: Partial<Settings> = {
@@ -166,6 +167,7 @@ describe("settings", () => {
         favoriteMachines: [],
         favoriteCommands: [],
         showAgentActivity: false,
+        autoApprovePlan: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       });
     });
@@ -202,6 +204,7 @@ describe("settings", () => {
         favoriteMachines: [],
         favoriteCommands: [],
         showAgentActivity: false,
+        autoApprovePlan: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: Partial<Settings> = {};
@@ -240,6 +243,7 @@ describe("settings", () => {
         favoriteMachines: [],
         favoriteCommands: [],
         showAgentActivity: false,
+        autoApprovePlan: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: Partial<Settings> = {
@@ -283,6 +287,7 @@ describe("settings", () => {
         favoriteMachines: [],
         favoriteCommands: [],
         showAgentActivity: false,
+        autoApprovePlan: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       expect(applySettings(currentSettings, {})).toEqual(currentSettings);
@@ -335,6 +340,7 @@ describe("settings", () => {
         favoriteMachines: [],
         favoriteCommands: [],
         showAgentActivity: false,
+        autoApprovePlan: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: any = {
@@ -378,7 +384,7 @@ describe("settings", () => {
         analyticsOptOut: false,
         inferenceOpenAIKey: null,
         experiments: false,
-        alwaysShowContextSize: false,
+        alwaysShowContextSize: true,
         avatarStyle: "brutalist",
         showFlavorIcons: false,
         compactSessionView: false,
@@ -398,6 +404,7 @@ describe("settings", () => {
         favoriteMachines: [],
         favoriteCommands: [],
         showAgentActivity: false,
+        autoApprovePlan: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
         useEnhancedSessionWizard: false,
       });
