@@ -472,7 +472,7 @@ export const AgentInput = React.memo(
     );
 
     // User message history navigation
-    const messageHistory = useUserMessageHistory();
+    const messageHistory = useUserMessageHistory(props.sessionId);
 
     // Debug logging
     // React.useEffect(() => {
@@ -578,7 +578,9 @@ export const AgentInput = React.memo(
     // Handle keyboard navigation
     const handleKeyPress = React.useCallback(
       (event: KeyPressEvent): boolean => {
-        // Handle autocomplete navigation first
+        // Autocomplete suggestions take priority over history navigation for arrow keys.
+        // When suggestions are visible (user typed "/" etc.), arrow keys navigate the list.
+        // History position is preserved so navigation can resume when suggestions disappear.
         if (suggestions.length > 0) {
           if (event.key === "ArrowUp") {
             moveUp();
@@ -590,13 +592,10 @@ export const AgentInput = React.memo(
             event.key === "Enter" ||
             (event.key === "Tab" && !event.shiftKey)
           ) {
-            // Both Enter and Tab select the current suggestion
-            // If none selected (selected === -1), select the first one
             const indexToSelect = selected >= 0 ? selected : 0;
             handleSuggestionSelect(indexToSelect);
             return true;
           } else if (event.key === "Escape") {
-            // Clear suggestions by collapsing selection (triggers activeWord to clear)
             if (inputRef.current) {
               const cursorPos = inputState.selection.start;
               inputRef.current.setTextAndSelection(inputState.text, {
@@ -608,13 +607,12 @@ export const AgentInput = React.memo(
           }
         }
 
-        // Handle history navigation when no autocomplete suggestions
+        // History navigation when no autocomplete suggestions
         if (suggestions.length === 0) {
           if (event.key === "ArrowUp") {
             const historyText = messageHistory.navigateUp(props.value);
             if (historyText !== null) {
               props.onChangeText(historyText);
-              // Move cursor to end
               inputRef.current?.setTextAndSelection(historyText, {
                 start: historyText.length,
                 end: historyText.length,
@@ -634,6 +632,17 @@ export const AgentInput = React.memo(
               return true;
             }
           }
+        }
+
+        // Handle Escape: exit history navigation, restoring draft text
+        if (event.key === "Escape" && messageHistory.isNavigating) {
+          const draft = messageHistory.reset();
+          props.onChangeText(draft);
+          inputRef.current?.setTextAndSelection(draft, {
+            start: draft.length,
+            end: draft.length,
+          });
+          return true;
         }
 
         // Handle Escape for abort when no suggestions are visible

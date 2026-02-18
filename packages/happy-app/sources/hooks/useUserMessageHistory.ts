@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { storage } from "@/sync/storage";
 
 /**
- * Hook for navigating through user message history across all sessions.
+ * Hook for navigating through user message history within the current session.
  * Provides arrow key navigation similar to shell history or Claude Code.
  *
  * Usage:
@@ -12,30 +12,30 @@ import { storage } from "@/sync/storage";
  *
  * The hook preserves the current input text as a "draft" when first navigating up,
  * and restores it when navigating back down past all history.
+ *
+ * @param sessionId - The current session ID to scope history to
  */
-export function useUserMessageHistory() {
+export function useUserMessageHistory(sessionId: string | undefined) {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const savedDraft = useRef<string>("");
 
-  // Build history from all sessions, sorted by timestamp (most recent first)
+  // Build history from the current session only, sorted by timestamp (most recent first)
   // This is called on-demand rather than memoized to avoid stale data
   const getHistory = useCallback(() => {
-    const allSessions = storage.getState().sessions;
+    if (!sessionId) return [];
+
     const allSessionMessages = storage.getState().sessionMessages;
+    const sessionMessages = allSessionMessages[sessionId];
+    if (!sessionMessages?.messages) return [];
+
     const userMessages: Array<{ text: string; time: number }> = [];
 
-    // Collect all user messages from all sessions
-    for (const sessionId in allSessions) {
-      const sessionMessages = allSessionMessages[sessionId];
-      if (!sessionMessages?.messages) continue;
-
-      for (const msg of sessionMessages.messages) {
-        if (msg.kind === "user-text") {
-          userMessages.push({
-            text: msg.text,
-            time: msg.createdAt,
-          });
-        }
+    for (const msg of sessionMessages.messages) {
+      if (msg.kind === "user-text") {
+        userMessages.push({
+          text: msg.text,
+          time: msg.createdAt,
+        });
       }
     }
 
@@ -43,7 +43,7 @@ export function useUserMessageHistory() {
     userMessages.sort((a, b) => b.time - a.time);
 
     return userMessages.map((m) => m.text);
-  }, []);
+  }, [sessionId]);
 
   /**
    * Navigate to previous message in history (older)
@@ -95,11 +95,13 @@ export function useUserMessageHistory() {
 
   /**
    * Reset history navigation to end (no selection)
-   * Clears saved draft
+   * Returns the saved draft text and clears it
    */
   const reset = useCallback(() => {
+    const draft = savedDraft.current;
     setHistoryIndex(-1);
     savedDraft.current = "";
+    return draft;
   }, []);
 
   return {
