@@ -71,14 +71,7 @@ export const OptionsPopover = React.memo(
 
 const styles = StyleSheet.create((theme) => ({
   overlay: {
-    ...Platform.select({
-      web: {
-        position: "fixed" as any,
-      },
-      default: {
-        position: "absolute",
-      },
-    }),
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -86,14 +79,7 @@ const styles = StyleSheet.create((theme) => ({
     zIndex: 100,
   },
   backdrop: {
-    ...Platform.select({
-      web: {
-        position: "fixed" as any,
-      },
-      default: {
-        position: "absolute",
-      },
-    }),
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
