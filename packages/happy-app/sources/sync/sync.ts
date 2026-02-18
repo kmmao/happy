@@ -333,10 +333,15 @@ class Sync {
       })
       .finally(() => {
         this.sessionQueueProcessing.delete(sessionId);
-        const pending = this.sessionMessageQueue.get(sessionId);
-        if (pending && pending.length > 0) {
-          this.scheduleQueuedMessagesProcessing(sessionId);
-        }
+        // Use queueMicrotask to check for new messages immediately after
+        // clearing the processing flag. This closes the race window where
+        // messages arrive between the while-loop exit and the delete above.
+        queueMicrotask(() => {
+          const pending = this.sessionMessageQueue.get(sessionId);
+          if (pending && pending.length > 0) {
+            this.scheduleQueuedMessagesProcessing(sessionId);
+          }
+        });
       });
   }
 
@@ -2058,11 +2063,21 @@ class Sync {
                 updatedAt: updateData.createdAt,
                 seq: updateData.seq,
                 // Update thinking state and attention flag based on task lifecycle events
+                // Set thinkingAt to current time so ephemeral updates with older
+                // timestamps won't overwrite this more reliable lifecycle signal
                 ...(isTaskComplete
-                  ? { thinking: false, needsAttention: true }
+                  ? {
+                      thinking: false,
+                      needsAttention: true,
+                      thinkingAt: Date.now(),
+                    }
                   : {}),
                 ...(isTaskStarted
-                  ? { thinking: true, needsAttention: false }
+                  ? {
+                      thinking: true,
+                      needsAttention: false,
+                      thinkingAt: Date.now(),
+                    }
                   : {}),
               },
             ]);
@@ -2071,20 +2086,24 @@ class Sync {
             this.fetchSessions();
           }
 
-          // Fast-path only on consecutive seq values, otherwise fetch from server.
+          // Always apply the current message immediately so the UI updates
+          // without waiting for a full fetchMessages round-trip.
           const currentLastSeq = this.sessionLastSeq.get(updateData.body.sid);
           const incomingSeq = updateData.body.message.seq;
-          if (
+          const isConsecutive =
             lastMessage &&
             currentLastSeq !== undefined &&
-            incomingSeq === currentLastSeq + 1
-          ) {
-            console.log(
-              "🔄 Sync: Applying message (fast path):",
-              JSON.stringify(lastMessage),
-            );
+            incomingSeq === currentLastSeq + 1;
+
+          if (lastMessage) {
             this.enqueueMessages(updateData.body.sid, [lastMessage]);
-            this.sessionLastSeq.set(updateData.body.sid, incomingSeq);
+
+            // Update seq tracker if this message advances it
+            if (currentLastSeq === undefined || incomingSeq > currentLastSeq) {
+              this.sessionLastSeq.set(updateData.body.sid, incomingSeq);
+            }
+
+            // Check for mutable tool calls to refresh git status
             let hasMutableTool = false;
             if (
               lastMessage.role === "agent" &&
@@ -2101,14 +2120,20 @@ class Sync {
             if (hasMutableTool) {
               gitStatusSync.invalidate(updateData.body.sid);
             }
-          } else {
+          }
+
+          // If seq is non-consecutive, also fetch missing messages from server
+          if (!isConsecutive) {
             this.getMessagesSync(updateData.body.sid).invalidate();
           }
         }
       }
 
-      // Ping session
-      this.onSessionVisible(updateData.body.sid);
+      // Note: We intentionally do NOT call onSessionVisible here.
+      // onSessionVisible triggers fetchMessages which competes with the
+      // message queue lock and causes unnecessary re-fetches on every
+      // incoming message. Session visibility is already handled by
+      // SessionView.useLayoutEffect when the user enters a session.
     } else if (updateData.body.t === "new-session") {
       log.log("🆕 New session update received");
       this.sessionsSync.invalidate();
@@ -2530,12 +2555,21 @@ class Sync {
     for (const [sessionId, update] of updates) {
       const session = storage.getState().sessions[sessionId];
       if (session) {
+        // Don't let a stale ephemeral update overwrite a more recent
+        // lifecycle-event-driven thinking state (task_started / task_complete).
+        // Lifecycle events set thinkingAt to Date.now(), which is always
+        // newer than the ephemeral update's activeAt when there's a race.
+        const lifecycleIsNewer =
+          session.thinkingAt > 0 && update.activeAt < session.thinkingAt;
+
         sessions.push({
           ...session,
           active: update.active,
           activeAt: update.activeAt,
-          thinking: update.thinking ?? false,
-          thinkingAt: update.activeAt, // Always use activeAt for consistency
+          thinking: lifecycleIsNewer
+            ? session.thinking
+            : (update.thinking ?? false),
+          thinkingAt: lifecycleIsNewer ? session.thinkingAt : update.activeAt,
         });
       }
     }
