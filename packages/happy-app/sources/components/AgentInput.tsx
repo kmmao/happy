@@ -23,6 +23,7 @@ import { useActiveSuggestions } from "./autocomplete/useActiveSuggestions";
 import { AgentInputAutocomplete } from "./AgentInputAutocomplete";
 import { FloatingOverlay } from "./FloatingOverlay";
 import { QuickCommandsPanel } from "./QuickCommandsPanel";
+import { CommandListPopover } from "./CommandListPopover";
 import { TextInputState, MultiTextInputHandle } from "./MultiTextInput";
 import { applySuggestion } from "./autocomplete/applySuggestion";
 import { GitStatusBadge, useHasMeaningfulGitStatus } from "./GitStatusBadge";
@@ -97,6 +98,9 @@ interface AgentInputProps {
   profileId?: string | null;
   onProfileClick?: () => void;
   onSlashCommandPress?: () => void;
+  showCommandList?: boolean;
+  onCommandSelect?: (command: string) => void;
+  onCommandListClose?: () => void;
   onImagePaste?: (blob: Blob) => void;
   onImagePickPress?: () => void;
   isPickingImage?: boolean;
@@ -956,6 +960,36 @@ export const AgentInput = React.memo(
                       </Text>
                     )}
                   </View>
+                </FloatingOverlay>
+              </View>
+            </>
+          )}
+
+          {/* Slash Command List - toggled by slash command button */}
+          {props.showCommandList && props.sessionId && (
+            <>
+              <TouchableWithoutFeedback
+                onPress={() => props.onCommandListClose?.()}
+              >
+                <View style={styles.overlayBackdrop} />
+              </TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.commandsOverlay,
+                  { paddingHorizontal: screenWidth > 700 ? 0 : 8 },
+                ]}
+              >
+                <FloatingOverlay
+                  maxHeight={420}
+                  keyboardShouldPersistTaps="always"
+                >
+                  <CommandListPopover
+                    visible={true}
+                    sessionId={props.sessionId}
+                    onCommandSelect={(cmd) => props.onCommandSelect?.(cmd)}
+                    onClose={() => props.onCommandListClose?.()}
+                    inline
+                  />
                 </FloatingOverlay>
               </View>
             </>

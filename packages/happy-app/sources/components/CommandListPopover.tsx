@@ -21,6 +21,8 @@ interface CommandListPopoverProps {
   sessionId: string;
   onCommandSelect: (command: string) => void;
   onClose: () => void;
+  /** When true, renders inline content only (no overlay/backdrop). Parent controls positioning. */
+  inline?: boolean;
 }
 
 export const CommandListPopover = React.memo(
@@ -29,6 +31,7 @@ export const CommandListPopover = React.memo(
     sessionId,
     onCommandSelect,
     onClose,
+    inline,
   }: CommandListPopoverProps) => {
     const { theme } = useUnistyles();
     const opacity = React.useRef(new Animated.Value(0)).current;
@@ -138,93 +141,101 @@ export const CommandListPopover = React.memo(
       </View>
     );
 
+    const bubbleContent = (
+      <View style={inline ? styles.inlineBubble : styles.bubble}>
+        {/* Search input */}
+        <View style={styles.searchContainer}>
+          <Ionicons
+            name="search"
+            size={16}
+            color={theme.colors.textSecondary}
+          />
+          <TextInput
+            ref={inputRef}
+            style={[styles.searchInput, { color: theme.colors.text }]}
+            placeholder="Search commands..."
+            placeholderTextColor={theme.colors.input.placeholder}
+            value={query}
+            onChangeText={setQuery}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {query.length > 0 && (
+            <Pressable onPress={() => setQuery("")}>
+              <Ionicons
+                name="close-circle"
+                size={16}
+                color={theme.colors.textSecondary}
+              />
+            </Pressable>
+          )}
+        </View>
+
+        {/* Command list */}
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {favoriteItems.length > 0 && (
+            <>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="star" size={12} color="#FFB800" />
+                <Text
+                  style={[
+                    styles.sectionHeaderText,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  Favorites
+                </Text>
+              </View>
+              {favoriteItems.map((cmd) => renderItem(cmd, true))}
+            </>
+          )}
+          {otherItems.length > 0 && (
+            <>
+              {favoriteItems.length > 0 && (
+                <View style={styles.sectionHeader}>
+                  <Text
+                    style={[
+                      styles.sectionHeaderText,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                  >
+                    All Commands
+                  </Text>
+                </View>
+              )}
+              {otherItems.map((cmd) => renderItem(cmd, false))}
+            </>
+          )}
+          {favoriteItems.length === 0 && otherItems.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text
+                style={[
+                  styles.emptyText,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
+                No commands found
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    );
+
+    if (inline) {
+      return bubbleContent;
+    }
+
     return (
       <Animated.View style={[styles.overlay, { opacity }]}>
         <Pressable style={styles.backdrop} onPress={onClose} />
 
         <View style={styles.centerAnchor} pointerEvents="box-none">
-          <View style={styles.bubble}>
-            {/* Search input */}
-            <View style={styles.searchContainer}>
-              <Ionicons
-                name="search"
-                size={16}
-                color={theme.colors.textSecondary}
-              />
-              <TextInput
-                ref={inputRef}
-                style={[styles.searchInput, { color: theme.colors.text }]}
-                placeholder="Search commands..."
-                placeholderTextColor={theme.colors.input.placeholder}
-                value={query}
-                onChangeText={setQuery}
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-              {query.length > 0 && (
-                <Pressable onPress={() => setQuery("")}>
-                  <Ionicons
-                    name="close-circle"
-                    size={16}
-                    color={theme.colors.textSecondary}
-                  />
-                </Pressable>
-              )}
-            </View>
-
-            {/* Command list */}
-            <ScrollView
-              style={styles.scrollView}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {favoriteItems.length > 0 && (
-                <>
-                  <View style={styles.sectionHeader}>
-                    <Ionicons name="star" size={12} color="#FFB800" />
-                    <Text
-                      style={[
-                        styles.sectionHeaderText,
-                        { color: theme.colors.textSecondary },
-                      ]}
-                    >
-                      Favorites
-                    </Text>
-                  </View>
-                  {favoriteItems.map((cmd) => renderItem(cmd, true))}
-                </>
-              )}
-              {otherItems.length > 0 && (
-                <>
-                  {favoriteItems.length > 0 && (
-                    <View style={styles.sectionHeader}>
-                      <Text
-                        style={[
-                          styles.sectionHeaderText,
-                          { color: theme.colors.textSecondary },
-                        ]}
-                      >
-                        All Commands
-                      </Text>
-                    </View>
-                  )}
-                  {otherItems.map((cmd) => renderItem(cmd, false))}
-                </>
-              )}
-              {favoriteItems.length === 0 && otherItems.length === 0 && (
-                <View style={styles.emptyState}>
-                  <Text
-                    style={[
-                      styles.emptyText,
-                      { color: theme.colors.textSecondary },
-                    ]}
-                  >
-                    No commands found
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-          </View>
+          {bubbleContent}
         </View>
       </Animated.View>
     );
@@ -271,6 +282,10 @@ const styles = StyleSheet.create((theme) => ({
     shadowRadius: 8,
     shadowOpacity: theme.colors.shadow.opacity * 1.5,
     elevation: 8,
+    overflow: "hidden",
+  },
+  inlineBubble: {
+    maxHeight: 420,
     overflow: "hidden",
   },
   searchContainer: {

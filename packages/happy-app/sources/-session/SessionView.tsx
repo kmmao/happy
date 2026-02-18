@@ -14,7 +14,6 @@ import { ChatList, ChatListHandle } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
 import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
 import { OptionsPopover } from "@/components/OptionsPopover";
-import { CommandListPopover } from "@/components/CommandListPopover";
 import { EmptyMessages } from "@/components/EmptyMessages";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
@@ -585,6 +584,9 @@ function SessionViewLoaded({
         }}
         packageScripts={session.metadata?.packageScripts}
         onSlashCommandPress={() => setShowCommandList(true)}
+        showCommandList={showCommandList}
+        onCommandSelect={handleCommandSelect}
+        onCommandListClose={() => setShowCommandList(false)}
       />
     </>
   );
@@ -657,12 +659,6 @@ function SessionViewLoaded({
           options={latestOptions}
           onOptionPress={handleFloatingOptionPress}
           onClose={() => setShowOptionsPopover(false)}
-        />
-        <CommandListPopover
-          visible={showCommandList}
-          sessionId={sessionId}
-          onCommandSelect={handleCommandSelect}
-          onClose={() => setShowCommandList(false)}
         />
       </View>
 
