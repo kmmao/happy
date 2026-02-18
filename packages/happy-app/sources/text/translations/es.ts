@@ -1017,6 +1017,7 @@ export const es: TranslationStructure = {
     cost: "Costo",
     usageOverTime: "Uso a lo largo del tiempo",
     byModel: "Por modelo",
+    byTokenType: "Por tipo de token",
     noData: "No hay datos de uso disponibles",
   },
 

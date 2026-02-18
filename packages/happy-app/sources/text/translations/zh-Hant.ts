@@ -968,6 +968,7 @@ export const zhHant: TranslationStructure = {
     cost: "費用",
     usageOverTime: "使用趨勢",
     byModel: "按模型",
+    byTokenType: "按類型",
     noData: "暫無使用資料",
   },
 

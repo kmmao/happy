@@ -967,6 +967,7 @@ export const zhHans: TranslationStructure = {
     cost: "费用",
     usageOverTime: "使用趋势",
     byModel: "按模型",
+    byTokenType: "按类型",
     noData: "暂无使用数据",
   },
 

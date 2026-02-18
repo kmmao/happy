@@ -146,37 +146,69 @@ export async function getSessionUsageSummary(
   });
 }
 
+// Known token type keys that are NOT model names
+const TOKEN_TYPE_KEYS = new Set([
+  "total",
+  "input",
+  "output",
+  "cache_creation",
+  "cache_read",
+]);
+
+const COST_TYPE_KEYS = new Set(["total", "input", "output"]);
+
 /**
  * Calculate total tokens and cost from usage data
  */
 export function calculateTotals(usage: UsageDataPoint[]): {
   totalTokens: number;
   totalCost: number;
+  tokensByType: Record<string, number>;
   tokensByModel: Record<string, number>;
+  costByType: Record<string, number>;
   costByModel: Record<string, number>;
 } {
   const result = {
     totalTokens: 0,
     totalCost: 0,
+    tokensByType: {} as Record<string, number>,
     tokensByModel: {} as Record<string, number>,
+    costByType: {} as Record<string, number>,
     costByModel: {} as Record<string, number>,
   };
 
   for (const dataPoint of usage) {
-    // Sum tokens
-    for (const [model, tokens] of Object.entries(dataPoint.tokens)) {
-      if (typeof tokens === "number") {
-        result.totalTokens += tokens;
-        result.tokensByModel[model] =
-          (result.tokensByModel[model] || 0) + tokens;
+    // Use the 'total' key for totalTokens to avoid double counting
+    const totalForPoint =
+      typeof dataPoint.tokens.total === "number" ? dataPoint.tokens.total : 0;
+    result.totalTokens += totalForPoint;
+
+    // Categorize token keys into types vs model names
+    for (const [key, tokens] of Object.entries(dataPoint.tokens)) {
+      if (typeof tokens !== "number" || key === "total") {
+        continue;
+      }
+      if (TOKEN_TYPE_KEYS.has(key)) {
+        result.tokensByType[key] = (result.tokensByType[key] || 0) + tokens;
+      } else {
+        result.tokensByModel[key] = (result.tokensByModel[key] || 0) + tokens;
       }
     }
 
-    // Sum costs
-    for (const [model, cost] of Object.entries(dataPoint.cost)) {
-      if (typeof cost === "number") {
-        result.totalCost += cost;
-        result.costByModel[model] = (result.costByModel[model] || 0) + cost;
+    // Use the 'total' key for totalCost
+    const costTotal =
+      typeof dataPoint.cost.total === "number" ? dataPoint.cost.total : 0;
+    result.totalCost += costTotal;
+
+    // Categorize cost keys into types vs model names
+    for (const [key, cost] of Object.entries(dataPoint.cost)) {
+      if (typeof cost !== "number" || key === "total") {
+        continue;
+      }
+      if (COST_TYPE_KEYS.has(key)) {
+        result.costByType[key] = (result.costByType[key] || 0) + cost;
+      } else {
+        result.costByModel[key] = (result.costByModel[key] || 0) + cost;
       }
     }
   }

@@ -1018,6 +1018,7 @@ export const ca: TranslationStructure = {
     cost: "Cost",
     usageOverTime: "Ús al llarg del temps",
     byModel: "Per model",
+    byTokenType: "Per tipus de token",
     noData: "No hi ha dades d'ús disponibles",
   },
 

@@ -695,21 +695,32 @@ export class ApiSessionClient extends EventEmitter {
     const costs = calculateCost(usage, model);
 
     // Transform Claude usage format to backend expected format
+    const tokens: { [key: string]: number; total: number } = {
+      total: totalTokens,
+      input: usage.input_tokens,
+      output: usage.output_tokens,
+      cache_creation: usage.cache_creation_input_tokens || 0,
+      cache_read: usage.cache_read_input_tokens || 0,
+    };
+    // Include model name for per-model tracking
+    if (model) {
+      tokens[model] = totalTokens;
+    }
+
+    const cost: { [key: string]: number; total: number } = {
+      total: costs.total,
+      input: costs.input,
+      output: costs.output,
+    };
+    if (model) {
+      cost[model] = costs.total;
+    }
+
     const usageReport = {
       key: "claude-session",
       sessionId: this.sessionId,
-      tokens: {
-        total: totalTokens,
-        input: usage.input_tokens,
-        output: usage.output_tokens,
-        cache_creation: usage.cache_creation_input_tokens || 0,
-        cache_read: usage.cache_read_input_tokens || 0,
-      },
-      cost: {
-        total: costs.total,
-        input: costs.input,
-        output: costs.output,
-      },
+      tokens,
+      cost,
     };
     logger.debugLargeJson("[SOCKET] Sending usage data:", usageReport);
     this.socket.emit("usage-report", usageReport);

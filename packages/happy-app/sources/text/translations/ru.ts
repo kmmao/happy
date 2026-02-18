@@ -1039,6 +1039,7 @@ export const ru: TranslationStructure = {
     cost: "Стоимость",
     usageOverTime: "Использование во времени",
     byModel: "По модели",
+    byTokenType: "По типу токенов",
     noData: "Данные об использовании недоступны",
   },
 

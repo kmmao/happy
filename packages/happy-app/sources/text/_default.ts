@@ -998,6 +998,7 @@ export const en = {
     cost: "Cost",
     usageOverTime: "Usage over time",
     byModel: "By Model",
+    byTokenType: "By Token Type",
     noData: "No usage data available",
   },
 

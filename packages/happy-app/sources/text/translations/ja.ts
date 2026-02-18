@@ -1061,6 +1061,7 @@ export const ja: TranslationStructure = {
     cost: "コスト",
     usageOverTime: "使用量の推移",
     byModel: "モデル別",
+    byTokenType: "トークンタイプ別",
     noData: "使用データがありません",
   },
 
