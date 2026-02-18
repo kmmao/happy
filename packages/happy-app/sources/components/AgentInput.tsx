@@ -41,6 +41,7 @@ import {
 } from "@/sync/settings";
 import { getBuiltInProfile } from "@/sync/profileUtils";
 import { MAX_IMAGES } from "@/utils/imageUpload";
+import { MAX_CONTEXT_SIZE, formatTokenCount } from "@/utils/formatUsage";
 
 interface AgentInputProps {
   value: string;
@@ -109,8 +110,6 @@ interface AgentInputProps {
   onShellCommand?: (command: string) => void;
   packageScripts?: Record<string, string>;
 }
-
-const MAX_CONTEXT_SIZE = 190000;
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
   container: {
@@ -319,15 +318,6 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     color: theme.colors.button.primary.tint,
   },
 }));
-
-const formatTokenCount = (tokens: number): string => {
-  if (tokens >= 1_000_000) {
-    return `${(tokens / 1_000_000).toFixed(1)}M tokens`;
-  } else if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(1)}K tokens`;
-  }
-  return `${tokens} tokens`;
-};
 
 const getContextWarning = (
   contextSize: number,
