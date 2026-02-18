@@ -3,6 +3,9 @@ import * as React from "react";
 import { Animated, Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+const IDLE_TIMEOUT = 3000;
+const IDLE_OPACITY = 0.15;
+
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
     position: "absolute",
@@ -27,14 +30,6 @@ const stylesheet = StyleSheet.create((theme) => ({
     height: 8,
     borderRadius: 4,
     backgroundColor: theme.colors.radio.dot,
-  },
-  navColumn: {
-    position: "absolute",
-    right: 12,
-    bottom: 0,
-    flexDirection: "column" as const,
-    alignItems: "center" as const,
-    gap: 8,
   },
   button: {
     width: 36,
@@ -64,6 +59,8 @@ interface ScrollToBottomButtonProps {
   hasUserMessages?: boolean;
   optionCount?: number;
   onOptionsPress?: () => void;
+  /** Bump this counter on every scroll event to wake buttons from idle fade */
+  scrollTick?: number;
 }
 
 export const ScrollToBottomButton = React.memo(
@@ -75,12 +72,52 @@ export const ScrollToBottomButton = React.memo(
     hasUserMessages,
     optionCount = 0,
     onOptionsPress,
+    scrollTick = 0,
   }: ScrollToBottomButtonProps) => {
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const scrollBtnOpacity = React.useRef(new Animated.Value(0)).current;
     const [shouldRenderScrollBtn, setShouldRenderScrollBtn] =
       React.useState(false);
+
+    // Idle fade-out for the entire button row
+    const idleOpacity = React.useRef(new Animated.Value(1)).current;
+    const idleTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
+
+    const resetIdleTimer = React.useCallback(() => {
+      // Restore full opacity immediately
+      Animated.timing(idleOpacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+
+      // Clear existing timer
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+      }
+
+      // Start new idle timer
+      idleTimerRef.current = setTimeout(() => {
+        Animated.timing(idleOpacity, {
+          toValue: IDLE_OPACITY,
+          duration: 600,
+          useNativeDriver: true,
+        }).start();
+      }, IDLE_TIMEOUT);
+    }, [idleOpacity]);
+
+    // Reset idle timer whenever the component is rendered and user scrolls
+    React.useEffect(() => {
+      resetIdleTimer();
+      return () => {
+        if (idleTimerRef.current) {
+          clearTimeout(idleTimerRef.current);
+        }
+      };
+    }, [visible, scrollTick, resetIdleTimer]);
 
     React.useEffect(() => {
       if (visible) {
@@ -111,6 +148,11 @@ export const ScrollToBottomButton = React.memo(
       return null;
     }
 
+    const wrapWithIdleReset = (handler: () => void) => () => {
+      resetIdleTimer();
+      handler();
+    };
+
     const renderButton = (
       icon: React.ComponentProps<typeof Ionicons>["name"],
       onButtonPress: () => void,
@@ -121,7 +163,7 @@ export const ScrollToBottomButton = React.memo(
           styles.button,
           pressed ? styles.buttonPressed : styles.buttonDefault,
         ]}
-        onPress={onButtonPress}
+        onPress={wrapWithIdleReset(onButtonPress)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <Ionicons name={icon} size={size} color={theme.colors.fab.icon} />
@@ -129,7 +171,10 @@ export const ScrollToBottomButton = React.memo(
     );
 
     return (
-      <View style={styles.container} pointerEvents="box-none">
+      <Animated.View
+        style={[styles.container, { opacity: idleOpacity }]}
+        pointerEvents="box-none"
+      >
         <View style={styles.scrollBtnWrapper}>
           <View style={styles.scrollBtnRow}>
             {showOptionsButton && (
@@ -138,20 +183,17 @@ export const ScrollToBottomButton = React.memo(
                 <View style={styles.badge} />
               </View>
             )}
+            {showNavButtons && renderButton("arrow-up", onPrevUserMessage, 18)}
             {shouldRenderScrollBtn && (
               <Animated.View style={{ opacity: scrollBtnOpacity }}>
                 {renderButton("chevron-down", onPress)}
               </Animated.View>
             )}
+            {showNavButtons &&
+              renderButton("arrow-down", onNextUserMessage, 18)}
           </View>
         </View>
-        {showNavButtons && (
-          <View style={styles.navColumn}>
-            {renderButton("arrow-up", onPrevUserMessage, 18)}
-            {renderButton("arrow-down", onNextUserMessage, 18)}
-          </View>
-        )}
-      </View>
+      </Animated.View>
     );
   },
 );

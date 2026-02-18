@@ -325,6 +325,10 @@ function SessionViewLoaded({
   // Scroll-to-bottom state
   const chatListRef = React.useRef<ChatListHandle>(null);
   const [showScrollToBottom, setShowScrollToBottom] = React.useState(false);
+  const [scrollTick, setScrollTick] = React.useState(0);
+  const handleScrollActivity = React.useCallback(() => {
+    setScrollTick((prev) => prev + 1);
+  }, []);
 
   // Navigation anchor for user message jumping (-1 = latest)
   const [navigatedIndex, setNavigatedIndex] = React.useState(-1);
@@ -446,6 +450,7 @@ function SessionViewLoaded({
             ref={chatListRef}
             session={session}
             onScrollAwayFromBottom={setShowScrollToBottom}
+            onScrollActivity={handleScrollActivity}
           />
         )}
       </Deferred>
@@ -466,6 +471,7 @@ function SessionViewLoaded({
         hasUserMessages={(chatListRef.current?.getUserMessageCount() ?? 0) > 0}
         optionCount={latestOptions.length}
         onOptionsPress={() => setShowOptionsPopover(true)}
+        scrollTick={scrollTick}
       />
     </>
   );

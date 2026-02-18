@@ -27,6 +27,7 @@ export const ChatList = React.memo(
     {
       session: Session;
       onScrollAwayFromBottom?: (isAway: boolean) => void;
+      onScrollActivity?: () => void;
     }
   >((props, ref) => {
     const { messages } = useSessionMessages(props.session.id);
@@ -37,6 +38,7 @@ export const ChatList = React.memo(
         sessionId={props.session.id}
         messages={messages}
         onScrollAwayFromBottom={props.onScrollAwayFromBottom}
+        onScrollActivity={props.onScrollActivity}
       />
     );
   }),
@@ -75,6 +77,7 @@ const ChatListInternal = React.memo(
       sessionId: string;
       messages: Message[];
       onScrollAwayFromBottom?: (isAway: boolean) => void;
+      onScrollActivity?: () => void;
     }
   >((props, ref) => {
     const flatListRef = React.useRef<FlatList>(null);
@@ -158,8 +161,9 @@ const ChatListInternal = React.memo(
           isAwayRef.current = isAway;
           props.onScrollAwayFromBottom?.(isAway);
         }
+        props.onScrollActivity?.();
       },
-      [props.onScrollAwayFromBottom],
+      [props.onScrollAwayFromBottom, props.onScrollActivity],
     );
 
     // Pre-compute which agent-text messages should show an avatar.
