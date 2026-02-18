@@ -140,6 +140,17 @@ interface StorageState {
     messages: NormalizedMessage[],
   ) => { changed: string[]; hasReadyEvent: boolean };
   applyMessagesLoaded: (sessionId: string) => void;
+  applySessionUsageBaseline: (
+    sessionId: string,
+    baseline: {
+      totalInputTokens: number;
+      totalOutputTokens: number;
+      lastInputTokens: number;
+      lastOutputTokens: number;
+      lastCacheCreation: number;
+      lastCacheRead: number;
+    },
+  ) => void;
   applySettings: (settings: Settings, version: number) => void;
   applySettingsLocal: (settings: Partial<Settings>) => void;
   applyLocalSettings: (settings: Partial<LocalSettings>) => void;
@@ -780,6 +791,68 @@ export const storage = create<StorageState>()((set, get) => {
         }
 
         return result;
+      }),
+    applySessionUsageBaseline: (
+      sessionId: string,
+      baseline: {
+        totalInputTokens: number;
+        totalOutputTokens: number;
+        lastInputTokens: number;
+        lastOutputTokens: number;
+        lastCacheCreation: number;
+        lastCacheRead: number;
+      },
+    ) =>
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) return state;
+
+        const currentUsage = session.latestUsage;
+        const updatedUsage = currentUsage
+          ? {
+              ...currentUsage,
+              totalInputTokens: baseline.totalInputTokens,
+              totalOutputTokens: baseline.totalOutputTokens,
+            }
+          : {
+              inputTokens: baseline.lastInputTokens,
+              outputTokens: baseline.lastOutputTokens,
+              cacheCreation: baseline.lastCacheCreation,
+              cacheRead: baseline.lastCacheRead,
+              contextSize:
+                baseline.lastInputTokens +
+                baseline.lastCacheCreation +
+                baseline.lastCacheRead,
+              totalInputTokens: baseline.totalInputTokens,
+              totalOutputTokens: baseline.totalOutputTokens,
+              timestamp: Date.now(),
+            };
+
+        const sessionMessages = state.sessionMessages[sessionId];
+        const updatedSessionMessages = sessionMessages?.reducerState
+          ? {
+              ...state.sessionMessages,
+              [sessionId]: {
+                ...sessionMessages,
+                reducerState: {
+                  ...sessionMessages.reducerState,
+                  latestUsage: { ...updatedUsage },
+                },
+              },
+            }
+          : state.sessionMessages;
+
+        return {
+          ...state,
+          sessions: {
+            ...state.sessions,
+            [sessionId]: {
+              ...session,
+              latestUsage: updatedUsage,
+            },
+          },
+          sessionMessages: updatedSessionMessages,
+        };
       }),
     applySettingsLocal: (settings: Partial<Settings>) =>
       set((state) => {

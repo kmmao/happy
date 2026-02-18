@@ -480,7 +480,7 @@ export const settingsDefaults: Settings = {
   experiments: false,
   showAgentActivity: false,
   useEnhancedSessionWizard: false,
-  alwaysShowContextSize: false,
+  alwaysShowContextSize: true,
   agentInputEnterToSend: true,
   avatarStyle: "brutalist",
   showFlavorIcons: false,

@@ -66,6 +66,7 @@ import { fetchFeed } from "./apiFeed";
 import { FeedItem } from "./feedTypes";
 import { UserProfile } from "./friendTypes";
 import { resolveMessageModeMeta } from "./messageMeta";
+import { getSessionUsageSummary } from "./apiUsage";
 
 type V3GetSessionMessagesResponse = {
   messages: ApiMessage[];
@@ -1863,6 +1864,31 @@ class Sync {
       log.log(
         `💬 fetchMessages completed for session ${sessionId} - processed ${totalNormalized} messages`,
       );
+
+      // Fetch cumulative usage baseline from server (non-blocking)
+      if (this.credentials) {
+        getSessionUsageSummary(this.credentials, sessionId)
+          .then((summary) => {
+            if (summary.reportCount > 0) {
+              storage.getState().applySessionUsageBaseline(sessionId, {
+                totalInputTokens: summary.totalInputTokens,
+                totalOutputTokens: summary.totalOutputTokens,
+                lastInputTokens: summary.lastInputTokens,
+                lastOutputTokens: summary.lastOutputTokens,
+                lastCacheCreation: summary.lastCacheCreation,
+                lastCacheRead: summary.lastCacheRead,
+              });
+              log.log(
+                `💬 Applied usage baseline for ${sessionId}: ${summary.totalInputTokens} in / ${summary.totalOutputTokens} out`,
+              );
+            }
+          })
+          .catch((error) => {
+            log.log(
+              `💬 Failed to fetch usage baseline for ${sessionId}: ${error}`,
+            );
+          });
+      }
     });
   };
 
