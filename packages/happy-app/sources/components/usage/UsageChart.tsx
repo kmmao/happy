@@ -19,7 +19,7 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: 8,
-    paddingBottom: 40, // Space for x-axis labels
+    marginBottom: 40, // Space for x-axis labels below the chart
   },
   barWrapper: {
     flex: 1,
@@ -128,7 +128,7 @@ export const UsageChart: React.FC<UsageChartProps> = ({
         <View style={[styles.chartContainer, { height }]}>
           {displayData.map((point, index) => {
             const value = getValueForDataPoint(point);
-            // Reserve 20px at top for value labels so they don't get clipped
+            // Reserve space at top for value label text (~18px)
             const maxBarHeight = height - 20;
             const barHeight = (value / maxValue) * maxBarHeight;
             const showValue = value > 0 && barHeight > 20;
