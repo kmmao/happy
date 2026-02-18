@@ -2595,7 +2595,10 @@ class Sync {
               updateData.tokens.cache_creation +
               updateData.tokens.cache_read,
             totalInputTokens:
-              (prevUsage?.totalInputTokens ?? 0) + updateData.tokens.input,
+              (prevUsage?.totalInputTokens ?? 0) +
+              updateData.tokens.input +
+              updateData.tokens.cache_creation +
+              updateData.tokens.cache_read,
             totalOutputTokens:
               (prevUsage?.totalOutputTokens ?? 0) + updateData.tokens.output,
             timestamp: updateData.timestamp,

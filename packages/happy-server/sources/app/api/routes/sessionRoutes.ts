@@ -460,7 +460,7 @@ export function sessionRoutes(app: Fastify) {
         const cacheCreation = Number(data.tokens?.cache_creation || 0);
         const cacheRead = Number(data.tokens?.cache_read || 0);
 
-        totalInputTokens += input;
+        totalInputTokens += input + cacheCreation + cacheRead;
         totalOutputTokens += output;
         totalCacheCreationTokens += cacheCreation;
         totalCacheReadTokens += cacheRead;

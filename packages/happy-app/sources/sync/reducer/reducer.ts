@@ -1261,7 +1261,11 @@ function processUsageData(
         (usage.cache_creation_input_tokens || 0) +
         (usage.cache_read_input_tokens || 0) +
         usage.input_tokens,
-      totalInputTokens: prevTotal.totalInputTokens + usage.input_tokens,
+      totalInputTokens:
+        prevTotal.totalInputTokens +
+        usage.input_tokens +
+        (usage.cache_creation_input_tokens || 0) +
+        (usage.cache_read_input_tokens || 0),
       totalOutputTokens: prevTotal.totalOutputTokens + usage.output_tokens,
       timestamp: timestamp,
     };
