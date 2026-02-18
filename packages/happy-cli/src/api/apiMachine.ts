@@ -332,6 +332,7 @@ export class ApiMachineClient {
         pid: process.pid,
         httpPort: this.machine.daemonState?.httpPort,
         startedAt: Date.now(),
+        startedWithCliVersion: configuration.currentCliVersion,
       }));
 
       // Register all handlers
