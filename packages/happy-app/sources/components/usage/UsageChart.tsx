@@ -14,12 +14,14 @@ interface UsageChartProps {
 const styles = StyleSheet.create((theme) => ({
   container: {
     marginVertical: 16,
+    paddingTop: 20, // Space for value labels above tallest bar
   },
   chartContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: 8,
     paddingBottom: 40, // Space for labels
+    overflow: "visible",
   },
   barWrapper: {
     flex: 1,
