@@ -14,14 +14,12 @@ interface UsageChartProps {
 const styles = StyleSheet.create((theme) => ({
   container: {
     marginVertical: 16,
-    paddingTop: 20, // Space for value labels above tallest bar
   },
   chartContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: 8,
-    paddingBottom: 40, // Space for labels
-    overflow: "visible",
+    paddingBottom: 40, // Space for x-axis labels
   },
   barWrapper: {
     flex: 1,
@@ -130,7 +128,9 @@ export const UsageChart: React.FC<UsageChartProps> = ({
         <View style={[styles.chartContainer, { height }]}>
           {displayData.map((point, index) => {
             const value = getValueForDataPoint(point);
-            const barHeight = (value / maxValue) * height;
+            // Reserve 20px at top for value labels so they don't get clipped
+            const maxBarHeight = height - 20;
+            const barHeight = (value / maxValue) * maxBarHeight;
             const showValue = value > 0 && barHeight > 20;
 
             return (
