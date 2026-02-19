@@ -95,6 +95,38 @@ export class GitStatusSync {
   }
 
   /**
+   * Invalidate git status for a session and wait for the refresh to complete.
+   * Use this after git operations (fetch/pull/push) to ensure UI updates.
+   */
+  async invalidateAndAwait(sessionId: string): Promise<void> {
+    // Clear submodule refresh throttle so submodules are also refreshed
+    this.clearSubmoduleRefreshThrottle(sessionId);
+
+    const projectKey = this.sessionToProjectKey.get(sessionId);
+    if (projectKey) {
+      const sync = this.projectSyncMap.get(projectKey);
+      if (sync) {
+        await sync.invalidateAndAwait();
+      }
+    }
+  }
+
+  /**
+   * Clear the submodule refresh throttle so the next invalidation refreshes submodules immediately
+   */
+  private clearSubmoduleRefreshThrottle(sessionId: string): void {
+    const session = storage.getState().sessions[sessionId];
+    if (!session?.metadata?.machineId || !session?.metadata?.path) {
+      return;
+    }
+    const pk = createProjectKey(
+      session.metadata.machineId,
+      session.metadata.path,
+    );
+    projectManager.clearSubmodulesLastUpdated(pk);
+  }
+
+  /**
    * Stop git status sync for a session
    */
   stop(sessionId: string): void {

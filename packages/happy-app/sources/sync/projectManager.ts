@@ -377,6 +377,21 @@ class ProjectManager {
   }
 
   /**
+   * Clear the submodule refresh throttle so the next refresh is immediate.
+   * Used after git remote operations (fetch/pull/push) to ensure fresh data.
+   */
+  clearSubmodulesLastUpdated(projectKey: ProjectKey): void {
+    const keyString = this.getProjectKeyString(projectKey);
+    const projectId = this.projectKeyToId.get(keyString);
+    if (!projectId) return;
+
+    const project = this.projects.get(projectId);
+    if (!project) return;
+
+    project.submodulesLastUpdatedAt = undefined;
+  }
+
+  /**
    * Get submodule statuses for a project
    */
   getProjectSubmodules(projectId: string): SubmoduleInfo[] | undefined {
