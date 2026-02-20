@@ -217,6 +217,18 @@ export const es: TranslationStructure = {
     compactSessionView: "Vista compacta de sesiones",
     compactSessionViewDescription:
       "Mostrar sesiones activas en un diseño más compacto",
+    voiceInputTapToToggle: "Entrada de voz: tocar para alternar",
+    voiceInputTapToToggleDescription:
+      "Toca el micrófono para iniciar/detener la grabación (desactivado = mantén pulsado para hablar)",
+    voiceInputLanguage: "Idioma de reconocimiento de voz",
+    voiceInputLanguageDescription:
+      "Toca para cambiar el idioma de la entrada de voz",
+    voiceInputLanguageOptions: {
+      auto: "Auto",
+      enUS: "English",
+      zhCN: "中文（简体）",
+      zhTW: "中文（繁體）",
+    },
   },
 
   settingsFeatures: {

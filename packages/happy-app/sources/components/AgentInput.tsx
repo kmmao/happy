@@ -52,6 +52,10 @@ interface AgentInputProps {
   sendIcon?: React.ReactNode;
   onMicPress?: () => void;
   isMicActive?: boolean;
+  onSttPress?: () => void;
+  onSttPressIn?: () => void;
+  onSttPressOut?: () => void;
+  isSttListening?: boolean;
   permissionMode?: PermissionMode | null;
   availableModes?: PermissionMode[];
   onPermissionModeChange?: (mode: PermissionMode) => void;
@@ -1667,6 +1671,50 @@ export const AgentInput = React.memo(
                         isPickingImage={props.isPickingImage}
                         imagePaths={props.imagePaths}
                       />
+                    )}
+
+                    {/* STT (Speech-to-Text) button */}
+                    {(props.onSttPress || props.onSttPressIn) && (
+                      <Pressable
+                        onPress={() => {
+                          hapticsLight();
+                          props.onSttPress?.();
+                        }}
+                        onPressIn={() => {
+                          if (props.onSttPressIn) {
+                            hapticsLight();
+                            props.onSttPressIn();
+                          }
+                        }}
+                        onPressOut={props.onSttPressOut}
+                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                        style={(p) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          borderRadius: Platform.select({
+                            default: 16,
+                            android: 20,
+                          }),
+                          paddingHorizontal: 8,
+                          paddingVertical: 6,
+                          justifyContent: "center",
+                          height: 32,
+                          opacity: p.pressed ? 0.7 : 1,
+                          backgroundColor: props.isSttListening
+                            ? "#FF3B30"
+                            : undefined,
+                        })}
+                      >
+                        <Ionicons
+                          name={props.isSttListening ? "stop" : "mic-outline"}
+                          size={16}
+                          color={
+                            props.isSttListening
+                              ? "#fff"
+                              : theme.colors.button.secondary.tint
+                          }
+                        />
+                      </Pressable>
                     )}
 
                     {/* Git Status Badge */}

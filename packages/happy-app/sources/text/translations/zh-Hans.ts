@@ -206,6 +206,17 @@ export const zhHans: TranslationStructure = {
     showFlavorIconsDescription: "在会话头像上显示 AI 提供商图标",
     compactSessionView: "紧凑会话视图",
     compactSessionViewDescription: "以更紧凑的布局显示活跃会话",
+    voiceInputTapToToggle: "语音输入：点击切换",
+    voiceInputTapToToggleDescription:
+      "点击麦克风开始/停止录音（关闭时按住麦克风说话）",
+    voiceInputLanguage: "语音识别语言",
+    voiceInputLanguageDescription: "点击切换语音输入使用的识别语言",
+    voiceInputLanguageOptions: {
+      auto: "自动（设备语言）",
+      enUS: "English",
+      zhCN: "中文（简体）",
+      zhTW: "中文（繁體）",
+    },
   },
 
   settingsFeatures: {

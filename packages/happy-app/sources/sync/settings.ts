@@ -375,6 +375,16 @@ export const SettingsSchema = z.object({
     .string()
     .nullable()
     .describe("Preferred language for voice assistant (null for auto-detect)"),
+  voiceInputMode: z
+    .enum(["push-to-talk", "toggle"])
+    .default("push-to-talk")
+    .describe("Voice input interaction mode: hold to talk or tap to toggle"),
+  voiceInputLanguage: z
+    .string()
+    .nullable()
+    .describe(
+      "Language for STT voice input (null = auto from device locale, e.g. 'en-US', 'zh-CN', 'zh-TW')",
+    ),
   preferredLanguage: z
     .string()
     .nullable()
@@ -495,6 +505,8 @@ export const settingsDefaults: Settings = {
   reviewPromptAnswered: false,
   reviewPromptLikedApp: null,
   voiceAssistantLanguage: null,
+  voiceInputMode: "push-to-talk",
+  voiceInputLanguage: null,
   preferredLanguage: null,
   recentMachinePaths: [],
   lastUsedAgent: null,

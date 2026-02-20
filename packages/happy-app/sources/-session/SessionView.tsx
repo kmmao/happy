@@ -41,6 +41,7 @@ import { sync } from "@/sync/sync";
 import { t } from "@/text";
 import { tracking, trackMessageSent } from "@/track";
 import { useImageUpload } from "@/hooks/useImageUpload";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { isRunningOnMac } from "@/utils/platform";
 import {
   useDeviceType,
@@ -366,6 +367,37 @@ function SessionViewLoaded({
     setPendingImagePaths,
   } = useImageUpload(sessionId);
 
+  // Speech-to-text: append transcripts to the input field
+  const voiceInputMode = useSetting("voiceInputMode");
+  const voiceInputLanguage = useSetting("voiceInputLanguage");
+  const handleTranscript = React.useCallback((text: string) => {
+    setMessage((prev) => {
+      const trimmed = prev.trimEnd();
+      return trimmed ? `${trimmed} ${text}` : text;
+    });
+  }, []);
+  const stt = useSpeechToText(
+    handleTranscript,
+    voiceInputLanguage ?? undefined,
+  );
+
+  // Compute display value: message + real-time interim speech text
+  const displayMessage = stt.interimTranscript
+    ? message.trimEnd()
+      ? `${message.trimEnd()} ${stt.interimTranscript}`
+      : stt.interimTranscript
+    : message;
+
+  // STT button props vary by mode (push-to-talk vs toggle)
+  const isPushToTalk = voiceInputMode === "push-to-talk";
+  const onSttToggle = React.useCallback(() => {
+    if (stt.isListening) {
+      stt.stopListening();
+    } else {
+      stt.startListening();
+    }
+  }, [stt]);
+
   // Guard against double-tap send — 300ms debounce covers the realistic fat-finger window.
   // queueMicrotask was insufficient because RN bridge batching can deliver two taps in separate frames.
   const sendingRef = React.useRef(false);
@@ -490,7 +522,7 @@ function SessionViewLoaded({
     <>
       <AgentInput
         placeholder={t("session.inputPlaceholder")}
-        value={message}
+        value={displayMessage}
         onChangeText={setMessage}
         sessionId={sessionId}
         permissionMode={permissionMode}
@@ -545,6 +577,10 @@ function SessionViewLoaded({
         }}
         onMicPress={micButtonState.onMicPress}
         isMicActive={micButtonState.isMicActive}
+        onSttPress={isPushToTalk ? undefined : onSttToggle}
+        onSttPressIn={isPushToTalk ? stt.startListening : undefined}
+        onSttPressOut={isPushToTalk ? stt.stopListening : undefined}
+        isSttListening={stt.isListening}
         onAbort={() => sessionAbort(sessionId)}
         showAbortButton={
           sessionStatus.state === "thinking" ||

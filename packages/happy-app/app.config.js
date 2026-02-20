@@ -102,6 +102,7 @@ export default {
       "react-native-vision-camera",
       "@more-tech/react-native-libsodium",
       "react-native-audio-api",
+      "expo-speech-recognition",
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
       [

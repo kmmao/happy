@@ -275,6 +275,17 @@ export const ja: TranslationStructure = {
     compactSessionView: "コンパクトセッション表示",
     compactSessionViewDescription:
       "アクティブなセッションをコンパクトなレイアウトで表示",
+    voiceInputTapToToggle: "音声入力：タップで切り替え",
+    voiceInputTapToToggleDescription:
+      "マイクをタップして録音開始/停止（オフ時は長押しで話す）",
+    voiceInputLanguage: "音声認識言語",
+    voiceInputLanguageDescription: "タップして音声入力の言語を変更",
+    voiceInputLanguageOptions: {
+      auto: "自動",
+      enUS: "English",
+      zhCN: "中文（简体）",
+      zhTW: "中文（繁體）",
+    },
   },
 
   settingsFeatures: {
