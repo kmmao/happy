@@ -206,9 +206,6 @@ export const zhHant: TranslationStructure = {
     showFlavorIconsDescription: "在工作階段頭像上顯示 AI 提供者圖示",
     compactSessionView: "緊湊工作階段檢視",
     compactSessionViewDescription: "以更緊湊的版面配置顯示活躍工作階段",
-    voiceInputTapToToggle: "語音輸入：點擊切換",
-    voiceInputTapToToggleDescription:
-      "點擊麥克風開始/停止錄音（關閉時按住麥克風說話）",
     voiceInputLanguage: "語音辨識語言",
     voiceInputLanguageDescription: "點擊切換語音輸入使用的辨識語言",
     voiceInputLanguageOptions: {

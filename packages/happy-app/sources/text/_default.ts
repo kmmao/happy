@@ -210,9 +210,6 @@ export const en = {
     compactSessionView: "Compact Session View",
     compactSessionViewDescription:
       "Show active sessions in a more compact layout",
-    voiceInputTapToToggle: "Voice Input: Tap to Toggle",
-    voiceInputTapToToggleDescription:
-      "Tap mic to start/stop recording (off = hold mic to talk)",
     voiceInputLanguage: "Voice Input Language",
     voiceInputLanguageDescription:
       "Language for speech recognition (tap to change)",

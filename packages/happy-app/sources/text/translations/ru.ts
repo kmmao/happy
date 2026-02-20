@@ -197,9 +197,6 @@ export const ru: TranslationStructure = {
     compactSessionView: "Компактный вид сессий",
     compactSessionViewDescription:
       "Отображать активные сессии в более компактном виде",
-    voiceInputTapToToggle: "Голосовой ввод: нажмите для переключения",
-    voiceInputTapToToggleDescription:
-      "Нажмите на микрофон для начала/остановки записи (выкл. = удерживайте для разговора)",
     voiceInputLanguage: "Язык распознавания речи",
     voiceInputLanguageDescription:
       "Нажмите, чтобы изменить язык голосового ввода",

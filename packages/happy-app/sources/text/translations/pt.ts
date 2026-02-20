@@ -217,9 +217,6 @@ export const pt: TranslationStructure = {
     compactSessionView: "Visualização compacta de sessões",
     compactSessionViewDescription:
       "Mostrar sessões ativas em um layout mais compacto",
-    voiceInputTapToToggle: "Entrada de voz: toque para alternar",
-    voiceInputTapToToggleDescription:
-      "Toque no microfone para iniciar/parar a gravação (desligado = mantenha pressionado para falar)",
     voiceInputLanguage: "Idioma de reconhecimento de voz",
     voiceInputLanguageDescription:
       "Toque para alterar o idioma da entrada de voz",

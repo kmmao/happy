@@ -53,8 +53,6 @@ interface AgentInputProps {
   onMicPress?: () => void;
   isMicActive?: boolean;
   onSttPress?: () => void;
-  onSttPressIn?: () => void;
-  onSttPressOut?: () => void;
   isSttListening?: boolean;
   permissionMode?: PermissionMode | null;
   availableModes?: PermissionMode[];
@@ -1674,19 +1672,12 @@ export const AgentInput = React.memo(
                     )}
 
                     {/* STT (Speech-to-Text) button */}
-                    {(props.onSttPress || props.onSttPressIn) && (
+                    {props.onSttPress && (
                       <Pressable
                         onPress={() => {
                           hapticsLight();
                           props.onSttPress?.();
                         }}
-                        onPressIn={() => {
-                          if (props.onSttPressIn) {
-                            hapticsLight();
-                            props.onSttPressIn();
-                          }
-                        }}
-                        onPressOut={props.onSttPressOut}
                         hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                         style={(p) => ({
                           flexDirection: "row",

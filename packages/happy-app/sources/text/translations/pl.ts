@@ -227,9 +227,6 @@ export const pl: TranslationStructure = {
     compactSessionView: "Kompaktowy widok sesji",
     compactSessionViewDescription:
       "Pokazuj aktywne sesje w bardziej zwartym układzie",
-    voiceInputTapToToggle: "Wprowadzanie głosowe: dotknij, aby przełączyć",
-    voiceInputTapToToggleDescription:
-      "Dotknij mikrofonu, aby rozpocząć/zatrzymać nagrywanie (wyłączone = przytrzymaj, aby mówić)",
     voiceInputLanguage: "Język rozpoznawania mowy",
     voiceInputLanguageDescription:
       "Dotknij, aby zmienić język rozpoznawania głosu",

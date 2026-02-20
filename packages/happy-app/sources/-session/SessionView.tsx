@@ -368,7 +368,6 @@ function SessionViewLoaded({
   } = useImageUpload(sessionId);
 
   // Speech-to-text: append transcripts to the input field
-  const voiceInputMode = useSetting("voiceInputMode");
   const voiceInputLanguage = useSetting("voiceInputLanguage");
   const handleTranscript = React.useCallback((text: string) => {
     setMessage((prev) => {
@@ -388,8 +387,7 @@ function SessionViewLoaded({
       : stt.interimTranscript
     : message;
 
-  // STT button props vary by mode (push-to-talk vs toggle)
-  const isPushToTalk = voiceInputMode === "push-to-talk";
+  // STT toggle: tap to start/stop
   const onSttToggle = React.useCallback(() => {
     if (stt.isListening) {
       stt.stopListening();
@@ -577,9 +575,7 @@ function SessionViewLoaded({
         }}
         onMicPress={micButtonState.onMicPress}
         isMicActive={micButtonState.isMicActive}
-        onSttPress={isPushToTalk ? undefined : onSttToggle}
-        onSttPressIn={isPushToTalk ? stt.startListening : undefined}
-        onSttPressOut={isPushToTalk ? stt.stopListening : undefined}
+        onSttPress={onSttToggle}
         isSttListening={stt.isListening}
         onAbort={() => sessionAbort(sessionId)}
         showAbortButton={

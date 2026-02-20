@@ -217,9 +217,6 @@ export const ca: TranslationStructure = {
     compactSessionView: "Vista compacta de sessions",
     compactSessionViewDescription:
       "Mostra les sessions actives en un disseny més compacte",
-    voiceInputTapToToggle: "Entrada de veu: toqueu per canviar",
-    voiceInputTapToToggleDescription:
-      "Toqueu el micròfon per iniciar/aturar la gravació (desactivat = manteniu premut per parlar)",
     voiceInputLanguage: "Idioma de reconeixement de veu",
     voiceInputLanguageDescription:
       "Toqueu per canviar l'idioma de l'entrada de veu",

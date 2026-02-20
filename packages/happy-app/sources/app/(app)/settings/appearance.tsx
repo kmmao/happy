@@ -38,8 +38,6 @@ export default function AppearanceSettingsScreen() {
     useSettingMutable("showFlavorIcons");
   const [compactSessionView, setCompactSessionView] =
     useSettingMutable("compactSessionView");
-  const [voiceInputMode, setVoiceInputMode] =
-    useSettingMutable("voiceInputMode");
   const [voiceInputLanguage, setVoiceInputLanguage] =
     useSettingMutable("voiceInputLanguage");
   const [themePreference, setThemePreference] =
@@ -302,19 +300,6 @@ export default function AppearanceSettingsScreen() {
             <Switch
               value={showFlavorIcons}
               onValueChange={setShowFlavorIcons}
-            />
-          }
-        />
-        <Item
-          title={t("settingsAppearance.voiceInputTapToToggle")}
-          subtitle={t("settingsAppearance.voiceInputTapToToggleDescription")}
-          icon={<Ionicons name="mic-outline" size={29} color="#5856D6" />}
-          rightElement={
-            <Switch
-              value={voiceInputMode === "toggle"}
-              onValueChange={(v) =>
-                setVoiceInputMode(v ? "toggle" : "push-to-talk")
-              }
             />
           }
         />
