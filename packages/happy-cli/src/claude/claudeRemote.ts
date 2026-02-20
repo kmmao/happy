@@ -21,6 +21,25 @@ import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
 import type { JsRuntime } from "./runClaude";
 
+/**
+ * Map App-level virtual model mode keys to real Anthropic model IDs.
+ * Returns undefined for "use default" modes so the system default takes effect.
+ */
+function resolveModelKey(modelKey: string | undefined): string | undefined {
+  if (!modelKey) return undefined;
+  switch (modelKey) {
+    case "default":
+    case "adaptiveUsage":
+      return undefined;
+    case "sonnet":
+      return "claude-sonnet-4-6";
+    case "opus":
+      return "claude-opus-4-6";
+    default:
+      return modelKey;
+  }
+}
+
 export async function claudeRemote(opts: {
   // Fixed parameters
   sessionId: string | null;
@@ -150,9 +169,10 @@ export async function claudeRemote(opts: {
 
   // Prepare SDK options
   let mode = initial.mode;
-  // Use ANTHROPIC_MODEL from env when mode doesn't set model (e.g. .env.dev-local-server)
+  // Translate App-level virtual model keys (e.g. "adaptiveUsage", "sonnet", "opus")
+  // to real Anthropic model IDs, then fall back to env-configured model.
   const model =
-    initial.mode.model ??
+    resolveModelKey(initial.mode.model) ??
     opts.claudeEnvVars?.ANTHROPIC_MODEL ??
     process.env.ANTHROPIC_MODEL;
   const sdkOptions: QueryOptions = {

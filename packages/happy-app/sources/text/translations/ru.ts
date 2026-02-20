@@ -206,6 +206,9 @@ export const ru: TranslationStructure = {
       zhCN: "中文（简体）",
       zhTW: "中文（繁體）",
     },
+    sttPolish: "ИИ-полировка голосового ввода",
+    sttPolishDescription:
+      "Использовать ИИ для улучшения результатов распознавания речи (исправление опечаток, добавление пунктуации)",
   },
 
   settingsFeatures: {

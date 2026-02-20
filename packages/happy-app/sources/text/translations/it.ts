@@ -290,6 +290,9 @@ export const it: TranslationStructure = {
       zhCN: "中文（简体）",
       zhTW: "中文（繁體）",
     },
+    sttPolish: "Rifinitura IA input vocale",
+    sttPolishDescription:
+      "Usa l'IA per rifinire i risultati voce-testo (correggere errori, aggiungere punteggiatura)",
   },
 
   settingsFeatures: {

@@ -226,6 +226,9 @@ export const pt: TranslationStructure = {
       zhCN: "中文（简体）",
       zhTW: "中文（繁體）",
     },
+    sttPolish: "Polimento IA de entrada de voz",
+    sttPolishDescription:
+      "Usar IA para polir resultados de voz para texto (corrigir erros, adicionar pontuação)",
   },
 
   settingsFeatures: {

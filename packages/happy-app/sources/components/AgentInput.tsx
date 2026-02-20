@@ -42,6 +42,8 @@ import {
 import { getBuiltInProfile } from "@/sync/profileUtils";
 import { MAX_IMAGES } from "@/utils/imageUpload";
 import { MAX_CONTEXT_SIZE, formatTokenCount } from "@/utils/formatUsage";
+import { SttWaveIndicator } from "./SttWaveIndicator";
+import { SttProgressLine } from "./SttProgressLine";
 
 interface AgentInputProps {
   value: string;
@@ -54,6 +56,7 @@ interface AgentInputProps {
   isMicActive?: boolean;
   onSttPress?: () => void;
   isSttListening?: boolean;
+  isSttPolishing?: boolean;
   permissionMode?: PermissionMode | null;
   availableModes?: PermissionMode[];
   onPermissionModeChange?: (mode: PermissionMode) => void;
@@ -1333,7 +1336,7 @@ export const AgentInput = React.memo(
           )}
 
           {/* Box 2: Action Area (Input + Send) */}
-          <View style={styles.unifiedPanel}>
+          <View style={[styles.unifiedPanel, { position: "relative" }]}>
             {/* Image attachment chips */}
             {hasImages && (
               <ScrollView
@@ -1675,6 +1678,7 @@ export const AgentInput = React.memo(
                     {props.onSttPress && (
                       <Pressable
                         onPress={() => {
+                          if (props.isSttPolishing) return;
                           hapticsLight();
                           props.onSttPress?.();
                         }}
@@ -1690,21 +1694,30 @@ export const AgentInput = React.memo(
                           paddingVertical: 6,
                           justifyContent: "center",
                           height: 32,
-                          opacity: p.pressed ? 0.7 : 1,
+                          opacity: props.isSttPolishing
+                            ? 0.5
+                            : p.pressed
+                              ? 0.7
+                              : 1,
                           backgroundColor: props.isSttListening
                             ? "#FF3B30"
                             : undefined,
                         })}
                       >
-                        <Ionicons
-                          name={props.isSttListening ? "stop" : "mic-outline"}
-                          size={16}
-                          color={
-                            props.isSttListening
-                              ? "#fff"
-                              : theme.colors.button.secondary.tint
-                          }
-                        />
+                        {props.isSttPolishing ? (
+                          <ActivityIndicator
+                            size={14}
+                            color={theme.colors.button.secondary.tint}
+                          />
+                        ) : props.isSttListening ? (
+                          <SttWaveIndicator />
+                        ) : (
+                          <Ionicons
+                            name="mic-outline"
+                            size={16}
+                            color={theme.colors.button.secondary.tint}
+                          />
+                        )}
                       </Pressable>
                     )}
 
@@ -1790,6 +1803,22 @@ export const AgentInput = React.memo(
                 </View>
               </View>
             </View>
+            {/* STT progress shimmer — absolutely pinned to bottom edge of panel */}
+            {(props.isSttListening || props.isSttPolishing) && (
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                }}
+              >
+                <SttProgressLine
+                  active={!!(props.isSttListening || props.isSttPolishing)}
+                  value={props.value}
+                />
+              </View>
+            )}
           </View>
         </View>
       </View>

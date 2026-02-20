@@ -40,6 +40,8 @@ export default function AppearanceSettingsScreen() {
     useSettingMutable("compactSessionView");
   const [voiceInputLanguage, setVoiceInputLanguage] =
     useSettingMutable("voiceInputLanguage");
+  const [sttPolishEnabled, setSttPolishEnabled] =
+    useSettingMutable("sttPolishEnabled");
   const [themePreference, setThemePreference] =
     useLocalSettingMutable("themePreference");
   const [preferredLanguage] = useSettingMutable("preferredLanguage");
@@ -327,6 +329,17 @@ export default function AppearanceSettingsScreen() {
             const nextIndex = (currentIndex + 1) % options.length;
             setVoiceInputLanguage(options[nextIndex] ?? null);
           }}
+        />
+        <Item
+          title={t("settingsAppearance.sttPolish")}
+          subtitle={t("settingsAppearance.sttPolishDescription")}
+          icon={<Ionicons name="sparkles-outline" size={29} color="#5856D6" />}
+          rightElement={
+            <Switch
+              value={sttPolishEnabled}
+              onValueChange={setSttPolishEnabled}
+            />
+          }
         />
         {/* <Item
                     title="Compact Mode"

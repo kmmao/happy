@@ -76,6 +76,8 @@ services:
       S3_BUCKET: handy
       # 客户端（浏览器/App）访问对象存储的地址，宿主机访问用 localhost
       S3_PUBLIC_URL: http://localhost:9000/handy
+      # STT 微服务地址（同 compose 网络内访问）
+      STT_BASE_URL: http://stt:8000
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,6 +85,8 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      stt:
+        condition: service_started
     ports:
       - "3005:3005"
     command: >
@@ -91,7 +95,27 @@ services:
       cd /repo && yarn --cwd packages/happy-server start
       "
 
+  stt:
+    build:
+      context: .
+      dockerfile: services/stt/Dockerfile
+    environment:
+      # faster-whisper model size: tiny/base/small/medium/large-v3
+      STT_MODEL: small
+    volumes:
+      # Persist downloaded Whisper models across container rebuilds
+      - happy_stt_models:/root/.cache/huggingface
+    ports:
+      # 宿主机端口改为更普通的 8082（容器内仍是 8000）
+      - "8082:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   happy_pgdata:
   happy_redisdata:
   happy_miniodata:
+  happy_stt_models:

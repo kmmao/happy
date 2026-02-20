@@ -381,6 +381,9 @@ export const SettingsSchema = z.object({
     .describe(
       "Language for STT voice input (null = auto from device locale, e.g. 'en-US', 'zh-CN', 'zh-TW')",
     ),
+  sttPolishEnabled: z
+    .boolean()
+    .describe("Enable LLM polishing for STT transcripts"),
   preferredLanguage: z
     .string()
     .nullable()
@@ -502,6 +505,7 @@ export const settingsDefaults: Settings = {
   reviewPromptLikedApp: null,
   voiceAssistantLanguage: null,
   voiceInputLanguage: null,
+  sttPolishEnabled: true,
   preferredLanguage: null,
   recentMachinePaths: [],
   lastUsedAgent: null,

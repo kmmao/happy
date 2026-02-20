@@ -42,6 +42,7 @@ import { t } from "@/text";
 import { tracking, trackMessageSent } from "@/track";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { polishSttTranscript } from "@/sync/apiStt";
 import { isRunningOnMac } from "@/utils/platform";
 import {
   useDeviceType,
@@ -369,12 +370,53 @@ function SessionViewLoaded({
 
   // Speech-to-text: append transcripts to the input field
   const voiceInputLanguage = useSetting("voiceInputLanguage");
+  const sttPolishEnabled = useSetting("sttPolishEnabled");
+  const [isSttPolishing, setIsSttPolishing] = React.useState(false);
+  const sttPolishEnabledRef = React.useRef(sttPolishEnabled);
+  sttPolishEnabledRef.current = sttPolishEnabled;
+  const voiceInputLanguageRef = React.useRef(voiceInputLanguage);
+  voiceInputLanguageRef.current = voiceInputLanguage;
+
+  // Polish is applied here — after transcript arrives — so it works correctly
+  // for both native (real-time utterances) and web (async MediaRecorder result).
   const handleTranscript = React.useCallback((text: string) => {
+    // Always append raw text immediately — no blank gap while polish is pending.
     setMessage((prev) => {
       const trimmed = prev.trimEnd();
       return trimmed ? `${trimmed} ${text}` : text;
     });
+
+    if (sttPolishEnabledRef.current) {
+      setIsSttPolishing(true);
+      const credentials = sync.getCredentials();
+      if (credentials) {
+        polishSttTranscript(
+          credentials,
+          text,
+          voiceInputLanguageRef.current ?? undefined,
+        )
+          .then((result) => {
+            if (result.text === text) return; // no change needed
+            // Replace the raw suffix with the polished version.
+            // If the user edited the field in the meantime, leave it alone.
+            setMessage((prev) => {
+              if (prev.endsWith(text)) {
+                const before = prev.slice(0, prev.length - text.length);
+                const trimmedBefore = before.trimEnd();
+                return trimmedBefore
+                  ? `${trimmedBefore} ${result.text}`
+                  : result.text;
+              }
+              return prev;
+            });
+          })
+          .finally(() => setIsSttPolishing(false));
+        return;
+      }
+      setIsSttPolishing(false);
+    }
   }, []);
+
   const stt = useSpeechToText(
     handleTranscript,
     voiceInputLanguage ?? undefined,
@@ -577,6 +619,7 @@ function SessionViewLoaded({
         isMicActive={micButtonState.isMicActive}
         onSttPress={onSttToggle}
         isSttListening={stt.isListening}
+        isSttPolishing={isSttPolishing}
         onAbort={() => sessionAbort(sessionId)}
         showAbortButton={
           sessionStatus.state === "thinking" ||

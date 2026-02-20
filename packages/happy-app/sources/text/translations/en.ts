@@ -234,6 +234,9 @@ export const en: TranslationStructure = {
       zhCN: "中文（简体）",
       zhTW: "中文（繁體）",
     },
+    sttPolish: "Voice Input AI Polish",
+    sttPolishDescription:
+      "Use AI to polish speech-to-text results (fix typos, add punctuation)",
   },
 
   settingsFeatures: {
