@@ -51,6 +51,7 @@ import {
 } from "@/sync/settings";
 import { getBuiltInProfile, DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { AgentInput } from "@/components/AgentInput";
+import { getSuggestions } from "@/components/autocomplete/suggestions";
 import { StyleSheet } from "react-native-unistyles";
 import { randomUUID } from "expo-crypto";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
@@ -507,6 +508,16 @@ function NewSessionWizard() {
       stt.startListening();
     }
   }, [stt]);
+
+  // Slash command popover
+  const [showCommandList, setShowCommandList] = React.useState(false);
+  const handleCommandSelect = React.useCallback((command: string) => {
+    setSessionPrompt((prev) => {
+      const trimmed = prev.trimEnd();
+      return trimmed ? `${trimmed} /${command}` : `/${command}`;
+    });
+    setShowCommandList(false);
+  }, []);
   const sttDisplayValue =
     stt.isListening && stt.interimTranscript
       ? sessionPrompt.trimEnd()
@@ -1514,8 +1525,8 @@ function NewSessionWizard() {
                 isSendDisabled={!canCreate}
                 isSending={isCreating}
                 placeholder="What would you like to work on?"
-                autocompletePrefixes={[]}
-                autocompleteSuggestions={async () => []}
+                autocompletePrefixes={["/"]}
+                autocompleteSuggestions={(query) => getSuggestions("", query)}
                 agentType={agentType}
                 onAgentClick={handleAgentClick}
                 permissionMode={permissionMode}
@@ -1532,6 +1543,10 @@ function NewSessionWizard() {
                 onMachineClick={handleMachineClick}
                 currentPath={selectedPath}
                 onPathClick={handlePathClick}
+                onSlashCommandPress={() => setShowCommandList(true)}
+                showCommandList={showCommandList}
+                onCommandSelect={handleCommandSelect}
+                onCommandListClose={() => setShowCommandList(false)}
                 onSttPress={onSttToggle}
                 isSttListening={stt.isListening}
                 onImagePickPress={doPickImage}
@@ -2912,8 +2927,8 @@ function NewSessionWizard() {
               isSendDisabled={!canCreate}
               isSending={isCreating}
               placeholder="What would you like to work on?"
-              autocompletePrefixes={[]}
-              autocompleteSuggestions={async () => []}
+              autocompletePrefixes={["/"]}
+              autocompleteSuggestions={(query) => getSuggestions("", query)}
               agentType={agentType}
               onAgentClick={handleAgentInputAgentClick}
               permissionMode={permissionMode}
@@ -2932,6 +2947,10 @@ function NewSessionWizard() {
               onPathClick={handleAgentInputPathClick}
               profileId={selectedProfileId}
               onProfileClick={handleAgentInputProfileClick}
+              onSlashCommandPress={() => setShowCommandList(true)}
+              showCommandList={showCommandList}
+              onCommandSelect={handleCommandSelect}
+              onCommandListClose={() => setShowCommandList(false)}
               onSttPress={onSttToggle}
               isSttListening={stt.isListening}
               onImagePickPress={doPickImage}

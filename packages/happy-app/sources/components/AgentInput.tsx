@@ -969,7 +969,7 @@ export const AgentInput = React.memo(
           )}
 
           {/* Slash Command List - toggled by slash command button */}
-          {props.showCommandList && props.sessionId && (
+          {props.showCommandList && (
             <>
               <TouchableWithoutFeedback
                 onPress={() => props.onCommandListClose?.()}
@@ -988,7 +988,7 @@ export const AgentInput = React.memo(
                 >
                   <CommandListPopover
                     visible={true}
-                    sessionId={props.sessionId}
+                    sessionId={props.sessionId ?? ""}
                     onCommandSelect={(cmd) => props.onCommandSelect?.(cmd)}
                     onClose={() => props.onCommandListClose?.()}
                     inline
