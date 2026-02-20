@@ -1227,6 +1227,14 @@ function NewSessionWizard() {
       return;
     }
 
+    // Use sttDisplayValue to capture any active STT interim transcript.
+    // If the user sends while STT is still listening, commit the full display
+    // value (committed text + interim) rather than just the committed state.
+    const effectivePrompt = stt.isListening ? sttDisplayValue : sessionPrompt;
+    if (stt.isListening) {
+      stt.stopListening();
+    }
+
     setIsCreating(true);
 
     try {
@@ -1310,7 +1318,7 @@ function NewSessionWizard() {
 
         // Send initial message (with any attached images) if provided
         const currentImages = pendingImagesRef.current;
-        const hasText = sessionPrompt.trim().length > 0;
+        const hasText = effectivePrompt.trim().length > 0;
         const hasImages = currentImages.length > 0;
         if (hasText || hasImages) {
           // Upload any pending images to the newly created session
@@ -1331,7 +1339,7 @@ function NewSessionWizard() {
               imageRefs = paths.map((p) => `[image: ${p}]`).join("\n");
             }
           }
-          const finalMessage = [sessionPrompt.trim(), imageRefs]
+          const finalMessage = [effectivePrompt.trim(), imageRefs]
             .filter(Boolean)
             .join("\n");
           if (finalMessage) {
@@ -1367,6 +1375,9 @@ function NewSessionWizard() {
     selectedMachineId,
     selectedPath,
     sessionPrompt,
+    sttDisplayValue,
+    stt.isListening,
+    stt.stopListening,
     sessionType,
     experimentsEnabled,
     agentType,

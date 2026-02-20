@@ -547,7 +547,16 @@ function SessionViewLoaded({
             sendingRef.current = false;
           }, 300);
 
-          const text = message.trim();
+          // Use displayMessage to capture any active STT interim transcript.
+          // If the user presses send while STT is still listening, we commit
+          // the full display value (committed text + interim) rather than just
+          // the committed state, which may not yet include the latest utterance.
+          const textToSend = stt.isListening ? displayMessage : message;
+          if (stt.isListening) {
+            stt.stopListening();
+          }
+
+          const text = textToSend.trim();
           // Special commands (/compact, /clear) don't support images — send command only
           const isSpecialCommand = /^\/(compact|clear)\b/.test(text);
 
