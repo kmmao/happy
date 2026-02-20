@@ -214,8 +214,6 @@ export const zhHans: TranslationStructure = {
       zhCN: "中文（简体）",
       zhTW: "中文（繁體）",
     },
-    sttPolish: "语音输入 AI 润色",
-    sttPolishDescription: "使用 AI 润色语音转文字结果（修正错别字、添加标点）",
   },
 
   settingsFeatures: {

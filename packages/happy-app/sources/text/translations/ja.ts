@@ -283,9 +283,6 @@ export const ja: TranslationStructure = {
       zhCN: "中文（简体）",
       zhTW: "中文（繁體）",
     },
-    sttPolish: "音声入力 AI ポリッシュ",
-    sttPolishDescription:
-      "AIを使用して音声入力結果を修正（誤字修正、句読点追加）",
   },
 
   settingsFeatures: {

@@ -226,9 +226,6 @@ export const ca: TranslationStructure = {
       zhCN: "中文（简体）",
       zhTW: "中文（繁體）",
     },
-    sttPolish: "Polit IA d'entrada de veu",
-    sttPolishDescription:
-      "Utilitza IA per polir els resultats de veu a text (corregir errors, afegir puntuació)",
   },
 
   settingsFeatures: {

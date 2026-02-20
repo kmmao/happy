@@ -56,7 +56,6 @@ interface AgentInputProps {
   isMicActive?: boolean;
   onSttPress?: () => void;
   isSttListening?: boolean;
-  isSttPolishing?: boolean;
   permissionMode?: PermissionMode | null;
   availableModes?: PermissionMode[];
   onPermissionModeChange?: (mode: PermissionMode) => void;
@@ -1678,7 +1677,6 @@ export const AgentInput = React.memo(
                     {props.onSttPress && (
                       <Pressable
                         onPress={() => {
-                          if (props.isSttPolishing) return;
                           hapticsLight();
                           props.onSttPress?.();
                         }}
@@ -1694,22 +1692,13 @@ export const AgentInput = React.memo(
                           paddingVertical: 6,
                           justifyContent: "center",
                           height: 32,
-                          opacity: props.isSttPolishing
-                            ? 0.5
-                            : p.pressed
-                              ? 0.7
-                              : 1,
+                          opacity: p.pressed ? 0.7 : 1,
                           backgroundColor: props.isSttListening
                             ? "#FF3B30"
                             : undefined,
                         })}
                       >
-                        {props.isSttPolishing ? (
-                          <ActivityIndicator
-                            size={14}
-                            color={theme.colors.button.secondary.tint}
-                          />
-                        ) : props.isSttListening ? (
+                        {props.isSttListening ? (
                           <SttWaveIndicator />
                         ) : (
                           <Ionicons
@@ -1804,7 +1793,7 @@ export const AgentInput = React.memo(
               </View>
             </View>
             {/* STT progress shimmer — absolutely pinned to bottom edge of panel */}
-            {(props.isSttListening || props.isSttPolishing) && (
+            {props.isSttListening && (
               <View
                 style={{
                   position: "absolute",
@@ -1814,7 +1803,7 @@ export const AgentInput = React.memo(
                 }}
               >
                 <SttProgressLine
-                  active={!!(props.isSttListening || props.isSttPolishing)}
+                  active={!!props.isSttListening}
                   value={props.value}
                 />
               </View>

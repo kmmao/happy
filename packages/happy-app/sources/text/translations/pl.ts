@@ -236,9 +236,6 @@ export const pl: TranslationStructure = {
       zhCN: "中文（简体）",
       zhTW: "中文（繁體）",
     },
-    sttPolish: "Polerowanie AI wejścia głosowego",
-    sttPolishDescription:
-      "Użyj AI do poprawienia wyników mowy na tekst (popraw literówki, dodaj interpunkcję)",
   },
 
   settingsFeatures: {

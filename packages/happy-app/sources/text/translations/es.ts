@@ -226,9 +226,6 @@ export const es: TranslationStructure = {
       zhCN: "中文（简体）",
       zhTW: "中文（繁體）",
     },
-    sttPolish: "Pulido IA de entrada de voz",
-    sttPolishDescription:
-      "Usar IA para pulir los resultados de voz a texto (corregir errores, añadir puntuación)",
   },
 
   settingsFeatures: {

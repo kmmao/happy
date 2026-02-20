@@ -44,6 +44,10 @@ export function useSpeechToText(
   const interimCounterRef = useRef(0);
 
   const cleanupMedia = useCallback(() => {
+    // Bump the counter so any in-flight interim API calls are silently discarded
+    // when they resolve — preventing stale transcripts from overwriting state.
+    interimCounterRef.current++;
+
     const recorder = mediaRecorderRef.current;
     if (recorder) {
       recorder.ondataavailable = null;
@@ -153,7 +157,6 @@ export function useSpeechToText(
                 fileName: mimeTypeToFileName(blobType),
                 mimeType: blobType,
                 lang: langRef.current,
-                polish: false,
               });
 
               // Only update if this is still the latest interim result
@@ -194,7 +197,6 @@ export function useSpeechToText(
             fileName: mimeTypeToFileName(currentType),
             mimeType: currentType,
             lang: langRef.current,
-            polish: false,
           });
 
           if (result?.text) {
