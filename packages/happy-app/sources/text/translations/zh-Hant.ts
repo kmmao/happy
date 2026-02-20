@@ -672,6 +672,11 @@ export const zhHant: TranslationStructure = {
     file: "檔案",
     fileEmpty: "檔案為空",
     noChanges: "沒有要顯示的更改",
+    // Browse mode strings
+    browseTab: "瀏覽",
+    changesTab: "變更",
+    directory: "目錄",
+    emptyDirectory: "此目錄為空",
     submodule: "子模組",
     submoduleNotInitialized: "未初始化",
     childReposSummary: ({ count }) => `${count} 個 Git 倉庫`,

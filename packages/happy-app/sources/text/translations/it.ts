@@ -768,6 +768,11 @@ export const it: TranslationStructure = {
     file: "File",
     fileEmpty: "File vuoto",
     noChanges: "Nessuna modifica da mostrare",
+    // Browse mode strings
+    browseTab: "Sfoglia",
+    changesTab: "Modifiche",
+    directory: "Cartella",
+    emptyDirectory: "Questa cartella è vuota",
     submodule: "Sottomodulo",
     submoduleNotInitialized: "Non inizializzato",
     childReposSummary: ({ count }: { count: number }) =>

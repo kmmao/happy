@@ -702,6 +702,11 @@ export const pt: TranslationStructure = {
     file: "Arquivo",
     fileEmpty: "Arquivo está vazio",
     noChanges: "Nenhuma alteração para exibir",
+    // Browse mode strings
+    browseTab: "Explorar",
+    changesTab: "Alterações",
+    directory: "Diretório",
+    emptyDirectory: "Este diretório está vazio",
     submodule: "Submódulo",
     submoduleNotInitialized: "Não inicializado",
     childReposSummary: ({ count }) =>

@@ -703,6 +703,11 @@ export const ca: TranslationStructure = {
     file: "Fitxer",
     fileEmpty: "El fitxer està buit",
     noChanges: "No hi ha canvis a mostrar",
+    // Browse mode strings
+    browseTab: "Navega",
+    changesTab: "Canvis",
+    directory: "Directori",
+    emptyDirectory: "Aquest directori és buit",
     submodule: "Submòdul",
     submoduleNotInitialized: "No inicialitzat",
     childReposSummary: ({ count }) =>
