@@ -171,15 +171,15 @@ export async function claudeRemoteLauncher(
         }
       }
     }
+    // Collect tool call IDs to release atomically with the next enqueue
+    let releaseIds: string[] = [];
     if (message.type === "user") {
       let umessage = message as SDKUserMessage;
       if (umessage.message.content && Array.isArray(umessage.message.content)) {
         for (let c of umessage.message.content) {
           if (c.type === "tool_result" && c.tool_use_id) {
             ongoingToolCalls.delete(c.tool_use_id);
-
-            // When tool result received, release any delayed messages for this tool call
-            messageQueue.releaseToolCall(c.tool_use_id);
+            releaseIds.push(c.tool_use_id);
           }
         }
       }
@@ -287,14 +287,19 @@ export async function claudeRemoteLauncher(
             messageQueue.enqueue(logMessage, {
               delay: 250,
               toolCallIds,
+              releaseToolCallIds:
+                releaseIds.length > 0 ? releaseIds : undefined,
             });
             return; // Don't queue again below
           }
         }
       }
 
-      // Queue all other messages immediately (no delay)
-      messageQueue.enqueue(logMessage);
+      // Queue all other messages immediately (no delay), releasing any pending tool calls atomically
+      messageQueue.enqueue(
+        logMessage,
+        releaseIds.length > 0 ? { releaseToolCallIds: releaseIds } : undefined,
+      );
     }
 
     // Insert a fake message to start the sidechain
@@ -428,7 +433,10 @@ export async function claudeRemoteLauncher(
             logger.debug("[remote]: Session reset");
             session.clearSessionId();
           },
-          onReady: () => {
+          onReady: async () => {
+            // Flush queued messages before closing the turn to prevent
+            // turn-end from arriving at the App before delayed tool call messages
+            await messageQueue.flush();
             session.client.closeClaudeSessionTurn("completed");
             if (!pending && session.queue.size() === 0) {
               session.api
