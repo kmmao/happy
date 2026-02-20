@@ -24,6 +24,8 @@ export default React.memo(function GitScreen() {
   const [selectedRepoPath, setSelectedRepoPath] = React.useState<string | null>(
     null,
   );
+  const [isRepoSelectorExpanded, setIsRepoSelectorExpanded] =
+    React.useState(true);
   const { theme } = useUnistyles();
 
   const projectGitStatus = useSessionProjectGitStatus(sessionId);
@@ -43,6 +45,24 @@ export default React.memo(function GitScreen() {
     return sub?.gitStatus ?? null;
   }, [selectedRepoPath, gitStatus, submodules]);
 
+  const handleRepoSelect = React.useCallback((repoPath: string | null) => {
+    setSelectedRepoPath(repoPath);
+  }, []);
+
+  const handleRepoSelectorToggle = React.useCallback(() => {
+    setIsRepoSelectorExpanded((v) => !v);
+  }, []);
+
+  // Tab content scrolled up → collapse repo list
+  const handleScrollUp = React.useCallback(() => {
+    setIsRepoSelectorExpanded(false);
+  }, []);
+
+  // Tab content pulled down at top → expand repo list
+  const handlePullDown = React.useCallback(() => {
+    setIsRepoSelectorExpanded(true);
+  }, []);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
       {hasSubmodules && (
@@ -50,7 +70,9 @@ export default React.memo(function GitScreen() {
           sessionPath={sessionPath}
           submodules={submodules}
           selectedRepoPath={selectedRepoPath}
-          onSelect={setSelectedRepoPath}
+          onSelect={handleRepoSelect}
+          isExpanded={isRepoSelectorExpanded}
+          onToggle={handleRepoSelectorToggle}
         />
       )}
       <GitBranchHeader
@@ -69,7 +91,12 @@ export default React.memo(function GitScreen() {
           display: activeTab === "changes" ? "flex" : "none",
         }}
       >
-        <GitChangesTab sessionId={sessionId} />
+        <GitChangesTab
+          sessionId={sessionId}
+          repoPath={selectedRepoPath ?? undefined}
+          onPullDown={hasSubmodules ? handlePullDown : undefined}
+          onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+        />
       </View>
       <View
         style={{
@@ -80,6 +107,8 @@ export default React.memo(function GitScreen() {
         <GitHistoryTab
           sessionId={sessionId}
           repoPath={selectedRepoPath ?? undefined}
+          onPullDown={hasSubmodules ? handlePullDown : undefined}
+          onScrollUp={hasSubmodules ? handleScrollUp : undefined}
         />
       </View>
       <View
@@ -91,6 +120,8 @@ export default React.memo(function GitScreen() {
         <GitBranchesTab
           sessionId={sessionId}
           repoPath={selectedRepoPath ?? undefined}
+          onPullDown={hasSubmodules ? handlePullDown : undefined}
+          onScrollUp={hasSubmodules ? handleScrollUp : undefined}
         />
       </View>
       <View
@@ -102,6 +133,8 @@ export default React.memo(function GitScreen() {
         <GitStashTab
           sessionId={sessionId}
           repoPath={selectedRepoPath ?? undefined}
+          onPullDown={hasSubmodules ? handlePullDown : undefined}
+          onScrollUp={hasSubmodules ? handleScrollUp : undefined}
         />
       </View>
     </View>

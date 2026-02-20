@@ -1,5 +1,13 @@
 import * as React from "react";
-import { View, Pressable, ActivityIndicator, Platform } from "react-native";
+import {
+  View,
+  Pressable,
+  ActivityIndicator,
+  Platform,
+  RefreshControl,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+} from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Octicons, Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
@@ -39,10 +47,14 @@ function renderLineChanges(file: GitStashFile): string {
   return parts.join(" ");
 }
 
+const SCROLL_COLLAPSE_THRESHOLD = 20;
+
 export const GitStashTab = React.memo<{
   sessionId: string;
   repoPath?: string;
-}>(function GitStashTab({ sessionId, repoPath }) {
+  onPullDown?: () => void;
+  onScrollUp?: () => void;
+}>(function GitStashTab({ sessionId, repoPath, onPullDown, onScrollUp }) {
   const { theme } = useUnistyles();
 
   const [stashList, setStashList] = React.useState<readonly GitStashEntry[]>(
@@ -105,6 +117,21 @@ export const GitStashTab = React.memo<{
     [sessionId, repoPath, expandedStashIndex],
   );
 
+  const scrollCollapseCalledRef = React.useRef(false);
+  const handleScroll = React.useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!onScrollUp) return;
+      const y = e.nativeEvent.contentOffset.y;
+      if (y > SCROLL_COLLAPSE_THRESHOLD && !scrollCollapseCalledRef.current) {
+        scrollCollapseCalledRef.current = true;
+        onScrollUp();
+      } else if (y <= 0) {
+        scrollCollapseCalledRef.current = false;
+      }
+    },
+    [onScrollUp],
+  );
+
   if (isLoading) {
     return (
       <View
@@ -146,7 +173,16 @@ export const GitStashTab = React.memo<{
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      <ItemList style={{ flex: 1 }}>
+      <ItemList
+        style={{ flex: 1 }}
+        onScroll={onScrollUp ? handleScroll : undefined}
+        scrollEventThrottle={onScrollUp ? 16 : undefined}
+        refreshControl={
+          onPullDown ? (
+            <RefreshControl refreshing={false} onRefresh={onPullDown} />
+          ) : undefined
+        }
+      >
         {stashList.map((stash, index) => {
           const isExpanded = expandedStashIndex === stash.index;
           return (

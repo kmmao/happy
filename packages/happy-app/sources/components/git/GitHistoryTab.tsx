@@ -5,6 +5,9 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  RefreshControl,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -329,10 +332,14 @@ const CommitItem = React.memo<CommitItemProps>(function CommitItem({
 
 const PAGE_SIZE = 20;
 
+const SCROLL_COLLAPSE_THRESHOLD = 20;
+
 export const GitHistoryTab = React.memo<{
   sessionId: string;
   repoPath?: string;
-}>(function GitHistoryTab({ sessionId, repoPath }) {
+  onPullDown?: () => void;
+  onScrollUp?: () => void;
+}>(function GitHistoryTab({ sessionId, repoPath, onPullDown, onScrollUp }) {
   const { theme } = useUnistyles();
   const [commits, setCommits] = React.useState<readonly GitCommit[]>([]);
   const [hasMore, setHasMore] = React.useState(false);
@@ -440,6 +447,21 @@ export const GitHistoryTab = React.memo<{
 
   const keyExtractor = React.useCallback((item: GitCommit) => item.hash, []);
 
+  const scrollCollapseCalledRef = React.useRef(false);
+  const handleScroll = React.useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!onScrollUp) return;
+      const y = e.nativeEvent.contentOffset.y;
+      if (y > SCROLL_COLLAPSE_THRESHOLD && !scrollCollapseCalledRef.current) {
+        scrollCollapseCalledRef.current = true;
+        onScrollUp();
+      } else if (y <= 0) {
+        scrollCollapseCalledRef.current = false;
+      }
+    },
+    [onScrollUp],
+  );
+
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -487,6 +509,13 @@ export const GitHistoryTab = React.memo<{
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
         showsVerticalScrollIndicator={false}
+        onScroll={onScrollUp ? handleScroll : undefined}
+        scrollEventThrottle={onScrollUp ? 16 : undefined}
+        refreshControl={
+          onPullDown ? (
+            <RefreshControl refreshing={false} onRefresh={onPullDown} />
+          ) : undefined
+        }
       />
     </View>
   );

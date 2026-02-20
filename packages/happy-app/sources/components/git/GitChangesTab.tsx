@@ -5,6 +5,9 @@ import {
   Platform,
   TextInput,
   Pressable,
+  RefreshControl,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from "react-native";
 import { t } from "@/text";
 import { useRouter } from "expo-router";
@@ -92,7 +95,14 @@ function renderCheckbox(checked: boolean, theme: any) {
   );
 }
 
-const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
+const SCROLL_COLLAPSE_THRESHOLD = 20;
+
+const GitChangesTab = React.memo<{
+  sessionId: string;
+  repoPath?: string;
+  onPullDown?: () => void;
+  onScrollUp?: () => void;
+}>(({ sessionId, repoPath, onPullDown, onScrollUp }) => {
   const router = useRouter();
 
   const [gitStatusFiles, setGitStatusFiles] =
@@ -156,7 +166,10 @@ const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
   // Derive selected file info for toolbar
   const selectedFileInfo = React.useMemo(() => {
     if (!gitStatusFiles || selectedFiles.size === 0) {
-      return { staged: [] as GitFileStatus[], unstaged: [] as GitFileStatus[] };
+      return {
+        staged: [] as GitFileStatus[],
+        unstaged: [] as GitFileStatus[],
+      };
     }
     const staged = gitStatusFiles.stagedFiles.filter((f) =>
       selectedFiles.has(f.fullPath),
@@ -171,14 +184,14 @@ const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
   const loadGitStatusFiles = React.useCallback(async () => {
     try {
       setIsLoading(true);
-      const result = await getGitStatusFiles(sessionId);
+      const result = await getGitStatusFiles(sessionId, repoPath);
       setGitStatusFiles(result);
     } catch {
       setGitStatusFiles(null);
     } finally {
       setIsLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, repoPath]);
 
   // Git operation wrapper — uses pre-resolved failedMessage string to avoid dynamic t() calls
   const handleOp = React.useCallback(
@@ -207,14 +220,18 @@ const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
   const handleStageSelected = React.useCallback(() => {
     const paths = selectedFileInfo.unstaged.map((f) => f.fullPath);
     if (paths.length === 0) return;
-    handleOp(t("git.stageFailed"), () => gitStageFiles(sessionId, paths));
-  }, [selectedFileInfo.unstaged, sessionId, handleOp]);
+    handleOp(t("git.stageFailed"), () =>
+      gitStageFiles(sessionId, paths, repoPath),
+    );
+  }, [selectedFileInfo.unstaged, sessionId, repoPath, handleOp]);
 
   const handleUnstageSelected = React.useCallback(() => {
     const paths = selectedFileInfo.staged.map((f) => f.fullPath);
     if (paths.length === 0) return;
-    handleOp(t("git.unstageFailed"), () => gitUnstageFiles(sessionId, paths));
-  }, [selectedFileInfo.staged, sessionId, handleOp]);
+    handleOp(t("git.unstageFailed"), () =>
+      gitUnstageFiles(sessionId, paths, repoPath),
+    );
+  }, [selectedFileInfo.staged, sessionId, repoPath, handleOp]);
 
   const handleDiscardSelected = React.useCallback(async () => {
     const files = selectedFileInfo.unstaged;
@@ -225,8 +242,10 @@ const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
       { destructive: true },
     );
     if (!confirmed) return;
-    handleOp(t("git.discardFailed"), () => gitDiscardFiles(sessionId, files));
-  }, [selectedFileInfo.unstaged, sessionId, handleOp]);
+    handleOp(t("git.discardFailed"), () =>
+      gitDiscardFiles(sessionId, files, repoPath),
+    );
+  }, [selectedFileInfo.unstaged, sessionId, repoPath, handleOp]);
 
   const handleGitignoreSelected = React.useCallback(() => {
     const paths = [
@@ -234,16 +253,18 @@ const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
       ...selectedFileInfo.staged.map((f) => f.fullPath),
     ];
     if (paths.length === 0) return;
-    handleOp(t("git.gitignoreFailed"), () => gitIgnoreFiles(sessionId, paths));
-  }, [selectedFileInfo, sessionId, handleOp]);
+    handleOp(t("git.gitignoreFailed"), () =>
+      gitIgnoreFiles(sessionId, paths, repoPath),
+    );
+  }, [selectedFileInfo, sessionId, repoPath, handleOp]);
 
   const handleStageAll = React.useCallback(() => {
-    handleOp(t("git.stageFailed"), () => gitStageAll(sessionId));
-  }, [sessionId, handleOp]);
+    handleOp(t("git.stageFailed"), () => gitStageAll(sessionId, repoPath));
+  }, [sessionId, repoPath, handleOp]);
 
   const handleUnstageAll = React.useCallback(() => {
-    handleOp(t("git.unstageFailed"), () => gitUnstageAll(sessionId));
-  }, [sessionId, handleOp]);
+    handleOp(t("git.unstageFailed"), () => gitUnstageAll(sessionId, repoPath));
+  }, [sessionId, repoPath, handleOp]);
 
   const handleDiscardAll = React.useCallback(async () => {
     const confirmed = await Modal.confirm(
@@ -254,9 +275,9 @@ const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
     if (!confirmed) return;
     if (!gitStatusFiles) return;
     handleOp(t("git.discardFailed"), () =>
-      gitDiscardFiles(sessionId, gitStatusFiles.unstagedFiles),
+      gitDiscardFiles(sessionId, gitStatusFiles.unstagedFiles, repoPath),
     );
-  }, [sessionId, gitStatusFiles, handleOp]);
+  }, [sessionId, repoPath, gitStatusFiles, handleOp]);
 
   const handleCommit = React.useCallback(async () => {
     if (!gitStatusFiles || gitStatusFiles.stagedFiles.length === 0) {
@@ -267,8 +288,10 @@ const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
       placeholder: t("git.commitMessagePlaceholder"),
     });
     if (!message) return;
-    handleOp(t("git.commitFailed"), () => gitCommit(sessionId, message));
-  }, [sessionId, gitStatusFiles, handleOp]);
+    handleOp(t("git.commitFailed"), () =>
+      gitCommit(sessionId, message, repoPath),
+    );
+  }, [sessionId, repoPath, gitStatusFiles, handleOp]);
 
   // Load on mount
   React.useEffect(() => {
@@ -438,6 +461,21 @@ const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
     />
   );
 
+  const scrollCollapseCalledRef = React.useRef(false);
+  const handleScroll = React.useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!onScrollUp) return;
+      const y = e.nativeEvent.contentOffset.y;
+      if (y > SCROLL_COLLAPSE_THRESHOLD && !scrollCollapseCalledRef.current) {
+        scrollCollapseCalledRef.current = true;
+        onScrollUp();
+      } else if (y <= 0) {
+        scrollCollapseCalledRef.current = false;
+      }
+    },
+    [onScrollUp],
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
       {/* Search Input - Always Visible */}
@@ -535,7 +573,16 @@ const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
       )}
 
       {/* Git Status List */}
-      <ItemList style={{ flex: 1 }}>
+      <ItemList
+        style={{ flex: 1 }}
+        onScroll={onScrollUp ? handleScroll : undefined}
+        scrollEventThrottle={onScrollUp ? 16 : undefined}
+        refreshControl={
+          onPullDown ? (
+            <RefreshControl refreshing={false} onRefresh={onPullDown} />
+          ) : undefined
+        }
+      >
         {isLoading ? (
           <View
             style={{
@@ -683,7 +730,9 @@ const GitChangesTab = React.memo<{ sessionId: string }>(({ sessionId }) => {
                       ...Typography.default(),
                     }}
                   >
-                    {t("files.searchResults", { count: searchResults.length })}
+                    {t("files.searchResults", {
+                      count: searchResults.length,
+                    })}
                   </Text>
                 </View>
               )}

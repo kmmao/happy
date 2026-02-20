@@ -48,6 +48,7 @@ export interface GitStatusFiles {
  */
 export async function getGitStatusFiles(
   sessionId: string,
+  repoPath?: string,
 ): Promise<GitStatusFiles | null> {
   try {
     // Check if we have a session with valid metadata
@@ -56,24 +57,32 @@ export async function getGitStatusFiles(
       return null;
     }
 
+    const cwd = repoPath
+      ? `${session.metadata.path}/${repoPath}`
+      : session.metadata.path;
+
     // Get git status in porcelain v2 format (includes branch info and repo check)
     // --untracked-files=all ensures we get individual files, not directories
     const statusResult = await sessionBash(sessionId, {
       command: "git status --porcelain=v2 --branch --untracked-files=all",
-      cwd: session.metadata.path,
+      cwd,
       timeout: 10000,
     });
 
     if (!statusResult.success || statusResult.exitCode !== 0) {
       // Not a git repo - try discovering child git repos in subdirectories
-      return fetchChildGitRepoFiles(sessionId, session.metadata.path);
+      // Only for root repo, not sub-repos
+      if (!repoPath) {
+        return fetchChildGitRepoFiles(sessionId, session.metadata.path);
+      }
+      return null;
     }
 
     // Get combined diff statistics for both staged and unstaged changes
     const diffStatResult = await sessionBash(sessionId, {
       command:
         'git diff --numstat HEAD && echo "---STAGED---" && git diff --cached --numstat',
-      cwd: session.metadata.path,
+      cwd,
       timeout: 10000,
     });
 
@@ -83,17 +92,19 @@ export async function getGitStatusFiles(
 
     const mainResult = parseGitStatusFilesV2(statusOutput, diffOutput);
 
-    // Fetch submodule file-level status
-    const submodulePaths = await fetchSubmodulePaths(
-      sessionId,
-      session.metadata.path,
-    );
-    if (submodulePaths.length > 0) {
-      mainResult.submodules = await Promise.all(
-        submodulePaths.map((subPath) =>
-          fetchSubmoduleFiles(sessionId, session.metadata!.path, subPath),
-        ),
+    // Fetch submodule file-level status only for root repo
+    if (!repoPath) {
+      const submodulePaths = await fetchSubmodulePaths(
+        sessionId,
+        session.metadata.path,
       );
+      if (submodulePaths.length > 0) {
+        mainResult.submodules = await Promise.all(
+          submodulePaths.map((subPath) =>
+            fetchSubmoduleFiles(sessionId, session.metadata!.path, subPath),
+          ),
+        );
+      }
     }
 
     return mainResult;

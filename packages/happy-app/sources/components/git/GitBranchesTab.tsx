@@ -1,5 +1,13 @@
 import * as React from "react";
-import { View, ActivityIndicator, Pressable, Platform } from "react-native";
+import {
+  View,
+  ActivityIndicator,
+  Pressable,
+  Platform,
+  RefreshControl,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+} from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
@@ -18,13 +26,17 @@ import {
   GitBranchList,
 } from "@/sync/gitBranches";
 
+const SCROLL_COLLAPSE_THRESHOLD = 20;
+
 interface GitBranchesTabProps {
   readonly sessionId: string;
   readonly repoPath?: string;
+  readonly onPullDown?: () => void;
+  readonly onScrollUp?: () => void;
 }
 
 export const GitBranchesTab = React.memo<GitBranchesTabProps>(
-  function GitBranchesTab({ sessionId, repoPath }) {
+  function GitBranchesTab({ sessionId, repoPath, onPullDown, onScrollUp }) {
     const { theme } = useUnistyles();
     const [branches, setBranches] = React.useState<GitBranchList | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
@@ -257,11 +269,35 @@ export const GitBranchesTab = React.memo<GitBranchesTabProps>(
       branches.local.length === 0 &&
       branches.remote.length === 0;
 
+    const scrollCollapseCalledRef = React.useRef(false);
+    const handleScroll = React.useCallback(
+      (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        if (!onScrollUp) return;
+        const y = e.nativeEvent.contentOffset.y;
+        if (y > SCROLL_COLLAPSE_THRESHOLD && !scrollCollapseCalledRef.current) {
+          scrollCollapseCalledRef.current = true;
+          onScrollUp();
+        } else if (y <= 0) {
+          scrollCollapseCalledRef.current = false;
+        }
+      },
+      [onScrollUp],
+    );
+
     return (
       <View
         style={[styles.container, { backgroundColor: theme.colors.surface }]}
       >
-        <ItemList style={{ flex: 1 }}>
+        <ItemList
+          style={{ flex: 1 }}
+          onScroll={onScrollUp ? handleScroll : undefined}
+          scrollEventThrottle={onScrollUp ? 16 : undefined}
+          refreshControl={
+            onPullDown ? (
+              <RefreshControl refreshing={false} onRefresh={onPullDown} />
+            ) : undefined
+          }
+        >
           {isLoading ? (
             <View style={styles.centerState}>
               <ActivityIndicator
