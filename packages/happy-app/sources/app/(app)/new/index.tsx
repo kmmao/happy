@@ -53,6 +53,13 @@ import { getBuiltInProfile, DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { AgentInput } from "@/components/AgentInput";
 import { StyleSheet } from "react-native-unistyles";
 import { randomUUID } from "expo-crypto";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { useHappyAction } from "@/hooks/useHappyAction";
+import {
+  pickImagesAsBase64,
+  uploadBase64Image,
+  MAX_IMAGES,
+} from "@/utils/imageUpload";
 import { useCLIDetection } from "@/hooks/useCLIDetection";
 import {
   useEnvironmentVariables,
@@ -480,6 +487,51 @@ function NewSessionWizard() {
     return tempSessionData?.prompt || prompt || persistedDraft?.input || "";
   });
   const [isCreating, setIsCreating] = React.useState(false);
+
+  // STT (Speech-to-Text)
+  const voiceInputLanguage = useSetting("voiceInputLanguage");
+  const handleTranscript = React.useCallback((text: string) => {
+    setSessionPrompt((prev) => {
+      const trimmed = prev.trimEnd();
+      return trimmed ? `${trimmed} ${text}` : text;
+    });
+  }, []);
+  const stt = useSpeechToText(
+    handleTranscript,
+    voiceInputLanguage ?? undefined,
+  );
+  const onSttToggle = React.useCallback(() => {
+    if (stt.isListening) {
+      stt.stopListening();
+    } else {
+      stt.startListening();
+    }
+  }, [stt]);
+  const sttDisplayValue =
+    stt.isListening && stt.interimTranscript
+      ? sessionPrompt.trimEnd()
+        ? `${sessionPrompt.trimEnd()} ${stt.interimTranscript}`
+        : stt.interimTranscript
+      : sessionPrompt;
+
+  // Image picking (deferred upload — happens after session creation)
+  const [pendingImages, setPendingImages] = React.useState<
+    { id: string; base64: string }[]
+  >([]);
+  const pendingImagesRef = React.useRef(pendingImages);
+  React.useEffect(() => {
+    pendingImagesRef.current = pendingImages;
+  }, [pendingImages]);
+  const [isPickingImage, doPickImage] = useHappyAction(
+    React.useCallback(async () => {
+      const result = await pickImagesAsBase64(pendingImagesRef.current.length);
+      if (!result) return;
+      setPendingImages((prev) => {
+        const remaining = MAX_IMAGES - prev.length;
+        return remaining <= 0 ? prev : [...prev, ...result.slice(0, remaining)];
+      });
+    }, []),
+  );
   const [showAdvanced, setShowAdvanced] = React.useState(false);
 
   // Handle machineId route param from picker screens (main's navigation pattern)
@@ -1256,9 +1308,35 @@ function NewSessionWizard() {
             .updateSessionModelMode(result.sessionId, modelMode.key);
         }
 
-        // Send initial message if provided
-        if (sessionPrompt.trim()) {
-          await sync.sendMessage(result.sessionId, sessionPrompt);
+        // Send initial message (with any attached images) if provided
+        const currentImages = pendingImagesRef.current;
+        const hasText = sessionPrompt.trim().length > 0;
+        const hasImages = currentImages.length > 0;
+        if (hasText || hasImages) {
+          // Upload any pending images to the newly created session
+          let imageRefs = "";
+          if (hasImages) {
+            const uploadResults = await Promise.allSettled(
+              currentImages.map((img) =>
+                uploadBase64Image(result.sessionId, img.base64),
+              ),
+            );
+            const paths = uploadResults
+              .filter(
+                (r): r is PromiseFulfilledResult<string> =>
+                  r.status === "fulfilled",
+              )
+              .map((r) => r.value);
+            if (paths.length > 0) {
+              imageRefs = paths.map((p) => `[image: ${p}]`).join("\n");
+            }
+          }
+          const finalMessage = [sessionPrompt.trim(), imageRefs]
+            .filter(Boolean)
+            .join("\n");
+          if (finalMessage) {
+            await sync.sendMessage(result.sessionId, finalMessage);
+          }
         }
 
         router.replace(`/session/${result.sessionId}`, {
@@ -1419,7 +1497,7 @@ function NewSessionWizard() {
               }}
             >
               <AgentInput
-                value={sessionPrompt}
+                value={sttDisplayValue}
                 onChangeText={setSessionPrompt}
                 onSend={handleCreateSession}
                 isSendDisabled={!canCreate}
@@ -1443,6 +1521,16 @@ function NewSessionWizard() {
                 onMachineClick={handleMachineClick}
                 currentPath={selectedPath}
                 onPathClick={handlePathClick}
+                onSttPress={onSttToggle}
+                isSttListening={stt.isListening}
+                onImagePickPress={doPickImage}
+                isPickingImage={isPickingImage}
+                imagePaths={pendingImages.map((img) => img.id)}
+                onImageRemove={(id) =>
+                  setPendingImages((prev) =>
+                    prev.filter((img) => img.id !== id),
+                  )
+                }
               />
             </View>
           </View>
@@ -2807,7 +2895,7 @@ function NewSessionWizard() {
             }}
           >
             <AgentInput
-              value={sessionPrompt}
+              value={sttDisplayValue}
               onChangeText={setSessionPrompt}
               onSend={handleCreateSession}
               isSendDisabled={!canCreate}
@@ -2833,6 +2921,14 @@ function NewSessionWizard() {
               onPathClick={handleAgentInputPathClick}
               profileId={selectedProfileId}
               onProfileClick={handleAgentInputProfileClick}
+              onSttPress={onSttToggle}
+              isSttListening={stt.isListening}
+              onImagePickPress={doPickImage}
+              isPickingImage={isPickingImage}
+              imagePaths={pendingImages.map((img) => img.id)}
+              onImageRemove={(id) =>
+                setPendingImages((prev) => prev.filter((img) => img.id !== id))
+              }
             />
           </View>
         </View>
