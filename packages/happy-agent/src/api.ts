@@ -152,17 +152,32 @@ export async function listSessions(
   config: Config,
   creds: Credentials,
 ): Promise<DecryptedSession[]> {
-  let data: { sessions: RawSession[] };
-  try {
-    const resp = await axios.get(`${config.serverUrl}/v1/sessions`, {
-      headers: authHeaders(creds),
-    });
-    data = resp.data as { sessions: RawSession[] };
-  } catch (err) {
-    handleApiError(err, "listing sessions");
+  const allSessions: RawSession[] = [];
+  let cursor: string | undefined;
+
+  // Paginate through all sessions using v2 API
+  while (true) {
+    const params: Record<string, string> = { limit: "100" };
+    if (cursor) params.cursor = cursor;
+
+    let data: { sessions: RawSession[]; nextCursor?: string };
+    try {
+      const resp = await axios.get(`${config.serverUrl}/v2/sessions`, {
+        headers: authHeaders(creds),
+        params,
+      });
+      data = resp.data as { sessions: RawSession[]; nextCursor?: string };
+    } catch (err) {
+      handleApiError(err, "listing sessions");
+    }
+
+    allSessions.push(...data.sessions);
+
+    if (!data.nextCursor || data.sessions.length === 0) break;
+    cursor = data.nextCursor;
   }
 
-  return data.sessions.map((raw) => decryptSession(raw, creds));
+  return allSessions.map((raw) => decryptSession(raw, creds));
 }
 
 export async function listActiveSessions(
