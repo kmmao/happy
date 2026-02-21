@@ -558,6 +558,28 @@ export const ca: TranslationStructure = {
     output: "Sortida",
   },
 
+  diff: {
+    toolbar: {
+      unified: "Unificat",
+      split: "Dividit",
+      expand: "Expandeix",
+      collapse: "Redueix",
+      copyDiff: "Copia",
+      copied: "Copiat!",
+    },
+  },
+
+  codeReview: {
+    accept: "Acceptar",
+    reject: "Rebutjar",
+    accepted: "Acceptat",
+    rejected: "Rebutjat",
+    rejectConfirmTitle: "Rebutjar canvi",
+    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
+      `Demanar a Claude que reverteixi els canvis a ${filePath}?`,
+    rejectConfirm: "Rebutjar i revertir",
+  },
+
   tools: {
     fullView: {
       description: "Descripció",
@@ -580,6 +602,11 @@ export const ca: TranslationStructure = {
       editNumber: ({ index, total }: { index: number; total: number }) =>
         `Edició ${index} de ${total}`,
       replaceAll: "Reemplaça tot",
+    },
+    contextMenu: {
+      copyPath: "Copia ruta del fitxer",
+      copyCommand: "Copia comanda",
+      copyOutput: "Copia sortida",
     },
     names: {
       task: "Tasca",

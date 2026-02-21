@@ -5,6 +5,8 @@ import * as z from "zod";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import React from "react";
 import { t } from "@/text";
+import { getDiffStatsLight } from "@/components/diff/calculateDiff";
+import { trimIdent } from "@/utils/trimIdent";
 
 // Icon factory functions
 const ICON_TASK = (size: number = 24, color: string = "#000") => (
@@ -438,6 +440,14 @@ export const knownTools = {
       })
       .partial()
       .passthrough(),
+    extractStats: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const parsed = knownTools.Edit.input.safeParse(opts.tool.input);
+      if (!parsed.success) return null;
+      const oldStr = trimIdent(parsed.data.old_string || "");
+      const newStr = trimIdent(parsed.data.new_string || "");
+      if (!oldStr && !newStr) return null;
+      return getDiffStatsLight(oldStr, newStr);
+    },
   },
   MultiEdit: {
     title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
@@ -476,6 +486,22 @@ export const knownTools = {
       })
       .partial()
       .passthrough(),
+    extractStats: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const parsed = knownTools.MultiEdit.input.safeParse(opts.tool.input);
+      if (!parsed.success || !parsed.data.edits) return null;
+      let totalAdditions = 0;
+      let totalDeletions = 0;
+      for (const edit of parsed.data.edits) {
+        const stats = getDiffStatsLight(
+          trimIdent(edit.old_string || ""),
+          trimIdent(edit.new_string || ""),
+        );
+        totalAdditions += stats.additions;
+        totalDeletions += stats.deletions;
+      }
+      if (totalAdditions === 0 && totalDeletions === 0) return null;
+      return { additions: totalAdditions, deletions: totalDeletions };
+    },
     extractStatus: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
       if (typeof opts.tool.input.file_path === "string") {
         const path = resolvePath(opts.tool.input.file_path, opts.metadata);
@@ -509,6 +535,19 @@ export const knownTools = {
       })
       .partial()
       .passthrough(),
+    extractStats: (opts: {
+      metadata: Metadata | null;
+      tool: ToolCall;
+    }): { additions: number; deletions: number } | null => {
+      const content =
+        typeof opts.tool.input?.content === "string"
+          ? opts.tool.input.content
+          : "";
+      if (!content) return null;
+      const lineCount: number = content.split("\n").filter(Boolean).length;
+      if (lineCount === 0) return null;
+      return { additions: lineCount, deletions: 0 };
+    },
   },
   WebFetch: {
     title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
@@ -1486,6 +1525,10 @@ export const knownTools = {
       metadata: Metadata | null;
       tool: ToolCall;
     }) => string | null;
+    extractStats?: (opts: {
+      metadata: Metadata | null;
+      tool: ToolCall;
+    }) => { additions: number; deletions: number } | null;
   }
 >;
 

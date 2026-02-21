@@ -3,6 +3,7 @@ import {
   Text,
   View,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   Platform,
 } from "react-native";
@@ -22,6 +23,11 @@ import { parseToolUseError } from "@/utils/toolErrorParser";
 import { formatMCPTitle } from "./views/MCPToolView";
 import { useSetting } from "@/sync/storage";
 import { t } from "@/text";
+import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
+import * as Clipboard from "expo-clipboard";
+import { Modal } from "@/modal/ModalManager";
+import { sessionAllow, sessionDeny } from "@/sync/ops";
+import { useToolReview } from "./useToolReview";
 
 interface ToolViewProps {
   metadata: Metadata | null;
@@ -49,6 +55,82 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
 
   // Enable pressable if either onPress is provided or we have navigation params
   const isPressable = !!(onPress || (sessionId && messageId));
+
+  // Long-press context menu
+  const handleLongPress = React.useCallback(() => {
+    const buttons: Array<{ text: string; onPress?: () => void }> = [];
+
+    // Copy file path
+    const filePath = tool.input?.file_path;
+    if (filePath && typeof filePath === "string") {
+      buttons.push({
+        text: t("tools.contextMenu.copyPath"),
+        onPress: () => {
+          Clipboard.setStringAsync(filePath);
+        },
+      });
+    }
+
+    // Copy command
+    const command = tool.input?.command;
+    if (command && typeof command === "string") {
+      buttons.push({
+        text: t("tools.contextMenu.copyCommand"),
+        onPress: () => {
+          Clipboard.setStringAsync(command);
+        },
+      });
+    }
+
+    // Copy output
+    if (tool.state === "completed" && tool.result) {
+      const resultText =
+        typeof tool.result === "string"
+          ? tool.result
+          : JSON.stringify(tool.result, null, 2);
+      buttons.push({
+        text: t("tools.contextMenu.copyOutput"),
+        onPress: () => {
+          Clipboard.setStringAsync(resultText);
+        },
+      });
+    }
+
+    if (buttons.length === 0) return;
+
+    buttons.push({ text: t("common.cancel") });
+    Modal.alert(tool.name, undefined, buttons);
+  }, [tool]);
+
+  // Code review accept/reject for completed mutable tools
+  const { isReviewable, reviewState, onAccept, onReject } = useToolReview({
+    tool,
+    messageId,
+    sessionId,
+  });
+
+  // Quick approve/deny for pending permissions
+  const [quickApproveLoading, setQuickApproveLoading] = React.useState(false);
+
+  const handleQuickApprove = React.useCallback(async () => {
+    if (!sessionId || !tool.permission?.id || quickApproveLoading) return;
+    setQuickApproveLoading(true);
+    try {
+      await sessionAllow(sessionId, tool.permission.id);
+    } finally {
+      setQuickApproveLoading(false);
+    }
+  }, [sessionId, tool.permission?.id, quickApproveLoading]);
+
+  const handleQuickDeny = React.useCallback(async () => {
+    if (!sessionId || !tool.permission?.id || quickApproveLoading) return;
+    setQuickApproveLoading(true);
+    try {
+      await sessionDeny(sessionId, tool.permission.id);
+    } finally {
+      setQuickApproveLoading(false);
+    }
+  }, [sessionId, tool.permission?.id, quickApproveLoading]);
 
   let knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
 
@@ -173,6 +255,14 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     hideDefaultError = knownTool.hideDefaultError;
   }
 
+  // Calculate diff stats for Edit/Write/MultiEdit tools
+  const diffStats = React.useMemo(() => {
+    if (knownTool && typeof knownTool.extractStats === "function") {
+      return knownTool.extractStats({ tool, metadata: props.metadata });
+    }
+    return null;
+  }, [knownTool, tool, props.metadata]);
+
   let statusIcon = null;
 
   let isToolUseError = false;
@@ -222,9 +312,44 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         }
         break;
       case "completed":
-        // if (!noStatus) {
-        //     statusIcon = <Ionicons name="checkmark-circle" size={20} color="#34C759" />;
-        // }
+        if (isReviewable) {
+          if (reviewState === "accepted") {
+            statusIcon = (
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={theme.colors.diff.success}
+              />
+            );
+          } else if (reviewState === "rejected") {
+            statusIcon = (
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={theme.colors.diff.error}
+              />
+            );
+          } else {
+            statusIcon = (
+              <View style={styles.quickApproveContainer}>
+                <Pressable onPress={onAccept} style={styles.quickApproveBtn}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={24}
+                    color={theme.colors.diff.success}
+                  />
+                </Pressable>
+                <Pressable onPress={onReject} style={styles.quickApproveBtn}>
+                  <Ionicons
+                    name="close-circle"
+                    size={24}
+                    color={theme.colors.diff.error}
+                  />
+                </Pressable>
+              </View>
+            );
+          }
+        }
         break;
       case "error":
         statusIcon = (
@@ -238,12 +363,55 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     }
   }
 
+  // Override statusIcon with quick approve/deny buttons when permission is pending
+  if (
+    tool.permission?.status === "pending" &&
+    sessionId &&
+    tool.name !== "AskUserQuestion"
+  ) {
+    statusIcon = (
+      <View style={styles.quickApproveContainer}>
+        <Pressable
+          onPress={handleQuickApprove}
+          style={styles.quickApproveBtn}
+          disabled={quickApproveLoading}
+        >
+          <Ionicons
+            name="checkmark-circle"
+            size={24}
+            color={theme.colors.diff.success}
+          />
+        </Pressable>
+        <Pressable
+          onPress={handleQuickDeny}
+          style={styles.quickApproveBtn}
+          disabled={quickApproveLoading}
+        >
+          <Ionicons
+            name="close-circle"
+            size={24}
+            color={theme.colors.diff.error}
+          />
+        </Pressable>
+      </View>
+    );
+  }
+
+  const statsBar =
+    diffStats && tool.state !== "running" ? (
+      <DiffStatsBar
+        additions={diffStats.additions}
+        deletions={diffStats.deletions}
+      />
+    ) : null;
+
   return (
     <View style={styles.container}>
       {isPressable ? (
         <TouchableOpacity
           style={styles.header}
           onPress={handlePress}
+          onLongPress={handleLongPress}
           activeOpacity={0.8}
         >
           <View style={styles.headerLeft}>
@@ -261,6 +429,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                 </Text>
               )}
             </View>
+            {statsBar}
             {tool.state === "running" && (
               <View style={styles.elapsedContainer}>
                 <ElapsedView from={tool.createdAt} />
@@ -270,7 +439,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
           </View>
         </TouchableOpacity>
       ) : (
-        <View style={styles.header}>
+        <Pressable style={styles.header} onLongPress={handleLongPress}>
           <View style={styles.headerLeft}>
             <View style={styles.iconContainer}>{icon}</View>
             <View style={styles.titleContainer}>
@@ -286,6 +455,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                 </Text>
               )}
             </View>
+            {statsBar}
             {tool.state === "running" && (
               <View style={styles.elapsedContainer}>
                 <ElapsedView from={tool.createdAt} />
@@ -293,7 +463,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
             )}
             {statusIcon}
           </View>
-        </View>
+        </Pressable>
       )}
 
       {/* Content area - either custom children or tool-specific view */}
@@ -452,5 +622,13 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: 12,
     paddingTop: 8,
     overflow: "visible",
+  },
+  quickApproveContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  quickApproveBtn: {
+    padding: 2,
   },
 }));

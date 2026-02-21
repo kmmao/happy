@@ -558,6 +558,28 @@ export const en: TranslationStructure = {
     output: "Output",
   },
 
+  diff: {
+    toolbar: {
+      unified: "Unified",
+      split: "Split",
+      expand: "Expand",
+      collapse: "Collapse",
+      copyDiff: "Copy",
+      copied: "Copied!",
+    },
+  },
+
+  codeReview: {
+    accept: "Accept",
+    reject: "Reject",
+    accepted: "Accepted",
+    rejected: "Rejected",
+    rejectConfirmTitle: "Reject Change",
+    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
+      `Ask Claude to revert changes to ${filePath}?`,
+    rejectConfirm: "Reject & Revert",
+  },
+
   tools: {
     fullView: {
       description: "Description",
@@ -580,6 +602,11 @@ export const en: TranslationStructure = {
       editNumber: ({ index, total }: { index: number; total: number }) =>
         `Edit ${index} of ${total}`,
       replaceAll: "Replace All",
+    },
+    contextMenu: {
+      copyPath: "Copy File Path",
+      copyCommand: "Copy Command",
+      copyOutput: "Copy Output",
     },
     names: {
       task: "Task",

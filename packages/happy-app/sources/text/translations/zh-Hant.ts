@@ -530,6 +530,28 @@ export const zhHant: TranslationStructure = {
     output: "輸出",
   },
 
+  diff: {
+    toolbar: {
+      unified: "統一",
+      split: "分欄",
+      expand: "展開",
+      collapse: "收起",
+      copyDiff: "複製",
+      copied: "已複製!",
+    },
+  },
+
+  codeReview: {
+    accept: "接受",
+    reject: "拒絕",
+    accepted: "已接受",
+    rejected: "已拒絕",
+    rejectConfirmTitle: "拒絕修改",
+    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
+      `讓 Claude 撤回對 ${filePath} 的修改？`,
+    rejectConfirm: "拒絕並撤回",
+  },
+
   tools: {
     fullView: {
       description: "描述",
@@ -552,6 +574,11 @@ export const zhHant: TranslationStructure = {
       editNumber: ({ index, total }: { index: number; total: number }) =>
         `編輯 ${index}/${total}`,
       replaceAll: "全部替換",
+    },
+    contextMenu: {
+      copyPath: "複製檔案路徑",
+      copyCommand: "複製命令",
+      copyOutput: "複製輸出",
     },
     names: {
       task: "任務",

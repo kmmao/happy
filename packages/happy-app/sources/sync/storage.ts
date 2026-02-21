@@ -129,6 +129,10 @@ interface StorageState {
   socketLastDisconnectedAt: number | null;
   isDataReady: boolean;
   nativeUpdateStatus: { available: boolean; updateUrl?: string } | null;
+  // Code review state (in-memory only, not persisted)
+  reviewedTools: Record<string, "accepted" | "rejected">;
+  setToolReview: (messageId: string, state: "accepted" | "rejected") => void;
+  getToolReview: (messageId: string) => "accepted" | "rejected" | undefined;
   applySessions: (
     sessions: (Omit<Session, "presence"> & { presence?: "online" | number })[],
   ) => void;
@@ -356,6 +360,12 @@ export const storage = create<StorageState>()((set, get) => {
     socketLastDisconnectedAt: null,
     isDataReady: false,
     nativeUpdateStatus: null,
+    reviewedTools: {},
+    setToolReview: (messageId: string, state: "accepted" | "rejected") =>
+      set((prev) => ({
+        reviewedTools: { ...prev.reviewedTools, [messageId]: state },
+      })),
+    getToolReview: (messageId: string) => get().reviewedTools[messageId],
     isMutableToolCall: (sessionId: string, callId: string) => {
       const sessionMessages = get().sessionMessages[sessionId];
       if (!sessionMessages) {
@@ -1396,6 +1406,16 @@ export function useMessage(
       const session = state.sessionMessages[sessionId];
       return session?.messagesMap[messageId] ?? null;
     }),
+  );
+}
+
+export function useToolReviewState(
+  messageId: string | undefined,
+): "accepted" | "rejected" | undefined {
+  return storage(
+    useShallow((state) =>
+      messageId ? state.reviewedTools[messageId] : undefined,
+    ),
   );
 }
 

@@ -609,6 +609,28 @@ export const ja: TranslationStructure = {
     output: "出力",
   },
 
+  diff: {
+    toolbar: {
+      unified: "統合",
+      split: "分割",
+      expand: "展開",
+      collapse: "折りたたむ",
+      copyDiff: "コピー",
+      copied: "コピー済み!",
+    },
+  },
+
+  codeReview: {
+    accept: "承認",
+    reject: "拒否",
+    accepted: "承認済み",
+    rejected: "拒否済み",
+    rejectConfirmTitle: "変更を拒否",
+    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
+      `Claude に ${filePath} の変更を元に戻すよう依頼しますか？`,
+    rejectConfirm: "拒否して元に戻す",
+  },
+
   tools: {
     fullView: {
       description: "説明",
@@ -637,6 +659,11 @@ export const ja: TranslationStructure = {
       editNumber: ({ index, total }: { index: number; total: number }) =>
         `編集 ${index}/${total}`,
       replaceAll: "すべて置換",
+    },
+    contextMenu: {
+      copyPath: "ファイルパスをコピー",
+      copyCommand: "コマンドをコピー",
+      copyOutput: "出力をコピー",
     },
     names: {
       task: "タスク",

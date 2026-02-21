@@ -569,6 +569,28 @@ export const ru: TranslationStructure = {
     output: "Результат",
   },
 
+  diff: {
+    toolbar: {
+      unified: "Единый",
+      split: "Разделённый",
+      expand: "Развернуть",
+      collapse: "Свернуть",
+      copyDiff: "Копировать",
+      copied: "Скопировано!",
+    },
+  },
+
+  codeReview: {
+    accept: "Принять",
+    reject: "Отклонить",
+    accepted: "Принято",
+    rejected: "Отклонено",
+    rejectConfirmTitle: "Отклонить изменение",
+    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
+      `Попросить Claude отменить изменения в ${filePath}?`,
+    rejectConfirm: "Отклонить и отменить",
+  },
+
   tools: {
     fullView: {
       description: "Описание",
@@ -591,6 +613,11 @@ export const ru: TranslationStructure = {
       editNumber: ({ index, total }: { index: number; total: number }) =>
         `Правка ${index} из ${total}`,
       replaceAll: "Заменить все",
+    },
+    contextMenu: {
+      copyPath: "Копировать путь файла",
+      copyCommand: "Копировать команду",
+      copyOutput: "Копировать вывод",
     },
     names: {
       task: "Задача",
