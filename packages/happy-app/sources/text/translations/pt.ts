@@ -928,6 +928,7 @@ export const pt: TranslationStructure = {
     unknownEvent: "Evento desconhecido",
     usageLimitUntil: ({ time }: { time: string }) =>
       `Limite de uso atingido até ${time}`,
+    usageLimitReached: "Limite de uso atingido. Por favor, aguarde e tente novamente.",
     unknownTime: "horário desconhecido",
     turnStats: ({
       model,

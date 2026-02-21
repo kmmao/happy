@@ -930,6 +930,7 @@ export const ca: TranslationStructure = {
     unknownEvent: "Esdeveniment desconegut",
     usageLimitUntil: ({ time }: { time: string }) =>
       `Límit d'ús assolit fins a ${time}`,
+    usageLimitReached: "S'ha assolit el límit d'ús. Si us plau, espera i torna a intentar-ho.",
     unknownTime: "temps desconegut",
     turnStats: ({
       model,

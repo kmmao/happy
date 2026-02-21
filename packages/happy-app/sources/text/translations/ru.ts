@@ -926,6 +926,7 @@ export const ru: TranslationStructure = {
     unknownEvent: "Неизвестное событие",
     usageLimitUntil: ({ time }: { time: string }) =>
       `Лимит использования достигнут до ${time}`,
+    usageLimitReached: "Лимит использования достигнут. Пожалуйста, подождите и попробуйте снова.",
     unknownTime: "неизвестное время",
     turnStats: ({
       model,

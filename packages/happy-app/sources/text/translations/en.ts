@@ -926,6 +926,7 @@ export const en: TranslationStructure = {
     unknownEvent: "Unknown event",
     usageLimitUntil: ({ time }: { time: string }) =>
       `Usage limit reached until ${time}`,
+    usageLimitReached: "Usage limit reached. Please wait and try again.",
     unknownTime: "unknown time",
     turnStats: ({
       model,
