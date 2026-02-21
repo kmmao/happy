@@ -893,6 +893,22 @@ export const ca: TranslationStructure = {
     usageLimitUntil: ({ time }: { time: string }) =>
       `Límit d'ús assolit fins a ${time}`,
     unknownTime: "temps desconegut",
+    turnStats: ({
+      model,
+      tokens,
+      duration,
+    }: {
+      model: string;
+      tokens: string;
+      duration: string;
+    }) => `${model} · ${tokens} tokens · ${duration}`,
+    turnStatsNoModel: ({
+      tokens,
+      duration,
+    }: {
+      tokens: string;
+      duration: string;
+    }) => `${tokens} tokens · ${duration}`,
   },
 
   codex: {

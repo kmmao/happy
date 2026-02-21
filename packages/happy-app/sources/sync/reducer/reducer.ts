@@ -262,12 +262,18 @@ export function reducer(
       continue;
     }
 
-    // Filter out ready events completely - they should not create any message
+    // Filter out ready events, unless they carry usage/model/duration data
     if (msg.role === "event" && msg.content.type === "ready") {
-      // Mark as processed to prevent duplication but don't add to messages
       state.messageIds.set(msg.id, msg.id);
       hasReadyEvent = true;
-      continue;
+      const hasStats =
+        msg.content.model !== undefined ||
+        msg.content.usage !== undefined ||
+        msg.content.durationMs !== undefined;
+      if (!hasStats) {
+        continue;
+      }
+      // Fall through to Phase 5 to render as a stats line
     }
 
     // Session protocol turn-start markers are lifecycle-only and should stay invisible.

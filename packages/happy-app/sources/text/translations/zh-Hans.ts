@@ -846,6 +846,22 @@ export const zhHans: TranslationStructure = {
     unknownEvent: "未知事件",
     usageLimitUntil: ({ time }: { time: string }) => `使用限制到 ${time}`,
     unknownTime: "未知时间",
+    turnStats: ({
+      model,
+      tokens,
+      duration,
+    }: {
+      model: string;
+      tokens: string;
+      duration: string;
+    }) => `${model} · ${tokens} tokens · ${duration}`,
+    turnStatsNoModel: ({
+      tokens,
+      duration,
+    }: {
+      tokens: string;
+      duration: string;
+    }) => `${tokens} tokens · ${duration}`,
   },
 
   codex: {

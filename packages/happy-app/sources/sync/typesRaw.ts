@@ -41,6 +41,16 @@ const agentEventSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("ready"),
+    model: z.string().optional(),
+    usage: z
+      .object({
+        input_tokens: z.number(),
+        output_tokens: z.number(),
+        cache_creation_input_tokens: z.number().optional(),
+        cache_read_input_tokens: z.number().optional(),
+      })
+      .optional(),
+    durationMs: z.number().optional(),
   }),
 ]);
 export type AgentEvent = z.infer<typeof agentEventSchema>;
@@ -96,6 +106,16 @@ const sessionStartEventSchema = z.object({
 const sessionTurnEndEventSchema = z.object({
   t: z.literal("turn-end"),
   status: z.enum(["completed", "failed", "cancelled"]),
+  model: z.string().optional(),
+  usage: z
+    .object({
+      input_tokens: z.number(),
+      output_tokens: z.number(),
+      cache_creation_input_tokens: z.number().optional(),
+      cache_read_input_tokens: z.number().optional(),
+    })
+    .optional(),
+  durationMs: z.number().optional(),
 });
 
 const sessionStopEventSchema = z.object({
@@ -662,7 +682,18 @@ function normalizeSessionEnvelope(
       createdAt: messageCreatedAt,
       role: "event",
       isSidechain: false,
-      content: { type: "ready" },
+      content: {
+        type: "ready",
+        ...(envelope.ev.model !== undefined
+          ? { model: envelope.ev.model }
+          : {}),
+        ...(envelope.ev.usage !== undefined
+          ? { usage: envelope.ev.usage }
+          : {}),
+        ...(envelope.ev.durationMs !== undefined
+          ? { durationMs: envelope.ev.durationMs }
+          : {}),
+      },
       meta,
     } satisfies NormalizedMessage;
   }

@@ -173,6 +173,25 @@ function AgentTextBlock(props: {
   );
 }
 
+function formatModelName(model: string): string {
+  // Strip date suffix from model IDs like "claude-sonnet-4-6-20250514" → "claude-sonnet-4-6"
+  return model.replace(/-\d{8}$/, "");
+}
+
+function formatTokenCount(count: number): string {
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}k`;
+  }
+  return String(count);
+}
+
+function formatDuration(ms: number): string {
+  if (ms >= 60000) {
+    return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+  }
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 function AgentEventBlock(props: {
   event: AgentEvent;
   metadata: Metadata | null;
@@ -216,11 +235,51 @@ function AgentEventBlock(props: {
       </View>
     );
   }
-  return (
-    <View style={styles.agentEventContainer}>
-      <Text style={styles.agentEventText}>{t("message.unknownEvent")}</Text>
-    </View>
-  );
+  if (props.event.type === "ready") {
+    const { model, usage, durationMs } = props.event;
+    if (!model && !usage && durationMs === undefined) {
+      return null;
+    }
+    const totalTokens = usage
+      ? usage.input_tokens +
+        usage.output_tokens +
+        (usage.cache_creation_input_tokens ?? 0) +
+        (usage.cache_read_input_tokens ?? 0)
+      : null;
+    const tokensStr =
+      totalTokens !== null ? formatTokenCount(totalTokens) : null;
+    const durationStr =
+      durationMs !== undefined ? formatDuration(durationMs) : null;
+    const modelStr = model ? formatModelName(model) : null;
+
+    let label: string;
+    if (modelStr && tokensStr && durationStr) {
+      label = t("message.turnStats", {
+        model: modelStr,
+        tokens: tokensStr,
+        duration: durationStr,
+      });
+    } else if (tokensStr && durationStr) {
+      label = t("message.turnStatsNoModel", {
+        tokens: tokensStr,
+        duration: durationStr,
+      });
+    } else {
+      const parts = [
+        modelStr,
+        tokensStr && `${tokensStr} tokens`,
+        durationStr,
+      ].filter(Boolean);
+      label = parts.join(" · ");
+    }
+
+    return (
+      <View style={styles.turnStatsContainer}>
+        <Text style={styles.turnStatsText}>{label}</Text>
+      </View>
+    );
+  }
+  return null;
 }
 
 function ToolCallBlock(props: {
@@ -305,6 +364,18 @@ const styles = StyleSheet.create((theme) => ({
   agentEventText: {
     color: theme.colors.agentEventText,
     fontSize: 14,
+  },
+  turnStatsContainer: {
+    marginHorizontal: 8,
+    marginTop: 2,
+    marginBottom: 8,
+    alignItems: "flex-start",
+    paddingLeft: 40,
+  },
+  turnStatsText: {
+    color: theme.colors.agentEventText,
+    fontSize: 11,
+    opacity: 0.6,
   },
   toolContainer: {
     marginHorizontal: 8,

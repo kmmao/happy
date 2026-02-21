@@ -29,6 +29,7 @@ import {
   closeClaudeTurnWithStatus,
   mapClaudeLogMessageToSessionEnvelopes,
   type ClaudeSessionProtocolState,
+  type TurnMeta,
 } from "@/claude/utils/sessionProtocolMapper";
 import { InvalidateSync } from "@/utils/sync";
 import axios from "axios";
@@ -208,6 +209,9 @@ export class ApiSessionClient extends EventEmitter {
   };
   private lastSeq = 0;
   private pendingOutbox: Array<{ content: string; localId: string }> = [];
+  private currentTurnStartTime: number | null = null;
+  private currentTurnModel: string | null = null;
+  private currentTurnUsage: Usage | null = null;
   private readonly sendSync: InvalidateSync;
   private readonly receiveSync: InvalidateSync;
 
@@ -514,16 +518,25 @@ export class ApiSessionClient extends EventEmitter {
     // Strip large image base64 from tool results to prevent oversized messages
     body = stripLargeImageContent(body);
 
+    const prevTurnId = this.claudeSessionProtocolState.currentTurnId;
     const mapped = mapClaudeLogMessageToSessionEnvelopes(
       body,
       this.claudeSessionProtocolState,
     );
     this.claudeSessionProtocolState.currentTurnId = mapped.currentTurnId;
+
+    // Track turn start time when a new turn is opened
+    if (!prevTurnId && this.claudeSessionProtocolState.currentTurnId) {
+      this.currentTurnStartTime = Date.now();
+    }
+
     for (const envelope of mapped.envelopes) {
       this.sendSessionProtocolMessage(envelope);
     }
     // Track usage from assistant messages
     if (body.type === "assistant" && body.message?.usage) {
+      this.currentTurnModel = body.message.model || null;
+      this.currentTurnUsage = body.message.usage;
       try {
         this.sendUsageData(body.message.usage, body.message.model);
       } catch (error) {
@@ -544,10 +557,28 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   closeClaudeSessionTurn(status: SessionTurnEndStatus = "completed") {
+    const durationMs =
+      this.currentTurnStartTime != null
+        ? Date.now() - this.currentTurnStartTime
+        : undefined;
+
+    const meta: TurnMeta = {
+      ...(this.currentTurnModel ? { model: this.currentTurnModel } : {}),
+      ...(this.currentTurnUsage ? { usage: this.currentTurnUsage } : {}),
+      ...(durationMs !== undefined ? { durationMs } : {}),
+    };
+
     const mapped = closeClaudeTurnWithStatus(
       this.claudeSessionProtocolState,
       status,
+      Object.keys(meta).length > 0 ? meta : undefined,
     );
+
+    // Reset turn tracking after close
+    this.currentTurnStartTime = null;
+    this.currentTurnModel = null;
+    this.currentTurnUsage = null;
+
     this.claudeSessionProtocolState.currentTurnId = mapped.currentTurnId;
     for (const envelope of mapped.envelopes) {
       this.sendSessionProtocolMessage(envelope);

@@ -891,6 +891,22 @@ export const pt: TranslationStructure = {
     usageLimitUntil: ({ time }: { time: string }) =>
       `Limite de uso atingido até ${time}`,
     unknownTime: "horário desconhecido",
+    turnStats: ({
+      model,
+      tokens,
+      duration,
+    }: {
+      model: string;
+      tokens: string;
+      duration: string;
+    }) => `${model} · ${tokens} tokens · ${duration}`,
+    turnStatsNoModel: ({
+      tokens,
+      duration,
+    }: {
+      tokens: string;
+      duration: string;
+    }) => `${tokens} tokens · ${duration}`,
   },
 
   codex: {

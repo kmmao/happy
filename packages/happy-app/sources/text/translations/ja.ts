@@ -935,6 +935,22 @@ export const ja: TranslationStructure = {
     unknownEvent: "不明なイベント",
     usageLimitUntil: ({ time }: { time: string }) => `${time}まで使用制限中`,
     unknownTime: "不明な時間",
+    turnStats: ({
+      model,
+      tokens,
+      duration,
+    }: {
+      model: string;
+      tokens: string;
+      duration: string;
+    }) => `${model} · ${tokens} tokens · ${duration}`,
+    turnStatsNoModel: ({
+      tokens,
+      duration,
+    }: {
+      tokens: string;
+      duration: string;
+    }) => `${tokens} tokens · ${duration}`,
   },
 
   codex: {

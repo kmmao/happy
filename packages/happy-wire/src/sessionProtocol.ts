@@ -1,22 +1,22 @@
-import { createId, isCuid } from '@paralleldrive/cuid2';
-import * as z from 'zod';
+import { createId, isCuid } from "@paralleldrive/cuid2";
+import * as z from "zod";
 
-export const sessionRoleSchema = z.enum(['user', 'agent']);
+export const sessionRoleSchema = z.enum(["user", "agent"]);
 export type SessionRole = z.infer<typeof sessionRoleSchema>;
 
 export const sessionTextEventSchema = z.object({
-  t: z.literal('text'),
+  t: z.literal("text"),
   text: z.string(),
   thinking: z.boolean().optional(),
 });
 
 export const sessionServiceMessageEventSchema = z.object({
-  t: z.literal('service'),
+  t: z.literal("service"),
   text: z.string(),
 });
 
 export const sessionToolCallStartEventSchema = z.object({
-  t: z.literal('tool-call-start'),
+  t: z.literal("tool-call-start"),
   call: z.string(),
   name: z.string(),
   title: z.string(),
@@ -25,12 +25,12 @@ export const sessionToolCallStartEventSchema = z.object({
 });
 
 export const sessionToolCallEndEventSchema = z.object({
-  t: z.literal('tool-call-end'),
+  t: z.literal("tool-call-end"),
   call: z.string(),
 });
 
 export const sessionFileEventSchema = z.object({
-  t: z.literal('file'),
+  t: z.literal("file"),
   ref: z.string(),
   name: z.string(),
   size: z.number(),
@@ -44,27 +44,41 @@ export const sessionFileEventSchema = z.object({
 });
 
 export const sessionTurnStartEventSchema = z.object({
-  t: z.literal('turn-start'),
+  t: z.literal("turn-start"),
 });
 
 export const sessionStartEventSchema = z.object({
-  t: z.literal('start'),
+  t: z.literal("start"),
   title: z.string().optional(),
 });
 
-export const sessionTurnEndStatusSchema = z.enum(['completed', 'failed', 'cancelled']);
+export const sessionTurnEndStatusSchema = z.enum([
+  "completed",
+  "failed",
+  "cancelled",
+]);
 export type SessionTurnEndStatus = z.infer<typeof sessionTurnEndStatusSchema>;
 
 export const sessionTurnEndEventSchema = z.object({
-  t: z.literal('turn-end'),
+  t: z.literal("turn-end"),
   status: sessionTurnEndStatusSchema,
+  model: z.string().optional(),
+  usage: z
+    .object({
+      input_tokens: z.number(),
+      output_tokens: z.number(),
+      cache_creation_input_tokens: z.number().optional(),
+      cache_read_input_tokens: z.number().optional(),
+    })
+    .optional(),
+  durationMs: z.number().optional(),
 });
 
 export const sessionStopEventSchema = z.object({
-  t: z.literal('stop'),
+  t: z.literal("stop"),
 });
 
-export const sessionEventSchema = z.discriminatedUnion('t', [
+export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
   sessionToolCallStartEventSchema,
@@ -87,24 +101,27 @@ export const sessionEnvelopeSchema = z
     subagent: z
       .string()
       .refine((value) => isCuid(value), {
-        message: 'subagent must be a cuid2 value',
+        message: "subagent must be a cuid2 value",
       })
       .optional(),
     ev: sessionEventSchema,
   })
   .superRefine((envelope, ctx) => {
-    if (envelope.ev.t === 'service' && envelope.role !== 'agent') {
+    if (envelope.ev.t === "service" && envelope.role !== "agent") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'service events must use role "agent"',
-        path: ['role'],
+        path: ["role"],
       });
     }
-    if ((envelope.ev.t === 'start' || envelope.ev.t === 'stop') && envelope.role !== 'agent') {
+    if (
+      (envelope.ev.t === "start" || envelope.ev.t === "stop") &&
+      envelope.role !== "agent"
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `${envelope.ev.t} events must use role "agent"`,
-        path: ['role'],
+        path: ["role"],
       });
     }
   });
@@ -118,7 +135,11 @@ export type CreateEnvelopeOptions = {
   subagent?: string;
 };
 
-export function createEnvelope(role: SessionRole, ev: SessionEvent, opts: CreateEnvelopeOptions = {}): SessionEnvelope {
+export function createEnvelope(
+  role: SessionRole,
+  ev: SessionEvent,
+  opts: CreateEnvelopeOptions = {},
+): SessionEnvelope {
   return sessionEnvelopeSchema.parse({
     id: opts.id ?? createId(),
     time: opts.time ?? Date.now(),
