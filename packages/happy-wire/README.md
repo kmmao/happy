@@ -1,4 +1,4 @@
-# @slopus/happy-wire
+# @kmmao/happy-wire
 
 Canonical wire specification package for Happy clients and services.
 
@@ -108,7 +108,7 @@ Wire-level encrypted container (same for legacy and new):
 
 ## Purpose
 
-`@slopus/happy-wire` centralizes definitions for:
+`@kmmao/happy-wire` centralizes definitions for:
 - encrypted message/update payloads
 - session protocol envelope and event stream
 - helper for creating valid session envelopes
@@ -117,7 +117,7 @@ The goal is to keep CLI/app/server/agent on the same wire contract and avoid sch
 
 ## Package Identity
 
-- Name: `@slopus/happy-wire`
+- Name: `@kmmao/happy-wire`
 - Workspace path: `packages/happy-wire`
 - Entry: `src/index.ts`
 - Runtime deps: `zod`, `@paralleldrive/cuid2`
@@ -678,7 +678,7 @@ For user text migration behavior:
 import {
   CoreUpdateContainerSchema,
   sessionEnvelopeSchema,
-} from '@slopus/happy-wire';
+} from '@kmmao/happy-wire';
 
 const maybeUpdate = CoreUpdateContainerSchema.safeParse(input);
 if (!maybeUpdate.success) {
@@ -715,10 +715,10 @@ Published files:
 
 ## Monorepo Build Dependency Behavior
 
-In this repository, consumer workspaces import `@slopus/happy-wire` through package exports that point at `dist/*`.
+In this repository, consumer workspaces import `@kmmao/happy-wire` through package exports that point at `dist/*`.
 
 That means on a clean checkout:
-1. Build wire first: `yarn workspace @slopus/happy-wire build`
+1. Build wire first: `yarn workspace @kmmao/happy-wire build`
 2. Then build/typecheck dependents.
 
 After publishing to npm, dependents consume prebuilt artifacts from the published tarball.
@@ -735,8 +735,8 @@ When modifying wire schemas:
 
 ```bash
 # from repository root
-yarn workspace @slopus/happy-wire build
-yarn workspace @slopus/happy-wire test
+yarn workspace @kmmao/happy-wire build
+yarn workspace @kmmao/happy-wire test
 ```
 
 ## Release Commands (maintainers)
@@ -746,7 +746,7 @@ yarn workspace @slopus/happy-wire test
 yarn release
 
 # direct release invocation
-yarn workspace @slopus/happy-wire release
+yarn workspace @kmmao/happy-wire release
 ```
 
 This prepares release artifacts using the same `release-it` flow as other publishable libraries in the monorepo.

@@ -11,7 +11,7 @@ This enables support for Gemini, OpenCode, and any future ACP agent without writ
 - **Existing AcpBackend** (`agent/acp/AcpBackend.ts`) already handles process spawning, ACP JSON-RPC, permissions, and tool tracking. Reused as-is.
 - **Existing runGemini.ts** (~1300 lines) is vendor-specific. Stays untouched; migration happens later.
 - **Codex already uses new session protocol** via `mapCodexMcpMessageToSessionEnvelopes()` — reference pattern.
-- **Session protocol types** in `@slopus/happy-wire` (`SessionEnvelope`, `createEnvelope()`).
+- **Session protocol types** in `@kmmao/happy-wire` (`SessionEnvelope`, `createEnvelope()`).
 - **AgentMessage** is the event type emitted by `AcpBackend.onMessage()`.
 - The runner does NOT resolve credentials, API keys, OAuth tokens, or environment variables. The user's shell environment is inherited as-is. If `gemini` needs `GEMINI_API_KEY`, the user sets it before running.
 

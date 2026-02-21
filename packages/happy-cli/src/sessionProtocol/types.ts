@@ -1,1 +1,1 @@
-export * from '@slopus/happy-wire';
+export * from "@kmmao/happy-wire";

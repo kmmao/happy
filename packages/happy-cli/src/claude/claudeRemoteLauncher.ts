@@ -15,7 +15,7 @@ import { EnhancedMode } from "./loop";
 import { RawJSONLines } from "@/claude/types";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import { getToolName } from "./utils/getToolName";
-import { createEnvelope } from "@slopus/happy-wire";
+import { createEnvelope } from "@kmmao/happy-wire";
 
 interface PermissionsField {
   date: number;

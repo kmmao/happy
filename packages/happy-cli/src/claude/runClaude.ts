@@ -40,7 +40,7 @@ import {
   applySandboxPermissionPolicy,
   resolveInitialClaudePermissionMode,
 } from "./utils/permissionMode";
-import { createEnvelope } from "@slopus/happy-wire";
+import { createEnvelope } from "@kmmao/happy-wire";
 
 /** JavaScript runtime to use for spawning Claude Code */
 export type JsRuntime = "node" | "bun";

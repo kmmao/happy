@@ -6,7 +6,7 @@ import type { AgentMessage } from "@/agent/core";
 import { AcpBackend, type AcpPermissionHandler } from "./AcpBackend";
 import { DefaultTransport } from "@/agent/transport";
 import { AcpSessionManager } from "./AcpSessionManager";
-import type { SessionEnvelope } from "@slopus/happy-wire";
+import type { SessionEnvelope } from "@kmmao/happy-wire";
 import { logger } from "@/ui/logger";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { hashObject } from "@/utils/deterministicJson";

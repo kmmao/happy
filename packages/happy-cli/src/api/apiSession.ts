@@ -24,7 +24,7 @@ import { calculateCost } from "@/utils/pricing";
 import {
   type SessionEnvelope,
   type SessionTurnEndStatus,
-} from "@slopus/happy-wire";
+} from "@kmmao/happy-wire";
 import {
   closeClaudeTurnWithStatus,
   mapClaudeLogMessageToSessionEnvelopes,
