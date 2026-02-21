@@ -42,7 +42,7 @@ describe("happy-agent CLI", () => {
 
   it("should display version", () => {
     const { stdout } = runCli("--version");
-    expect(stdout.trim()).toBe("0.2.0");
+    expect(stdout.trim()).toBe("0.2.1");
   });
 
   it("should list all expected commands in help", () => {
