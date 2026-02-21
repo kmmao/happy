@@ -14,6 +14,9 @@ import { useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { MermaidRenderer } from "./MermaidRenderer";
 import { t } from "@/text";
+import { useBookmarks } from "@/hooks/useBookmarks";
+import { Ionicons } from "@expo/vector-icons";
+import { useUnistyles } from "react-native-unistyles";
 
 // Option type for callback
 export type Option = {
@@ -312,6 +315,9 @@ function RenderOptionsBlock(props: {
   selectable: boolean;
   onOptionPress?: (option: Option) => void;
 }) {
+  const { toggleBookmark, isBookmarked } = useBookmarks();
+  const { theme } = useUnistyles();
+
   return (
     <View
       style={[
@@ -322,19 +328,41 @@ function RenderOptionsBlock(props: {
     >
       {props.items.map((item, index) => {
         if (props.onOptionPress) {
+          const bookmarked = isBookmarked(item);
           return (
-            <Pressable
-              key={index}
-              style={({ pressed }) => [
-                style.optionItem,
-                pressed && style.optionItemPressed,
-              ]}
-              onPress={() => props.onOptionPress?.({ title: item })}
-            >
-              <Text selectable={props.selectable} style={style.optionText}>
-                {item}
-              </Text>
-            </Pressable>
+            <View key={index} style={style.optionItemRow}>
+              <Pressable
+                style={({ pressed }) => [
+                  style.optionItem,
+                  style.optionItemFlex,
+                  pressed && style.optionItemPressed,
+                ]}
+                onPress={() => props.onOptionPress?.({ title: item })}
+              >
+                <Text selectable={props.selectable} style={style.optionText}>
+                  {item}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  style.bookmarkButton,
+                  pressed && style.bookmarkButtonPressed,
+                ]}
+                onPress={() => toggleBookmark(item)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel={t("session.bookmarkOption")}
+              >
+                <Ionicons
+                  name={bookmarked ? "bookmark" : "bookmark-outline"}
+                  size={16}
+                  color={
+                    bookmarked
+                      ? theme.colors.radio.active
+                      : theme.colors.textSecondary
+                  }
+                />
+              </Pressable>
+            </View>
           );
         } else {
           return (
@@ -647,6 +675,14 @@ const style = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.divider,
   },
+  optionItemRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+  },
+  optionItemFlex: {
+    flex: 1,
+  },
   optionItemPressed: {
     opacity: 0.7,
     backgroundColor: theme.colors.surfaceHigh,
@@ -656,6 +692,12 @@ const style = StyleSheet.create((theme) => ({
     fontSize: 16,
     lineHeight: 24,
     color: theme.colors.text,
+  },
+  bookmarkButton: {
+    padding: 6,
+  },
+  bookmarkButtonPressed: {
+    opacity: 0.5,
   },
 
   //

@@ -383,6 +383,7 @@ export const pt: TranslationStructure = {
       `${failed} de ${total} imagens falharam ao carregar`,
     couldNotAttachFile: "Não foi possível anexar este arquivo",
     imageLoadFailed: "Falha ao carregar imagem",
+    bookmarkOption: "Favorito",
   },
 
   commandPalette: {

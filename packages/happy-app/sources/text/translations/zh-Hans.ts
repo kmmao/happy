@@ -360,6 +360,7 @@ export const zhHans: TranslationStructure = {
       `${total} 张图片中有 ${failed} 张上传失败`,
     couldNotAttachFile: "无法附加此文件",
     imageLoadFailed: "图片加载失败",
+    bookmarkOption: "收藏",
   },
 
   commandPalette: {

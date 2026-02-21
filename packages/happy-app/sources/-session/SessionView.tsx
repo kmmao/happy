@@ -18,6 +18,7 @@ import { EmptyMessages } from "@/components/EmptyMessages";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
 import { useLatestOptions } from "@/hooks/useLatestOptions";
+import { BookmarkProvider, useBookmarks } from "@/hooks/useBookmarks";
 import { Modal } from "@/modal";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import {
@@ -259,6 +260,20 @@ function SessionViewLoaded({
   sessionId: string;
   session: Session;
 }) {
+  return (
+    <BookmarkProvider sessionId={sessionId}>
+      <SessionViewInner sessionId={sessionId} session={session} />
+    </BookmarkProvider>
+  );
+}
+
+function SessionViewInner({
+  sessionId,
+  session,
+}: {
+  sessionId: string;
+  session: Session;
+}) {
   const { theme } = useUnistyles();
   const router = useRouter();
   const safeArea = useSafeAreaInsets();
@@ -340,6 +355,18 @@ function SessionViewLoaded({
   const handleFloatingOptionPress = React.useCallback(
     (option: string) => {
       setShowOptionsPopover(false);
+      sync.sendMessage(sessionId, option);
+      trackMessageSent();
+    },
+    [sessionId],
+  );
+
+  // Bookmarks
+  const { bookmarkedOptions } = useBookmarks();
+  const [showBookmarksPopover, setShowBookmarksPopover] = React.useState(false);
+  const handleBookmarkOptionPress = React.useCallback(
+    (option: string) => {
+      setShowBookmarksPopover(false);
       sync.sendMessage(sessionId, option);
       trackMessageSent();
     },
@@ -503,6 +530,8 @@ function SessionViewLoaded({
         hasUserMessages={(chatListRef.current?.getUserMessageCount() ?? 0) > 0}
         optionCount={latestOptions.length}
         onOptionsPress={() => setShowOptionsPopover(true)}
+        bookmarkCount={bookmarkedOptions.size}
+        onBookmarksPress={() => setShowBookmarksPopover(true)}
         scrollTick={scrollTick}
       />
     </>
@@ -708,6 +737,13 @@ function SessionViewLoaded({
           options={latestOptions}
           onOptionPress={handleFloatingOptionPress}
           onClose={() => setShowOptionsPopover(false)}
+        />
+        <OptionsPopover
+          visible={showBookmarksPopover && bookmarkedOptions.size > 0}
+          options={Array.from(bookmarkedOptions)}
+          onOptionPress={handleBookmarkOptionPress}
+          onClose={() => setShowBookmarksPopover(false)}
+          title={t("session.bookmarkOption")}
         />
       </View>
 

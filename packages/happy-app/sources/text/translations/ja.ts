@@ -436,6 +436,7 @@ export const ja: TranslationStructure = {
       `${total}枚中${failed}枚の画像のアップロードに失敗しました`,
     couldNotAttachFile: "このファイルを添付できませんでした",
     imageLoadFailed: "画像の読み込みに失敗しました",
+    bookmarkOption: "ブックマーク",
   },
 
   commandPalette: {

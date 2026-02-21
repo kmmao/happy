@@ -9,10 +9,17 @@ interface OptionsPopoverProps {
   options: string[];
   onOptionPress: (option: string) => void;
   onClose: () => void;
+  title?: string;
 }
 
 export const OptionsPopover = React.memo(
-  ({ visible, options, onOptionPress, onClose }: OptionsPopoverProps) => {
+  ({
+    visible,
+    options,
+    onOptionPress,
+    onClose,
+    title,
+  }: OptionsPopoverProps) => {
     const opacity = React.useRef(new Animated.Value(0)).current;
     const [shouldRender, setShouldRender] = React.useState(false);
 
@@ -47,6 +54,11 @@ export const OptionsPopover = React.memo(
         {/* Centered bubble */}
         <View style={styles.centerAnchor} pointerEvents="box-none">
           <View style={styles.bubble}>
+            {title && (
+              <View style={styles.titleContainer}>
+                <Text style={styles.titleText}>{title}</Text>
+              </View>
+            )}
             {options.map((option, index) => (
               <Pressable
                 key={index}
@@ -104,6 +116,19 @@ const styles = StyleSheet.create((theme) => ({
     shadowOpacity: theme.colors.shadow.opacity * 2,
     elevation: 12,
     overflow: "hidden",
+  },
+  titleContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: theme.colors.divider,
+  },
+  titleText: {
+    ...Typography.default("semiBold"),
+    fontSize: 14,
+    lineHeight: 20,
+    color: theme.colors.textSecondary,
+    textAlign: "center" as const,
   },
   optionItem: {
     paddingHorizontal: 16,

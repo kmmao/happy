@@ -260,6 +260,34 @@ export function saveProfile(profile: Profile) {
   mmkv.set("profile", JSON.stringify(profile));
 }
 
+// Session bookmarks - persisted per session, cleared on session delete
+export function loadSessionBookmarks(sessionId: string): string[] {
+  const raw = mmkv.getString(`session-bookmarks-${sessionId}`);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch (e) {
+      console.error("Failed to parse session bookmarks", e);
+    }
+  }
+  return [];
+}
+
+export function saveSessionBookmarks(sessionId: string, bookmarks: string[]) {
+  if (bookmarks.length === 0) {
+    mmkv.delete(`session-bookmarks-${sessionId}`);
+  } else {
+    mmkv.set(`session-bookmarks-${sessionId}`, JSON.stringify(bookmarks));
+  }
+}
+
+export function deleteSessionBookmarks(sessionId: string) {
+  mmkv.delete(`session-bookmarks-${sessionId}`);
+}
+
 // Simple temporary text storage for passing large strings between screens
 export function storeTempText(content: string): string {
   const id = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

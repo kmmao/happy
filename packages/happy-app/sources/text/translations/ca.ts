@@ -384,6 +384,7 @@ export const ca: TranslationStructure = {
       `${failed} de ${total} imatges no s'han pogut pujar`,
     couldNotAttachFile: "No s'ha pogut adjuntar aquest fitxer",
     imageLoadFailed: "No s'ha pogut carregar la imatge",
+    bookmarkOption: "Marcador",
   },
 
   commandPalette: {

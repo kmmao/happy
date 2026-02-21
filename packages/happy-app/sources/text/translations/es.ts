@@ -385,6 +385,7 @@ export const es: TranslationStructure = {
       `${failed} de ${total} imágenes no se pudieron subir`,
     couldNotAttachFile: "No se pudo adjuntar este archivo",
     imageLoadFailed: "Error al cargar la imagen",
+    bookmarkOption: "Marcador",
   },
 
   commandPalette: {

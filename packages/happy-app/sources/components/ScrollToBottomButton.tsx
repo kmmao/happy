@@ -59,6 +59,8 @@ interface ScrollToBottomButtonProps {
   hasUserMessages?: boolean;
   optionCount?: number;
   onOptionsPress?: () => void;
+  bookmarkCount?: number;
+  onBookmarksPress?: () => void;
   /** Bump this counter on every scroll event to wake buttons from idle fade */
   scrollTick?: number;
 }
@@ -72,6 +74,8 @@ export const ScrollToBottomButton = React.memo(
     hasUserMessages,
     optionCount = 0,
     onOptionsPress,
+    bookmarkCount = 0,
+    onBookmarksPress,
     scrollTick = 0,
   }: ScrollToBottomButtonProps) => {
     const { theme } = useUnistyles();
@@ -143,8 +147,14 @@ export const ScrollToBottomButton = React.memo(
     const showNavButtons =
       hasUserMessages && onPrevUserMessage && onNextUserMessage;
     const showOptionsButton = optionCount > 0 && onOptionsPress;
+    const showBookmarkButton = bookmarkCount > 0 && onBookmarksPress;
 
-    if (!shouldRenderScrollBtn && !showNavButtons && !showOptionsButton) {
+    if (
+      !shouldRenderScrollBtn &&
+      !showNavButtons &&
+      !showOptionsButton &&
+      !showBookmarkButton
+    ) {
       return null;
     }
 
@@ -191,6 +201,12 @@ export const ScrollToBottomButton = React.memo(
             )}
             {showNavButtons &&
               renderButton("arrow-down", onNextUserMessage, 18)}
+            {showBookmarkButton && (
+              <View>
+                {renderButton("bookmark", onBookmarksPress!, 18)}
+                <View style={styles.badge} />
+              </View>
+            )}
           </View>
         </View>
       </Animated.View>

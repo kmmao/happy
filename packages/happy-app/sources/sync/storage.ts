@@ -27,6 +27,7 @@ import {
   saveSessionModelModes,
   loadSessionNeedsAttention,
   saveSessionNeedsAttention,
+  deleteSessionBookmarks,
 } from "./persistence";
 import type { PermissionModeKey } from "@/components/PermissionModeSelector";
 import type { CustomerInfo } from "./revenueCat/types";
@@ -1223,6 +1224,8 @@ export const storage = create<StorageState>()((set, get) => {
         const attention = loadSessionNeedsAttention();
         delete attention[sessionId];
         saveSessionNeedsAttention(attention);
+
+        deleteSessionBookmarks(sessionId);
 
         // Rebuild sessionListViewData without the deleted session
         const sessionListViewData = buildSessionListViewData(remainingSessions);

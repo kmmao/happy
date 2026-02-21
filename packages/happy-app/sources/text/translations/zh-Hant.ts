@@ -360,6 +360,7 @@ export const zhHant: TranslationStructure = {
       `${total} 張圖片中有 ${failed} 張上傳失敗`,
     couldNotAttachFile: "無法附加此檔案",
     imageLoadFailed: "圖片載入失敗",
+    bookmarkOption: "收藏",
   },
 
   commandPalette: {
