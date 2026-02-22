@@ -439,6 +439,11 @@ export const ja: TranslationStructure = {
     bookmarkOption: "ブックマーク",
   },
 
+  bookmark: {
+    sourceAI: "AI",
+    sourceUser: "自分",
+  },
+
   commandPalette: {
     placeholder: "コマンドを入力または検索...",
   },

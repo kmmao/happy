@@ -387,6 +387,11 @@ export const ca: TranslationStructure = {
     bookmarkOption: "Marcador",
   },
 
+  bookmark: {
+    sourceAI: "AI",
+    sourceUser: "Jo",
+  },
+
   commandPalette: {
     placeholder: "Escriu una comanda o cerca...",
   },

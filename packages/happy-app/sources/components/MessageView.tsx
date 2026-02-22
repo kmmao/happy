@@ -1,6 +1,7 @@
 import * as React from "react";
-import { View, Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { View, Text, Pressable } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { Ionicons } from "@expo/vector-icons";
 import { MarkdownView } from "./markdown/MarkdownView";
 import { t } from "@/text";
 import {
@@ -19,6 +20,7 @@ import { useSetting } from "@/sync/storage";
 import { FlavorIcon } from "./FlavorIcon";
 import { MessageImage } from "./MessageImage";
 import { parseImageRefs } from "@/utils/parseImageRefs";
+import { useBookmarks } from "@/hooks/useBookmarks";
 
 export const MessageView = (props: {
   message: Message;
@@ -92,6 +94,9 @@ function RenderBlock(props: {
 }
 
 function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
+  const { toggleBookmark, isBookmarked } = useBookmarks();
+  const { theme } = useUnistyles();
+
   const handleOptionPress = React.useCallback(
     (option: Option) => {
       sync.sendMessage(props.sessionId, option.title);
@@ -109,6 +114,8 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
       ? parsed.text
       : props.message.displayText || props.message.text;
 
+  const bookmarked = isBookmarked(displayText);
+
   return (
     <View style={styles.userMessageContainer}>
       {parsed.imagePaths.length > 0 && (
@@ -123,11 +130,31 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
         </View>
       )}
       {displayText.length > 0 && (
-        <View style={styles.userMessageBubble}>
-          <MarkdownView
-            markdown={displayText}
-            onOptionPress={handleOptionPress}
-          />
+        <View style={styles.userBubbleRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.userBookmarkButton,
+              pressed && { opacity: 0.5 },
+            ]}
+            onPress={() => toggleBookmark(displayText, "user")}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={bookmarked ? "bookmark" : "bookmark-outline"}
+              size={14}
+              color={
+                bookmarked
+                  ? theme.colors.radio.active
+                  : theme.colors.textSecondary
+              }
+            />
+          </Pressable>
+          <View style={styles.userMessageBubble}>
+            <MarkdownView
+              markdown={displayText}
+              onOptionPress={handleOptionPress}
+            />
+          </View>
         </View>
       )}
     </View>
@@ -321,6 +348,16 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "flex-end",
     justifyContent: "flex-end",
     paddingHorizontal: 16,
+  },
+  userBubbleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    maxWidth: "100%",
+  },
+  userBookmarkButton: {
+    padding: 4,
+    flexShrink: 0,
   },
   userImageContainer: {
     flexDirection: "row",

@@ -490,6 +490,11 @@ export const ru: TranslationStructure = {
     bookmarkOption: "Закладка",
   },
 
+  bookmark: {
+    sourceAI: "AI",
+    sourceUser: "Я",
+  },
+
   commandPalette: {
     placeholder: "Введите команду или поиск...",
   },

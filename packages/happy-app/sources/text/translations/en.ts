@@ -391,6 +391,11 @@ export const en: TranslationStructure = {
     bookmarkOption: "Bookmark",
   },
 
+  bookmark: {
+    sourceAI: "AI",
+    sourceUser: "Me",
+  },
+
   commandPalette: {
     placeholder: "Type a command or search...",
   },

@@ -4,14 +4,24 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
 import { layout } from "./layout";
+import { t } from "@/text";
+
+export interface OptionItem {
+  text: string;
+  source?: "ai" | "user";
+}
 
 interface OptionsPopoverProps {
   visible: boolean;
-  options: string[];
-  onOptionPress: (option: string) => void;
+  options: readonly (string | OptionItem)[];
+  onOptionPress: (text: string) => void;
   onClose: () => void;
   title?: string;
-  onRemoveOption?: (option: string) => void;
+  onRemoveOption?: (text: string) => void;
+}
+
+function normalizeOption(option: string | OptionItem): OptionItem {
+  return typeof option === "string" ? { text: option } : option;
 }
 
 export const OptionsPopover = React.memo(
@@ -63,44 +73,78 @@ export const OptionsPopover = React.memo(
                 <Text style={styles.titleText}>{title}</Text>
               </View>
             )}
-            {options.map((option, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.optionRow,
-                  index < options.length - 1 && styles.optionItemBorder,
-                ]}
-              >
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.optionItem,
-                    onRemoveOption && styles.optionItemFlex,
-                    pressed && styles.optionItemPressed,
+            {options.map((raw, index) => {
+              const option = normalizeOption(raw);
+              return (
+                <View
+                  key={index}
+                  style={[
+                    styles.optionRow,
+                    index < options.length - 1 && styles.optionItemBorder,
                   ]}
-                  onPress={() => onOptionPress(option)}
                 >
-                  <Text style={styles.optionText} numberOfLines={2}>
-                    {option}
-                  </Text>
-                </Pressable>
-                {onRemoveOption && (
                   <Pressable
                     style={({ pressed }) => [
-                      styles.removeButton,
-                      pressed && styles.removeButtonPressed,
+                      styles.optionItem,
+                      onRemoveOption && styles.optionItemFlex,
+                      pressed && styles.optionItemPressed,
                     ]}
-                    onPress={() => onRemoveOption(option)}
-                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                    onPress={() => onOptionPress(option.text)}
                   >
-                    <Ionicons
-                      name="bookmark-outline"
-                      size={16}
-                      color={theme.colors.textSecondary}
-                    />
+                    <View style={styles.optionContent}>
+                      <Text style={styles.optionText} numberOfLines={2}>
+                        {option.text}
+                      </Text>
+                      {option.source && (
+                        <View
+                          style={[
+                            styles.sourceTag,
+                            option.source === "ai"
+                              ? {
+                                  backgroundColor:
+                                    theme.colors.radio.active + "20",
+                                }
+                              : {
+                                  backgroundColor:
+                                    theme.colors.box.warning.background,
+                                },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.sourceTagText,
+                              option.source === "ai"
+                                ? { color: theme.colors.radio.active }
+                                : { color: theme.colors.box.warning.text },
+                            ]}
+                          >
+                            {option.source === "ai"
+                              ? t("bookmark.sourceAI")
+                              : t("bookmark.sourceUser")}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </Pressable>
-                )}
-              </View>
-            ))}
+                  {onRemoveOption && (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.removeButton,
+                        pressed && styles.removeButtonPressed,
+                      ]}
+                      onPress={() => onRemoveOption(option.text)}
+                      hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                    >
+                      <Ionicons
+                        name="bookmark-outline"
+                        size={16}
+                        color={theme.colors.textSecondary}
+                      />
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
       </Animated.View>
@@ -175,11 +219,27 @@ const styles = StyleSheet.create((theme) => ({
   optionItemPressed: {
     backgroundColor: theme.colors.surfaceHigh,
   },
+  optionContent: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
   optionText: {
     ...Typography.default(),
     fontSize: 15,
     lineHeight: 22,
     color: theme.colors.text,
+    flexShrink: 1,
+  },
+  sourceTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    flexShrink: 0,
+  },
+  sourceTagText: {
+    fontSize: 10,
+    ...Typography.default("semiBold"),
   },
   removeButton: {
     paddingHorizontal: 12,

@@ -386,6 +386,11 @@ export const pt: TranslationStructure = {
     bookmarkOption: "Favorito",
   },
 
+  bookmark: {
+    sourceAI: "AI",
+    sourceUser: "Eu",
+  },
+
   commandPalette: {
     placeholder: "Digite um comando ou pesquise...",
   },

@@ -363,6 +363,11 @@ export const zhHant: TranslationStructure = {
     bookmarkOption: "收藏",
   },
 
+  bookmark: {
+    sourceAI: "AI",
+    sourceUser: "我",
+  },
+
   commandPalette: {
     placeholder: "輸入命令或搜尋...",
   },

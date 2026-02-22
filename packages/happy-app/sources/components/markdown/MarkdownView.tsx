@@ -348,7 +348,7 @@ function RenderOptionsBlock(props: {
                   style.bookmarkButton,
                   pressed && style.bookmarkButtonPressed,
                 ]}
-                onPress={() => toggleBookmark(item)}
+                onPress={() => toggleBookmark(item, "ai")}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityLabel={t("session.bookmarkOption")}
               >

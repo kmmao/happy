@@ -1,17 +1,20 @@
 import * as React from "react";
 import {
+  BookmarkItem,
   loadSessionBookmarks,
   saveSessionBookmarks,
 } from "@/sync/persistence";
 
+type BookmarkSource = "ai" | "user";
+
 interface BookmarkContextValue {
-  bookmarkedOptions: ReadonlySet<string>;
-  toggleBookmark: (option: string) => void;
-  isBookmarked: (option: string) => boolean;
+  bookmarks: readonly BookmarkItem[];
+  toggleBookmark: (text: string, source: BookmarkSource) => void;
+  isBookmarked: (text: string) => boolean;
 }
 
 const defaultValue: BookmarkContextValue = {
-  bookmarkedOptions: new Set(),
+  bookmarks: [],
   toggleBookmark: () => {},
   isBookmarked: () => false,
 };
@@ -25,35 +28,36 @@ export function BookmarkProvider({
   sessionId: string;
   children: React.ReactNode;
 }) {
-  const [bookmarkedOptions, setBookmarkedOptions] = React.useState<
-    ReadonlySet<string>
-  >(() => new Set(loadSessionBookmarks(sessionId)));
+  const [bookmarks, setBookmarks] = React.useState<readonly BookmarkItem[]>(
+    () => loadSessionBookmarks(sessionId),
+  );
 
   // Sync to MMKV whenever bookmarks change
   React.useEffect(() => {
-    saveSessionBookmarks(sessionId, Array.from(bookmarkedOptions));
-  }, [sessionId, bookmarkedOptions]);
+    saveSessionBookmarks(sessionId, [...bookmarks]);
+  }, [sessionId, bookmarks]);
 
-  const toggleBookmark = React.useCallback((option: string) => {
-    setBookmarkedOptions((prev) => {
-      const next = new Set(prev);
-      if (next.has(option)) {
-        next.delete(option);
-      } else {
-        next.add(option);
-      }
-      return next;
-    });
-  }, []);
+  const toggleBookmark = React.useCallback(
+    (text: string, source: BookmarkSource) => {
+      setBookmarks((prev) => {
+        const exists = prev.some((b) => b.text === text);
+        if (exists) {
+          return prev.filter((b) => b.text !== text);
+        }
+        return [...prev, { text, source }];
+      });
+    },
+    [],
+  );
 
   const isBookmarked = React.useCallback(
-    (option: string) => bookmarkedOptions.has(option),
-    [bookmarkedOptions],
+    (text: string) => bookmarks.some((b) => b.text === text),
+    [bookmarks],
   );
 
   const value = React.useMemo(
-    () => ({ bookmarkedOptions, toggleBookmark, isBookmarked }),
-    [bookmarkedOptions, toggleBookmark, isBookmarked],
+    () => ({ bookmarks, toggleBookmark, isBookmarked }),
+    [bookmarks, toggleBookmark, isBookmarked],
   );
 
   return (

@@ -452,6 +452,11 @@ export const it: TranslationStructure = {
     bookmarkOption: "Segnalibro",
   },
 
+  bookmark: {
+    sourceAI: "AI",
+    sourceUser: "Io",
+  },
+
   commandPalette: {
     placeholder: "Digita un comando o cerca...",
   },

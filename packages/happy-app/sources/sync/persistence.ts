@@ -261,13 +261,23 @@ export function saveProfile(profile: Profile) {
 }
 
 // Session bookmarks - persisted per session, cleared on session delete
-export function loadSessionBookmarks(sessionId: string): string[] {
+export interface BookmarkItem {
+  text: string;
+  source: "ai" | "user";
+}
+
+export function loadSessionBookmarks(sessionId: string): BookmarkItem[] {
   const raw = mmkv.getString(`session-bookmarks-${sessionId}`);
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed;
+        // Migrate legacy string[] format to BookmarkItem[]
+        return parsed.map((item: unknown) =>
+          typeof item === "string"
+            ? { text: item, source: "ai" as const }
+            : (item as BookmarkItem),
+        );
       }
     } catch (e) {
       console.error("Failed to parse session bookmarks", e);
@@ -276,7 +286,10 @@ export function loadSessionBookmarks(sessionId: string): string[] {
   return [];
 }
 
-export function saveSessionBookmarks(sessionId: string, bookmarks: string[]) {
+export function saveSessionBookmarks(
+  sessionId: string,
+  bookmarks: BookmarkItem[],
+) {
   if (bookmarks.length === 0) {
     mmkv.delete(`session-bookmarks-${sessionId}`);
   } else {

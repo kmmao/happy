@@ -362,7 +362,7 @@ function SessionViewInner({
   );
 
   // Bookmarks
-  const { bookmarkedOptions, toggleBookmark } = useBookmarks();
+  const { bookmarks, toggleBookmark } = useBookmarks();
   const [showBookmarksPopover, setShowBookmarksPopover] = React.useState(false);
   const handleBookmarkOptionPress = React.useCallback(
     (option: string) => {
@@ -530,7 +530,7 @@ function SessionViewInner({
         hasUserMessages={(chatListRef.current?.getUserMessageCount() ?? 0) > 0}
         optionCount={latestOptions.length}
         onOptionsPress={() => setShowOptionsPopover(true)}
-        bookmarkCount={bookmarkedOptions.size}
+        bookmarkCount={bookmarks.length}
         onBookmarksPress={() => setShowBookmarksPopover(true)}
         scrollTick={scrollTick}
       />
@@ -739,12 +739,12 @@ function SessionViewInner({
           onClose={() => setShowOptionsPopover(false)}
         />
         <OptionsPopover
-          visible={showBookmarksPopover && bookmarkedOptions.size > 0}
-          options={Array.from(bookmarkedOptions)}
+          visible={showBookmarksPopover && bookmarks.length > 0}
+          options={bookmarks}
           onOptionPress={handleBookmarkOptionPress}
           onClose={() => setShowBookmarksPopover(false)}
           title={t("session.bookmarkOption")}
-          onRemoveOption={toggleBookmark}
+          onRemoveOption={(text) => toggleBookmark(text, "ai")}
         />
       </View>
 
