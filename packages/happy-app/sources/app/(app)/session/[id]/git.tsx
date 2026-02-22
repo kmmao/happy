@@ -1,8 +1,9 @@
 import * as React from "react";
-import { View } from "react-native";
+import { View, Pressable, Platform } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import { GitTabBar, GitTabId } from "@/components/git/GitTabBar";
 import { GitChangesTab } from "@/components/git/GitChangesTab";
+import { GitBrowseTab } from "@/components/git/GitBrowseTab";
 import { GitHistoryTab } from "@/components/git/GitHistoryTab";
 import { GitBranchesTab } from "@/components/git/GitBranchesTab";
 import { GitStashTab } from "@/components/git/GitStashTab";
@@ -16,11 +17,15 @@ import {
 import { storage } from "@/sync/storage";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { layout } from "@/components/layout";
+import { Text } from "@/components/StyledText";
+import { Typography } from "@/constants/Typography";
+import { t } from "@/text";
 
 export default React.memo(function GitScreen() {
   const route = useRoute();
   const sessionId = (route.params! as any).id as string;
   const [activeTab, setActiveTab] = React.useState<GitTabId>("changes");
+  const [browseMode, setBrowseMode] = React.useState(false);
   const [selectedRepoPath, setSelectedRepoPath] = React.useState<string | null>(
     null,
   );
@@ -44,6 +49,11 @@ export default React.memo(function GitScreen() {
     const sub = submodules?.find((s) => s.path === selectedRepoPath);
     return sub?.gitStatus ?? null;
   }, [selectedRepoPath, gitStatus, submodules]);
+
+  const handleTabChange = React.useCallback((tab: GitTabId) => {
+    setActiveTab(tab);
+    if (tab !== "changes") setBrowseMode(false);
+  }, []);
 
   const handleRepoSelect = React.useCallback((repoPath: string | null) => {
     setSelectedRepoPath(repoPath);
@@ -82,18 +92,77 @@ export default React.memo(function GitScreen() {
       />
       <GitTabBar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         stashCount={gitStatus?.stashCount}
       />
+
+      {/* Changes / Browse sub-toggle — only visible on the Changes tab */}
+      {activeTab === "changes" && (
+        <View
+          style={{
+            flexDirection: "row",
+            borderBottomWidth: Platform.select({ ios: 0.33, default: 1 }),
+            borderBottomColor: theme.colors.divider,
+            backgroundColor: theme.colors.surfaceHigh,
+          }}
+        >
+          {(["changes", "browse"] as const).map((mode) => {
+            const isActive = browseMode === (mode === "browse");
+            return (
+              <Pressable
+                key={mode}
+                onPress={() => setBrowseMode(mode === "browse")}
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  paddingVertical: 8,
+                  borderBottomWidth: isActive ? 2 : 0,
+                  borderBottomColor: isActive
+                    ? theme.colors.textLink
+                    : "transparent",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: isActive ? "600" : "400",
+                    color: isActive
+                      ? theme.colors.textLink
+                      : theme.colors.textSecondary,
+                    ...Typography.default(),
+                  }}
+                >
+                  {mode === "changes"
+                    ? t("files.changesTab")
+                    : t("files.browseTab")}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
       <View
         style={{
           flex: 1,
-          display: activeTab === "changes" ? "flex" : "none",
+          display: activeTab === "changes" && !browseMode ? "flex" : "none",
         }}
       >
         <GitChangesTab
           sessionId={sessionId}
           repoPath={selectedRepoPath ?? undefined}
+          onPullDown={hasSubmodules ? handlePullDown : undefined}
+          onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+        />
+      </View>
+      <View
+        style={{
+          flex: 1,
+          display: activeTab === "changes" && browseMode ? "flex" : "none",
+        }}
+      >
+        <GitBrowseTab
+          sessionId={sessionId}
           onPullDown={hasSubmodules ? handlePullDown : undefined}
           onScrollUp={hasSubmodules ? handleScrollUp : undefined}
         />

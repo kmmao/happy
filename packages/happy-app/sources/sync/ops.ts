@@ -69,7 +69,7 @@ interface SessionListDirectoryRequest {
   path: string;
 }
 
-interface DirectoryEntry {
+export interface DirectoryEntry {
   name: string;
   type: "file" | "directory" | "other";
   size?: number;
@@ -594,7 +594,6 @@ export type {
   SessionReadFileResponse,
   SessionWriteFileResponse,
   SessionListDirectoryResponse,
-  DirectoryEntry,
   SessionGetDirectoryTreeResponse,
   TreeNode,
   SessionRipgrepResponse,
