@@ -3,6 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { MarkdownView } from "./markdown/MarkdownView";
+import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import {
   Message,
@@ -168,6 +169,8 @@ function AgentTextBlock(props: {
   flavor?: string | null;
 }) {
   const experiments = useSetting("experiments");
+  const { theme } = useUnistyles();
+  const [thinkingExpanded, setThinkingExpanded] = React.useState(false);
   const handleOptionPress = React.useCallback(
     (option: Option) => {
       sync.sendMessage(props.sessionId, option.title);
@@ -180,17 +183,49 @@ function AgentTextBlock(props: {
     return null;
   }
 
+  // Collapsed thinking block
+  if (props.message.isThinking) {
+    return (
+      <View style={styles.agentMessageRow}>
+        <View style={styles.avatarSlot}>
+          {props.showAvatar && <FlavorIcon flavor={props.flavor} size={24} />}
+        </View>
+        <View style={styles.agentMessageContainer}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.thinkingHeader,
+              pressed && { opacity: 0.6 },
+            ]}
+            onPress={() => setThinkingExpanded((v) => !v)}
+          >
+            <Ionicons
+              name={thinkingExpanded ? "chevron-down" : "chevron-forward"}
+              size={14}
+              color={theme.colors.textSecondary}
+            />
+            <Text style={styles.thinkingLabel}>
+              {t("sessionInfo.thinking")}
+            </Text>
+          </Pressable>
+          {thinkingExpanded && (
+            <View style={styles.thinkingContent}>
+              <MarkdownView
+                markdown={props.message.text}
+                onOptionPress={handleOptionPress}
+              />
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.agentMessageRow}>
       <View style={styles.avatarSlot}>
         {props.showAvatar && <FlavorIcon flavor={props.flavor} size={24} />}
       </View>
-      <View
-        style={[
-          styles.agentMessageContainer,
-          props.message.isThinking && { opacity: 0.3 },
-        ]}
-      >
+      <View style={styles.agentMessageContainer}>
         <MarkdownView
           markdown={props.message.text}
           onOptionPress={handleOptionPress}
@@ -392,6 +427,23 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: 12,
     borderRadius: 16,
     flex: 1,
+  },
+  thinkingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    opacity: 0.5,
+  },
+  thinkingLabel: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    ...Typography.default(),
+  },
+  thinkingContent: {
+    opacity: 0.4,
+    paddingLeft: 4,
   },
   agentEventContainer: {
     marginHorizontal: 8,
