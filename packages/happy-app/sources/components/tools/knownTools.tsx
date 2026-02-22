@@ -69,7 +69,6 @@ export const knownTools = {
       return t("tools.names.task");
     },
     icon: ICON_TASK,
-    isMutable: true,
     minimal: (opts: {
       metadata: Metadata | null;
       tool: ToolCall;
@@ -110,7 +109,6 @@ export const knownTools = {
     icon: ICON_TERMINAL,
     minimal: true,
     hideDefaultError: true,
-    isMutable: true,
     input: z.object({
       command: z.string().describe("The command to execute"),
       timeout: z
@@ -811,7 +809,6 @@ export const knownTools = {
     icon: ICON_TERMINAL,
     minimal: true,
     hideDefaultError: true,
-    isMutable: true,
     input: z
       .object({
         command: z.array(z.string()).describe("The command array to execute"),
@@ -1092,7 +1089,6 @@ export const knownTools = {
     title: t("tools.names.terminal"),
     icon: ICON_TERMINAL,
     minimal: true,
-    isMutable: true,
     input: z.object({}).partial().passthrough(),
   },
   execute: {
@@ -1111,7 +1107,6 @@ export const knownTools = {
       return t("tools.names.terminal");
     },
     icon: ICON_TERMINAL,
-    isMutable: true,
     minimal: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
       const input = opts.tool.input;
       const title = input?.toolCall?.title;
@@ -1235,7 +1230,6 @@ export const knownTools = {
     icon: ICON_TERMINAL,
     minimal: true,
     hideDefaultError: true,
-    isMutable: true,
     input: z
       .object({
         command: z.array(z.string()).describe("The command array to execute"),
