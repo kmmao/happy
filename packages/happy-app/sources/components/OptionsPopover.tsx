@@ -1,7 +1,8 @@
 import * as React from "react";
 import { Animated, Platform, Pressable, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
+import { Ionicons } from "@expo/vector-icons";
 import { layout } from "./layout";
 
 interface OptionsPopoverProps {
@@ -10,6 +11,7 @@ interface OptionsPopoverProps {
   onOptionPress: (option: string) => void;
   onClose: () => void;
   title?: string;
+  onRemoveOption?: (option: string) => void;
 }
 
 export const OptionsPopover = React.memo(
@@ -19,7 +21,9 @@ export const OptionsPopover = React.memo(
     onOptionPress,
     onClose,
     title,
+    onRemoveOption,
   }: OptionsPopoverProps) => {
+    const { theme } = useUnistyles();
     const opacity = React.useRef(new Animated.Value(0)).current;
     const [shouldRender, setShouldRender] = React.useState(false);
 
@@ -60,19 +64,42 @@ export const OptionsPopover = React.memo(
               </View>
             )}
             {options.map((option, index) => (
-              <Pressable
+              <View
                 key={index}
-                style={({ pressed }) => [
-                  styles.optionItem,
+                style={[
+                  styles.optionRow,
                   index < options.length - 1 && styles.optionItemBorder,
-                  pressed && styles.optionItemPressed,
                 ]}
-                onPress={() => onOptionPress(option)}
               >
-                <Text style={styles.optionText} numberOfLines={2}>
-                  {option}
-                </Text>
-              </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.optionItem,
+                    onRemoveOption && styles.optionItemFlex,
+                    pressed && styles.optionItemPressed,
+                  ]}
+                  onPress={() => onOptionPress(option)}
+                >
+                  <Text style={styles.optionText} numberOfLines={2}>
+                    {option}
+                  </Text>
+                </Pressable>
+                {onRemoveOption && (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.removeButton,
+                      pressed && styles.removeButtonPressed,
+                    ]}
+                    onPress={() => onRemoveOption(option)}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                  >
+                    <Ionicons
+                      name="bookmark-outline"
+                      size={16}
+                      color={theme.colors.textSecondary}
+                    />
+                  </Pressable>
+                )}
+              </View>
             ))}
           </View>
         </View>
@@ -130,9 +157,16 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textSecondary,
     textAlign: "center" as const,
   },
+  optionRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+  },
   optionItem: {
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  optionItemFlex: {
+    flex: 1,
   },
   optionItemBorder: {
     borderBottomWidth: 0.5,
@@ -146,5 +180,14 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 15,
     lineHeight: 22,
     color: theme.colors.text,
+  },
+  removeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  removeButtonPressed: {
+    opacity: 0.5,
   },
 }));

@@ -362,7 +362,7 @@ function SessionViewInner({
   );
 
   // Bookmarks
-  const { bookmarkedOptions } = useBookmarks();
+  const { bookmarkedOptions, toggleBookmark } = useBookmarks();
   const [showBookmarksPopover, setShowBookmarksPopover] = React.useState(false);
   const handleBookmarkOptionPress = React.useCallback(
     (option: string) => {
@@ -744,6 +744,7 @@ function SessionViewInner({
           onOptionPress={handleBookmarkOptionPress}
           onClose={() => setShowBookmarksPopover(false)}
           title={t("session.bookmarkOption")}
+          onRemoveOption={toggleBookmark}
         />
       </View>
 
