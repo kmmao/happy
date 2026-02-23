@@ -538,6 +538,18 @@ export async function sessionRipgrep(
 }
 
 /**
+ * Get the latest compaction summary for a session
+ */
+export async function sessionGetCompactionSummary(
+  sessionId: string,
+): Promise<{ summary: string | null }> {
+  return apiSocket.sessionRPC<
+    { summary: string | null },
+    Record<string, never>
+  >(sessionId, "getCompactionSummary", {});
+}
+
+/**
  * Kill the session process immediately
  */
 export async function sessionKill(

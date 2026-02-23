@@ -387,6 +387,9 @@ export const es: TranslationStructure = {
     couldNotAttachFile: "No se pudo adjuntar este archivo",
     imageLoadFailed: "Error al cargar la imagen",
     bookmarkOption: "Marcador",
+    compactionSummaryTitle: "Resumen del contexto",
+    compactionSummaryEmpty:
+      "Aún no hay resumen de compresión. Aparecerá aquí después de que se comprima el contexto.",
   },
 
   bookmark: {
@@ -544,8 +547,9 @@ export const es: TranslationStructure = {
     },
     context: {
       remaining: ({ percent }: { percent: number }) => `${percent}% restante`,
-      breakdownTitle: 'Desglose de tokens',
-      breakdownMessage: '↓ Lectura de caché – Tokens reutilizados de la caché de contexto anterior. Reduce el costo significativamente.\n\nin Entrada – Nuevos tokens enviados en este turno (tu mensaje + resultados de herramientas).\n\nout Salida – Tokens generados por el modelo en este turno.\n\n↑ Escritura de caché – Tokens escritos en caché en este turno, reutilizables como lectura de caché en el siguiente.',
+      breakdownTitle: "Desglose de tokens",
+      breakdownMessage:
+        "↓ Lectura de caché – Tokens reutilizados de la caché de contexto anterior. Reduce el costo significativamente.\n\nin Entrada – Nuevos tokens enviados en este turno (tu mensaje + resultados de herramientas).\n\nout Salida – Tokens generados por el modelo en este turno.\n\n↑ Escritura de caché – Tokens escritos en caché en este turno, reutilizables como lectura de caché en el siguiente.",
     },
     suggestion: {
       fileLabel: "ARCHIVO",
@@ -935,7 +939,8 @@ export const es: TranslationStructure = {
     unknownEvent: "Evento desconocido",
     usageLimitUntil: ({ time }: { time: string }) =>
       `Límite de uso alcanzado hasta ${time}`,
-    usageLimitReached: "Límite de uso alcanzado. Por favor, espera e intenta de nuevo.",
+    usageLimitReached:
+      "Límite de uso alcanzado. Por favor, espera e intenta de nuevo.",
     unknownTime: "tiempo desconocido",
     turnStats: ({
       model,

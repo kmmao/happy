@@ -386,6 +386,9 @@ export const ca: TranslationStructure = {
     couldNotAttachFile: "No s'ha pogut adjuntar aquest fitxer",
     imageLoadFailed: "No s'ha pogut carregar la imatge",
     bookmarkOption: "Marcador",
+    compactionSummaryTitle: "Resum del context",
+    compactionSummaryEmpty:
+      "Encara no hi ha cap resum de compressió. Apareixerà aquí després de comprimir el context.",
   },
 
   bookmark: {
@@ -544,8 +547,9 @@ export const ca: TranslationStructure = {
     },
     context: {
       remaining: ({ percent }: { percent: number }) => `${percent}% restant`,
-      breakdownTitle: 'Desglose de tokens',
-      breakdownMessage: '↓ Lectura de caché – Tokens reutilitzats de la caché de context anterior. Redueix el cost significativament.\n\nin Entrada – Nous tokens enviats en aquest torn (el teu missatge + resultats d\'eines).\n\nout Sortida – Tokens generats pel model en aquest torn.\n\n↑ Escriptura de caché – Tokens escrits a la caché en aquest torn, reutilitzables com a lectura de caché en el següent.',
+      breakdownTitle: "Desglose de tokens",
+      breakdownMessage:
+        "↓ Lectura de caché – Tokens reutilitzats de la caché de context anterior. Redueix el cost significativament.\n\nin Entrada – Nous tokens enviats en aquest torn (el teu missatge + resultats d'eines).\n\nout Sortida – Tokens generats pel model en aquest torn.\n\n↑ Escriptura de caché – Tokens escrits a la caché en aquest torn, reutilitzables com a lectura de caché en el següent.",
     },
     suggestion: {
       fileLabel: "FITXER",
@@ -936,7 +940,8 @@ export const ca: TranslationStructure = {
     unknownEvent: "Esdeveniment desconegut",
     usageLimitUntil: ({ time }: { time: string }) =>
       `Límit d'ús assolit fins a ${time}`,
-    usageLimitReached: "S'ha assolit el límit d'ús. Si us plau, espera i torna a intentar-ho.",
+    usageLimitReached:
+      "S'ha assolit el límit d'ús. Si us plau, espera i torna a intentar-ho.",
     unknownTime: "temps desconegut",
     turnStats: ({
       model,

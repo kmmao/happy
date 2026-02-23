@@ -438,6 +438,9 @@ export const ja: TranslationStructure = {
     couldNotAttachFile: "このファイルを添付できませんでした",
     imageLoadFailed: "画像の読み込みに失敗しました",
     bookmarkOption: "ブックマーク",
+    compactionSummaryTitle: "コンテキストサマリー",
+    compactionSummaryEmpty:
+      "圧縮サマリーはまだありません。コンテキストが圧縮されるとここに表示されます。",
   },
 
   bookmark: {
@@ -595,8 +598,9 @@ export const ja: TranslationStructure = {
     },
     context: {
       remaining: ({ percent }: { percent: number }) => `残り ${percent}%`,
-      breakdownTitle: 'トークン内訳',
-      breakdownMessage: '↓ キャッシュ読み取り – 前回のコンテキストキャッシュから再利用されたトークン。コストを大幅削減。\n\nin 入力 – 今回のターンで送信された新しいトークン（メッセージ＋ツール結果）。\n\nout 出力 – 今回のターンでモデルが生成したトークン。\n\n↑ キャッシュ書き込み – 今回のターンでキャッシュに書き込まれたトークン。次のターンで再利用可能。',
+      breakdownTitle: "トークン内訳",
+      breakdownMessage:
+        "↓ キャッシュ読み取り – 前回のコンテキストキャッシュから再利用されたトークン。コストを大幅削減。\n\nin 入力 – 今回のターンで送信された新しいトークン（メッセージ＋ツール結果）。\n\nout 出力 – 今回のターンでモデルが生成したトークン。\n\n↑ キャッシュ書き込み – 今回のターンでキャッシュに書き込まれたトークン。次のターンで再利用可能。",
     },
     suggestion: {
       fileLabel: "ファイル",
@@ -978,7 +982,8 @@ export const ja: TranslationStructure = {
       `${mode}モードに切り替えました`,
     unknownEvent: "不明なイベント",
     usageLimitUntil: ({ time }: { time: string }) => `${time}まで使用制限中`,
-    usageLimitReached: "使用制限に達しました。しばらく待ってから再試行してください。",
+    usageLimitReached:
+      "使用制限に達しました。しばらく待ってから再試行してください。",
     unknownTime: "不明な時間",
     turnStats: ({
       model,

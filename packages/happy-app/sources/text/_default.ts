@@ -375,6 +375,9 @@ export const en = {
     couldNotAttachFile: "Could not attach this file",
     imageLoadFailed: "Failed to load image",
     bookmarkOption: "Bookmark",
+    compactionSummaryTitle: "Context Summary",
+    compactionSummaryEmpty:
+      "No compaction summary yet. A summary will appear here after the context is compressed.",
   },
 
   bookmark: {

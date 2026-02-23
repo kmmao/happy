@@ -11,17 +11,29 @@ export type LauncherResult =
 export async function claudeLocalLauncher(
   session: Session,
 ): Promise<LauncherResult> {
+  // Track the latest compaction summary for on-demand retrieval via RPC
+  let latestCompactionSummary: string | null = null;
+
   // Create scanner
   const scanner = await createSessionScanner({
     sessionId: session.sessionId,
     workingDirectory: session.path,
     onMessage: (message) => {
       // Block SDK summary messages - we generate our own
-      if (message.type !== "summary") {
-        session.client.sendClaudeSessionMessage(message);
+      // But capture the summary text for RPC retrieval
+      if (message.type === "summary") {
+        latestCompactionSummary = message.summary;
+        return;
       }
+      session.client.sendClaudeSessionMessage(message);
     },
   });
+
+  // Register RPC handler to allow App to fetch the latest compaction summary
+  session.client.rpcHandlerManager.registerHandler(
+    "getCompactionSummary",
+    async () => ({ summary: latestCompactionSummary }),
+  );
 
   // Register callback to notify scanner when session ID is found via hook
   // This is important for --continue/--resume where session ID is not known upfront

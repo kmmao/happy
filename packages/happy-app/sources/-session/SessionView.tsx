@@ -26,7 +26,7 @@ import {
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
 import { gitStatusSync } from "@/sync/gitStatusSync";
-import { sessionAbort } from "@/sync/ops";
+import { sessionAbort, sessionGetCompactionSummary } from "@/sync/ops";
 import {
   storage,
   useIsDataReady,
@@ -139,6 +139,22 @@ export const SessionView = React.memo((props: { id: string }) => {
     };
   }, [session, isDataReady, sessionId, router, showAgentActivity]);
 
+  const handleSummaryPress = React.useCallback(async () => {
+    try {
+      const { summary } = await sessionGetCompactionSummary(sessionId);
+      if (!summary) {
+        Modal.alert(
+          t("session.compactionSummaryTitle"),
+          t("session.compactionSummaryEmpty"),
+        );
+        return;
+      }
+      Modal.alert(t("session.compactionSummaryTitle"), summary);
+    } catch {
+      Modal.alert(t("common.error"), t("errors.operationFailed"));
+    }
+  }, [sessionId]);
+
   return (
     <>
       {/* Status bar shadow for landscape mode */}
@@ -175,7 +191,11 @@ export const SessionView = React.memo((props: { id: string }) => {
             zIndex: 1000,
           }}
         >
-          <ChatHeaderView {...headerProps} onBackPress={() => router.back()} />
+          <ChatHeaderView
+            {...headerProps}
+            onBackPress={() => router.back()}
+            onSummaryPress={handleSummaryPress}
+          />
           {/* Voice status bar below header - not on tablet (shown in sidebar) */}
           {!isTablet && realtimeStatus !== "disconnected" && (
             <VoiceAssistantStatusBar variant="full" />
