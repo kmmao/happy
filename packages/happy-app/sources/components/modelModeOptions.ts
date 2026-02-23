@@ -150,8 +150,9 @@ export function getClaudeModelModes(): ModelMode[] {
       name: "Adaptive Usage",
       description: "Balanced model routing",
     },
-    { key: "sonnet", name: "Sonnet", description: "Fast and capable" },
-    { key: "opus", name: "Opus", description: "Most capable" },
+    { key: "haiku", name: "Haiku", description: "Fastest · 200K" },
+    { key: "sonnet", name: "Sonnet", description: "Fast and capable · 200K" },
+    { key: "opus", name: "Opus", description: "Most capable · 200K" },
   ];
 }
 

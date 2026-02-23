@@ -31,6 +31,8 @@ function resolveModelKey(modelKey: string | undefined): string | undefined {
     case "default":
     case "adaptiveUsage":
       return undefined;
+    case "haiku":
+      return "claude-haiku-4-5-20251001";
     case "sonnet":
       return "claude-sonnet-4-6";
     case "opus":
