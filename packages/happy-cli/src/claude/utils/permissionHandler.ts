@@ -213,6 +213,16 @@ export class PermissionHandler {
       };
     }
 
+    // In plan mode, auto-approve all non-ExitPlanMode tools (read, search, web, etc.).
+    // ExitPlanMode is handled above and is the only meaningful approval checkpoint.
+    // AskUserQuestion must still go through permission flow — it's how Q&A reaches the App.
+    if (this.permissionMode === "plan" && toolName !== "AskUserQuestion") {
+      return {
+        behavior: "allow",
+        updatedInput: input as Record<string, unknown>,
+      };
+    }
+
     if (this.permissionMode === "acceptEdits" && descriptor.edit) {
       return {
         behavior: "allow",
