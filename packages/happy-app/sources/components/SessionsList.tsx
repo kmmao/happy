@@ -28,10 +28,7 @@ import { UpdateBanner } from "./UpdateBanner";
 import { layout } from "./layout";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { t } from "@/text";
-import {
-  getContextRemainingPercent,
-  formatTokenCountShort,
-} from "@/utils/formatUsage";
+import { formatTokenCountShort } from "@/utils/formatUsage";
 import { useRouter } from "expo-router";
 import { Item } from "./Item";
 import { ItemGroup } from "./ItemGroup";
@@ -490,7 +487,14 @@ const SessionItem = React.memo(
 
           {/* Subtitle line */}
           <Text style={styles.sessionSubtitle} numberOfLines={1}>
-            {sessionSubtitle}
+            {[
+              sessionSubtitle,
+              session.metadata?.currentModelCode
+                ?.replace(/-\d{8}$/, "")
+                .replace(/^claude-/, ""),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </Text>
 
           {/* Status line with dot and usage */}
@@ -511,9 +515,8 @@ const SessionItem = React.memo(
                 {sessionStatus.statusText}
               </Text>
             </View>
-            {session.latestUsage?.contextSize ? (
+            {session.latestUsage ? (
               <Text style={styles.usageText}>
-                {getContextRemainingPercent(session.latestUsage.contextSize)}% ·{" "}
                 {formatTokenCountShort(
                   session.latestUsage.totalInputTokens +
                     session.latestUsage.totalOutputTokens,

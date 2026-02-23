@@ -544,6 +544,8 @@ export const ca: TranslationStructure = {
     },
     context: {
       remaining: ({ percent }: { percent: number }) => `${percent}% restant`,
+      breakdownTitle: 'Desglose de tokens',
+      breakdownMessage: '↓ Lectura de caché – Tokens reutilitzats de la caché de context anterior. Redueix el cost significativament.\n\nin Entrada – Nous tokens enviats en aquest torn (el teu missatge + resultats d\'eines).\n\nout Sortida – Tokens generats pel model en aquest torn.\n\n↑ Escriptura de caché – Tokens escrits a la caché en aquest torn, reutilitzables com a lectura de caché en el següent.',
     },
     suggestion: {
       fileLabel: "FITXER",

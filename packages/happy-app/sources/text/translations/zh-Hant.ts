@@ -516,6 +516,8 @@ export const zhHant: TranslationStructure = {
     },
     context: {
       remaining: ({ percent }: { percent: number }) => `剩餘 ${percent}%`,
+      breakdownTitle: 'Token 明細',
+      breakdownMessage: '↓ 快取讀取 – 從上輪上下文快取復用的 token，可大幅降低費用。\n\nin 輸入 – 本輪傳送的新 token（你的訊息 + 工具結果）。\n\nout 輸出 – 模型本輪產生的 token。\n\n↑ 快取寫入 – 本輪寫入快取的 token，下輪可作為快取讀取復用。',
     },
     suggestion: {
       fileLabel: "檔案",

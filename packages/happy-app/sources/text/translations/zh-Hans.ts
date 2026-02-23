@@ -516,6 +516,8 @@ export const zhHans: TranslationStructure = {
     },
     context: {
       remaining: ({ percent }: { percent: number }) => `剩余 ${percent}%`,
+      breakdownTitle: 'Token 明细',
+      breakdownMessage: '↓ 缓存读取 – 从上轮上下文缓存复用的 token，可大幅降低费用。\n\nin 输入 – 本轮发送的新 token（你的消息 + 工具结果）。\n\nout 输出 – 模型本轮生成的 token。\n\n↑ 缓存写入 – 本轮写入缓存的 token，下轮可作为缓存读取复用。',
     },
     suggestion: {
       fileLabel: "文件",

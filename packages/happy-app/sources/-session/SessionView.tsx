@@ -650,6 +650,7 @@ function SessionViewInner({
               : undefined
         }
         alwaysShowContextSize={alwaysShowContextSize}
+        currentModelCode={session.metadata?.currentModelCode}
         onImagePaste={handleImagePaste}
         onImagePickPress={doPickImage}
         isPickingImage={isPickingImage || isProcessingImage}

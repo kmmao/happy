@@ -553,6 +553,8 @@ export const pl: TranslationStructure = {
     },
     context: {
       remaining: ({ percent }: { percent: number }) => `Pozostało ${percent}%`,
+      breakdownTitle: 'Podział tokenów',
+      breakdownMessage: '↓ Odczyt cache – tokeny ponownie użyte z poprzedniego cache kontekstu. Znacznie redukuje koszty.\n\nin Wejście – nowe tokeny w tej turze (wiadomość + wyniki narzędzi).\n\nout Wyjście – tokeny wygenerowane przez model w tej turze.\n\n↑ Zapis do cache – tokeny zapisane do cache w tej turze, wielokrotnego użytku w następnej turze.',
     },
     suggestion: {
       fileLabel: "PLIK",

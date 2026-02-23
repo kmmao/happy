@@ -606,6 +606,8 @@ export const it: TranslationStructure = {
     },
     context: {
       remaining: ({ percent }: { percent: number }) => `${percent}% restante`,
+      breakdownTitle: 'Dettaglio token',
+      breakdownMessage: '↓ Lettura cache – Token riutilizzati dalla cache del contesto precedente. Riduce significativamente i costi.\n\nin Input – Nuovi token inviati in questo turno (il tuo messaggio + risultati degli strumenti).\n\nout Output – Token generati dal modello in questo turno.\n\n↑ Scrittura cache – Token scritti nella cache in questo turno, riutilizzabili come lettura cache nel turno successivo.',
     },
     suggestion: {
       fileLabel: "FILE",

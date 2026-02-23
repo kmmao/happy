@@ -314,22 +314,42 @@ function AgentEventBlock(props: {
       durationMs !== undefined ? formatDuration(durationMs) : null;
     const modelStr = model ? formatModelName(model) : null;
 
+    // Build cache breakdown suffix
+    let breakdownSuffix = "";
+    if (usage) {
+      const cr = usage.cache_read_input_tokens ?? 0;
+      const cc = usage.cache_creation_input_tokens ?? 0;
+      const inp = usage.input_tokens ?? 0;
+      const out = usage.output_tokens ?? 0;
+      const totalInput = cr + cc + inp;
+      const hitPct =
+        totalInput > 0 && cr > 0 ? Math.round((cr / totalInput) * 100) : null;
+      const parts: string[] = [];
+      if (cr > 0) parts.push(`↓${formatTokenCount(cr)}`);
+      if (inp > 0) parts.push(`in ${formatTokenCount(inp)}`);
+      if (out > 0) parts.push(`out ${formatTokenCount(out)}`);
+      if (cc > 0) parts.push(`↑${formatTokenCount(cc)}`);
+      if (hitPct !== null) {
+        breakdownSuffix = ` (↓${hitPct}% hit [${parts.join(" · ")}])`;
+      }
+    }
+
     let label: string;
     if (modelStr && tokensStr && durationStr) {
       label = t("message.turnStats", {
         model: modelStr,
-        tokens: tokensStr,
+        tokens: tokensStr + breakdownSuffix,
         duration: durationStr,
       });
     } else if (tokensStr && durationStr) {
       label = t("message.turnStatsNoModel", {
-        tokens: tokensStr,
+        tokens: tokensStr + breakdownSuffix,
         duration: durationStr,
       });
     } else {
       const parts = [
         modelStr,
-        tokensStr && `${tokensStr} tokens`,
+        tokensStr && `${tokensStr + breakdownSuffix} tokens`,
         durationStr,
       ].filter(Boolean);
       label = parts.join(" · ");

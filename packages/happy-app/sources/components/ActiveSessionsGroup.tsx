@@ -23,10 +23,7 @@ import { Modal } from "@/modal";
 import { CompactGitStatus } from "./CompactGitStatus";
 import { ProjectGitStatus } from "./ProjectGitStatus";
 import { t } from "@/text";
-import {
-  getContextRemainingPercent,
-  formatTokenCountShort,
-} from "@/utils/formatUsage";
+import { formatTokenCountShort } from "@/utils/formatUsage";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { useIsTablet } from "@/utils/responsive";
 import { useHappyAction } from "@/hooks/useHappyAction";
@@ -508,13 +505,9 @@ const CompactSessionRow = React.memo(
               )}
 
               {/* Usage indicator */}
-              {session.latestUsage?.contextSize ? (
+              {session.latestUsage ? (
                 <View style={styles.taskStatusContainer}>
                   <Text style={styles.taskStatusText}>
-                    {getContextRemainingPercent(
-                      session.latestUsage.contextSize,
-                    )}
-                    % ·{" "}
                     {formatTokenCountShort(
                       session.latestUsage.totalInputTokens +
                         session.latestUsage.totalOutputTokens,

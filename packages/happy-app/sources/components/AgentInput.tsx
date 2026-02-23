@@ -41,7 +41,13 @@ import {
 } from "@/sync/settings";
 import { getBuiltInProfile } from "@/sync/profileUtils";
 import { MAX_IMAGES } from "@/utils/imageUpload";
-import { MAX_CONTEXT_SIZE, formatTokenCount } from "@/utils/formatUsage";
+import {
+  MAX_CONTEXT_SIZE,
+  formatTokenCount,
+  formatTokenCountShort,
+  getContextWindowSize,
+} from "@/utils/formatUsage";
+import { Modal } from "@/modal";
 import { SttWaveIndicator } from "./SttWaveIndicator";
 import { SttProgressLine } from "./SttProgressLine";
 
@@ -90,6 +96,7 @@ interface AgentInputProps {
     totalOutputTokens: number;
   };
   alwaysShowContextSize?: boolean;
+  currentModelCode?: string | null;
   onFileViewerPress?: () => void;
   agentType?: "claude" | "codex" | "gemini";
   onAgentClick?: () => void;
@@ -355,6 +362,93 @@ const getContextWarning = (
     };
   }
   return null; // No display needed
+};
+
+const getProgressBarColor = (
+  percentageRemaining: number,
+  theme: Theme,
+): string => {
+  if (percentageRemaining <= 5) {
+    return theme.colors.warningCritical;
+  } else if (percentageRemaining <= 20) {
+    return "#FF9500";
+  }
+  return theme.colors.success;
+};
+
+const ContextProgressBar: React.FC<{
+  contextSize: number;
+  alwaysShow: boolean;
+  modelCode?: string | null;
+  theme: Theme;
+}> = ({ contextSize, alwaysShow, modelCode, theme }) => {
+  // If contextSize already exceeds 200K, the session is using 1M beta context window
+  const contextWindowSize =
+    contextSize > 200_000 ? 1_000_000 : getContextWindowSize(modelCode);
+  const percentageUsed = Math.min(100, (contextSize / contextWindowSize) * 100);
+  const percentageRemaining = Math.max(0, 100 - percentageUsed);
+  const shouldShow = alwaysShow || percentageRemaining <= 10;
+
+  if (!shouldShow) return null;
+
+  const barColor = getProgressBarColor(percentageRemaining, theme);
+  const label = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}`;
+
+  return (
+    <View style={{ paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2 }}>
+      <View
+        style={{
+          height: 3,
+          backgroundColor: theme.colors.divider,
+          borderRadius: 3,
+          overflow: "hidden",
+          marginBottom: 3,
+        }}
+      >
+        <View
+          style={{
+            height: "100%",
+            width: `${percentageUsed}%`,
+            backgroundColor: barColor,
+            borderRadius: 3,
+          }}
+        />
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 4,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 10,
+            color: barColor,
+            ...Typography.default(),
+          }}
+        >
+          {label}
+        </Text>
+        <Pressable
+          onPress={() =>
+            Modal.alert(
+              t("agentInput.context.breakdownTitle"),
+              t("agentInput.context.breakdownMessage"),
+            )
+          }
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Ionicons
+            name="help-circle-outline"
+            size={12}
+            color={theme.colors.textSecondary}
+          />
+        </Pressable>
+      </View>
+    </View>
+  );
 };
 
 export const AgentInput = React.memo(
@@ -1030,9 +1124,8 @@ export const AgentInput = React.memo(
             </>
           )}
 
-          {/* Connection status, context warning, and permission mode */}
+          {/* Connection status and permission mode */}
           {(props.connectionStatus ||
-            contextWarning ||
             displayPermissionMode ||
             props.modelMode) && (
             <View
@@ -1181,19 +1274,6 @@ export const AgentInput = React.memo(
                     )}
                   </>
                 )}
-                {contextWarning && (
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: contextWarning.color,
-                      marginLeft: props.connectionStatus ? 8 : 0,
-                      ...Typography.default(),
-                    }}
-                  >
-                    {props.connectionStatus ? "• " : ""}
-                    {contextWarning.text}
-                  </Text>
-                )}
               </View>
               <View
                 style={{
@@ -1336,6 +1416,16 @@ export const AgentInput = React.memo(
 
           {/* Box 2: Action Area (Input + Send) */}
           <View style={[styles.unifiedPanel, { position: "relative" }]}>
+            {/* Context progress bar */}
+            {props.usageData?.contextSize ? (
+              <ContextProgressBar
+                contextSize={props.usageData.contextSize}
+                alwaysShow={props.alwaysShowContextSize ?? false}
+                modelCode={props.currentModelCode}
+                theme={theme}
+              />
+            ) : null}
+
             {/* Image attachment chips */}
             {hasImages && (
               <ScrollView

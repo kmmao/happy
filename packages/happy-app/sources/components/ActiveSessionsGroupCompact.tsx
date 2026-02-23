@@ -22,10 +22,7 @@ import { resolveAbsolutePath } from "@/utils/pathUtils";
 import { storage } from "@/sync/storage";
 import { Modal } from "@/modal";
 import { t } from "@/text";
-import {
-  getContextRemainingPercent,
-  formatTokenCountShort,
-} from "@/utils/formatUsage";
+import { formatTokenCountShort } from "@/utils/formatUsage";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { useIsTablet } from "@/utils/responsive";
 import { ProjectGitStatus } from "./ProjectGitStatus";
@@ -462,9 +459,8 @@ const CompactSessionRow = React.memo(
             >
               {sessionName}
             </Text>
-            {session.latestUsage?.contextSize ? (
+            {session.latestUsage ? (
               <Text style={styles.usageLabel}>
-                {getContextRemainingPercent(session.latestUsage.contextSize)}% ·{" "}
                 {formatTokenCountShort(
                   session.latestUsage.totalInputTokens +
                     session.latestUsage.totalOutputTokens,
