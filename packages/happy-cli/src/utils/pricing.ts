@@ -2,7 +2,7 @@ import { Usage } from "../api/types";
 
 /**
  * Pricing rates per million tokens for different models
- * Source: https://docs.anthropic.com/en/docs/about-claude/models (as of 2025)
+ * Source: https://platform.claude.com/docs/en/about-claude/pricing
  */
 export const PRICING = {
   // --- Claude 4.6 / 4.5 (official API IDs) ---
@@ -11,6 +11,24 @@ export const PRICING = {
     output: 25.0,
     cache_write: 6.25,
     cache_read: 0.5,
+  },
+  "claude-opus-4-6[1m]": {
+    input: 10.0,
+    output: 37.5,
+    cache_write: 12.5,
+    cache_read: 1.0,
+  },
+  "claude-sonnet-4-6": {
+    input: 3.0,
+    output: 15.0,
+    cache_write: 3.75,
+    cache_read: 0.3,
+  },
+  "claude-sonnet-4-6[1m]": {
+    input: 6.0,
+    output: 22.5,
+    cache_write: 7.5,
+    cache_read: 0.6,
   },
   "claude-sonnet-4-5-20250929": {
     input: 3.0,
@@ -104,13 +122,13 @@ export const PRICING = {
 
 export type ModelId = keyof typeof PRICING;
 
-// Default to Sonnet 4.5 (official API ID) if unknown
-const DEFAULT_MODEL = "claude-sonnet-4-5-20250929";
+// Default to Sonnet 4.6 (official API ID) if unknown
+const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 /**
  * Calculate cost for usage
  * @param usage - Usage stats
- * @param modelId - Model ID (optional, defaults to Sonnet 3.5)
+ * @param modelId - Model ID (optional, defaults to Sonnet 4.6)
  */
 export function calculateCost(
   usage: Usage,
@@ -122,14 +140,26 @@ export function calculateCost(
   if (!pricing) {
     // Try fuzzy matching for common aliases
     if (modelId?.includes("opus")) {
-      if (modelId.includes("4-6") || modelId.includes("4.6"))
+      if (
+        (modelId.includes("4-6") || modelId.includes("4.6")) &&
+        modelId.includes("[1m]")
+      )
+        pricing = PRICING["claude-opus-4-6[1m]"];
+      else if (modelId.includes("4-6") || modelId.includes("4.6"))
         pricing = PRICING["claude-opus-4-6"];
       else if (modelId.includes("4.5")) pricing = PRICING["claude-4.5-opus"];
       else if (modelId.includes("4.1")) pricing = PRICING["claude-4.1-opus"];
       else if (modelId.includes("4")) pricing = PRICING["claude-4-opus"];
       else pricing = PRICING["claude-3-opus-20240229"];
     } else if (modelId?.includes("sonnet")) {
-      if (modelId.includes("4-5") || modelId.includes("4.5"))
+      if (
+        (modelId.includes("4-6") || modelId.includes("4.6")) &&
+        modelId.includes("[1m]")
+      )
+        pricing = PRICING["claude-sonnet-4-6[1m]"];
+      else if (modelId.includes("4-6") || modelId.includes("4.6"))
+        pricing = PRICING["claude-sonnet-4-6"];
+      else if (modelId.includes("4-5") || modelId.includes("4.5"))
         pricing = PRICING["claude-sonnet-4-5-20250929"];
       else if (modelId.includes("4")) pricing = PRICING["claude-4-sonnet"];
       else pricing = PRICING["claude-3-5-sonnet-20241022"];

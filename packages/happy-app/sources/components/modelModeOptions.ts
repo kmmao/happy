@@ -150,9 +150,27 @@ export function getClaudeModelModes(): ModelMode[] {
       name: "Adaptive Usage",
       description: "Balanced model routing",
     },
-    { key: "haiku", name: "Haiku", description: "Fastest · 200K" },
-    { key: "sonnet", name: "Sonnet", description: "Fast and capable · 200K" },
-    { key: "opus", name: "Opus", description: "Most capable · 200K" },
+    { key: "haiku", name: "Haiku", description: "Fastest · $1/$5 · 200K" },
+    {
+      key: "sonnet",
+      name: "Sonnet",
+      description: "Balanced · $3/$15 · 200K",
+    },
+    {
+      key: "sonnet-1m",
+      name: "Sonnet (1M)",
+      description: "Long context · $6/$22.50",
+    },
+    {
+      key: "opus",
+      name: "Opus",
+      description: "Most capable · $5/$25 · 200K",
+    },
+    {
+      key: "opus-1m",
+      name: "Opus (1M)",
+      description: "Long context · $10/$37.50",
+    },
   ];
 }
 

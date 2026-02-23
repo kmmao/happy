@@ -35,8 +35,12 @@ function resolveModelKey(modelKey: string | undefined): string | undefined {
       return "claude-haiku-4-5-20251001";
     case "sonnet":
       return "claude-sonnet-4-6";
+    case "sonnet-1m":
+      return "claude-sonnet-4-6[1m]";
     case "opus":
       return "claude-opus-4-6";
+    case "opus-1m":
+      return "claude-opus-4-6[1m]";
     default:
       return modelKey;
   }

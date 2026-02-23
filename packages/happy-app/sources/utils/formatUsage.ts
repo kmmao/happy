@@ -1,22 +1,24 @@
-export const MAX_CONTEXT_SIZE = 200000;
+const DEFAULT_CONTEXT_WINDOW = 200_000;
 
 // Context window sizes by model pattern (tokens)
 const CONTEXT_WINDOW_MAP: Array<[RegExp, number]> = [
+  // Claude 4.6 1M context models (must be before standard 4.6 matches)
+  [/claude-.*4-6.*\[1m\]/i, 1_000_000],
   // Claude 3 legacy (100K models)
-  [/claude-instant-1/i, 100000],
-  [/claude-2\.0/i, 100000],
+  [/claude-instant-1/i, 100_000],
+  [/claude-2\.0/i, 100_000],
   // Claude 3.7 Sonnet (200K)
-  [/claude-3[-_.]7/i, 200000],
+  [/claude-3[-_.]7/i, 200_000],
   // All other Claude 3.x / 4.x — 200K
-  [/claude/i, 200000],
+  [/claude/i, 200_000],
 ];
 
 export const getContextWindowSize = (modelCode?: string | null): number => {
-  if (!modelCode) return MAX_CONTEXT_SIZE;
+  if (!modelCode) return DEFAULT_CONTEXT_WINDOW;
   for (const [pattern, size] of CONTEXT_WINDOW_MAP) {
     if (pattern.test(modelCode)) return size;
   }
-  return MAX_CONTEXT_SIZE;
+  return DEFAULT_CONTEXT_WINDOW;
 };
 
 export const formatTokenCount = (tokens: number): string => {
@@ -35,9 +37,4 @@ export const formatTokenCountShort = (tokens: number): string => {
     return `${(tokens / 1_000).toFixed(1)}K`;
   }
   return `${tokens}`;
-};
-
-export const getContextRemainingPercent = (contextSize: number): number => {
-  const percentageUsed = (contextSize / MAX_CONTEXT_SIZE) * 100;
-  return Math.max(0, Math.min(100, Math.round(100 - percentageUsed)));
 };

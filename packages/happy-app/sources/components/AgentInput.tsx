@@ -42,7 +42,6 @@ import {
 import { getBuiltInProfile } from "@/sync/profileUtils";
 import { MAX_IMAGES } from "@/utils/imageUpload";
 import {
-  MAX_CONTEXT_SIZE,
   formatTokenCount,
   formatTokenCountShort,
   getContextWindowSize,
@@ -335,8 +334,12 @@ const getContextWarning = (
   alwaysShow: boolean = false,
   theme: Theme,
   totalTokens?: number,
+  modelCode?: string | null,
 ) => {
-  const percentageUsed = (contextSize / MAX_CONTEXT_SIZE) * 100;
+  const knownWindowSize = getContextWindowSize(modelCode);
+  const contextWindowSize =
+    contextSize > knownWindowSize ? 1_000_000 : knownWindowSize;
+  const percentageUsed = (contextSize / contextWindowSize) * 100;
   const percentageRemaining = Math.max(0, Math.min(100, 100 - percentageUsed));
 
   const contextText = t("agentInput.context.remaining", {
@@ -382,9 +385,10 @@ const ContextProgressBar: React.FC<{
   modelCode?: string | null;
   theme: Theme;
 }> = ({ contextSize, alwaysShow, modelCode, theme }) => {
-  // If contextSize already exceeds 200K, the session is using 1M beta context window
+  // Use model-aware window size; fall back to 1M if contextSize exceeds known window
+  const knownWindowSize = getContextWindowSize(modelCode);
   const contextWindowSize =
-    contextSize > 200_000 ? 1_000_000 : getContextWindowSize(modelCode);
+    contextSize > knownWindowSize ? 1_000_000 : knownWindowSize;
   const percentageUsed = Math.min(100, (contextSize / contextWindowSize) * 100);
   const percentageRemaining = Math.max(0, 100 - percentageUsed);
   const shouldShow = alwaysShow || percentageRemaining <= 10;
@@ -527,6 +531,7 @@ export const AgentInput = React.memo(
           props.alwaysShowContextSize ?? false,
           theme,
           props.usageData.totalInputTokens + props.usageData.totalOutputTokens,
+          props.currentModelCode,
         )
       : null;
 
