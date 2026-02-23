@@ -68,22 +68,22 @@ export function getClaudePermissionModes(
     {
       key: "default",
       name: translate("agentInput.permissionMode.default"),
-      description: null,
+      description: "Ask before each action",
     },
     {
       key: "acceptEdits",
       name: translate("agentInput.permissionMode.acceptEdits"),
-      description: null,
+      description: "Auto-approve file edits",
     },
     {
       key: "plan",
       name: translate("agentInput.permissionMode.plan"),
-      description: null,
+      description: "Plan only, no code execution",
     },
     {
       key: "bypassPermissions",
       name: translate("agentInput.permissionMode.bypassPermissions"),
-      description: null,
+      description: "Auto-approve everything",
     },
   ];
 }
@@ -95,22 +95,22 @@ export function getCodexPermissionModes(
     {
       key: "default",
       name: translate("agentInput.codexPermissionMode.default"),
-      description: null,
+      description: "Use CLI default settings",
     },
     {
       key: "read-only",
       name: translate("agentInput.codexPermissionMode.readOnly"),
-      description: null,
+      description: "Read files, no modifications",
     },
     {
       key: "safe-yolo",
       name: translate("agentInput.codexPermissionMode.safeYolo"),
-      description: null,
+      description: "Auto-approve safe actions",
     },
     {
       key: "yolo",
       name: translate("agentInput.codexPermissionMode.yolo"),
-      description: null,
+      description: "Auto-approve everything",
     },
   ];
 }
@@ -122,22 +122,22 @@ export function getGeminiPermissionModes(
     {
       key: "default",
       name: translate("agentInput.geminiPermissionMode.default"),
-      description: null,
+      description: "Use CLI default settings",
     },
     {
       key: "read-only",
       name: translate("agentInput.geminiPermissionMode.readOnly"),
-      description: null,
+      description: "Read files, no modifications",
     },
     {
       key: "safe-yolo",
       name: translate("agentInput.geminiPermissionMode.safeYolo"),
-      description: null,
+      description: "Auto-approve safe actions",
     },
     {
       key: "yolo",
       name: translate("agentInput.geminiPermissionMode.yolo"),
-      description: null,
+      description: "Auto-approve everything",
     },
   ];
 }
