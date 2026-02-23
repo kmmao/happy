@@ -212,6 +212,7 @@ export class ApiSessionClient extends EventEmitter {
   private currentTurnStartTime: number | null = null;
   private currentTurnModel: string | null = null;
   private currentTurnUsage: Usage | null = null;
+  private modelModeKey: string | undefined;
   private readonly sendSync: InvalidateSync;
   private readonly receiveSync: InvalidateSync;
 
@@ -377,6 +378,15 @@ export class ApiSessionClient extends EventEmitter {
     this.socket.connect();
   }
 
+  /**
+   * Set the App-level model mode key (e.g., "sonnet-1m", "opus-1m").
+   * Used to derive the correct model name for usage reporting,
+   * since Claude API responses strip the [1m] suffix.
+   */
+  setModelModeKey(key: string | undefined) {
+    this.modelModeKey = key;
+  }
+
   onUserMessage(callback: (data: UserMessage) => void) {
     this.pendingMessageCallback = callback;
     while (this.pendingMessages.length > 0) {
@@ -538,7 +548,14 @@ export class ApiSessionClient extends EventEmitter {
       this.currentTurnModel = body.message.model || null;
       this.currentTurnUsage = body.message.usage;
       try {
-        this.sendUsageData(body.message.usage, body.message.model);
+        // Claude API returns model IDs without [1m] suffix (e.g., "claude-sonnet-4-6").
+        // When modelModeKey indicates 1M context (e.g., "sonnet-1m"), append [1m]
+        // so usage is tracked separately for 1M variants.
+        const effectiveModel =
+          this.modelModeKey?.endsWith("-1m") && body.message.model
+            ? `${body.message.model}[1m]`
+            : body.message.model;
+        this.sendUsageData(body.message.usage, effectiveModel);
       } catch (error) {
         logger.debug("[SOCKET] Failed to send usage data:", error);
       }

@@ -232,6 +232,9 @@ export async function runClaude(
   // Create realtime session FIRST (before SDK metadata extraction)
   const session = api.sessionSyncClient(response);
 
+  // Set initial model mode key for usage tracking (e.g., "sonnet-1m")
+  session.setModelModeKey(options.model);
+
   // Extract SDK metadata in background and update session when ready
   extractSDKMetadataAsync(async (sdkMetadata) => {
     logger.debug(
@@ -350,6 +353,7 @@ export async function runClaude(
         // Explicit model specified — update current model
         messageModel = message.meta.model;
         currentModel = messageModel;
+        session.setModelModeKey(currentModel);
         logger.debug(`[loop] Model updated from user message: ${messageModel}`);
       } else {
         // model is null/undefined — use current model (don't reset)
