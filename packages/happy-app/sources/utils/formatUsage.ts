@@ -2,8 +2,9 @@ const DEFAULT_CONTEXT_WINDOW = 200_000;
 
 // Context window sizes by model pattern (tokens)
 const CONTEXT_WINDOW_MAP: Array<[RegExp, number]> = [
-  // Claude 4.6 1M context models (must be before standard 4.6 matches)
-  [/claude-.*4-6.*\[1m\]/i, 1_000_000],
+  // Any model/mode key indicating 1M context window
+  // Matches: "claude-sonnet-4-6[1m]", "[1m]", "sonnet-1m", "opus-1m"
+  [/\[1m\]|-1m\b/i, 1_000_000],
   // Claude 3 legacy (100K models)
   [/claude-instant-1/i, 100_000],
   [/claude-2\.0/i, 100_000],

@@ -334,6 +334,14 @@ function SessionViewInner({
     ],
   );
 
+  // Build effective model code for context window detection.
+  // Claude API returns model IDs without [1m] suffix (e.g., "claude-sonnet-4-6"),
+  // so we append it when the model mode indicates 1M context.
+  // Falls back to the mode key itself (e.g., "sonnet-1m") if currentModelCode is absent.
+  const effectiveModelCode = modelMode?.key?.includes("1m")
+    ? `${session.metadata?.currentModelCode ?? ""}[1m]`
+    : (session.metadata?.currentModelCode ?? modelMode?.key);
+
   const sessionStatus = useSessionStatus(session);
   const sessionUsage = useSessionUsage(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
@@ -650,7 +658,7 @@ function SessionViewInner({
               : undefined
         }
         alwaysShowContextSize={alwaysShowContextSize}
-        currentModelCode={session.metadata?.currentModelCode}
+        currentModelCode={effectiveModelCode}
         onImagePaste={handleImagePaste}
         onImagePickPress={doPickImage}
         isPickingImage={isPickingImage || isProcessingImage}
