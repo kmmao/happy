@@ -482,6 +482,27 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
     toolName === "exit_plan_mode" || toolName === "ExitPlanMode";
 
   if (isExitPlan) {
+    const handlePlanApproveAll = async () => {
+      if (
+        permission.status !== "pending" ||
+        loadingButton !== null ||
+        loadingAllEdits
+      )
+        return;
+
+      setLoadingAllEdits(true);
+      try {
+        await sessionAllow(sessionId, permission.id, "bypassPermissions");
+        storage
+          .getState()
+          .updateSessionPermissionMode(sessionId, "bypassPermissions");
+      } catch (error) {
+        console.error("Failed to approve plan with bypass:", error);
+      } finally {
+        setLoadingAllEdits(false);
+      }
+    };
+
     const handleDenyWithReason = async () => {
       if (
         permission.status !== "pending" ||
@@ -561,7 +582,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
             )}
           </TouchableOpacity>
 
-          {/* Approve & Auto-approve Edits */}
+          {/* Approve & Auto-approve All (bypassPermissions) */}
           <TouchableOpacity
             style={[
               styles.button,
@@ -569,7 +590,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
               isApprovedViaAllEdits && styles.buttonSelected,
               (isDenied || isApprovedViaAllow) && styles.buttonInactive,
             ]}
-            onPress={handleApproveAllEdits}
+            onPress={handlePlanApproveAll}
             disabled={!isPending || loadingButton !== null || loadingAllEdits}
             activeOpacity={isPending ? 0.7 : 1}
           >
