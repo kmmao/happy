@@ -914,26 +914,44 @@ export async function startDaemon(): Promise<void> {
 
         clearInterval(restartOnStaleVersionAndHeartbeat);
 
-        // Spawn new daemon through the CLI
-        // We do not need to clean ourselves up - we will be killed by
-        // the CLI start command.
-        // 1. It will first check if daemon is running (yes in this case)
-        // 2. If the version is stale (it will read daemon.state.json file and check startedWithCliVersion) & compare it to its own version
-        // 3. Next it will start a new daemon with the latest version with daemon-sync :D
-        // Done!
-        try {
-          spawnHappyCLI(["daemon", "start"], {
-            detached: true,
-            stdio: "ignore",
-          });
-        } catch (error) {
+        // Spawn new daemon through the CLI with retry logic.
+        // During a build (rm -rf dist && pkgroll), dist/index.mjs is temporarily
+        // missing. Retry with backoff so we don't die before the build finishes.
+        const maxSpawnAttempts = 30;
+        const spawnRetryDelayMs = 2_000;
+        let spawned = false;
+
+        for (let attempt = 1; attempt <= maxSpawnAttempts; attempt++) {
+          try {
+            spawnHappyCLI(["daemon", "start"], {
+              detached: true,
+              stdio: "ignore",
+            });
+            spawned = true;
+            logger.debug(
+              `[DAEMON RUN] Successfully spawned new daemon on attempt ${attempt}`,
+            );
+            break;
+          } catch (error) {
+            logger.debug(
+              `[DAEMON RUN] Failed to spawn new daemon (attempt ${attempt}/${maxSpawnAttempts}), dist/ may be rebuilding`,
+              error,
+            );
+            if (attempt < maxSpawnAttempts) {
+              await new Promise((resolve) =>
+                setTimeout(resolve, spawnRetryDelayMs),
+              );
+            }
+          }
+        }
+
+        if (!spawned) {
           logger.debug(
-            "[DAEMON RUN] Failed to spawn new daemon, this is quite likely to happen during integration tests as we are cleaning out dist/ directory",
-            error,
+            "[DAEMON RUN] Exhausted all spawn attempts. Exiting — a manual restart will be needed.",
           );
         }
 
-        // So we can just hang forever
+        // Give the new daemon time to start and kill us
         logger.debug(
           "[DAEMON RUN] Hanging for a bit - waiting for CLI to kill us because we are running outdated version of the code",
         );
