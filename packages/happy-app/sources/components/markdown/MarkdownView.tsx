@@ -433,7 +433,7 @@ function RenderTableBlock(props: {
     >
       <ScrollView
         horizontal
-        showsHorizontalScrollIndicator={Platform.OS !== "web"}
+        showsHorizontalScrollIndicator={true}
         nestedScrollEnabled={true}
         style={style.tableScrollView}
       >
@@ -711,6 +711,7 @@ const style = StyleSheet.create((theme) => ({
     borderRadius: 8,
     overflow: "hidden",
     alignSelf: "flex-start",
+    maxWidth: "100%",
   },
   tableScrollView: {
     flexGrow: 0,
