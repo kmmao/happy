@@ -58,6 +58,7 @@ export const es: TranslationStructure = {
     version: "Versión",
     copied: "Copiado",
     copy: "Copiar",
+    submit: "Enviar",
     scanning: "Escaneando...",
     urlPlaceholder: "https://ejemplo.com",
     home: "Inicio",
@@ -964,6 +965,15 @@ export const es: TranslationStructure = {
       yesForTool: "Sí, no volver a preguntar para esta herramienta",
       noTellClaude: "No, proporcionar comentarios",
     },
+  },
+
+  plan: {
+    approve: "Aprobar plan",
+    approveAutoEdits: "Aprobar y auto-aprobar ediciones",
+    rejectWithFeedback: "Rechazar con comentarios",
+    rejectTitle: "¿Por qué rechazas este plan?",
+    rejectMessage: "Tu retroalimentación ayuda a Claude a mejorar el plan",
+    rejectPlaceholder: "Describe qué debería cambiar...",
   },
 
   textSelection: {

@@ -60,6 +60,7 @@ export const ja: TranslationStructure = {
     version: "バージョン",
     copied: "コピーしました",
     copy: "コピー",
+    submit: "送信",
     scanning: "スキャン中...",
     urlPlaceholder: "https://example.com",
     home: "ホーム",
@@ -1007,6 +1008,15 @@ export const ja: TranslationStructure = {
       yesForTool: "はい、このツールについては確認しない",
       noTellClaude: "いいえ、フィードバックを提供",
     },
+  },
+
+  plan: {
+    approve: "プランを承認",
+    approveAutoEdits: "承認して編集も自動承認",
+    rejectWithFeedback: "フィードバック付きで拒否",
+    rejectTitle: "なぜこのプランを拒否しますか？",
+    rejectMessage: "フィードバックはClaudeのプラン改善に役立ちます",
+    rejectPlaceholder: "変更すべき点を説明してください...",
   },
 
   textSelection: {

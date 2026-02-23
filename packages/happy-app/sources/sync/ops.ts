@@ -365,6 +365,7 @@ export async function sessionDeny(
   mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan",
   allowedTools?: string[],
   decision?: "denied" | "abort",
+  reason?: string,
 ): Promise<void> {
   // Clear needsAttention when user handles a permission request
   const session = storage.getState().sessions[sessionId];
@@ -378,6 +379,7 @@ export async function sessionDeny(
     mode,
     allowTools: allowedTools,
     decision,
+    reason,
   };
   await apiSocket.sessionRPC(sessionId, "permission", request);
 }

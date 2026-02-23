@@ -71,6 +71,7 @@ export const ru: TranslationStructure = {
     version: "Версия",
     copied: "Скопировано",
     copy: "Копировать",
+    submit: "Отправить",
     scanning: "Сканирование...",
     urlPlaceholder: "https://example.com",
     home: "Главная",
@@ -961,6 +962,15 @@ export const ru: TranslationStructure = {
       yesForTool: "Да, больше не спрашивать для этого инструмента",
       noTellClaude: "Нет, дать обратную связь",
     },
+  },
+
+  plan: {
+    approve: "Одобрить план",
+    approveAutoEdits: "Одобрить и авто-одобрять правки",
+    rejectWithFeedback: "Отклонить с отзывом",
+    rejectTitle: "Почему вы отклоняете этот план?",
+    rejectMessage: "Ваш отзыв поможет Claude улучшить план",
+    rejectPlaceholder: "Опишите, что нужно изменить...",
   },
 
   settingsLanguage: {

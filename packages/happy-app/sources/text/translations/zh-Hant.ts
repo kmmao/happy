@@ -60,6 +60,7 @@ export const zhHant: TranslationStructure = {
     version: "版本",
     copied: "已複製",
     copy: "複製",
+    submit: "提交",
     scanning: "掃描中...",
     urlPlaceholder: "https://example.com",
     home: "首頁",
@@ -919,6 +920,15 @@ export const zhHant: TranslationStructure = {
       yesForTool: "是，不再詢問此工具",
       noTellClaude: "否，並告訴 Claude 該如何不同地操作",
     },
+  },
+
+  plan: {
+    approve: "批准計劃",
+    approveAutoEdits: "批准並自動通過後續編輯",
+    rejectWithFeedback: "拒絕並提供反饋",
+    rejectTitle: "為什麼拒絕這個計劃？",
+    rejectMessage: "你的反饋有助於 Claude 改進計劃",
+    rejectPlaceholder: "描述需要修改的內容...",
   },
 
   textSelection: {

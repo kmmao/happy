@@ -58,6 +58,7 @@ export const en = {
     version: "Version",
     copied: "Copied",
     copy: "Copy",
+    submit: "Submit",
     scanning: "Scanning...",
     urlPlaceholder: "https://example.com",
     home: "Home",
@@ -946,6 +947,15 @@ export const en = {
       yesForTool: "Yes, don't ask again for this tool",
       noTellClaude: "No, and provide feedback",
     },
+  },
+
+  plan: {
+    approve: "Approve plan",
+    approveAutoEdits: "Approve & auto-approve edits",
+    rejectWithFeedback: "Reject with feedback",
+    rejectTitle: "Why reject this plan?",
+    rejectMessage: "Your feedback helps Claude improve the plan",
+    rejectPlaceholder: "Describe what should change...",
   },
 
   textSelection: {

@@ -58,6 +58,7 @@ export const ca: TranslationStructure = {
     version: "Versió",
     copied: "Copiat",
     copy: "Copiar",
+    submit: "Enviar",
     scanning: "Escanejant...",
     urlPlaceholder: "https://exemple.com",
     home: "Inici",
@@ -965,6 +966,15 @@ export const ca: TranslationStructure = {
       yesForTool: "Sí, no tornis a preguntar per aquesta eina",
       noTellClaude: "No, proporciona comentaris",
     },
+  },
+
+  plan: {
+    approve: "Aprova el pla",
+    approveAutoEdits: "Aprova i auto-aprova edicions",
+    rejectWithFeedback: "Rebutja amb comentaris",
+    rejectTitle: "Per què rebutges aquest pla?",
+    rejectMessage: "Els teus comentaris ajuden Claude a millorar el pla",
+    rejectPlaceholder: "Descriu què hauria de canviar...",
   },
 
   textSelection: {
