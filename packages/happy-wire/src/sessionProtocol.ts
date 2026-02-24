@@ -87,6 +87,7 @@ export const sessionUsageUpdateEventSchema = z.object({
     cache_creation_input_tokens: z.number().optional(),
     cache_read_input_tokens: z.number().optional(),
   }),
+  durationMs: z.number().optional(),
 });
 
 export const sessionEventSchema = z.discriminatedUnion("t", [
