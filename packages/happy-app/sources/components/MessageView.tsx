@@ -300,8 +300,7 @@ function AgentEventBlock(props: {
   if (props.event.type === "ready" || props.event.type === "usage-stats") {
     const model = props.event.model;
     const usage = props.event.usage;
-    const durationMs =
-      props.event.type === "ready" ? props.event.durationMs : undefined;
+    const durationMs = props.event.durationMs;
     if (!model && !usage && durationMs === undefined) {
       return null;
     }

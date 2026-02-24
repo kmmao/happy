@@ -211,6 +211,7 @@ export class ApiSessionClient extends EventEmitter {
   private lastSeq = 0;
   private pendingOutbox: Array<{ content: string; localId: string }> = [];
   private currentTurnStartTime: number | null = null;
+  private lastApiCallEndTime: number | null = null;
   private currentTurnModel: string | null = null;
   private currentTurnUsage: Usage | null = null;
   private accumulatedTurnUsage: Usage | null = null;
@@ -562,6 +563,10 @@ export class ApiSessionClient extends EventEmitter {
         // Send per-request usage-update envelope to App for real-time display
         const turnId = this.claudeSessionProtocolState.currentTurnId;
         if (turnId) {
+          const now = Date.now();
+          const callDurationMs =
+            now - (this.lastApiCallEndTime ?? this.currentTurnStartTime ?? now);
+          this.lastApiCallEndTime = now;
           this.sendSessionProtocolMessage(
             createEnvelope(
               "agent",
@@ -584,6 +589,7 @@ export class ApiSessionClient extends EventEmitter {
                       }
                     : {}),
                 },
+                durationMs: callDurationMs,
               },
               { turn: turnId },
             ),
@@ -633,6 +639,7 @@ export class ApiSessionClient extends EventEmitter {
 
     // Reset turn tracking after close
     this.currentTurnStartTime = null;
+    this.lastApiCallEndTime = null;
     this.currentTurnModel = null;
     this.currentTurnUsage = null;
     this.accumulatedTurnUsage = null;

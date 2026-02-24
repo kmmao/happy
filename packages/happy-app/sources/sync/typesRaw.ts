@@ -62,6 +62,7 @@ const agentEventSchema = z.discriminatedUnion("type", [
       cache_creation_input_tokens: z.number().optional(),
       cache_read_input_tokens: z.number().optional(),
     }),
+    durationMs: z.number().optional(),
   }),
 ]);
 export type AgentEvent = z.infer<typeof agentEventSchema>;
@@ -142,6 +143,7 @@ const sessionUsageUpdateEventSchema = z.object({
     cache_creation_input_tokens: z.number().optional(),
     cache_read_input_tokens: z.number().optional(),
   }),
+  durationMs: z.number().optional(),
 });
 
 const sessionEventSchema = z.discriminatedUnion("t", [
@@ -736,6 +738,9 @@ function normalizeSessionEnvelope(
           ? { model: envelope.ev.model }
           : {}),
         usage: envelope.ev.usage,
+        ...(envelope.ev.durationMs !== undefined
+          ? { durationMs: envelope.ev.durationMs }
+          : {}),
       },
       meta,
     } satisfies NormalizedMessage;

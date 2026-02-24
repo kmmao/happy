@@ -150,6 +150,7 @@ export type ReducerState = {
   messages: Map<string, ReducerMessage>;
   sidechains: Map<string, ReducerMessage[]>;
   tracerState: TracerState; // Tracer state for sidechain processing
+  turnHadUsageStats: boolean; // true if current turn already has per-call usage-stats lines
   latestTodos?: {
     todos: Array<{
       content: string;
@@ -183,6 +184,7 @@ export function createReducer(): ReducerState {
     sidechains: new Map(),
     tracerState: createTracer(),
     latestAgentTextTime: 0,
+    turnHadUsageStats: false,
   };
 }
 
@@ -266,6 +268,12 @@ export function reducer(
     if (msg.role === "event" && msg.content.type === "ready") {
       state.messageIds.set(msg.id, msg.id);
       hasReadyEvent = true;
+      // If per-call usage-stats were already shown for this turn, suppress the
+      // turn-end stats line to avoid showing the same info twice.
+      if (state.turnHadUsageStats) {
+        state.turnHadUsageStats = false;
+        continue;
+      }
       const hasStats =
         msg.content.model !== undefined ||
         msg.content.usage !== undefined ||
@@ -280,6 +288,7 @@ export function reducer(
     // Unlike "ready", this does NOT set hasReadyEvent (agent is still working).
     if (msg.role === "event" && msg.content.type === "usage-stats") {
       state.messageIds.set(msg.id, msg.id);
+      state.turnHadUsageStats = true;
       if (msg.content.usage) {
         processUsageData(state, msg.content.usage, msg.createdAt);
       }
