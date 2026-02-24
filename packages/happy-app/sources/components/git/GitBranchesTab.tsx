@@ -25,6 +25,7 @@ import {
   GitBranch,
   GitBranchList,
 } from "@/sync/gitBranches";
+import { gitStatusSync } from "@/sync/gitStatusSync";
 
 const SCROLL_COLLAPSE_THRESHOLD = 20;
 
@@ -101,7 +102,10 @@ export const GitBranchesTab = React.memo<GitBranchesTabProps>(
             t("common.success"),
             t("git.switchBranchSuccess", { name: displayName }),
           );
-          await loadBranches();
+          await Promise.all([
+            loadBranches(),
+            gitStatusSync.invalidateAndAwait(sessionId),
+          ]);
         } catch {
           Modal.alert(t("common.error"), t("git.branchSwitchFailed"));
         } finally {
@@ -146,7 +150,10 @@ export const GitBranchesTab = React.memo<GitBranchesTabProps>(
           t("common.success"),
           t("git.createBranchSuccess", { name: branchName }),
         );
-        await loadBranches();
+        await Promise.all([
+          loadBranches(),
+          gitStatusSync.invalidateAndAwait(sessionId),
+        ]);
       } catch {
         Modal.alert(t("common.error"), t("git.branchCreateFailed"));
       } finally {
