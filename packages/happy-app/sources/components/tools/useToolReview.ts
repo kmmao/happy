@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ToolCall } from "@/sync/typesMessage";
-import { isMutableTool } from "@/components/tools/knownTools";
+import { isReviewableTool } from "@/components/tools/knownTools";
 import { storage, useToolReviewState } from "@/sync/storage";
 import { sync } from "@/sync/sync";
 import { Modal } from "@/modal/ModalManager";
@@ -28,7 +28,7 @@ export function useToolReview({
 
   const isReviewable =
     tool.state === "completed" &&
-    isMutableTool(tool.name) &&
+    isReviewableTool(tool.name) &&
     tool.permission?.status !== "pending" &&
     !!sessionId &&
     !!messageId;
