@@ -16,7 +16,7 @@ import { RawJSONLines } from "@/claude/types";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import { getToolName } from "./utils/getToolName";
 import { createEnvelope } from "@kmmao/happy-wire";
-import { isAdaptiveMode } from "./utils/adaptiveRouter";
+import { isAdaptiveMode, resolveModel } from "./utils/adaptiveRouter";
 
 interface PermissionsField {
   date: number;
@@ -130,24 +130,7 @@ export async function claudeRemoteLauncher(
   let planModeToolCalls = new Set<string>();
   let ongoingToolCalls = new Map<string, { parentToolCallId: string | null }>();
 
-  // Track /model command responses to filter them from App sync
-  let isModelSwitchResponse = false;
-
   function onMessage(message: SDKMessage) {
-    // Filter /model command messages from App sync
-    if (message.type === "user") {
-      const userMsg = message as SDKUserMessage;
-      const content = userMsg.message?.content;
-      if (typeof content === "string" && content.startsWith("/model ")) {
-        isModelSwitchResponse = true;
-        return;
-      }
-    }
-    if (isModelSwitchResponse && message.type === "result") {
-      isModelSwitchResponse = false;
-      return;
-    }
-
     // Write to message log
     formatClaudeMessageForInk(message, messageBuffer);
 
@@ -394,10 +377,6 @@ export async function claudeRemoteLauncher(
           isAborted: (toolCallId: string) => {
             return permissionHandler.isAborted(toolCallId);
           },
-          getAdaptiveRouterState: () => session.adaptiveRouterState,
-          setAdaptiveRouterState: (state) => {
-            session.adaptiveRouterState = state;
-          },
           onTurnComplete: () => {
             if (session.adaptiveRouterState) {
               const usage = session.client.getAccumulatedTurnUsage();
@@ -416,13 +395,6 @@ export async function claudeRemoteLauncher(
               }
             }
           },
-          onAdaptiveModelSwitch: (modelId, reason) => {
-            logger.debug(`[adaptive] Model switched to ${modelId}: ${reason}`);
-            session.client.updateMetadata((m) => ({
-              ...m,
-              currentModelCode: modelId,
-            }));
-          },
           nextMessage: async () => {
             if (pending) {
               let p = pending;
@@ -435,8 +407,44 @@ export async function claudeRemoteLauncher(
               controller.signal,
             );
 
-            // Check if mode has changed — but keep adaptive keys stable
             if (msg) {
+              // Adaptive routing: resolve real model before hash comparison
+              if (
+                session.adaptiveRouterState &&
+                isAdaptiveMode(msg.mode.model)
+              ) {
+                const routeResult = resolveModel(
+                  session.adaptiveRouterState,
+                  msg.message,
+                );
+                const targetModel = routeResult.modelId;
+                logger.debug(
+                  `[adaptive] Route decision: ${targetModel} (changed=${routeResult.changed}, reason=${routeResult.reason})`,
+                );
+                if (routeResult.changed) {
+                  session.adaptiveRouterState = {
+                    ...session.adaptiveRouterState,
+                    currentModelId: targetModel,
+                    lastSwitchTurn: session.adaptiveRouterState.turnCount,
+                  };
+                  session.client.updateMetadata((m) => ({
+                    ...m,
+                    currentModelCode: targetModel,
+                  }));
+                }
+                // Overwrite mode.model with the resolved real model ID
+                // This changes the hash, triggering process restart when model differs
+                msg = {
+                  ...msg,
+                  mode: { ...msg.mode, model: targetModel },
+                  hash: session.queue.modeHasher({
+                    ...msg.mode,
+                    model: targetModel,
+                  }),
+                };
+              }
+
+              // Check if mode has changed
               if ((modeHash && msg.hash !== modeHash) || msg.isolate) {
                 logger.debug("[remote]: mode has changed, pending message");
                 pending = msg;

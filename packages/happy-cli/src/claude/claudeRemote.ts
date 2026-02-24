@@ -20,12 +20,7 @@ import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
 import type { JsRuntime } from "./runClaude";
-import {
-  parseAdaptiveKey,
-  isAdaptiveMode,
-  resolveModel,
-  type AdaptiveRouterState,
-} from "./utils/adaptiveRouter";
+import { parseAdaptiveKey, isAdaptiveMode } from "./utils/adaptiveRouter";
 
 /**
  * Map App-level virtual model mode keys to real Anthropic model IDs.
@@ -83,10 +78,6 @@ export async function claudeRemote(opts: {
   onReady: () => void | Promise<void>;
   isAborted: (toolCallId: string) => boolean;
 
-  // Adaptive model routing — use getters to read live session state
-  getAdaptiveRouterState?: () => AdaptiveRouterState | null;
-  setAdaptiveRouterState?: (state: AdaptiveRouterState) => void;
-  onAdaptiveModelSwitch?: (modelId: string, reason: string) => void;
   /** Called after each turn to feed usage data back to the adaptive router */
   onTurnComplete?: () => void;
 
@@ -201,23 +192,6 @@ export async function claudeRemote(opts: {
     opts.claudeEnvVars?.ANTHROPIC_MODEL ??
     process.env.ANTHROPIC_MODEL;
 
-  // Evaluate first message with adaptive router to pick optimal initial model
-  const initialRouterState = opts.getAdaptiveRouterState?.();
-  if (initialRouterState && isAdaptiveMode(initial.mode.model)) {
-    const routeResult = resolveModel(initialRouterState, initial.message);
-    if (routeResult.changed) {
-      logger.debug(
-        `[adaptive] Initial message routed to ${routeResult.modelId}: ${routeResult.reason}`,
-      );
-      model = routeResult.modelId;
-      opts.setAdaptiveRouterState?.({
-        ...initialRouterState,
-        currentModelId: routeResult.modelId,
-        lastSwitchTurn: initialRouterState.turnCount,
-      });
-      opts.onAdaptiveModelSwitch?.(routeResult.modelId, routeResult.reason);
-    }
-  }
   const sdkOptions: QueryOptions = {
     cwd: opts.path,
     resume: startFrom ?? undefined,
@@ -252,10 +226,6 @@ export async function claudeRemote(opts: {
     })(),
     settingsPath: opts.hookSettingsPath,
   };
-
-  // Track pending adaptive model switch message
-  let pendingAdaptiveMessage: { message: string; mode: EnhancedMode } | null =
-    null;
 
   // Track thinking state
   let thinking = false;
@@ -345,19 +315,6 @@ export async function claudeRemote(opts: {
           isCompactCommand = false;
         }
 
-        // Handle pending adaptive message (/model result came back, now send the real user message)
-        if (pendingAdaptiveMessage) {
-          const pending = pendingAdaptiveMessage;
-          pendingAdaptiveMessage = null;
-          mode = pending.mode;
-          messages.push({
-            type: "user",
-            message: { role: "user", content: pending.message },
-          });
-          updateThinking(true);
-          continue;
-        }
-
         // Send ready event (flush queued messages before signaling turn end)
         await opts.onReady();
 
@@ -388,36 +345,6 @@ export async function claudeRemote(opts: {
           // Don't push to Claude, wait for next user message
           await opts.onReady();
           continue;
-        }
-
-        // Adaptive routing: evaluate model switch before sending user message
-        const currentRouterState = opts.getAdaptiveRouterState?.();
-        if (currentRouterState && isAdaptiveMode(next.mode.model)) {
-          const routeResult = resolveModel(currentRouterState, next.message);
-          if (routeResult.changed) {
-            logger.debug(
-              `[adaptive] Switching to ${routeResult.modelId}: ${routeResult.reason}`,
-            );
-            messages.push({
-              type: "user",
-              message: {
-                role: "user",
-                content: `/model ${routeResult.modelId}`,
-              },
-            });
-            updateThinking(true);
-            opts.setAdaptiveRouterState?.({
-              ...currentRouterState,
-              currentModelId: routeResult.modelId,
-              lastSwitchTurn: currentRouterState.turnCount,
-            });
-            opts.onAdaptiveModelSwitch?.(
-              routeResult.modelId,
-              routeResult.reason,
-            );
-            pendingAdaptiveMessage = next;
-            continue;
-          }
         }
 
         mode = next.mode;
