@@ -87,6 +87,15 @@ const SIMPLE_PATTERNS = new Set([
   "ship it",
   "go ahead",
   "sounds good",
+  "got it",
+  "right",
+  "yep",
+  "yup",
+  "nope",
+  // Navigation
+  "continue",
+  "next",
+  "go",
   // Greetings
   "hi",
   "hello",
@@ -96,6 +105,8 @@ const SIMPLE_PATTERNS = new Set([
   "thanks",
   "thank you",
   "thx",
+  // Thinking
+  "hmm",
   // Chinese
   "\u597D",
   "\u597D\u7684",
@@ -108,6 +119,11 @@ const SIMPLE_PATTERNS = new Set([
   "\u884C",
   "\u4F60\u597D",
   "\u563F",
+  "\u770B\u770B",
+  "\u53EF\u4EE5",
+  "\u55EF",
+  "\u6CA1\u95EE\u9898",
+  "\u4E0B\u4E00\u4E2A",
 ]);
 
 const MAX_HISTORY = 20;
@@ -192,8 +208,11 @@ function containsComplexKeyword(message: string): boolean {
 }
 
 function isSimpleMessage(message: string): boolean {
-  const trimmed = message.trim().toLowerCase();
-  return SIMPLE_PATTERNS.has(trimmed);
+  const trimmed = message
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?。！？]+$/, "");
+  return trimmed.length > 0 && SIMPLE_PATTERNS.has(trimmed);
 }
 
 function recentAverageOutput(

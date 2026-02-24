@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getAvailableModels,
   getAvailablePermissionModes,
+  getClaudeModelModes,
   getCodexModelModes,
   getClaudePermissionModes,
   mapMetadataOptions,
@@ -110,6 +111,36 @@ describe("modelModeOptions", () => {
       { key: "build", name: "Build", description: "Do build steps" },
       { key: "plan", name: "Plan", description: "Plan first" },
     ]);
+  });
+
+  describe("getClaudeModelModes", () => {
+    it("includes all three adaptive usage variants", () => {
+      const modes = getClaudeModelModes();
+      const adaptiveKeys = modes
+        .filter((m) => m.key.startsWith("adaptiveUsage:"))
+        .map((m) => m.key);
+      expect(adaptiveKeys).toEqual([
+        "adaptiveUsage:sonnet",
+        "adaptiveUsage:opus",
+        "adaptiveUsage:haiku",
+      ]);
+    });
+
+    it("includes manual model options", () => {
+      const modes = getClaudeModelModes();
+      const keys = modes.map((m) => m.key);
+      expect(keys).toContain("default");
+      expect(keys).toContain("haiku");
+      expect(keys).toContain("sonnet");
+      expect(keys).toContain("opus");
+    });
+
+    it("all options have non-empty description", () => {
+      const modes = getClaudeModelModes();
+      for (const mode of modes) {
+        expect(mode.description).toBeTruthy();
+      }
+    });
   });
 
   it("resolves the first matching preferred key", () => {

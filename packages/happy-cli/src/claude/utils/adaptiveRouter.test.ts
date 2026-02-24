@@ -336,6 +336,109 @@ describe("resolveModel", () => {
     });
   });
 
+  describe("simple messages with punctuation → haiku", () => {
+    it("routes 'ok!' to haiku (trailing punctuation stripped)", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      const result = resolveModel(state, "ok!");
+      expect(result.changed).toBe(true);
+      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
+    });
+
+    it("routes 'OK?' to haiku (case insensitive + punctuation)", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      const result = resolveModel(state, "OK?");
+      expect(result.changed).toBe(true);
+      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
+    });
+
+    it("routes 'continue' to haiku", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      const result = resolveModel(state, "continue");
+      expect(result.changed).toBe(true);
+      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
+    });
+
+    it("routes 'got it!' to haiku", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      const result = resolveModel(state, "got it!");
+      expect(result.changed).toBe(true);
+      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
+    });
+
+    it("routes '好。' to haiku (Chinese punctuation)", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      const result = resolveModel(state, "好。");
+      expect(result.changed).toBe(true);
+      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
+    });
+
+    it("routes '没问题！' to haiku", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      const result = resolveModel(state, "没问题！");
+      expect(result.changed).toBe(true);
+      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
+    });
+
+    it("does NOT route empty string to haiku", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      const result = resolveModel(state, "");
+      expect(result.modelId).not.toBe("claude-haiku-4-5-20251001");
+    });
+
+    it("does NOT route whitespace-only to haiku", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      const result = resolveModel(state, "   ");
+      expect(result.modelId).not.toBe("claude-haiku-4-5-20251001");
+    });
+
+    it("does NOT route message at exactly 50 chars to haiku", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      // 50 chars exactly — exceeds SIMPLE_MESSAGE_MAX_LENGTH (< 50)
+      const msg = "ok" + "x".repeat(48);
+      expect(msg.length).toBe(50);
+      const result = resolveModel(state, msg);
+      expect(result.modelId).not.toBe("claude-haiku-4-5-20251001");
+    });
+  });
+
+  describe("priority & edge cases", () => {
+    it("1M upgrade takes priority over opus upgrade", () => {
+      const state = stateWithBase("claude-sonnet-4-6", {
+        cumulativeInputTokens: 160_000,
+        currentModelId: "claude-sonnet-4-6",
+      });
+      const longMessage =
+        "Please refactor the entire authentication architecture to use OAuth 2.0 with PKCE flow. " +
+        "We need to migrate from session-based auth to JWT tokens with proper refresh token rotation. " +
+        "Also design the new permission system with RBAC and attribute-based access control.";
+      const result = resolveModel(state, longMessage);
+      // 1M upgrade has highest priority, even though complex keywords present
+      expect(result.modelId).toBe("claude-sonnet-4-6[1m]");
+    });
+
+    it("complex keyword alone without long message does NOT trigger opus", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      const result = resolveModel(state, "refactor this please");
+      expect(result.modelId).not.toBe("claude-opus-4-6");
+    });
+
+    it("routes long Chinese message with '重构' keyword to opus", () => {
+      const state = stateWithBase("claude-sonnet-4-6");
+      const longMessage =
+        "帮我重构这个架构，目前的实现方式有很多问题需要解决。" +
+        "首先是数据库访问层和业务逻辑层耦合太紧密，没有做到关注点分离。" +
+        "其次是错误处理不够统一，每个模块都有自己的错误处理方式，缺乏标准化。" +
+        "第三是缓存策略不够灵活，需要支持多级缓存和缓存失效策略。" +
+        "第四是日志系统需要统一，目前各个服务使用不同的日志库和格式，导致问题排查困难。" +
+        "第五是配置管理混乱，需要引入统一的配置中心来管理所有微服务的配置信息。" +
+        "最后是监控和告警体系不完善，需要建立完整的可观测性平台来保障系统稳定运行。";
+      expect(longMessage.length).toBeGreaterThan(200);
+      const result = resolveModel(state, longMessage);
+      expect(result.changed).toBe(true);
+      expect(result.modelId).toBe("claude-opus-4-6");
+    });
+  });
+
   describe("default behavior", () => {
     it("returns to base model when no special signal", () => {
       const state = stateWithBase("claude-sonnet-4-6", {
