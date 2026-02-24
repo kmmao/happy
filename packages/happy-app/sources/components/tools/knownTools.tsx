@@ -109,6 +109,7 @@ export const knownTools = {
     icon: ICON_TERMINAL,
     minimal: true,
     hideDefaultError: true,
+    isMutable: true,
     input: z.object({
       command: z.string().describe("The command to execute"),
       timeout: z
@@ -809,6 +810,7 @@ export const knownTools = {
     icon: ICON_TERMINAL,
     minimal: true,
     hideDefaultError: true,
+    isMutable: true,
     input: z
       .object({
         command: z.array(z.string()).describe("The command array to execute"),
