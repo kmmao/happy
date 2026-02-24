@@ -101,6 +101,7 @@ const LONG_CONTEXT_THRESHOLD = 150_000;
 const COMPLEX_MESSAGE_MIN_LENGTH = 200;
 const HIGH_OUTPUT_THRESHOLD = 3000;
 const SIMPLE_MESSAGE_MAX_LENGTH = 30;
+const SHORT_MESSAGE_MAX_LENGTH = 80;
 
 /**
  * Parse an adaptive usage key to extract the base model ID.
@@ -210,6 +211,17 @@ export function resolveModel(
     }
   }
 
+  // Stay on 1M variant while context is long — never downgrade from 1M
+  const isOn1mVariant = state.currentModelId.includes("[1m]");
+  const isLongContext = state.cumulativeInputTokens > LONG_CONTEXT_THRESHOLD;
+  if (isOn1mVariant && isLongContext) {
+    return {
+      modelId: state.currentModelId,
+      reason: "Staying on 1M variant (long context)",
+      changed: false,
+    };
+  }
+
   // Respect cooldown for non-1M switches
   if (inCooldown) {
     return {
@@ -248,7 +260,8 @@ export function resolveModel(
     }
   }
 
-  // Priority 4: Simple message → haiku
+  // Priority 4: Simple/short message → haiku
+  // 4a: Exact simple patterns (ok, yes, 好, etc.)
   if (
     userMessage.length < SIMPLE_MESSAGE_MAX_LENGTH &&
     isSimpleMessage(userMessage)
@@ -261,15 +274,22 @@ export function resolveModel(
       };
     }
   }
+  // 4b: Short messages without complex keywords (greetings, simple questions)
+  if (
+    userMessage.length < SHORT_MESSAGE_MAX_LENGTH &&
+    !containsComplexKeyword(userMessage)
+  ) {
+    if (state.currentModelId !== MODEL_IDS.haiku) {
+      return {
+        modelId: MODEL_IDS.haiku,
+        reason: `Short message (${userMessage.length} chars) without complex keywords`,
+        changed: true,
+      };
+    }
+  }
 
   // Default: return to base model if not already there
-  // Stay on 1M variant if context is long (don't downgrade from 1M)
-  const isOn1mVariant = state.currentModelId.includes("[1m]");
-  const isLongContext = state.cumulativeInputTokens > LONG_CONTEXT_THRESHOLD;
-  if (
-    state.currentModelId !== state.baseModel &&
-    !(isOn1mVariant && isLongContext)
-  ) {
+  if (state.currentModelId !== state.baseModel) {
     return {
       modelId: state.baseModel,
       reason: "No special signal, returning to base model",

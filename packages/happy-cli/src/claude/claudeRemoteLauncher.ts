@@ -394,7 +394,10 @@ export async function claudeRemoteLauncher(
           isAborted: (toolCallId: string) => {
             return permissionHandler.isAborted(toolCallId);
           },
-          adaptiveRouterState: session.adaptiveRouterState,
+          getAdaptiveRouterState: () => session.adaptiveRouterState,
+          setAdaptiveRouterState: (state) => {
+            session.adaptiveRouterState = state;
+          },
           onAdaptiveModelSwitch: (modelId, reason) => {
             logger.debug(`[adaptive] Model switched to ${modelId}: ${reason}`);
             session.client.updateMetadata((m) => ({

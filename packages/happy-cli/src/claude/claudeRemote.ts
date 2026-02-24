@@ -83,8 +83,9 @@ export async function claudeRemote(opts: {
   onReady: () => void | Promise<void>;
   isAborted: (toolCallId: string) => boolean;
 
-  // Adaptive model routing
-  adaptiveRouterState?: AdaptiveRouterState | null;
+  // Adaptive model routing — use getters to read live session state
+  getAdaptiveRouterState?: () => AdaptiveRouterState | null;
+  setAdaptiveRouterState?: (state: AdaptiveRouterState) => void;
   onAdaptiveModelSwitch?: (modelId: string, reason: string) => void;
 
   // Callbacks
@@ -199,18 +200,19 @@ export async function claudeRemote(opts: {
     process.env.ANTHROPIC_MODEL;
 
   // Evaluate first message with adaptive router to pick optimal initial model
-  if (opts.adaptiveRouterState && isAdaptiveMode(initial.mode.model)) {
-    const routeResult = resolveModel(opts.adaptiveRouterState, initial.message);
+  const initialRouterState = opts.getAdaptiveRouterState?.();
+  if (initialRouterState && isAdaptiveMode(initial.mode.model)) {
+    const routeResult = resolveModel(initialRouterState, initial.message);
     if (routeResult.changed) {
       logger.debug(
         `[adaptive] Initial message routed to ${routeResult.modelId}: ${routeResult.reason}`,
       );
       model = routeResult.modelId;
-      opts.adaptiveRouterState = {
-        ...opts.adaptiveRouterState,
+      opts.setAdaptiveRouterState?.({
+        ...initialRouterState,
         currentModelId: routeResult.modelId,
-        lastSwitchTurn: opts.adaptiveRouterState.turnCount,
-      };
+        lastSwitchTurn: initialRouterState.turnCount,
+      });
       opts.onAdaptiveModelSwitch?.(routeResult.modelId, routeResult.reason);
     }
   }
@@ -384,11 +386,9 @@ export async function claudeRemote(opts: {
         }
 
         // Adaptive routing: evaluate model switch before sending user message
-        if (opts.adaptiveRouterState && isAdaptiveMode(next.mode.model)) {
-          const routeResult = resolveModel(
-            opts.adaptiveRouterState,
-            next.message,
-          );
+        const currentRouterState = opts.getAdaptiveRouterState?.();
+        if (currentRouterState && isAdaptiveMode(next.mode.model)) {
+          const routeResult = resolveModel(currentRouterState, next.message);
           if (routeResult.changed) {
             logger.debug(
               `[adaptive] Switching to ${routeResult.modelId}: ${routeResult.reason}`,
@@ -401,11 +401,11 @@ export async function claudeRemote(opts: {
               },
             });
             updateThinking(true);
-            opts.adaptiveRouterState = {
-              ...opts.adaptiveRouterState,
+            opts.setAdaptiveRouterState?.({
+              ...currentRouterState,
               currentModelId: routeResult.modelId,
-              lastSwitchTurn: opts.adaptiveRouterState.turnCount,
-            };
+              lastSwitchTurn: currentRouterState.turnCount,
+            });
             opts.onAdaptiveModelSwitch?.(
               routeResult.modelId,
               routeResult.reason,
