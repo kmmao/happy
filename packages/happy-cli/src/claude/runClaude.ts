@@ -357,13 +357,25 @@ export async function runClaude(
         session.setModelModeKey(currentModel);
         logger.debug(`[loop] Model updated from user message: ${messageModel}`);
 
-        // Initialize or reinitialize adaptive router when switching to/between adaptive modes
+        // Initialize adaptive router only when switching TO adaptive mode or changing base model
+        // Don't reinitialize on every message (would lose turn history)
         if (isAdaptiveMode(messageModel) && currentSession) {
-          const { baseModelId } = parseAdaptiveKey(messageModel);
-          currentSession.initAdaptiveRouter(baseModelId);
-          logger.debug(
-            `[loop] Adaptive router initialized/reset for base model: ${baseModelId}`,
-          );
+          if (!currentSession.adaptiveRouterState) {
+            const { baseModelId } = parseAdaptiveKey(messageModel);
+            currentSession.initAdaptiveRouter(baseModelId);
+            logger.debug(
+              `[loop] Adaptive router initialized for base model: ${baseModelId}`,
+            );
+          } else {
+            // Check if base model changed (e.g. adaptiveUsage:sonnet → adaptiveUsage:opus)
+            const { baseModelId } = parseAdaptiveKey(messageModel);
+            if (currentSession.adaptiveRouterState.baseModel !== baseModelId) {
+              currentSession.initAdaptiveRouter(baseModelId);
+              logger.debug(
+                `[loop] Adaptive router reset for new base model: ${baseModelId}`,
+              );
+            }
+          }
         }
       } else {
         // model is null/undefined — use current model (don't reset)

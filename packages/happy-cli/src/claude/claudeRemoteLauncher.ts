@@ -398,6 +398,24 @@ export async function claudeRemoteLauncher(
           setAdaptiveRouterState: (state) => {
             session.adaptiveRouterState = state;
           },
+          onTurnComplete: () => {
+            if (session.adaptiveRouterState) {
+              const usage = session.client.getAccumulatedTurnUsage();
+              const turnModel = session.client.getCurrentTurnModel();
+              if (usage && turnModel) {
+                session.updateAdaptiveRouter({
+                  model: turnModel,
+                  inputTokens: usage.input_tokens,
+                  outputTokens: usage.output_tokens,
+                  durationMs: 0,
+                });
+                logger.debug(
+                  `[adaptive] Turn recorded: model=${turnModel} in=${usage.input_tokens} out=${usage.output_tokens} ` +
+                    `cumulative_in=${session.adaptiveRouterState.cumulativeInputTokens} turns=${session.adaptiveRouterState.turnCount}`,
+                );
+              }
+            }
+          },
           onAdaptiveModelSwitch: (modelId, reason) => {
             logger.debug(`[adaptive] Model switched to ${modelId}: ${reason}`);
             session.client.updateMetadata((m) => ({
@@ -479,20 +497,6 @@ export async function claudeRemoteLauncher(
           },
           signal: abortController.signal,
         });
-
-        // Feed turn history back to adaptive router
-        if (session.adaptiveRouterState) {
-          const usage = session.client.getAccumulatedTurnUsage();
-          const turnModel = session.client.getCurrentTurnModel();
-          if (usage && turnModel) {
-            session.updateAdaptiveRouter({
-              model: turnModel,
-              inputTokens: usage.input_tokens,
-              outputTokens: usage.output_tokens,
-              durationMs: 0,
-            });
-          }
-        }
 
         // Consume one-time Claude flags after spawn
         session.consumeOneTimeFlags();

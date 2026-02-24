@@ -87,6 +87,8 @@ export async function claudeRemote(opts: {
   getAdaptiveRouterState?: () => AdaptiveRouterState | null;
   setAdaptiveRouterState?: (state: AdaptiveRouterState) => void;
   onAdaptiveModelSwitch?: (modelId: string, reason: string) => void;
+  /** Called after each turn to feed usage data back to the adaptive router */
+  onTurnComplete?: () => void;
 
   // Callbacks
   onSessionFound: (id: string) => void;
@@ -330,6 +332,9 @@ export async function claudeRemote(opts: {
       if (message.type === "result") {
         updateThinking(false);
         logger.debug("[claudeRemote] Result received");
+
+        // Feed turn usage data back to adaptive router BEFORE onReady resets it
+        opts.onTurnComplete?.();
 
         // Send completion messages
         if (isCompactCommand) {

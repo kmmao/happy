@@ -136,7 +136,7 @@ describe("resolveModel", () => {
     };
   }
 
-  describe("simple/short messages → haiku", () => {
+  describe("simple messages → haiku", () => {
     it("routes 'ok' to haiku", () => {
       const state = stateWithBase("claude-sonnet-4-6");
       const result = resolveModel(state, "ok");
@@ -158,24 +158,31 @@ describe("resolveModel", () => {
       expect(result.modelId).toBe("claude-haiku-4-5-20251001");
     });
 
-    it("routes short greetings like 'hello, what's model' to haiku", () => {
+    it("routes 'hello' to haiku", () => {
+      const state = stateWithBase("claude-opus-4-6");
+      const result = resolveModel(state, "hello");
+      expect(result.changed).toBe(true);
+      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
+    });
+
+    it("routes '你好' to haiku", () => {
+      const state = stateWithBase("claude-opus-4-6");
+      const result = resolveModel(state, "你好");
+      expect(result.changed).toBe(true);
+      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
+    });
+
+    it("does NOT route 'hello,what's model' to haiku (not exact pattern)", () => {
       const state = stateWithBase("claude-opus-4-6");
       const result = resolveModel(state, "hello,what's model");
-      expect(result.changed).toBe(true);
-      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
+      // Not an exact simple pattern → stays on base model
+      expect(result.changed).toBe(false);
     });
 
-    it("routes short questions without complex keywords to haiku", () => {
-      const state = stateWithBase("claude-sonnet-4-6");
-      const result = resolveModel(state, "what time is it?");
-      expect(result.changed).toBe(true);
-      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
-    });
-
-    it("does not route short message with complex keyword to haiku", () => {
-      const state = stateWithBase("claude-sonnet-4-6");
-      const result = resolveModel(state, "review this code");
-      expect(result.modelId).not.toBe("claude-haiku-4-5-20251001");
+    it("does NOT route technical Chinese question to haiku", () => {
+      const state = stateWithBase("claude-opus-4-6");
+      const result = resolveModel(state, "CLI daemon 如何工作 & 进程生命周期");
+      expect(result.changed).toBe(false);
     });
 
     it("does not change if already on haiku", () => {
@@ -330,34 +337,20 @@ describe("resolveModel", () => {
   });
 
   describe("default behavior", () => {
-    it("returns to base model when no special signal and message is medium length", () => {
+    it("returns to base model when no special signal", () => {
       const state = stateWithBase("claude-sonnet-4-6", {
         currentModelId: "claude-opus-4-6",
       });
-      // Message > 80 chars, no complex keywords → return to base model
-      const result = resolveModel(
-        state,
-        "Can you explain how the weather API works and what endpoints are available for fetching forecast data?",
-      );
+      const result = resolveModel(state, "How does the weather API work?");
       expect(result.changed).toBe(true);
       expect(result.modelId).toBe("claude-sonnet-4-6");
       expect(result.reason).toContain("base model");
     });
 
-    it("does not change when already on base model with medium message", () => {
+    it("does not change when already on base model", () => {
       const state = stateWithBase("claude-sonnet-4-6");
-      const result = resolveModel(
-        state,
-        "Can you explain how the weather API works and what endpoints are available for fetching forecast data?",
-      );
+      const result = resolveModel(state, "How does the weather API work?");
       expect(result.changed).toBe(false);
-    });
-
-    it("routes short message to haiku even when on base model", () => {
-      const state = stateWithBase("claude-sonnet-4-6");
-      const result = resolveModel(state, "How is the weather today?");
-      expect(result.changed).toBe(true);
-      expect(result.modelId).toBe("claude-haiku-4-5-20251001");
     });
   });
 });

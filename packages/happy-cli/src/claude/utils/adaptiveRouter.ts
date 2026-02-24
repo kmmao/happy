@@ -74,25 +74,40 @@ const COMPLEX_KEYWORDS = new Set([
 ]);
 
 const SIMPLE_PATTERNS = new Set([
+  // Confirmations
   "yes",
   "no",
   "ok",
+  "okay",
   "y",
   "n",
-  "\u597D",
-  "\u7EE7\u7EED",
-  "\u786E\u8BA4",
-  "lgtm",
-  "ship it",
   "sure",
   "done",
+  "lgtm",
+  "ship it",
+  "go ahead",
+  "sounds good",
+  // Greetings
+  "hi",
+  "hello",
+  "hey",
+  "yo",
+  // Thanks
   "thanks",
   "thank you",
+  "thx",
+  // Chinese
+  "\u597D",
+  "\u597D\u7684",
+  "\u7EE7\u7EED",
+  "\u786E\u8BA4",
   "\u8C22\u8C22",
   "\u5BF9",
   "\u662F",
   "\u4E0D",
   "\u884C",
+  "\u4F60\u597D",
+  "\u563F",
 ]);
 
 const MAX_HISTORY = 20;
@@ -100,8 +115,7 @@ const COOLDOWN_TURNS = 2;
 const LONG_CONTEXT_THRESHOLD = 150_000;
 const COMPLEX_MESSAGE_MIN_LENGTH = 200;
 const HIGH_OUTPUT_THRESHOLD = 3000;
-const SIMPLE_MESSAGE_MAX_LENGTH = 30;
-const SHORT_MESSAGE_MAX_LENGTH = 80;
+const SIMPLE_MESSAGE_MAX_LENGTH = 50;
 
 /**
  * Parse an adaptive usage key to extract the base model ID.
@@ -260,8 +274,7 @@ export function resolveModel(
     }
   }
 
-  // Priority 4: Simple/short message → haiku
-  // 4a: Exact simple patterns (ok, yes, 好, etc.)
+  // Priority 4: Simple message → haiku (exact pattern match only)
   if (
     userMessage.length < SIMPLE_MESSAGE_MAX_LENGTH &&
     isSimpleMessage(userMessage)
@@ -269,20 +282,7 @@ export function resolveModel(
     if (state.currentModelId !== MODEL_IDS.haiku) {
       return {
         modelId: MODEL_IDS.haiku,
-        reason: "Simple confirmation message",
-        changed: true,
-      };
-    }
-  }
-  // 4b: Short messages without complex keywords (greetings, simple questions)
-  if (
-    userMessage.length < SHORT_MESSAGE_MAX_LENGTH &&
-    !containsComplexKeyword(userMessage)
-  ) {
-    if (state.currentModelId !== MODEL_IDS.haiku) {
-      return {
-        modelId: MODEL_IDS.haiku,
-        reason: `Short message (${userMessage.length} chars) without complex keywords`,
+        reason: "Simple confirmation/greeting message",
         changed: true,
       };
     }
