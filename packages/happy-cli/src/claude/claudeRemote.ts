@@ -20,6 +20,12 @@ import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
 import type { JsRuntime } from "./runClaude";
+import {
+  parseAdaptiveKey,
+  isAdaptiveMode,
+  resolveModel,
+  type AdaptiveRouterState,
+} from "./utils/adaptiveRouter";
 
 /**
  * Map App-level virtual model mode keys to real Anthropic model IDs.
@@ -27,9 +33,15 @@ import type { JsRuntime } from "./runClaude";
  */
 function resolveModelKey(modelKey: string | undefined): string | undefined {
   if (!modelKey) return undefined;
+
+  // Handle adaptive usage keys: "adaptiveUsage", "adaptiveUsage:sonnet", etc.
+  if (isAdaptiveMode(modelKey)) {
+    const { baseModelId } = parseAdaptiveKey(modelKey);
+    return baseModelId;
+  }
+
   switch (modelKey) {
     case "default":
-    case "adaptiveUsage":
       return undefined;
     case "haiku":
       return "claude-haiku-4-5-20251001";
@@ -70,6 +82,10 @@ export async function claudeRemote(opts: {
   nextMessage: () => Promise<{ message: string; mode: EnhancedMode } | null>;
   onReady: () => void | Promise<void>;
   isAborted: (toolCallId: string) => boolean;
+
+  // Adaptive model routing
+  adaptiveRouterState?: AdaptiveRouterState | null;
+  onAdaptiveModelSwitch?: (modelId: string, reason: string) => void;
 
   // Callbacks
   onSessionFound: (id: string) => void;
@@ -216,6 +232,10 @@ export async function claudeRemote(opts: {
     settingsPath: opts.hookSettingsPath,
   };
 
+  // Track pending adaptive model switch message
+  let pendingAdaptiveMessage: { message: string; mode: EnhancedMode } | null =
+    null;
+
   // Track thinking state
   let thinking = false;
   const updateThinking = (newThinking: boolean) => {
@@ -301,6 +321,19 @@ export async function claudeRemote(opts: {
           isCompactCommand = false;
         }
 
+        // Handle pending adaptive message (/model result came back, now send the real user message)
+        if (pendingAdaptiveMessage) {
+          const pending = pendingAdaptiveMessage;
+          pendingAdaptiveMessage = null;
+          mode = pending.mode;
+          messages.push({
+            type: "user",
+            message: { role: "user", content: pending.message },
+          });
+          updateThinking(true);
+          continue;
+        }
+
         // Send ready event (flush queued messages before signaling turn end)
         await opts.onReady();
 
@@ -331,6 +364,38 @@ export async function claudeRemote(opts: {
           // Don't push to Claude, wait for next user message
           await opts.onReady();
           continue;
+        }
+
+        // Adaptive routing: evaluate model switch before sending user message
+        if (opts.adaptiveRouterState && isAdaptiveMode(next.mode.model)) {
+          const routeResult = resolveModel(
+            opts.adaptiveRouterState,
+            next.message,
+          );
+          if (routeResult.changed) {
+            logger.debug(
+              `[adaptive] Switching to ${routeResult.modelId}: ${routeResult.reason}`,
+            );
+            messages.push({
+              type: "user",
+              message: {
+                role: "user",
+                content: `/model ${routeResult.modelId}`,
+              },
+            });
+            updateThinking(true);
+            opts.adaptiveRouterState = {
+              ...opts.adaptiveRouterState,
+              currentModelId: routeResult.modelId,
+              lastSwitchTurn: opts.adaptiveRouterState.turnCount,
+            };
+            opts.onAdaptiveModelSwitch?.(
+              routeResult.modelId,
+              routeResult.reason,
+            );
+            pendingAdaptiveMessage = next;
+            continue;
+          }
         }
 
         mode = next.mode;

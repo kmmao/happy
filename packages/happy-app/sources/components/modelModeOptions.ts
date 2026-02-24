@@ -146,30 +146,44 @@ export function getClaudeModelModes(): ModelMode[] {
   return [
     { key: "default", name: "Default", description: "Use CLI settings" },
     {
-      key: "adaptiveUsage",
-      name: "Adaptive Usage",
-      description: "Balanced model routing",
+      key: "adaptiveUsage:sonnet",
+      name: "Auto (Sonnet)",
+      description: "Smart routing \u00B7 Sonnet base",
     },
-    { key: "haiku", name: "Haiku", description: "Fastest · $1/$5 · 200K" },
+    {
+      key: "adaptiveUsage:opus",
+      name: "Auto (Opus)",
+      description: "Smart routing \u00B7 Opus base",
+    },
+    {
+      key: "adaptiveUsage:haiku",
+      name: "Auto (Haiku)",
+      description: "Smart routing \u00B7 Haiku base",
+    },
+    {
+      key: "haiku",
+      name: "Haiku",
+      description: "Fastest \u00B7 $1/$5 \u00B7 200K",
+    },
     {
       key: "sonnet",
       name: "Sonnet",
-      description: "Balanced · $3/$15 · 200K",
+      description: "Balanced \u00B7 $3/$15 \u00B7 200K",
     },
     {
       key: "sonnet-1m",
       name: "Sonnet (1M)",
-      description: "Long context · $6/$22.50",
+      description: "Long context \u00B7 $6/$22.50",
     },
     {
       key: "opus",
       name: "Opus",
-      description: "Most capable · $5/$25 · 200K",
+      description: "Most capable \u00B7 $5/$25 \u00B7 200K",
     },
     {
       key: "opus-1m",
       name: "Opus (1M)",
-      description: "Long context · $10/$37.50",
+      description: "Long context \u00B7 $10/$37.50",
     },
   ];
 }

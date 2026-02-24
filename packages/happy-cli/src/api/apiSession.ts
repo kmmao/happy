@@ -674,6 +674,21 @@ export class ApiSessionClient extends EventEmitter {
     }
   }
 
+  getAccumulatedTurnUsage(): {
+    input_tokens: number;
+    output_tokens: number;
+  } | null {
+    if (!this.accumulatedTurnUsage) return null;
+    return {
+      input_tokens: this.accumulatedTurnUsage.input_tokens,
+      output_tokens: this.accumulatedTurnUsage.output_tokens,
+    };
+  }
+
+  getCurrentTurnModel(): string | null {
+    return this.currentTurnModel;
+  }
+
   sendCodexMessage(body: any) {
     let content = {
       role: "agent",

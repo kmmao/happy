@@ -16,6 +16,7 @@ import { RawJSONLines } from "@/claude/types";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import { getToolName } from "./utils/getToolName";
 import { createEnvelope } from "@kmmao/happy-wire";
+import { isAdaptiveMode } from "./utils/adaptiveRouter";
 
 interface PermissionsField {
   date: number;
@@ -129,7 +130,24 @@ export async function claudeRemoteLauncher(
   let planModeToolCalls = new Set<string>();
   let ongoingToolCalls = new Map<string, { parentToolCallId: string | null }>();
 
+  // Track /model command responses to filter them from App sync
+  let isModelSwitchResponse = false;
+
   function onMessage(message: SDKMessage) {
+    // Filter /model command messages from App sync
+    if (message.type === "user") {
+      const userMsg = message as SDKUserMessage;
+      const content = userMsg.message?.content;
+      if (typeof content === "string" && content.startsWith("/model ")) {
+        isModelSwitchResponse = true;
+        return;
+      }
+    }
+    if (isModelSwitchResponse && message.type === "result") {
+      isModelSwitchResponse = false;
+      return;
+    }
+
     // Write to message log
     formatClaudeMessageForInk(message, messageBuffer);
 
@@ -376,6 +394,14 @@ export async function claudeRemoteLauncher(
           isAborted: (toolCallId: string) => {
             return permissionHandler.isAborted(toolCallId);
           },
+          adaptiveRouterState: session.adaptiveRouterState,
+          onAdaptiveModelSwitch: (modelId, reason) => {
+            logger.debug(`[adaptive] Model switched to ${modelId}: ${reason}`);
+            session.client.updateMetadata((m) => ({
+              ...m,
+              currentModelCode: modelId,
+            }));
+          },
           nextMessage: async () => {
             if (pending) {
               let p = pending;
@@ -388,7 +414,7 @@ export async function claudeRemoteLauncher(
               controller.signal,
             );
 
-            // Check if mode has changed
+            // Check if mode has changed — but keep adaptive keys stable
             if (msg) {
               if ((modeHash && msg.hash !== modeHash) || msg.isolate) {
                 logger.debug("[remote]: mode has changed, pending message");
@@ -450,6 +476,20 @@ export async function claudeRemoteLauncher(
           },
           signal: abortController.signal,
         });
+
+        // Feed turn history back to adaptive router
+        if (session.adaptiveRouterState) {
+          const usage = session.client.getAccumulatedTurnUsage();
+          const turnModel = session.client.getCurrentTurnModel();
+          if (usage && turnModel) {
+            session.updateAdaptiveRouter({
+              model: turnModel,
+              inputTokens: usage.input_tokens,
+              outputTokens: usage.output_tokens,
+              durationMs: 0,
+            });
+          }
+        }
 
         // Consume one-time Claude flags after spawn
         session.consumeOneTimeFlags();
