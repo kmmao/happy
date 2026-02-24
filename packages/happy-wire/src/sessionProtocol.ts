@@ -78,6 +78,17 @@ export const sessionStopEventSchema = z.object({
   t: z.literal("stop"),
 });
 
+export const sessionUsageUpdateEventSchema = z.object({
+  t: z.literal("usage-update"),
+  model: z.string().optional(),
+  usage: z.object({
+    input_tokens: z.number(),
+    output_tokens: z.number(),
+    cache_creation_input_tokens: z.number().optional(),
+    cache_read_input_tokens: z.number().optional(),
+  }),
+});
+
 export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -88,6 +99,7 @@ export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionStartEventSchema,
   sessionTurnEndEventSchema,
   sessionStopEventSchema,
+  sessionUsageUpdateEventSchema,
 ]);
 
 export type SessionEvent = z.infer<typeof sessionEventSchema>;
@@ -115,7 +127,9 @@ export const sessionEnvelopeSchema = z
       });
     }
     if (
-      (envelope.ev.t === "start" || envelope.ev.t === "stop") &&
+      (envelope.ev.t === "start" ||
+        envelope.ev.t === "stop" ||
+        envelope.ev.t === "usage-update") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({
