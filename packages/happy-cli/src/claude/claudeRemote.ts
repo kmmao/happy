@@ -193,10 +193,27 @@ export async function claudeRemote(opts: {
   let mode = initial.mode;
   // Translate App-level virtual model keys (e.g. "adaptiveUsage", "sonnet", "opus")
   // to real Anthropic model IDs, then fall back to env-configured model.
-  const model =
+  let model =
     resolveModelKey(initial.mode.model) ??
     opts.claudeEnvVars?.ANTHROPIC_MODEL ??
     process.env.ANTHROPIC_MODEL;
+
+  // Evaluate first message with adaptive router to pick optimal initial model
+  if (opts.adaptiveRouterState && isAdaptiveMode(initial.mode.model)) {
+    const routeResult = resolveModel(opts.adaptiveRouterState, initial.message);
+    if (routeResult.changed) {
+      logger.debug(
+        `[adaptive] Initial message routed to ${routeResult.modelId}: ${routeResult.reason}`,
+      );
+      model = routeResult.modelId;
+      opts.adaptiveRouterState = {
+        ...opts.adaptiveRouterState,
+        currentModelId: routeResult.modelId,
+        lastSwitchTurn: opts.adaptiveRouterState.turnCount,
+      };
+      opts.onAdaptiveModelSwitch?.(routeResult.modelId, routeResult.reason);
+    }
+  }
   const sdkOptions: QueryOptions = {
     cwd: opts.path,
     resume: startFrom ?? undefined,
