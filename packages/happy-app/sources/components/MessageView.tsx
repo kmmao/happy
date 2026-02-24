@@ -297,8 +297,11 @@ function AgentEventBlock(props: {
       </View>
     );
   }
-  if (props.event.type === "ready") {
-    const { model, usage, durationMs } = props.event;
+  if (props.event.type === "ready" || props.event.type === "usage-stats") {
+    const model = props.event.model;
+    const usage = props.event.usage;
+    const durationMs =
+      props.event.type === "ready" ? props.event.durationMs : undefined;
     if (!model && !usage && durationMs === undefined) {
       return null;
     }

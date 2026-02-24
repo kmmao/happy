@@ -53,6 +53,16 @@ const agentEventSchema = z.discriminatedUnion("type", [
       .optional(),
     durationMs: z.number().optional(),
   }),
+  z.object({
+    type: z.literal("usage-stats"),
+    model: z.string().optional(),
+    usage: z.object({
+      input_tokens: z.number(),
+      output_tokens: z.number(),
+      cache_creation_input_tokens: z.number().optional(),
+      cache_read_input_tokens: z.number().optional(),
+    }),
+  }),
 ]);
 export type AgentEvent = z.infer<typeof agentEventSchema>;
 
@@ -123,6 +133,17 @@ const sessionStopEventSchema = z.object({
   t: z.literal("stop"),
 });
 
+const sessionUsageUpdateEventSchema = z.object({
+  t: z.literal("usage-update"),
+  model: z.string().optional(),
+  usage: z.object({
+    input_tokens: z.number(),
+    output_tokens: z.number(),
+    cache_creation_input_tokens: z.number().optional(),
+    cache_read_input_tokens: z.number().optional(),
+  }),
+});
+
 const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -133,6 +154,7 @@ const sessionEventSchema = z.discriminatedUnion("t", [
   sessionStartEventSchema,
   sessionTurnEndEventSchema,
   sessionStopEventSchema,
+  sessionUsageUpdateEventSchema,
 ]);
 
 const sessionEnvelopeSchema = z
@@ -158,7 +180,9 @@ const sessionEnvelopeSchema = z
       });
     }
     if (
-      (envelope.ev.t === "start" || envelope.ev.t === "stop") &&
+      (envelope.ev.t === "start" ||
+        envelope.ev.t === "stop" ||
+        envelope.ev.t === "usage-update") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({
@@ -694,6 +718,24 @@ function normalizeSessionEnvelope(
         ...(envelope.ev.durationMs !== undefined
           ? { durationMs: envelope.ev.durationMs }
           : {}),
+      },
+      meta,
+    } satisfies NormalizedMessage;
+  }
+
+  if (envelope.ev.t === "usage-update") {
+    return {
+      id: messageId,
+      localId,
+      createdAt: messageCreatedAt,
+      role: "event",
+      isSidechain: false,
+      content: {
+        type: "usage-stats",
+        ...(envelope.ev.model !== undefined
+          ? { model: envelope.ev.model }
+          : {}),
+        usage: envelope.ev.usage,
       },
       meta,
     } satisfies NormalizedMessage;

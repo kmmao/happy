@@ -276,6 +276,16 @@ export function reducer(
       // Fall through to Phase 5 to render as a stats line
     }
 
+    // Per-request usage stats: render as visible stats line + update cumulative usage.
+    // Unlike "ready", this does NOT set hasReadyEvent (agent is still working).
+    if (msg.role === "event" && msg.content.type === "usage-stats") {
+      state.messageIds.set(msg.id, msg.id);
+      if (msg.content.usage) {
+        processUsageData(state, msg.content.usage, msg.createdAt);
+      }
+      // Fall through to Phase 5 to render as a stats line
+    }
+
     // Session protocol turn-start markers are lifecycle-only and should stay invisible.
     if (
       msg.role === "event" &&

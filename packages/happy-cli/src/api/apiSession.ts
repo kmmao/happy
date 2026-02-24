@@ -22,6 +22,7 @@ import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { registerCommonHandlers } from "../modules/common/registerCommonHandlers";
 import { calculateCost } from "@/utils/pricing";
 import {
+  createEnvelope,
   type SessionEnvelope,
   type SessionTurnEndStatus,
 } from "@kmmao/happy-wire";
@@ -212,6 +213,7 @@ export class ApiSessionClient extends EventEmitter {
   private currentTurnStartTime: number | null = null;
   private currentTurnModel: string | null = null;
   private currentTurnUsage: Usage | null = null;
+  private accumulatedTurnUsage: Usage | null = null;
   private modelModeKey: string | undefined;
   private readonly sendSync: InvalidateSync;
   private readonly receiveSync: InvalidateSync;
@@ -556,6 +558,40 @@ export class ApiSessionClient extends EventEmitter {
             ? `${body.message.model}[1m]`
             : body.message.model;
         this.sendUsageData(body.message.usage, effectiveModel);
+
+        // Send per-request usage-update envelope to App for real-time display
+        const turnId = this.claudeSessionProtocolState.currentTurnId;
+        if (turnId) {
+          this.sendSessionProtocolMessage(
+            createEnvelope(
+              "agent",
+              {
+                t: "usage-update" as const,
+                ...(effectiveModel ? { model: effectiveModel } : {}),
+                usage: {
+                  input_tokens: body.message.usage.input_tokens,
+                  output_tokens: body.message.usage.output_tokens,
+                  ...(body.message.usage.cache_creation_input_tokens != null
+                    ? {
+                        cache_creation_input_tokens:
+                          body.message.usage.cache_creation_input_tokens,
+                      }
+                    : {}),
+                  ...(body.message.usage.cache_read_input_tokens != null
+                    ? {
+                        cache_read_input_tokens:
+                          body.message.usage.cache_read_input_tokens,
+                      }
+                    : {}),
+                },
+              },
+              { turn: turnId },
+            ),
+          );
+        }
+
+        // Accumulate usage across all API calls within this turn
+        this.accumulateTurnUsage(body.message.usage);
       } catch (error) {
         logger.debug("[SOCKET] Failed to send usage data:", error);
       }
@@ -579,9 +615,13 @@ export class ApiSessionClient extends EventEmitter {
         ? Date.now() - this.currentTurnStartTime
         : undefined;
 
+    // Use accumulated usage (total across all API calls in this turn)
+    // instead of currentTurnUsage (which is only the last API call's snapshot)
+    const usageForMeta = this.accumulatedTurnUsage ?? this.currentTurnUsage;
+
     const meta: TurnMeta = {
       ...(this.currentTurnModel ? { model: this.currentTurnModel } : {}),
-      ...(this.currentTurnUsage ? { usage: this.currentTurnUsage } : {}),
+      ...(usageForMeta ? { usage: usageForMeta } : {}),
       ...(durationMs !== undefined ? { durationMs } : {}),
     };
 
@@ -595,10 +635,35 @@ export class ApiSessionClient extends EventEmitter {
     this.currentTurnStartTime = null;
     this.currentTurnModel = null;
     this.currentTurnUsage = null;
+    this.accumulatedTurnUsage = null;
 
     this.claudeSessionProtocolState.currentTurnId = mapped.currentTurnId;
     for (const envelope of mapped.envelopes) {
       this.sendSessionProtocolMessage(envelope);
+    }
+  }
+
+  private accumulateTurnUsage(usage: Usage) {
+    if (!this.accumulatedTurnUsage) {
+      this.accumulatedTurnUsage = {
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+        cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+        cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
+      };
+    } else {
+      this.accumulatedTurnUsage = {
+        input_tokens:
+          this.accumulatedTurnUsage.input_tokens + usage.input_tokens,
+        output_tokens:
+          this.accumulatedTurnUsage.output_tokens + usage.output_tokens,
+        cache_creation_input_tokens:
+          (this.accumulatedTurnUsage.cache_creation_input_tokens ?? 0) +
+          (usage.cache_creation_input_tokens ?? 0),
+        cache_read_input_tokens:
+          (this.accumulatedTurnUsage.cache_read_input_tokens ?? 0) +
+          (usage.cache_read_input_tokens ?? 0),
+      };
     }
   }
 
