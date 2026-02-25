@@ -98,9 +98,16 @@ export const TaskView = React.memo<ToolViewProps>(
       toolItem: {
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 4,
+        paddingVertical: 3,
         paddingLeft: 4,
         paddingRight: 2,
+      },
+      treeLine: {
+        fontSize: 14,
+        fontFamily: "monospace",
+        color: theme.colors.textSecondary,
+        opacity: 0.3,
+        width: 24,
       },
       toolTitle: {
         fontSize: 14,
@@ -125,8 +132,10 @@ export const TaskView = React.memo<ToolViewProps>(
         color: theme.colors.textSecondary,
       },
       moreToolsItem: {
-        paddingVertical: 4,
-        paddingHorizontal: 4,
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 3,
+        paddingLeft: 4,
       },
       moreToolsText: {
         fontSize: 14,
@@ -157,35 +166,43 @@ export const TaskView = React.memo<ToolViewProps>(
             {promptSummary}
           </Text>
         )}
-        {visibleTools.map((item, index) => (
-          <View key={`${item.tool.name}-${index}`} style={styles.toolItem}>
-            <Text style={styles.toolTitle}>{item.title}</Text>
-            <View style={styles.statusContainer}>
-              {item.state === "running" && (
-                <ActivityIndicator
-                  size={Platform.OS === "ios" ? "small" : (14 as any)}
-                  color={theme.colors.warning}
-                />
-              )}
-              {item.state === "completed" && (
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color={theme.colors.success}
-                />
-              )}
-              {item.state === "error" && (
-                <Ionicons
-                  name="close-circle"
-                  size={16}
-                  color={theme.colors.textDestructive}
-                />
-              )}
+        {visibleTools.map((item, index) => {
+          const isLast =
+            index === visibleTools.length - 1 && remainingCount <= 0;
+          return (
+            <View key={`${item.tool.name}-${index}`} style={styles.toolItem}>
+              <Text style={styles.treeLine}>{isLast ? "└─" : "├─"}</Text>
+              <Text style={styles.toolTitle} numberOfLines={1}>
+                {item.title}
+              </Text>
+              <View style={styles.statusContainer}>
+                {item.state === "running" && (
+                  <ActivityIndicator
+                    size={Platform.OS === "ios" ? "small" : (14 as any)}
+                    color={theme.colors.warning}
+                  />
+                )}
+                {item.state === "completed" && (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={16}
+                    color={theme.colors.success}
+                  />
+                )}
+                {item.state === "error" && (
+                  <Ionicons
+                    name="close-circle"
+                    size={16}
+                    color={theme.colors.textDestructive}
+                  />
+                )}
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
         {remainingCount > 0 && (
           <View style={styles.moreToolsItem}>
+            <Text style={styles.treeLine}>└─</Text>
             <Text style={styles.moreToolsText}>
               {t("tools.taskView.moreTools", { count: remainingCount })}
             </Text>

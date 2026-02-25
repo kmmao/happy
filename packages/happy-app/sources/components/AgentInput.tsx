@@ -396,8 +396,16 @@ const ContextProgressBar: React.FC<{
   alwaysShow: boolean;
   modelCode?: string | null;
   sdkContextWindow?: number;
+  totalCostUsd?: number;
   theme: Theme;
-}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme }) => {
+}> = ({
+  contextSize,
+  alwaysShow,
+  modelCode,
+  sdkContextWindow,
+  totalCostUsd,
+  theme,
+}) => {
   // Use SDK-provided window size if available; fall back to model-aware heuristic
   const knownWindowSize = getContextWindowSize(modelCode, sdkContextWindow);
   const contextWindowSize =
@@ -409,7 +417,11 @@ const ContextProgressBar: React.FC<{
   if (!shouldShow) return null;
 
   const barColor = getProgressBarColor(percentageRemaining, theme);
-  const label = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}`;
+  const costSuffix =
+    totalCostUsd !== undefined && totalCostUsd > 0
+      ? ` · $${totalCostUsd < 0.01 ? totalCostUsd.toFixed(4) : totalCostUsd.toFixed(2)}`
+      : "";
+  const label = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}${costSuffix}`;
 
   return (
     <View style={{ paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2 }}>
@@ -1741,6 +1753,7 @@ export const AgentInput = React.memo(
                 alwaysShow={props.alwaysShowContextSize ?? false}
                 modelCode={props.currentModelCode}
                 sdkContextWindow={props.usageData.contextWindow}
+                totalCostUsd={props.usageData.totalCostUsd}
                 theme={theme}
               />
             ) : null}

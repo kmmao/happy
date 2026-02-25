@@ -628,17 +628,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
             sessionSubagentForCall,
             pickTaskTitle(block.input) ?? prompt,
           );
-          getHiddenParentToolCalls(state).add(call);
-
-          const buffered = consumeBufferedSubagentMessages(state, call);
-          for (const bufferedMessage of buffered) {
-            const replay = mapClaudeLogMessageToSessionEnvelopesInternal(
-              bufferedMessage,
-              state,
-            );
-            envelopes.push(...replay.envelopes);
-          }
-          continue;
+          // Fall through to emit tool-call-start envelope like regular tools
         }
 
         envelopes.push(

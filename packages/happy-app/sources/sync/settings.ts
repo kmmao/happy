@@ -489,7 +489,7 @@ export const settingsDefaults: Settings = {
   wrapLinesInDiffs: false,
   analyticsOptOut: false,
   experiments: false,
-  showAgentActivity: false,
+  showAgentActivity: true,
   autoApprovePlan: false,
   useEnhancedSessionWizard: false,
   alwaysShowContextSize: true,
