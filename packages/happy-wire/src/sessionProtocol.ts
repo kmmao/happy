@@ -90,6 +90,48 @@ export const sessionUsageUpdateEventSchema = z.object({
   durationMs: z.number().optional(),
 });
 
+export const sessionTaskStartEventSchema = z.object({
+  t: z.literal("task-start"),
+  taskId: z.string(),
+  toolUseId: z.string().optional(),
+  description: z.string(),
+  taskType: z.string().optional(),
+});
+
+export const sessionTaskProgressEventSchema = z.object({
+  t: z.literal("task-progress"),
+  taskId: z.string(),
+  description: z.string(),
+  usage: z.object({
+    totalTokens: z.number(),
+    toolUses: z.number(),
+    durationMs: z.number(),
+  }),
+  lastToolName: z.string().optional(),
+});
+
+export const sessionTaskEndEventSchema = z.object({
+  t: z.literal("task-end"),
+  taskId: z.string(),
+  status: z.enum(["completed", "failed", "stopped"]),
+  summary: z.string(),
+  usage: z
+    .object({
+      totalTokens: z.number(),
+      toolUses: z.number(),
+      durationMs: z.number(),
+    })
+    .optional(),
+});
+
+export const sessionToolProgressEventSchema = z.object({
+  t: z.literal("tool-progress"),
+  toolUseId: z.string(),
+  toolName: z.string(),
+  elapsedSeconds: z.number(),
+  taskId: z.string().optional(),
+});
+
 export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -101,6 +143,10 @@ export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTurnEndEventSchema,
   sessionStopEventSchema,
   sessionUsageUpdateEventSchema,
+  sessionTaskStartEventSchema,
+  sessionTaskProgressEventSchema,
+  sessionTaskEndEventSchema,
+  sessionToolProgressEventSchema,
 ]);
 
 export type SessionEvent = z.infer<typeof sessionEventSchema>;
@@ -130,7 +176,11 @@ export const sessionEnvelopeSchema = z
     if (
       (envelope.ev.t === "start" ||
         envelope.ev.t === "stop" ||
-        envelope.ev.t === "usage-update") &&
+        envelope.ev.t === "usage-update" ||
+        envelope.ev.t === "task-start" ||
+        envelope.ev.t === "task-progress" ||
+        envelope.ev.t === "task-end" ||
+        envelope.ev.t === "tool-progress") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({
