@@ -10,7 +10,9 @@ global.setTimeout = function(callback, delay, ...args) {
 Object.defineProperty(global.setTimeout, 'name', { value: 'setTimeout' });
 Object.defineProperty(global.setTimeout, 'length', { value: originalSetTimeout.length });
 
-// Import global Claude Code CLI
+// Import global Claude Code CLI (CJS interop via createRequire)
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 const { getClaudeCliPath, runClaudeCli } = require('./claude_version_utils.cjs');
 
 runClaudeCli(getClaudeCliPath());
