@@ -12,6 +12,16 @@ export const MessageMetaSchema = z.object({
   disallowedTools: z.array(z.string()).nullable().optional(), // Disallowed tools for this message (null = reset)
   autoApprovePlan: z.boolean().optional(), // Auto-approve ExitPlanMode without showing confirmation buttons
   displayText: z.string().optional(), // Optional text to display in UI instead of actual message text
+  // SDK reasoning & budget controls (Phase 3A)
+  maxBudgetUsd: z.number().nullable().optional(), // Max budget in USD for the session
+  thinking: z
+    .object({
+      type: z.enum(["adaptive", "enabled", "disabled"]),
+      budgetTokens: z.number().optional(),
+    })
+    .nullable()
+    .optional(), // Thinking configuration
+  effort: z.enum(["low", "medium", "high", "max"]).nullable().optional(), // Reasoning effort level
 });
 
 export type MessageMeta = z.infer<typeof MessageMetaSchema>;

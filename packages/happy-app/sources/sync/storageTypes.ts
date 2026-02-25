@@ -119,6 +119,11 @@ export interface Session {
   draft?: string | null; // Local draft message, not synced to server
   permissionMode?: string | null; // Local permission mode key, not synced to server
   modelMode?: string | null; // Local model key, not synced to server
+  // SDK reasoning & budget controls (Phase 3A)
+  thinkingMode?: string | null; // "disabled" | "adaptive" | "enabled"
+  thinkingBudget?: number | null; // Budget tokens when thinkingMode is "enabled"
+  effortLevel?: string | null; // "low" | "medium" | "high" | "max"
+  maxBudgetUsd?: number | null; // Max budget in USD
   // IMPORTANT: latestUsage is extracted from reducerState.latestUsage after message processing.
   // We store it directly on Session to ensure it's available immediately on load.
   // Do NOT store reducerState itself on Session - it's mutable and should only exist in SessionMessages.

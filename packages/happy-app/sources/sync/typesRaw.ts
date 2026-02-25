@@ -146,6 +146,49 @@ const sessionUsageUpdateEventSchema = z.object({
   durationMs: z.number().optional(),
 });
 
+// Task lifecycle events (Phase 2 wire protocol)
+const sessionTaskStartEventSchema = z.object({
+  t: z.literal("task-start"),
+  taskId: z.string(),
+  toolUseId: z.string().optional(),
+  description: z.string(),
+  taskType: z.string().optional(),
+});
+
+const sessionTaskProgressEventSchema = z.object({
+  t: z.literal("task-progress"),
+  taskId: z.string(),
+  description: z.string(),
+  usage: z.object({
+    totalTokens: z.number(),
+    toolUses: z.number(),
+    durationMs: z.number(),
+  }),
+  lastToolName: z.string().optional(),
+});
+
+const sessionTaskEndEventSchema = z.object({
+  t: z.literal("task-end"),
+  taskId: z.string(),
+  status: z.enum(["completed", "failed", "stopped"]),
+  summary: z.string(),
+  usage: z
+    .object({
+      totalTokens: z.number(),
+      toolUses: z.number(),
+      durationMs: z.number(),
+    })
+    .optional(),
+});
+
+const sessionToolProgressEventSchema = z.object({
+  t: z.literal("tool-progress"),
+  toolUseId: z.string(),
+  toolName: z.string(),
+  elapsedSeconds: z.number(),
+  taskId: z.string().optional(),
+});
+
 const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -157,6 +200,10 @@ const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTurnEndEventSchema,
   sessionStopEventSchema,
   sessionUsageUpdateEventSchema,
+  sessionTaskStartEventSchema,
+  sessionTaskProgressEventSchema,
+  sessionTaskEndEventSchema,
+  sessionToolProgressEventSchema,
 ]);
 
 const sessionEnvelopeSchema = z
@@ -184,7 +231,11 @@ const sessionEnvelopeSchema = z
     if (
       (envelope.ev.t === "start" ||
         envelope.ev.t === "stop" ||
-        envelope.ev.t === "usage-update") &&
+        envelope.ev.t === "usage-update" ||
+        envelope.ev.t === "task-start" ||
+        envelope.ev.t === "task-progress" ||
+        envelope.ev.t === "task-end" ||
+        envelope.ev.t === "tool-progress") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({
@@ -699,6 +750,61 @@ function normalizeSessionEnvelope(
 
   if (envelope.ev.t === "start" || envelope.ev.t === "stop") {
     // Lifecycle marker for subagent boundaries; currently not rendered as chat content.
+    return null;
+  }
+
+  // Task lifecycle events — rendered as service messages for visibility
+  if (envelope.ev.t === "task-start") {
+    return {
+      id: messageId,
+      localId,
+      createdAt: messageCreatedAt,
+      role: "agent",
+      isSidechain,
+      content: [
+        {
+          type: "text",
+          text: `**Task:** ${envelope.ev.description}${envelope.ev.taskType ? ` (${envelope.ev.taskType})` : ""}`,
+          uuid: contentUUID,
+          parentUUID,
+        },
+      ],
+      meta,
+    } satisfies NormalizedMessage;
+  }
+
+  if (envelope.ev.t === "task-progress") {
+    // Task progress updates — skip to avoid flooding chat
+    return null;
+  }
+
+  if (envelope.ev.t === "task-end") {
+    const statusIcon =
+      envelope.ev.status === "completed"
+        ? "✓"
+        : envelope.ev.status === "failed"
+          ? "✗"
+          : "■";
+    return {
+      id: messageId,
+      localId,
+      createdAt: messageCreatedAt,
+      role: "agent",
+      isSidechain,
+      content: [
+        {
+          type: "text",
+          text: `${statusIcon} **Task ${envelope.ev.status}:** ${envelope.ev.summary}`,
+          uuid: contentUUID,
+          parentUUID,
+        },
+      ],
+      meta,
+    } satisfies NormalizedMessage;
+  }
+
+  if (envelope.ev.t === "tool-progress") {
+    // Tool progress updates — skip to avoid flooding chat
     return null;
   }
 

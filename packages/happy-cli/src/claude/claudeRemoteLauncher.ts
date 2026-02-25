@@ -680,7 +680,7 @@ export async function claudeRemoteLauncher(
             if (info.models && info.models.length > 0) {
               session.client.updateMetadata((m) => ({
                 ...m,
-                supportedModels: info.models,
+                models: info.models,
               }));
             }
           },

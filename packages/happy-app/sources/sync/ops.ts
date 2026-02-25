@@ -322,12 +322,29 @@ export async function machineUpdateMetadata(
 }
 
 /**
- * Abort the current session operation
+ * Abort the current session operation (kills the process)
  */
 export async function sessionAbort(sessionId: string): Promise<void> {
   await apiSocket.sessionRPC(sessionId, "abort", {
     reason: `The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.`,
   });
+}
+
+/**
+ * Interrupt the current session operation (graceful, keeps process alive)
+ */
+export async function sessionInterrupt(sessionId: string): Promise<void> {
+  await apiSocket.sessionRPC(sessionId, "interrupt", {});
+}
+
+/**
+ * Stop a specific background task
+ */
+export async function sessionStopTask(
+  sessionId: string,
+  taskId: string,
+): Promise<void> {
+  await apiSocket.sessionRPC(sessionId, "stopTask", { taskId });
 }
 
 /**

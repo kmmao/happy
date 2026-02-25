@@ -67,6 +67,13 @@ interface AgentInputProps {
   modelMode?: ModelMode | null;
   availableModels?: ModelMode[];
   onModelModeChange?: (mode: ModelMode) => void;
+  // SDK reasoning & budget settings
+  thinkingMode?: string | null;
+  effortLevel?: string | null;
+  maxBudgetUsd?: number | null;
+  onThinkingModeChange?: (mode: string) => void;
+  onEffortLevelChange?: (level: string) => void;
+  onMaxBudgetUsdChange?: (budget: number | null) => void;
   metadata?: Metadata | null;
   onAbort?: () => void | Promise<void>;
   showAbortButton?: boolean;
@@ -1062,6 +1069,253 @@ export const AgentInput = React.memo(
                       </Text>
                     )}
                   </View>
+
+                  {/* Effort Level Section (only for Claude) */}
+                  {!isCodex && !isGemini && props.onEffortLevelChange && (
+                    <>
+                      <View
+                        style={{
+                          height: 1,
+                          backgroundColor: theme.colors.divider,
+                          marginHorizontal: 16,
+                        }}
+                      />
+                      <View style={{ paddingVertical: 8 }}>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "600",
+                            color: theme.colors.textSecondary,
+                            paddingHorizontal: 16,
+                            paddingBottom: 4,
+                            ...Typography.default("semiBold"),
+                          }}
+                        >
+                          {t("agentInput.effort.title")}
+                        </Text>
+                        {(
+                          [
+                            {
+                              key: "high",
+                              name: t("agentInput.effort.high"),
+                              description: t("agentInput.effort.highDesc"),
+                            },
+                            {
+                              key: "max",
+                              name: t("agentInput.effort.max"),
+                              description: t("agentInput.effort.maxDesc"),
+                            },
+                            {
+                              key: "medium",
+                              name: t("agentInput.effort.medium"),
+                              description: t("agentInput.effort.mediumDesc"),
+                            },
+                            {
+                              key: "low",
+                              name: t("agentInput.effort.low"),
+                              description: t("agentInput.effort.lowDesc"),
+                            },
+                          ] as const
+                        ).map((level) => {
+                          const isSelected =
+                            props.effortLevel === level.key ||
+                            (!props.effortLevel && level.key === "high");
+
+                          return (
+                            <Pressable
+                              key={level.key}
+                              onPress={() => {
+                                hapticsLight();
+                                props.onEffortLevelChange?.(level.key);
+                              }}
+                              style={({ pressed }) => ({
+                                flexDirection: "row",
+                                alignItems: "center",
+                                paddingHorizontal: 16,
+                                paddingVertical: 8,
+                                backgroundColor: pressed
+                                  ? theme.colors.surfacePressed
+                                  : "transparent",
+                              })}
+                            >
+                              <View
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: 8,
+                                  borderWidth: 2,
+                                  borderColor: isSelected
+                                    ? theme.colors.radio.active
+                                    : theme.colors.radio.inactive,
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  marginRight: 12,
+                                }}
+                              >
+                                {isSelected && (
+                                  <View
+                                    style={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: 3,
+                                      backgroundColor: theme.colors.radio.dot,
+                                    }}
+                                  />
+                                )}
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text
+                                  style={{
+                                    fontSize: 14,
+                                    color: isSelected
+                                      ? theme.colors.radio.active
+                                      : theme.colors.text,
+                                    ...Typography.default(),
+                                  }}
+                                >
+                                  {level.name}
+                                </Text>
+                                {!!level.description && (
+                                  <Text
+                                    style={{
+                                      fontSize: 11,
+                                      color: theme.colors.textSecondary,
+                                      ...Typography.default(),
+                                    }}
+                                  >
+                                    {level.description}
+                                  </Text>
+                                )}
+                              </View>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </>
+                  )}
+
+                  {/* Thinking Mode Section (only for Claude) */}
+                  {!isCodex && !isGemini && props.onThinkingModeChange && (
+                    <>
+                      <View
+                        style={{
+                          height: 1,
+                          backgroundColor: theme.colors.divider,
+                          marginHorizontal: 16,
+                        }}
+                      />
+                      <View style={{ paddingVertical: 8 }}>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "600",
+                            color: theme.colors.textSecondary,
+                            paddingHorizontal: 16,
+                            paddingBottom: 4,
+                            ...Typography.default("semiBold"),
+                          }}
+                        >
+                          {t("agentInput.thinking.title")}
+                        </Text>
+                        {(
+                          [
+                            {
+                              key: "adaptive",
+                              name: t("agentInput.thinking.adaptive"),
+                              description: t(
+                                "agentInput.thinking.adaptiveDesc",
+                              ),
+                            },
+                            {
+                              key: "enabled",
+                              name: t("agentInput.thinking.enabled"),
+                              description: t("agentInput.thinking.enabledDesc"),
+                            },
+                            {
+                              key: "disabled",
+                              name: t("agentInput.thinking.disabled"),
+                              description: t(
+                                "agentInput.thinking.disabledDesc",
+                              ),
+                            },
+                          ] as const
+                        ).map((mode) => {
+                          const isSelected =
+                            props.thinkingMode === mode.key ||
+                            (!props.thinkingMode && mode.key === "adaptive");
+
+                          return (
+                            <Pressable
+                              key={mode.key}
+                              onPress={() => {
+                                hapticsLight();
+                                props.onThinkingModeChange?.(mode.key);
+                              }}
+                              style={({ pressed }) => ({
+                                flexDirection: "row",
+                                alignItems: "center",
+                                paddingHorizontal: 16,
+                                paddingVertical: 8,
+                                backgroundColor: pressed
+                                  ? theme.colors.surfacePressed
+                                  : "transparent",
+                              })}
+                            >
+                              <View
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: 8,
+                                  borderWidth: 2,
+                                  borderColor: isSelected
+                                    ? theme.colors.radio.active
+                                    : theme.colors.radio.inactive,
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  marginRight: 12,
+                                }}
+                              >
+                                {isSelected && (
+                                  <View
+                                    style={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: 3,
+                                      backgroundColor: theme.colors.radio.dot,
+                                    }}
+                                  />
+                                )}
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text
+                                  style={{
+                                    fontSize: 14,
+                                    color: isSelected
+                                      ? theme.colors.radio.active
+                                      : theme.colors.text,
+                                    ...Typography.default(),
+                                  }}
+                                >
+                                  {mode.name}
+                                </Text>
+                                {!!mode.description && (
+                                  <Text
+                                    style={{
+                                      fontSize: 11,
+                                      color: theme.colors.textSecondary,
+                                      ...Typography.default(),
+                                    }}
+                                  >
+                                    {mode.description}
+                                  </Text>
+                                )}
+                              </View>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </>
+                  )}
                 </FloatingOverlay>
               </View>
             </>
@@ -1326,6 +1580,27 @@ export const AgentInput = React.memo(
                     {props.modelMode.name}
                   </Text>
                 )}
+                {props.effortLevel &&
+                  props.effortLevel !== "high" &&
+                  !isCodex &&
+                  !isGemini && (
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color:
+                          props.effortLevel === "max"
+                            ? theme.colors.radio.active
+                            : theme.colors.textSecondary,
+                        ...Typography.default(),
+                      }}
+                    >
+                      {props.effortLevel === "low"
+                        ? t("agentInput.effort.low")
+                        : props.effortLevel === "medium"
+                          ? t("agentInput.effort.medium")
+                          : t("agentInput.effort.max")}
+                    </Text>
+                  )}
               </View>
             </View>
           )}

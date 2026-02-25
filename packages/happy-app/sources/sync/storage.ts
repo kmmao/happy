@@ -25,6 +25,9 @@ import {
   saveSessionPermissionModes,
   loadSessionModelModes,
   saveSessionModelModes,
+  loadSessionSdkSettings,
+  saveSessionSdkSettings,
+  type SessionSdkSettings,
   loadSessionNeedsAttention,
   saveSessionNeedsAttention,
   deleteSessionBookmarks,
@@ -178,6 +181,10 @@ interface StorageState {
   updateSessionDraft: (sessionId: string, draft: string | null) => void;
   updateSessionPermissionMode: (sessionId: string, mode: string) => void;
   updateSessionModelMode: (sessionId: string, mode: string) => void;
+  updateSessionSdkSettings: (
+    sessionId: string,
+    settings: SessionSdkSettings,
+  ) => void;
   // Artifact methods
   applyArtifacts: (artifacts: DecryptedArtifact[]) => void;
   addArtifact: (artifact: DecryptedArtifact) => void;
@@ -332,6 +339,7 @@ export const storage = create<StorageState>()((set, get) => {
   let sessionDrafts = loadSessionDrafts();
   let sessionPermissionModes = loadSessionPermissionModes();
   let sessionModelModes = loadSessionModelModes();
+  let sessionSdkSettings = loadSessionSdkSettings();
   let sessionNeedsAttention = loadSessionNeedsAttention();
   return {
     settings,
@@ -402,6 +410,7 @@ export const storage = create<StorageState>()((set, get) => {
           ? sessionPermissionModes
           : {};
         const savedModelModes = isInitialLoad ? sessionModelModes : {};
+        const savedSdkSettings = isInitialLoad ? sessionSdkSettings : {};
         const savedNeedsAttention = isInitialLoad ? sessionNeedsAttention : {};
 
         // Merge new sessions with existing ones
@@ -450,6 +459,18 @@ export const storage = create<StorageState>()((set, get) => {
               : undefined) ||
             "default";
 
+          // Resolve SDK settings: prefer existing, then saved
+          const existingSdk = state.sessions[session.id];
+          const savedSdk = savedSdkSettings[session.id];
+          const resolvedThinkingMode =
+            existingSdk?.thinkingMode ?? savedSdk?.thinkingMode ?? null;
+          const resolvedThinkingBudget =
+            existingSdk?.thinkingBudget ?? savedSdk?.thinkingBudget ?? null;
+          const resolvedEffortLevel =
+            existingSdk?.effortLevel ?? savedSdk?.effortLevel ?? null;
+          const resolvedMaxBudgetUsd =
+            existingSdk?.maxBudgetUsd ?? savedSdk?.maxBudgetUsd ?? null;
+
           // Resolve needsAttention: prefer explicit value from update, then existing, then saved
           const existingNeedsAttention =
             state.sessions[session.id]?.needsAttention;
@@ -465,6 +486,10 @@ export const storage = create<StorageState>()((set, get) => {
             draft: existingDraft || savedDraft || session.draft || null,
             permissionMode: resolvedPermissionMode,
             modelMode: resolvedModelMode,
+            thinkingMode: resolvedThinkingMode,
+            thinkingBudget: resolvedThinkingBudget,
+            effortLevel: resolvedEffortLevel,
+            maxBudgetUsd: resolvedMaxBudgetUsd,
             needsAttention: resolvedNeedsAttention,
           };
         });
@@ -1095,6 +1120,53 @@ export const storage = create<StorageState>()((set, get) => {
           sessions: updatedSessions,
         };
       }),
+    updateSessionSdkSettings: (
+      sessionId: string,
+      settings: SessionSdkSettings,
+    ) =>
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) return state;
+
+        const updatedSessions = {
+          ...state.sessions,
+          [sessionId]: {
+            ...session,
+            ...("thinkingMode" in settings && {
+              thinkingMode: settings.thinkingMode,
+            }),
+            ...("thinkingBudget" in settings && {
+              thinkingBudget: settings.thinkingBudget,
+            }),
+            ...("effortLevel" in settings && {
+              effortLevel: settings.effortLevel,
+            }),
+            ...("maxBudgetUsd" in settings && {
+              maxBudgetUsd: settings.maxBudgetUsd,
+            }),
+          },
+        };
+
+        // Persist SDK settings (only sessions with non-null values)
+        const allSdkSettings: Record<string, SessionSdkSettings> = {};
+        Object.entries(updatedSessions).forEach(([id, sess]) => {
+          const sdk: SessionSdkSettings = {};
+          if (sess.thinkingMode) sdk.thinkingMode = sess.thinkingMode;
+          if (sess.thinkingBudget != null)
+            sdk.thinkingBudget = sess.thinkingBudget;
+          if (sess.effortLevel) sdk.effortLevel = sess.effortLevel;
+          if (sess.maxBudgetUsd != null) sdk.maxBudgetUsd = sess.maxBudgetUsd;
+          if (Object.keys(sdk).length > 0) {
+            allSdkSettings[id] = sdk;
+          }
+        });
+        saveSessionSdkSettings(allSdkSettings);
+
+        return {
+          ...state,
+          sessions: updatedSessions,
+        };
+      }),
     // Project management methods
     getProjects: () => projectManager.getProjects(),
     getProject: (projectId: string) => projectManager.getProject(projectId),
@@ -1224,6 +1296,10 @@ export const storage = create<StorageState>()((set, get) => {
         const attention = loadSessionNeedsAttention();
         delete attention[sessionId];
         saveSessionNeedsAttention(attention);
+
+        const { [sessionId]: _sdk, ...remainingSdkSettings } =
+          loadSessionSdkSettings();
+        saveSessionSdkSettings(remainingSdkSettings);
 
         deleteSessionBookmarks(sessionId);
 

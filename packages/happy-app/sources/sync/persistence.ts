@@ -225,6 +225,33 @@ export function saveSessionModelModes(modes: Record<string, string>) {
   mmkv.set("session-model-modes", JSON.stringify(modes));
 }
 
+// SDK settings per session (thinking, effort, budget)
+export interface SessionSdkSettings {
+  thinkingMode?: string | null;
+  thinkingBudget?: number | null;
+  effortLevel?: string | null;
+  maxBudgetUsd?: number | null;
+}
+
+export function loadSessionSdkSettings(): Record<string, SessionSdkSettings> {
+  const data = mmkv.getString("session-sdk-settings");
+  if (data) {
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error("Failed to parse session SDK settings", e);
+      return {};
+    }
+  }
+  return {};
+}
+
+export function saveSessionSdkSettings(
+  settings: Record<string, SessionSdkSettings>,
+) {
+  mmkv.set("session-sdk-settings", JSON.stringify(settings));
+}
+
 export function loadSessionNeedsAttention(): Record<string, boolean> {
   const data = mmkv.getString("session-needs-attention");
   if (data) {

@@ -12,6 +12,9 @@ describe("resolveMessageModeMeta", () => {
     expect(meta).toEqual({
       permissionMode: "read-only",
       model: "gpt-5-high",
+      thinking: null,
+      effort: null,
+      maxBudgetUsd: null,
     });
   });
 
@@ -27,6 +30,9 @@ describe("resolveMessageModeMeta", () => {
     expect(meta).toEqual({
       permissionMode: "bypassPermissions",
       model: null,
+      thinking: null,
+      effort: null,
+      maxBudgetUsd: null,
     });
   });
 
@@ -40,6 +46,9 @@ describe("resolveMessageModeMeta", () => {
     expect(meta).toEqual({
       permissionMode: "default",
       model: "adaptiveUsage:opus",
+      thinking: null,
+      effort: null,
+      maxBudgetUsd: null,
     });
   });
 
@@ -53,6 +62,9 @@ describe("resolveMessageModeMeta", () => {
     expect(meta).toEqual({
       permissionMode: "default",
       model: "adaptiveUsage:haiku",
+      thinking: null,
+      effort: null,
+      maxBudgetUsd: null,
     });
   });
 
@@ -68,6 +80,79 @@ describe("resolveMessageModeMeta", () => {
     expect(meta).toEqual({
       permissionMode: "default",
       model: null,
+      thinking: null,
+      effort: null,
+      maxBudgetUsd: null,
     });
+  });
+
+  it("resolves thinking mode as adaptive", () => {
+    const meta = resolveMessageModeMeta({
+      permissionMode: "default",
+      modelMode: "default",
+      metadata: null,
+      thinkingMode: "adaptive",
+      thinkingBudget: null,
+      effortLevel: null,
+      maxBudgetUsd: null,
+    } as any);
+
+    expect(meta.thinking).toEqual({ type: "adaptive" });
+  });
+
+  it("resolves thinking mode as enabled with budget", () => {
+    const meta = resolveMessageModeMeta({
+      permissionMode: "default",
+      modelMode: "default",
+      metadata: null,
+      thinkingMode: "enabled",
+      thinkingBudget: 8000,
+      effortLevel: null,
+      maxBudgetUsd: null,
+    } as any);
+
+    expect(meta.thinking).toEqual({ type: "enabled", budgetTokens: 8000 });
+  });
+
+  it("resolves effort level", () => {
+    const meta = resolveMessageModeMeta({
+      permissionMode: "default",
+      modelMode: "default",
+      metadata: null,
+      thinkingMode: null,
+      thinkingBudget: null,
+      effortLevel: "max",
+      maxBudgetUsd: null,
+    } as any);
+
+    expect(meta.effort).toBe("max");
+  });
+
+  it("resolves maxBudgetUsd", () => {
+    const meta = resolveMessageModeMeta({
+      permissionMode: "default",
+      modelMode: "default",
+      metadata: null,
+      thinkingMode: null,
+      thinkingBudget: null,
+      effortLevel: null,
+      maxBudgetUsd: 5.0,
+    } as any);
+
+    expect(meta.maxBudgetUsd).toBe(5.0);
+  });
+
+  it("returns null thinking when mode is disabled", () => {
+    const meta = resolveMessageModeMeta({
+      permissionMode: "default",
+      modelMode: "default",
+      metadata: null,
+      thinkingMode: "disabled",
+      thinkingBudget: null,
+      effortLevel: null,
+      maxBudgetUsd: null,
+    } as any);
+
+    expect(meta.thinking).toBeNull();
   });
 });

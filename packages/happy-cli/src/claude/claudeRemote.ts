@@ -95,7 +95,7 @@ export async function claudeRemote(opts: {
   ) => void;
   /** Called with initialization info (supported models) after system init */
   onInitialized?: (info: {
-    models?: Array<{ id: string; name?: string }>;
+    models?: Array<{ code: string; value: string; description: string | null }>;
   }) => void;
 }) {
   // Check if session is valid
@@ -324,8 +324,9 @@ export async function claudeRemote(opts: {
               if (signal?.aborted) return; // session already torn down
               opts.onInitialized?.({
                 models: initResult.models?.map((m) => ({
-                  id: m.value,
-                  name: m.displayName,
+                  code: m.value,
+                  value: m.displayName ?? m.value,
+                  description: m.description ?? null,
                 })),
               });
             })

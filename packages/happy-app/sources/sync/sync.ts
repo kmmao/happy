@@ -513,7 +513,8 @@ class Sync {
       storage.getState().applySessions([{ ...session, needsAttention: false }]);
     }
 
-    const { permissionMode, model } = resolveMessageModeMeta(session);
+    const { permissionMode, model, thinking, effort, maxBudgetUsd } =
+      resolveMessageModeMeta(session);
     const autoApprovePlan =
       storage.getState().settings.autoApprovePlan || false;
 
@@ -553,7 +554,10 @@ class Sync {
         fallbackModel,
         appendSystemPrompt: systemPrompt,
         ...(autoApprovePlan && { autoApprovePlan }),
-        ...(displayText && { displayText }), // Add displayText if provided
+        ...(displayText && { displayText }),
+        ...(thinking && { thinking }),
+        ...(effort && { effort }),
+        ...(maxBudgetUsd != null && { maxBudgetUsd }),
       },
     };
     const encryptedRawRecord = await encryption.encryptRawRecord(content);

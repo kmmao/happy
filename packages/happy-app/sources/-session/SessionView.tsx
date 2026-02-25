@@ -26,7 +26,11 @@ import {
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
 import { gitStatusSync } from "@/sync/gitStatusSync";
-import { sessionAbort, sessionGetCompactionSummary } from "@/sync/ops";
+import {
+  sessionAbort,
+  sessionInterrupt,
+  sessionGetCompactionSummary,
+} from "@/sync/ops";
 import {
   storage,
   useIsDataReady,
@@ -484,6 +488,34 @@ function SessionViewInner({
     [sessionId],
   );
 
+  // SDK settings callbacks
+  const updateThinkingMode = React.useCallback(
+    (mode: string) => {
+      storage
+        .getState()
+        .updateSessionSdkSettings(sessionId, { thinkingMode: mode });
+    },
+    [sessionId],
+  );
+
+  const updateEffortLevel = React.useCallback(
+    (level: string) => {
+      storage
+        .getState()
+        .updateSessionSdkSettings(sessionId, { effortLevel: level });
+    },
+    [sessionId],
+  );
+
+  const updateMaxBudgetUsd = React.useCallback(
+    (budget: number | null) => {
+      storage
+        .getState()
+        .updateSessionSdkSettings(sessionId, { maxBudgetUsd: budget });
+    },
+    [sessionId],
+  );
+
   // Handle microphone button press - memoized to prevent button flashing
   const handleMicrophonePress = React.useCallback(async () => {
     if (realtimeStatus === "connecting") {
@@ -588,6 +620,12 @@ function SessionViewInner({
         modelMode={modelMode}
         availableModels={availableModels}
         onModelModeChange={updateModelMode}
+        thinkingMode={session.thinkingMode}
+        effortLevel={session.effortLevel}
+        maxBudgetUsd={session.maxBudgetUsd}
+        onThinkingModeChange={updateThinkingMode}
+        onEffortLevelChange={updateEffortLevel}
+        onMaxBudgetUsdChange={updateMaxBudgetUsd}
         metadata={session.metadata}
         connectionStatus={{
           text: sessionStatus.statusText,
@@ -645,7 +683,7 @@ function SessionViewInner({
         isMicActive={micButtonState.isMicActive}
         onSttPress={onSttToggle}
         isSttListening={stt.isListening}
-        onAbort={() => sessionAbort(sessionId)}
+        onAbort={() => sessionInterrupt(sessionId).catch(() => {})}
         showAbortButton={
           sessionStatus.state === "thinking" ||
           sessionStatus.state === "waiting"
