@@ -79,6 +79,11 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
     result.extraArgs = { ...result.extraArgs, settings: opts.settingsPath };
   }
 
+  // ── Budget, thinking, and effort ──
+  if (opts.maxBudgetUsd != null) result.maxBudgetUsd = opts.maxBudgetUsd;
+  if (opts.thinking) result.thinking = opts.thinking;
+  if (opts.effort != null) result.effort = opts.effort;
+
   // ── Load user & project settings so custom skills/commands are discovered ──
   // The SDK defaults settingSources to [] which produces --setting-sources "",
   // causing Claude Code to skip loading ~/.claude/commands/ and project commands.

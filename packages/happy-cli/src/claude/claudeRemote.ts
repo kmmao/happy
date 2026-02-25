@@ -89,6 +89,14 @@ export async function claudeRemote(opts: {
   onCompletionEvent?: (message: string) => void;
   onShellResult?: (output: string) => void;
   onSessionReset?: () => void;
+  /** Called when the SDK Query object is ready, exposing it for runtime control (interrupt, stopTask, etc.) */
+  onQueryReady?: (
+    query: import("@anthropic-ai/claude-agent-sdk").Query,
+  ) => void;
+  /** Called with initialization info (supported models) after system init */
+  onInitialized?: (info: {
+    models?: Array<{ id: string; name?: string }>;
+  }) => void;
 }) {
   // Check if session is valid
   let startFrom = opts.sessionId;
@@ -226,6 +234,9 @@ export async function claudeRemote(opts: {
       );
     })(),
     settingsPath: opts.hookSettingsPath,
+    maxBudgetUsd: initial.mode.maxBudgetUsd,
+    thinking: initial.mode.thinking,
+    effort: initial.mode.effort,
   };
 
   // Track thinking state
@@ -269,6 +280,9 @@ export async function claudeRemote(opts: {
     },
   });
 
+  // Expose the underlying SDK Query for runtime control (interrupt, stopTask, etc.)
+  opts.onQueryReady?.((response as AdaptedQuery)._officialQuery);
+
   updateThinking(true);
   try {
     logger.debug(`[claudeRemote] Starting to iterate over response`);
@@ -298,6 +312,29 @@ export async function claudeRemote(opts: {
             `[claudeRemote] Session file found: ${systemInit.session_id} ${found}`,
           );
           opts.onSessionFound(systemInit.session_id);
+        }
+
+        // Fetch initialization result (supported models) asynchronously
+        if (opts.onInitialized) {
+          const officialQuery = (response as AdaptedQuery)._officialQuery;
+          const signal = opts.signal;
+          officialQuery
+            .initializationResult()
+            .then((initResult) => {
+              if (signal?.aborted) return; // session already torn down
+              opts.onInitialized?.({
+                models: initResult.models?.map((m) => ({
+                  id: m.value,
+                  name: m.displayName,
+                })),
+              });
+            })
+            .catch((e) => {
+              logger.debug(
+                "[claudeRemote] Failed to get initializationResult:",
+                e,
+              );
+            });
         }
       }
 
@@ -361,6 +398,31 @@ export async function claudeRemote(opts: {
           );
           await (response as AdaptedQuery)._officialQuery.setModel(newModel);
           model = newModel;
+        }
+
+        // Hot-swap permissionMode via setPermissionMode() if changed (non-plan, non-bypass ↔ non-plan, non-bypass)
+        // Plan and bypass transitions require cold restart (handled by coldModeHash in launcher).
+        const newPermissionMode = mapToClaudeMode(next.mode.permissionMode);
+        const currentPermissionMode = mapToClaudeMode(mode.permissionMode);
+        if (newPermissionMode !== currentPermissionMode) {
+          if (
+            newPermissionMode === "plan" ||
+            currentPermissionMode === "plan" ||
+            newPermissionMode === "bypassPermissions" ||
+            currentPermissionMode === "bypassPermissions"
+          ) {
+            // Should never reach here: plan/bypass transitions are caught by coldModeHash.
+            logger.debug(
+              `[claudeRemote] BUG: plan/bypass transition reached setPermissionMode — skipping (${currentPermissionMode} → ${newPermissionMode})`,
+            );
+          } else {
+            logger.debug(
+              `[claudeRemote] Hot-swapping permissionMode: ${currentPermissionMode} → ${newPermissionMode}`,
+            );
+            await (response as AdaptedQuery)._officialQuery.setPermissionMode(
+              newPermissionMode,
+            );
+          }
         }
 
         mode = next.mode;

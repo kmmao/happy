@@ -227,6 +227,15 @@ export const MessageMetaSchema = z.object({
   allowedTools: z.array(z.string()).nullable().optional(), // Allowed tools for this message (null = reset)
   disallowedTools: z.array(z.string()).nullable().optional(), // Disallowed tools for this message (null = reset)
   autoApprovePlan: z.boolean().optional(), // Auto-approve ExitPlanMode without showing confirmation buttons
+  maxBudgetUsd: z.number().nullable().optional(), // Maximum USD budget for this session (null = reset)
+  thinking: z
+    .object({
+      type: z.enum(["adaptive", "enabled", "disabled"]),
+      budgetTokens: z.number().optional(),
+    })
+    .nullable()
+    .optional(), // Thinking/reasoning behavior (null = reset)
+  effort: z.enum(["low", "medium", "high", "max"]).nullable().optional(), // Effort level (null = reset)
 });
 
 export type MessageMeta = z.infer<typeof MessageMetaSchema>;

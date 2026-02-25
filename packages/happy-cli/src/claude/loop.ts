@@ -7,6 +7,7 @@ import { claudeRemoteLauncher } from "./claudeRemoteLauncher";
 import { ApiClient } from "@/lib";
 import type { JsRuntime } from "./runClaude";
 import type { SandboxConfig } from "@/persistence";
+import type { ThinkingConfig } from "./sdk/types";
 
 // Re-export permission mode type from api/types
 // Single unified type with 7 modes - Codex modes mapped at SDK boundary
@@ -22,6 +23,12 @@ export interface EnhancedMode {
   allowedTools?: string[];
   disallowedTools?: string[];
   autoApprovePlan?: boolean;
+  /** Maximum USD budget — SDK returns error_max_budget_usd when exceeded */
+  maxBudgetUsd?: number;
+  /** Controls thinking/reasoning behavior (adaptive, enabled, disabled) */
+  thinking?: ThinkingConfig;
+  /** Controls how much effort Claude puts into its response */
+  effort?: "low" | "medium" | "high" | "max";
 }
 
 interface LoopOptions {

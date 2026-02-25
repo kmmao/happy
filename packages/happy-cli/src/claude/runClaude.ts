@@ -306,13 +306,16 @@ export async function runClaude(
   // Import MessageQueue2 and create message queue
   const messageQueue = new MessageQueue2<EnhancedMode>((mode) =>
     hashObject({
-      isPlan: mode.permissionMode === "plan",
+      permissionMode: mode.permissionMode,
       model: mode.model,
       fallbackModel: mode.fallbackModel,
       customSystemPrompt: mode.customSystemPrompt,
       appendSystemPrompt: mode.appendSystemPrompt,
       allowedTools: mode.allowedTools,
       disallowedTools: mode.disallowedTools,
+      maxBudgetUsd: mode.maxBudgetUsd,
+      thinking: mode.thinking,
+      effort: mode.effort,
     }),
   );
 
@@ -326,6 +329,9 @@ export async function runClaude(
   let currentAllowedTools: string[] | undefined = undefined; // Track current allowed tools
   let currentDisallowedTools: string[] | undefined = undefined; // Track current disallowed tools
   let currentAutoApprovePlan = false; // Track auto-approve plan setting
+  let currentMaxBudgetUsd: number | undefined = undefined; // Track current budget
+  let currentThinking: EnhancedMode["thinking"] = undefined; // Track current thinking config
+  let currentEffort: EnhancedMode["effort"] = undefined; // Track current effort level
   session.onUserMessage((message) => {
     // Resolve permission mode from meta - pass through as-is, mapping happens at SDK boundary
     let messagePermissionMode: PermissionMode | undefined =
@@ -469,6 +475,34 @@ export async function runClaude(
       );
     }
 
+    // Resolve maxBudgetUsd
+    let messageMaxBudgetUsd = currentMaxBudgetUsd;
+    if (message.meta?.hasOwnProperty("maxBudgetUsd")) {
+      messageMaxBudgetUsd = message.meta.maxBudgetUsd ?? undefined;
+      currentMaxBudgetUsd = messageMaxBudgetUsd;
+      logger.debug(
+        `[loop] maxBudgetUsd updated: ${messageMaxBudgetUsd ?? "none"}`,
+      );
+    }
+
+    // Resolve thinking
+    let messageThinking = currentThinking;
+    if (message.meta?.hasOwnProperty("thinking")) {
+      messageThinking = message.meta.thinking ?? undefined;
+      currentThinking = messageThinking;
+      logger.debug(
+        `[loop] thinking updated: ${messageThinking ? messageThinking.type : "none"}`,
+      );
+    }
+
+    // Resolve effort
+    let messageEffort = currentEffort;
+    if (message.meta?.hasOwnProperty("effort")) {
+      messageEffort = message.meta.effort ?? undefined;
+      currentEffort = messageEffort;
+      logger.debug(`[loop] effort updated: ${messageEffort ?? "none"}`);
+    }
+
     // Check for special commands before processing
     const specialCommand = parseSpecialCommand(message.content.text);
 
@@ -501,6 +535,9 @@ export async function runClaude(
         allowedTools: messageAllowedTools,
         disallowedTools: messageDisallowedTools,
         autoApprovePlan: messageAutoApprovePlan,
+        maxBudgetUsd: messageMaxBudgetUsd,
+        thinking: messageThinking,
+        effort: messageEffort,
       };
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
@@ -524,6 +561,9 @@ export async function runClaude(
         allowedTools: messageAllowedTools,
         disallowedTools: messageDisallowedTools,
         autoApprovePlan: messageAutoApprovePlan,
+        maxBudgetUsd: messageMaxBudgetUsd,
+        thinking: messageThinking,
+        effort: messageEffort,
       };
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
