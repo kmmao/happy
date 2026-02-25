@@ -7,6 +7,10 @@ import { claudeRemote } from "./claudeRemote";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
 import { SDKAssistantMessage, SDKMessage, SDKUserMessage } from "./sdk";
+import type {
+  SDKStatusMessage as SDKStatusMsg,
+  SDKCompactBoundaryMessage as SDKCompactMsg,
+} from "@anthropic-ai/claude-agent-sdk";
 import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
 import { SDKToLogConverter } from "./utils/sdkToLogConverter";
@@ -18,6 +22,7 @@ import { getToolName } from "./utils/getToolName";
 import { createEnvelope } from "@kmmao/happy-wire";
 import { isAdaptiveMode, resolveModel } from "./utils/adaptiveRouter";
 import { hashObject } from "@/utils/deterministicJson";
+import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
 
 interface PermissionsField {
   date: number;
@@ -99,9 +104,43 @@ export async function claudeRemoteLauncher(
     await abort();
   }
 
+  // Track current SDK Query for runtime control (interrupt, stopTask)
+  let currentQuery: OfficialQuery | null = null;
+
+  async function doInterrupt() {
+    logger.debug("[remote]: doInterrupt — graceful interrupt via SDK");
+    if (currentQuery) {
+      try {
+        await currentQuery.interrupt();
+      } catch (e) {
+        // Do not fall back to abort() — interrupt() may have partially succeeded
+        // and already sent a signal to Claude. Hard abort would kill the process.
+        // User can press the abort button explicitly if they need a hard stop.
+        logger.debug(
+          "[remote]: interrupt() threw — not falling back to abort",
+          e,
+        );
+      }
+    }
+    // If no active query, interrupt is a no-op (nothing to interrupt)
+  }
+
+  async function doStopTask(args: { taskId: string }) {
+    logger.debug(`[remote]: doStopTask — taskId=${args.taskId}`);
+    if (currentQuery && args.taskId) {
+      try {
+        await currentQuery.stopTask(args.taskId);
+      } catch (e) {
+        logger.debug("[remote]: stopTask() failed", e);
+      }
+    }
+  }
+
   // When to abort
   session.client.rpcHandlerManager.registerHandler("abort", doAbort); // When abort clicked
   session.client.rpcHandlerManager.registerHandler("switch", doSwitch); // When switch clicked
+  session.client.rpcHandlerManager.registerHandler("interrupt", doInterrupt); // Graceful interrupt
+  session.client.rpcHandlerManager.registerHandler("stopTask", doStopTask); // Stop background task
   // Removed catch-all stdin handler - now handled by RemoteModeDisplay keyboard handlers
 
   // Create permission handler
@@ -185,6 +224,95 @@ export async function claudeRemoteLauncher(
           }
         }
       }
+    }
+
+    // Forward status events to App (compacting, compact_boundary, etc.)
+    if (message.type === "system") {
+      const statusMsg = message as SDKStatusMsg;
+      if (statusMsg.subtype === "status") {
+        if (statusMsg.status === "compacting") {
+          session.client.sendSessionEvent({
+            type: "message",
+            message: "Compacting context...",
+          });
+        }
+      } else if ((message as SDKCompactMsg).subtype === "compact_boundary") {
+        session.client.sendSessionEvent({
+          type: "message",
+          message: "Context compacted",
+        });
+      }
+    }
+
+    // Forward Task messages to session protocol
+    if (
+      message.type === "system" &&
+      (message as any).subtype === "task_started"
+    ) {
+      const m = message as any; // SDKTaskStartedMessage
+      const envelope = createEnvelope("agent", {
+        t: "task-start",
+        taskId: m.task_id,
+        toolUseId: m.tool_use_id,
+        description: m.description,
+        taskType: m.task_type,
+      });
+      session.client.sendSessionProtocolMessage(envelope);
+    }
+
+    // Forward Task progress to session protocol
+    if (
+      message.type === "system" &&
+      (message as any).subtype === "task_progress"
+    ) {
+      const m = message as any; // SDKTaskProgressMessage
+      const envelope = createEnvelope("agent", {
+        t: "task-progress",
+        taskId: m.task_id,
+        description: m.description,
+        usage: {
+          totalTokens: m.usage.total_tokens,
+          toolUses: m.usage.tool_uses,
+          durationMs: m.usage.duration_ms,
+        },
+        lastToolName: m.last_tool_name,
+      });
+      session.client.sendSessionProtocolMessage(envelope);
+    }
+
+    // Forward Task notification to session protocol
+    if (
+      message.type === "system" &&
+      (message as any).subtype === "task_notification"
+    ) {
+      const m = message as any; // SDKTaskNotificationMessage
+      const envelope = createEnvelope("agent", {
+        t: "task-end",
+        taskId: m.task_id,
+        status: m.status,
+        summary: m.summary,
+        usage: m.usage
+          ? {
+              totalTokens: m.usage.total_tokens,
+              toolUses: m.usage.tool_uses,
+              durationMs: m.usage.duration_ms,
+            }
+          : undefined,
+      });
+      session.client.sendSessionProtocolMessage(envelope);
+    }
+
+    // Forward Tool progress to session protocol
+    if (message.type === "tool_progress") {
+      const m = message as any; // SDKToolProgressMessage
+      const envelope = createEnvelope("agent", {
+        t: "tool-progress",
+        toolUseId: m.tool_use_id,
+        toolName: m.tool_name,
+        elapsedSeconds: m.elapsed_time_seconds,
+        taskId: m.task_id,
+      });
+      session.client.sendSessionProtocolMessage(envelope);
     }
 
     // Convert SDK message to log format and send to client
@@ -367,16 +495,26 @@ export async function claudeRemoteLauncher(
       let modeHash: string | null = null;
       let mode: EnhancedMode | null = null;
 
-      // "Cold hash" excludes model — if only model changed, we can hot-swap
-      // via setModel() without restarting the process.
+      // "Cold hash" detects changes that require a process restart.
+      // It intentionally excludes fields that can be hot-swapped:
+      //   - model: hot-swapped via setModel()
+      //   - permissionMode (between non-plan, non-bypass modes): via setPermissionMode()
+      // Cold restart is required for:
+      //   - plan ↔ non-plan: different tool sets (ExitPlanMode etc.)
+      //   - bypassPermissions ↔ other: AskUserQuestion disallowedTools changes
+      //   - thinking, effort, maxBudgetUsd: SDK has no runtime set methods
       const coldModeHash = (m: EnhancedMode) =>
         hashObject({
           isPlan: m.permissionMode === "plan",
+          isBypass: m.permissionMode === "bypassPermissions",
           fallbackModel: m.fallbackModel,
           customSystemPrompt: m.customSystemPrompt,
           appendSystemPrompt: m.appendSystemPrompt,
           allowedTools: m.allowedTools,
           disallowedTools: m.disallowedTools,
+          maxBudgetUsd: m.maxBudgetUsd,
+          thinking: m.thinking,
+          effort: m.effort,
         });
       let currentColdHash: string | null = null;
       try {
@@ -466,12 +604,19 @@ export async function claudeRemoteLauncher(
               }
 
               if (modeHash && msg.hash !== modeHash) {
-                // Mode changed. Check if ONLY model changed (hot-swappable).
+                // Mode changed. Check if cold-restart fields are unchanged (hot-swappable).
                 const newColdHash = coldModeHash(msg.mode);
                 if (currentColdHash && newColdHash === currentColdHash) {
-                  // Model-only change — hot-swap via setModel(), no restart
+                  // Only hot-swappable fields changed (model and/or permissionMode)
+                  const changed = [
+                    mode?.model !== msg.mode.model && "model",
+                    mode?.permissionMode !== msg.mode.permissionMode &&
+                      "permissionMode",
+                  ]
+                    .filter(Boolean)
+                    .join(", ");
                   logger.debug(
-                    `[remote]: model-only change detected (${mode?.model} → ${msg.mode.model}), hot-swapping`,
+                    `[remote]: hot-swap detected (${changed || "unknown"}), no restart needed`,
                   );
                   modeHash = msg.hash;
                   mode = msg.mode;
@@ -525,6 +670,20 @@ export async function claudeRemoteLauncher(
             session.client.sendSessionProtocolMessage(envelope);
             session.client.closeClaudeSessionTurn("completed");
           },
+          onQueryReady: (query) => {
+            currentQuery = query;
+          },
+          onInitialized: (info) => {
+            logger.debug(
+              `[remote]: SDK initialized — ${info.models?.length ?? 0} models`,
+            );
+            if (info.models && info.models.length > 0) {
+              session.client.updateMetadata((m) => ({
+                ...m,
+                supportedModels: info.models,
+              }));
+            }
+          },
           onSessionReset: () => {
             logger.debug("[remote]: Session reset");
             session.clearSessionId();
@@ -570,6 +729,9 @@ export async function claudeRemoteLauncher(
         }
       } finally {
         logger.debug("[remote]: launch finally");
+
+        // Clear query reference immediately to prevent stale interrupt/stopTask calls
+        currentQuery = null;
 
         // Terminate all ongoing tool calls
         for (let [toolCallId, { parentToolCallId }] of ongoingToolCalls) {
