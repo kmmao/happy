@@ -20,7 +20,6 @@ import { randomUUID } from "node:crypto";
 import { AsyncLock } from "@/utils/lock";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { registerCommonHandlers } from "../modules/common/registerCommonHandlers";
-import { calculateCost } from "@/utils/pricing";
 import {
   createEnvelope,
   type SessionEnvelope,
@@ -659,6 +658,22 @@ export class ApiSessionClient extends EventEmitter {
         : {}),
     };
 
+    // Send turn-end cost report using SDK-provided cost data
+    if (
+      resultData?.totalCostUsd !== undefined &&
+      resultData.totalCostUsd > 0 &&
+      resultData.modelUsage
+    ) {
+      try {
+        this.sendTurnCostReport({
+          totalCostUsd: resultData.totalCostUsd,
+          modelUsage: resultData.modelUsage,
+        });
+      } catch (error) {
+        logger.debug("[SOCKET] Failed to send turn cost report:", error);
+      }
+    }
+
     const mapped = closeClaudeTurnWithStatus(
       this.claudeSessionProtocolState,
       status,
@@ -845,19 +860,16 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
-   * Send usage data to the server
+   * Send per-request usage data (tokens only) to the server.
+   * Cost is reported once at turn end using SDK-provided data.
    */
   sendUsageData(usage: Usage, model?: string) {
-    // Calculate total tokens
     const totalTokens =
       usage.input_tokens +
       usage.output_tokens +
       (usage.cache_creation_input_tokens || 0) +
       (usage.cache_read_input_tokens || 0);
 
-    const costs = calculateCost(usage, model);
-
-    // Transform Claude usage format to backend expected format
     const tokens: { [key: string]: number; total: number } = {
       total: totalTokens,
       input: usage.input_tokens,
@@ -865,19 +877,16 @@ export class ApiSessionClient extends EventEmitter {
       cache_creation: usage.cache_creation_input_tokens || 0,
       cache_read: usage.cache_read_input_tokens || 0,
     };
-    // Include model name for per-model tracking
     if (model) {
       tokens[model] = totalTokens;
     }
 
+    // Cost is zero for per-request reports; actual cost comes from SDK at turn end
     const cost: { [key: string]: number; total: number } = {
-      total: costs.total,
-      input: costs.input,
-      output: costs.output,
+      total: 0,
+      input: 0,
+      output: 0,
     };
-    if (model) {
-      cost[model] = costs.total;
-    }
 
     const usageReport = {
       key: "claude-session",
@@ -886,6 +895,37 @@ export class ApiSessionClient extends EventEmitter {
       cost,
     };
     logger.debugLargeJson("[SOCKET] Sending usage data:", usageReport);
+    this.socket.emit("usage-report", usageReport);
+  }
+
+  /**
+   * Send turn-end cost report using SDK-provided cost data.
+   * Called once per turn with accurate cost from the official SDK.
+   */
+  sendTurnCostReport(resultData: {
+    totalCostUsd: number;
+    modelUsage: Record<string, { costUSD: number }>;
+  }) {
+    const cost: { [key: string]: number; total: number } = {
+      total: resultData.totalCostUsd,
+      ...Object.fromEntries(
+        Object.entries(resultData.modelUsage).map(([model, usage]) => [
+          model,
+          usage.costUSD,
+        ]),
+      ),
+    };
+
+    const usageReport = {
+      key: "claude-session",
+      sessionId: this.sessionId,
+      tokens: { total: 0, input: 0, output: 0 },
+      cost,
+    };
+    logger.debugLargeJson(
+      "[SOCKET] Sending turn-end cost report (SDK):",
+      usageReport,
+    );
     this.socket.emit("usage-report", usageReport);
   }
 
