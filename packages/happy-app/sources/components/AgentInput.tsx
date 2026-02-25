@@ -100,6 +100,8 @@ interface AgentInputProps {
     contextSize: number;
     totalInputTokens: number;
     totalOutputTokens: number;
+    totalCostUsd?: number;
+    contextWindow?: number;
   };
   alwaysShowContextSize?: boolean;
   currentModelCode?: string | null;
@@ -344,8 +346,9 @@ const getContextWarning = (
   theme: Theme,
   totalTokens?: number,
   modelCode?: string | null,
+  sdkContextWindow?: number,
 ) => {
-  const knownWindowSize = getContextWindowSize(modelCode);
+  const knownWindowSize = getContextWindowSize(modelCode, sdkContextWindow);
   const contextWindowSize =
     contextSize > knownWindowSize ? 1_000_000 : knownWindowSize;
   const percentageUsed = (contextSize / contextWindowSize) * 100;
@@ -392,10 +395,11 @@ const ContextProgressBar: React.FC<{
   contextSize: number;
   alwaysShow: boolean;
   modelCode?: string | null;
+  sdkContextWindow?: number;
   theme: Theme;
-}> = ({ contextSize, alwaysShow, modelCode, theme }) => {
-  // Use model-aware window size; fall back to 1M if contextSize exceeds known window
-  const knownWindowSize = getContextWindowSize(modelCode);
+}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme }) => {
+  // Use SDK-provided window size if available; fall back to model-aware heuristic
+  const knownWindowSize = getContextWindowSize(modelCode, sdkContextWindow);
   const contextWindowSize =
     contextSize > knownWindowSize ? 1_000_000 : knownWindowSize;
   const percentageUsed = Math.min(100, (contextSize / contextWindowSize) * 100);
@@ -541,6 +545,7 @@ export const AgentInput = React.memo(
           theme,
           props.usageData.totalInputTokens + props.usageData.totalOutputTokens,
           props.currentModelCode,
+          props.usageData.contextWindow,
         )
       : null;
 
@@ -1735,6 +1740,7 @@ export const AgentInput = React.memo(
                 contextSize={props.usageData.contextSize}
                 alwaysShow={props.alwaysShowContextSize ?? false}
                 modelCode={props.currentModelCode}
+                sdkContextWindow={props.usageData.contextWindow}
                 theme={theme}
               />
             ) : null}

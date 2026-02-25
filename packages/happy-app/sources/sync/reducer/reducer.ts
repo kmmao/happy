@@ -169,6 +169,17 @@ export type ReducerState = {
     totalInputTokens: number;
     totalOutputTokens: number;
     timestamp: number;
+    totalCostUsd?: number;
+    contextWindow?: number;
+    modelUsage?: Record<
+      string,
+      {
+        inputTokens: number;
+        outputTokens: number;
+        costUSD: number;
+        contextWindow: number;
+      }
+    >;
   };
   latestAgentTextTime: number;
 };
@@ -206,6 +217,17 @@ export type ReducerResult = {
     contextSize: number;
     totalInputTokens: number;
     totalOutputTokens: number;
+    totalCostUsd?: number;
+    contextWindow?: number;
+    modelUsage?: Record<
+      string,
+      {
+        inputTokens: number;
+        outputTokens: number;
+        costUSD: number;
+        contextWindow: number;
+      }
+    >;
   };
   hasReadyEvent?: boolean;
 };
@@ -268,6 +290,46 @@ export function reducer(
     if (msg.role === "event" && msg.content.type === "ready") {
       state.messageIds.set(msg.id, msg.id);
       hasReadyEvent = true;
+
+      // Extract SDK result data (cost, model usage, context window) if present
+      if (
+        msg.content.totalCostUsd !== undefined ||
+        msg.content.modelUsage !== undefined
+      ) {
+        const maxContextWindow = msg.content.modelUsage
+          ? Math.max(
+              0,
+              ...Object.values(msg.content.modelUsage).map(
+                (m: { contextWindow: number }) => m.contextWindow,
+              ),
+            )
+          : undefined;
+        const compactModelUsage = msg.content.modelUsage
+          ? Object.fromEntries(
+              Object.entries(msg.content.modelUsage).map(([key, val]) => [
+                key,
+                {
+                  inputTokens: (val as { inputTokens: number }).inputTokens,
+                  outputTokens: (val as { outputTokens: number }).outputTokens,
+                  costUSD: (val as { costUSD: number }).costUSD,
+                  contextWindow: (val as { contextWindow: number })
+                    .contextWindow,
+                },
+              ]),
+            )
+          : undefined;
+        if (state.latestUsage) {
+          state.latestUsage = {
+            ...state.latestUsage,
+            ...(msg.content.totalCostUsd !== undefined
+              ? { totalCostUsd: msg.content.totalCostUsd }
+              : {}),
+            ...(maxContextWindow ? { contextWindow: maxContextWindow } : {}),
+            ...(compactModelUsage ? { modelUsage: compactModelUsage } : {}),
+          };
+        }
+      }
+
       // If per-call usage-stats were already shown for this turn, suppress the
       // turn-end stats line to avoid showing the same info twice.
       if (state.turnHadUsageStats) {
@@ -1252,6 +1314,9 @@ export function reducer(
           contextSize: state.latestUsage.contextSize,
           totalInputTokens: state.latestUsage.totalInputTokens,
           totalOutputTokens: state.latestUsage.totalOutputTokens,
+          totalCostUsd: state.latestUsage.totalCostUsd,
+          contextWindow: state.latestUsage.contextWindow,
+          modelUsage: state.latestUsage.modelUsage,
         }
       : undefined,
     hasReadyEvent: hasReadyEvent || undefined,

@@ -140,6 +140,17 @@ export interface Session {
     totalInputTokens: number;
     totalOutputTokens: number;
     timestamp: number;
+    totalCostUsd?: number;
+    contextWindow?: number;
+    modelUsage?: Record<
+      string,
+      {
+        inputTokens: number;
+        outputTokens: number;
+        costUSD: number;
+        contextWindow: number;
+      }
+    >;
   } | null;
 }
 

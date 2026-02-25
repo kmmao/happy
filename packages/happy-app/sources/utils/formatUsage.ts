@@ -14,7 +14,11 @@ const CONTEXT_WINDOW_MAP: Array<[RegExp, number]> = [
   [/claude/i, 200_000],
 ];
 
-export const getContextWindowSize = (modelCode?: string | null): number => {
+export const getContextWindowSize = (
+  modelCode?: string | null,
+  sdkContextWindow?: number,
+): number => {
+  if (sdkContextWindow && sdkContextWindow > 0) return sdkContextWindow;
   if (!modelCode) return DEFAULT_CONTEXT_WINDOW;
   for (const [pattern, size] of CONTEXT_WINDOW_MAP) {
     if (pattern.test(modelCode)) return size;

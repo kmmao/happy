@@ -615,7 +615,25 @@ export class ApiSessionClient extends EventEmitter {
     }
   }
 
-  closeClaudeSessionTurn(status: SessionTurnEndStatus = "completed") {
+  closeClaudeSessionTurn(
+    status: SessionTurnEndStatus = "completed",
+    resultData?: {
+      totalCostUsd: number;
+      numTurns: number;
+      modelUsage: Record<
+        string,
+        {
+          inputTokens: number;
+          outputTokens: number;
+          cacheReadInputTokens: number;
+          cacheCreationInputTokens: number;
+          costUSD: number;
+          contextWindow: number;
+          maxOutputTokens: number;
+        }
+      >;
+    },
+  ) {
     const durationMs =
       this.currentTurnStartTime != null
         ? Date.now() - this.currentTurnStartTime
@@ -629,6 +647,16 @@ export class ApiSessionClient extends EventEmitter {
       ...(this.currentTurnModel ? { model: this.currentTurnModel } : {}),
       ...(usageForMeta ? { usage: usageForMeta } : {}),
       ...(durationMs !== undefined ? { durationMs } : {}),
+      ...(resultData?.totalCostUsd !== undefined
+        ? { totalCostUsd: resultData.totalCostUsd }
+        : {}),
+      ...(resultData?.numTurns !== undefined
+        ? { numTurns: resultData.numTurns }
+        : {}),
+      ...(resultData?.modelUsage &&
+      Object.keys(resultData.modelUsage).length > 0
+        ? { modelUsage: resultData.modelUsage }
+        : {}),
     };
 
     const mapped = closeClaudeTurnWithStatus(

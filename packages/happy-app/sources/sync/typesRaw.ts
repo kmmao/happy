@@ -52,6 +52,22 @@ const agentEventSchema = z.discriminatedUnion("type", [
       })
       .optional(),
     durationMs: z.number().optional(),
+    totalCostUsd: z.number().optional(),
+    numTurns: z.number().optional(),
+    modelUsage: z
+      .record(
+        z.string(),
+        z.object({
+          inputTokens: z.number(),
+          outputTokens: z.number(),
+          cacheReadInputTokens: z.number(),
+          cacheCreationInputTokens: z.number(),
+          costUSD: z.number(),
+          contextWindow: z.number(),
+          maxOutputTokens: z.number(),
+        }),
+      )
+      .optional(),
   }),
   z.object({
     type: z.literal("usage-stats"),

@@ -704,6 +704,8 @@ function SessionViewInner({
                 contextSize: sessionUsage.contextSize,
                 totalInputTokens: sessionUsage.totalInputTokens ?? 0,
                 totalOutputTokens: sessionUsage.totalOutputTokens ?? 0,
+                totalCostUsd: sessionUsage.totalCostUsd,
+                contextWindow: sessionUsage.contextWindow,
               }
             : session.latestUsage
               ? {
@@ -714,6 +716,8 @@ function SessionViewInner({
                   contextSize: session.latestUsage.contextSize,
                   totalInputTokens: session.latestUsage.totalInputTokens ?? 0,
                   totalOutputTokens: session.latestUsage.totalOutputTokens ?? 0,
+                  totalCostUsd: session.latestUsage.totalCostUsd,
+                  contextWindow: session.latestUsage.contextWindow,
                 }
               : undefined
         }

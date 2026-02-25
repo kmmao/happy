@@ -89,6 +89,23 @@ export async function claudeRemote(opts: {
   onCompletionEvent?: (message: string) => void;
   onShellResult?: (output: string) => void;
   onSessionReset?: () => void;
+  /** Called with SDK result data (cost, usage breakdown) when a query completes */
+  onResult?: (result: {
+    totalCostUsd: number;
+    numTurns: number;
+    modelUsage: Record<
+      string,
+      {
+        inputTokens: number;
+        outputTokens: number;
+        cacheReadInputTokens: number;
+        cacheCreationInputTokens: number;
+        costUSD: number;
+        contextWindow: number;
+        maxOutputTokens: number;
+      }
+    >;
+  }) => void;
   /** Called when the SDK Query object is ready, exposing it for runtime control (interrupt, stopTask, etc.) */
   onQueryReady?: (
     query: import("@anthropic-ai/claude-agent-sdk").Query,
@@ -354,6 +371,31 @@ export async function claudeRemote(opts: {
       if (message.type === "result") {
         updateThinking(false);
         logger.debug("[claudeRemote] Result received");
+
+        // Extract SDK result data (cost, usage breakdown) before signaling ready
+        const resultMsg = message as {
+          total_cost_usd?: number;
+          num_turns?: number;
+          modelUsage?: Record<
+            string,
+            {
+              inputTokens: number;
+              outputTokens: number;
+              cacheReadInputTokens: number;
+              cacheCreationInputTokens: number;
+              costUSD: number;
+              contextWindow: number;
+              maxOutputTokens: number;
+            }
+          >;
+        };
+        if (resultMsg.total_cost_usd !== undefined || resultMsg.modelUsage) {
+          opts.onResult?.({
+            totalCostUsd: resultMsg.total_cost_usd ?? 0,
+            numTurns: resultMsg.num_turns ?? 0,
+            modelUsage: resultMsg.modelUsage ?? {},
+          });
+        }
 
         // Feed turn usage data back to adaptive router BEFORE onReady resets it
         opts.onTurnComplete?.();

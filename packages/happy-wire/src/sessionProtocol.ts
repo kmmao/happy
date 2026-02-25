@@ -59,6 +59,17 @@ export const sessionTurnEndStatusSchema = z.enum([
 ]);
 export type SessionTurnEndStatus = z.infer<typeof sessionTurnEndStatusSchema>;
 
+export const sessionModelUsageSchema = z.object({
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheReadInputTokens: z.number(),
+  cacheCreationInputTokens: z.number(),
+  costUSD: z.number(),
+  contextWindow: z.number(),
+  maxOutputTokens: z.number(),
+});
+export type SessionModelUsage = z.infer<typeof sessionModelUsageSchema>;
+
 export const sessionTurnEndEventSchema = z.object({
   t: z.literal("turn-end"),
   status: sessionTurnEndStatusSchema,
@@ -72,6 +83,9 @@ export const sessionTurnEndEventSchema = z.object({
     })
     .optional(),
   durationMs: z.number().optional(),
+  totalCostUsd: z.number().optional(),
+  numTurns: z.number().optional(),
+  modelUsage: z.record(z.string(), sessionModelUsageSchema).optional(),
 });
 
 export const sessionStopEventSchema = z.object({

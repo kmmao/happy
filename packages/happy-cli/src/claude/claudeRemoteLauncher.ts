@@ -169,6 +169,22 @@ export async function claudeRemoteLauncher(
   // Handle messages
   let planModeToolCalls = new Set<string>();
   let ongoingToolCalls = new Map<string, { parentToolCallId: string | null }>();
+  let lastResultData: {
+    totalCostUsd: number;
+    numTurns: number;
+    modelUsage: Record<
+      string,
+      {
+        inputTokens: number;
+        outputTokens: number;
+        cacheReadInputTokens: number;
+        cacheCreationInputTokens: number;
+        costUSD: number;
+        contextWindow: number;
+        maxOutputTokens: number;
+      }
+    >;
+  } | null = null;
 
   function onMessage(message: SDKMessage) {
     // Write to message log
@@ -700,11 +716,18 @@ export async function claudeRemoteLauncher(
             logger.debug("[remote]: Session reset");
             session.clearSessionId();
           },
+          onResult: (data) => {
+            lastResultData = data;
+          },
           onReady: async () => {
             // Flush queued messages before closing the turn to prevent
             // turn-end from arriving at the App before delayed tool call messages
             await messageQueue.flush();
-            session.client.closeClaudeSessionTurn("completed");
+            session.client.closeClaudeSessionTurn(
+              "completed",
+              lastResultData ?? undefined,
+            );
+            lastResultData = null;
             if (!pending && session.queue.size() === 0) {
               session.api
                 .push()

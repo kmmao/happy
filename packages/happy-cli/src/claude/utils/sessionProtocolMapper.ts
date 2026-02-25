@@ -18,6 +18,16 @@ export type ClaudeSessionProtocolState = {
   activeSubagents?: Set<string>;
 };
 
+export type TurnModelUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  costUSD: number;
+  contextWindow: number;
+  maxOutputTokens: number;
+};
+
 export type TurnMeta = {
   model?: string;
   usage?: {
@@ -27,6 +37,9 @@ export type TurnMeta = {
     cache_read_input_tokens?: number;
   };
   durationMs?: number;
+  totalCostUsd?: number;
+  numTurns?: number;
+  modelUsage?: Record<string, TurnModelUsage>;
 };
 
 type ClaudeMapperResult = {
@@ -471,6 +484,13 @@ function closeTurn(
         ...(meta?.usage !== undefined ? { usage: meta.usage } : {}),
         ...(meta?.durationMs !== undefined
           ? { durationMs: meta.durationMs }
+          : {}),
+        ...(meta?.totalCostUsd !== undefined
+          ? { totalCostUsd: meta.totalCostUsd }
+          : {}),
+        ...(meta?.numTurns !== undefined ? { numTurns: meta.numTurns } : {}),
+        ...(meta?.modelUsage !== undefined
+          ? { modelUsage: meta.modelUsage }
           : {}),
       },
       { turn: state.currentTurnId },
