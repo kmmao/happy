@@ -132,6 +132,11 @@ export const sessionToolProgressEventSchema = z.object({
   taskId: z.string().optional(),
 });
 
+export const sessionPromptSuggestionEventSchema = z.object({
+  t: z.literal("prompt-suggestion"),
+  suggestion: z.string(),
+});
+
 export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -147,6 +152,7 @@ export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTaskProgressEventSchema,
   sessionTaskEndEventSchema,
   sessionToolProgressEventSchema,
+  sessionPromptSuggestionEventSchema,
 ]);
 
 export type SessionEvent = z.infer<typeof sessionEventSchema>;
@@ -180,7 +186,8 @@ export const sessionEnvelopeSchema = z
         envelope.ev.t === "task-start" ||
         envelope.ev.t === "task-progress" ||
         envelope.ev.t === "task-end" ||
-        envelope.ev.t === "tool-progress") &&
+        envelope.ev.t === "tool-progress" ||
+        envelope.ev.t === "prompt-suggestion") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({
