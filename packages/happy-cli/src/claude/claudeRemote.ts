@@ -4,6 +4,7 @@ import {
   type QueryOptions,
   type SDKMessage,
   type SDKSystemMessage,
+  type AdaptedQuery,
   AbortError,
   SDKUserMessage,
 } from "@/claude/sdk";
@@ -345,6 +346,19 @@ export async function claudeRemote(opts: {
           // Don't push to Claude, wait for next user message
           await opts.onReady();
           continue;
+        }
+
+        // Hot-swap model via setModel() if model changed (avoids process restart)
+        const newModel =
+          resolveModelKey(next.mode.model) ??
+          opts.claudeEnvVars?.ANTHROPIC_MODEL ??
+          process.env.ANTHROPIC_MODEL;
+        if (newModel && newModel !== model) {
+          logger.debug(
+            `[claudeRemote] Hot-swapping model: ${model} → ${newModel}`,
+          );
+          await (response as AdaptedQuery)._officialQuery.setModel(newModel);
+          model = newModel;
         }
 
         mode = next.mode;

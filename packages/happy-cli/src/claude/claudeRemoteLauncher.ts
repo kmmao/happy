@@ -17,6 +17,7 @@ import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import { getToolName } from "./utils/getToolName";
 import { createEnvelope } from "@kmmao/happy-wire";
 import { isAdaptiveMode, resolveModel } from "./utils/adaptiveRouter";
+import { hashObject } from "@/utils/deterministicJson";
 
 interface PermissionsField {
   date: number;
@@ -365,6 +366,19 @@ export async function claudeRemoteLauncher(
       abortFuture = new Future<void>();
       let modeHash: string | null = null;
       let mode: EnhancedMode | null = null;
+
+      // "Cold hash" excludes model — if only model changed, we can hot-swap
+      // via setModel() without restarting the process.
+      const coldModeHash = (m: EnhancedMode) =>
+        hashObject({
+          isPlan: m.permissionMode === "plan",
+          fallbackModel: m.fallbackModel,
+          customSystemPrompt: m.customSystemPrompt,
+          appendSystemPrompt: m.appendSystemPrompt,
+          allowedTools: m.allowedTools,
+          disallowedTools: m.disallowedTools,
+        });
+      let currentColdHash: string | null = null;
       try {
         const remoteResult = await claudeRemote({
           sessionId: session.sessionId,
@@ -433,7 +447,7 @@ export async function claudeRemoteLauncher(
                   }));
                 }
                 // Overwrite mode.model with the resolved real model ID
-                // This changes the hash, triggering process restart when model differs
+                // This changes the hash — model-only changes are hot-swapped via setModel()
                 msg = {
                   ...msg,
                   mode: { ...msg.mode, model: targetModel },
@@ -445,13 +459,40 @@ export async function claudeRemoteLauncher(
               }
 
               // Check if mode has changed
-              if ((modeHash && msg.hash !== modeHash) || msg.isolate) {
-                logger.debug("[remote]: mode has changed, pending message");
+              if (msg.isolate) {
+                logger.debug("[remote]: isolate requested, pending message");
                 pending = msg;
                 return null;
               }
+
+              if (modeHash && msg.hash !== modeHash) {
+                // Mode changed. Check if ONLY model changed (hot-swappable).
+                const newColdHash = coldModeHash(msg.mode);
+                if (currentColdHash && newColdHash === currentColdHash) {
+                  // Model-only change — hot-swap via setModel(), no restart
+                  logger.debug(
+                    `[remote]: model-only change detected (${mode?.model} → ${msg.mode.model}), hot-swapping`,
+                  );
+                  modeHash = msg.hash;
+                  mode = msg.mode;
+                  permissionHandler.handleModeChange(mode.permissionMode);
+                  return {
+                    message: msg.message,
+                    mode: msg.mode,
+                  };
+                }
+
+                // Other fields changed — cold restart required
+                logger.debug(
+                  "[remote]: non-model mode change detected, pending message for restart",
+                );
+                pending = msg;
+                return null;
+              }
+
               modeHash = msg.hash;
               mode = msg.mode;
+              currentColdHash = coldModeHash(mode);
               permissionHandler.handleModeChange(mode.permissionMode);
               return {
                 message: msg.message,
@@ -573,6 +614,7 @@ export async function claudeRemoteLauncher(
         permissionHandler.reset();
         modeHash = null;
         mode = null;
+        currentColdHash = null;
       }
     }
   } finally {
