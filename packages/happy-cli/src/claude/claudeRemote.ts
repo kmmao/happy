@@ -248,6 +248,8 @@ export async function claudeRemote(opts: {
       role: "user",
       content: initial.message,
     },
+    parent_tool_use_id: null,
+    session_id: "",
   });
 
   // Start the loop.
@@ -365,6 +367,8 @@ export async function claudeRemote(opts: {
         messages.push({
           type: "user",
           message: { role: "user", content: next.message },
+          parent_tool_use_id: null,
+          session_id: "",
         });
       }
 

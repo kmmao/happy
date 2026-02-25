@@ -2,385 +2,414 @@
  * Tests for SDK to Log converter
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
-import { SDKToLogConverter, convertSDKToLog } from './sdkToLogConverter'
-import type { SDKMessage, SDKUserMessage, SDKAssistantMessage, SDKSystemMessage, SDKResultMessage } from '@/claude/sdk'
+import { describe, it, expect, beforeEach } from "vitest";
+import { SDKToLogConverter, convertSDKToLog } from "./sdkToLogConverter";
+import type {
+  SDKMessage,
+  SDKUserMessage,
+  SDKAssistantMessage,
+  SDKSystemMessage,
+  SDKResultMessage,
+} from "@/claude/sdk";
 
-describe('SDKToLogConverter', () => {
-    let converter: SDKToLogConverter
-    const context = {
-        sessionId: 'test-session-123',
-        cwd: '/test/project',
-        version: '1.0.0',
-        gitBranch: 'main'
-    }
+// Helper to create test SDK messages with minimal required fields
+const userMsg = (
+  content: string | Array<Record<string, unknown>>,
+): SDKUserMessage =>
+  ({
+    type: "user",
+    message: { role: "user", content },
+    parent_tool_use_id: null,
+    session_id: "test",
+  }) as SDKUserMessage;
 
-    beforeEach(() => {
-        converter = new SDKToLogConverter(context)
-    })
+const assistantMsg = (
+  content: Array<Record<string, unknown>>,
+): SDKAssistantMessage =>
+  ({
+    type: "assistant",
+    message: { role: "assistant", content },
+    parent_tool_use_id: null,
+    session_id: "test",
+  }) as SDKAssistantMessage;
 
-    describe('User messages', () => {
-        it('should convert SDK user message to log format', () => {
-            const sdkMessage: SDKUserMessage = {
-                type: 'user',
-                message: {
-                    role: 'user',
-                    content: 'Hello Claude'
-                }
-            }
+const systemMsg = (overrides: Record<string, unknown> = {}): SDKSystemMessage =>
+  ({
+    type: "system",
+    subtype: "init",
+    session_id: "test",
+    model: "claude-opus-4",
+    cwd: "/test",
+    tools: [],
+    slash_commands: [],
+    apiKeySource: "user",
+    claude_code_version: "1.0.0",
+    mcp_servers: [],
+    permissionMode: "default",
+    output_style: "text",
+    skills: [],
+    plugins: [],
+    uuid: "00000000-0000-0000-0000-000000000000" as `${string}-${string}-${string}-${string}-${string}`,
+    ...overrides,
+  }) as SDKSystemMessage;
 
-            const logMessage = converter.convert(sdkMessage)
+const resultMsg = (overrides: Record<string, unknown> = {}): SDKResultMessage =>
+  ({
+    type: "result",
+    subtype: "success",
+    result: "",
+    num_turns: 0,
+    usage: {
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+    },
+    total_cost_usd: 0,
+    duration_ms: 0,
+    duration_api_ms: 0,
+    is_error: false,
+    session_id: "test",
+    stop_reason: null,
+    modelUsage: {},
+    permission_denials: [],
+    uuid: "00000000-0000-0000-0000-000000000000" as `${string}-${string}-${string}-${string}-${string}`,
+    ...overrides,
+  }) as SDKResultMessage;
 
-            expect(logMessage).toBeTruthy()
-            expect(logMessage?.type).toBe('user')
-            expect(logMessage).toMatchObject({
-                type: 'user',
-                sessionId: context.sessionId,
-                cwd: context.cwd,
-                version: context.version,
-                gitBranch: context.gitBranch,
-                parentUuid: null,
-                isSidechain: false,
-                userType: 'external',
-                message: {
-                    role: 'user',
-                    content: 'Hello Claude'
-                }
-            })
-            expect(logMessage?.uuid).toBeTruthy()
-            expect(logMessage?.timestamp).toBeTruthy()
-        })
+describe("SDKToLogConverter", () => {
+  let converter: SDKToLogConverter;
+  const context = {
+    sessionId: "test-session-123",
+    cwd: "/test/project",
+    version: "1.0.0",
+    gitBranch: "main",
+  };
 
-        it('should handle user message with complex content', () => {
-            const sdkMessage: SDKUserMessage = {
-                type: 'user',
-                message: {
-                    role: 'user',
-                    content: [
-                        { type: 'text', text: 'Check this out' },
-                        { type: 'tool_result', tool_use_id: 'tool123', content: 'Result data' }
-                    ]
-                }
-            }
+  beforeEach(() => {
+    converter = new SDKToLogConverter(context);
+  });
 
-            const logMessage = converter.convert(sdkMessage)
+  describe("User messages", () => {
+    it("should convert SDK user message to log format", () => {
+      const sdkMessage = userMsg("Hello Claude");
 
-            expect(logMessage?.type).toBe('user')
-            expect((logMessage as any).message.content).toHaveLength(2)
-        })
-    })
+      const logMessage = converter.convert(sdkMessage);
 
-    describe('Assistant messages', () => {
-        it('should convert SDK assistant message to log format', () => {
-            const sdkMessage: SDKAssistantMessage = {
-                type: 'assistant',
-                message: {
-                    role: 'assistant',
-                    content: [
-                        { type: 'text', text: 'Hello! How can I help?' }
-                    ]
-                }
-            }
+      expect(logMessage).toBeTruthy();
+      expect(logMessage?.type).toBe("user");
+      expect(logMessage).toMatchObject({
+        type: "user",
+        sessionId: context.sessionId,
+        cwd: context.cwd,
+        version: context.version,
+        gitBranch: context.gitBranch,
+        parentUuid: null,
+        isSidechain: false,
+        userType: "external",
+        message: {
+          role: "user",
+          content: "Hello Claude",
+        },
+      });
+      expect(logMessage?.uuid).toBeTruthy();
+      expect(logMessage?.timestamp).toBeTruthy();
+    });
 
-            const logMessage = converter.convert(sdkMessage)
+    it("should handle user message with complex content", () => {
+      const sdkMessage = userMsg([
+        { type: "text", text: "Check this out" },
+        { type: "tool_result", tool_use_id: "tool123", content: "Result data" },
+      ]);
 
-            expect(logMessage).toBeTruthy()
-            expect(logMessage?.type).toBe('assistant')
-            expect(logMessage).toMatchObject({
-                type: 'assistant',
-                sessionId: context.sessionId,
-                message: {
-                    role: 'assistant',
-                    content: [
-                        { type: 'text', text: 'Hello! How can I help?' }
-                    ]
-                }
-            })
-        })
+      const logMessage = converter.convert(sdkMessage);
 
-        it('should include requestId if present', () => {
-            const sdkMessage: any = {
-                type: 'assistant',
-                message: {
-                    role: 'assistant',
-                    content: [{ type: 'text', text: 'Response' }]
-                },
-                requestId: 'req_123'
-            }
+      expect(logMessage?.type).toBe("user");
+      expect((logMessage as any).message.content).toHaveLength(2);
+    });
+  });
 
-            const logMessage = converter.convert(sdkMessage)
+  describe("Assistant messages", () => {
+    it("should convert SDK assistant message to log format", () => {
+      const sdkMessage = assistantMsg([
+        { type: "text", text: "Hello! How can I help?" },
+      ]);
 
-            expect((logMessage as any).requestId).toBe('req_123')
-        })
-    })
+      const logMessage = converter.convert(sdkMessage);
 
-    describe('System messages', () => {
-        it('should convert SDK system message to log format', () => {
-            const sdkMessage: SDKSystemMessage = {
-                type: 'system',
-                subtype: 'init',
-                session_id: 'new-session-456',
-                model: 'claude-opus-4',
-                cwd: '/project',
-                tools: ['bash', 'edit']
-            }
+      expect(logMessage).toBeTruthy();
+      expect(logMessage?.type).toBe("assistant");
+      expect(logMessage).toMatchObject({
+        type: "assistant",
+        sessionId: context.sessionId,
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Hello! How can I help?" }],
+        },
+      });
+    });
 
-            const logMessage = converter.convert(sdkMessage)
+    it("should include requestId if present", () => {
+      const sdkMessage: any = {
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Response" }],
+        },
+        requestId: "req_123",
+      };
 
-            expect(logMessage).toBeTruthy()
-            expect(logMessage?.type).toBe('system')
-            expect(logMessage).toMatchObject({
-                type: 'system',
-                subtype: 'init',
-                model: 'claude-opus-4',
-                tools: ['bash', 'edit']
-            })
-        })
+      const logMessage = converter.convert(sdkMessage);
 
-        it('should update session ID on init system message', () => {
-            const sdkMessage: SDKSystemMessage = {
-                type: 'system',
-                subtype: 'init',
-                session_id: 'updated-session-789'
-            }
+      expect((logMessage as any).requestId).toBe("req_123");
+    });
+  });
 
-            converter.convert(sdkMessage)
+  describe("System messages", () => {
+    it("should convert SDK system message to log format", () => {
+      const sdkMessage = systemMsg({
+        session_id: "new-session-456",
+        model: "claude-opus-4",
+        cwd: "/project",
+        tools: ["bash", "edit"],
+      });
 
-            // Next message should have updated session ID
-            const userMessage: SDKUserMessage = {
-                type: 'user',
-                message: { role: 'user', content: 'Test' }
-            }
+      const logMessage = converter.convert(sdkMessage);
 
-            const logMessage = converter.convert(userMessage)
-            expect(logMessage?.sessionId).toBe('updated-session-789')
-        })
-    })
+      expect(logMessage).toBeTruthy();
+      expect(logMessage?.type).toBe("system");
+      expect(logMessage).toMatchObject({
+        type: "system",
+        subtype: "init",
+        model: "claude-opus-4",
+        tools: ["bash", "edit"],
+      });
+    });
 
-    describe('Result messages', () => {
-        it('should not convert result messages', () => {
-            const sdkMessage: SDKResultMessage = {
-                type: 'result',
-                subtype: 'success',
-                result: 'Task completed',
-                num_turns: 5,
-                usage: {
-                    input_tokens: 100,
-                    output_tokens: 200
-                },
-                total_cost_usd: 0.05,
-                duration_ms: 3000,
-                duration_api_ms: 2500,
-                is_error: false,
-                session_id: 'result-session'
-            }
+    it("should update session ID on init system message", () => {
+      const sdkMessage = systemMsg({ session_id: "updated-session-789" });
 
-            const logMessage = converter.convert(sdkMessage)
+      converter.convert(sdkMessage);
 
-            expect(logMessage).toBeNull()
-        })
+      // Next message should have updated session ID
+      const nextMsg = userMsg("Test");
 
-        it('should not convert error results', () => {
-            const sdkMessage: SDKResultMessage = {
-                type: 'result',
-                subtype: 'error_max_turns',
-                num_turns: 10,
-                total_cost_usd: 0.1,
-                duration_ms: 5000,
-                duration_api_ms: 4500,
-                is_error: true,
-                session_id: 'error-session'
-            }
+      const logMessage = converter.convert(nextMsg);
+      expect(logMessage?.sessionId).toBe("updated-session-789");
+    });
+  });
 
-            const logMessage = converter.convert(sdkMessage)
+  describe("Result messages", () => {
+    it("should not convert result messages", () => {
+      const sdkMessage = resultMsg({
+        result: "Task completed",
+        num_turns: 5,
+        usage: {
+          input_tokens: 100,
+          output_tokens: 200,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+        },
+        total_cost_usd: 0.05,
+        duration_ms: 3000,
+        duration_api_ms: 2500,
+        is_error: false,
+        session_id: "result-session",
+      });
 
-            // Error results are not converted to summaries
-            expect(logMessage).toBeFalsy()
-        })
-    })
+      const logMessage = converter.convert(sdkMessage);
 
-    describe('Parent-child relationships', () => {
-        it('should track parent UUIDs across messages', () => {
-            const msg1: SDKUserMessage = {
-                type: 'user',
-                message: { role: 'user', content: 'First' }
-            }
-            const msg2: SDKAssistantMessage = {
-                type: 'assistant',
-                message: { role: 'assistant', content: [{ type: 'text', text: 'Second' }] }
-            }
-            const msg3: SDKUserMessage = {
-                type: 'user',
-                message: { role: 'user', content: 'Third' }
-            }
+      expect(logMessage).toBeNull();
+    });
 
-            const log1 = converter.convert(msg1)
-            const log2 = converter.convert(msg2)
-            const log3 = converter.convert(msg3)
+    it("should not convert error results", () => {
+      const sdkMessage = resultMsg({
+        subtype: "error_max_turns",
+        num_turns: 10,
+        total_cost_usd: 0.1,
+        duration_ms: 5000,
+        duration_api_ms: 4500,
+        is_error: true,
+        session_id: "error-session",
+        errors: ["Max turns reached"],
+      });
 
-            expect(log1?.parentUuid).toBeNull()
-            expect(log2?.parentUuid).toBe(log1?.uuid)
-            expect(log3?.parentUuid).toBe(log2?.uuid)
-        })
+      const logMessage = converter.convert(sdkMessage);
 
-        it('should reset parent chain when requested', () => {
-            const msg1: SDKUserMessage = {
-                type: 'user',
-                message: { role: 'user', content: 'First' }
-            }
-            const log1 = converter.convert(msg1)
+      // Error results are not converted to summaries
+      expect(logMessage).toBeFalsy();
+    });
+  });
 
-            converter.resetParentChain()
+  describe("Parent-child relationships", () => {
+    it("should track parent UUIDs across messages", () => {
+      const msg1 = userMsg("First");
+      const msg2 = assistantMsg([{ type: "text", text: "Second" }]);
+      const msg3 = userMsg("Third");
 
-            const msg2: SDKUserMessage = {
-                type: 'user',
-                message: { role: 'user', content: 'Second' }
-            }
-            const log2 = converter.convert(msg2)
+      const log1 = converter.convert(msg1);
+      const log2 = converter.convert(msg2);
+      const log3 = converter.convert(msg3);
 
-            expect(log2?.parentUuid).toBeNull()
-        })
-    })
+      expect(log1?.parentUuid).toBeNull();
+      expect(log2?.parentUuid).toBe(log1?.uuid);
+      expect(log3?.parentUuid).toBe(log2?.uuid);
+    });
 
-    describe('Batch conversion', () => {
-        it('should convert multiple messages maintaining relationships', () => {
-            const messages: SDKMessage[] = [
-                {
-                    type: 'user',
-                    message: { role: 'user', content: 'Hello' }
-                } as SDKUserMessage,
-                {
-                    type: 'assistant',
-                    message: { role: 'assistant', content: [{ type: 'text', text: 'Hi there!' }] }
-                } as SDKAssistantMessage,
-                {
-                    type: 'user',
-                    message: { role: 'user', content: 'How are you?' }
-                } as SDKUserMessage
-            ]
+    it("should reset parent chain when requested", () => {
+      const msg1 = userMsg("First");
+      const log1 = converter.convert(msg1);
 
-            const logMessages = converter.convertMany(messages)
+      converter.resetParentChain();
 
-            expect(logMessages).toHaveLength(3)
-            expect(logMessages[0].parentUuid).toBeNull()
-            expect(logMessages[1].parentUuid).toBe(logMessages[0].uuid)
-            expect(logMessages[2].parentUuid).toBe(logMessages[1].uuid)
-        })
-    })
+      const msg2 = userMsg("Second");
+      const log2 = converter.convert(msg2);
 
-    describe('Convenience function', () => {
-        it('should convert single message without state', () => {
-            const sdkMessage: SDKUserMessage = {
-                type: 'user',
-                message: { role: 'user', content: 'Test message' }
-            }
+      expect(log2?.parentUuid).toBeNull();
+    });
+  });
 
-            const logMessage = convertSDKToLog(sdkMessage, context)
+  describe("Batch conversion", () => {
+    it("should convert multiple messages maintaining relationships", () => {
+      const messages: SDKMessage[] = [
+        userMsg("Hello"),
+        assistantMsg([{ type: "text", text: "Hi there!" }]),
+        userMsg("How are you?"),
+      ];
 
-            expect(logMessage).toBeTruthy()
-            expect(logMessage?.type).toBe('user')
-            expect(logMessage?.parentUuid).toBeNull()
-        })
-    })
+      const logMessages = converter.convertMany(messages);
 
-    describe('Tool results with mode', () => {
-        it('should add mode to tool result when available in responses', () => {
-            const responses = new Map<string, { approved: boolean, mode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan', reason?: string }>()
-            responses.set('tool_123', { approved: true, mode: 'acceptEdits' })
-            
-            const converterWithResponses = new SDKToLogConverter(context, responses)
-            
-            const sdkMessage: SDKUserMessage = {
-                type: 'user',
-                message: {
-                    role: 'user',
-                    content: [{
-                        type: 'tool_result',
-                        tool_use_id: 'tool_123',
-                        content: 'Tool executed successfully'
-                    }]
-                }
-            }
+      expect(logMessages).toHaveLength(3);
+      expect(logMessages[0].parentUuid).toBeNull();
+      expect(logMessages[1].parentUuid).toBe(logMessages[0].uuid);
+      expect(logMessages[2].parentUuid).toBe(logMessages[1].uuid);
+    });
+  });
 
-            const logMessage = converterWithResponses.convert(sdkMessage)
+  describe("Convenience function", () => {
+    it("should convert single message without state", () => {
+      const sdkMessage = userMsg("Test message");
 
-            expect(logMessage).toBeTruthy()
-            expect((logMessage as any).mode).toBe('acceptEdits')
-            expect((logMessage as any).toolUseResult).toBeUndefined() // toolUseResult is not added when using array content
-        })
+      const logMessage = convertSDKToLog(sdkMessage, context);
 
-        it('should not add mode when not in responses', () => {
-            const responses = new Map<string, { approved: boolean, mode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan', reason?: string }>()
-            
-            const converterWithResponses = new SDKToLogConverter(context, responses)
-            
-            const sdkMessage: SDKUserMessage = {
-                type: 'user',
-                message: {
-                    role: 'user',
-                    content: [{
-                        type: 'tool_result',
-                        tool_use_id: 'tool_456',
-                        content: 'Tool result'
-                    }]
-                }
-            }
+      expect(logMessage).toBeTruthy();
+      expect(logMessage?.type).toBe("user");
+      expect(logMessage?.parentUuid).toBeNull();
+    });
+  });
 
-            const logMessage = converterWithResponses.convert(sdkMessage)
+  describe("Tool results with mode", () => {
+    it("should add mode to tool result when available in responses", () => {
+      const responses = new Map<
+        string,
+        {
+          approved: boolean;
+          mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan";
+          reason?: string;
+        }
+      >();
+      responses.set("tool_123", { approved: true, mode: "acceptEdits" });
 
-            expect(logMessage).toBeTruthy()
-            expect((logMessage as any).mode).toBeUndefined()
-            expect((logMessage as any).toolUseResult).toBeUndefined() // toolUseResult is not added when using array content
-        })
+      const converterWithResponses = new SDKToLogConverter(context, responses);
 
-        it('should handle mixed content with tool results', () => {
-            const responses = new Map<string, { approved: boolean, mode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan', reason?: string }>()
-            responses.set('tool_789', { approved: true, mode: 'bypassPermissions' })
-            
-            const converterWithResponses = new SDKToLogConverter(context, responses)
-            
-            const sdkMessage: SDKUserMessage = {
-                type: 'user',
-                message: {
-                    role: 'user',
-                    content: [
-                        { type: 'text', text: 'Here is the result:' },
-                        {
-                            type: 'tool_result',
-                            tool_use_id: 'tool_789',
-                            content: 'Tool output'
-                        }
-                    ]
-                }
-            }
+      const sdkMessage = userMsg([
+        {
+          type: "tool_result",
+          tool_use_id: "tool_123",
+          content: "Tool executed successfully",
+        },
+      ]);
 
-            const logMessage = converterWithResponses.convert(sdkMessage)
+      const logMessage = converterWithResponses.convert(sdkMessage);
 
-            expect(logMessage).toBeTruthy()
-            expect((logMessage as any).mode).toBe('bypassPermissions')
-            expect((logMessage as any).toolUseResult).toBeUndefined() // toolUseResult is not added when using array content
-        })
+      expect(logMessage).toBeTruthy();
+      expect((logMessage as any).mode).toBe("acceptEdits");
+      expect((logMessage as any).toolUseResult).toBeUndefined(); // toolUseResult is not added when using array content
+    });
 
-        it('should work with convenience function', () => {
-            const responses = new Map<string, { approved: boolean, mode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan', reason?: string }>()
-            responses.set('tool_abc', { approved: false, mode: 'plan', reason: 'User rejected' })
-            
-            const sdkMessage: SDKUserMessage = {
-                type: 'user',
-                message: {
-                    role: 'user',
-                    content: [{
-                        type: 'tool_result',
-                        tool_use_id: 'tool_abc',
-                        content: 'Permission denied'
-                    }]
-                }
-            }
+    it("should not add mode when not in responses", () => {
+      const responses = new Map<
+        string,
+        {
+          approved: boolean;
+          mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan";
+          reason?: string;
+        }
+      >();
 
-            const logMessage = convertSDKToLog(sdkMessage, context, responses)
+      const converterWithResponses = new SDKToLogConverter(context, responses);
 
-            expect(logMessage).toBeTruthy()
-            expect((logMessage as any).mode).toBe('plan')
-        })
-    })
-})
+      const sdkMessage = userMsg([
+        {
+          type: "tool_result",
+          tool_use_id: "tool_456",
+          content: "Tool result",
+        },
+      ]);
+
+      const logMessage = converterWithResponses.convert(sdkMessage);
+
+      expect(logMessage).toBeTruthy();
+      expect((logMessage as any).mode).toBeUndefined();
+      expect((logMessage as any).toolUseResult).toBeUndefined(); // toolUseResult is not added when using array content
+    });
+
+    it("should handle mixed content with tool results", () => {
+      const responses = new Map<
+        string,
+        {
+          approved: boolean;
+          mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan";
+          reason?: string;
+        }
+      >();
+      responses.set("tool_789", { approved: true, mode: "bypassPermissions" });
+
+      const converterWithResponses = new SDKToLogConverter(context, responses);
+
+      const sdkMessage = userMsg([
+        { type: "text", text: "Here is the result:" },
+        {
+          type: "tool_result",
+          tool_use_id: "tool_789",
+          content: "Tool output",
+        },
+      ]);
+
+      const logMessage = converterWithResponses.convert(sdkMessage);
+
+      expect(logMessage).toBeTruthy();
+      expect((logMessage as any).mode).toBe("bypassPermissions");
+      expect((logMessage as any).toolUseResult).toBeUndefined(); // toolUseResult is not added when using array content
+    });
+
+    it("should work with convenience function", () => {
+      const responses = new Map<
+        string,
+        {
+          approved: boolean;
+          mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan";
+          reason?: string;
+        }
+      >();
+      responses.set("tool_abc", {
+        approved: false,
+        mode: "plan",
+        reason: "User rejected",
+      });
+
+      const sdkMessage = userMsg([
+        {
+          type: "tool_result",
+          tool_use_id: "tool_abc",
+          content: "Permission denied",
+        },
+      ]);
+
+      const logMessage = convertSDKToLog(sdkMessage, context, responses);
+
+      expect(logMessage).toBeTruthy();
+      expect((logMessage as any).mode).toBe("plan");
+    });
+  });
+});

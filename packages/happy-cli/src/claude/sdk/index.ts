@@ -14,10 +14,8 @@ export type {
   SDKAssistantMessage,
   SDKSystemMessage,
   SDKResultMessage,
-  SDKControlResponse,
-  ControlRequest,
-  InterruptRequest,
-  SDKControlRequest,
+  SDKResultSuccess,
+  SDKResultError,
   CanCallToolCallback,
   PermissionResult,
 } from "./types"

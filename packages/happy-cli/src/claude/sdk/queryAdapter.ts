@@ -1,19 +1,20 @@
 /**
  * Query adapter — wraps official @anthropic-ai/claude-agent-sdk
- * to match the self-built SDK interface consumed by claudeRemote.ts
- *
- * Drop-in replacement for the self-built query() function.
- * See migration plan: Phase 1 adapter layer.
+ * to match the adapter interface consumed by claudeRemote.ts
  */
 
 import {
   query as officialQuery,
   AbortError as OfficialAbortError,
   type Options as OfficialOptions,
-  type SDKUserMessage as OfficialSDKUserMessage,
   type Query as OfficialQuery,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { QueryOptions, QueryPrompt, SDKMessage } from "./types";
+import type {
+  QueryOptions,
+  QueryPrompt,
+  SDKMessage,
+  SDKUserMessage,
+} from "./types";
 import { AbortError } from "./types";
 import { PushableAsyncIterable } from "@/utils/PushableAsyncIterable";
 import { logger } from "@/ui/logger";
@@ -28,7 +29,7 @@ export interface AdaptedQuery extends AsyncIterableIterator<SDKMessage> {
 }
 
 /**
- * Map self-built QueryOptions → official SDK Options.
+ * Map QueryOptions → official SDK Options.
  * Returns a new Options object; does not mutate the input.
  */
 export function mapOptions(opts: QueryOptions): OfficialOptions {
@@ -67,8 +68,6 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   }
 
   // ── canCallTool → canUseTool (signature adaptation) ──
-  // Self-built: (toolName, input, { signal }) => Promise<PermissionResult>
-  // Official:   (toolName, input, { signal, suggestions, blockedPath, decisionReason, toolUseID, agentID }) => Promise<PermissionResult>
   if (opts.canCallTool) {
     result.canUseTool = (toolName, input, options) => {
       return opts.canCallTool!(toolName, input, { signal: options.signal });
@@ -80,9 +79,12 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
     result.extraArgs = { ...result.extraArgs, settings: opts.settingsPath };
   }
 
+  // ── Load user & project settings so custom skills/commands are discovered ──
+  // The SDK defaults settingSources to [] which produces --setting-sources "",
+  // causing Claude Code to skip loading ~/.claude/commands/ and project commands.
+  result.settingSources = ["user", "project", "local"];
+
   // ── System prompt mapping ──
-  // customSystemPrompt → replaces entire system prompt (string)
-  // appendSystemPrompt → appends to Claude Code's default (preset + append)
   if (opts.customSystemPrompt) {
     result.systemPrompt = opts.customSystemPrompt;
   } else if (opts.appendSystemPrompt) {
@@ -102,11 +104,11 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
 }
 
 /**
- * Query function that wraps the official SDK with the self-built interface.
+ * Query function that wraps the official SDK.
  *
  * Key adaptation: `onMessageReceived` fires synchronously for every message
  * read from the official SDK stream, BEFORE it is enqueued for the for-await
- * consumer. This matches the self-built SDK's semantics exactly.
+ * consumer.
  */
 export function query(config: {
   prompt: QueryPrompt;
@@ -120,7 +122,7 @@ export function query(config: {
   logger.debug("[queryAdapter] Starting query via official SDK");
 
   const response = officialQuery({
-    prompt: config.prompt as string | AsyncIterable<OfficialSDKUserMessage>,
+    prompt: config.prompt as string | AsyncIterable<SDKUserMessage>,
     options: officialOptions,
   });
 
@@ -131,13 +133,12 @@ export function query(config: {
   (async () => {
     try {
       for await (const message of response) {
-        const adapted = message as unknown as SDKMessage;
-        config.onMessageReceived?.(adapted);
-        queue.push(adapted);
+        config.onMessageReceived?.(message);
+        queue.push(message);
       }
       queue.end();
     } catch (e) {
-      // Map official AbortError → self-built AbortError for instanceof checks
+      // Map official AbortError → our re-exported AbortError for instanceof checks
       const error =
         e instanceof OfficialAbortError
           ? new AbortError(e.message)
@@ -148,7 +149,6 @@ export function query(config: {
     }
   })();
 
-  // Attach _officialQuery for Phase 4 (setModel, setPermissionMode, etc.)
   return Object.assign(queue, {
     _officialQuery: response,
   }) as AdaptedQuery;

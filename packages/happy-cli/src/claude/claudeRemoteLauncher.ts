@@ -198,7 +198,7 @@ export async function claudeRemoteLauncher(
           ...umessage,
           message: {
             ...umessage.message,
-            content: umessage.message.content.map((c) => {
+            content: umessage.message.content.map((c: any) => {
               if (
                 c.type === "tool_result" &&
                 c.tool_use_id &&
