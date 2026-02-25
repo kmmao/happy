@@ -95,7 +95,14 @@ export async function claudeRemote(opts: {
   ) => void;
   /** Called with initialization info (supported models) after system init */
   onInitialized?: (info: {
-    models?: Array<{ code: string; value: string; description: string | null }>;
+    models?: Array<{
+      code: string;
+      value: string;
+      description: string | null;
+      supportsEffort?: boolean | null;
+      supportedEffortLevels?: string[] | null;
+      supportsAdaptiveThinking?: boolean | null;
+    }>;
   }) => void;
 }) {
   // Check if session is valid
@@ -328,11 +335,9 @@ export async function claudeRemote(opts: {
                   code: m.value,
                   value: m.displayName ?? m.value,
                   description: m.description ?? null,
-                  supportsEffort: (m as any).supportsEffort ?? null,
-                  supportedEffortLevels:
-                    (m as any).supportedEffortLevels ?? null,
-                  supportsAdaptiveThinking:
-                    (m as any).supportsAdaptiveThinking ?? null,
+                  supportsEffort: m.supportsEffort ?? null,
+                  supportedEffortLevels: m.supportedEffortLevels ?? null,
+                  supportsAdaptiveThinking: m.supportsAdaptiveThinking ?? null,
                 })),
               });
             })
