@@ -222,7 +222,7 @@ export async function claudeRemote(opts: {
     abort: opts.signal,
     pathToClaudeCodeExecutable: (() => {
       return resolve(
-        join(projectPath(), "scripts", "claude_remote_launcher.cjs"),
+        join(projectPath(), "scripts", "claude_remote_launcher.js"),
       );
     })(),
     settingsPath: opts.hookSettingsPath,
