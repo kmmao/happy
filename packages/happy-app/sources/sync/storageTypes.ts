@@ -11,6 +11,9 @@ export const MetadataSchema = z.object({
         code: z.string(),
         value: z.string(),
         description: z.string().nullish(),
+        supportsEffort: z.boolean().nullish(),
+        supportedEffortLevels: z.array(z.string()).nullish(),
+        supportsAdaptiveThinking: z.boolean().nullish(),
       }),
     )
     .optional(),

@@ -79,10 +79,11 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
     result.extraArgs = { ...result.extraArgs, settings: opts.settingsPath };
   }
 
-  // ── Budget, thinking, and effort ──
+  // ── Budget, thinking, effort, and prompt suggestions ──
   if (opts.maxBudgetUsd != null) result.maxBudgetUsd = opts.maxBudgetUsd;
   if (opts.thinking) result.thinking = opts.thinking;
   if (opts.effort != null) result.effort = opts.effort;
+  if (opts.promptSuggestions) result.promptSuggestions = opts.promptSuggestions;
 
   // ── Load user & project settings so custom skills/commands are discovered ──
   // The SDK defaults settingSources to [] which produces --setting-sources "",

@@ -189,6 +189,11 @@ const sessionToolProgressEventSchema = z.object({
   taskId: z.string().optional(),
 });
 
+const sessionPromptSuggestionEventSchema = z.object({
+  t: z.literal("prompt-suggestion"),
+  suggestion: z.string(),
+});
+
 const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -204,6 +209,7 @@ const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTaskProgressEventSchema,
   sessionTaskEndEventSchema,
   sessionToolProgressEventSchema,
+  sessionPromptSuggestionEventSchema,
 ]);
 
 const sessionEnvelopeSchema = z
@@ -235,7 +241,8 @@ const sessionEnvelopeSchema = z
         envelope.ev.t === "task-start" ||
         envelope.ev.t === "task-progress" ||
         envelope.ev.t === "task-end" ||
-        envelope.ev.t === "tool-progress") &&
+        envelope.ev.t === "tool-progress" ||
+        envelope.ev.t === "prompt-suggestion") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({
@@ -1002,6 +1009,39 @@ function normalizeSessionEnvelope(
     } satisfies NormalizedMessage;
   }
 
+  if (envelope.ev.t === "prompt-suggestion") {
+    // Prompt suggestions are side-channel signals, not chat messages.
+    // They are extracted separately via extractPromptSuggestionFromRaw().
+    return null;
+  }
+
+  return null;
+}
+
+/**
+ * Extract a prompt suggestion from a raw record, if present.
+ * Returns the suggestion text or null if the record is not a prompt-suggestion event.
+ */
+export function extractPromptSuggestionFromRaw(raw: RawRecord): string | null {
+  // Session protocol envelope can arrive via two paths:
+  // 1. raw.role === "session" → raw.content.data is the envelope
+  // 2. raw.role === "agent" && raw.content.type === "session" → raw.content.data is the envelope
+  let envelope: any = null;
+  if (raw.role === "session" && raw.content?.data) {
+    envelope = raw.content.data;
+  } else if (
+    raw.role === "agent" &&
+    raw.content?.type === "session" &&
+    raw.content?.data
+  ) {
+    envelope = raw.content.data;
+  }
+  if (
+    envelope?.ev?.t === "prompt-suggestion" &&
+    typeof envelope.ev.suggestion === "string"
+  ) {
+    return envelope.ev.suggestion;
+  }
   return null;
 }
 

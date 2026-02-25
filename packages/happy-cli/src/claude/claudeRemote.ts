@@ -237,6 +237,7 @@ export async function claudeRemote(opts: {
     maxBudgetUsd: initial.mode.maxBudgetUsd,
     thinking: initial.mode.thinking,
     effort: initial.mode.effort,
+    promptSuggestions: true,
   };
 
   // Track thinking state
@@ -327,6 +328,11 @@ export async function claudeRemote(opts: {
                   code: m.value,
                   value: m.displayName ?? m.value,
                   description: m.description ?? null,
+                  supportsEffort: (m as any).supportsEffort ?? null,
+                  supportedEffortLevels:
+                    (m as any).supportedEffortLevels ?? null,
+                  supportsAdaptiveThinking:
+                    (m as any).supportsAdaptiveThinking ?? null,
                 })),
               });
             })

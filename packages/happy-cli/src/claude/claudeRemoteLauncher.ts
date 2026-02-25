@@ -315,6 +315,18 @@ export async function claudeRemoteLauncher(
       session.client.sendSessionProtocolMessage(envelope);
     }
 
+    // Forward prompt suggestion to session protocol
+    if (message.type === "prompt_suggestion") {
+      const suggestion = (message as any).suggestion as string;
+      if (suggestion) {
+        const envelope = createEnvelope("agent", {
+          t: "prompt-suggestion",
+          suggestion,
+        });
+        session.client.sendSessionProtocolMessage(envelope);
+      }
+    }
+
     // Convert SDK message to log format and send to client
     let msg = message;
 

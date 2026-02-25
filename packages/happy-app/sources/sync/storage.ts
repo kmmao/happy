@@ -116,6 +116,8 @@ interface StorageState {
   sessionListViewData: SessionListViewItem[] | null;
   sessionMessages: Record<string, SessionMessages>;
   sessionGitStatus: Record<string, GitStatus | null>;
+  sessionPromptSuggestions: Record<string, string | null>;
+  setPromptSuggestion: (sessionId: string, suggestion: string | null) => void;
   machines: Record<string, Machine>;
   artifacts: Record<string, DecryptedArtifact>; // New artifacts storage
   friends: Record<string, UserProfile>; // All relationships (friends, pending, requested, etc.)
@@ -362,6 +364,14 @@ export const storage = create<StorageState>()((set, get) => {
     sessionListViewData: null,
     sessionMessages: {},
     sessionGitStatus: {},
+    sessionPromptSuggestions: {},
+    setPromptSuggestion: (sessionId: string, suggestion: string | null) =>
+      set((prev) => ({
+        sessionPromptSuggestions: {
+          ...prev.sessionPromptSuggestions,
+          [sessionId]: suggestion,
+        },
+      })),
     realtimeStatus: "disconnected",
     realtimeMode: "idle",
     socketStatus: "disconnected",
@@ -1284,6 +1294,12 @@ export const storage = create<StorageState>()((set, get) => {
         const { [sessionId]: deletedGitStatus, ...remainingGitStatus } =
           state.sessionGitStatus;
 
+        // Remove prompt suggestion if it exists
+        const {
+          [sessionId]: _deletedSuggestion,
+          ...remainingPromptSuggestions
+        } = state.sessionPromptSuggestions;
+
         // Clear drafts and permission modes from persistent storage
         const drafts = loadSessionDrafts();
         delete drafts[sessionId];
@@ -1311,6 +1327,7 @@ export const storage = create<StorageState>()((set, get) => {
           sessions: remainingSessions,
           sessionMessages: remainingSessionMessages,
           sessionGitStatus: remainingGitStatus,
+          sessionPromptSuggestions: remainingPromptSuggestions,
           sessionListViewData,
         };
       }),
@@ -1715,6 +1732,12 @@ export function useSocketStatus() {
 export function useSessionGitStatus(sessionId: string): GitStatus | null {
   return storage(
     useShallow((state) => state.sessionGitStatus[sessionId] ?? null),
+  );
+}
+
+export function usePromptSuggestion(sessionId: string): string | null {
+  return storage(
+    useShallow((state) => state.sessionPromptSuggestions[sessionId] ?? null),
   );
 }
 

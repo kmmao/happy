@@ -18,7 +18,12 @@ import * as Notifications from "expo-notifications";
 import { registerPushToken } from "./apiPush";
 import { Platform, AppState, type AppStateStatus } from "react-native";
 import { isRunningOnMac } from "@/utils/platform";
-import { NormalizedMessage, normalizeRawMessage, RawRecord } from "./typesRaw";
+import {
+  NormalizedMessage,
+  normalizeRawMessage,
+  extractPromptSuggestionFromRaw,
+  RawRecord,
+} from "./typesRaw";
 import {
   applySettings,
   Settings,
@@ -493,6 +498,9 @@ class Sync {
   }
 
   async sendMessage(sessionId: string, text: string, displayText?: string) {
+    // Clear any existing prompt suggestion when the user sends a message
+    storage.getState().setPromptSuggestion(sessionId, null);
+
     // Get encryption
     const encryption = this.encryption.getSessionEncryption(sessionId);
     if (!encryption) {
@@ -1840,10 +1848,16 @@ class Sync {
 
         const decryptedMessages = await encryption.decryptMessages(messages);
         const normalizedMessages: NormalizedMessage[] = [];
+        let latestPromptSuggestion: string | null = null;
         for (let i = 0; i < decryptedMessages.length; i++) {
           const decrypted = decryptedMessages[i];
           if (!decrypted) {
             continue;
+          }
+          // Extract prompt suggestion before normalizing (normalization returns null for these)
+          const suggestion = extractPromptSuggestionFromRaw(decrypted.content);
+          if (suggestion !== null) {
+            latestPromptSuggestion = suggestion;
           }
           const normalized = normalizeRawMessage(
             decrypted.id,
@@ -1854,6 +1868,13 @@ class Sync {
           if (normalized) {
             normalizedMessages.push(normalized);
           }
+        }
+
+        // Surface the latest prompt suggestion for this session
+        if (latestPromptSuggestion !== null) {
+          storage
+            .getState()
+            .setPromptSuggestion(sessionId, latestPromptSuggestion);
         }
 
         if (normalizedMessages.length > 0) {
@@ -2009,6 +2030,14 @@ class Sync {
           updateData.body.message,
         );
         if (decrypted) {
+          // Extract prompt suggestion before normalizing
+          const suggestion = extractPromptSuggestionFromRaw(decrypted.content);
+          if (suggestion !== null) {
+            storage
+              .getState()
+              .setPromptSuggestion(updateData.body.sid, suggestion);
+          }
+
           lastMessage = normalizeRawMessage(
             decrypted.id,
             decrypted.localId,

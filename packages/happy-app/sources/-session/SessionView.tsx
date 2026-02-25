@@ -35,6 +35,7 @@ import {
   storage,
   useIsDataReady,
   useLocalSetting,
+  usePromptSuggestion,
   useRealtimeStatus,
   useSessionMessages,
   useSessionUsage,
@@ -368,6 +369,7 @@ function SessionViewInner({
 
   const sessionStatus = useSessionStatus(session);
   const sessionUsage = useSessionUsage(sessionId);
+  const promptSuggestion = usePromptSuggestion(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
 
   // Scroll-to-bottom state
@@ -732,6 +734,11 @@ function SessionViewInner({
         showCommandList={showCommandList}
         onCommandSelect={handleCommandSelect}
         onCommandListClose={() => setShowCommandList(false)}
+        promptSuggestion={promptSuggestion}
+        onPromptSuggestionPress={(text) => {
+          storage.getState().setPromptSuggestion(sessionId, null);
+          sync.sendMessage(sessionId, text);
+        }}
       />
     </>
   );

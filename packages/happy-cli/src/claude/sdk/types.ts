@@ -57,6 +57,8 @@ export interface QueryOptions {
   thinking?: import("@anthropic-ai/claude-agent-sdk").ThinkingConfig;
   /** Controls how much effort Claude puts into its response (low/medium/high/max) */
   effort?: "low" | "medium" | "high" | "max";
+  /** Enable prompt suggestions — agent emits a prompt_suggestion after each turn */
+  promptSuggestions?: boolean;
 }
 
 /** Query prompt — string or async stream of user messages */
