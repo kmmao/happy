@@ -19,51 +19,51 @@ Create a portable, self-contained distribution of happy-server as a single Bun-c
 ## Implementation Steps
 
 ### Task 1: Add PGlite + adapter dependencies
-- [ ] Add `@electric-sql/pglite`, `pglite-prisma-adapter` to happy-server dependencies
-- [ ] Add `driverAdapters` to `previewFeatures` in `prisma/schema.prisma` generator block
-- [ ] Run `prisma generate` to regenerate client with adapter support
-- [ ] Verify existing server still works (no breaking changes from preview feature)
+- [x] Add `@electric-sql/pglite`, `pglite-prisma-adapter` to happy-server dependencies
+- [x] Add `driverAdapters` to `previewFeatures` in `prisma/schema.prisma` generator block
+- [x] Run `prisma generate` to regenerate client with adapter support
+- [x] Verify existing server still works (no breaking changes from preview feature)
 
 ### Task 2: Make database layer PGlite-aware
-- [ ] Modify `sources/storage/db.ts` to conditionally use PGlite when `PGLITE_DIR` env var is set
+- [x] Modify `sources/storage/db.ts` to conditionally use PGlite when `PGLITE_DIR` env var is set
   - If `PGLITE_DIR` is set: create PGlite instance with that dir, wrap in `PrismaPGlite` adapter, pass to `new PrismaClient({ adapter })`
   - If not set: use existing `new PrismaClient()` (connects via `DATABASE_URL` as before)
-- [ ] Export a `getPGlite()` function for direct SQL access (needed by migration command)
+- [x] Export a `getPGlite()` function for direct SQL access (needed by migration command)
 
 ### Task 3: Make Redis optional
-- [ ] In `main.ts`, make `redis.ping()` conditional — only if `REDIS_URL` env var is set
-- [ ] Skip redis import when not needed (dynamic import or guard)
+- [x] In `main.ts`, make `redis.ping()` conditional — only if `REDIS_URL` env var is set
+- [x] Skip redis import when not needed (dynamic import or guard)
 
 ### Task 4: Replace S3 with local filesystem storage
-- [ ] Modify `sources/storage/files.ts`:
+- [x] Modify `sources/storage/files.ts`:
   - If S3 env vars are set: use existing Minio client (no change)
   - If not: use local filesystem under `DATA_DIR/files/` directory
-- [ ] Modify `sources/storage/uploadImage.ts`:
+- [x] Modify `sources/storage/uploadImage.ts`:
   - Replace `s3client.putObject` with conditional: S3 or `fs.writeFile` to local path
   - Replace `resolveImageUrl` to return local file-serving URL when in local mode
-- [ ] Add a static file serving route in API for local files (e.g., `/files/*`)
+- [x] Add a static file serving route in API for local files (e.g., `/files/*`)
 
 ### Task 5: Create CLI entry point with migrate command
-- [ ] Create `sources/standalone.ts` as the portable entry point:
+- [x] Create `sources/standalone.ts` as the portable entry point:
   - Parse `process.argv` for subcommands: `migrate`, `serve`
   - `migrate`: initialize PGlite directly, read all `prisma/migrations/*/migration.sql` files in order, execute them via PGlite SQL, track applied migrations
   - `serve`: call existing `main()` logic
   - No args or `--help`: print usage
-- [ ] Embed migration SQL files at build time (Bun can import text files)
+- [x] Embed migration SQL files at build time (Bun can import text files)
 
 ### Task 6: Add Bun build configuration
-- [ ] Add `build:standalone` script to `package.json`: `bun build ./sources/standalone.ts --compile --outfile happy-server`
-- [ ] Handle PGlite WASM files: add a post-build step to copy postgres data files next to the binary
-- [ ] Test the build: `bun run build:standalone`
-- [ ] Test: `./happy-server migrate` creates and migrates a PGlite database
-- [ ] Test: `./happy-server serve` starts the server with PGlite
+- [x] Add `build:standalone` script to `package.json`: `bun build ./sources/standalone.ts --compile --outfile happy-server`
+- [x] Handle PGlite WASM files: add a post-build step to copy postgres data files next to the binary
+- [x] Test the build: `bun run build:standalone`
+- [x] Test: `./happy-server migrate` creates and migrates a PGlite database
+- [x] Test: `./happy-server serve` starts the server with PGlite
 
 ### Task 7: Verify end-to-end
-- [ ] Build the binary
-- [ ] Run `./happy-server migrate` — verify database is created in `./data/`
-- [ ] Run `./happy-server serve` — verify server starts, health endpoint responds
-- [ ] Verify no Redis connection attempted
-- [ ] Verify files can be stored/served locally
+- [x] Build the binary
+- [x] Run `./happy-server migrate` — verify database is created in `./data/`
+- [x] Run `./happy-server serve` — verify server starts, health endpoint responds
+- [x] Verify no Redis connection attempted
+- [x] Verify files can be stored/served locally
 
 ## Technical Details
 

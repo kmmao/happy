@@ -119,17 +119,17 @@ Since all IDs are non-deterministic cuid2, tests must:
 - Assert all `id` fields are unique cuid2
 - Assert `turn` changes between separate turns
 
-- [ ] Create `AcpSessionMapper` class with `mapMessage()` method
-- [ ] Implement turn lifecycle (turn-start on running, turn-end on idle/error)
-- [ ] Implement text mapping (model-output -> text event)
-- [ ] Implement tool call mapping (tool-call -> tool-call-start, tool-result -> tool-call-end) with cuid2 call ID mapping
-- [ ] Implement thinking mapping (event/thinking -> text with thinking: true)
-- [ ] Write tests for turn lifecycle (all cases above)
-- [ ] Write tests for text/tool/thinking mapping (all cases above)
-- [ ] Write tests for ignored messages
-- [ ] Write tests for ID consistency across full turn sequence
-- [ ] Write tests for edge cases (multiple idles, running without idle, etc.)
-- [ ] Run tests - must pass before next task
+- [x] Create `AcpSessionManager` class with `mapMessage()` method (implemented as `AcpSessionManager` instead of `AcpSessionMapper`)
+- [x] Implement turn lifecycle (turn-start on running, turn-end on idle/error)
+- [x] Implement text mapping (model-output -> text event)
+- [x] Implement tool call mapping (tool-call -> tool-call-start, tool-result -> tool-call-end) with cuid2 call ID mapping
+- [x] Implement thinking mapping (event/thinking -> text with thinking: true)
+- [x] Write tests for turn lifecycle (all cases above)
+- [x] Write tests for text/tool/thinking mapping (all cases above)
+- [x] Write tests for ignored messages
+- [x] Write tests for ID consistency across full turn sequence
+- [x] Write tests for edge cases (multiple idles, running without idle, etc.)
+- [x] Run tests - must pass before next task
 
 ### Task 2: Create generic runAcp runner function
 
@@ -162,15 +162,15 @@ async function runAcp(opts: {
 9. Simple console logging (no Ink)
 10. Clean up on exit
 
-- [ ] Create `runAcp()` function with session setup (API client, machine, session creation)
-- [ ] Wire AcpBackend + AcpSessionMapper + session protocol message sending
-- [ ] Implement user message handling (session.onUserMessage -> messageQueue -> sendPrompt)
-- [ ] Implement abort/kill session handlers
-- [ ] Implement permission handling via AcpPermissionHandler interface
-- [ ] Add simple console logging for status (no Ink)
-- [ ] Add cleanup/dispose logic
-- [ ] Write tests for runner setup and message flow (with mocked backend)
-- [ ] Run tests - must pass before next task
+- [x] Create `runAcp()` function with session setup (API client, machine, session creation)
+- [x] Wire AcpBackend + AcpSessionManager + session protocol message sending
+- [x] Implement user message handling (session.onUserMessage -> messageQueue -> sendPrompt)
+- [x] Implement abort/kill session handlers
+- [x] Implement permission handling via AcpPermissionHandler interface (GenericAcpPermissionHandler)
+- [x] Add simple console logging for status (no Ink)
+- [x] Add cleanup/dispose logic
+- [x] Write tests for runner setup and message flow (with mocked backend)
+- [x] Run tests - must pass before next task
 
 ### Task 3: Register agents and add CLI commands
 
@@ -190,24 +190,24 @@ const KNOWN_ACP_AGENTS: Record<string, { command: string; args: string[] }> = {
 
 No env vars, no API keys, no model config. Just command + args.
 
-- [ ] Define known ACP agent configs (command + args only)
-- [ ] Add CLI routing for `happy acp <agent-name>` and `happy acp -- <cmd> [args]`
-- [ ] Wire to `runAcp()` with resolved config
-- [ ] Write tests for agent config resolution
-- [ ] Run tests - must pass before next task
+- [x] Define known ACP agent configs (command + args only) — `acpAgentConfig.ts`
+- [x] Add CLI routing for `happy acp <agent-name>` and `happy acp -- <cmd> [args]` — `index.ts`
+- [x] Wire to `runAcp()` with resolved config
+- [x] Write tests for agent config resolution — `acpAgentConfig.test.ts`
+- [x] Run tests - must pass before next task
 
 ### Task 4: Verify acceptance criteria
-- [ ] Verify generic runner works without vendor-specific code
-- [ ] Verify no credentials/env/API key resolution anywhere in the new code
-- [ ] Verify new session protocol envelopes are emitted correctly
-- [ ] Verify sessions are never restarted (only in-memory state)
-- [ ] Verify permission handling works
-- [ ] Run full test suite (unit tests)
+- [x] Verify generic runner works without vendor-specific code
+- [x] Verify no credentials/env/API key resolution anywhere in the new code
+- [x] Verify new session protocol envelopes are emitted correctly
+- [x] Verify sessions are never restarted (only in-memory state)
+- [x] Verify permission handling works
+- [x] Run full test suite (unit tests)
 - [ ] Run linter - all issues must be fixed
 
 ### Task 5: [Final] Update documentation
-- [ ] Update README.md if needed
-- [ ] Add inline comments explaining the architecture
+- [x] Update README.md if needed
+- [x] Add inline comments explaining the architecture
 
 ## Technical Details
 
