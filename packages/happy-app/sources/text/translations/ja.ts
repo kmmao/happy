@@ -681,6 +681,7 @@ export const ja: TranslationStructure = {
     taskView: {
       initializing: "エージェントを初期化中...",
       moreTools: ({ count }: { count: number }) => `+${count} 個のツール`,
+      collapseTools: "折りたたむ",
       agentThinking: "思考中...",
       subagentRunning: ({ type }: { type: string }) => `${type} を実行中...`,
     },

@@ -210,6 +210,7 @@ export const TaskView = React.memo<ToolViewProps>(
     });
 
     const [collapsed, setCollapsed] = React.useState(true);
+    const [showAllTools, setShowAllTools] = React.useState(false);
 
     if (filtered.length === 0) {
       return null;
@@ -247,8 +248,10 @@ export const TaskView = React.memo<ToolViewProps>(
 
     // Show more tools when activity mode is enabled
     const maxVisible = showAgentActivity ? 6 : 3;
-    const visibleTools = filtered.slice(filtered.length - maxVisible);
-    const remainingCount = filtered.length - maxVisible;
+    const displayTools = showAllTools
+      ? filtered
+      : filtered.slice(filtered.length - maxVisible);
+    const remainingCount = showAllTools ? 0 : filtered.length - maxVisible;
 
     return (
       <View style={styles.container}>
@@ -270,15 +273,13 @@ export const TaskView = React.memo<ToolViewProps>(
             {promptSummary}
           </Text>
         )}
-        {visibleTools.map((item, index) => {
+        {displayTools.map((item, index) => {
           const isLast =
-            index === visibleTools.length - 1 && remainingCount <= 0;
+            index === displayTools.length - 1 && remainingCount <= 0;
           return (
             <View key={`${item.tool.name}-${index}`} style={styles.toolItem}>
               <Text style={styles.treeLine}>{isLast ? "└─" : "├─"}</Text>
-              <Text style={styles.toolTitle} numberOfLines={1}>
-                {item.title}
-              </Text>
+              <Text style={styles.toolTitle}>{item.title}</Text>
               <View style={styles.statusContainer}>
                 {item.state === "running" && (
                   <ActivityIndicator
@@ -305,12 +306,26 @@ export const TaskView = React.memo<ToolViewProps>(
           );
         })}
         {remainingCount > 0 && (
-          <View style={styles.moreToolsItem}>
+          <Pressable
+            style={styles.moreToolsItem}
+            onPress={() => setShowAllTools(true)}
+          >
             <Text style={styles.treeLine}>└─</Text>
             <Text style={styles.moreToolsText}>
               {t("tools.taskView.moreTools", { count: remainingCount })}
             </Text>
-          </View>
+          </Pressable>
+        )}
+        {showAllTools && filtered.length > maxVisible && (
+          <Pressable
+            style={styles.moreToolsItem}
+            onPress={() => setShowAllTools(false)}
+          >
+            <Text style={styles.treeLine}>└─</Text>
+            <Text style={styles.moreToolsText}>
+              {t("tools.taskView.collapseTools")}
+            </Text>
+          </Pressable>
         )}
       </View>
     );

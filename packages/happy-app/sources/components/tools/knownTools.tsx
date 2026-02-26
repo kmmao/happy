@@ -130,28 +130,7 @@ export const knownTools = {
       tool: ToolCall;
     }) => {
       if (typeof opts.tool.input.command === "string") {
-        const cmd = opts.tool.input.command;
-        // Extract just the command name for common commands
-        const firstWord = cmd.split(" ")[0];
-        if (
-          [
-            "cd",
-            "ls",
-            "pwd",
-            "mkdir",
-            "rm",
-            "cp",
-            "mv",
-            "npm",
-            "yarn",
-            "git",
-          ].includes(firstWord)
-        ) {
-          return t("tools.desc.terminalCmd", { cmd: firstWord });
-        }
-        // For other commands, show truncated version
-        const truncated = cmd.length > 20 ? cmd.substring(0, 20) + "..." : cmd;
-        return t("tools.desc.terminalCmd", { cmd: truncated });
+        return t("tools.desc.terminalCmd", { cmd: opts.tool.input.command });
       }
       return t("tools.names.terminal");
     },

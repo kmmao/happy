@@ -602,6 +602,7 @@ export const zhHans: TranslationStructure = {
       initializing: "正在初始化 agent...",
       moreTools: ({ count }: { count: number }) =>
         `+${count} 个更多${plural({ count, singular: "工具", plural: "工具" })}`,
+      collapseTools: "收起",
       agentThinking: "思考中...",
       subagentRunning: ({ type }: { type: string }) => `正在运行 ${type}...`,
     },

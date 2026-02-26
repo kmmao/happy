@@ -631,6 +631,7 @@ export const en: TranslationStructure = {
       initializing: "Initializing agent...",
       moreTools: ({ count }: { count: number }) =>
         `+${count} more ${plural({ count, singular: "tool", plural: "tools" })}`,
+      collapseTools: "Collapse",
       agentThinking: "Thinking...",
       subagentRunning: ({ type }: { type: string }) => `Running ${type}...`,
     },

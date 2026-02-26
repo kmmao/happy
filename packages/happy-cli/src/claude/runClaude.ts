@@ -1,5 +1,4 @@
 import os from "node:os";
-import { randomUUID } from "node:crypto";
 import { readFile, readdir, rm } from "node:fs/promises";
 import { join, basename } from "node:path";
 
@@ -72,7 +71,6 @@ export async function runClaude(
   }
 
   const workingDirectory = process.cwd();
-  const sessionTag = randomUUID();
 
   // Log environment info at startup
   logger.debugLargeJson("[START] Happy process started", getEnvironmentInfo());
@@ -121,6 +119,13 @@ export async function runClaude(
   }
   logger.debug(`Using machineId: ${machineId}`);
 
+  // Deterministic session tag: same machine + directory + flavor = same session
+  const sessionTag = hashObject({
+    machineId,
+    path: workingDirectory,
+    flavor: "claude",
+  });
+
   // Create machine if it doesn't exist
   await api.getOrCreateMachine({
     machineId,
@@ -166,7 +171,7 @@ export async function runClaude(
       serverUrl: configuration.serverUrl,
       onReconnected: async () => {
         const resp = await api.getOrCreateSession({
-          tag: randomUUID(),
+          tag: sessionTag,
           metadata,
           state,
         });
