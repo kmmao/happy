@@ -976,6 +976,7 @@ export const ru: TranslationStructure = {
       tokens: string;
       duration: string;
     }) => `${tokens} tokens · ${duration}`,
+    sessionSummary: ({ tokens }: { tokens: string }) => `Σ${tokens} tokens`,
   },
 
   codex: {

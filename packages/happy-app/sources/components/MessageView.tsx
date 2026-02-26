@@ -84,6 +84,7 @@ function RenderBlock(props: {
         <AgentEventBlock
           event={props.message.event}
           metadata={props.metadata}
+          sessionUsage={props.message.sessionUsage}
         />
       );
 
@@ -241,6 +242,9 @@ function formatModelName(model: string): string {
 }
 
 function formatTokenCount(count: number): string {
+  if (count >= 1000000) {
+    return `${(count / 1000000).toFixed(1)}M`;
+  }
   if (count >= 1000) {
     return `${(count / 1000).toFixed(1)}k`;
   }
@@ -254,9 +258,21 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+function formatCost(costUsd: number): string {
+  if (costUsd < 0.01) {
+    return `$${costUsd.toFixed(4)}`;
+  }
+  return `$${costUsd.toFixed(2)}`;
+}
+
 function AgentEventBlock(props: {
   event: AgentEvent;
   metadata: Metadata | null;
+  sessionUsage?: {
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalCostUsd?: number;
+  };
 }) {
   if (props.event.type === "switch") {
     return (
@@ -297,69 +313,60 @@ function AgentEventBlock(props: {
       </View>
     );
   }
-  if (props.event.type === "ready" || props.event.type === "usage-stats") {
+  // Per-call usage-stats are hidden — session summary is shown at turn-end only
+  if (props.event.type === "usage-stats") {
+    return null;
+  }
+  if (props.event.type === "ready") {
     const model = props.event.model;
-    const usage = props.event.usage;
     const durationMs = props.event.durationMs;
-    if (!model && !usage && durationMs === undefined) {
-      return null;
-    }
-    const totalTokens = usage
-      ? usage.input_tokens +
-        usage.output_tokens +
-        (usage.cache_creation_input_tokens ?? 0) +
-        (usage.cache_read_input_tokens ?? 0)
-      : null;
-    const tokensStr =
-      totalTokens !== null ? formatTokenCount(totalTokens) : null;
+    const modelStr = model ? formatModelName(model) : null;
     const durationStr =
       durationMs !== undefined ? formatDuration(durationMs) : null;
-    const modelStr = model ? formatModelName(model) : null;
 
-    // Build cache breakdown suffix
-    let breakdownSuffix = "";
-    if (usage) {
-      const cr = usage.cache_read_input_tokens ?? 0;
-      const cc = usage.cache_creation_input_tokens ?? 0;
-      const inp = usage.input_tokens ?? 0;
-      const out = usage.output_tokens ?? 0;
-      const totalInput = cr + cc + inp;
-      const hitPct =
-        totalInput > 0 && cr > 0 ? Math.round((cr / totalInput) * 100) : null;
-      const parts: string[] = [];
-      if (cr > 0) parts.push(`↓${formatTokenCount(cr)}`);
-      if (inp > 0) parts.push(`in ${formatTokenCount(inp)}`);
-      if (out > 0) parts.push(`out ${formatTokenCount(out)}`);
-      if (cc > 0) parts.push(`↑${formatTokenCount(cc)}`);
-      if (hitPct !== null) {
-        breakdownSuffix = ` (↓${hitPct}% hit [${parts.join(" · ")}])`;
-      }
+    // Session total tokens: prefer SDK modelUsage, fallback to reducer cumulative
+    let sessionTotalTokens: number | null = null;
+    if (props.event.modelUsage) {
+      sessionTotalTokens = Object.values(props.event.modelUsage).reduce(
+        (sum, m) =>
+          sum +
+          m.inputTokens +
+          m.outputTokens +
+          m.cacheReadInputTokens +
+          m.cacheCreationInputTokens,
+        0,
+      );
+    } else if (props.sessionUsage) {
+      sessionTotalTokens =
+        props.sessionUsage.totalInputTokens +
+        props.sessionUsage.totalOutputTokens;
     }
 
-    let label: string;
-    if (modelStr && tokensStr && durationStr) {
-      label = t("message.turnStats", {
-        model: modelStr,
-        tokens: tokensStr + breakdownSuffix,
-        duration: durationStr,
-      });
-    } else if (tokensStr && durationStr) {
-      label = t("message.turnStatsNoModel", {
-        tokens: tokensStr + breakdownSuffix,
-        duration: durationStr,
-      });
-    } else {
-      const parts = [
-        modelStr,
-        tokensStr && `${tokensStr + breakdownSuffix} tokens`,
-        durationStr,
-      ].filter(Boolean);
-      label = parts.join(" · ");
+    // Session cost
+    const sessionCost =
+      props.event.totalCostUsd ?? props.sessionUsage?.totalCostUsd;
+
+    const parts: string[] = [];
+    if (modelStr) parts.push(modelStr);
+    if (durationStr) parts.push(durationStr);
+    if (sessionTotalTokens !== null) {
+      parts.push(
+        t("message.sessionSummary", {
+          tokens: formatTokenCount(sessionTotalTokens),
+        }),
+      );
+    }
+    if (sessionCost !== undefined && sessionCost > 0) {
+      parts.push(formatCost(sessionCost));
+    }
+
+    if (parts.length === 0) {
+      return null;
     }
 
     return (
       <View style={styles.turnStatsContainer}>
-        <Text style={styles.turnStatsText}>{label}</Text>
+        <Text style={styles.turnStatsText}>{parts.join(" · ")}</Text>
       </View>
     );
   }

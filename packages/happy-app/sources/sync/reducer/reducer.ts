@@ -110,7 +110,7 @@
  * - Updated internal state for future processing
  */
 
-import { Message, ToolCall } from "../typesMessage";
+import { Message, ModeSwitchMessage, ToolCall } from "../typesMessage";
 import { AgentEvent, NormalizedMessage, UsageData } from "../typesRaw";
 import { createTracer, traceMessages, TracerState } from "./reducerTracer";
 import { AgentState } from "../storageTypes";
@@ -297,10 +297,25 @@ export function reducer(
       continue;
     }
 
-    // Filter out ready events, unless they carry usage/model/duration data
+    // Turn-end: render session-level summary line with cumulative tokens and cost.
     if (msg.role === "event" && msg.content.type === "ready") {
       state.messageIds.set(msg.id, msg.id);
       hasReadyEvent = true;
+
+      // Accumulate this turn's usage if not already done by usage-stats events
+      if (msg.content.usage && !state.turnHadUsageStats) {
+        processUsageData(
+          state,
+          {
+            input_tokens: msg.content.usage.input_tokens,
+            output_tokens: msg.content.usage.output_tokens,
+            cache_creation_input_tokens:
+              msg.content.usage.cache_creation_input_tokens,
+            cache_read_input_tokens: msg.content.usage.cache_read_input_tokens,
+          },
+          msg.createdAt,
+        );
+      }
 
       // Extract SDK result data (cost, model usage, context window) if present
       if (
@@ -341,31 +356,31 @@ export function reducer(
         }
       }
 
-      // If per-call usage-stats were already shown for this turn, suppress the
-      // turn-end stats line to avoid showing the same info twice.
-      if (state.turnHadUsageStats) {
-        state.turnHadUsageStats = false;
-        continue;
-      }
+      // Reset turn tracking
+      state.turnHadUsageStats = false;
+
+      // Show session summary if we have any useful data
       const hasStats =
-        msg.content.model !== undefined ||
+        msg.content.totalCostUsd !== undefined ||
+        msg.content.modelUsage !== undefined ||
         msg.content.usage !== undefined ||
+        msg.content.model !== undefined ||
         msg.content.durationMs !== undefined;
       if (!hasStats) {
         continue;
       }
-      // Fall through to Phase 5 to render as a stats line
+      // Fall through to Phase 5 to render as session summary line
     }
 
-    // Per-request usage stats: render as visible stats line + update cumulative usage.
-    // Unlike "ready", this does NOT set hasReadyEvent (agent is still working).
+    // Per-request usage stats: update cumulative usage only, no longer rendered.
+    // Session-level summary is shown at turn-end ("ready" event) instead.
     if (msg.role === "event" && msg.content.type === "usage-stats") {
       state.messageIds.set(msg.id, msg.id);
       state.turnHadUsageStats = true;
       if (msg.content.usage) {
         processUsageData(state, msg.content.usage, msg.createdAt);
       }
-      // Fall through to Phase 5 to render as a stats line
+      continue;
     }
 
     // Session protocol turn-start markers are lifecycle-only and should stay invisible.
@@ -1448,13 +1463,27 @@ function convertReducerMessageToMessage(
       meta: reducerMsg.meta,
     };
   } else if (reducerMsg.role === "agent" && reducerMsg.event !== null) {
-    return {
+    const eventMessage: ModeSwitchMessage = {
       id: reducerMsg.id,
       createdAt: reducerMsg.createdAt,
       kind: "agent-event",
       event: reducerMsg.event,
       meta: reducerMsg.meta,
     };
+    // Inject session-level cumulative usage for "ready" events
+    if (reducerMsg.event.type === "ready" && state.latestUsage) {
+      return {
+        ...eventMessage,
+        sessionUsage: {
+          totalInputTokens: state.latestUsage.totalInputTokens,
+          totalOutputTokens: state.latestUsage.totalOutputTokens,
+          ...(state.latestUsage.totalCostUsd !== undefined
+            ? { totalCostUsd: state.latestUsage.totalCostUsd }
+            : {}),
+        },
+      };
+    }
+    return eventMessage;
   }
 
   return null;
