@@ -715,6 +715,7 @@ export const pl: TranslationStructure = {
       other: "Inne",
       otherDescription: "Wpisz własną odpowiedź",
       otherPlaceholder: "Wpisz swoją odpowiedź...",
+      recommended: "Zalecane",
     },
   },
 

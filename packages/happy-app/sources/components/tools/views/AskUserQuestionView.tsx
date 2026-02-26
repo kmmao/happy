@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TextInput,
+  ScrollView,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ToolViewProps } from "./_all";
@@ -30,159 +31,196 @@ interface AskUserQuestionInput {
   questions: Question[];
 }
 
-// Styles MUST be defined outside the component to prevent infinite re-renders
-// with react-native-unistyles. The theme is passed as a function parameter.
-const styles = StyleSheet.create((theme) => ({
-  container: {
-    gap: 16,
-  },
-  questionSection: {
-    gap: 8,
-  },
-  headerChip: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.surfaceHighest,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginBottom: 4,
-  },
-  headerText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: theme.colors.textSecondary,
-    textTransform: "uppercase",
-  },
-  questionText: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: theme.colors.text,
-    marginBottom: 8,
-  },
-  optionsContainer: {
-    gap: 4,
-  },
-  optionButton: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: theme.colors.divider,
-    gap: 10,
-    minHeight: 44, // Minimum touch target for mobile
-  },
-  optionButtonSelected: {
-    backgroundColor: theme.colors.surfaceHigh,
-    borderColor: theme.colors.radio.active,
-  },
-  optionButtonDisabled: {
-    opacity: 0.6,
-  },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: theme.colors.textSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 2,
-  },
-  radioOuterSelected: {
-    borderColor: theme.colors.radio.active,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: theme.colors.radio.dot,
-  },
-  checkboxOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: theme.colors.textSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 2,
-  },
-  checkboxOuterSelected: {
-    borderColor: theme.colors.radio.active,
-    backgroundColor: theme.colors.radio.active,
-  },
-  optionContent: {
-    flex: 1,
-  },
-  optionLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: theme.colors.text,
-  },
-  optionDescription: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
-  },
-  actionsContainer: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
-    justifyContent: "flex-end",
-  },
-  submitButton: {
-    backgroundColor: theme.colors.button.primary.background,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    minHeight: 44, // Minimum touch target for mobile
-  },
-  submitButtonDisabled: {
-    opacity: 0.5,
-  },
-  submitButtonText: {
-    color: theme.colors.button.primary.tint,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  submittedContainer: {
-    gap: 8,
-  },
-  submittedItem: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  submittedHeader: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: theme.colors.textSecondary,
-  },
-  submittedValue: {
-    fontSize: 13,
-    color: theme.colors.text,
-    flex: 1,
-  },
-  otherInput: {
-    borderWidth: 1,
-    borderColor: theme.colors.divider,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    color: theme.colors.text,
-    minHeight: 60,
-    marginTop: 4,
-  },
-  otherInputFocused: {
-    borderColor: theme.colors.radio.active,
-  },
-}));
+/**
+ * Parse "(Recommended)" suffix from option label.
+ * Returns the cleaned label and whether it was recommended.
+ */
+function parseRecommended(label: string): {
+  cleanLabel: string;
+  isRecommended: boolean;
+} {
+  const match = label.match(/^(.+?)\s*\(Recommended\)\s*$/i);
+  if (match) {
+    return { cleanLabel: match[1].trim(), isRecommended: true };
+  }
+  return { cleanLabel: label, isRecommended: false };
+}
+
+/**
+ * Get the selected labels for a question (for submitted display).
+ */
+function getSelectedLabels(
+  question: Question,
+  selected: Set<number> | undefined,
+  otherTexts: Map<number, string>,
+  qIndex: number,
+): string {
+  if (!selected || selected.size === 0) return "-";
+  const otherIndex = question.options.length;
+  return Array.from(selected)
+    .map((optIndex) => {
+      if (optIndex === otherIndex) {
+        return otherTexts.get(qIndex) || t("tools.askUserQuestion.other");
+      }
+      return question.options[optIndex]?.label;
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
+// ─── Step Indicator ──────────────────────────────────────────────────
+
+const StepIndicator = React.memo<{
+  questions: Question[];
+  selections: Map<number, Set<number>>;
+}>(({ questions, selections }) => {
+  const { theme } = useUnistyles();
+  if (questions.length < 2) return null;
+
+  // Auto-compute: first unanswered question is the active step
+  const activeIndex = questions.findIndex(
+    (_, i) => (selections.get(i)?.size ?? 0) === 0,
+  );
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.stepRow}
+      contentContainerStyle={styles.stepRowContent}
+    >
+      {questions.map((q, idx) => {
+        const hasAnswer = (selections.get(idx)?.size ?? 0) > 0;
+        const isActive = idx === activeIndex;
+
+        return (
+          <View
+            key={idx}
+            style={[
+              styles.stepChip,
+              isActive && styles.stepChipFocused,
+              hasAnswer && !isActive && styles.stepChipDone,
+            ]}
+          >
+            {hasAnswer ? (
+              <Ionicons
+                name="checkmark-circle"
+                size={14}
+                color={theme.colors.radio.active}
+              />
+            ) : (
+              <View
+                style={[styles.stepDot, isActive && styles.stepDotFocused]}
+              />
+            )}
+            <Text
+              style={[styles.stepLabel, isActive && styles.stepLabelFocused]}
+              numberOfLines={1}
+            >
+              {q.header}
+            </Text>
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
+});
+
+// ─── Option Row ──────────────────────────────────────────────────────
+
+const OptionRow = React.memo<{
+  option: QuestionOption;
+  isSelected: boolean;
+  multiSelect: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}>(({ option, isSelected, multiSelect, disabled, onPress }) => {
+  const { cleanLabel, isRecommended } = parseRecommended(option.label);
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.optionButton,
+        isSelected && styles.optionButtonSelected,
+        disabled && styles.optionButtonDisabled,
+      ]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.7}
+    >
+      {multiSelect ? (
+        <View
+          style={[
+            styles.checkboxOuter,
+            isSelected && styles.checkboxOuterSelected,
+          ]}
+        >
+          {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+        </View>
+      ) : (
+        <View
+          style={[styles.radioOuter, isSelected && styles.radioOuterSelected]}
+        >
+          {isSelected && <View style={styles.radioInner} />}
+        </View>
+      )}
+      <View style={styles.optionContent}>
+        <View style={styles.optionLabelRow}>
+          <Text style={styles.optionLabel}>{cleanLabel}</Text>
+          {isRecommended && (
+            <View style={styles.recommendedTag}>
+              <Text style={styles.recommendedText}>
+                {t("tools.askUserQuestion.recommended")}
+              </Text>
+            </View>
+          )}
+        </View>
+        {option.description ? (
+          <Text style={styles.optionDescription}>{option.description}</Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+// ─── Submitted View ──────────────────────────────────────────────────
+
+const SubmittedView = React.memo<{
+  questions: Question[];
+  selections: Map<number, Set<number>>;
+  otherTexts: Map<number, string>;
+}>(({ questions, selections, otherTexts }) => {
+  const { theme } = useUnistyles();
+  return (
+    <ToolSectionView>
+      <View style={styles.submittedContainer}>
+        {questions.map((q, qIndex) => {
+          const label = getSelectedLabels(
+            q,
+            selections.get(qIndex),
+            otherTexts,
+            qIndex,
+          );
+          return (
+            <View key={qIndex} style={styles.submittedCard}>
+              <View style={styles.submittedCardHeader}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={16}
+                  color={theme.colors.radio.active}
+                />
+                <Text style={styles.submittedHeader}>{q.header}</Text>
+              </View>
+              <Text style={styles.submittedValue}>{label}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </ToolSectionView>
+  );
+});
+
+// ─── Main Component ──────────────────────────────────────────────────
 
 export const AskUserQuestionView = React.memo<ToolViewProps>(
   ({ tool, sessionId }) => {
@@ -191,11 +229,9 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       Map<number, Set<number>>
     >(new Map());
     const [isSubmitting, setIsSubmitting] = React.useState(false);
-    const [isSubmitted, setIsSubmitted] = React.useState(false);
     const [otherTexts, setOtherTexts] = React.useState<Map<number, string>>(
       new Map(),
     );
-
     // Parse input
     const input = tool.input as AskUserQuestionInput | undefined;
     const questions = input?.questions;
@@ -204,11 +240,15 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       return null;
     }
 
+    // Derive interaction state from permission status instead of local state.
+    // This fixes re-mount issues and cross-device sync (the old isSubmitted
+    // was purely local and would reset on navigation).
     const isRunning = tool.state === "running";
-    const canInteract = isRunning && !isSubmitted;
+    const isAnswered =
+      tool.permission != null && tool.permission.status !== "pending";
+    const canInteract = isRunning && !isAnswered && !isSubmitting;
 
     // Check if all questions have at least one selection
-    // If "Other" is selected (index === options.length), require non-empty text
     const allQuestionsAnswered = questions.every((q, qIndex) => {
       const selected = selections.get(qIndex);
       if (!selected || selected.size === 0) return false;
@@ -229,7 +269,6 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
           const currentSet = newMap.get(questionIndex) || new Set();
 
           if (multiSelect) {
-            // Toggle for multi-select
             const newSet = new Set(currentSet);
             if (newSet.has(optionIndex)) {
               newSet.delete(optionIndex);
@@ -238,7 +277,6 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
             }
             newMap.set(questionIndex, newSet);
           } else {
-            // Replace for single-select
             newMap.set(questionIndex, new Set([optionIndex]));
           }
 
@@ -252,12 +290,6 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       if (!sessionId || !allQuestionsAnswered || isSubmitting) return;
 
       setIsSubmitting(true);
-
-      // HACK: Disable the form immediately by switching to the submitted view.
-      // Without this, users could edit their selections while the network calls
-      // are in flight, but those edits would be ignored since we've already
-      // captured the values above. TODO: Revisit this logic.
-      setIsSubmitted(true);
 
       // Format answers as readable text
       const responseLines: string[] = [];
@@ -288,7 +320,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
         // 2. Send the answer as a message
         await sync.sendMessage(sessionId, responseText);
       } catch (error) {
-        console.error("Failed to submit answer:", error);
+        // Intentionally empty — errors are surfaced via the sync layer
       } finally {
         setIsSubmitting(false);
       }
@@ -302,110 +334,48 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       tool.permission?.id,
     ]);
 
-    // Show submitted state
-    if (isSubmitted || tool.state === "completed") {
+    // Show submitted/completed state
+    if (isAnswered || tool.state === "completed") {
       return (
-        <ToolSectionView>
-          <View style={styles.submittedContainer}>
-            {questions.map((q, qIndex) => {
-              const selected = selections.get(qIndex);
-              const otherIndex = q.options.length;
-              const selectedLabels = selected
-                ? Array.from(selected)
-                    .map((optIndex) => {
-                      if (optIndex === otherIndex) {
-                        return (
-                          otherTexts.get(qIndex) ||
-                          t("tools.askUserQuestion.other")
-                        );
-                      }
-                      return q.options[optIndex]?.label;
-                    })
-                    .filter(Boolean)
-                    .join(", ")
-                : "-";
-              return (
-                <View key={qIndex} style={styles.submittedItem}>
-                  <Text style={styles.submittedHeader}>{q.header}:</Text>
-                  <Text style={styles.submittedValue}>{selectedLabels}</Text>
-                </View>
-              );
-            })}
-          </View>
-        </ToolSectionView>
+        <SubmittedView
+          questions={questions}
+          selections={selections}
+          otherTexts={otherTexts}
+        />
       );
     }
 
     return (
       <ToolSectionView>
         <View style={styles.container}>
+          {/* Step progress indicator for multi-question */}
+          <StepIndicator questions={questions} selections={selections} />
+
           {questions.map((question, qIndex) => {
             const selectedOptions = selections.get(qIndex) || new Set();
 
             return (
               <View key={qIndex} style={styles.questionSection}>
-                <View style={styles.headerChip}>
-                  <Text style={styles.headerText}>{question.header}</Text>
-                </View>
+                {/* Only show header chip if single question (multi uses step indicator) */}
+                {questions.length === 1 && (
+                  <View style={styles.headerChip}>
+                    <Text style={styles.headerText}>{question.header}</Text>
+                  </View>
+                )}
                 <Text style={styles.questionText}>{question.question}</Text>
                 <View style={styles.optionsContainer}>
-                  {question.options.map((option, oIndex) => {
-                    const isSelected = selectedOptions.has(oIndex);
-
-                    return (
-                      <TouchableOpacity
-                        key={oIndex}
-                        style={[
-                          styles.optionButton,
-                          isSelected && styles.optionButtonSelected,
-                          !canInteract && styles.optionButtonDisabled,
-                        ]}
-                        onPress={() =>
-                          handleOptionToggle(
-                            qIndex,
-                            oIndex,
-                            question.multiSelect,
-                          )
-                        }
-                        disabled={!canInteract}
-                        activeOpacity={0.7}
-                      >
-                        {question.multiSelect ? (
-                          <View
-                            style={[
-                              styles.checkboxOuter,
-                              isSelected && styles.checkboxOuterSelected,
-                            ]}
-                          >
-                            {isSelected && (
-                              <Ionicons
-                                name="checkmark"
-                                size={14}
-                                color="#fff"
-                              />
-                            )}
-                          </View>
-                        ) : (
-                          <View
-                            style={[
-                              styles.radioOuter,
-                              isSelected && styles.radioOuterSelected,
-                            ]}
-                          >
-                            {isSelected && <View style={styles.radioInner} />}
-                          </View>
-                        )}
-                        <View style={styles.optionContent}>
-                          <Text style={styles.optionLabel}>{option.label}</Text>
-                          {option.description && (
-                            <Text style={styles.optionDescription}>
-                              {option.description}
-                            </Text>
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {question.options.map((option, oIndex) => (
+                    <OptionRow
+                      key={oIndex}
+                      option={option}
+                      isSelected={selectedOptions.has(oIndex)}
+                      multiSelect={question.multiSelect}
+                      disabled={!canInteract}
+                      onPress={() =>
+                        handleOptionToggle(qIndex, oIndex, question.multiSelect)
+                      }
+                    />
+                  ))}
 
                   {/* "Other" option for custom text input */}
                   {(() => {
@@ -520,3 +490,239 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
     );
   },
 );
+
+// ─── Styles ──────────────────────────────────────────────────────────
+// Styles MUST be defined outside the component to prevent infinite re-renders
+// with react-native-unistyles. The theme is passed as a function parameter.
+
+const styles = StyleSheet.create((theme) => ({
+  // Step indicator
+  stepRow: {
+    marginBottom: 8,
+    flexGrow: 0,
+  },
+  stepRowContent: {
+    gap: 6,
+    paddingVertical: 2,
+  },
+  stepChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceHighest,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  stepChipFocused: {
+    borderColor: theme.colors.radio.active,
+    backgroundColor: theme.colors.surfaceHigh,
+  },
+  stepChipDone: {
+    backgroundColor: theme.colors.surfaceHigh,
+  },
+  stepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.textSecondary,
+    opacity: 0.4,
+  },
+  stepDotFocused: {
+    backgroundColor: theme.colors.radio.active,
+    opacity: 1,
+  },
+  stepLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: theme.colors.textSecondary,
+  },
+  stepLabelFocused: {
+    color: theme.colors.text,
+    fontWeight: "600",
+  },
+
+  // Container
+  container: {
+    gap: 16,
+  },
+  questionSection: {
+    gap: 8,
+  },
+  headerChip: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.colors.surfaceHighest,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  headerText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: theme.colors.textSecondary,
+    textTransform: "uppercase",
+  },
+  questionText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+
+  // Options
+  optionsContainer: {
+    gap: 4,
+  },
+  optionButton: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: theme.colors.divider,
+    gap: 10,
+    minHeight: 44,
+  },
+  optionButtonSelected: {
+    backgroundColor: theme.colors.surfaceHigh,
+    borderColor: theme.colors.radio.active,
+    borderLeftWidth: 3,
+  },
+  optionButtonDisabled: {
+    opacity: 0.6,
+  },
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: theme.colors.textSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  radioOuterSelected: {
+    borderColor: theme.colors.radio.active,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.radio.dot,
+  },
+  checkboxOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: theme.colors.textSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  checkboxOuterSelected: {
+    borderColor: theme.colors.radio.active,
+    backgroundColor: theme.colors.radio.active,
+  },
+  optionContent: {
+    flex: 1,
+  },
+  optionLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+  },
+  optionLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: theme.colors.text,
+  },
+  recommendedTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    backgroundColor: theme.colors.radio.active + "20",
+  },
+  recommendedText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: theme.colors.radio.active,
+  },
+  optionDescription: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+
+  // Actions
+  actionsContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+    justifyContent: "flex-end",
+  },
+  submitButton: {
+    backgroundColor: theme.colors.button.primary.background,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 44,
+  },
+  submitButtonDisabled: {
+    opacity: 0.5,
+  },
+  submitButtonText: {
+    color: theme.colors.button.primary.tint,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  // Other input
+  otherInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.divider,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: theme.colors.text,
+    minHeight: 60,
+    marginTop: 4,
+  },
+
+  // Submitted state
+  submittedContainer: {
+    gap: 6,
+  },
+  submittedCard: {
+    backgroundColor: theme.colors.surfaceHigh,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  submittedCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  submittedHeader: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.textSecondary,
+  },
+  submittedValue: {
+    fontSize: 13,
+    color: theme.colors.text,
+    paddingLeft: 22,
+  },
+}));

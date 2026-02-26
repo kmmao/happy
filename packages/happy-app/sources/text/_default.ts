@@ -656,6 +656,7 @@ export const en = {
       other: "Other",
       otherDescription: "Type your own answer",
       otherPlaceholder: "Type your answer...",
+      recommended: "Recommended",
     },
     desc: {
       terminalCmd: ({ cmd }: { cmd: string }) => `Terminal(cmd: ${cmd})`,

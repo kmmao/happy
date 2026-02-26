@@ -690,6 +690,7 @@ export const ja: TranslationStructure = {
       other: "その他",
       otherDescription: "自分の回答を入力",
       otherPlaceholder: "回答を入力...",
+      recommended: "推奨",
     },
     multiEdit: {
       editNumber: ({ index, total }: { index: number; total: number }) =>
