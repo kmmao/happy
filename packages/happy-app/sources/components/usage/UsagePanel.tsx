@@ -150,6 +150,21 @@ function formatModelName(modelId: string): string {
   return is1M ? `${name} (1M)` : name;
 }
 
+const TOKEN_TYPE_LABELS: Record<string, string> = {
+  input: "Input",
+  output: "Output",
+  cache_read: "Cache Read",
+  cache_creation: "Cache Write",
+  total: "Total",
+};
+
+function formatTokenType(type: string): string {
+  return (
+    TOKEN_TYPE_LABELS[type] ??
+    type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
 export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
   const { theme } = useUnistyles();
   const auth = useAuth();
@@ -360,7 +375,9 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
                   }
                   color="#007AFF"
                   formatValue={
-                    chartMetric === "cost" ? (v) => formatCost(v) : undefined
+                    chartMetric === "cost"
+                      ? (v) => formatCost(v)
+                      : (v) => formatTokens(v)
                   }
                 />
               ),
@@ -376,10 +393,11 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
             {tokenTypes.map(([type, tokens]) => (
               <UsageBar
                 key={type}
-                label={type}
+                label={formatTokenType(type)}
                 value={tokens}
                 maxValue={maxTypeTokens}
                 color="#007AFF"
+                formatValue={(v) => formatTokens(v)}
               />
             ))}
           </View>

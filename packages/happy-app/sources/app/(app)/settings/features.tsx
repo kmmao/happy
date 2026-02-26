@@ -21,8 +21,6 @@ export default function FeaturesSettingsScreen() {
   );
   const [useEnhancedSessionWizard, setUseEnhancedSessionWizard] =
     useSettingMutable("useEnhancedSessionWizard");
-  const [showAgentActivity, setShowAgentActivity] =
-    useSettingMutable("showAgentActivity");
   const [autoApprovePlan, setAutoApprovePlan] =
     useSettingMutable("autoApprovePlan");
 
@@ -79,22 +77,6 @@ export default function FeaturesSettingsScreen() {
             <Switch
               value={useEnhancedSessionWizard}
               onValueChange={setUseEnhancedSessionWizard}
-            />
-          }
-          showChevron={false}
-        />
-        <Item
-          title={t("settingsFeatures.showAgentActivity")}
-          subtitle={
-            showAgentActivity
-              ? t("settingsFeatures.showAgentActivityEnabled")
-              : t("settingsFeatures.showAgentActivityDisabled")
-          }
-          icon={<Ionicons name="pulse-outline" size={29} color="#30B0C7" />}
-          rightElement={
-            <Switch
-              value={showAgentActivity}
-              onValueChange={setShowAgentActivity}
             />
           }
           showChevron={false}

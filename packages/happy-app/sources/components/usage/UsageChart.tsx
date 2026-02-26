@@ -18,8 +18,8 @@ const styles = StyleSheet.create((theme) => ({
   chartContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingHorizontal: 8,
-    marginBottom: 40, // Space for x-axis labels below the chart
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   barWrapper: {
     flex: 1,
@@ -39,11 +39,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   barLabel: {
     position: "absolute",
-    bottom: -24,
-    fontSize: 10,
+    bottom: -20,
+    fontSize: 9,
     color: theme.colors.textSecondary,
-    transform: [{ rotate: "-45deg" }],
-    width: 60,
     textAlign: "center",
   },
   emptyState: {
@@ -93,10 +91,7 @@ export const UsageChart: React.FC<UsageChartProps> = ({
     if (isToday) {
       return date.toLocaleTimeString("en-US", { hour: "numeric" });
     } else {
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
+      return `${date.getMonth() + 1}/${date.getDate()}`;
     }
   };
 
@@ -118,48 +113,59 @@ export const UsageChart: React.FC<UsageChartProps> = ({
   const displayData =
     data.length > maxBarsToShow ? data.slice(-maxBarsToShow) : data;
 
+  // Only use horizontal scroll when there are many bars
+  const needsScroll = displayData.length > 10;
+
+  const chartContent = (
+    <View style={[styles.chartContainer, { height }]}>
+      {displayData.map((point, index) => {
+        const value = getValueForDataPoint(point);
+        // Reserve space at top for value label text (~18px)
+        const maxBarHeight = height - 20;
+        const barHeight = (value / maxValue) * maxBarHeight;
+        const showValue = value > 0 && barHeight > 20;
+
+        return (
+          <Pressable
+            key={`${point.timestamp}-${index}`}
+            style={[
+              styles.barWrapper,
+              needsScroll ? { minWidth: 40 } : undefined,
+            ]}
+            onPress={() => onBarPress?.(point, index)}
+          >
+            {showValue && (
+              <Text style={styles.barValue}>{formatValue(value)}</Text>
+            )}
+            <View
+              style={[
+                styles.bar,
+                {
+                  height: Math.max(barHeight, 2),
+                  backgroundColor: metric === "cost" ? "#FF9500" : "#007AFF",
+                },
+              ]}
+            />
+            <Text style={styles.barLabel}>{formatLabel(point.timestamp)}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
   return (
     <View style={styles.container}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        bounces={false}
-      >
-        <View style={[styles.chartContainer, { height }]}>
-          {displayData.map((point, index) => {
-            const value = getValueForDataPoint(point);
-            // Reserve space at top for value label text (~18px)
-            const maxBarHeight = height - 20;
-            const barHeight = (value / maxValue) * maxBarHeight;
-            const showValue = value > 0 && barHeight > 20;
-
-            return (
-              <Pressable
-                key={`${point.timestamp}-${index}`}
-                style={[styles.barWrapper, { minWidth: 40 }]}
-                onPress={() => onBarPress?.(point, index)}
-              >
-                {showValue && (
-                  <Text style={styles.barValue}>{formatValue(value)}</Text>
-                )}
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      height: Math.max(barHeight, 2),
-                      backgroundColor:
-                        metric === "cost" ? "#FF9500" : "#007AFF",
-                    },
-                  ]}
-                />
-                <Text style={styles.barLabel}>
-                  {formatLabel(point.timestamp)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ScrollView>
+      {needsScroll ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          bounces={false}
+        >
+          {chartContent}
+        </ScrollView>
+      ) : (
+        chartContent
+      )}
     </View>
   );
 };
