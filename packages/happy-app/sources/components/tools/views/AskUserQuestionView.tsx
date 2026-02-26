@@ -73,14 +73,11 @@ function getSelectedLabels(
 const StepIndicator = React.memo<{
   questions: Question[];
   selections: Map<number, Set<number>>;
-}>(({ questions, selections }) => {
+  activeIndex: number;
+  onStepPress: (index: number) => void;
+}>(({ questions, selections, activeIndex, onStepPress }) => {
   const { theme } = useUnistyles();
   if (questions.length < 2) return null;
-
-  // Auto-compute: first unanswered question is the active step
-  const activeIndex = questions.findIndex(
-    (_, i) => (selections.get(i)?.size ?? 0) === 0,
-  );
 
   return (
     <ScrollView
@@ -94,13 +91,15 @@ const StepIndicator = React.memo<{
         const isActive = idx === activeIndex;
 
         return (
-          <View
+          <TouchableOpacity
             key={idx}
             style={[
               styles.stepChip,
               isActive && styles.stepChipFocused,
               hasAnswer && !isActive && styles.stepChipDone,
             ]}
+            onPress={() => onStepPress(idx)}
+            activeOpacity={0.7}
           >
             {hasAnswer ? (
               <Ionicons
@@ -119,7 +118,7 @@ const StepIndicator = React.memo<{
             >
               {q.header}
             </Text>
-          </View>
+          </TouchableOpacity>
         );
       })}
     </ScrollView>
@@ -232,6 +231,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
     const [otherTexts, setOtherTexts] = React.useState<Map<number, string>>(
       new Map(),
     );
+    const [activeStep, setActiveStep] = React.useState(0);
     // Parse input
     const input = tool.input as AskUserQuestionInput | undefined;
     const questions = input?.questions;
@@ -278,12 +278,23 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
             newMap.set(questionIndex, newSet);
           } else {
             newMap.set(questionIndex, new Set([optionIndex]));
+
+            // Auto-advance to next unanswered question for single-select
+            if (questions && questionIndex < questions.length - 1) {
+              const nextUnanswered = questions.findIndex(
+                (_, i) => i > questionIndex && (newMap.get(i)?.size ?? 0) === 0,
+              );
+              if (nextUnanswered >= 0) {
+                // Defer to avoid state update during render
+                setTimeout(() => setActiveStep(nextUnanswered), 200);
+              }
+            }
           }
 
           return newMap;
         });
       },
-      [canInteract],
+      [canInteract, questions],
     );
 
     const handleSubmit = React.useCallback(async () => {
@@ -345,144 +356,187 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       );
     }
 
+    // Clamp activeStep to valid range
+    const currentStep = Math.min(activeStep, questions.length - 1);
+    const question = questions[currentStep];
+    const selectedOptions = selections.get(currentStep) || new Set();
+
     return (
       <ToolSectionView>
         <View style={styles.container}>
-          {/* Step progress indicator for multi-question */}
-          <StepIndicator questions={questions} selections={selections} />
+          {/* Step progress indicator for multi-question (clickable tabs) */}
+          <StepIndicator
+            questions={questions}
+            selections={selections}
+            activeIndex={currentStep}
+            onStepPress={setActiveStep}
+          />
 
-          {questions.map((question, qIndex) => {
-            const selectedOptions = selections.get(qIndex) || new Set();
-
-            return (
-              <View key={qIndex} style={styles.questionSection}>
-                {/* Only show header chip if single question (multi uses step indicator) */}
-                {questions.length === 1 && (
-                  <View style={styles.headerChip}>
-                    <Text style={styles.headerText}>{question.header}</Text>
-                  </View>
-                )}
-                <Text style={styles.questionText}>{question.question}</Text>
-                <View style={styles.optionsContainer}>
-                  {question.options.map((option, oIndex) => (
-                    <OptionRow
-                      key={oIndex}
-                      option={option}
-                      isSelected={selectedOptions.has(oIndex)}
-                      multiSelect={question.multiSelect}
-                      disabled={!canInteract}
-                      onPress={() =>
-                        handleOptionToggle(qIndex, oIndex, question.multiSelect)
-                      }
-                    />
-                  ))}
-
-                  {/* "Other" option for custom text input */}
-                  {(() => {
-                    const otherIndex = question.options.length;
-                    const isOtherSelected = selectedOptions.has(otherIndex);
-                    return (
-                      <>
-                        <TouchableOpacity
-                          key="other"
-                          style={[
-                            styles.optionButton,
-                            isOtherSelected && styles.optionButtonSelected,
-                            !canInteract && styles.optionButtonDisabled,
-                          ]}
-                          onPress={() =>
-                            handleOptionToggle(
-                              qIndex,
-                              otherIndex,
-                              question.multiSelect,
-                            )
-                          }
-                          disabled={!canInteract}
-                          activeOpacity={0.7}
-                        >
-                          {question.multiSelect ? (
-                            <View
-                              style={[
-                                styles.checkboxOuter,
-                                isOtherSelected && styles.checkboxOuterSelected,
-                              ]}
-                            >
-                              {isOtherSelected && (
-                                <Ionicons
-                                  name="checkmark"
-                                  size={14}
-                                  color="#fff"
-                                />
-                              )}
-                            </View>
-                          ) : (
-                            <View
-                              style={[
-                                styles.radioOuter,
-                                isOtherSelected && styles.radioOuterSelected,
-                              ]}
-                            >
-                              {isOtherSelected && (
-                                <View style={styles.radioInner} />
-                              )}
-                            </View>
-                          )}
-                          <View style={styles.optionContent}>
-                            <Text style={styles.optionLabel}>
-                              {t("tools.askUserQuestion.other")}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                        {isOtherSelected && canInteract && (
-                          <TextInput
-                            style={styles.otherInput}
-                            value={otherTexts.get(qIndex) || ""}
-                            onChangeText={(text) =>
-                              setOtherTexts((prev) => {
-                                const next = new Map(prev);
-                                next.set(qIndex, text);
-                                return next;
-                              })
-                            }
-                            placeholder={t(
-                              "tools.askUserQuestion.otherPlaceholder",
-                            )}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            multiline
-                            editable={canInteract}
-                          />
-                        )}
-                      </>
-                    );
-                  })()}
-                </View>
+          {/* Show only the current question */}
+          <View style={styles.questionSection}>
+            {/* Show header chip for single question */}
+            {questions.length === 1 && (
+              <View style={styles.headerChip}>
+                <Text style={styles.headerText}>{question.header}</Text>
               </View>
-            );
-          })}
+            )}
+            <Text style={styles.questionText}>{question.question}</Text>
+            <View style={styles.optionsContainer}>
+              {question.options.map((option, oIndex) => (
+                <OptionRow
+                  key={oIndex}
+                  option={option}
+                  isSelected={selectedOptions.has(oIndex)}
+                  multiSelect={question.multiSelect}
+                  disabled={!canInteract}
+                  onPress={() =>
+                    handleOptionToggle(
+                      currentStep,
+                      oIndex,
+                      question.multiSelect,
+                    )
+                  }
+                />
+              ))}
 
+              {/* "Other" option for custom text input */}
+              {(() => {
+                const otherIndex = question.options.length;
+                const isOtherSelected = selectedOptions.has(otherIndex);
+                return (
+                  <>
+                    <TouchableOpacity
+                      key="other"
+                      style={[
+                        styles.optionButton,
+                        isOtherSelected && styles.optionButtonSelected,
+                        !canInteract && styles.optionButtonDisabled,
+                      ]}
+                      onPress={() =>
+                        handleOptionToggle(
+                          currentStep,
+                          otherIndex,
+                          question.multiSelect,
+                        )
+                      }
+                      disabled={!canInteract}
+                      activeOpacity={0.7}
+                    >
+                      {question.multiSelect ? (
+                        <View
+                          style={[
+                            styles.checkboxOuter,
+                            isOtherSelected && styles.checkboxOuterSelected,
+                          ]}
+                        >
+                          {isOtherSelected && (
+                            <Ionicons name="checkmark" size={14} color="#fff" />
+                          )}
+                        </View>
+                      ) : (
+                        <View
+                          style={[
+                            styles.radioOuter,
+                            isOtherSelected && styles.radioOuterSelected,
+                          ]}
+                        >
+                          {isOtherSelected && (
+                            <View style={styles.radioInner} />
+                          )}
+                        </View>
+                      )}
+                      <View style={styles.optionContent}>
+                        <Text style={styles.optionLabel}>
+                          {t("tools.askUserQuestion.other")}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    {isOtherSelected && canInteract && (
+                      <TextInput
+                        style={styles.otherInput}
+                        value={otherTexts.get(currentStep) || ""}
+                        onChangeText={(text) =>
+                          setOtherTexts((prev) => {
+                            const next = new Map(prev);
+                            next.set(currentStep, text);
+                            return next;
+                          })
+                        }
+                        placeholder={t(
+                          "tools.askUserQuestion.otherPlaceholder",
+                        )}
+                        placeholderTextColor={theme.colors.textSecondary}
+                        multiline
+                        editable={canInteract}
+                      />
+                    )}
+                  </>
+                );
+              })()}
+            </View>
+          </View>
+
+          {/* Navigation + Submit */}
           {canInteract && (
             <View style={styles.actionsContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.submitButton,
-                  (!allQuestionsAnswered || isSubmitting) &&
-                    styles.submitButtonDisabled,
-                ]}
-                onPress={handleSubmit}
-                disabled={!allQuestionsAnswered || isSubmitting}
-                activeOpacity={0.7}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator
-                    size="small"
+              {questions.length > 1 && currentStep > 0 && (
+                <TouchableOpacity
+                  style={styles.navButton}
+                  onPress={() => setActiveStep(currentStep - 1)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="chevron-back"
+                    size={16}
+                    color={theme.colors.text}
+                  />
+                </TouchableOpacity>
+              )}
+              <View style={styles.actionsSpacer} />
+              {questions.length > 1 && currentStep < questions.length - 1 ? (
+                <TouchableOpacity
+                  style={[
+                    styles.nextButton,
+                    !selectedOptions.size && styles.submitButtonDisabled,
+                  ]}
+                  onPress={() => setActiveStep(currentStep + 1)}
+                  disabled={!selectedOptions.size}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.nextButtonText}>
+                    {question.header
+                      ? questions[currentStep + 1]?.header || ""
+                      : ""}
+                  </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
                     color={theme.colors.button.primary.tint}
                   />
-                ) : (
-                  <Text style={styles.submitButtonText}>
-                    {t("tools.askUserQuestion.submit")}
-                  </Text>
-                )}
-              </TouchableOpacity>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    (!allQuestionsAnswered || isSubmitting) &&
+                      styles.submitButtonDisabled,
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={!allQuestionsAnswered || isSubmitting}
+                  activeOpacity={0.7}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.colors.button.primary.tint}
+                    />
+                  ) : (
+                    <Text style={styles.submitButtonText}>
+                      {t("tools.askUserQuestion.submit")}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -663,9 +717,34 @@ const styles = StyleSheet.create((theme) => ({
   // Actions
   actionsContainer: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     marginTop: 8,
-    justifyContent: "flex-end",
+  },
+  actionsSpacer: {
+    flex: 1,
+  },
+  navButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.surfaceHighest,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nextButton: {
+    backgroundColor: theme.colors.button.primary.background,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  nextButtonText: {
+    color: theme.colors.button.primary.tint,
+    fontSize: 13,
+    fontWeight: "600",
   },
   submitButton: {
     backgroundColor: theme.colors.button.primary.background,

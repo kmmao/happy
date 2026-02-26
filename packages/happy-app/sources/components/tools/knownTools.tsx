@@ -1440,15 +1440,20 @@ export const knownTools = {
   },
   AskUserQuestion: {
     title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
-      // Use first question header as title if available
       if (
         opts.tool.input?.questions &&
         Array.isArray(opts.tool.input.questions) &&
         opts.tool.input.questions.length > 0
       ) {
-        const firstQuestion = opts.tool.input.questions[0];
-        if (firstQuestion.header) {
-          return firstQuestion.header;
+        const qs = opts.tool.input.questions;
+        // Multi-question: show count; single: show header
+        if (qs.length > 1) {
+          return t("tools.askUserQuestion.multipleQuestions", {
+            count: qs.length,
+          });
+        }
+        if (qs[0].header) {
+          return qs[0].header;
         }
       }
       return t("tools.names.question");
