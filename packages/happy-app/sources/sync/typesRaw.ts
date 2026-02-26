@@ -131,6 +131,16 @@ const sessionStartEventSchema = z.object({
   title: z.string().optional(),
 });
 
+const sessionModelUsageSchema = z.object({
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheReadInputTokens: z.number(),
+  cacheCreationInputTokens: z.number(),
+  costUSD: z.number(),
+  contextWindow: z.number(),
+  maxOutputTokens: z.number(),
+});
+
 const sessionTurnEndEventSchema = z.object({
   t: z.literal("turn-end"),
   status: z.enum(["completed", "failed", "cancelled"]),
@@ -144,6 +154,9 @@ const sessionTurnEndEventSchema = z.object({
     })
     .optional(),
   durationMs: z.number().optional(),
+  totalCostUsd: z.number().optional(),
+  numTurns: z.number().optional(),
+  modelUsage: z.record(z.string(), sessionModelUsageSchema).optional(),
 });
 
 const sessionStopEventSchema = z.object({
@@ -850,6 +863,12 @@ function normalizeSessionEnvelope(
           : {}),
         ...(envelope.ev.durationMs !== undefined
           ? { durationMs: envelope.ev.durationMs }
+          : {}),
+        ...(envelope.ev.totalCostUsd !== undefined
+          ? { totalCostUsd: envelope.ev.totalCostUsd }
+          : {}),
+        ...(envelope.ev.modelUsage !== undefined
+          ? { modelUsage: envelope.ev.modelUsage }
           : {}),
       },
       meta,

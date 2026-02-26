@@ -397,6 +397,7 @@ const ContextProgressBar: React.FC<{
   modelCode?: string | null;
   sdkContextWindow?: number;
   totalCostUsd?: number;
+  totalSessionTokens?: number;
   theme: Theme;
 }> = ({
   contextSize,
@@ -404,6 +405,7 @@ const ContextProgressBar: React.FC<{
   modelCode,
   sdkContextWindow,
   totalCostUsd,
+  totalSessionTokens,
   theme,
 }) => {
   // Use SDK-provided window size if available; fall back to model-aware heuristic
@@ -417,11 +419,15 @@ const ContextProgressBar: React.FC<{
   if (!shouldShow) return null;
 
   const barColor = getProgressBarColor(percentageRemaining, theme);
+  const sessionTokensSuffix =
+    totalSessionTokens !== undefined && totalSessionTokens > 0
+      ? ` · Σ${formatTokenCountShort(totalSessionTokens)}`
+      : "";
   const costSuffix =
     totalCostUsd !== undefined && totalCostUsd > 0
       ? ` · $${totalCostUsd < 0.01 ? totalCostUsd.toFixed(4) : totalCostUsd.toFixed(2)}`
       : "";
-  const label = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}${costSuffix}`;
+  const label = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}${sessionTokensSuffix}${costSuffix}`;
 
   return (
     <View style={{ paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2 }}>
@@ -1754,6 +1760,10 @@ export const AgentInput = React.memo(
                 modelCode={props.currentModelCode}
                 sdkContextWindow={props.usageData.contextWindow}
                 totalCostUsd={props.usageData.totalCostUsd}
+                totalSessionTokens={
+                  props.usageData.totalInputTokens +
+                  props.usageData.totalOutputTokens
+                }
                 theme={theme}
               />
             ) : null}
