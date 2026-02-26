@@ -1497,6 +1497,12 @@ export const knownTools = {
       return null;
     },
   },
+  // Internal Claude Code tool for loading deferred tools - no user-visible output
+  ToolSearch: {
+    title: "ToolSearch",
+    icon: ICON_SEARCH,
+    hidden: true,
+  },
 } satisfies Record<
   string,
   {
@@ -1506,6 +1512,7 @@ export const knownTools = {
     icon: (size: number, color: string) => React.ReactNode;
     noStatus?: boolean;
     hideDefaultError?: boolean;
+    hidden?: boolean;
     isMutable?: boolean;
     isReviewable?: boolean;
     input?: z.ZodObject<any>;

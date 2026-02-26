@@ -114,7 +114,7 @@ function formatTextForConsole(text: string): string {
 }
 
 function formatOptionalDetail(
-  text: string | undefined,
+  text: string | null | undefined,
   limit = ACP_EVENT_PREVIEW_CHARS,
 ): string {
   if (!text) {
