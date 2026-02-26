@@ -409,6 +409,14 @@ export const SettingsSchema = z.object({
     .string()
     .nullable()
     .describe("Last selected model mode for new sessions"),
+  lastUsedThinkingMode: z
+    .string()
+    .nullable()
+    .describe("Last selected thinking mode for new sessions"),
+  lastUsedEffortLevel: z
+    .string()
+    .nullable()
+    .describe("Last selected effort level for new sessions"),
   // Profile management settings
   profiles: z
     .array(AIBackendProfileSchema)
@@ -507,6 +515,8 @@ export const settingsDefaults: Settings = {
   lastUsedAgent: null,
   lastUsedPermissionMode: null,
   lastUsedModelMode: null,
+  lastUsedThinkingMode: null,
+  lastUsedEffortLevel: null,
   // Profile management defaults
   profiles: [],
   lastUsedProfile: null,

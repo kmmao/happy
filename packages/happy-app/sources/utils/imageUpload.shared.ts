@@ -12,7 +12,12 @@ import { HappyError } from "@/utils/errors";
 
 export const MAX_IMAGES = 5;
 
-export type MultiImageUploadResult = { paths: string[]; failedCount: number };
+export type MultiImageUploadResult = {
+  paths: string[];
+  /** Displayable URIs parallel to paths (local asset URIs or data URIs) */
+  displayUris: string[];
+  failedCount: number;
+};
 
 export const MAX_DIMENSION = 1024;
 export const JPEG_QUALITY = 0.7;

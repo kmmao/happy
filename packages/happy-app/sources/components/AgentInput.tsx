@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   Pressable,
   ScrollView,
+  Modal as RNModal,
 } from "react-native";
 import { Image } from "expo-image";
 import { layout } from "./layout";
@@ -125,6 +126,8 @@ interface AgentInputProps {
   onImagePickPress?: () => void;
   isPickingImage?: boolean;
   imagePaths?: string[];
+  /** Displayable URIs parallel to imagePaths — used to render thumbnails */
+  imageUris?: string[];
   onImageRemove?: (path: string) => void;
   onShellCommand?: (command: string) => void;
   packageScripts?: Record<string, string>;
@@ -495,6 +498,9 @@ export const AgentInput = React.memo(
     const hasText = props.value.trim().length > 0;
     const hasImages = (props.imagePaths?.length ?? 0) > 0;
     const canSend = hasText || hasImages;
+
+    // Lightbox state for full-screen image preview
+    const [previewUri, setPreviewUri] = React.useState<string | null>(null);
 
     // Check if this is a Codex or Gemini session
     // Use metadata.flavor for existing sessions, agentType prop for new sessions
@@ -1780,74 +1786,133 @@ export const AgentInput = React.memo(
                   gap: 8,
                 }}
               >
-                {(props.imagePaths ?? []).map((path, index) => (
-                  <View
-                    key={path}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.surfacePressed,
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: theme.colors.divider,
-                      paddingLeft: 8,
-                      paddingRight: 6,
-                      paddingVertical: 6,
-                      gap: 6,
-                      height: 36,
-                    }}
-                  >
+                {(props.imagePaths ?? []).map((path, index) => {
+                  const uri = props.imageUris?.[index];
+                  return (
                     <View
+                      key={path}
                       style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: 5,
-                        backgroundColor: `${theme.colors.success}18`,
+                        flexDirection: "row",
                         alignItems: "center",
-                        justifyContent: "center",
+                        backgroundColor: theme.colors.surfacePressed,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: theme.colors.divider,
+                        overflow: "hidden",
+                        height: uri ? 52 : 36,
                       }}
                     >
-                      <Ionicons
-                        name="image"
-                        size={13}
-                        color={theme.colors.success}
-                      />
+                      {uri ? (
+                        <Pressable
+                          onPress={() => {
+                            hapticsLight();
+                            setPreviewUri(uri);
+                          }}
+                          style={({ pressed }) => ({
+                            opacity: pressed ? 0.7 : 1,
+                          })}
+                        >
+                          <Image
+                            source={{ uri }}
+                            style={{
+                              width: 52,
+                              height: 52,
+                            }}
+                            contentFit="cover"
+                          />
+                        </Pressable>
+                      ) : (
+                        <View
+                          style={{
+                            paddingLeft: 8,
+                            paddingRight: props.onImageRemove ? 2 : 8,
+                            paddingVertical: 6,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 5,
+                              backgroundColor: `${theme.colors.success}18`,
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Ionicons
+                              name="image"
+                              size={13}
+                              color={theme.colors.success}
+                            />
+                          </View>
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              color: theme.colors.text,
+                              ...Typography.default("semiBold"),
+                            }}
+                            numberOfLines={1}
+                          >
+                            {(props.imagePaths ?? []).length === 1
+                              ? t("session.imageAttached")
+                              : t("session.imageLabel", { index: index + 1 })}
+                          </Text>
+                        </View>
+                      )}
+                      {props.onImageRemove && (
+                        <Pressable
+                          onPress={() => {
+                            hapticsLight();
+                            props.onImageRemove?.(path);
+                          }}
+                          hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                          style={({ pressed }) => ({
+                            opacity: pressed ? 0.4 : 0.7,
+                            padding: 4,
+                            paddingRight: 6,
+                          })}
+                        >
+                          <Ionicons
+                            name="close-circle"
+                            size={17}
+                            color={theme.colors.textSecondary}
+                          />
+                        </Pressable>
+                      )}
                     </View>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: theme.colors.text,
-                        ...Typography.default("semiBold"),
-                      }}
-                      numberOfLines={1}
-                    >
-                      {(props.imagePaths ?? []).length === 1
-                        ? t("session.imageAttached")
-                        : t("session.imageLabel", { index: index + 1 })}
-                    </Text>
-                    {props.onImageRemove && (
-                      <Pressable
-                        onPress={() => {
-                          hapticsLight();
-                          props.onImageRemove?.(path);
-                        }}
-                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                        style={(p) => ({
-                          opacity: p.pressed ? 0.4 : 0.7,
-                          padding: 2,
-                        })}
-                      >
-                        <Ionicons
-                          name="close-circle"
-                          size={17}
-                          color={theme.colors.textSecondary}
-                        />
-                      </Pressable>
-                    )}
-                  </View>
-                ))}
+                  );
+                })}
               </ScrollView>
             )}
+
+            {/* Full-screen image preview lightbox */}
+            <RNModal
+              visible={previewUri !== null}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setPreviewUri(null)}
+            >
+              <Pressable
+                style={{
+                  flex: 1,
+                  backgroundColor: "rgba(0,0,0,0.92)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onPress={() => setPreviewUri(null)}
+              >
+                {previewUri && (
+                  <Image
+                    source={{ uri: previewUri }}
+                    style={{ width: "100%", height: "80%" }}
+                    contentFit="contain"
+                  />
+                )}
+              </Pressable>
+            </RNModal>
 
             {/* Prompt suggestion chip */}
             {props.promptSuggestion && props.onPromptSuggestionPress && (

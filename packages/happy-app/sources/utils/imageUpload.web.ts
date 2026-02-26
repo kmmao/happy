@@ -190,15 +190,18 @@ export async function pickAndUploadImages(
   const results = await Promise.allSettled(
     selected.map(async (file) => {
       const base64 = await blobToResizedBase64(file);
-      return uploadImage(sessionId, base64);
+      const path = await uploadImage(sessionId, base64);
+      return { path, displayUri: `data:image/jpeg;base64,${base64}` };
     }),
   );
 
   const paths: string[] = [];
+  const displayUris: string[] = [];
   let failedCount = 0;
   for (const r of results) {
     if (r.status === "fulfilled") {
-      paths.push(r.value);
+      paths.push(r.value.path);
+      displayUris.push(r.value.displayUri);
     } else {
       console.warn(
         "Image upload failed:",
@@ -208,5 +211,5 @@ export async function pickAndUploadImages(
     }
   }
 
-  return { paths, failedCount };
+  return { paths, displayUris, failedCount };
 }

@@ -58,6 +58,7 @@ import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import {
   pickImagesAsBase64,
+  blobToResizedBase64,
   uploadBase64Image,
   MAX_IMAGES,
 } from "@/utils/imageUpload";
@@ -343,6 +344,8 @@ function NewSessionWizard() {
   const useEnhancedSessionWizard = useSetting("useEnhancedSessionWizard");
   const lastUsedPermissionMode = useSetting("lastUsedPermissionMode");
   const lastUsedModelMode = useSetting("lastUsedModelMode");
+  const lastUsedThinkingMode = useSetting("lastUsedThinkingMode");
+  const lastUsedEffortLevel = useSetting("lastUsedEffortLevel");
   const experimentsEnabled = useSetting("experiments");
   const [profiles, setProfiles] = useSettingMutable("profiles");
   const lastUsedProfile = useSetting("lastUsedProfile");
@@ -446,6 +449,13 @@ function NewSessionWizard() {
     ]);
   });
 
+  const [thinkingMode, setThinkingMode] = React.useState<string | null>(
+    () => lastUsedThinkingMode ?? null,
+  );
+  const [effortLevel, setEffortLevel] = React.useState<string | null>(
+    () => lastUsedEffortLevel ?? null,
+  );
+
   // Session details state
   const [selectedMachineId, setSelectedMachineId] = React.useState<
     string | null
@@ -475,6 +485,16 @@ function NewSessionWizard() {
   const handleModelModeChange = React.useCallback((mode: ModelMode) => {
     setModelMode(mode);
     sync.applySettings({ lastUsedModelMode: mode.key });
+  }, []);
+
+  const handleThinkingModeChange = React.useCallback((mode: string) => {
+    setThinkingMode(mode);
+    sync.applySettings({ lastUsedThinkingMode: mode });
+  }, []);
+
+  const handleEffortLevelChange = React.useCallback((level: string) => {
+    setEffortLevel(level);
+    sync.applySettings({ lastUsedEffortLevel: level });
   }, []);
 
   //
@@ -543,6 +563,28 @@ function NewSessionWizard() {
       });
     }, []),
   );
+
+  // Handle clipboard image paste in new session wizard (web only)
+  // Unlike SessionView which uploads immediately, we store base64 locally
+  // and upload after session creation (consistent with doPickImage flow)
+  const handleNewSessionImagePaste = React.useCallback(
+    Platform.OS === "web"
+      ? async (blob: Blob) => {
+          if (pendingImagesRef.current.length >= MAX_IMAGES) return;
+          try {
+            const base64 = await blobToResizedBase64(blob);
+            setPendingImages((prev) => {
+              if (prev.length >= MAX_IMAGES) return prev;
+              return [...prev, { id: randomUUID(), base64 }];
+            });
+          } catch {
+            // Silently ignore paste errors — non-critical UX path
+          }
+        }
+      : () => {},
+    [],
+  );
+
   const [showAdvanced, setShowAdvanced] = React.useState(false);
 
   // Handle machineId route param from picker screens (main's navigation pattern)
@@ -1535,6 +1577,10 @@ function NewSessionWizard() {
                 modelMode={modelMode}
                 availableModels={availableModels}
                 onModelModeChange={handleModelModeChange}
+                thinkingMode={thinkingMode}
+                onThinkingModeChange={handleThinkingModeChange}
+                effortLevel={effortLevel}
+                onEffortLevelChange={handleEffortLevelChange}
                 connectionStatus={connectionStatus}
                 machineName={
                   selectedMachine?.metadata?.displayName ||
@@ -1549,9 +1595,13 @@ function NewSessionWizard() {
                 onCommandListClose={() => setShowCommandList(false)}
                 onSttPress={onSttToggle}
                 isSttListening={stt.isListening}
+                onImagePaste={handleNewSessionImagePaste}
                 onImagePickPress={doPickImage}
                 isPickingImage={isPickingImage}
                 imagePaths={pendingImages.map((img) => img.id)}
+                imageUris={pendingImages.map(
+                  (img) => `data:image/jpeg;base64,${img.base64}`,
+                )}
                 onImageRemove={(id) =>
                   setPendingImages((prev) =>
                     prev.filter((img) => img.id !== id),
@@ -2937,6 +2987,10 @@ function NewSessionWizard() {
               modelMode={modelMode}
               availableModels={availableModels}
               onModelModeChange={handleModelModeChange}
+              thinkingMode={thinkingMode}
+              onThinkingModeChange={handleThinkingModeChange}
+              effortLevel={effortLevel}
+              onEffortLevelChange={handleEffortLevelChange}
               connectionStatus={connectionStatus}
               machineName={
                 selectedMachine?.metadata?.displayName ||
@@ -2953,9 +3007,13 @@ function NewSessionWizard() {
               onCommandListClose={() => setShowCommandList(false)}
               onSttPress={onSttToggle}
               isSttListening={stt.isListening}
+              onImagePaste={handleNewSessionImagePaste}
               onImagePickPress={doPickImage}
               isPickingImage={isPickingImage}
               imagePaths={pendingImages.map((img) => img.id)}
+              imageUris={pendingImages.map(
+                (img) => `data:image/jpeg;base64,${img.base64}`,
+              )}
               onImageRemove={(id) =>
                 setPendingImages((prev) => prev.filter((img) => img.id !== id))
               }

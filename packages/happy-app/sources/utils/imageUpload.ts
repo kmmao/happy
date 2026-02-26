@@ -115,15 +115,18 @@ export async function pickAndUploadImages(
         asset.width,
         asset.height,
       );
-      return uploadImage(sessionId, base64);
+      const path = await uploadImage(sessionId, base64);
+      return { path, displayUri: asset.uri };
     }),
   );
 
   const paths: string[] = [];
+  const displayUris: string[] = [];
   let failedCount = 0;
   for (const r of results) {
     if (r.status === "fulfilled") {
-      paths.push(r.value);
+      paths.push(r.value.path);
+      displayUris.push(r.value.displayUri);
     } else {
       console.warn(
         "Image upload failed:",
@@ -133,7 +136,7 @@ export async function pickAndUploadImages(
     }
   }
 
-  return { paths, failedCount };
+  return { paths, displayUris, failedCount };
 }
 
 /** Convert a Blob to resized base64 — web only, stub on native. */

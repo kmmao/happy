@@ -426,6 +426,8 @@ function SessionViewInner({
     doPickImage,
     handleImagePaste,
     setPendingImagePaths,
+    pendingImageUris,
+    removeImageByPath,
   } = useImageUpload(sessionId);
 
   // Speech-to-text: append transcripts to the input field
@@ -486,6 +488,7 @@ function SessionViewInner({
   const updateModelMode = React.useCallback(
     (mode: ModelMode) => {
       storage.getState().updateSessionModelMode(sessionId, mode.key);
+      sync.applySettings({ lastUsedModelMode: mode.key });
     },
     [sessionId],
   );
@@ -496,6 +499,7 @@ function SessionViewInner({
       storage
         .getState()
         .updateSessionSdkSettings(sessionId, { thinkingMode: mode });
+      sync.applySettings({ lastUsedThinkingMode: mode });
     },
     [sessionId],
   );
@@ -505,6 +509,7 @@ function SessionViewInner({
       storage
         .getState()
         .updateSessionSdkSettings(sessionId, { effortLevel: level });
+      sync.applySettings({ lastUsedEffortLevel: level });
     },
     [sessionId],
   );
@@ -727,9 +732,8 @@ function SessionViewInner({
         onImagePickPress={doPickImage}
         isPickingImage={isPickingImage || isProcessingImage}
         imagePaths={pendingImagePaths}
-        onImageRemove={(path: string) =>
-          setPendingImagePaths((prev) => prev.filter((p) => p !== path))
-        }
+        imageUris={pendingImageUris}
+        onImageRemove={removeImageByPath}
         onShellCommand={(command) => {
           sync.sendMessage(sessionId, `$ ${command}`);
         }}
