@@ -11,9 +11,24 @@ import {
 import { knownTools } from "../../tools/knownTools";
 import { Ionicons } from "@expo/vector-icons";
 import { ToolCall } from "@/sync/typesMessage";
+import { AgentEvent } from "@/sync/typesRaw";
 import { useUnistyles } from "react-native-unistyles";
 import { useSetting } from "@/sync/storage";
 import { t } from "@/text";
+
+function formatTokenCount(count: number): string {
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}k`;
+  }
+  return String(count);
+}
+
+function formatDuration(ms: number): string {
+  if (ms >= 60000) {
+    return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+  }
+  return `${(ms / 1000).toFixed(1)}s`;
+}
 
 interface FilteredTool {
   tool: ToolCall;
@@ -64,6 +79,42 @@ export const TaskView = React.memo<ToolViewProps>(
         }
       }
     }
+
+    // Aggregate usage stats from agent-event children (one line instead of many)
+    const usageByModel = new Map<
+      string,
+      { tokens: number; durationMs: number }
+    >();
+    for (const m of messages) {
+      if (m.kind === "agent-event") {
+        const evt = m.event as AgentEvent;
+        if ((evt.type === "usage-stats" || evt.type === "ready") && evt.usage) {
+          const model = evt.model ?? "unknown";
+          const totalTokens =
+            evt.usage.input_tokens +
+            evt.usage.output_tokens +
+            (evt.usage.cache_creation_input_tokens ?? 0) +
+            (evt.usage.cache_read_input_tokens ?? 0);
+          const existing = usageByModel.get(model) ?? {
+            tokens: 0,
+            durationMs: 0,
+          };
+          usageByModel.set(model, {
+            tokens: existing.tokens + totalTokens,
+            durationMs: existing.durationMs + (evt.durationMs ?? 0),
+          });
+        }
+      }
+    }
+    const usageSummary =
+      usageByModel.size > 0
+        ? Array.from(usageByModel.entries())
+            .map(
+              ([model, data]) =>
+                `${model.replace(/-\d{8}$/, "")} · ${formatTokenCount(data.tokens)}`,
+            )
+            .join(" · ")
+        : null;
 
     // When showAgentActivity is enabled, extract prompt summary and subagent type
     const promptSummary =
@@ -175,6 +226,7 @@ export const TaskView = React.memo<ToolViewProps>(
     if (completedCount > 0) summaryParts.push(`${completedCount}✓`);
     if (runningCount > 0) summaryParts.push(`${runningCount}⟳`);
     if (errorCount > 0) summaryParts.push(`${errorCount}✗`);
+    if (usageSummary) summaryParts.push(usageSummary);
     const summaryLabel = summaryParts.join(" · ");
 
     if (collapsed) {

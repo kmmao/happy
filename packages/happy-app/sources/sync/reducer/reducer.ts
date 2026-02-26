@@ -1212,6 +1212,32 @@ export function reducer(
           }
         }
       }
+    } else if (msg.role === "event") {
+      // Sidechain event messages (e.g. usage-stats, ready with model data).
+      // Store them as children so TaskView can aggregate usage summaries
+      // instead of showing individual per-turn stats lines.
+      const evt = msg.content;
+      const hasUsageData =
+        evt.type === "usage-stats" ||
+        (evt.type === "ready" &&
+          (evt.model !== undefined ||
+            evt.usage !== undefined ||
+            evt.durationMs !== undefined));
+      if (hasUsageData) {
+        const mid = allocateId();
+        const eventMsg: ReducerMessage = {
+          id: mid,
+          realID: msg.id,
+          role: "agent",
+          createdAt: msg.createdAt,
+          text: null,
+          tool: null,
+          event: evt,
+          meta: msg.meta,
+        };
+        state.messages.set(mid, eventMsg);
+        existingSidechain.push(eventMsg);
+      }
     }
 
     // Update the sidechain in state
