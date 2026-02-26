@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { ApiClient } from "@/api/api";
 import type { ApiSessionClient } from "@/api/apiSession";
 import type { AgentMessage } from "@/agent/core";
@@ -524,12 +525,7 @@ export async function runAcp(opts: {
     throw new Error("No machine ID found in settings");
   }
 
-  // Deterministic session tag: same machine + directory + flavor = same session
-  const sessionTag = hashObject({
-    machineId: settings.machineId,
-    path: process.cwd(),
-    flavor: resolveSessionFlavor(opts.agentName),
-  });
+  const sessionTag = randomUUID();
 
   await api.getOrCreateMachine({
     machineId: settings.machineId,

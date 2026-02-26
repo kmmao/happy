@@ -1,4 +1,5 @@
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import { readFile, readdir, rm } from "node:fs/promises";
 import { join, basename } from "node:path";
 
@@ -119,12 +120,7 @@ export async function runClaude(
   }
   logger.debug(`Using machineId: ${machineId}`);
 
-  // Deterministic session tag: same machine + directory + flavor = same session
-  const sessionTag = hashObject({
-    machineId,
-    path: workingDirectory,
-    flavor: "claude",
-  });
+  const sessionTag = randomUUID();
 
   // Create machine if it doesn't exist
   await api.getOrCreateMachine({

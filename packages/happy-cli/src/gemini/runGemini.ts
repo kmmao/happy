@@ -87,12 +87,7 @@ export async function runGemini(opts: {
   }
   logger.debug(`Using machineId: ${machineId}`);
 
-  // Deterministic session tag: same machine + directory + flavor = same session
-  const sessionTag = hashObject({
-    machineId,
-    path: process.cwd(),
-    flavor: "gemini",
-  });
+  const sessionTag = randomUUID();
 
   await api.getOrCreateMachine({
     machineId,

@@ -11,6 +11,7 @@ import { initialMachineMetadata } from "@/daemon/run";
 import { configuration } from "@/configuration";
 import packageJson from "../../package.json";
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { hashObject } from "@/utils/deterministicJson";
 import { projectPath } from "@/projectPath";
@@ -114,12 +115,7 @@ export async function runCodex(opts: {
   }
   logger.debug(`Using machineId: ${machineId}`);
 
-  // Deterministic session tag: same machine + directory + flavor = same session
-  const sessionTag = hashObject({
-    machineId,
-    path: process.cwd(),
-    flavor: "codex",
-  });
+  const sessionTag = randomUUID();
 
   await api.getOrCreateMachine({
     machineId,
