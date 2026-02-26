@@ -461,6 +461,9 @@ export const en = {
     }) =>
       `Version ${currentVersion} installed. Update to ${requiredVersion} or later`,
     updateCliInstructions: "Please run npm install -g happy-coder@latest",
+    resumeSession: "Resume Session",
+    resumeSessionSubtitle:
+      "Resume this session with full context on the same machine",
     deleteSession: "Delete Session",
     deleteSessionSubtitle: "Permanently remove this session",
     deleteSessionConfirm: "Delete Session Permanently?",

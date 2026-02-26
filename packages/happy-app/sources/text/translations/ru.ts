@@ -428,6 +428,9 @@ export const ru: TranslationStructure = {
       `Установлена версия ${currentVersion}. Обновите до ${requiredVersion} или новее`,
     updateCliInstructions:
       "Пожалуйста, выполните npm install -g happy-coder@latest",
+    resumeSession: "Возобновить сессию",
+    resumeSessionSubtitle:
+      "Возобновить сессию с полным контекстом на той же машине",
     deleteSession: "Удалить сессию",
     deleteSessionSubtitle: "Удалить эту сессию навсегда",
     deleteSessionConfirm: "Удалить сессию навсегда?",

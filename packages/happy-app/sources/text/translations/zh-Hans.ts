@@ -447,6 +447,8 @@ export const zhHans: TranslationStructure = {
     }) =>
       `已安装版本 ${currentVersion}。请更新到 ${requiredVersion} 或更高版本`,
     updateCliInstructions: "请运行 npm install -g happy-coder@latest",
+    resumeSession: "恢复会话",
+    resumeSessionSubtitle: "在同一台机器上恢复此会话的完整上下文",
     deleteSession: "删除会话",
     deleteSessionSubtitle: "永久删除此会话",
     deleteSessionConfirm: "永久删除会话？",

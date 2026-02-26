@@ -142,6 +142,8 @@ export interface SpawnSessionOptions {
   approvedNewDirectoryCreation?: boolean;
   token?: string;
   agent?: "codex" | "claude" | "gemini";
+  // Claude Code session ID for --resume (resumes an existing session with full context)
+  claudeSessionId?: string;
   // Environment variables from AI backend profile
   // Accepts any environment variables - daemon will pass them to the agent process
   // Common variables include:
@@ -169,6 +171,7 @@ export async function machineSpawnNewSession(
     approvedNewDirectoryCreation = false,
     token,
     agent,
+    claudeSessionId,
     environmentVariables,
   } = options;
 
@@ -181,6 +184,7 @@ export async function machineSpawnNewSession(
         approvedNewDirectoryCreation?: boolean;
         token?: string;
         agent?: "codex" | "claude" | "gemini";
+        sessionId?: string;
         environmentVariables?: Record<string, string>;
       }
     >(machineId, "spawn-happy-session", {
@@ -189,6 +193,7 @@ export async function machineSpawnNewSession(
       approvedNewDirectoryCreation,
       token,
       agent,
+      sessionId: claudeSessionId,
       environmentVariables,
     });
     return result;

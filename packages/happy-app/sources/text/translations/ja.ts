@@ -527,6 +527,9 @@ export const ja: TranslationStructure = {
       `バージョン ${currentVersion} がインストールされています。${requiredVersion} 以降に更新してください`,
     updateCliInstructions:
       "npm install -g happy-coder@latest を実行してください",
+    resumeSession: "セッションを再開",
+    resumeSessionSubtitle:
+      "同じマシンで完全なコンテキストを使ってセッションを再開",
     deleteSession: "セッションを削除",
     deleteSessionSubtitle: "このセッションを完全に削除",
     deleteSessionConfirm: "セッションを完全に削除しますか？",

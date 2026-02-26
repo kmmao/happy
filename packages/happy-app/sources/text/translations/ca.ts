@@ -476,6 +476,9 @@ export const ca: TranslationStructure = {
       `Versió ${currentVersion} instal·lada. Actualitzeu a ${requiredVersion} o posterior`,
     updateCliInstructions:
       "Si us plau executeu npm install -g happy-coder@latest",
+    resumeSession: "Reprendre sessió",
+    resumeSessionSubtitle:
+      "Reprendre aquesta sessió amb el context complet a la mateixa màquina",
     deleteSession: "Elimina la sessió",
     deleteSessionSubtitle: "Elimina permanentment aquesta sessió",
     deleteSessionConfirm: "Eliminar la sessió permanentment?",

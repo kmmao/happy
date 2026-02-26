@@ -485,6 +485,9 @@ export const pl: TranslationStructure = {
     }) =>
       `Zainstalowana wersja ${currentVersion}. Zaktualizuj do ${requiredVersion} lub nowszej`,
     updateCliInstructions: "Proszę uruchomić npm install -g happy-coder@latest",
+    resumeSession: "Wznów sesję",
+    resumeSessionSubtitle:
+      "Wznów tę sesję z pełnym kontekstem na tej samej maszynie",
     deleteSession: "Usuń sesję",
     deleteSessionSubtitle: "Trwale usuń tę sesję",
     deleteSessionConfirm: "Usunąć sesję na stałe?",

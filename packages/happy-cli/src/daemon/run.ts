@@ -518,7 +518,11 @@ export async function startDaemon(): Promise<void> {
               : options.agent === "codex"
                 ? "codex"
                 : "claude";
-          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon`;
+          const resumeArg =
+            sessionId && /^[0-9a-f-]+$/i.test(sessionId)
+              ? ` --resume ${sessionId}`
+              : "";
+          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeArg}`;
 
           // Spawn in tmux with environment variables
           // IMPORTANT: Pass complete environment (process.env + extraEnv) because:
@@ -641,8 +645,14 @@ export async function startDaemon(): Promise<void> {
             "daemon",
           ];
 
-          // TODO: In future, sessionId could be used with --resume to continue existing sessions
-          // For now, we ignore it - each spawn creates a new session
+          // Resume existing Claude Code session if sessionId provided
+          if (sessionId && /^[0-9a-f-]+$/i.test(sessionId)) {
+            args.push("--resume", sessionId);
+            logger.debug(
+              `[DAEMON RUN] Adding --resume ${sessionId} to spawn args`,
+            );
+          }
+
           const happyProcess = spawnHappyCLI(args, {
             cwd: directory,
             detached: true, // Sessions stay alive when daemon stops
