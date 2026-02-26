@@ -308,7 +308,7 @@ function resolveProviderSubagent(
   }
 
   const parentUuid = pickParentUuid(message);
-  if (parentUuid) {
+  if (parentUuid && isSidechainMessage(message)) {
     const inheritedSubagent = getUuidToProviderSubagent(state).get(parentUuid);
     if (inheritedSubagent) {
       return inheritedSubagent;
