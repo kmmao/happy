@@ -241,10 +241,7 @@ export async function claudeRemote(opts: {
     allowedTools: initial.mode.allowedTools
       ? initial.mode.allowedTools.concat(opts.allowedTools)
       : opts.allowedTools,
-    disallowedTools:
-      mapToClaudeMode(initial.mode.permissionMode) === "bypassPermissions"
-        ? [...(initial.mode.disallowedTools || []), "AskUserQuestion"]
-        : initial.mode.disallowedTools,
+    disallowedTools: initial.mode.disallowedTools,
     canCallTool: (
       toolName: string,
       input: unknown,
