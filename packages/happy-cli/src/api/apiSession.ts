@@ -542,6 +542,9 @@ export class ApiSessionClient extends EventEmitter {
       this.currentTurnStartTime = Date.now();
     }
 
+    // Extract subagent from mapped envelopes for usage-update attribution
+    const mappedSubagent = mapped.envelopes.find((e) => e.subagent)?.subagent;
+
     for (const envelope of mapped.envelopes) {
       this.sendSessionProtocolMessage(envelope);
     }
@@ -590,7 +593,10 @@ export class ApiSessionClient extends EventEmitter {
                 },
                 durationMs: callDurationMs,
               },
-              { turn: turnId },
+              {
+                turn: turnId,
+                ...(mappedSubagent ? { subagent: mappedSubagent } : {}),
+              },
             ),
           );
         }

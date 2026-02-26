@@ -745,6 +745,7 @@ export type NormalizedMessage = (
   localId: string | null;
   createdAt: number;
   isSidechain: boolean;
+  parentRef?: string | null; // Subagent/parent reference for sidechain linking (event messages)
   meta?: MessageMeta;
   usage?: UsageData;
 };
@@ -837,7 +838,8 @@ function normalizeSessionEnvelope(
       localId,
       createdAt: messageCreatedAt,
       role: "event",
-      isSidechain: false,
+      isSidechain,
+      ...(isSidechain ? { parentRef: parentUUID } : {}),
       content: {
         type: "ready",
         ...(envelope.ev.model !== undefined
@@ -860,7 +862,8 @@ function normalizeSessionEnvelope(
       localId,
       createdAt: messageCreatedAt,
       role: "event",
-      isSidechain: false,
+      isSidechain,
+      ...(isSidechain ? { parentRef: parentUUID } : {}),
       content: {
         type: "usage-stats",
         ...(envelope.ev.model !== undefined

@@ -239,6 +239,28 @@ export function traceMessages(
       continue;
     }
 
+    // Handle sidechain event messages with parentRef (subagent usage/turn-end events).
+    // These don't carry UUID/parentUUID in content, so handle separately before UUID logic.
+    if (message.parentRef) {
+      const parentSidechainId = state.toolCallToMessageId.get(
+        message.parentRef,
+      );
+      if (parentSidechainId) {
+        state.processedIds.add(message.id);
+        const tracedMessage: TracedMessage = {
+          ...message,
+          sidechainId: parentSidechainId,
+        };
+        results.push(tracedMessage);
+      } else {
+        // Buffer as orphan — Task tool call will flush when it arrives
+        const orphans = state.orphanMessages.get(message.parentRef) || [];
+        orphans.push(message);
+        state.orphanMessages.set(message.parentRef, orphans);
+      }
+      continue;
+    }
+
     // Handle sidechain messages - these need to be linked to their originating Task
     const uuid = getMessageUuid(message);
     const parentUuid = getParentUuid(message);

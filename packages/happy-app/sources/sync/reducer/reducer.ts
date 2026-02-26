@@ -286,6 +286,17 @@ export function reducer(
       continue;
     }
 
+    // Suppress subagent usage/ready events that slip through to non-sidechain processing.
+    // These are aggregated in TaskView via sidechain children instead.
+    if (
+      msg.role === "event" &&
+      msg.isSidechain &&
+      (msg.content.type === "ready" || msg.content.type === "usage-stats")
+    ) {
+      state.messageIds.set(msg.id, msg.id);
+      continue;
+    }
+
     // Filter out ready events, unless they carry usage/model/duration data
     if (msg.role === "event" && msg.content.type === "ready") {
       state.messageIds.set(msg.id, msg.id);
