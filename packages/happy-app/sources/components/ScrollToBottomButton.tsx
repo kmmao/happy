@@ -9,7 +9,7 @@ const IDLE_OPACITY = 0.15;
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
     position: "absolute",
-    bottom: -12,
+    bottom: 0,
     left: 0,
     right: 0,
     zIndex: 10,
