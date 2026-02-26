@@ -41,7 +41,6 @@ import {
   resolveInitialClaudePermissionMode,
 } from "./utils/permissionMode";
 import { createEnvelope } from "@kmmao/happy-wire";
-import { isAdaptiveMode, parseAdaptiveKey } from "./utils/adaptiveRouter";
 
 /** JavaScript runtime to use for spawning Claude Code */
 export type JsRuntime = "node" | "bun";
@@ -362,27 +361,6 @@ export async function runClaude(
         currentModel = messageModel;
         session.setModelModeKey(currentModel);
         logger.debug(`[loop] Model updated from user message: ${messageModel}`);
-
-        // Initialize adaptive router only when switching TO adaptive mode or changing base model
-        // Don't reinitialize on every message (would lose turn history)
-        if (isAdaptiveMode(messageModel) && currentSession) {
-          if (!currentSession.adaptiveRouterState) {
-            const { baseModelId } = parseAdaptiveKey(messageModel);
-            currentSession.initAdaptiveRouter(baseModelId);
-            logger.debug(
-              `[loop] Adaptive router initialized for base model: ${baseModelId}`,
-            );
-          } else {
-            // Check if base model changed (e.g. adaptiveUsage:sonnet → adaptiveUsage:opus)
-            const { baseModelId } = parseAdaptiveKey(messageModel);
-            if (currentSession.adaptiveRouterState.baseModel !== baseModelId) {
-              currentSession.initAdaptiveRouter(baseModelId);
-              logger.debug(
-                `[loop] Adaptive router reset for new base model: ${baseModelId}`,
-              );
-            }
-          }
-        }
       } else {
         // model is null/undefined — use current model (don't reset)
         logger.debug(
@@ -679,12 +657,6 @@ export async function runClaude(
     onSessionReady: (sessionInstance) => {
       // Store reference for hook server callback
       currentSession = sessionInstance;
-
-      // Initialize adaptive router when using adaptive model mode
-      if (currentModel && isAdaptiveMode(currentModel)) {
-        const { baseModelId } = parseAdaptiveKey(currentModel);
-        sessionInstance.initAdaptiveRouter(baseModelId);
-      }
     },
     mcpServers: {
       happy: {

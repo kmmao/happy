@@ -36,38 +36,6 @@ describe("resolveMessageModeMeta", () => {
     });
   });
 
-  it("passes adaptiveUsage:opus as model key", () => {
-    const meta = resolveMessageModeMeta({
-      permissionMode: "default",
-      modelMode: "adaptiveUsage:opus",
-      metadata: null,
-    } as any);
-
-    expect(meta).toEqual({
-      permissionMode: "default",
-      model: "adaptiveUsage:opus",
-      thinking: null,
-      effort: null,
-      maxBudgetUsd: null,
-    });
-  });
-
-  it("passes adaptiveUsage:haiku as model key", () => {
-    const meta = resolveMessageModeMeta({
-      permissionMode: null,
-      modelMode: "adaptiveUsage:haiku",
-      metadata: null,
-    } as any);
-
-    expect(meta).toEqual({
-      permissionMode: "default",
-      model: "adaptiveUsage:haiku",
-      thinking: null,
-      effort: null,
-      maxBudgetUsd: null,
-    });
-  });
-
   it("keeps default permissions when sandbox is disabled", () => {
     const meta = resolveMessageModeMeta({
       permissionMode: null,

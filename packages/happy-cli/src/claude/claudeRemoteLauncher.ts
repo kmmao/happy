@@ -20,7 +20,6 @@ import { RawJSONLines } from "@/claude/types";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import { getToolName } from "./utils/getToolName";
 import { createEnvelope } from "@kmmao/happy-wire";
-import { isAdaptiveMode, resolveModel } from "./utils/adaptiveRouter";
 import { hashObject } from "@/utils/deterministicJson";
 import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
 
@@ -557,24 +556,7 @@ export async function claudeRemoteLauncher(
           isAborted: (toolCallId: string) => {
             return permissionHandler.isAborted(toolCallId);
           },
-          onTurnComplete: () => {
-            if (session.adaptiveRouterState) {
-              const usage = session.client.getAccumulatedTurnUsage();
-              const turnModel = session.client.getCurrentTurnModel();
-              if (usage && turnModel) {
-                session.updateAdaptiveRouter({
-                  model: turnModel,
-                  inputTokens: usage.input_tokens,
-                  outputTokens: usage.output_tokens,
-                  durationMs: 0,
-                });
-                logger.debug(
-                  `[adaptive] Turn recorded: model=${turnModel} in=${usage.input_tokens} out=${usage.output_tokens} ` +
-                    `cumulative_in=${session.adaptiveRouterState.cumulativeInputTokens} turns=${session.adaptiveRouterState.turnCount}`,
-                );
-              }
-            }
-          },
+          onTurnComplete: () => {},
           nextMessage: async () => {
             if (pending) {
               let p = pending;
@@ -588,42 +570,6 @@ export async function claudeRemoteLauncher(
             );
 
             if (msg) {
-              // Adaptive routing: resolve real model before hash comparison
-              if (
-                session.adaptiveRouterState &&
-                isAdaptiveMode(msg.mode.model)
-              ) {
-                const routeResult = resolveModel(
-                  session.adaptiveRouterState,
-                  msg.message,
-                );
-                const targetModel = routeResult.modelId;
-                logger.debug(
-                  `[adaptive] Route decision: ${targetModel} (changed=${routeResult.changed}, reason=${routeResult.reason})`,
-                );
-                if (routeResult.changed) {
-                  session.adaptiveRouterState = {
-                    ...session.adaptiveRouterState,
-                    currentModelId: targetModel,
-                    lastSwitchTurn: session.adaptiveRouterState.turnCount,
-                  };
-                  session.client.updateMetadata((m) => ({
-                    ...m,
-                    currentModelCode: targetModel,
-                  }));
-                }
-                // Overwrite mode.model with the resolved real model ID
-                // This changes the hash — model-only changes are hot-swapped via setModel()
-                msg = {
-                  ...msg,
-                  mode: { ...msg.mode, model: targetModel },
-                  hash: session.queue.modeHasher({
-                    ...msg.mode,
-                    model: targetModel,
-                  }),
-                };
-              }
-
               // Check if mode has changed
               if (msg.isolate) {
                 logger.debug("[remote]: isolate requested, pending message");

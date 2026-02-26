@@ -146,21 +146,6 @@ export function getClaudeModelModes(): ModelMode[] {
   return [
     { key: "default", name: "Default", description: "Use CLI settings" },
     {
-      key: "adaptiveUsage:sonnet",
-      name: "Auto (Sonnet)",
-      description: "Smart routing \u00B7 Sonnet base",
-    },
-    {
-      key: "adaptiveUsage:opus",
-      name: "Auto (Opus)",
-      description: "Smart routing \u00B7 Opus base",
-    },
-    {
-      key: "adaptiveUsage:haiku",
-      name: "Auto (Haiku)",
-      description: "Smart routing \u00B7 Haiku base",
-    },
-    {
       key: "haiku",
       name: "Haiku",
       description: "Fastest \u00B7 $1/$5 \u00B7 200K",

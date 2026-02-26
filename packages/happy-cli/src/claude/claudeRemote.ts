@@ -21,20 +21,12 @@ import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
 import type { JsRuntime } from "./runClaude";
-import { parseAdaptiveKey, isAdaptiveMode } from "./utils/adaptiveRouter";
-
 /**
  * Map App-level virtual model mode keys to real Anthropic model IDs.
  * Returns undefined for "use default" modes so the system default takes effect.
  */
 function resolveModelKey(modelKey: string | undefined): string | undefined {
   if (!modelKey) return undefined;
-
-  // Handle adaptive usage keys: "adaptiveUsage", "adaptiveUsage:sonnet", etc.
-  if (isAdaptiveMode(modelKey)) {
-    const { baseModelId } = parseAdaptiveKey(modelKey);
-    return baseModelId;
-  }
 
   switch (modelKey) {
     case "default":
@@ -218,7 +210,7 @@ export async function claudeRemote(opts: {
 
   // Prepare SDK options
   let mode = initial.mode;
-  // Translate App-level virtual model keys (e.g. "adaptiveUsage", "sonnet", "opus")
+  // Translate App-level virtual model keys (e.g. "sonnet", "opus")
   // to real Anthropic model IDs, then fall back to env-configured model.
   let model =
     resolveModelKey(initial.mode.model) ??

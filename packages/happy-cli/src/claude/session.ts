@@ -4,8 +4,6 @@ import { EnhancedMode } from "./loop";
 import { logger } from "@/ui/logger";
 import type { JsRuntime } from "./runClaude";
 import type { SandboxConfig } from "@/persistence";
-import type { AdaptiveRouterState, TurnRecord } from "./utils/adaptiveRouter";
-import { createInitialState, recordTurn } from "./utils/adaptiveRouter";
 
 export class Session {
   readonly path: string;
@@ -29,7 +27,6 @@ export class Session {
   sessionId: string | null;
   mode: "local" | "remote" = "local";
   thinking: boolean = false;
-  adaptiveRouterState: AdaptiveRouterState | null = null;
 
   /** Callbacks to be notified when session ID is found/changed */
   private sessionFoundCallbacks: ((sessionId: string) => void)[] = [];
@@ -145,19 +142,6 @@ export class Session {
     const index = this.sessionFoundCallbacks.indexOf(callback);
     if (index !== -1) {
       this.sessionFoundCallbacks.splice(index, 1);
-    }
-  };
-
-  initAdaptiveRouter = (baseModelId: string): void => {
-    this.adaptiveRouterState = createInitialState(baseModelId);
-    logger.debug(
-      `[Session] Adaptive router initialized with base model: ${baseModelId}`,
-    );
-  };
-
-  updateAdaptiveRouter = (turn: TurnRecord): void => {
-    if (this.adaptiveRouterState) {
-      this.adaptiveRouterState = recordTurn(this.adaptiveRouterState, turn);
     }
   };
 

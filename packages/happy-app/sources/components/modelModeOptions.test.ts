@@ -114,18 +114,6 @@ describe("modelModeOptions", () => {
   });
 
   describe("getClaudeModelModes", () => {
-    it("includes all three adaptive usage variants", () => {
-      const modes = getClaudeModelModes();
-      const adaptiveKeys = modes
-        .filter((m) => m.key.startsWith("adaptiveUsage:"))
-        .map((m) => m.key);
-      expect(adaptiveKeys).toEqual([
-        "adaptiveUsage:sonnet",
-        "adaptiveUsage:opus",
-        "adaptiveUsage:haiku",
-      ]);
-    });
-
     it("includes manual model options", () => {
       const modes = getClaudeModelModes();
       const keys = modes.map((m) => m.key);
