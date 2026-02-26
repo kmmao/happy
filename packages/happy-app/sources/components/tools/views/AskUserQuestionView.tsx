@@ -11,7 +11,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ToolViewProps } from "./_all";
 import { ToolSectionView } from "../ToolSectionView";
 import { sessionAllow } from "@/sync/ops";
-import { sync } from "@/sync/sync";
 import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -302,8 +301,9 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
 
       setIsSubmitting(true);
 
-      // Format answers as readable text
-      const responseLines: string[] = [];
+      // Build answers as Record<string, string> keyed by question text
+      // This matches the AskUserQuestion tool's `answers` parameter schema
+      const answers: Record<string, string> = {};
       questions.forEach((q, qIndex) => {
         const selected = selections.get(qIndex);
         if (selected && selected.size > 0) {
@@ -317,19 +317,23 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
             })
             .filter(Boolean)
             .join(", ");
-          responseLines.push(`${q.header}: ${selectedLabels}`);
+          answers[q.question] = selectedLabels;
         }
       });
 
-      const responseText = responseLines.join("\n");
-
       try {
-        // 1. Approve the permission (like PermissionFooter.handleApprove does)
+        // Send answers through the permission channel so the SDK includes
+        // them in updatedInput → tool_result (not as a separate user message)
         if (tool.permission?.id) {
-          await sessionAllow(sessionId, tool.permission.id);
+          await sessionAllow(
+            sessionId,
+            tool.permission.id,
+            undefined,
+            undefined,
+            undefined,
+            answers,
+          );
         }
-        // 2. Send the answer as a message
-        await sync.sendMessage(sessionId, responseText);
       } catch (error) {
         // Intentionally empty — errors are surfaced via the sync layer
       } finally {

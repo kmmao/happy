@@ -18,6 +18,8 @@ interface SessionPermissionRequest {
   mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan";
   allowTools?: string[];
   decision?: "approved" | "approved_for_session" | "denied" | "abort";
+  /** User answers for AskUserQuestion — keyed by question text */
+  answers?: Record<string, string>;
 }
 
 // Mode change operation types
@@ -356,6 +358,7 @@ export async function sessionAllow(
   mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan",
   allowedTools?: string[],
   decision?: "approved" | "approved_for_session",
+  answers?: Record<string, string>,
 ): Promise<void> {
   // Clear needsAttention when user handles a permission request
   const session = storage.getState().sessions[sessionId];
@@ -369,6 +372,7 @@ export async function sessionAllow(
     mode,
     allowTools: allowedTools,
     decision,
+    ...(answers && { answers }),
   };
   await apiSocket.sessionRPC(sessionId, "permission", request);
 }

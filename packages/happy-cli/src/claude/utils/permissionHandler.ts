@@ -23,6 +23,8 @@ interface PermissionResponse {
   mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan";
   allowTools?: string[];
   receivedAt?: number;
+  /** User answers for AskUserQuestion — keyed by question text */
+  answers?: Record<string, string>;
 }
 
 interface PendingRequest {
@@ -119,7 +121,12 @@ export class PermissionHandler {
       const result: PermissionResult = response.approved
         ? {
             behavior: "allow",
-            updatedInput: (pending.input as Record<string, unknown>) || {},
+            updatedInput: {
+              ...((pending.input as Record<string, unknown>) || {}),
+              // For AskUserQuestion: merge user answers into updatedInput
+              // so the SDK includes them in the tool_result sent to Claude
+              ...(response.answers && { answers: response.answers }),
+            },
           }
         : {
             behavior: "deny",
