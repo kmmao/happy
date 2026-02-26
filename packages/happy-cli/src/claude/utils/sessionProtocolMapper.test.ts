@@ -175,20 +175,27 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
       state,
     );
 
-    expect(
-      parent.envelopes.some((envelope) => {
-        return (
-          envelope.ev.t === "tool-call-start" &&
-          envelope.ev.call === "task-buffer-1"
-        );
-      }),
-    ).toBe(true);
+    const taskStart = parent.envelopes.find((envelope) => {
+      return (
+        envelope.ev.t === "tool-call-start" &&
+        envelope.ev.call === "task-buffer-1"
+      );
+    });
+    expect(taskStart).toBeDefined();
+    // Task tool-call-start should carry _subagentId in args for App sidechain linking
+    const taskStartArgs = (taskStart!.ev as { args: Record<string, unknown> })
+      .args;
+    expect(taskStartArgs._subagentId).toBeDefined();
+    expect(isCuid(taskStartArgs._subagentId as string)).toBe(true);
+
     const bufferedText = parent.envelopes.find((envelope) => {
       return envelope.ev.t === "text" && envelope.ev.text === "buffer me";
     });
     expect(bufferedText?.subagent).toBeDefined();
     expect(isCuid(bufferedText!.subagent!)).toBe(true);
     expect(bufferedText?.subagent).not.toBe("task-buffer-1");
+    // The subagent ID on child messages should match _subagentId in Task args
+    expect(bufferedText!.subagent).toBe(taskStartArgs._subagentId);
   });
 
   it("creates and tags subagent chain from Task prompt when parent_tool_use_id is absent", () => {
@@ -216,6 +223,19 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
       } as any,
       state,
     );
+
+    const taskStart = taskToolUse.envelopes.find((envelope) => {
+      return (
+        envelope.ev.t === "tool-call-start" &&
+        envelope.ev.call === "task-call-1"
+      );
+    });
+    expect(taskStart).toBeDefined();
+    // Task tool-call-start should carry _subagentId in args
+    const taskStartArgs = (taskStart!.ev as { args: Record<string, unknown> })
+      .args;
+    expect(taskStartArgs._subagentId).toBeDefined();
+    expect(isCuid(taskStartArgs._subagentId as string)).toBe(true);
 
     expect(
       taskToolUse.envelopes.some((envelope) => {

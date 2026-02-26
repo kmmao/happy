@@ -628,6 +628,10 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
             sessionSubagentForCall,
             pickTaskTitle(block.input) ?? prompt,
           );
+          // Inject subagent ID into args for App-side sidechain linking
+          if (sessionSubagentForCall) {
+            args._subagentId = sessionSubagentForCall;
+          }
           // Fall through to emit tool-call-start envelope like regular tools
         }
 

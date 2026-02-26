@@ -4,6 +4,7 @@ import {
   Text,
   View,
   ActivityIndicator,
+  Pressable,
   StyleSheet,
   Platform,
 } from "react-native";
@@ -143,10 +144,53 @@ export const TaskView = React.memo<ToolViewProps>(
         fontStyle: "italic",
         opacity: 0.7,
       },
+      summaryRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 6,
+        paddingHorizontal: 4,
+        gap: 4,
+      },
+      summaryText: {
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        fontFamily: "monospace",
+      },
     });
+
+    const [collapsed, setCollapsed] = React.useState(true);
 
     if (filtered.length === 0) {
       return null;
+    }
+
+    // Summary stats for collapsed view
+    const completedCount = filtered.filter(
+      (ti) => ti.state === "completed",
+    ).length;
+    const runningCount = filtered.filter((ti) => ti.state === "running").length;
+    const errorCount = filtered.filter((ti) => ti.state === "error").length;
+
+    const summaryParts = [`${filtered.length} tools`];
+    if (completedCount > 0) summaryParts.push(`${completedCount}✓`);
+    if (runningCount > 0) summaryParts.push(`${runningCount}⟳`);
+    if (errorCount > 0) summaryParts.push(`${errorCount}✗`);
+    const summaryLabel = summaryParts.join(" · ");
+
+    if (collapsed) {
+      return (
+        <Pressable
+          onPress={() => setCollapsed(false)}
+          style={styles.summaryRow}
+        >
+          <Ionicons
+            name="chevron-forward"
+            size={14}
+            color={theme.colors.textSecondary}
+          />
+          <Text style={styles.summaryText}>{summaryLabel}</Text>
+        </Pressable>
+      );
     }
 
     // Show more tools when activity mode is enabled
@@ -156,6 +200,14 @@ export const TaskView = React.memo<ToolViewProps>(
 
     return (
       <View style={styles.container}>
+        <Pressable onPress={() => setCollapsed(true)} style={styles.summaryRow}>
+          <Ionicons
+            name="chevron-down"
+            size={14}
+            color={theme.colors.textSecondary}
+          />
+          <Text style={styles.summaryText}>{summaryLabel}</Text>
+        </Pressable>
         {subagentType && (
           <Text style={styles.subagentType} numberOfLines={1}>
             {t("tools.taskView.subagentRunning", { type: subagentType })}
