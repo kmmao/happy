@@ -12,26 +12,36 @@ export async function createWorktree(
     success: boolean;
     worktreePath: string;
     branchName: string;
+    parentBranch: string;
     error?: string;
 }> {
     const name = generateWorktreeName();
-    
+
     // Check if it's a git repository
     const gitCheck = await machineBash(
         machineId,
         'git rev-parse --git-dir',
         basePath
     );
-    
+
     if (!gitCheck.success) {
         return {
             success: false,
             worktreePath: '',
             branchName: '',
+            parentBranch: '',
             error: 'Not a Git repository'
         };
     }
-    
+
+    // Get current branch name (parent branch for the worktree)
+    const branchResult = await machineBash(
+        machineId,
+        'git rev-parse --abbrev-ref HEAD',
+        basePath
+    );
+    const parentBranch = branchResult.success ? branchResult.stdout.trim() : 'main';
+
     // Create the worktree with new branch
     const worktreePath = `.dev/worktree/${name}`;
     let result = await machineBash(
@@ -39,7 +49,7 @@ export async function createWorktree(
         `git worktree add -b ${name} ${worktreePath}`,
         basePath
     );
-    
+
     // If worktree exists, try with a different name
     if (!result.success && result.stderr.includes('already exists')) {
         // Try up to 3 times with numbered suffixes
@@ -51,31 +61,34 @@ export async function createWorktree(
                 `git worktree add -b ${newName} ${newWorktreePath}`,
                 basePath
             );
-            
+
             if (result.success) {
                 return {
                     success: true,
                     worktreePath: `${basePath}/${newWorktreePath}`,
                     branchName: newName,
+                    parentBranch,
                     error: undefined
                 };
             }
         }
     }
-    
+
     if (result.success) {
         return {
             success: true,
             worktreePath: `${basePath}/${worktreePath}`,
             branchName: name,
+            parentBranch,
             error: undefined
         };
     }
-    
+
     return {
         success: false,
         worktreePath: '',
         branchName: '',
+        parentBranch: '',
         error: result.stderr || 'Failed to create worktree'
     };
 }

@@ -29,6 +29,7 @@ import { HappyError } from "@/utils/errors";
 import { useMachine } from "@/sync/storage";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
+import { WorktreeInfoSection } from "@/components/WorktreeInfoSection";
 
 // Animated status dot component
 function StatusDot({
@@ -432,6 +433,16 @@ function SessionInfoContent({ session }: { session: Session }) {
             showChevron={false}
           />
         </ItemGroup>
+
+        {/* Worktree Info */}
+        {session.metadata?.worktree?.isWorktree &&
+          session.metadata.machineId && (
+            <WorktreeInfoSection
+              sessionId={session.id}
+              machineId={session.metadata.machineId}
+              worktree={session.metadata.worktree}
+            />
+          )}
 
         {/* Quick Actions */}
         <ItemGroup title={t("sessionInfo.quickActions")}>

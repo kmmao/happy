@@ -344,6 +344,26 @@ export type Metadata = {
   sandbox?: SandboxConfig | null;
   dangerouslySkipPermissions?: boolean | null;
   packageScripts?: Record<string, string>;
+  worktree?: {
+    isWorktree: boolean;
+    name: string;
+    branchName: string;
+    worktreePath: string;
+    parentRepoPath: string;
+    parentBranch: string;
+    state:
+      | "creating"
+      | "active"
+      | "merging"
+      | "merged"
+      | "cleaning"
+      | "cleaned"
+      | "error";
+    stateChangedAt: number;
+    mergeStrategy?: "pr" | "direct-merge";
+    prUrl?: string;
+    error?: string;
+  };
 };
 
 export type AgentState = {

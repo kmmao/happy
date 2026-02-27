@@ -61,6 +61,29 @@ export const MetadataSchema = z.object({
   sandbox: z.any().nullish(), // Sandbox config metadata from CLI (or null when disabled)
   dangerouslySkipPermissions: z.boolean().nullish(), // Claude --dangerously-skip-permissions mode (or null when unknown)
   packageScripts: z.record(z.string(), z.string()).optional(), // package.json scripts from working directory
+  worktree: z
+    .object({
+      isWorktree: z.boolean(),
+      name: z.string(),
+      branchName: z.string(),
+      worktreePath: z.string(),
+      parentRepoPath: z.string(),
+      parentBranch: z.string(),
+      state: z.enum([
+        "creating",
+        "active",
+        "merging",
+        "merged",
+        "cleaning",
+        "cleaned",
+        "error",
+      ]),
+      stateChangedAt: z.number(),
+      mergeStrategy: z.enum(["pr", "direct-merge"]).optional(),
+      prUrl: z.string().optional(),
+      error: z.string().optional(),
+    })
+    .optional(),
 });
 
 export type Metadata = z.infer<typeof MetadataSchema>;

@@ -12,7 +12,14 @@ import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { hashObject } from "@/utils/deterministicJson";
 import { Credentials, readSettings } from "@/persistence";
 import { initialMachineMetadata } from "@/daemon/run";
-import { createSessionMetadata } from "@/utils/createSessionMetadata";
+import {
+  createSessionMetadata,
+  enrichMetadataWithWorktree,
+} from "@/utils/createSessionMetadata";
+import {
+  cleanupWorktreeOnSessionEnd,
+  type WorktreeCleanupInput,
+} from "@/utils/worktreeCleanup";
 import { setupOfflineReconnection } from "@/utils/setupOfflineReconnection";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
 import { registerKillSessionHandler } from "@/claude/registerKillSessionHandler";
@@ -532,12 +539,13 @@ export async function runAcp(opts: {
     metadata: initialMachineMetadata,
   });
 
-  const { state, metadata } = createSessionMetadata({
+  const { state, metadata: rawMetadata } = createSessionMetadata({
     flavor: resolveSessionFlavor(opts.agentName),
     machineId: settings.machineId,
     startedBy: opts.startedBy,
     sandbox: settings.sandboxConfig,
   });
+  const metadata = await enrichMetadataWithWorktree(rawMetadata);
   const response = await api.getOrCreateSession({
     tag: sessionTag,
     metadata,
@@ -1144,6 +1152,17 @@ export async function runAcp(opts: {
         archivedBy: "cli",
         archiveReason: "Session ended",
       }));
+
+      // Cleanup worktree if applicable
+      if (metadata.worktree?.isWorktree) {
+        const cleanupResult = await cleanupWorktreeOnSessionEnd(
+          metadata.worktree as WorktreeCleanupInput,
+        );
+        logger.debug(
+          `[WORKTREE CLEANUP] ${cleanupResult.action}: ${cleanupResult.message}`,
+        );
+      }
+
       session.sendSessionDeath();
       await session.flush();
       await session.close();

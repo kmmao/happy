@@ -29,6 +29,11 @@ import {
 import { registerKillSessionHandler } from "./registerKillSessionHandler";
 import { projectPath } from "../projectPath";
 import { resolve } from "node:path";
+import { detectWorktreeInfo } from "@/utils/detectWorktreeInfo";
+import {
+  cleanupWorktreeOnSessionEnd,
+  type WorktreeCleanupInput,
+} from "@/utils/worktreeCleanup";
 import {
   startOfflineReconnection,
   connectionState,
@@ -152,6 +157,22 @@ export async function runClaude(
     dangerouslySkipPermissions,
     packageScripts,
   };
+
+  // Detect if running inside a Happy-managed worktree
+  const worktreeInfo = await detectWorktreeInfo(workingDirectory);
+  if (worktreeInfo) {
+    metadata = {
+      ...metadata,
+      worktree: {
+        ...worktreeInfo,
+        state: "active",
+        stateChangedAt: Date.now(),
+      },
+    };
+    logger.debug(
+      `[CLAUDE] Detected worktree: ${worktreeInfo.name} (branch: ${worktreeInfo.branchName}, parent: ${worktreeInfo.parentBranch})`,
+    );
+  }
 
   // Session creation: reconnect to existing or create new
   let response;
@@ -613,6 +634,16 @@ export async function runClaude(
         // Cleanup session resources (intervals, callbacks)
         currentSession?.cleanup();
 
+        // Cleanup worktree if applicable
+        if (metadata.worktree?.isWorktree) {
+          const cleanupResult = await cleanupWorktreeOnSessionEnd(
+            metadata.worktree as WorktreeCleanupInput,
+          );
+          logger.debug(
+            `[WORKTREE CLEANUP] ${cleanupResult.action}: ${cleanupResult.message}`,
+          );
+        }
+
         // Send session death message
         session.sendSessionDeath();
         await session.flush();
@@ -701,6 +732,16 @@ export async function runClaude(
   // Cleanup session resources (intervals, callbacks) - prevents memory leak
   // Note: currentSession is set by onSessionReady callback during loop()
   (currentSession as Session | null)?.cleanup();
+
+  // Cleanup worktree if applicable
+  if (metadata.worktree?.isWorktree) {
+    const cleanupResult = await cleanupWorktreeOnSessionEnd(
+      metadata.worktree as WorktreeCleanupInput,
+    );
+    logger.debug(
+      `[WORKTREE CLEANUP] ${cleanupResult.action}: ${cleanupResult.message}`,
+    );
+  }
 
   // Send session death message
   session.sendSessionDeath();

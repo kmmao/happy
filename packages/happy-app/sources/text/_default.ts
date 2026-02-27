@@ -408,6 +408,45 @@ export const en = {
       "This is an advanced feature. Only change the server if you know what you're doing. You will need to log out and log in again after changing servers.",
   },
 
+  worktreeInfo: {
+    title: "Worktree",
+    branch: "Branch",
+    parentBranch: "Parent Branch",
+    status: "Status",
+    errorLabel: "Error",
+    state: {
+      creating: "Creating",
+      active: "Active",
+      merging: "Merging",
+      merged: "Merged",
+      cleaning: "Cleaning",
+      cleaned: "Cleaned",
+      error: "Error",
+    },
+    merge: {
+      title: "Merge Strategy",
+      description: ({ parentBranch }: { parentBranch: string }) =>
+        `How do you want to merge into ${parentBranch}?`,
+      action: "Merge",
+      createPr: "Create Pull Request",
+      directMerge: "Direct Merge",
+      prSuccess: ({ url }: { url: string }) => `PR created: ${url}`,
+      directSuccess: "Merged successfully",
+      failed: ({ error }: { error: string }) => `Merge failed: ${error}`,
+    },
+    cleanup: {
+      title: "Remove Worktree",
+      action: "Remove Worktree",
+      confirm: "Remove this worktree and its branch?",
+      notMerged:
+        "This worktree has not been merged yet. Removing it may lose changes. Continue?",
+      remove: "Remove",
+      success: "Worktree removed",
+      failed: ({ error }: { error: string }) =>
+        `Failed to remove worktree: ${error}`,
+    },
+  },
+
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     killSession: "Kill Session",

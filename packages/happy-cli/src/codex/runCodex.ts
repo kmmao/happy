@@ -16,7 +16,14 @@ import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { hashObject } from "@/utils/deterministicJson";
 import { projectPath } from "@/projectPath";
 import { resolve, join } from "node:path";
-import { createSessionMetadata } from "@/utils/createSessionMetadata";
+import {
+  createSessionMetadata,
+  enrichMetadataWithWorktree,
+} from "@/utils/createSessionMetadata";
+import {
+  cleanupWorktreeOnSessionEnd,
+  type WorktreeCleanupInput,
+} from "@/utils/worktreeCleanup";
 import fs from "node:fs";
 import { startHappyServer } from "@/claude/utils/startHappyServer";
 import { MessageBuffer } from "@/ui/ink/messageBuffer";
@@ -126,12 +133,13 @@ export async function runCodex(opts: {
   // Create session
   //
 
-  const { state, metadata } = createSessionMetadata({
+  const { state, metadata: rawMetadata } = createSessionMetadata({
     flavor: "codex",
     machineId,
     startedBy: opts.startedBy,
     sandbox: sandboxConfig,
   });
+  const metadata = await enrichMetadataWithWorktree(rawMetadata);
   const response = await api.getOrCreateSession({
     tag: sessionTag,
     metadata,
@@ -341,6 +349,16 @@ export async function runCodex(opts: {
           archivedBy: "cli",
           archiveReason: "User terminated",
         }));
+
+        // Cleanup worktree if applicable
+        if (metadata.worktree?.isWorktree) {
+          const cleanupResult = await cleanupWorktreeOnSessionEnd(
+            metadata.worktree as WorktreeCleanupInput,
+          );
+          logger.debug(
+            `[WORKTREE CLEANUP] ${cleanupResult.action}: ${cleanupResult.message}`,
+          );
+        }
 
         // Send session death message
         session.sendSessionDeath();
@@ -829,6 +847,16 @@ export async function runCodex(opts: {
     }
 
     try {
+      // Cleanup worktree if applicable
+      if (metadata.worktree?.isWorktree) {
+        const cleanupResult = await cleanupWorktreeOnSessionEnd(
+          metadata.worktree as WorktreeCleanupInput,
+        );
+        logger.debug(
+          `[WORKTREE CLEANUP] ${cleanupResult.action}: ${cleanupResult.message}`,
+        );
+      }
+
       logger.debug("[codex]: sendSessionDeath");
       session.sendSessionDeath();
       logger.debug("[codex]: flush begin");

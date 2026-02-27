@@ -15,7 +15,14 @@ import { join, resolve } from "node:path";
 import { ApiClient } from "@/api/api";
 import { logger } from "@/ui/logger";
 import { Credentials, readSettings } from "@/persistence";
-import { createSessionMetadata } from "@/utils/createSessionMetadata";
+import {
+  createSessionMetadata,
+  enrichMetadataWithWorktree,
+} from "@/utils/createSessionMetadata";
+import {
+  cleanupWorktreeOnSessionEnd,
+  type WorktreeCleanupInput,
+} from "@/utils/worktreeCleanup";
 import { initialMachineMetadata } from "@/daemon/run";
 import { configuration } from "@/configuration";
 import packageJson from "../../package.json";
@@ -131,12 +138,13 @@ export async function runGemini(opts: {
   // Create session
   //
 
-  const { state, metadata } = createSessionMetadata({
+  const { state, metadata: rawMetadata } = createSessionMetadata({
     flavor: "gemini",
     machineId,
     startedBy: opts.startedBy,
     sandbox: sandboxConfig,
   });
+  const metadata = await enrichMetadataWithWorktree(rawMetadata);
   const response = await api.getOrCreateSession({
     tag: sessionTag,
     metadata,
@@ -425,6 +433,16 @@ export async function runGemini(opts: {
           archivedBy: "cli",
           archiveReason: "User terminated",
         }));
+
+        // Cleanup worktree if applicable
+        if (metadata.worktree?.isWorktree) {
+          const cleanupResult = await cleanupWorktreeOnSessionEnd(
+            metadata.worktree as WorktreeCleanupInput,
+          );
+          logger.debug(
+            `[WORKTREE CLEANUP] ${cleanupResult.action}: ${cleanupResult.message}`,
+          );
+        }
 
         session.sendSessionDeath();
         await session.flush();
@@ -1547,6 +1565,16 @@ export async function runGemini(opts: {
     }
 
     try {
+      // Cleanup worktree if applicable
+      if (metadata.worktree?.isWorktree) {
+        const cleanupResult = await cleanupWorktreeOnSessionEnd(
+          metadata.worktree as WorktreeCleanupInput,
+        );
+        logger.debug(
+          `[WORKTREE CLEANUP] ${cleanupResult.action}: ${cleanupResult.message}`,
+        );
+      }
+
       session.sendSessionDeath();
       await session.flush();
       await session.close();

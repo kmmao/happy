@@ -7,44 +7,46 @@
  * @module createSessionMetadata
  */
 
-import os from 'node:os';
-import { resolve } from 'node:path';
+import os from "node:os";
+import { resolve } from "node:path";
 
-import type { AgentState, Metadata } from '@/api/types';
-import { configuration } from '@/configuration';
-import { projectPath } from '@/projectPath';
-import type { SandboxConfig } from '@/persistence';
-import packageJson from '../../package.json';
+import type { AgentState, Metadata } from "@/api/types";
+import { configuration } from "@/configuration";
+import { projectPath } from "@/projectPath";
+import type { SandboxConfig } from "@/persistence";
+import { detectWorktreeInfo } from "@/utils/detectWorktreeInfo";
+import { logger } from "@/ui/logger";
+import packageJson from "../../package.json";
 
 /**
  * Backend flavor identifier for session metadata.
  */
-export type BackendFlavor = 'claude' | 'codex' | 'gemini' | 'opencode' | 'acp';
+export type BackendFlavor = "claude" | "codex" | "gemini" | "opencode" | "acp";
 
 /**
  * Options for creating session metadata.
  */
 export interface CreateSessionMetadataOptions {
-    /** Backend flavor (claude, codex, gemini) */
-    flavor: BackendFlavor;
-    /** Machine ID for server identification */
-    machineId: string;
-    /** How the session was started */
-    startedBy?: 'daemon' | 'terminal';
-    /** Active sandbox config for the session, or undefined when not used */
-    sandbox?: SandboxConfig;
-    /** Whether the backend runs with "dangerously skip permissions" behavior */
-    dangerouslySkipPermissions?: boolean;
+  /** Backend flavor (claude, codex, gemini) */
+  flavor: BackendFlavor;
+  /** Machine ID for server identification */
+  machineId: string;
+  /** How the session was started */
+  startedBy?: "daemon" | "terminal";
+  /** Active sandbox config for the session, or undefined when not used */
+  sandbox?: SandboxConfig;
+  /** Whether the backend runs with "dangerously skip permissions" behavior */
+  dangerouslySkipPermissions?: boolean;
 }
 
 /**
  * Result containing both state and metadata for session creation.
  */
 export interface SessionMetadataResult {
-    /** Agent state for session */
-    state: AgentState;
-    /** Session metadata */
-    metadata: Metadata;
+  /** Agent state for session */
+  state: AgentState;
+  /** Session metadata */
+  metadata: Metadata;
 }
 
 /**
@@ -67,30 +69,58 @@ export interface SessionMetadataResult {
  * const response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
  * ```
  */
-export function createSessionMetadata(opts: CreateSessionMetadataOptions): SessionMetadataResult {
-    const state: AgentState = {
-        controlledByUser: false,
-    };
+export function createSessionMetadata(
+  opts: CreateSessionMetadataOptions,
+): SessionMetadataResult {
+  const state: AgentState = {
+    controlledByUser: false,
+  };
 
-    const metadata: Metadata = {
-        path: process.cwd(),
-        host: os.hostname(),
-        version: packageJson.version,
-        os: os.platform(),
-        machineId: opts.machineId,
-        homeDir: os.homedir(),
-        happyHomeDir: configuration.happyHomeDir,
-        happyLibDir: projectPath(),
-        happyToolsDir: resolve(projectPath(), 'tools', 'unpacked'),
-        startedFromDaemon: opts.startedBy === 'daemon',
-        hostPid: process.pid,
-        startedBy: opts.startedBy || 'terminal',
-        lifecycleState: 'running',
-        lifecycleStateSince: Date.now(),
-        flavor: opts.flavor,
-        sandbox: opts.sandbox?.enabled ? opts.sandbox : null,
-        dangerouslySkipPermissions: opts.dangerouslySkipPermissions ?? null,
-    };
+  const metadata: Metadata = {
+    path: process.cwd(),
+    host: os.hostname(),
+    version: packageJson.version,
+    os: os.platform(),
+    machineId: opts.machineId,
+    homeDir: os.homedir(),
+    happyHomeDir: configuration.happyHomeDir,
+    happyLibDir: projectPath(),
+    happyToolsDir: resolve(projectPath(), "tools", "unpacked"),
+    startedFromDaemon: opts.startedBy === "daemon",
+    hostPid: process.pid,
+    startedBy: opts.startedBy || "terminal",
+    lifecycleState: "running",
+    lifecycleStateSince: Date.now(),
+    flavor: opts.flavor,
+    sandbox: opts.sandbox?.enabled ? opts.sandbox : null,
+    dangerouslySkipPermissions: opts.dangerouslySkipPermissions ?? null,
+  };
 
-    return { state, metadata };
+  return { state, metadata };
+}
+
+/**
+ * Enrich metadata with worktree information if running inside a Happy-managed worktree.
+ * Call this after createSessionMetadata() for backends that use it.
+ */
+export async function enrichMetadataWithWorktree(
+  metadata: Metadata,
+): Promise<Metadata> {
+  const worktreeInfo = await detectWorktreeInfo(metadata.path);
+  if (!worktreeInfo) {
+    return metadata;
+  }
+
+  logger.debug(
+    `[SESSION] Detected worktree: ${worktreeInfo.name} (branch: ${worktreeInfo.branchName}, parent: ${worktreeInfo.parentBranch})`,
+  );
+
+  return {
+    ...metadata,
+    worktree: {
+      ...worktreeInfo,
+      state: "active",
+      stateChangedAt: Date.now(),
+    },
+  };
 }
