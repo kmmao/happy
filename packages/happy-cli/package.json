@@ -118,7 +118,7 @@
   },
   "devDependencies": {
     "@eslint/compat": "^1",
-    "@kmmao/happy-wire": "^0.2.3",
+    "@kmmao/happy-wire": "^0.2.5",
     "@types/cross-spawn": "^6.0.6",
     "@types/http-proxy": "^1.17.17",
     "@types/inquirer": "^9.0.9",

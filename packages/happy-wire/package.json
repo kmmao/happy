@@ -1,6 +1,6 @@
 {
   "name": "@kmmao/happy-wire",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Shared message wire types and Zod schemas for Happy clients and services",
   "author": "kmmao",
   "license": "MIT",
