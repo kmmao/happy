@@ -19,6 +19,8 @@ import type { VoiceSession, VoiceSessionConfig } from "./types";
 // Module-level state
 let isSessionActive = false;
 const spokenMessageIds = new Set<string>();
+let thinkingTimeoutId: ReturnType<typeof setTimeout> | null = null;
+const THINKING_TIMEOUT_MS = 30_000;
 
 const RealtimeVoiceSessionInner: React.FC = () => {
   const ttsPlayer = useTtsPlayer();
@@ -67,9 +69,15 @@ const RealtimeVoiceSessionInner: React.FC = () => {
         }
 
         if (audioData && isSessionActive) {
+          if (thinkingTimeoutId) {
+            clearTimeout(thinkingTimeoutId);
+            thinkingTimeoutId = null;
+          }
           storage.getState().setRealtimeMode("speaking");
           await ttsPlayerRef.current.play(audioData);
-          storage.getState().setRealtimeMode("idle");
+          if (isSessionActive) {
+            storage.getState().setRealtimeMode("listening");
+          }
         }
       } catch (error) {
         if (error instanceof ElevenLabsAuthError) {
@@ -103,12 +111,24 @@ const RealtimeVoiceSessionInner: React.FC = () => {
     // Stop any currently playing TTS when user speaks
     ttsPlayerRef.current.stop();
     ttsQueueRef.current = [];
-    storage.getState().setRealtimeMode("idle");
+    storage.getState().setRealtimeMode("thinking", true);
+
+    // Timeout guard: if no TTS arrives within 30s, fall back to listening
+    if (thinkingTimeoutId) clearTimeout(thinkingTimeoutId);
+    thinkingTimeoutId = setTimeout(() => {
+      if (isSessionActive && storage.getState().realtimeMode === "thinking") {
+        storage.getState().setRealtimeMode("listening", true);
+      }
+    }, THINKING_TIMEOUT_MS);
 
     sync.sendMessage(sessionId, text.trim());
   }, []);
 
-  const stt = useSpeechToText(onTranscript);
+  // Extract ISO 639-1 lang code (e.g. "zh" from "zh-CN") for STT
+  const sttLang =
+    storage.getState().settings.voiceAssistantLanguage?.split("-")[0] ??
+    undefined;
+  const stt = useSpeechToText(onTranscript, sttLang);
   const sttRef = useRef(stt);
   sttRef.current = stt;
 
@@ -125,7 +145,7 @@ const RealtimeVoiceSessionInner: React.FC = () => {
         ttsQueueRef.current = [];
 
         storage.getState().setRealtimeStatus("connected");
-        storage.getState().setRealtimeMode("idle");
+        storage.getState().setRealtimeMode("listening");
 
         await sttRef.current.startListening();
       },
@@ -134,6 +154,10 @@ const RealtimeVoiceSessionInner: React.FC = () => {
         isSessionActive = false;
         isProcessingRef.current = false;
         ttsQueueRef.current = [];
+        if (thinkingTimeoutId) {
+          clearTimeout(thinkingTimeoutId);
+          thinkingTimeoutId = null;
+        }
 
         sttRef.current.stopListening();
         ttsPlayerRef.current.stop();

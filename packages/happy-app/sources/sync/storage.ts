@@ -131,7 +131,7 @@ interface StorageState {
   feedLoaded: boolean; // True after initial feed fetch
   friendsLoaded: boolean; // True after initial friends fetch
   realtimeStatus: "disconnected" | "connecting" | "connected" | "error";
-  realtimeMode: "idle" | "speaking";
+  realtimeMode: "idle" | "listening" | "thinking" | "speaking";
   socketStatus: "disconnected" | "connecting" | "connected" | "error";
   socketLastConnectedAt: number | null;
   socketLastDisconnectedAt: number | null;
@@ -176,7 +176,10 @@ interface StorageState {
   setRealtimeStatus: (
     status: "disconnected" | "connecting" | "connected" | "error",
   ) => void;
-  setRealtimeMode: (mode: "idle" | "speaking", immediate?: boolean) => void;
+  setRealtimeMode: (
+    mode: "idle" | "listening" | "thinking" | "speaking",
+    immediate?: boolean,
+  ) => void;
   clearRealtimeModeDebounce: () => void;
   setSocketStatus: (
     status: "disconnected" | "connecting" | "connected" | "error",
@@ -1023,7 +1026,10 @@ export const storage = create<StorageState>()((set, get) => {
         ...state,
         realtimeStatus: status,
       })),
-    setRealtimeMode: (mode: "idle" | "speaking", immediate?: boolean) => {
+    setRealtimeMode: (
+      mode: "idle" | "listening" | "thinking" | "speaking",
+      immediate?: boolean,
+    ) => {
       if (immediate) {
         // Clear any pending debounce and set immediately
         if (realtimeModeDebounceTimer) {
@@ -1833,7 +1839,11 @@ export function useRealtimeStatus():
   return storage(useShallow((state) => state.realtimeStatus));
 }
 
-export function useRealtimeMode(): "idle" | "speaking" {
+export function useRealtimeMode():
+  | "idle"
+  | "listening"
+  | "thinking"
+  | "speaking" {
   return storage(useShallow((state) => state.realtimeMode));
 }
 

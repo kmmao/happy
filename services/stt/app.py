@@ -85,16 +85,23 @@ async def transcribe(
             if not is_traditional:
                 initial_prompt = "以下是普通话的句子。"
 
-        segments, info = model.transcribe(
-            tmp_path,
-            language=lang,
-            beam_size=5,
-            vad_filter=True,  # Filter silence to prevent hallucinations
-            initial_prompt=initial_prompt,
-        )
-        # Consume generator — empty on pure-silence audio, not an error
-        text = "".join(seg.text for seg in segments).strip()
-        detected_lang = info.language
+        try:
+            segments, info = model.transcribe(
+                tmp_path,
+                language=lang,
+                beam_size=5,
+                vad_filter=True,  # Filter silence to prevent hallucinations
+                initial_prompt=initial_prompt,
+            )
+            # Consume generator — empty on pure-silence audio, not an error
+            text = "".join(seg.text for seg in segments).strip()
+            detected_lang = info.language
+        except (ValueError, StopIteration):
+            # faster-whisper raises ValueError ("max() arg is an empty sequence")
+            # when VAD filter finds no speech in very short or silent audio.
+            # Treat as "no speech detected" rather than a server error.
+            text = ""
+            detected_lang = lang or "auto"
 
         # Guard against Whisper hallucinations on noise/silence
         if text and _HALLUCINATION_RE.search(text):

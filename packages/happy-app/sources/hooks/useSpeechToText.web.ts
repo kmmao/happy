@@ -9,6 +9,37 @@ function mimeTypeToFileName(mimeType: string): string {
   return "speech.webm";
 }
 
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("Failed to encode audio blob"));
+        return;
+      }
+      const base64 = result.split(",")[1];
+      if (!base64) {
+        reject(new Error("Invalid base64 data"));
+        return;
+      }
+      resolve(base64);
+    };
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("FileReader error"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Average byte frequency level (0–255) below which audio is silence. */
+const SILENCE_THRESHOLD = 15;
+/** Milliseconds of silence after speech before ending an utterance. */
+const SPEECH_END_DELAY_MS = 2000;
+/** How often to sample volume levels (ms). */
+const VAD_POLL_INTERVAL_MS = 100;
+/** Minimum blob size (bytes) worth sending to STT. */
+const MIN_BLOB_SIZE = 500;
+
 export interface UseSpeechToTextReturn {
   isListening: boolean;
   /** The latest unfinalized speech text — updates in real-time as the user speaks. */
@@ -18,11 +49,13 @@ export interface UseSpeechToTextReturn {
 }
 
 /**
- * Web speech-to-text via Happy server API (`/v1/stt/transcribe`).
+ * Web speech-to-text with automatic utterance detection (VAD).
  *
- * Uses MediaRecorder with 3-second timeslice to provide real-time interim
- * transcription while the user is still speaking. Final accurate transcription
- * is sent when recording stops.
+ * Records audio via MediaRecorder. Uses Web Audio API AnalyserNode to monitor
+ * volume levels and automatically detect when the user finishes speaking.
+ * On silence after speech, stops the recorder (triggering final transcription
+ * via the server STT API), sends the result, and immediately starts a new
+ * recording segment — mirroring the native `continuous: false` behavior.
  */
 export function useSpeechToText(
   onTranscript: (text: string) => void,
@@ -32,21 +65,47 @@ export function useSpeechToText(
   const [interimTranscript, setInterimTranscript] = useState("");
   const onTranscriptRef = useRef(onTranscript);
   onTranscriptRef.current = onTranscript;
-
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
   const langRef = useRef(lang);
   langRef.current = lang;
 
-  // Flags for real-time interim transcription
-  const isStoppedRef = useRef(false);
-  const interimCounterRef = useRef(0);
+  // Media resources (shared across utterance segments)
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const mimeTypeRef = useRef("");
 
-  const cleanupMedia = useCallback(() => {
-    // Bump the counter so any in-flight interim API calls are silently discarded
-    // when they resolve — preventing stale transcripts from overwriting state.
+  // Control flags
+  const wantListeningRef = useRef(false);
+  const isUtteranceEndRef = useRef(false);
+  const interimCounterRef = useRef(0);
+  // Mirror of interimTranscript for synchronous access in VAD/onstop callbacks
+  const interimTextRef = useRef("");
+
+  // VAD state
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const speechDetectedRef = useRef(false);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Ref for the startSegment function (allows onstop to restart without circular deps)
+  const startSegmentRef = useRef<() => void>(() => {});
+
+  const cancelVad = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (vadIntervalRef.current) {
+      clearInterval(vadIntervalRef.current);
+      vadIntervalRef.current = null;
+    }
+  }, []);
+
+  const cleanupAll = useCallback(() => {
+    wantListeningRef.current = false;
     interimCounterRef.current++;
+    cancelVad();
 
     const recorder = mediaRecorderRef.current;
     if (recorder) {
@@ -56,45 +115,208 @@ export function useSpeechToText(
       mediaRecorderRef.current = null;
     }
 
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+      analyserRef.current = null;
+    }
+
     const stream = mediaStreamRef.current;
     if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach((t) => t.stop());
       mediaStreamRef.current = null;
     }
 
     chunksRef.current = [];
+    speechDetectedRef.current = false;
+    interimTextRef.current = "";
     setInterimTranscript("");
+  }, [cancelVad]);
+
+  // Start VAD polling (uses setInterval so it keeps running when tab loses focus)
+  const startVad = useCallback(() => {
+    cancelVad();
+    speechDetectedRef.current = false;
+
+    vadIntervalRef.current = setInterval(() => {
+      const analyser = analyserRef.current;
+      if (!analyser || !wantListeningRef.current) return;
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a, b) => a + b, 0) / data.length;
+
+      if (avg > SILENCE_THRESHOLD) {
+        speechDetectedRef.current = true;
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+      } else if (speechDetectedRef.current && !silenceTimerRef.current) {
+        silenceTimerRef.current = setTimeout(() => {
+          silenceTimerRef.current = null;
+          if (!wantListeningRef.current) return;
+
+          // Utterance ended — stop recorder to trigger transcription + restart
+          isUtteranceEndRef.current = true;
+          speechDetectedRef.current = false;
+          const rec = mediaRecorderRef.current;
+          if (rec && rec.state !== "inactive") {
+            rec.stop();
+          }
+        }, SPEECH_END_DELAY_MS);
+      }
+    }, VAD_POLL_INTERVAL_MS);
+  }, [cancelVad]);
+
+  // Reset VAD state when tab returns from background to prevent false silence detection
+  // (AudioContext is throttled by browsers when tab is hidden, producing zero-level data)
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && wantListeningRef.current) {
+        speechDetectedRef.current = false;
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
-  const blobToBase64 = useCallback((blob: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result;
-        if (typeof result !== "string") {
-          reject(new Error("Failed to encode audio blob"));
-          return;
+  // Start a new MediaRecorder segment (reuses existing stream)
+  const startSegment = useCallback(() => {
+    const stream = mediaStreamRef.current;
+    if (!stream || !wantListeningRef.current) return;
+
+    const mimeType = mimeTypeRef.current;
+    const recorder = new MediaRecorder(
+      stream,
+      mimeType ? { mimeType } : undefined,
+    );
+    chunksRef.current = [];
+    isUtteranceEndRef.current = false;
+    interimTextRef.current = "";
+    interimCounterRef.current++;
+
+    recorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        chunksRef.current.push(event.data);
+      }
+
+      // Fire interim transcription on timeslice events (skip utterance-end flush)
+      if (
+        !isUtteranceEndRef.current &&
+        wantListeningRef.current &&
+        chunksRef.current.length > 0
+      ) {
+        const myCounter = ++interimCounterRef.current;
+        const chunks = [...chunksRef.current];
+        const blobType = recorder.mimeType || mimeType;
+
+        (async () => {
+          try {
+            const blob = new Blob(chunks, { type: blobType });
+            if (blob.size < MIN_BLOB_SIZE) return;
+
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return;
+
+            const audioBase64 = await blobToBase64(blob);
+            const result = await transcribeSttAudio(credentials, {
+              audioBase64,
+              fileName: mimeTypeToFileName(blobType),
+              mimeType: blobType,
+              lang: langRef.current,
+            });
+
+            if (myCounter === interimCounterRef.current && result?.text) {
+              interimTextRef.current = result.text;
+              setInterimTranscript(result.text);
+            }
+          } catch {
+            // ignore interim failures
+          }
+        })();
+      }
+    };
+
+    recorder.onerror = () => {
+      setIsListening(false);
+      cleanupAll();
+    };
+
+    recorder.onstop = async () => {
+      const savedChunks = [...chunksRef.current];
+      const savedType = recorder.mimeType || mimeType;
+      const wasUtteranceEnd = isUtteranceEndRef.current;
+      const cachedInterim = interimTextRef.current;
+      chunksRef.current = [];
+      interimTextRef.current = "";
+      interimCounterRef.current++;
+
+      // Only restart if this was a VAD-triggered stop (not user-initiated)
+      if (wantListeningRef.current && wasUtteranceEnd) {
+        startSegmentRef.current();
+      }
+
+      // If VAD-triggered and we have a cached interim transcript, use it directly
+      // to skip the final STT round-trip (saves 1-3s latency).
+      if (wasUtteranceEnd && cachedInterim) {
+        onTranscriptRef.current(cachedInterim.trim());
+      } else {
+        // No interim available (speech < 3s) or user-initiated stop — do full transcription
+        try {
+          if (savedChunks.length > 0) {
+            const blob = new Blob(savedChunks, { type: savedType });
+            if (blob.size >= MIN_BLOB_SIZE) {
+              const credentials = await TokenStorage.getCredentials();
+              if (credentials) {
+                const audioBase64 = await blobToBase64(blob);
+                const result = await transcribeSttAudio(credentials, {
+                  audioBase64,
+                  fileName: mimeTypeToFileName(savedType),
+                  mimeType: savedType,
+                  lang: langRef.current,
+                });
+                if (result?.text) {
+                  onTranscriptRef.current(result.text.trim());
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore transcription failures
         }
-        const base64 = result.split(",")[1];
-        if (!base64) {
-          reject(new Error("Invalid base64 data"));
-          return;
-        }
-        resolve(base64);
-      };
-      reader.onerror = () =>
-        reject(reader.error ?? new Error("FileReader error"));
-      reader.readAsDataURL(blob);
-    });
-  }, []);
+      }
+
+      setInterimTranscript("");
+
+      // Clean up if user stopped (either before or during transcription)
+      if (!wantListeningRef.current) {
+        setIsListening(false);
+        cleanupAll();
+      }
+    };
+
+    mediaRecorderRef.current = recorder;
+    recorder.start(3000); // 3-second timeslice for interim transcription
+  }, [cleanupAll]);
+
+  // Keep the ref updated so onstop can always call the latest version
+  startSegmentRef.current = startSegment;
 
   const startListening = useCallback(async () => {
-    if (isListening || mediaRecorderRef.current) return;
+    if (isListening || wantListeningRef.current) return;
+    // Lock immediately before async getUserMedia to prevent double-start
+    wantListeningRef.current = true;
 
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (error: unknown) {
+      wantListeningRef.current = false;
       const name = error instanceof Error ? error.name : "";
       const isPermanentDenial =
         name === "NotAllowedError" || name === "PermissionDeniedError";
@@ -102,10 +324,16 @@ export function useSpeechToText(
       return;
     }
 
+    // Guard: user may have called stopListening during the getUserMedia await
+    if (!wantListeningRef.current) {
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+
     try {
       mediaStreamRef.current = stream;
 
-      // Detect best supported format — Safari/iOS uses mp4, Chrome/Firefox use webm
+      // Detect best supported format
       let mimeType = "";
       const candidates = [
         "audio/webm;codecs=opus",
@@ -122,131 +350,57 @@ export function useSpeechToText(
           }
         }
       }
+      mimeTypeRef.current = mimeType;
 
-      const recorder = new MediaRecorder(
-        stream,
-        mimeType ? { mimeType } : undefined,
-      );
-      chunksRef.current = [];
-      isStoppedRef.current = false;
-      interimCounterRef.current = 0;
+      // Set up Web Audio API for VAD
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
 
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
-
-        // Fire interim transcription on timeslice events (not on the final stop event)
-        if (!isStoppedRef.current && chunksRef.current.length > 0) {
-          const myCounter = ++interimCounterRef.current;
-          const chunks = [...chunksRef.current];
-          const blobType = recorder.mimeType || mimeType;
-
-          // Non-blocking interim transcription
-          (async () => {
-            try {
-              const blob = new Blob(chunks, { type: blobType });
-              if (blob.size < 500) return; // skip tiny blobs
-
-              const credentials = await TokenStorage.getCredentials();
-              if (!credentials) return;
-
-              const audioBase64 = await blobToBase64(blob);
-              const result = await transcribeSttAudio(credentials, {
-                audioBase64,
-                fileName: mimeTypeToFileName(blobType),
-                mimeType: blobType,
-                lang: langRef.current,
-              });
-
-              // Only update if this is still the latest interim result
-              if (myCounter === interimCounterRef.current && result?.text) {
-                setInterimTranscript(result.text);
-              }
-            } catch {
-              // ignore interim transcription failures
-            }
-          })();
-        }
-      };
-
-      recorder.onerror = () => {
-        setIsListening(false);
-        cleanupMedia();
-      };
-
-      recorder.onstop = async () => {
-        const currentChunks = [...chunksRef.current];
-        const currentType = recorder.mimeType || mimeType;
-        setIsListening(false);
-        // Don't clear interimTranscript here — cleanupMedia() in the finally
-        // block will do it after onTranscript(), so React 18 batches both
-        // updates into one render: message appears, interim disappears together.
-
-        try {
-          if (currentChunks.length === 0) return;
-          const blob = new Blob(currentChunks, { type: currentType });
-          if (blob.size === 0) return;
-
-          const credentials = await TokenStorage.getCredentials();
-          if (!credentials) return;
-
-          const audioBase64 = await blobToBase64(blob);
-          const result = await transcribeSttAudio(credentials, {
-            audioBase64,
-            fileName: mimeTypeToFileName(currentType),
-            mimeType: currentType,
-            lang: langRef.current,
-          });
-
-          if (result?.text) {
-            onTranscriptRef.current(result.text.trim());
-          }
-        } catch {
-          // ignore transcription failures; keep UX non-blocking
-        } finally {
-          cleanupMedia();
-        }
-      };
-
-      mediaRecorderRef.current = recorder;
       setIsListening(true);
       setInterimTranscript("");
-      // 3-second timeslice for real-time interim transcription
-      recorder.start(3000);
+
+      // Start first recording segment + VAD monitoring
+      startSegmentRef.current();
+      startVad();
     } catch {
+      wantListeningRef.current = false;
       setIsListening(false);
-      cleanupMedia();
+      cleanupAll();
     }
-  }, [blobToBase64, cleanupMedia, isListening]);
+  }, [cleanupAll, isListening, startVad]);
 
   const stopListening = useCallback(() => {
-    // Mark stopped BEFORE calling recorder.stop() so the final ondataavailable
-    // event is NOT treated as a timeslice interim event
-    isStoppedRef.current = true;
+    wantListeningRef.current = false;
+    cancelVad();
 
     const recorder = mediaRecorderRef.current;
     if (!recorder) {
       setIsListening(false);
-      cleanupMedia();
+      cleanupAll();
       return;
     }
 
     if (recorder.state !== "inactive") {
+      // Stop triggers onstop → final transcription → cleanup
       recorder.stop();
     } else {
       setIsListening(false);
-      cleanupMedia();
+      cleanupAll();
     }
-  }, [cleanupMedia]);
+  }, [cancelVad, cleanupAll]);
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      isStoppedRef.current = true;
-      setIsListening(false);
-      cleanupMedia();
+      wantListeningRef.current = false;
+      cleanupAll();
     };
-  }, [cleanupMedia]);
+  }, [cleanupAll]);
 
   return { isListening, interimTranscript, startListening, stopListening };
 }

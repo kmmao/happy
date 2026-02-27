@@ -30,7 +30,10 @@ export function sttRoutes(app: Fastify) {
       const { audioBase64, fileName, mimeType, lang } = request.body;
       const sttBaseUrl = process.env.STT_BASE_URL || "http://stt:8000";
 
-      log({ module: "stt" }, `STT transcribe request from user ${userId}, lang=${lang ?? "auto"}`);
+      log(
+        { module: "stt" },
+        `STT transcribe request from user ${userId}, lang=${lang ?? "auto"}`,
+      );
 
       try {
         const audio = Buffer.from(audioBase64, "base64");
@@ -53,20 +56,32 @@ export function sttRoutes(app: Fastify) {
 
         if (!sttResp.ok) {
           const errText = await sttResp.text();
-          log({ module: "stt" }, `STT backend error: ${sttResp.status} ${errText}`);
-          return reply.code(502).send({ error: `STT backend error: ${sttResp.status}` });
+          log(
+            { module: "stt" },
+            `STT backend error: ${sttResp.status} ${errText}`,
+          );
+          return reply
+            .code(502)
+            .send({ error: `STT backend error: ${sttResp.status}` });
         }
 
         const sttData = (await sttResp.json()) as any;
         const text = (sttData?.text || "").toString().trim();
-        if (!text) {
-          return reply.code(400).send({ error: "Empty transcript" });
-        }
 
-        return reply.send({ text, language: sttData?.language ?? lang ?? "auto" });
+        return reply.send({
+          text,
+          language: sttData?.language ?? lang ?? "auto",
+        });
       } catch (error) {
         log({ module: "stt" }, `STT transcribe error: ${error}`);
-        return reply.code(400).send({ error: error instanceof Error ? error.message : "Failed to transcribe audio" });
+        return reply
+          .code(400)
+          .send({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to transcribe audio",
+          });
       }
     },
   );
