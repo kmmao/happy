@@ -486,6 +486,7 @@ export const es: TranslationStructure = {
     claudeCodeSessionId: "ID de sesión de Claude Code",
     claudeCodeSessionIdCopied:
       "ID de sesión de Claude Code copiado al portapapeles",
+    profile: "Perfil de IA",
     aiProvider: "Proveedor de IA",
     failedToCopyClaudeCodeSessionId:
       "Falló al copiar ID de sesión de Claude Code",

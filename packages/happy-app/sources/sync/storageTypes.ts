@@ -151,6 +151,8 @@ export interface Session {
     description?: string | null;
   }> | null; // Profile custom models, copied at session creation
   modelMappings?: Record<string, string> | null; // Maps UI keys (opus/sonnet/haiku) to real model IDs, copied at session creation
+  profileId?: string | null; // AI backend profile ID used when session was created
+  profileName?: string | null; // AI backend profile display name, copied at session creation
   // SDK reasoning & budget controls (Phase 3A)
   thinkingMode?: string | null; // "disabled" | "adaptive" | "enabled"
   thinkingBudget?: number | null; // Budget tokens when thinkingMode is "enabled"

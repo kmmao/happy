@@ -12,12 +12,12 @@ import { Modal } from "@/modal";
  * user content into WebView HTML templates.
  */
 function escapeHtml(str: string): string {
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // Style for Web platform
@@ -38,9 +38,7 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
   const copyMermaidSource = React.useCallback(async () => {
     try {
       await Clipboard.setStringAsync(props.content);
-      Modal.alert(t("common.success"), t("markdown.mermaidCopied"), [
-        { text: t("common.ok"), style: "cancel" },
-      ]);
+      Modal.toast(t("markdown.mermaidCopied"));
     } catch (error) {
       console.error("Failed to copy mermaid source:", error);
       Modal.alert(t("common.error"), t("markdown.copyFailed"), [

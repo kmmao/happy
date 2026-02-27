@@ -172,7 +172,7 @@ function SessionInfoContent({ session }: { session: Session }) {
     if (!session) return;
     try {
       await Clipboard.setStringAsync(session.id);
-      Modal.alert(t("common.success"), t("sessionInfo.happySessionIdCopied"));
+      Modal.toast(t("sessionInfo.happySessionIdCopied"));
     } catch (error) {
       Modal.alert(t("common.error"), t("sessionInfo.failedToCopySessionId"));
     }
@@ -182,7 +182,7 @@ function SessionInfoContent({ session }: { session: Session }) {
     if (!session?.metadata) return;
     try {
       await Clipboard.setStringAsync(JSON.stringify(session.metadata, null, 2));
-      Modal.alert(t("common.success"), t("sessionInfo.metadataCopied"));
+      Modal.toast(t("sessionInfo.metadataCopied"));
     } catch (error) {
       Modal.alert(t("common.error"), t("sessionInfo.failedToCopyMetadata"));
     }
@@ -533,6 +533,16 @@ function SessionInfoContent({ session }: { session: Session }) {
                     size={29}
                     color="#5856D6"
                   />
+                }
+                showChevron={false}
+              />
+            )}
+            {session.profileName && (
+              <Item
+                title={t("sessionInfo.profile")}
+                subtitle={session.profileName}
+                icon={
+                  <Ionicons name="layers-outline" size={29} color="#5856D6" />
                 }
                 showChevron={false}
               />

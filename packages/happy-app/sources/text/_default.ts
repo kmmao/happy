@@ -473,6 +473,7 @@ export const en = {
     happySessionId: "Happy Session ID",
     claudeCodeSessionId: "Claude Code Session ID",
     claudeCodeSessionIdCopied: "Claude Code Session ID copied to clipboard",
+    profile: "AI Profile",
     aiProvider: "AI Provider",
     failedToCopyClaudeCodeSessionId: "Failed to copy Claude Code Session ID",
     metadataCopied: "Metadata copied to clipboard",

@@ -438,6 +438,7 @@ export const ru: TranslationStructure = {
     claudeCodeSessionId: "ID сессии Claude Code",
     claudeCodeSessionIdCopied:
       "ID сессии Claude Code скопирован в буфер обмена",
+    profile: "Профиль ИИ",
     aiProvider: "Поставщик ИИ",
     failedToCopyClaudeCodeSessionId:
       "Не удалось скопировать ID сессии Claude Code",

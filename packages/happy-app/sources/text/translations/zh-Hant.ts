@@ -457,6 +457,7 @@ export const zhHant: TranslationStructure = {
     happySessionId: "Happy 工作階段 ID",
     claudeCodeSessionId: "Claude Code 工作階段 ID",
     claudeCodeSessionIdCopied: "Claude Code 工作階段 ID 已複製到剪貼簿",
+    profile: "AI 設定檔",
     aiProvider: "AI 提供者",
     failedToCopyClaudeCodeSessionId: "複製 Claude Code 工作階段 ID 失敗",
     metadataCopied: "中繼資料已複製到剪貼簿",

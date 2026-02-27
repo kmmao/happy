@@ -200,6 +200,10 @@ interface StorageState {
     sessionId: string,
     modelMappings: Record<string, string> | null,
   ) => void;
+  updateSessionProfile: (
+    sessionId: string,
+    profile: { profileId: string | null; profileName: string | null },
+  ) => void;
   updateSessionSdkSettings: (
     sessionId: string,
     settings: SessionSdkSettings,
@@ -1246,6 +1250,26 @@ export const storage = create<StorageState>()((set, get) => {
         return {
           ...state,
           sessions: updatedSessions,
+        };
+      }),
+    updateSessionProfile: (
+      sessionId: string,
+      profile: { profileId: string | null; profileName: string | null },
+    ) =>
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) return state;
+
+        return {
+          ...state,
+          sessions: {
+            ...state.sessions,
+            [sessionId]: {
+              ...session,
+              profileId: profile.profileId,
+              profileName: profile.profileName,
+            },
+          },
         };
       }),
     updateSessionSdkSettings: (

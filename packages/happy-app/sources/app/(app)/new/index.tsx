@@ -1434,6 +1434,13 @@ function NewSessionWizard() {
               resolvedProfile.modelMappings,
             );
         }
+        // Save profile info for display in session info page
+        if (selectedProfileId && resolvedProfile) {
+          storage.getState().updateSessionProfile(result.sessionId, {
+            profileId: selectedProfileId,
+            profileName: resolvedProfile.name,
+          });
+        }
 
         // Send initial message (with any attached images) if provided
         const currentImages = pendingImagesRef.current;

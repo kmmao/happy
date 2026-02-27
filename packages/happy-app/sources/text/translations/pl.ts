@@ -497,6 +497,7 @@ export const pl: TranslationStructure = {
     happySessionId: "ID sesji Happy",
     claudeCodeSessionId: "ID sesji Claude Code",
     claudeCodeSessionIdCopied: "ID sesji Claude Code skopiowane do schowka",
+    profile: "Profil AI",
     aiProvider: "Dostawca AI",
     failedToCopyClaudeCodeSessionId:
       "Nie udało się skopiować ID sesji Claude Code",
