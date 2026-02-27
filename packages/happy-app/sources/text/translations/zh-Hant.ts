@@ -394,6 +394,43 @@ export const zhHant: TranslationStructure = {
       "這是一個進階功能。只有在您知道自己在做什麼時才更改伺服器。更改伺服器後您需要重新登入。",
   },
 
+  worktreeInfo: {
+    title: "Worktree",
+    branch: "分支",
+    parentBranch: "父分支",
+    status: "狀態",
+    errorLabel: "錯誤",
+    state: {
+      creating: "建立中",
+      active: "使用中",
+      merging: "合併中",
+      merged: "已合併",
+      cleaning: "清理中",
+      cleaned: "已清理",
+      error: "錯誤",
+    },
+    merge: {
+      title: "合併策略",
+      description: ({ parentBranch }: { parentBranch: string }) =>
+        `您希望如何合併到 ${parentBranch}？`,
+      action: "合併",
+      createPr: "建立 Pull Request",
+      directMerge: "直接合併",
+      prSuccess: ({ url }: { url: string }) => `PR 已建立：${url}`,
+      directSuccess: "合併成功",
+      failed: ({ error }: { error: string }) => `合併失敗：${error}`,
+    },
+    cleanup: {
+      title: "移除 Worktree",
+      action: "移除 Worktree",
+      confirm: "確定要移除此 Worktree 及其分支嗎？",
+      notMerged: "此 Worktree 尚未合併。移除可能導致變更遺失。是否繼續？",
+      remove: "移除",
+      success: "Worktree 已移除",
+      failed: ({ error }: { error: string }) => `移除 Worktree 失敗：${error}`,
+    },
+  },
+
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     killSession: "終止工作階段",

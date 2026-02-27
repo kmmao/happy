@@ -420,6 +420,45 @@ export const es: TranslationStructure = {
       "Esta es una característica avanzada. Solo cambia el servidor si sabes lo que haces. Necesitarás cerrar sesión e iniciarla nuevamente después de cambiar servidores.",
   },
 
+  worktreeInfo: {
+    title: "Worktree",
+    branch: "Rama",
+    parentBranch: "Rama principal",
+    status: "Estado",
+    errorLabel: "Error",
+    state: {
+      creating: "Creando",
+      active: "Activo",
+      merging: "Fusionando",
+      merged: "Fusionado",
+      cleaning: "Limpiando",
+      cleaned: "Limpiado",
+      error: "Error",
+    },
+    merge: {
+      title: "Estrategia de fusión",
+      description: ({ parentBranch }: { parentBranch: string }) =>
+        `¿Cómo quieres fusionar en ${parentBranch}?`,
+      action: "Fusionar",
+      createPr: "Crear Pull Request",
+      directMerge: "Fusión directa",
+      prSuccess: ({ url }: { url: string }) => `PR creado: ${url}`,
+      directSuccess: "Fusionado con éxito",
+      failed: ({ error }: { error: string }) => `Error al fusionar: ${error}`,
+    },
+    cleanup: {
+      title: "Eliminar Worktree",
+      action: "Eliminar Worktree",
+      confirm: "¿Eliminar este Worktree y su rama?",
+      notMerged:
+        "Este Worktree aún no se ha fusionado. Eliminarlo puede causar pérdida de cambios. ¿Continuar?",
+      remove: "Eliminar",
+      success: "Worktree eliminado",
+      failed: ({ error }: { error: string }) =>
+        `Error al eliminar Worktree: ${error}`,
+    },
+  },
+
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     killSession: "Terminar sesión",

@@ -372,6 +372,45 @@ export const ru: TranslationStructure = {
       "Это расширенная функция. Изменяйте сервер только если знаете, что делаете. Вам нужно будет выйти и войти снова после изменения серверов.",
   },
 
+  worktreeInfo: {
+    title: "Worktree",
+    branch: "Ветка",
+    parentBranch: "Родительская ветка",
+    status: "Статус",
+    errorLabel: "Ошибка",
+    state: {
+      creating: "Создание",
+      active: "Активно",
+      merging: "Слияние",
+      merged: "Слито",
+      cleaning: "Очистка",
+      cleaned: "Очищено",
+      error: "Ошибка",
+    },
+    merge: {
+      title: "Стратегия слияния",
+      description: ({ parentBranch }: { parentBranch: string }) =>
+        `Как вы хотите выполнить слияние в ${parentBranch}?`,
+      action: "Слить",
+      createPr: "Создать Pull Request",
+      directMerge: "Прямое слияние",
+      prSuccess: ({ url }: { url: string }) => `PR создан: ${url}`,
+      directSuccess: "Слияние выполнено успешно",
+      failed: ({ error }: { error: string }) => `Ошибка слияния: ${error}`,
+    },
+    cleanup: {
+      title: "Удалить Worktree",
+      action: "Удалить Worktree",
+      confirm: "Удалить этот Worktree и его ветку?",
+      notMerged:
+        "Этот Worktree ещё не был слит. Удаление может привести к потере изменений. Продолжить?",
+      remove: "Удалить",
+      success: "Worktree удалён",
+      failed: ({ error }: { error: string }) =>
+        `Не удалось удалить Worktree: ${error}`,
+    },
+  },
+
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     killSession: "Завершить сессию",

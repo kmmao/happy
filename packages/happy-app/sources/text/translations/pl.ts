@@ -431,6 +431,46 @@ export const pl: TranslationStructure = {
       "To jest zaawansowana funkcja. Zmieniaj serwer tylko jeśli wiesz, co robisz. Po zmianie serwera będziesz musiał się wylogować i zalogować ponownie.",
   },
 
+  worktreeInfo: {
+    title: "Worktree",
+    branch: "Gałąź",
+    parentBranch: "Gałąź nadrzędna",
+    status: "Status",
+    errorLabel: "Błąd",
+    state: {
+      creating: "Tworzenie",
+      active: "Aktywny",
+      merging: "Scalanie",
+      merged: "Scalono",
+      cleaning: "Czyszczenie",
+      cleaned: "Wyczyszczono",
+      error: "Błąd",
+    },
+    merge: {
+      title: "Strategia scalania",
+      description: ({ parentBranch }: { parentBranch: string }) =>
+        `Jak chcesz scalić do ${parentBranch}?`,
+      action: "Scal",
+      createPr: "Utwórz Pull Request",
+      directMerge: "Bezpośrednie scalanie",
+      prSuccess: ({ url }: { url: string }) => `PR utworzony: ${url}`,
+      directSuccess: "Scalono pomyślnie",
+      failed: ({ error }: { error: string }) =>
+        `Scalanie nie powiodło się: ${error}`,
+    },
+    cleanup: {
+      title: "Usuń Worktree",
+      action: "Usuń Worktree",
+      confirm: "Usunąć ten Worktree i jego gałąź?",
+      notMerged:
+        "Ten Worktree nie został jeszcze scalony. Usunięcie może spowodować utratę zmian. Kontynuować?",
+      remove: "Usuń",
+      success: "Worktree usunięty",
+      failed: ({ error }: { error: string }) =>
+        `Nie udało się usunąć Worktree: ${error}`,
+    },
+  },
+
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     killSession: "Zakończ sesję",

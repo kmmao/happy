@@ -471,6 +471,46 @@ export const ja: TranslationStructure = {
       "これは高度な機能です。何をしているか理解している場合のみサーバーを変更してください。サーバー変更後は再度ログインが必要です。",
   },
 
+  worktreeInfo: {
+    title: "Worktree",
+    branch: "ブランチ",
+    parentBranch: "親ブランチ",
+    status: "ステータス",
+    errorLabel: "エラー",
+    state: {
+      creating: "作成中",
+      active: "アクティブ",
+      merging: "マージ中",
+      merged: "マージ済み",
+      cleaning: "クリーンアップ中",
+      cleaned: "クリーンアップ済み",
+      error: "エラー",
+    },
+    merge: {
+      title: "マージ戦略",
+      description: ({ parentBranch }: { parentBranch: string }) =>
+        `${parentBranch} にどのようにマージしますか？`,
+      action: "マージ",
+      createPr: "Pull Request を作成",
+      directMerge: "直接マージ",
+      prSuccess: ({ url }: { url: string }) => `PR を作成しました: ${url}`,
+      directSuccess: "マージが完了しました",
+      failed: ({ error }: { error: string }) =>
+        `マージに失敗しました: ${error}`,
+    },
+    cleanup: {
+      title: "Worktree を削除",
+      action: "Worktree を削除",
+      confirm: "この Worktree とそのブランチを削除しますか？",
+      notMerged:
+        "この Worktree はまだマージされていません。削除すると変更が失われる可能性があります。続行しますか？",
+      remove: "削除",
+      success: "Worktree を削除しました",
+      failed: ({ error }: { error: string }) =>
+        `Worktree の削除に失敗しました: ${error}`,
+    },
+  },
+
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     killSession: "セッションを終了",

@@ -418,6 +418,45 @@ export const pt: TranslationStructure = {
       "Este é um recurso avançado. Altere o servidor apenas se souber o que está fazendo. Você precisará sair e entrar novamente após alterar servidores.",
   },
 
+  worktreeInfo: {
+    title: "Worktree",
+    branch: "Ramo",
+    parentBranch: "Ramo principal",
+    status: "Estado",
+    errorLabel: "Erro",
+    state: {
+      creating: "Criando",
+      active: "Ativo",
+      merging: "Mesclando",
+      merged: "Mesclado",
+      cleaning: "Limpando",
+      cleaned: "Limpo",
+      error: "Erro",
+    },
+    merge: {
+      title: "Estratégia de mesclagem",
+      description: ({ parentBranch }: { parentBranch: string }) =>
+        `Como deseja mesclar em ${parentBranch}?`,
+      action: "Mesclar",
+      createPr: "Criar Pull Request",
+      directMerge: "Mesclagem direta",
+      prSuccess: ({ url }: { url: string }) => `PR criado: ${url}`,
+      directSuccess: "Mesclado com sucesso",
+      failed: ({ error }: { error: string }) => `Falha ao mesclar: ${error}`,
+    },
+    cleanup: {
+      title: "Remover Worktree",
+      action: "Remover Worktree",
+      confirm: "Remover este Worktree e seu ramo?",
+      notMerged:
+        "Este Worktree ainda não foi mesclado. Removê-lo pode causar perda de alterações. Continuar?",
+      remove: "Remover",
+      success: "Worktree removido",
+      failed: ({ error }: { error: string }) =>
+        `Falha ao remover Worktree: ${error}`,
+    },
+  },
+
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     killSession: "Encerrar sessão",
