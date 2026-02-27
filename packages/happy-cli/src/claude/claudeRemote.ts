@@ -41,6 +41,8 @@ function resolveModelKey(modelKey: string | undefined): string | undefined {
       return "claude-opus-4-6";
     case "opus-1m":
       return "claude-opus-4-6[1m]";
+    case "opusplan":
+      return "opusplan";
     default:
       return modelKey;
   }

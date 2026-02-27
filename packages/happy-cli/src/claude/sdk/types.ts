@@ -42,7 +42,12 @@ export interface QueryOptions {
   maxTurns?: number;
   mcpServers?: Record<string, unknown>;
   pathToClaudeCodeExecutable?: string;
-  permissionMode?: "default" | "acceptEdits" | "bypassPermissions" | "plan";
+  permissionMode?:
+    | "default"
+    | "acceptEdits"
+    | "bypassPermissions"
+    | "plan"
+    | "dontAsk";
   continue?: boolean;
   resume?: string;
   model?: string;

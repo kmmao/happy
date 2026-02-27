@@ -545,10 +545,12 @@ export const pt: TranslationStructure = {
       default: "Padrão",
       acceptEdits: "Aceitar edições",
       plan: "Modo de planejamento",
+      dontAsk: "Não Perguntar",
       bypassPermissions: "Modo Yolo",
       badgeAcceptAllEdits: "Aceitar todas as edições",
       badgeBypassAllPermissions: "Ignorar todas as permissões",
       badgePlanMode: "Modo de planejamento",
+      badgeDontAsk: "Não Perguntar",
     },
     agent: {
       claude: "Claude",

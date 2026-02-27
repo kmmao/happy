@@ -20,7 +20,7 @@ interface PermissionResponse {
   id: string;
   approved: boolean;
   reason?: string;
-  mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan";
+  mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk";
   allowTools?: string[];
   receivedAt?: number;
   /** User answers for AskUserQuestion — keyed by question text */

@@ -26,7 +26,7 @@ import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
 interface PermissionsField {
   date: number;
   result: "approved" | "denied";
-  mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan";
+  mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk";
   allowedTools?: string[];
 }
 

@@ -557,10 +557,12 @@ export const ru: TranslationStructure = {
       default: "По умолчанию",
       acceptEdits: "Принимать правки",
       plan: "Режим планирования",
+      dontAsk: "Не спрашивать",
       bypassPermissions: "YOLO режим",
       badgeAcceptAllEdits: "Принимать все правки",
       badgeBypassAllPermissions: "Обход всех разрешений",
       badgePlanMode: "Режим планирования",
+      badgeDontAsk: "Не спрашивать",
     },
     agent: {
       claude: "Claude",

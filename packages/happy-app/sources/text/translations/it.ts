@@ -609,10 +609,12 @@ export const it: TranslationStructure = {
       default: "Predefinito",
       acceptEdits: "Accetta modifiche",
       plan: "Modalità piano",
+      dontAsk: "Non Chiedere",
       bypassPermissions: "Modalità YOLO",
       badgeAcceptAllEdits: "Accetta tutte le modifiche",
       badgeBypassAllPermissions: "Bypassa tutti i permessi",
       badgePlanMode: "Modalità piano",
+      badgeDontAsk: "Non Chiedere",
     },
     agent: {
       claude: "Claude",

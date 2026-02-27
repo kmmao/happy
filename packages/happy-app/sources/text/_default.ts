@@ -532,10 +532,12 @@ export const en = {
       default: "Default",
       acceptEdits: "Accept Edits",
       plan: "Plan Mode",
+      dontAsk: "Don't Ask",
       bypassPermissions: "Yolo",
       badgeAcceptAllEdits: "Accept All Edits",
       badgeBypassAllPermissions: "Yolo",
       badgePlanMode: "Plan Mode",
+      badgeDontAsk: "Don't Ask",
     },
     agent: {
       claude: "Claude",

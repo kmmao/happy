@@ -1615,13 +1615,15 @@ export const AgentInput = React.memo(
                             ? theme.colors.permission.bypass
                             : permissionModeKey === "plan"
                               ? theme.colors.permission.plan
-                              : permissionModeKey === "read-only"
-                                ? theme.colors.permission.readOnly
-                                : permissionModeKey === "safe-yolo"
-                                  ? theme.colors.permission.safeYolo
-                                  : permissionModeKey === "yolo"
-                                    ? theme.colors.permission.yolo
-                                    : theme.colors.textSecondary, // Use secondary text color for default
+                              : permissionModeKey === "dontAsk"
+                                ? theme.colors.permission.dontAsk
+                                : permissionModeKey === "read-only"
+                                  ? theme.colors.permission.readOnly
+                                  : permissionModeKey === "safe-yolo"
+                                    ? theme.colors.permission.safeYolo
+                                    : permissionModeKey === "yolo"
+                                      ? theme.colors.permission.yolo
+                                      : theme.colors.textSecondary, // Use secondary text color for default
                       ...Typography.default(),
                     }}
                   >

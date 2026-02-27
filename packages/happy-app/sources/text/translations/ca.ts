@@ -547,10 +547,12 @@ export const ca: TranslationStructure = {
       default: "Per defecte",
       acceptEdits: "Accepta edicions",
       plan: "Mode de planificació",
+      dontAsk: "No Preguntis",
       bypassPermissions: "Mode Yolo",
       badgeAcceptAllEdits: "Accepta totes les edicions",
       badgeBypassAllPermissions: "Omet tots els permisos",
       badgePlanMode: "Mode de planificació",
+      badgeDontAsk: "No Preguntis",
     },
     agent: {
       claude: "Claude",

@@ -91,6 +91,11 @@ export function getClaudePermissionModes(
       description: "Plan only, no code execution",
     },
     {
+      key: "dontAsk",
+      name: translate("agentInput.permissionMode.dontAsk"),
+      description: "Auto-deny unapproved actions",
+    },
+    {
       key: "bypassPermissions",
       name: translate("agentInput.permissionMode.bypassPermissions"),
       description: "Auto-approve everything",
@@ -179,6 +184,11 @@ export function getClaudeModelModes(): ModelMode[] {
       key: "opus-1m",
       name: "Opus (1M)",
       description: "Long context \u00B7 $10/$37.50",
+    },
+    {
+      key: "opusplan",
+      name: "Opus Plan",
+      description: "Plan: Opus \u00B7 Execute: Sonnet",
     },
   ];
 }

@@ -515,10 +515,12 @@ export const zhHant: TranslationStructure = {
       default: "預設",
       acceptEdits: "接受編輯",
       plan: "計畫模式",
+      dontAsk: "不詢問",
       bypassPermissions: "Yolo 模式",
       badgeAcceptAllEdits: "接受所有編輯",
       badgeBypassAllPermissions: "繞過所有權限",
       badgePlanMode: "計畫模式",
+      badgeDontAsk: "不詢問",
     },
     agent: {
       claude: "Claude",
