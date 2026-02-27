@@ -484,6 +484,45 @@ export const it: TranslationStructure = {
       "Questa è una funzionalità avanzata. Cambia il server solo se sai cosa stai facendo. Dovrai disconnetterti e accedere di nuovo dopo aver cambiato server.",
   },
 
+  worktreeInfo: {
+    title: "Worktree",
+    branch: "Ramo",
+    parentBranch: "Ramo principale",
+    status: "Stato",
+    errorLabel: "Errore",
+    state: {
+      creating: "Creazione",
+      active: "Attivo",
+      merging: "Unione in corso",
+      merged: "Unito",
+      cleaning: "Pulizia",
+      cleaned: "Pulito",
+      error: "Errore",
+    },
+    merge: {
+      title: "Strategia di unione",
+      description: ({ parentBranch }: { parentBranch: string }) =>
+        `Come vuoi unire in ${parentBranch}?`,
+      action: "Unisci",
+      createPr: "Crea Pull Request",
+      directMerge: "Unione diretta",
+      prSuccess: ({ url }: { url: string }) => `PR creata: ${url}`,
+      directSuccess: "Unione completata con successo",
+      failed: ({ error }: { error: string }) => `Unione fallita: ${error}`,
+    },
+    cleanup: {
+      title: "Rimuovi Worktree",
+      action: "Rimuovi Worktree",
+      confirm: "Rimuovere questo Worktree e il suo ramo?",
+      notMerged:
+        "Questo Worktree non è ancora stato unito. La rimozione potrebbe causare la perdita delle modifiche. Continuare?",
+      remove: "Rimuovi",
+      success: "Worktree rimosso",
+      failed: ({ error }: { error: string }) =>
+        `Impossibile rimuovere il Worktree: ${error}`,
+    },
+  },
+
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     killSession: "Termina sessione",

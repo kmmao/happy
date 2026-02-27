@@ -420,6 +420,45 @@ export const ca: TranslationStructure = {
       "Aquesta és una funció avançada. Només canvia el servidor si saps el que fas. Hauràs de tancar la sessió i tornar-la a iniciar després de canviar els servidors.",
   },
 
+  worktreeInfo: {
+    title: "Worktree",
+    branch: "Branca",
+    parentBranch: "Branca principal",
+    status: "Estat",
+    errorLabel: "Error",
+    state: {
+      creating: "Creant",
+      active: "Actiu",
+      merging: "Fusionant",
+      merged: "Fusionat",
+      cleaning: "Netejant",
+      cleaned: "Netejat",
+      error: "Error",
+    },
+    merge: {
+      title: "Estratègia de fusió",
+      description: ({ parentBranch }: { parentBranch: string }) =>
+        `Com vols fusionar a ${parentBranch}?`,
+      action: "Fusiona",
+      createPr: "Crea Pull Request",
+      directMerge: "Fusió directa",
+      prSuccess: ({ url }: { url: string }) => `PR creat: ${url}`,
+      directSuccess: "Fusionat amb èxit",
+      failed: ({ error }: { error: string }) => `Error en fusionar: ${error}`,
+    },
+    cleanup: {
+      title: "Elimina Worktree",
+      action: "Elimina Worktree",
+      confirm: "Vols eliminar aquest Worktree i la seva branca?",
+      notMerged:
+        "Aquest Worktree encara no s'ha fusionat. Eliminar-lo pot causar pèrdua de canvis. Vols continuar?",
+      remove: "Elimina",
+      success: "Worktree eliminat",
+      failed: ({ error }: { error: string }) =>
+        `Error en eliminar el Worktree: ${error}`,
+    },
+  },
+
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     killSession: "Finalitza la sessió",
