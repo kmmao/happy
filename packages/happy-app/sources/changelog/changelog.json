@@ -1,6 +1,16 @@
 {
   "entries": [
     {
+      "version": 2,
+      "date": "2026-02-27",
+      "summary": "Fixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.",
+      "changes": [
+        "Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor",
+        "Added session resume V2 support — resume now reconnects to the same session instead of creating a new one"
+      ],
+      "rawMarkdown": "## Version 2 - 2026-02-27\n\n\nFixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.\n\n- Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor\n- Added session resume V2 support — resume now reconnects to the same session instead of creating a new one"
+    },
+    {
       "version": 1,
       "date": "2026-02-27",
       "summary": "Happy Coder 2.0 — 基于上游 Happy Coder 深度定制的移动端 AI 开发助手，支持远程控制 Claude Code 与 Codex，全链路端到端加密。",
@@ -20,5 +30,5 @@
       "rawMarkdown": "## Version 1 - 2026-02-27\n\n\nHappy Coder 2.0 — 基于上游 Happy Coder 深度定制的移动端 AI 开发助手，支持远程控制 Claude Code 与 Codex，全链路端到端加密。\n\n- 支持通过手机远程控制 Claude Code 和 Codex，随时随地发起 AI 编程会话\n- 全链路端到端加密（AES-256-GCM / NaCl secretbox），确保会话内容完全私密\n- QR 码扫描与 URL 手动输入两种方式快速认证设备\n- Daemon 模式常驻运行，手机一键即可启动远程开发会话\n- 智能语音助手，支持 15+ 语言的自然对话交互\n- GitHub 与 Claude 账户连接，统一管理开发者身份\n- 多设备实时同步，在线/离线状态一目了然\n- 深色模式与外观自定义，自动跟随系统主题\n- 聊天中 Markdown 表格渲染，代码高亮显示\n- 精简设置页面，移除上游相关链接，开始维护自有更新日志\n- 支持 iOS、Android 和 Web 三端"
     }
   ],
-  "latestVersion": 1
+  "latestVersion": 2
 }

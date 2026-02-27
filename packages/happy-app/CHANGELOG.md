@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 2 - 2026-02-27
+
+Fixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.
+
+- Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor
+- Added session resume V2 support — resume now reconnects to the same session instead of creating a new one
+
 ## Version 1 - 2026-02-27
 
 Happy Coder 2.0 — 基于上游 Happy Coder 深度定制的移动端 AI 开发助手，支持远程控制 Claude Code 与 Codex，全链路端到端加密。
