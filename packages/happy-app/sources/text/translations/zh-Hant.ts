@@ -328,6 +328,8 @@ export const zhHant: TranslationStructure = {
     notConnectedToServer: "未連線到伺服器。請檢查您的網路連線。",
     noMachineSelected: "請選擇一台裝置以啟動工作階段",
     noPathSelected: "請選擇一個目錄以啟動工作階段",
+    profileConfigEmpty: ({ name }: { name: string }) =>
+      `設定檔「${name}」未設定環境變數。請編輯設定檔並新增所需的環境變數。`,
     sessionType: {
       title: "工作階段類型",
       simple: "簡單",

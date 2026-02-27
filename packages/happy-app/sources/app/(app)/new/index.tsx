@@ -1355,6 +1355,23 @@ function NewSessionWizard() {
           resolvedProfile,
           agentType,
         );
+
+        // Validate: non-default profiles must produce environment variables
+        // Anthropic default profile legitimately has empty env vars (uses daemon defaults)
+        // All other profiles (custom or built-in like MiniMax, DeepSeek, etc.) MUST have env vars
+        const isDefaultAnthropicProfile = resolvedProfile.id === "anthropic";
+        const hasEnvVars =
+          environmentVariables && Object.keys(environmentVariables).length > 0;
+        if (!isDefaultAnthropicProfile && !hasEnvVars) {
+          Modal.alert(
+            t("common.error"),
+            t("newSession.profileConfigEmpty", {
+              name: resolvedProfile.name,
+            }),
+          );
+          setIsCreating(false);
+          return;
+        }
       }
 
       const result = await machineSpawnNewSession({
@@ -1364,6 +1381,22 @@ function NewSessionWizard() {
         agent: agentType,
         environmentVariables,
       });
+
+      if (result.type === "error") {
+        // Daemon returned a specific error (e.g., auth validation failure, missing env vars)
+        // Show the daemon's error message directly instead of a generic fallback
+        Modal.alert(t("common.error"), result.errorMessage);
+        setIsCreating(false);
+        return;
+      }
+
+      if (result.type === "requestToApproveDirectoryCreation") {
+        // Should not happen since approvedNewDirectoryCreation is always true above,
+        // but handle explicitly for type safety
+        Modal.alert(t("common.error"), t("newSession.failedToStart"));
+        setIsCreating(false);
+        return;
+      }
 
       if ("sessionId" in result && result.sessionId) {
         // Clear draft state on successful session creation
@@ -1443,15 +1476,12 @@ function NewSessionWizard() {
       }
     } catch (error) {
       console.error("Failed to start session", error);
-      let errorMessage =
-        "Failed to start session. Make sure the daemon is running on the target machine.";
+      let errorMessage = t("newSession.failedToStart");
       if (error instanceof Error) {
         if (error.message.includes("timeout")) {
-          errorMessage =
-            "Session startup timed out. The machine may be slow or the daemon may not be responding.";
+          errorMessage = t("newSession.sessionTimeout");
         } else if (error.message.includes("Socket not connected")) {
-          errorMessage =
-            "Not connected to server. Check your internet connection.";
+          errorMessage = t("newSession.notConnectedToServer");
         }
       }
       Modal.alert(t("common.error"), errorMessage);

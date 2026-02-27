@@ -328,6 +328,8 @@ export const zhHans: TranslationStructure = {
     notConnectedToServer: "未连接到服务器。请检查您的网络连接。",
     noMachineSelected: "请选择一台设备以启动会话",
     noPathSelected: "请选择一个目录以启动会话",
+    profileConfigEmpty: ({ name }: { name: string }) =>
+      `配置文件「${name}」没有设置环境变量。请编辑配置文件并添加所需的环境变量。`,
     sessionType: {
       title: "会话类型",
       simple: "简单",

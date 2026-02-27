@@ -402,6 +402,8 @@ export const ja: TranslationStructure = {
       "サーバーに接続されていません。インターネット接続を確認してください。",
     noMachineSelected: "セッションを開始するマシンを選択してください",
     noPathSelected: "セッションを開始するディレクトリを選択してください",
+    profileConfigEmpty: ({ name }: { name: string }) =>
+      `プロファイル「${name}」に環境変数が設定されていません。プロファイルを編集して必要な環境変数を追加してください。`,
     sessionType: {
       title: "セッションタイプ",
       simple: "シンプル",

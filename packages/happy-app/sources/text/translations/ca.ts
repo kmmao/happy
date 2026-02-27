@@ -351,6 +351,8 @@ export const ca: TranslationStructure = {
     noMachineSelected:
       "Si us plau, selecciona una màquina per iniciar la sessió",
     noPathSelected: "Si us plau, selecciona un directori per iniciar la sessió",
+    profileConfigEmpty: ({ name }: { name: string }) =>
+      `El perfil "${name}" no té variables d'entorn configurades. Edita el perfil i afegeix les variables necessàries.`,
     sessionType: {
       title: "Tipus de sessió",
       simple: "Simple",

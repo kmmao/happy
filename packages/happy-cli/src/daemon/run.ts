@@ -370,22 +370,28 @@ export async function startDaemon(): Promise<void> {
 
         // Layer 2: Profile environment variables
         // Priority: GUI-provided profile > CLI local active profile > none
+        // IMPORTANT: Distinguish between undefined (no profile selected) and {} (profile selected but empty)
+        // When GUI explicitly provides environmentVariables (even empty {}), NEVER fallback to CLI local profile
         let profileEnv: Record<string, string> = {};
+        const guiProfileProvided = options.environmentVariables !== undefined;
 
-        if (
-          options.environmentVariables &&
-          Object.keys(options.environmentVariables).length > 0
-        ) {
-          // GUI provided profile environment variables - highest priority for profile settings
-          profileEnv = options.environmentVariables;
+        if (guiProfileProvided) {
+          // GUI explicitly provided profile environment variables — use as-is, no fallback
+          profileEnv = options.environmentVariables!;
+          const varCount = Object.keys(profileEnv).length;
           logger.info(
-            `[DAEMON RUN] Using GUI-provided profile environment variables (${Object.keys(profileEnv).length} vars)`,
+            `[DAEMON RUN] Using GUI-provided profile environment variables (${varCount} vars)`,
           );
+          if (varCount === 0) {
+            logger.warn(
+              `[DAEMON RUN] GUI profile has ZERO environment variables — this may be the Anthropic default profile or a misconfigured custom profile`,
+            );
+          }
           logger.debug(
-            `[DAEMON RUN] GUI profile env var keys: ${Object.keys(profileEnv).join(", ")}`,
+            `[DAEMON RUN] GUI profile env var keys: ${Object.keys(profileEnv).join(", ") || "(none)"}`,
           );
         } else {
-          // Fallback to CLI local active profile
+          // No GUI profile provided — fallback to CLI local active profile
           try {
             const settings = await readSettings();
             if (settings.activeProfileId) {
@@ -421,8 +427,10 @@ export async function startDaemon(): Promise<void> {
         let extraEnv = { ...profileEnv, ...authEnv };
 
         // If spawning Claude and profile did not set ANTHROPIC_MODEL, inherit from daemon's env
+        // ONLY when no GUI profile was explicitly provided (to avoid overriding profile's model choice)
         // (e.g. daemon started via dev:local-server with .env.dev-local-server)
         if (
+          !guiProfileProvided &&
           (options.agent === "claude" || !options.agent) &&
           !extraEnv.ANTHROPIC_MODEL &&
           process.env.ANTHROPIC_MODEL

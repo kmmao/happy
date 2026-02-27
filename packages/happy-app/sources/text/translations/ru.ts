@@ -329,6 +329,8 @@ export const ru: TranslationStructure = {
     startNewSessionInFolder: "Новая сессия здесь",
     noMachineSelected: "Пожалуйста, выберите машину для запуска сессии",
     noPathSelected: "Пожалуйста, выберите директорию для запуска сессии",
+    profileConfigEmpty: ({ name }: { name: string }) =>
+      `Профиль "${name}" не содержит переменных окружения. Отредактируйте профиль и добавьте необходимые переменные.`,
     sessionType: {
       title: "Тип сессии",
       simple: "Простая",

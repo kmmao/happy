@@ -339,6 +339,8 @@ export const en = {
       "Not connected to server. Check your internet connection.",
     noMachineSelected: "Please select a machine to start the session",
     noPathSelected: "Please select a directory to start the session in",
+    profileConfigEmpty: ({ name }: { name: string }) =>
+      `Profile "${name}" has no environment variables configured. Please edit the profile and add the required environment variables.`,
     sessionType: {
       title: "Session Type",
       simple: "Simple",

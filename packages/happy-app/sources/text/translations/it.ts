@@ -415,6 +415,8 @@ export const it: TranslationStructure = {
       "Non connesso al server. Controlla la tua connessione Internet.",
     noMachineSelected: "Seleziona una macchina per avviare la sessione",
     noPathSelected: "Seleziona una directory in cui avviare la sessione",
+    profileConfigEmpty: ({ name }: { name: string }) =>
+      `Il profilo "${name}" non ha variabili d'ambiente configurate. Modifica il profilo e aggiungi le variabili necessarie.`,
     sessionType: {
       title: "Tipo di sessione",
       simple: "Semplice",

@@ -251,9 +251,7 @@ function RenderCodeBlock(props: {
   const copyCode = React.useCallback(async () => {
     try {
       await Clipboard.setStringAsync(props.content);
-      Modal.alert(t("common.success"), t("markdown.codeCopied"), [
-        { text: t("common.ok"), style: "cancel" },
-      ]);
+      Modal.toast(t("markdown.codeCopied"));
     } catch (error) {
       console.error("Failed to copy code:", error);
       Modal.alert(t("common.error"), t("markdown.copyFailed"), [
