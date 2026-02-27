@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { View, ActivityIndicator, ScrollView, Pressable } from "react-native";
+import {
+  View,
+  ActivityIndicator,
+  ScrollView,
+  Pressable,
+  Platform,
+} from "react-native";
 import { Text } from "@/components/StyledText";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useAuth } from "@/auth/AuthContext";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
+import { layout } from "@/components/layout";
 import { UsageChart } from "./UsageChart";
 import { UsageBar } from "./UsageBar";
 import {
@@ -45,6 +52,14 @@ const styles = StyleSheet.create((theme) => ({
   },
   periodTextActive: {
     color: "#FFFFFF",
+  },
+  statsWrapper: {
+    alignItems: "center",
+  },
+  statsConstraint: {
+    width: "100%",
+    maxWidth: layout.maxWidth,
+    paddingHorizontal: Platform.select({ ios: 0, default: 4 }),
   },
   statsContainer: {
     padding: 16,
@@ -279,84 +294,100 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
   return (
     <ScrollView style={styles.container}>
       {/* Period Selector */}
-      <View style={styles.periodSelector}>
-        {(["today", "7days", "30days"] as TimePeriod[]).map((p) => (
-          <Pressable
-            key={p}
-            style={[
-              styles.periodButton,
-              period === p && styles.periodButtonActive,
-            ]}
-            onPress={() => setPeriod(p)}
-          >
-            <Text
-              style={[
-                styles.periodText,
-                period === p && styles.periodTextActive,
-              ]}
-            >
-              {periodLabels[p]}
-            </Text>
-          </Pressable>
-        ))}
+      <View style={styles.statsWrapper}>
+        <View style={styles.statsConstraint}>
+          <View style={styles.periodSelector}>
+            {(["today", "7days", "30days"] as TimePeriod[]).map((p) => (
+              <Pressable
+                key={p}
+                style={[
+                  styles.periodButton,
+                  period === p && styles.periodButtonActive,
+                ]}
+                onPress={() => setPeriod(p)}
+              >
+                <Text
+                  style={[
+                    styles.periodText,
+                    period === p && styles.periodTextActive,
+                  ]}
+                >
+                  {periodLabels[p]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
       </View>
 
       {/* Summary Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>{t("usage.totalTokens")}</Text>
-          <Text style={styles.statValue}>
-            {formatTokens(totals.totalTokens)}
-          </Text>
-        </View>
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>{t("usage.totalCost")}</Text>
-          <Text style={styles.statValue}>{formatCost(totals.totalCost)}</Text>
+      <View style={styles.statsWrapper}>
+        <View style={styles.statsConstraint}>
+          <View style={styles.statsContainer}>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>{t("usage.totalTokens")}</Text>
+              <Text style={styles.statValue}>
+                {formatTokens(totals.totalTokens)}
+              </Text>
+            </View>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>{t("usage.totalCost")}</Text>
+              <Text style={styles.statValue}>
+                {formatCost(totals.totalCost)}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
 
       {/* Usage Chart */}
       {usageData.length > 0 && (
-        <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>{t("usage.usageOverTime")}</Text>
+        <View style={styles.statsWrapper}>
+          <View style={styles.statsConstraint}>
+            <View style={styles.chartSection}>
+              <Text style={styles.sectionTitle}>
+                {t("usage.usageOverTime")}
+              </Text>
 
-          {/* Metric Toggle */}
-          <View style={styles.metricToggle}>
-            <Pressable
-              style={[
-                styles.metricButton,
-                chartMetric === "tokens" && styles.metricButtonActive,
-              ]}
-              onPress={() => setChartMetric("tokens")}
-            >
-              <Text
-                style={[
-                  styles.metricText,
-                  chartMetric === "tokens" && styles.metricTextActive,
-                ]}
-              >
-                {t("usage.tokens")}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.metricButton,
-                chartMetric === "cost" && styles.metricButtonActive,
-              ]}
-              onPress={() => setChartMetric("cost")}
-            >
-              <Text
-                style={[
-                  styles.metricText,
-                  chartMetric === "cost" && styles.metricTextActive,
-                ]}
-              >
-                {t("usage.cost")}
-              </Text>
-            </Pressable>
+              {/* Metric Toggle */}
+              <View style={styles.metricToggle}>
+                <Pressable
+                  style={[
+                    styles.metricButton,
+                    chartMetric === "tokens" && styles.metricButtonActive,
+                  ]}
+                  onPress={() => setChartMetric("tokens")}
+                >
+                  <Text
+                    style={[
+                      styles.metricText,
+                      chartMetric === "tokens" && styles.metricTextActive,
+                    ]}
+                  >
+                    {t("usage.tokens")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.metricButton,
+                    chartMetric === "cost" && styles.metricButtonActive,
+                  ]}
+                  onPress={() => setChartMetric("cost")}
+                >
+                  <Text
+                    style={[
+                      styles.metricText,
+                      chartMetric === "cost" && styles.metricTextActive,
+                    ]}
+                  >
+                    {t("usage.cost")}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <UsageChart data={usageData} metric={chartMetric} height={180} />
+            </View>
           </View>
-
-          <UsageChart data={usageData} metric={chartMetric} height={180} />
         </View>
       )}
 
