@@ -9,9 +9,6 @@ import { getDiffStatsLight } from "@/components/diff/calculateDiff";
 import { trimIdent } from "@/utils/trimIdent";
 
 // Icon factory functions
-const ICON_TASK = (size: number = 24, color: string = "#000") => (
-  <Octicons name="rocket" size={size} color={color} />
-);
 const ICON_TERMINAL = (size: number = 24, color: string = "#000") => (
   <Octicons name="terminal" size={size} color={color} />
 );
@@ -58,17 +55,24 @@ function extractDisplayName(path: string): string {
 export const knownTools = {
   Task: {
     title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
-      // Check for description field at runtime
-      if (
-        opts.tool.input &&
-        opts.tool.input.description &&
-        typeof opts.tool.input.description === "string"
-      ) {
-        return opts.tool.input.description;
+      const subagentType =
+        typeof opts.tool.input?.subagent_type === "string"
+          ? opts.tool.input.subagent_type
+          : null;
+      const desc =
+        typeof opts.tool.input?.description === "string"
+          ? opts.tool.input.description
+          : null;
+      if (subagentType && desc) {
+        return `${subagentType} · ${desc}`;
       }
+      if (desc) return desc;
+      if (subagentType) return subagentType;
       return t("tools.names.task");
     },
-    icon: ICON_TASK,
+    icon: (size: number = 24, color: string = "#000") => (
+      <Octicons name="copilot" size={size} color={color} />
+    ),
     minimal: (opts: {
       metadata: Metadata | null;
       tool: ToolCall;

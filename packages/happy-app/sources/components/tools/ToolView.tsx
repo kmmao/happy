@@ -200,9 +200,49 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     }
   }
 
+  // For Task tool: derive subtitle from the currently running child tool
+  // This provides real-time feedback about what the subagent is doing
+  if (tool.name === "Task" && !description && props.messages) {
+    for (let i = props.messages.length - 1; i >= 0; i--) {
+      const m = props.messages[i];
+      if (m.kind === "tool-call" && m.tool.state === "running") {
+        const childKnown = knownTools[
+          m.tool.name as keyof typeof knownTools
+        ] as any;
+        let childTitle = m.tool.name;
+        if (childKnown) {
+          if (
+            "extractDescription" in childKnown &&
+            typeof childKnown.extractDescription === "function"
+          ) {
+            childTitle = childKnown.extractDescription({
+              tool: m.tool,
+              metadata: props.metadata,
+            });
+          } else if (typeof childKnown.title === "function") {
+            childTitle = childKnown.title({
+              tool: m.tool,
+              metadata: props.metadata,
+            });
+          } else if (childKnown.title) {
+            childTitle = childKnown.title;
+          }
+        }
+        description = childTitle;
+        break;
+      }
+    }
+  }
+
   // When showAgentActivity is enabled and tool is running without a subtitle,
   // show tool.description or extract a brief description from tool.input
-  if (showAgentActivity && tool.state === "running" && !description) {
+  // (skip for Task tool to avoid repeating the title)
+  if (
+    showAgentActivity &&
+    tool.state === "running" &&
+    !description &&
+    tool.name !== "Task"
+  ) {
     if (tool.description) {
       description = tool.description;
     } else if (
