@@ -6,9 +6,9 @@
  * @module handlers
  */
 
-export { GeminiTransport, geminiTransport } from './GeminiTransport';
+export { GeminiTransport, geminiTransport } from "./GeminiTransport";
+export { CodexAcpTransport, codexAcpTransport } from "./CodexAcpTransport";
 
 // Future handlers:
-// export { CodexTransport, codexTransport } from './CodexTransport';
 // export { ClaudeTransport, claudeTransport } from './ClaudeTransport';
 // export { OpenCodeTransport, openCodeTransport } from './OpenCodeTransport';

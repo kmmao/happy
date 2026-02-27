@@ -440,13 +440,22 @@ export const ca: TranslationStructure = {
     },
     merge: {
       title: "Estratègia de fusió",
+      preview: "Vista prèvia de fusió",
       description: ({ parentBranch }: { parentBranch: string }) =>
         `Com vols fusionar a ${parentBranch}?`,
       action: "Fusiona",
       createPr: "Crea Pull Request",
       directMerge: "Fusió directa",
+      openPr: "Obrir PR",
+      keepBranch: "Mantenir branca",
+      deleteBranch: "Eliminar branca",
+      filesChanged: "fitxer(s) modificat(s)",
+      commits: ({ count }: { count: number }) => `Commits (${count})`,
+      noCommits: "No hi ha commits per fusionar",
       prSuccess: ({ url }: { url: string }) => `PR creat: ${url}`,
       directSuccess: "Fusionat amb èxit",
+      directSuccessDeleteBranch: ({ branchName }: { branchName: string }) =>
+        `Fusionat amb èxit. Vols eliminar la branca '${branchName}'?`,
       failed: ({ error }: { error: string }) => `Error en fusionar: ${error}`,
     },
     cleanup: {
@@ -457,6 +466,7 @@ export const ca: TranslationStructure = {
         "Aquest Worktree encara no s'ha fusionat. Eliminar-lo pot causar pèrdua de canvis. Vols continuar?",
       remove: "Elimina",
       success: "Worktree eliminat",
+      successAndArchived: "Worktree eliminat i sessió arxivada",
       failed: ({ error }: { error: string }) =>
         `Error en eliminar el Worktree: ${error}`,
     },
@@ -623,6 +633,7 @@ export const ca: TranslationStructure = {
       disabledDesc: "Sense pensament ampliat",
     },
     noMachinesAvailable: "Sense màquines",
+    continue: "Continua — Claude ha assolit el límit de torns",
   },
 
   machineLauncher: {
@@ -808,6 +819,21 @@ export const ca: TranslationStructure = {
         `${count} ${plural({ count, singular: "idioma", plural: "idiomes" })} disponibles`,
       autoDetect: "Detecta automàticament",
     },
+    // TTS provider settings
+    ttsProviderTitle: "Proveïdor TTS",
+    ttsProviderDescription:
+      "Tria entre Edge TTS gratuït o ElevenLabs TTS de pagament amb la teva pròpia clau API.",
+    ttsProviderEdge: "Edge TTS (Gratuït)",
+    ttsProviderEdgeSubtitle: "Microsoft Edge TTS, gratuït i il·limitat",
+    ttsProviderElevenLabs: "ElevenLabs (De pagament)",
+    ttsProviderElevenLabsSubtitle:
+      "Alta qualitat, requereix la teva pròpia clau API",
+    elevenLabsApiKey: "Clau API",
+    elevenLabsApiKeyPlaceholder: "Introdueix la teva clau API d'ElevenLabs",
+    elevenLabsVoiceId: "Voice ID",
+    elevenLabsVoiceIdPlaceholder: "Predeterminat: Rachel",
+    elevenLabsVoiceIdSubtitle:
+      "Deixa buit per a la veu predeterminada (Rachel)",
   },
 
   settingsAccount: {

@@ -10,6 +10,7 @@ import {
   useSessionStatus,
   getSessionAvatarId,
   formatPathRelativeToHome,
+  getSessionProjectPath,
 } from "@/utils/sessionUtils";
 import { Avatar } from "./Avatar";
 import { Typography } from "@/constants/Typography";
@@ -197,6 +198,22 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     textAlign: "center",
     ...Typography.default("semiBold"),
   },
+  worktreeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceHighest,
+    paddingHorizontal: 4,
+    height: 16,
+    borderRadius: 4,
+    gap: 2,
+  },
+  worktreeBadgeText: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: theme.colors.textSecondary,
+    ...Typography.default(),
+    maxWidth: 80,
+  },
 }));
 
 interface ActiveSessionsGroupProps {
@@ -238,7 +255,7 @@ export function ActiveSessionsGroup({
     >();
 
     sessions.forEach((session) => {
-      const projectPath = session.metadata?.path || "";
+      const projectPath = getSessionProjectPath(session);
       const machineId = session.metadata?.machineId || "unknown";
 
       // Get machine info
@@ -496,6 +513,20 @@ const CompactSessionRow = React.memo(
                 transform: [{ translateY: 1 }],
               }}
             >
+              {/* Worktree badge */}
+              {session.metadata?.worktree?.isWorktree && (
+                <View style={styles.worktreeBadge}>
+                  <Ionicons
+                    name="git-branch-outline"
+                    size={10}
+                    color={styles.worktreeBadgeText.color}
+                  />
+                  <Text style={styles.worktreeBadgeText} numberOfLines={1}>
+                    {session.metadata.worktree.branchName}
+                  </Text>
+                </View>
+              )}
+
               {/* Draft status indicator */}
               {session.draft && (
                 <View style={styles.taskStatusContainer}>

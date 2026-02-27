@@ -424,9 +424,16 @@ function NewSessionWizard() {
     () => getAvailablePermissionModes(agentType, null, t),
     [agentType],
   );
+  const profileCustomModels = React.useMemo(() => {
+    if (!selectedProfileId) return undefined;
+    const profile =
+      profileMap.get(selectedProfileId) ?? getBuiltInProfile(selectedProfileId);
+    return profile?.customModels;
+  }, [selectedProfileId, profileMap]);
+
   const availableModels = React.useMemo(
-    () => getAvailableModels(agentType, null, t),
-    [agentType],
+    () => getAvailableModels(agentType, null, t, profileCustomModels),
+    [agentType, profileCustomModels],
   );
 
   const [permissionMode, setPermissionMode] = React.useState<PermissionMode>(
@@ -1333,16 +1340,17 @@ function NewSessionWizard() {
         lastUsedModelMode: modelMode?.key ?? null,
       });
 
-      // Get environment variables from selected profile
+      // Get environment variables from selected profile (check custom + built-in)
       let environmentVariables = undefined;
-      if (selectedProfileId) {
-        const selectedProfile = profileMap.get(selectedProfileId);
-        if (selectedProfile) {
-          environmentVariables = transformProfileToEnvironmentVars(
-            selectedProfile,
-            agentType,
-          );
-        }
+      const resolvedProfile = selectedProfileId
+        ? (profileMap.get(selectedProfileId) ??
+          getBuiltInProfile(selectedProfileId))
+        : null;
+      if (resolvedProfile) {
+        environmentVariables = transformProfileToEnvironmentVars(
+          resolvedProfile,
+          agentType,
+        );
       }
 
       const result = await machineSpawnNewSession({
@@ -1367,6 +1375,27 @@ function NewSessionWizard() {
           storage
             .getState()
             .updateSessionModelMode(result.sessionId, modelMode.key);
+        }
+        // Save profile custom models to session for model picker
+        if (
+          resolvedProfile?.customModels &&
+          resolvedProfile.customModels.length > 0
+        ) {
+          storage
+            .getState()
+            .updateSessionCustomModels(
+              result.sessionId,
+              resolvedProfile.customModels,
+            );
+        }
+        // Save profile model mappings (e.g., opus → MiniMax-M2.5)
+        if (resolvedProfile?.modelMappings) {
+          storage
+            .getState()
+            .updateSessionModelMappings(
+              result.sessionId,
+              resolvedProfile.modelMappings,
+            );
         }
 
         // Send initial message (with any attached images) if provided

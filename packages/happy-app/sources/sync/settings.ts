@@ -132,6 +132,23 @@ export const AIBackendProfileSchema = z.object({
   // Environment variables (validated)
   environmentVariables: z.array(EnvironmentVariableSchema).default([]),
 
+  // Custom model list for non-Anthropic providers (e.g., MiniMax, DeepSeek)
+  // When defined, these models appear in the model picker instead of Claude defaults
+  customModels: z
+    .array(
+      z.object({
+        id: z.string().min(1), // Actual model ID sent to API (e.g., "MiniMax-M2.5")
+        name: z.string().min(1).max(100), // Display name (e.g., "MiniMax M2.5")
+        description: z.string().nullish(), // Optional description
+      }),
+    )
+    .optional(),
+
+  // Model mappings: maps UI model keys (opus, sonnet, haiku) to provider-specific model IDs
+  // When defined, UI keeps showing Opus/Sonnet/Haiku but sends the mapped model ID to API
+  // Example: { "opus": "MiniMax-M2.5", "sonnet": "MiniMax-M2.5", "haiku": "MiniMax-M2.5-highspeed" }
+  modelMappings: z.record(z.string(), z.string()).optional(),
+
   // Default session type for this profile
   defaultSessionType: z.enum(["simple", "worktree"]).optional(),
 
@@ -386,6 +403,20 @@ export const SettingsSchema = z.object({
     .describe(
       "Language for STT voice input (null = auto from device locale, e.g. 'en-US', 'zh-CN', 'zh-TW')",
     ),
+  ttsProvider: z
+    .enum(["edge", "elevenlabs"])
+    .describe(
+      "TTS provider: 'edge' (free, default) or 'elevenlabs' (paid, user's own API key)",
+    ),
+  elevenLabsApiKey: z
+    .string()
+    .nullable()
+    .describe("User's own ElevenLabs API key for paid TTS"),
+  elevenLabsVoiceId: z
+    .string()
+    .regex(/^[a-zA-Z0-9]{10,30}$/)
+    .nullable()
+    .describe("ElevenLabs voice ID (null for default 'Rachel')"),
   preferredLanguage: z
     .string()
     .nullable()
@@ -516,6 +547,9 @@ export const settingsDefaults: Settings = {
   reviewPromptLikedApp: null,
   voiceAssistantLanguage: null,
   voiceInputLanguage: null,
+  ttsProvider: "edge",
+  elevenLabsApiKey: null,
+  elevenLabsVoiceId: null,
   preferredLanguage: null,
   recentMachinePaths: [],
   lastUsedAgent: null,

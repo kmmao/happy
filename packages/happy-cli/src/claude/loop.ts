@@ -29,6 +29,8 @@ export interface EnhancedMode {
   thinking?: ThinkingConfig;
   /** Controls how much effort Claude puts into its response */
   effort?: "low" | "medium" | "high" | "max";
+  /** When true, continue from last conversation without a new prompt (one-time flag) */
+  continue?: boolean;
 }
 
 interface LoopOptions {

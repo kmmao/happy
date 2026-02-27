@@ -133,6 +133,8 @@ interface AgentInputProps {
   packageScripts?: Record<string, string>;
   promptSuggestion?: string | null;
   onPromptSuggestionPress?: (text: string) => void;
+  needsContinue?: boolean;
+  onContinuePress?: () => void;
 }
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
@@ -1915,6 +1917,56 @@ export const AgentInput = React.memo(
                 )}
               </Pressable>
             </RNModal>
+
+            {/* Continue chip — shown when max turns reached and no prompt suggestion */}
+            {props.needsContinue &&
+              props.onContinuePress &&
+              !props.promptSuggestion && (
+                <Pressable
+                  onPress={() => {
+                    hapticsLight();
+                    props.onContinuePress?.();
+                  }}
+                  style={({ pressed }) => ({
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginHorizontal: 8,
+                    marginTop: 8,
+                    marginBottom: 4,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    backgroundColor: pressed
+                      ? theme.colors.surfacePressed
+                      : `${theme.colors.permission.plan}10`,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: `${theme.colors.permission.plan}30`,
+                    gap: 8,
+                  })}
+                >
+                  <Ionicons
+                    name="play-circle-outline"
+                    size={14}
+                    color={theme.colors.permission.plan}
+                  />
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      color: theme.colors.text,
+                      ...Typography.default(),
+                    }}
+                    numberOfLines={1}
+                  >
+                    {t("agentInput.continue")}
+                  </Text>
+                  <Ionicons
+                    name="arrow-up-circle"
+                    size={18}
+                    color={theme.colors.permission.plan}
+                  />
+                </Pressable>
+              )}
 
             {/* Prompt suggestion chip */}
             {props.promptSuggestion && props.onPromptSuggestionPress && (

@@ -164,9 +164,16 @@ export function formatPathRelativeToHome(
 
 /**
  * Returns the session path for the subtitle.
+ * For worktree sessions, shows branch → parent branch instead of path.
  */
 export function getSessionSubtitle(session: Session): string {
   if (session.metadata) {
+    // For worktree sessions, show branch info
+    if (session.metadata.worktree?.isWorktree) {
+      const { branchName, parentBranch } = session.metadata.worktree;
+      return `${branchName} → ${parentBranch}`;
+    }
+
     const path = formatPathRelativeToHome(
       session.metadata.path,
       session.metadata.homeDir,
@@ -177,6 +184,17 @@ export function getSessionSubtitle(session: Session): string {
     return path;
   }
   return t("status.unknown");
+}
+
+/**
+ * Returns the project path for grouping.
+ * Worktree sessions use parentRepoPath so they group with their parent project.
+ */
+export function getSessionProjectPath(session: Session): string {
+  if (session.metadata?.worktree?.isWorktree) {
+    return session.metadata.worktree.parentRepoPath;
+  }
+  return session.metadata?.path || "";
 }
 
 /**

@@ -443,13 +443,22 @@ export const en: TranslationStructure = {
     },
     merge: {
       title: "Merge Strategy",
+      preview: "Merge Preview",
       description: ({ parentBranch }: { parentBranch: string }) =>
         `How do you want to merge into ${parentBranch}?`,
       action: "Merge",
       createPr: "Create Pull Request",
       directMerge: "Direct Merge",
+      openPr: "Open PR",
+      keepBranch: "Keep Branch",
+      deleteBranch: "Delete Branch",
+      filesChanged: "file(s) changed",
+      commits: ({ count }: { count: number }) => `Commits (${count})`,
+      noCommits: "No commits to merge",
       prSuccess: ({ url }: { url: string }) => `PR created: ${url}`,
       directSuccess: "Merged successfully",
+      directSuccessDeleteBranch: ({ branchName }: { branchName: string }) =>
+        `Merged successfully. Delete branch '${branchName}'?`,
       failed: ({ error }: { error: string }) => `Merge failed: ${error}`,
     },
     cleanup: {
@@ -460,6 +469,7 @@ export const en: TranslationStructure = {
         "This worktree has not been merged yet. Removing it may lose changes. Continue?",
       remove: "Remove",
       success: "Worktree removed",
+      successAndArchived: "Worktree removed and session archived",
       failed: ({ error }: { error: string }) =>
         `Failed to remove worktree: ${error}`,
     },
@@ -623,6 +633,7 @@ export const en: TranslationStructure = {
       disabledDesc: "No extended thinking",
     },
     noMachinesAvailable: "No machines",
+    continue: "Continue — Claude hit the turn limit",
   },
 
   machineLauncher: {
@@ -806,6 +817,19 @@ export const en: TranslationStructure = {
         `${count} ${plural({ count, singular: "language", plural: "languages" })} available`,
       autoDetect: "Auto-detect",
     },
+    // TTS provider settings
+    ttsProviderTitle: "TTS Provider",
+    ttsProviderDescription:
+      "Choose between free Edge TTS or paid ElevenLabs TTS with your own API key.",
+    ttsProviderEdge: "Edge TTS (Free)",
+    ttsProviderEdgeSubtitle: "Microsoft Edge TTS, free and unlimited",
+    ttsProviderElevenLabs: "ElevenLabs (Paid)",
+    ttsProviderElevenLabsSubtitle: "High quality, requires your own API key",
+    elevenLabsApiKey: "API Key",
+    elevenLabsApiKeyPlaceholder: "Enter your ElevenLabs API key",
+    elevenLabsVoiceId: "Voice ID",
+    elevenLabsVoiceIdPlaceholder: "Default: Rachel",
+    elevenLabsVoiceIdSubtitle: "Leave empty for default voice (Rachel)",
   },
 
   settingsAccount: {

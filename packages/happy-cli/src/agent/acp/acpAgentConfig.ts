@@ -4,8 +4,9 @@ export type AcpAgentConfig = {
 };
 
 export const KNOWN_ACP_AGENTS: Record<string, AcpAgentConfig> = {
-  gemini: { command: 'gemini', args: ['--experimental-acp'] },
-  opencode: { command: 'opencode', args: ['acp'] },
+  gemini: { command: "gemini", args: ["--experimental-acp"] },
+  opencode: { command: "opencode", args: ["acp"] },
+  "codex-acp": { command: "codex-acp", args: [] },
 };
 
 export type ResolvedAcpAgentConfig = {
@@ -14,15 +15,21 @@ export type ResolvedAcpAgentConfig = {
   args: string[];
 };
 
-export function resolveAcpAgentConfig(cliArgs: string[]): ResolvedAcpAgentConfig {
+export function resolveAcpAgentConfig(
+  cliArgs: string[],
+): ResolvedAcpAgentConfig {
   if (cliArgs.length === 0) {
-    throw new Error('Usage: happy acp <agent-name> or happy acp -- <command> [args]');
+    throw new Error(
+      "Usage: happy acp <agent-name> or happy acp -- <command> [args]",
+    );
   }
 
-  if (cliArgs[0] === '--') {
+  if (cliArgs[0] === "--") {
     const command = cliArgs[1];
     if (!command) {
-      throw new Error('Missing command after "--". Usage: happy acp -- <command> [args]');
+      throw new Error(
+        'Missing command after "--". Usage: happy acp -- <command> [args]',
+      );
     }
     return {
       agentName: command,
@@ -37,7 +44,7 @@ export function resolveAcpAgentConfig(cliArgs: string[]): ResolvedAcpAgentConfig
     const passthroughArgs = cliArgs
       .slice(1)
       // Backward-compatible with old OpenCode docs/flags.
-      .filter((arg) => !(agentName === 'opencode' && arg === '--acp'));
+      .filter((arg) => !(agentName === "opencode" && arg === "--acp"));
     return {
       agentName,
       command: known.command,

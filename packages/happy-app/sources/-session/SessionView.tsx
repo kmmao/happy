@@ -36,6 +36,7 @@ import {
   useIsDataReady,
   useLocalSetting,
   usePromptSuggestion,
+  useNeedsContinue,
   useRealtimeStatus,
   useSessionMessages,
   useSessionUsage,
@@ -321,8 +322,8 @@ function SessionViewInner({
   // Metadata-driven mode/model selection
   const flavor = session.metadata?.flavor;
   const availableModels = React.useMemo(
-    () => getAvailableModels(flavor, session.metadata, t),
-    [flavor, session.metadata],
+    () => getAvailableModels(flavor, session.metadata, t, session.customModels),
+    [flavor, session.metadata, session.customModels],
   );
   const availableModes = React.useMemo(
     () => getAvailablePermissionModes(flavor, session.metadata, t),
@@ -370,6 +371,7 @@ function SessionViewInner({
   const sessionStatus = useSessionStatus(session);
   const sessionUsage = useSessionUsage(sessionId);
   const promptSuggestion = usePromptSuggestion(sessionId);
+  const needsContinue = useNeedsContinue(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
 
   // Scroll-to-bottom state
@@ -530,8 +532,8 @@ function SessionViewInner({
     }
     if (realtimeStatus === "disconnected" || realtimeStatus === "error") {
       try {
-        const initialPrompt = voiceHooks.onVoiceStarted(sessionId);
-        await startRealtimeSession(sessionId, initialPrompt);
+        voiceHooks.onVoiceStarted(sessionId);
+        await startRealtimeSession(sessionId);
         tracking?.capture("voice_session_started", { sessionId });
       } catch (error) {
         console.error("Failed to start realtime session:", error);
@@ -746,6 +748,10 @@ function SessionViewInner({
         onPromptSuggestionPress={(text) => {
           storage.getState().setPromptSuggestion(sessionId, null);
           sync.sendMessage(sessionId, text);
+        }}
+        needsContinue={needsContinue}
+        onContinuePress={() => {
+          sync.sendMessage(sessionId, "", undefined, { continue: true });
         }}
       />
     </>

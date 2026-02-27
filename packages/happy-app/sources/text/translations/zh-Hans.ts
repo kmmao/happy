@@ -414,13 +414,22 @@ export const zhHans: TranslationStructure = {
     },
     merge: {
       title: "合并策略",
+      preview: "合并预览",
       description: ({ parentBranch }: { parentBranch: string }) =>
         `您希望如何合并到 ${parentBranch}？`,
       action: "合并",
       createPr: "创建 Pull Request",
       directMerge: "直接合并",
       prSuccess: ({ url }: { url: string }) => `PR 已创建：${url}`,
+      openPr: "打开 PR",
+      keepBranch: "保留分支",
+      deleteBranch: "删除分支",
+      filesChanged: "个文件更改",
+      commits: ({ count }: { count: number }) => `提交 (${count})`,
+      noCommits: "没有待合并的提交",
       directSuccess: "合并成功",
+      directSuccessDeleteBranch: ({ branchName }: { branchName: string }) =>
+        `合并成功。是否删除分支 '${branchName}'？`,
       failed: ({ error }: { error: string }) => `合并失败：${error}`,
     },
     cleanup: {
@@ -430,6 +439,7 @@ export const zhHans: TranslationStructure = {
       notMerged: "此 Worktree 尚未合并。移除可能导致更改丢失。是否继续？",
       remove: "移除",
       success: "Worktree 已移除",
+      successAndArchived: "Worktree 已移除，会话已归档",
       failed: ({ error }: { error: string }) => `移除 Worktree 失败：${error}`,
     },
   },
@@ -591,6 +601,7 @@ export const zhHans: TranslationStructure = {
       disabledDesc: "不使用扩展思考",
     },
     noMachinesAvailable: "无设备",
+    continue: "继续 — Claude 达到轮次上限",
   },
 
   machineLauncher: {
@@ -770,6 +781,19 @@ export const zhHans: TranslationStructure = {
       footer: ({ count }: { count: number }) => `${count} 种可用语言`,
       autoDetect: "自动检测",
     },
+    // TTS provider settings
+    ttsProviderTitle: "TTS 语音引擎",
+    ttsProviderDescription:
+      "选择免费的 Edge TTS 或使用您自己的 API Key 启用付费的 ElevenLabs TTS。",
+    ttsProviderEdge: "Edge TTS（免费）",
+    ttsProviderEdgeSubtitle: "微软 Edge TTS，免费无限制",
+    ttsProviderElevenLabs: "ElevenLabs（付费）",
+    ttsProviderElevenLabsSubtitle: "高质量语音，需要您自己的 API Key",
+    elevenLabsApiKey: "API Key",
+    elevenLabsApiKeyPlaceholder: "输入您的 ElevenLabs API Key",
+    elevenLabsVoiceId: "Voice ID",
+    elevenLabsVoiceIdPlaceholder: "默认：Rachel",
+    elevenLabsVoiceIdSubtitle: "留空使用默认语音（Rachel）",
   },
 
   settingsAccount: {

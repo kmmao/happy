@@ -451,13 +451,22 @@ export const pl: TranslationStructure = {
     },
     merge: {
       title: "Strategia scalania",
+      preview: "Podgląd scalania",
       description: ({ parentBranch }: { parentBranch: string }) =>
         `Jak chcesz scalić do ${parentBranch}?`,
       action: "Scal",
       createPr: "Utwórz Pull Request",
       directMerge: "Bezpośrednie scalanie",
+      openPr: "Otwórz PR",
+      keepBranch: "Zachowaj gałąź",
+      deleteBranch: "Usuń gałąź",
+      filesChanged: "zmieniony(ch) plik(ów)",
+      commits: ({ count }: { count: number }) => `Commity (${count})`,
+      noCommits: "Brak commitów do scalenia",
       prSuccess: ({ url }: { url: string }) => `PR utworzony: ${url}`,
       directSuccess: "Scalono pomyślnie",
+      directSuccessDeleteBranch: ({ branchName }: { branchName: string }) =>
+        `Scalono pomyślnie. Usunąć gałąź '${branchName}'?`,
       failed: ({ error }: { error: string }) =>
         `Scalanie nie powiodło się: ${error}`,
     },
@@ -469,6 +478,7 @@ export const pl: TranslationStructure = {
         "Ten Worktree nie został jeszcze scalony. Usunięcie może spowodować utratę zmian. Kontynuować?",
       remove: "Usuń",
       success: "Worktree usunięty",
+      successAndArchived: "Worktree usunięty i sesja zarchiwizowana",
       failed: ({ error }: { error: string }) =>
         `Nie udało się usunąć Worktree: ${error}`,
     },
@@ -633,6 +643,7 @@ export const pl: TranslationStructure = {
       disabledDesc: "Bez rozszerzonego myślenia",
     },
     noMachinesAvailable: "Brak maszyn",
+    continue: "Kontynuuj — Claude osiągnął limit tur",
   },
 
   machineLauncher: {
@@ -821,6 +832,19 @@ export const pl: TranslationStructure = {
         `Dostępnych ${count} ${plural({ count, one: "język", few: "języki", many: "języków" })}`,
       autoDetect: "Automatyczne wykrywanie",
     },
+    // TTS provider settings
+    ttsProviderTitle: "Dostawca TTS",
+    ttsProviderDescription:
+      "Wybierz między darmowym Edge TTS a płatnym ElevenLabs TTS z własnym kluczem API.",
+    ttsProviderEdge: "Edge TTS (Darmowy)",
+    ttsProviderEdgeSubtitle: "Microsoft Edge TTS, darmowy i bez ograniczeń",
+    ttsProviderElevenLabs: "ElevenLabs (Płatny)",
+    ttsProviderElevenLabsSubtitle: "Wysoka jakość, wymaga własnego klucza API",
+    elevenLabsApiKey: "Klucz API",
+    elevenLabsApiKeyPlaceholder: "Wprowadź swój klucz API ElevenLabs",
+    elevenLabsVoiceId: "Voice ID",
+    elevenLabsVoiceIdPlaceholder: "Domyślny: Rachel",
+    elevenLabsVoiceIdSubtitle: "Pozostaw puste dla domyślnego głosu (Rachel)",
   },
 
   settingsAccount: {

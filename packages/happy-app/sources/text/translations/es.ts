@@ -440,13 +440,22 @@ export const es: TranslationStructure = {
     },
     merge: {
       title: "Estrategia de fusión",
+      preview: "Vista previa de fusión",
       description: ({ parentBranch }: { parentBranch: string }) =>
         `¿Cómo quieres fusionar en ${parentBranch}?`,
       action: "Fusionar",
       createPr: "Crear Pull Request",
       directMerge: "Fusión directa",
+      openPr: "Abrir PR",
+      keepBranch: "Mantener rama",
+      deleteBranch: "Eliminar rama",
+      filesChanged: "archivo(s) cambiado(s)",
+      commits: ({ count }: { count: number }) => `Commits (${count})`,
+      noCommits: "No hay commits para fusionar",
       prSuccess: ({ url }: { url: string }) => `PR creado: ${url}`,
       directSuccess: "Fusionado con éxito",
+      directSuccessDeleteBranch: ({ branchName }: { branchName: string }) =>
+        `Fusionado con éxito. ¿Eliminar rama '${branchName}'?`,
       failed: ({ error }: { error: string }) => `Error al fusionar: ${error}`,
     },
     cleanup: {
@@ -457,6 +466,7 @@ export const es: TranslationStructure = {
         "Este Worktree aún no se ha fusionado. Eliminarlo puede causar pérdida de cambios. ¿Continuar?",
       remove: "Eliminar",
       success: "Worktree eliminado",
+      successAndArchived: "Worktree eliminado y sesión archivada",
       failed: ({ error }: { error: string }) =>
         `Error al eliminar Worktree: ${error}`,
     },
@@ -623,6 +633,7 @@ export const es: TranslationStructure = {
       disabledDesc: "Sin pensamiento extendido",
     },
     noMachinesAvailable: "Sin máquinas",
+    continue: "Continuar — Claude alcanzó el límite de turnos",
   },
 
   machineLauncher: {
@@ -808,6 +819,19 @@ export const es: TranslationStructure = {
         `${count} ${plural({ count, singular: "idioma", plural: "idiomas" })} disponibles`,
       autoDetect: "Detectar automáticamente",
     },
+    // TTS provider settings
+    ttsProviderTitle: "Proveedor TTS",
+    ttsProviderDescription:
+      "Elige entre Edge TTS gratuito o ElevenLabs TTS de pago con tu propia clave API.",
+    ttsProviderEdge: "Edge TTS (Gratis)",
+    ttsProviderEdgeSubtitle: "Microsoft Edge TTS, gratis e ilimitado",
+    ttsProviderElevenLabs: "ElevenLabs (De pago)",
+    ttsProviderElevenLabsSubtitle: "Alta calidad, requiere tu propia clave API",
+    elevenLabsApiKey: "Clave API",
+    elevenLabsApiKeyPlaceholder: "Introduce tu clave API de ElevenLabs",
+    elevenLabsVoiceId: "Voice ID",
+    elevenLabsVoiceIdPlaceholder: "Predeterminado: Rachel",
+    elevenLabsVoiceIdSubtitle: "Deja vacío para la voz predeterminada (Rachel)",
   },
 
   settingsAccount: {

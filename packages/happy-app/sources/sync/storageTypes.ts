@@ -145,6 +145,12 @@ export interface Session {
   draft?: string | null; // Local draft message, not synced to server
   permissionMode?: string | null; // Local permission mode key, not synced to server
   modelMode?: string | null; // Local model key, not synced to server
+  customModels?: Array<{
+    id: string;
+    name: string;
+    description?: string | null;
+  }> | null; // Profile custom models, copied at session creation
+  modelMappings?: Record<string, string> | null; // Maps UI keys (opus/sonnet/haiku) to real model IDs, copied at session creation
   // SDK reasoning & budget controls (Phase 3A)
   thinkingMode?: string | null; // "disabled" | "adaptive" | "enabled"
   thinkingBudget?: number | null; // Budget tokens when thinkingMode is "enabled"

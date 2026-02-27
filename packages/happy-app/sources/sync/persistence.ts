@@ -269,6 +269,55 @@ export function saveSessionNeedsAttention(attention: Record<string, boolean>) {
   mmkv.set("session-needs-attention", JSON.stringify(attention));
 }
 
+// Model mappings per session (maps UI keys like opus/sonnet to provider model IDs)
+export function loadSessionModelMappings(): Record<
+  string,
+  Record<string, string>
+> {
+  const data = mmkv.getString("session-model-mappings");
+  if (data) {
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error("Failed to parse session model mappings", e);
+      return {};
+    }
+  }
+  return {};
+}
+
+export function saveSessionModelMappings(
+  mappings: Record<string, Record<string, string>>,
+) {
+  mmkv.set("session-model-mappings", JSON.stringify(mappings));
+}
+
+// Custom models per session (provider-specific model lists for the model picker)
+type CustomModelEntry = Array<{
+  id: string;
+  name: string;
+  description?: string | null;
+}>;
+
+export function loadSessionCustomModels(): Record<string, CustomModelEntry> {
+  const data = mmkv.getString("session-custom-models");
+  if (data) {
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error("Failed to parse session custom models", e);
+      return {};
+    }
+  }
+  return {};
+}
+
+export function saveSessionCustomModels(
+  models: Record<string, CustomModelEntry>,
+) {
+  mmkv.set("session-custom-models", JSON.stringify(models));
+}
+
 export function loadProfile(): Profile {
   const profile = mmkv.getString("profile");
   if (profile) {

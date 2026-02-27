@@ -22,6 +22,7 @@ import {
   NormalizedMessage,
   normalizeRawMessage,
   extractPromptSuggestionFromRaw,
+  extractNeedsContinueFromRaw,
   RawRecord,
 } from "./typesRaw";
 import {
@@ -497,9 +498,15 @@ class Sync {
     this.backgroundSendStartedAt = null;
   }
 
-  async sendMessage(sessionId: string, text: string, displayText?: string) {
-    // Clear any existing prompt suggestion when the user sends a message
+  async sendMessage(
+    sessionId: string,
+    text: string,
+    displayText?: string,
+    options?: { continue?: boolean },
+  ) {
+    // Clear any existing prompt suggestion and needsContinue when user sends a message
     storage.getState().setPromptSuggestion(sessionId, null);
+    storage.getState().setNeedsContinue(sessionId, false);
 
     // Get encryption
     const encryption = this.encryption.getSessionEncryption(sessionId);
@@ -566,6 +573,7 @@ class Sync {
         ...(thinking && { thinking }),
         ...(effort && { effort }),
         ...(maxBudgetUsd != null && { maxBudgetUsd }),
+        ...(options?.continue && { continue: true }),
       },
     };
     const encryptedRawRecord = await encryption.encryptRawRecord(content);
@@ -1849,6 +1857,7 @@ class Sync {
         const decryptedMessages = await encryption.decryptMessages(messages);
         const normalizedMessages: NormalizedMessage[] = [];
         let latestPromptSuggestion: string | null = null;
+        let latestNeedsContinue = false;
         for (let i = 0; i < decryptedMessages.length; i++) {
           const decrypted = decryptedMessages[i];
           if (!decrypted) {
@@ -1858,6 +1867,12 @@ class Sync {
           const suggestion = extractPromptSuggestionFromRaw(decrypted.content);
           if (suggestion !== null) {
             latestPromptSuggestion = suggestion;
+          }
+          // Extract needs-continue signal (reset on user messages — user already intervened)
+          if (extractNeedsContinueFromRaw(decrypted.content)) {
+            latestNeedsContinue = true;
+          } else if (decrypted.content?.role === "user") {
+            latestNeedsContinue = false;
           }
           const normalized = normalizeRawMessage(
             decrypted.id,
@@ -1876,6 +1891,9 @@ class Sync {
             .getState()
             .setPromptSuggestion(sessionId, latestPromptSuggestion);
         }
+
+        // Surface needs-continue signal for this session (always sync to handle resets)
+        storage.getState().setNeedsContinue(sessionId, latestNeedsContinue);
 
         if (normalizedMessages.length > 0) {
           totalNormalized += normalizedMessages.length;
@@ -2036,6 +2054,11 @@ class Sync {
             storage
               .getState()
               .setPromptSuggestion(updateData.body.sid, suggestion);
+          }
+
+          // Extract needs-continue signal
+          if (extractNeedsContinueFromRaw(decrypted.content)) {
+            storage.getState().setNeedsContinue(updateData.body.sid, true);
           }
 
           lastMessage = normalizeRawMessage(

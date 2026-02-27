@@ -75,6 +75,8 @@ export async function claudeRemote(opts: {
 
   /** Called after each turn to feed usage data back to the adaptive router */
   onTurnComplete?: () => void;
+  /** Called when SDK returns error_max_turns — triggers "Continue" button in App */
+  onMaxTurnsReached?: () => void;
 
   // Callbacks
   onSessionFound: (id: string) => void;
@@ -222,6 +224,7 @@ export async function claudeRemote(opts: {
   const sdkOptions: QueryOptions = {
     cwd: opts.path,
     resume: startFrom ?? undefined,
+    continue: initial.mode.continue || undefined,
     mcpServers: opts.mcpServers,
     permissionMode: mapToClaudeMode(initial.mode.permissionMode),
     model: model || undefined,
@@ -267,17 +270,19 @@ export async function claudeRemote(opts: {
     }
   };
 
-  // Push initial message
+  // Push initial message (skip when continuing — SDK resumes without a prompt)
   let messages = new PushableAsyncIterable<SDKUserMessage>();
-  messages.push({
-    type: "user",
-    message: {
-      role: "user",
-      content: initial.message,
-    },
-    parent_tool_use_id: null,
-    session_id: "",
-  });
+  if (!initial.mode.continue) {
+    messages.push({
+      type: "user",
+      message: {
+        role: "user",
+        content: initial.message,
+      },
+      parent_tool_use_id: null,
+      session_id: "",
+    });
+  }
 
   // Start the loop.
   // Forward all messages for sync immediately as they arrive from stdout,
@@ -362,6 +367,15 @@ export async function claudeRemote(opts: {
       if (message.type === "result") {
         updateThinking(false);
         logger.debug("[claudeRemote] Result received");
+
+        // Detect error_max_turns for continue support
+        const resultSubtype = (message as any).subtype;
+        if (resultSubtype === "error_max_turns") {
+          logger.debug(
+            "[claudeRemote] Max turns reached — signaling needsContinue",
+          );
+          opts.onMaxTurnsReached?.();
+        }
 
         // Extract SDK result data (cost, usage breakdown) before signaling ready
         const resultMsg = message as {

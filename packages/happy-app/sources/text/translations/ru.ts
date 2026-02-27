@@ -392,13 +392,22 @@ export const ru: TranslationStructure = {
     },
     merge: {
       title: "Стратегия слияния",
+      preview: "Предпросмотр слияния",
       description: ({ parentBranch }: { parentBranch: string }) =>
         `Как вы хотите выполнить слияние в ${parentBranch}?`,
       action: "Слить",
       createPr: "Создать Pull Request",
       directMerge: "Прямое слияние",
       prSuccess: ({ url }: { url: string }) => `PR создан: ${url}`,
+      openPr: "Открыть PR",
+      keepBranch: "Сохранить ветку",
+      deleteBranch: "Удалить ветку",
+      filesChanged: "файл(ов) изменено",
+      commits: ({ count }: { count: number }) => `Коммиты (${count})`,
+      noCommits: "Нет коммитов для слияния",
       directSuccess: "Слияние выполнено успешно",
+      directSuccessDeleteBranch: ({ branchName }: { branchName: string }) =>
+        `Слияние выполнено успешно. Удалить ветку '${branchName}'?`,
       failed: ({ error }: { error: string }) => `Ошибка слияния: ${error}`,
     },
     cleanup: {
@@ -409,6 +418,7 @@ export const ru: TranslationStructure = {
         "Этот Worktree ещё не был слит. Удаление может привести к потере изменений. Продолжить?",
       remove: "Удалить",
       success: "Worktree удалён",
+      successAndArchived: "Worktree удалён, сессия архивирована",
       failed: ({ error }: { error: string }) =>
         `Не удалось удалить Worktree: ${error}`,
     },
@@ -633,6 +643,7 @@ export const ru: TranslationStructure = {
       disabledDesc: "Без расширенного мышления",
     },
     noMachinesAvailable: "Нет машин",
+    continue: "Продолжить — Claude достиг лимита ходов",
   },
 
   machineLauncher: {
@@ -820,6 +831,20 @@ export const ru: TranslationStructure = {
         `Доступно ${count} ${plural({ count, one: "язык", few: "языка", many: "языков" })}`,
       autoDetect: "Автоопределение",
     },
+    // TTS provider settings
+    ttsProviderTitle: "Провайдер TTS",
+    ttsProviderDescription:
+      "Выберите бесплатный Edge TTS или платный ElevenLabs TTS с вашим собственным API-ключом.",
+    ttsProviderEdge: "Edge TTS (бесплатно)",
+    ttsProviderEdgeSubtitle: "Microsoft Edge TTS, бесплатно и без ограничений",
+    ttsProviderElevenLabs: "ElevenLabs (платно)",
+    ttsProviderElevenLabsSubtitle: "Высокое качество, требуется ваш API-ключ",
+    elevenLabsApiKey: "API-ключ",
+    elevenLabsApiKeyPlaceholder: "Введите ваш API-ключ ElevenLabs",
+    elevenLabsVoiceId: "Voice ID",
+    elevenLabsVoiceIdPlaceholder: "По умолчанию: Rachel",
+    elevenLabsVoiceIdSubtitle:
+      "Оставьте пустым для голоса по умолчанию (Rachel)",
   },
 
   settingsAccount: {

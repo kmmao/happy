@@ -53,3 +53,10 @@ CLAUDE.local.md
 notes/
 # ralphex progress logs
 progress*.txt
+
+# Python virtual environments
+.venv/
+__pycache__/
+
+# Service output/artifacts
+services/*/output/

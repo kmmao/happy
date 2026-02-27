@@ -528,6 +528,12 @@ export async function runClaude(
       logger.debug(`[loop] effort updated: ${messageEffort ?? "none"}`);
     }
 
+    // Resolve continue (one-time flag, not persisted across messages)
+    const messageContinue = !!message.meta?.continue;
+    if (messageContinue) {
+      logger.debug("[loop] continue flag detected on message");
+    }
+
     // Check for special commands before processing
     const specialCommand = parseSpecialCommand(message.content.text);
 
@@ -611,6 +617,10 @@ export async function runClaude(
       allowedTools: messageAllowedTools,
       disallowedTools: messageDisallowedTools,
       autoApprovePlan: messageAutoApprovePlan,
+      maxBudgetUsd: messageMaxBudgetUsd,
+      thinking: messageThinking,
+      effort: messageEffort,
+      ...(messageContinue && { continue: true }),
     };
     messageQueue.push(message.content.text, enhancedMode);
     logger.debugLargeJson("User message pushed to queue:", message);

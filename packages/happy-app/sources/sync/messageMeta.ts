@@ -28,6 +28,7 @@ export function resolveMessageModeMeta(
     Session,
     | "permissionMode"
     | "modelMode"
+    | "modelMappings"
     | "metadata"
     | "thinkingMode"
     | "thinkingBudget"
@@ -44,7 +45,12 @@ export function resolveMessageModeMeta(
         : "default";
 
   const modelMode = session.modelMode || "default";
-  const model = modelMode !== "default" ? modelMode : null;
+  // Apply model mappings: e.g., "opus" → "MiniMax-M2.5" if profile has modelMappings
+  const rawModel = modelMode !== "default" ? modelMode : null;
+  const model =
+    rawModel && session.modelMappings?.[rawModel]
+      ? session.modelMappings[rawModel]
+      : rawModel;
 
   // Resolve thinking configuration
   const thinkingMode = session.thinkingMode;

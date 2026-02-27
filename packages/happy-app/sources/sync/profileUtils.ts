@@ -221,6 +221,57 @@ export AZURE_OPENAI_API_KEY="YOUR_AZURE_API_KEY"
 export AZURE_OPENAI_API_VERSION="2024-02-15-preview"
 export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-5.3-codex"`,
       };
+    case "minimax":
+      return {
+        setupGuideUrl:
+          "https://platform.minimaxi.com/docs/api-reference/text-anthropic-api",
+        description:
+          "MiniMax M2.5 API proxied through Anthropic-compatible interface",
+        environmentVariables: [
+          {
+            name: "MINIMAX_BASE_URL",
+            expectedValue: "https://api.minimaxi.com/anthropic",
+            description: "MiniMax API endpoint (Anthropic-compatible)",
+            isSecret: false,
+          },
+          {
+            name: "MINIMAX_AUTH_TOKEN",
+            expectedValue: "eyJ...",
+            description: "Your MiniMax API key (JWT token from platform)",
+            isSecret: true,
+          },
+          {
+            name: "MINIMAX_API_TIMEOUT_MS",
+            expectedValue: "600000",
+            description: "API timeout (10 minutes)",
+            isSecret: false,
+          },
+          {
+            name: "MINIMAX_MODEL",
+            expectedValue: "MiniMax-M2.5",
+            description: "Default model (most capable, 204K context)",
+            isSecret: false,
+          },
+          {
+            name: "MINIMAX_SMALL_FAST_MODEL",
+            expectedValue: "MiniMax-M2.5-highspeed",
+            description: "Fast model for quick responses (~100 TPS)",
+            isSecret: false,
+          },
+        ],
+        shellConfigExample: `# Add to ~/.zshrc or ~/.bashrc:
+export MINIMAX_BASE_URL="https://api.minimaxi.com/anthropic"
+export MINIMAX_AUTH_TOKEN="YOUR_MINIMAX_API_KEY"
+export MINIMAX_API_TIMEOUT_MS="600000"
+export MINIMAX_MODEL="MiniMax-M2.5"
+export MINIMAX_SMALL_FAST_MODEL="MiniMax-M2.5-highspeed"
+
+# Available models:
+# - MiniMax-M2.5: Most capable, coding + agent (204K context)
+# - MiniMax-M2.5-highspeed: Fast version (~100 TPS)
+# - MiniMax-M2.1: Previous gen, multilingual coding
+# - MiniMax-M2.1-highspeed: Previous gen fast`,
+      };
     default:
       return null;
   }
@@ -375,6 +426,53 @@ export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
         updatedAt: Date.now(),
         version: "1.0.0",
       };
+    case "minimax":
+      return {
+        id: "minimax",
+        name: "MiniMax (M2.5)",
+        anthropicConfig: {},
+        environmentVariables: [
+          {
+            name: "ANTHROPIC_BASE_URL",
+            value: "${MINIMAX_BASE_URL:-https://api.minimaxi.com/anthropic}",
+          },
+          {
+            name: "ANTHROPIC_AUTH_TOKEN",
+            value: "${MINIMAX_AUTH_TOKEN}",
+          },
+          {
+            name: "API_TIMEOUT_MS",
+            value: "${MINIMAX_API_TIMEOUT_MS:-600000}",
+          },
+          {
+            name: "ANTHROPIC_MODEL",
+            value: "${MINIMAX_MODEL:-MiniMax-M2.5}",
+          },
+          {
+            name: "ANTHROPIC_SMALL_FAST_MODEL",
+            value: "${MINIMAX_SMALL_FAST_MODEL:-MiniMax-M2.5-highspeed}",
+          },
+          {
+            name: "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+            value: "1",
+          },
+        ],
+        // UI keeps showing Opus/Sonnet/Haiku, but maps them to MiniMax models
+        modelMappings: {
+          haiku: "MiniMax-M2.5-highspeed",
+          sonnet: "MiniMax-M2.5",
+          "sonnet-1m": "MiniMax-M2.5",
+          opus: "MiniMax-M2.5",
+          "opus-1m": "MiniMax-M2.5",
+          opusplan: "MiniMax-M2.5",
+        },
+        defaultPermissionMode: "default",
+        compatibility: { claude: true, codex: false, gemini: false },
+        isBuiltIn: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        version: "1.0.0",
+      };
     default:
       return null;
   }
@@ -408,6 +506,11 @@ export const DEFAULT_PROFILES = [
   {
     id: "azure-openai",
     name: "Azure OpenAI",
+    isBuiltIn: true,
+  },
+  {
+    id: "minimax",
+    name: "MiniMax (M2.5)",
     isBuiltIn: true,
   },
 ];

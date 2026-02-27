@@ -30,16 +30,16 @@ import {
   type SessionSdkSettings,
   loadSessionNeedsAttention,
   saveSessionNeedsAttention,
+  loadSessionModelMappings,
+  saveSessionModelMappings,
+  loadSessionCustomModels,
+  saveSessionCustomModels,
   deleteSessionBookmarks,
 } from "./persistence";
 import type { PermissionModeKey } from "@/components/PermissionModeSelector";
 import type { CustomerInfo } from "./revenueCat/types";
 import React from "react";
 import { sync } from "./sync";
-import {
-  getCurrentRealtimeSessionId,
-  getVoiceSession,
-} from "@/realtime/RealtimeSession";
 import { isMutableTool } from "@/components/tools/knownTools";
 import { projectManager } from "./projectManager";
 import { DecryptedArtifact } from "./artifactTypes";
@@ -118,6 +118,8 @@ interface StorageState {
   sessionGitStatus: Record<string, GitStatus | null>;
   sessionPromptSuggestions: Record<string, string | null>;
   setPromptSuggestion: (sessionId: string, suggestion: string | null) => void;
+  sessionNeedsContinue: Record<string, boolean>;
+  setNeedsContinue: (sessionId: string, value: boolean) => void;
   machines: Record<string, Machine>;
   artifacts: Record<string, DecryptedArtifact>; // New artifacts storage
   friends: Record<string, UserProfile>; // All relationships (friends, pending, requested, etc.)
@@ -183,6 +185,18 @@ interface StorageState {
   updateSessionDraft: (sessionId: string, draft: string | null) => void;
   updateSessionPermissionMode: (sessionId: string, mode: string) => void;
   updateSessionModelMode: (sessionId: string, mode: string) => void;
+  updateSessionCustomModels: (
+    sessionId: string,
+    customModels: Array<{
+      id: string;
+      name: string;
+      description?: string | null;
+    }> | null,
+  ) => void;
+  updateSessionModelMappings: (
+    sessionId: string,
+    modelMappings: Record<string, string> | null,
+  ) => void;
   updateSessionSdkSettings: (
     sessionId: string,
     settings: SessionSdkSettings,
@@ -345,6 +359,8 @@ export const storage = create<StorageState>()((set, get) => {
   let sessionModelModes = loadSessionModelModes();
   let sessionSdkSettings = loadSessionSdkSettings();
   let sessionNeedsAttention = loadSessionNeedsAttention();
+  let sessionModelMappings = loadSessionModelMappings();
+  let sessionCustomModels = loadSessionCustomModels();
   return {
     settings,
     settingsVersion: version,
@@ -372,6 +388,14 @@ export const storage = create<StorageState>()((set, get) => {
         sessionPromptSuggestions: {
           ...prev.sessionPromptSuggestions,
           [sessionId]: suggestion,
+        },
+      })),
+    sessionNeedsContinue: {},
+    setNeedsContinue: (sessionId: string, value: boolean) =>
+      set((prev) => ({
+        sessionNeedsContinue: {
+          ...prev.sessionNeedsContinue,
+          [sessionId]: value,
         },
       })),
     realtimeStatus: "disconnected",
@@ -423,6 +447,8 @@ export const storage = create<StorageState>()((set, get) => {
           : {};
         const savedModelModes = isInitialLoad ? sessionModelModes : {};
         const savedSdkSettings = isInitialLoad ? sessionSdkSettings : {};
+        const savedModelMappingsAll = isInitialLoad ? sessionModelMappings : {};
+        const savedCustomModelsAll = isInitialLoad ? sessionCustomModels : {};
         const savedNeedsAttention = isInitialLoad ? sessionNeedsAttention : {};
 
         // Merge new sessions with existing ones
@@ -500,6 +526,18 @@ export const storage = create<StorageState>()((set, get) => {
               ? { ...session.metadata, summary: existingSummary }
               : session.metadata;
 
+          // Resolve modelMappings: prefer existing in-memory, then saved from disk
+          const resolvedModelMappings =
+            state.sessions[session.id]?.modelMappings ??
+            savedModelMappingsAll[session.id] ??
+            null;
+
+          // Resolve customModels: prefer existing in-memory, then saved from disk
+          const resolvedCustomModels =
+            state.sessions[session.id]?.customModels ??
+            savedCustomModelsAll[session.id] ??
+            null;
+
           mergedSessions[session.id] = {
             ...session,
             metadata: resolvedMetadata,
@@ -507,6 +545,8 @@ export const storage = create<StorageState>()((set, get) => {
             draft: existingDraft || savedDraft || session.draft || null,
             permissionMode: resolvedPermissionMode,
             modelMode: resolvedModelMode,
+            modelMappings: resolvedModelMappings,
+            customModels: resolvedCustomModels,
             thinkingMode: resolvedThinkingMode,
             thinkingBudget: resolvedThinkingBudget,
             effortLevel: resolvedEffortLevel,
@@ -574,36 +614,6 @@ export const storage = create<StorageState>()((set, get) => {
               newSession.agentStateVersion >
                 (oldSession.agentStateVersion || 0))
           ) {
-            // Check for NEW permission requests before processing
-            const currentRealtimeSessionId = getCurrentRealtimeSessionId();
-            const voiceSession = getVoiceSession();
-
-            // console.log('[REALTIME DEBUG] Permission check:', {
-            //     currentRealtimeSessionId,
-            //     sessionId: session.id,
-            //     match: currentRealtimeSessionId === session.id,
-            //     hasVoiceSession: !!voiceSession,
-            //     oldRequests: Object.keys(oldSession?.agentState?.requests || {}),
-            //     newRequests: Object.keys(newSession.agentState?.requests || {})
-            // });
-
-            if (currentRealtimeSessionId === session.id && voiceSession) {
-              const oldRequests = oldSession?.agentState?.requests || {};
-              const newRequests = newSession.agentState?.requests || {};
-
-              // Find NEW permission requests only
-              for (const [requestId, request] of Object.entries(newRequests)) {
-                if (!oldRequests[requestId]) {
-                  // This is a NEW permission request
-                  const toolName = request.tool;
-                  // console.log('[REALTIME DEBUG] Sending permission notification for:', toolName);
-                  voiceSession.sendTextMessage(
-                    `Claude is requesting permission to use the ${toolName} tool`,
-                  );
-                }
-              }
-            }
-
             // Process new AgentState through reducer
             const reducerResult = reducer(
               existingSessionMessages.reducerState,
@@ -1157,6 +1167,76 @@ export const storage = create<StorageState>()((set, get) => {
         saveSessionModelModes(allModelModes);
 
         // No need to rebuild sessionListViewData since model mode doesn't affect the list display
+        return {
+          ...state,
+          sessions: updatedSessions,
+        };
+      }),
+    updateSessionCustomModels: (
+      sessionId: string,
+      customModels: Array<{
+        id: string;
+        name: string;
+        description?: string | null;
+      }> | null,
+    ) =>
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) return state;
+
+        const updatedSessions = {
+          ...state.sessions,
+          [sessionId]: {
+            ...session,
+            customModels,
+          },
+        };
+
+        // Persist custom models to disk
+        const allCustomModels: Record<
+          string,
+          Array<{ id: string; name: string; description?: string | null }>
+        > = {};
+        Object.entries(updatedSessions).forEach(([id, sess]) => {
+          if (sess.customModels && sess.customModels.length > 0) {
+            allCustomModels[id] = sess.customModels;
+          }
+        });
+        saveSessionCustomModels(allCustomModels);
+
+        return {
+          ...state,
+          sessions: updatedSessions,
+        };
+      }),
+    updateSessionModelMappings: (
+      sessionId: string,
+      modelMappings: Record<string, string> | null,
+    ) =>
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) return state;
+
+        const updatedSessions = {
+          ...state.sessions,
+          [sessionId]: {
+            ...session,
+            modelMappings,
+          },
+        };
+
+        // Persist model mappings to disk
+        const allModelMappings: Record<string, Record<string, string>> = {};
+        Object.entries(updatedSessions).forEach(([id, sess]) => {
+          if (
+            sess.modelMappings &&
+            Object.keys(sess.modelMappings).length > 0
+          ) {
+            allModelMappings[id] = sess.modelMappings;
+          }
+        });
+        saveSessionModelMappings(allModelMappings);
+
         return {
           ...state,
           sessions: updatedSessions,
@@ -1776,6 +1856,12 @@ export function useSessionGitStatus(sessionId: string): GitStatus | null {
 export function usePromptSuggestion(sessionId: string): string | null {
   return storage(
     useShallow((state) => state.sessionPromptSuggestions[sessionId] ?? null),
+  );
+}
+
+export function useNeedsContinue(sessionId: string): boolean {
+  return storage(
+    useShallow((state) => state.sessionNeedsContinue[sessionId] ?? false),
   );
 }
 

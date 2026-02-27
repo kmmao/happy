@@ -258,15 +258,37 @@ export function getHardcodedModelModes(
   return getClaudeModelModes();
 }
 
+export type CustomModel = {
+  id: string;
+  name: string;
+  description?: string | null;
+};
+
 export function getAvailableModels(
   flavor: AgentFlavor,
   metadata: Metadata | null | undefined,
   translate: Translate,
+  customModels?: CustomModel[] | null,
 ): ModelMode[] {
+  // Priority 1: CLI dynamically reported models
   const metadataModels = mapMetadataOptions(metadata?.models);
   if (metadataModels.length > 0) {
     return metadataModels;
   }
+
+  // Priority 2: Profile custom models (e.g., MiniMax, DeepSeek)
+  if (customModels && customModels.length > 0) {
+    return [
+      { key: "default", name: "Default", description: "Use CLI settings" },
+      ...customModels.map((m) => ({
+        key: m.id,
+        name: m.name,
+        description: m.description ?? null,
+      })),
+    ];
+  }
+
+  // Priority 3: Hardcoded defaults
   return getHardcodedModelModes(flavor, translate);
 }
 

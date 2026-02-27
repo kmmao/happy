@@ -1,160 +1,167 @@
-import React, { useEffect, useRef } from 'react';
-import { useConversation } from '@elevenlabs/react-native';
-import { registerVoiceSession } from './RealtimeSession';
-import { storage } from '@/sync/storage';
-import { realtimeClientTools } from './realtimeClientTools';
-import { getElevenLabsCodeFromPreference } from '@/constants/Languages';
-import type { VoiceSession, VoiceSessionConfig } from './types';
+import React, { useEffect, useRef, useCallback } from "react";
+import {
+  registerVoiceSession,
+  getCurrentRealtimeSessionId,
+} from "./RealtimeSession";
+import { storage } from "@/sync/storage";
+import { sync } from "@/sync/sync";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { useTtsPlayer } from "@/hooks/useTtsPlayer";
+import {
+  synthesizeSpeechEdge,
+  synthesizeSpeechElevenLabs,
+  ElevenLabsAuthError,
+} from "@/sync/apiTts";
+import { TokenStorage } from "@/auth/tokenStorage";
+import { getEdgeTtsVoice } from "@/constants/Languages";
+import type { VoiceSession, VoiceSessionConfig } from "./types";
 
-// Static reference to the conversation hook instance
-let conversationInstance: ReturnType<typeof useConversation> | null = null;
+// Module-level state
+let isSessionActive = false;
+const spokenMessageIds = new Set<string>();
 
-// Global voice session implementation
-class RealtimeVoiceSessionImpl implements VoiceSession {
-    
-    async startSession(config: VoiceSessionConfig): Promise<void> {
-        if (!conversationInstance) {
-            console.warn('Realtime voice session not initialized');
-            return;
+const RealtimeVoiceSessionInner: React.FC = () => {
+  const ttsPlayer = useTtsPlayer();
+  const ttsPlayerRef = useRef(ttsPlayer);
+  ttsPlayerRef.current = ttsPlayer;
+
+  const ttsQueueRef = useRef<Array<{ text: string; messageId: string }>>([]);
+  const isProcessingRef = useRef(false);
+
+  const processQueue = useCallback(async () => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+
+    while (ttsQueueRef.current.length > 0 && isSessionActive) {
+      const item = ttsQueueRef.current.shift();
+      if (!item) break;
+
+      try {
+        const settings = storage.getState().settings;
+        const voicePref = settings.voiceAssistantLanguage;
+
+        let audioData: ArrayBuffer | null = null;
+
+        if (
+          settings.ttsProvider === "elevenlabs" &&
+          settings.elevenLabsApiKey
+        ) {
+          // ElevenLabs TTS (paid, direct API call with user's own key)
+          const langCode = voicePref?.split("-")[0] ?? undefined;
+          audioData = await synthesizeSpeechElevenLabs({
+            text: item.text,
+            apiKey: settings.elevenLabsApiKey,
+            voiceId: settings.elevenLabsVoiceId ?? undefined,
+            languageCode: langCode,
+          });
+        } else {
+          // Edge TTS (free, through server proxy)
+          const credentials = await TokenStorage.getCredentials();
+          if (!credentials) break;
+
+          const voice = getEdgeTtsVoice(voicePref);
+          audioData = await synthesizeSpeechEdge(credentials, {
+            text: item.text,
+            voice,
+          });
         }
 
-        try {
-            storage.getState().setRealtimeStatus('connecting');
-            
-            // Get user's preferred language for voice assistant
-            const userLanguagePreference = storage.getState().settings.voiceAssistantLanguage;
-            const elevenLabsLanguage = getElevenLabsCodeFromPreference(userLanguagePreference);
-            
-            if (!config.token && !config.agentId) {
-                throw new Error('Neither token nor agentId provided');
-            }
-            
-            const sessionConfig: any = {
-                dynamicVariables: {
-                    sessionId: config.sessionId,
-                    initialConversationContext: config.initialContext || ''
-                },
-                overrides: {
-                    agent: {
-                        language: elevenLabsLanguage
-                    }
-                },
-                ...(config.token ? { conversationToken: config.token } : { agentId: config.agentId })
-            };
-            
-            await conversationInstance.startSession(sessionConfig);
-        } catch (error) {
-            console.error('Failed to start realtime session:', error);
-            storage.getState().setRealtimeStatus('error');
+        if (audioData && isSessionActive) {
+          storage.getState().setRealtimeMode("speaking");
+          await ttsPlayerRef.current.play(audioData);
+          storage.getState().setRealtimeMode("idle");
         }
+      } catch (error) {
+        if (error instanceof ElevenLabsAuthError) {
+          // Auth failed — fallback to Edge TTS for remaining queue items
+          sync.applySettings({ ttsProvider: "edge" });
+          ttsQueueRef.current = [];
+          break;
+        }
+        // Skip other TTS failures, continue with queue
+      }
     }
 
-    async endSession(): Promise<void> {
-        if (!conversationInstance) {
-            return;
-        }
+    isProcessingRef.current = false;
+  }, []);
 
-        try {
-            await conversationInstance.endSession();
-            storage.getState().setRealtimeStatus('disconnected');
-        } catch (error) {
-            console.error('Failed to end realtime session:', error);
-        }
-    }
+  const enqueueTts = useCallback(
+    (text: string, messageId: string) => {
+      if (spokenMessageIds.has(messageId)) return;
+      spokenMessageIds.add(messageId);
+      ttsQueueRef.current.push({ text, messageId });
+      processQueue();
+    },
+    [processQueue],
+  );
 
-    sendTextMessage(message: string): void {
-        if (!conversationInstance) {
-            console.warn('Realtime voice session not initialized');
-            return;
-        }
+  // STT callback: send transcribed text to Claude Code
+  const onTranscript = useCallback((text: string) => {
+    const sessionId = getCurrentRealtimeSessionId();
+    if (!sessionId || !text.trim()) return;
 
-        try {
-            conversationInstance.sendUserMessage(message);
-        } catch (error) {
-            console.error('Failed to send text message:', error);
-        }
-    }
+    // Stop any currently playing TTS when user speaks
+    ttsPlayerRef.current.stop();
+    ttsQueueRef.current = [];
+    storage.getState().setRealtimeMode("idle");
 
-    sendContextualUpdate(update: string): void {
-        if (!conversationInstance) {
-            console.warn('Realtime voice session not initialized');
-            return;
-        }
+    sync.sendMessage(sessionId, text.trim());
+  }, []);
 
-        try {
-            conversationInstance.sendContextualUpdate(update);
-        } catch (error) {
-            console.error('Failed to send contextual update:', error);
-        }
-    }
-}
+  const stt = useSpeechToText(onTranscript);
+  const sttRef = useRef(stt);
+  sttRef.current = stt;
 
-export const RealtimeVoiceSession: React.FC = () => {
-    const conversation = useConversation({
-        clientTools: realtimeClientTools,
-        onConnect: (data) => {
-            console.log('Realtime session connected:', data);
-            storage.getState().setRealtimeStatus('connected');
-            storage.getState().setRealtimeMode('idle');
-        },
-        onDisconnect: () => {
-            console.log('Realtime session disconnected');
-            storage.getState().setRealtimeStatus('disconnected');
-            storage.getState().setRealtimeMode('idle', true); // immediate mode change
-            storage.getState().clearRealtimeModeDebounce();
-        },
-        onMessage: (data) => {
-            console.log('Realtime message:', data);
-        },
-        onError: (error) => {
-            // Log but don't block app - voice features will be unavailable
-            // This prevents initialization errors from showing "Terminals error" on startup
-            console.warn('Realtime voice not available:', error);
-            // Don't set error status during initialization - just set disconnected
-            // This allows the app to continue working without voice features
-            storage.getState().setRealtimeStatus('disconnected');
-            storage.getState().setRealtimeMode('idle', true); // immediate mode change
-        },
-        onStatusChange: (data) => {
-            console.log('Realtime status change:', data);
-        },
-        onModeChange: (data) => {
-            console.log('Realtime mode change:', data);
-            
-            // Only animate when speaking
-            const mode = data.mode as string;
-            const isSpeaking = mode === 'speaking';
-            
-            // Use centralized debounce logic from storage
-            storage.getState().setRealtimeMode(isSpeaking ? 'speaking' : 'idle');
-        },
-        onDebug: (message) => {
-            console.debug('Realtime debug:', message);
-        }
-    });
+  const hasRegistered = useRef(false);
 
-    const hasRegistered = useRef(false);
+  useEffect(() => {
+    if (hasRegistered.current) return;
 
-    useEffect(() => {
-        // Store the conversation instance globally
-        conversationInstance = conversation;
+    const session: VoiceSession = {
+      async startSession(_config: VoiceSessionConfig) {
+        isSessionActive = true;
+        isProcessingRef.current = false;
+        spokenMessageIds.clear();
+        ttsQueueRef.current = [];
 
-        // Register the voice session once
-        if (!hasRegistered.current) {
-            try {
-                registerVoiceSession(new RealtimeVoiceSessionImpl());
-                hasRegistered.current = true;
-            } catch (error) {
-                console.error('Failed to register voice session:', error);
-            }
-        }
+        storage.getState().setRealtimeStatus("connected");
+        storage.getState().setRealtimeMode("idle");
 
-        return () => {
-            // Clean up on unmount
-            conversationInstance = null;
-        };
-    }, [conversation]);
+        await sttRef.current.startListening();
+      },
 
-    // This component doesn't render anything visible
-    return null;
+      async endSession() {
+        isSessionActive = false;
+        isProcessingRef.current = false;
+        ttsQueueRef.current = [];
+
+        sttRef.current.stopListening();
+        ttsPlayerRef.current.stop();
+
+        storage.getState().setRealtimeStatus("disconnected");
+        storage.getState().setRealtimeMode("idle", true);
+        storage.getState().clearRealtimeModeDebounce();
+        spokenMessageIds.clear();
+      },
+    };
+
+    registerVoiceSession(session);
+    hasRegistered.current = true;
+  }, []);
+
+  // Expose enqueueTts globally for voiceHooks
+  useEffect(() => {
+    voiceTtsEnqueue = enqueueTts;
+    return () => {
+      voiceTtsEnqueue = null;
+    };
+  }, [enqueueTts]);
+
+  return null;
 };
+
+// Global function for voiceHooks to enqueue TTS playback
+export let voiceTtsEnqueue: ((text: string, messageId: string) => void) | null =
+  null;
+
+export const RealtimeVoiceSession = React.memo(RealtimeVoiceSessionInner);

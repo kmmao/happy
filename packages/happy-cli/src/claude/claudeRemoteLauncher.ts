@@ -577,6 +577,15 @@ export async function claudeRemoteLauncher(
                 return null;
               }
 
+              // continue requires a fresh query with sdkOptions.continue=true
+              if (msg.mode.continue) {
+                logger.debug(
+                  "[remote]: continue flag detected, forcing restart for new query",
+                );
+                pending = msg;
+                return null;
+              }
+
               if (modeHash && msg.hash !== modeHash) {
                 // Mode changed. Check if cold-restart fields are unchanged (hot-swappable).
                 const newColdHash = coldModeHash(msg.mode);
@@ -664,6 +673,15 @@ export async function claudeRemoteLauncher(
           },
           onResult: (data) => {
             lastResultData = data;
+          },
+          onMaxTurnsReached: () => {
+            logger.debug(
+              "[remote]: Max turns reached — sending needs-continue",
+            );
+            const envelope = createEnvelope("agent", {
+              t: "needs-continue",
+            });
+            session.client.sendSessionProtocolMessage(envelope);
           },
           onReady: async () => {
             // Flush queued messages before closing the turn to prevent

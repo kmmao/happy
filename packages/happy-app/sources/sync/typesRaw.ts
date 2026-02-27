@@ -223,6 +223,10 @@ const sessionPromptSuggestionEventSchema = z.object({
   suggestion: z.string(),
 });
 
+const sessionNeedsContinueEventSchema = z.object({
+  t: z.literal("needs-continue"),
+});
+
 const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -239,6 +243,7 @@ const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTaskEndEventSchema,
   sessionToolProgressEventSchema,
   sessionPromptSuggestionEventSchema,
+  sessionNeedsContinueEventSchema,
 ]);
 
 const sessionEnvelopeSchema = z
@@ -1081,6 +1086,25 @@ export function extractPromptSuggestionFromRaw(raw: RawRecord): string | null {
     return envelope.ev.suggestion;
   }
   return null;
+}
+
+/**
+ * Extract a needs-continue signal from a raw record.
+ * Returns true when the agent signals that max turns was reached
+ * and the user can choose to continue.
+ */
+export function extractNeedsContinueFromRaw(raw: RawRecord): boolean {
+  let envelope: any = null;
+  if (raw.role === "session" && raw.content?.data) {
+    envelope = raw.content.data;
+  } else if (
+    raw.role === "agent" &&
+    raw.content?.type === "session" &&
+    raw.content?.data
+  ) {
+    envelope = raw.content.data;
+  }
+  return envelope?.ev?.t === "needs-continue";
 }
 
 /**

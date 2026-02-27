@@ -491,13 +491,22 @@ export const ja: TranslationStructure = {
     },
     merge: {
       title: "マージ戦略",
+      preview: "マージプレビュー",
       description: ({ parentBranch }: { parentBranch: string }) =>
         `${parentBranch} にどのようにマージしますか？`,
       action: "マージ",
       createPr: "Pull Request を作成",
       directMerge: "直接マージ",
       prSuccess: ({ url }: { url: string }) => `PR を作成しました: ${url}`,
+      openPr: "PR を開く",
+      keepBranch: "ブランチを保持",
+      deleteBranch: "ブランチを削除",
+      filesChanged: "ファイル変更",
+      commits: ({ count }: { count: number }) => `コミット (${count})`,
+      noCommits: "マージするコミットがありません",
       directSuccess: "マージが完了しました",
+      directSuccessDeleteBranch: ({ branchName }: { branchName: string }) =>
+        `マージが完了しました。ブランチ '${branchName}' を削除しますか？`,
       failed: ({ error }: { error: string }) =>
         `マージに失敗しました: ${error}`,
     },
@@ -509,6 +518,7 @@ export const ja: TranslationStructure = {
         "この Worktree はまだマージされていません。削除すると変更が失われる可能性があります。続行しますか？",
       remove: "削除",
       success: "Worktree を削除しました",
+      successAndArchived: "Worktree を削除し、セッションをアーカイブしました",
       failed: ({ error }: { error: string }) =>
         `Worktree の削除に失敗しました: ${error}`,
     },
@@ -675,6 +685,7 @@ export const ja: TranslationStructure = {
       disabledDesc: "拡張思考なし",
     },
     noMachinesAvailable: "マシンなし",
+    continue: "続行 — Claudeがターン制限に達しました",
   },
 
   machineLauncher: {
@@ -855,6 +866,19 @@ export const ja: TranslationStructure = {
       footer: ({ count }: { count: number }) => `${count}言語が利用可能`,
       autoDetect: "自動検出",
     },
+    // TTS provider settings
+    ttsProviderTitle: "TTS プロバイダー",
+    ttsProviderDescription:
+      "無料の Edge TTS または自分の API キーで有料の ElevenLabs TTS を選択できます。",
+    ttsProviderEdge: "Edge TTS（無料）",
+    ttsProviderEdgeSubtitle: "Microsoft Edge TTS、無料で無制限",
+    ttsProviderElevenLabs: "ElevenLabs（有料）",
+    ttsProviderElevenLabsSubtitle: "高品質、自分の API キーが必要",
+    elevenLabsApiKey: "API キー",
+    elevenLabsApiKeyPlaceholder: "ElevenLabs API キーを入力",
+    elevenLabsVoiceId: "Voice ID",
+    elevenLabsVoiceIdPlaceholder: "デフォルト：Rachel",
+    elevenLabsVoiceIdSubtitle: "空欄でデフォルト音声（Rachel）を使用",
   },
 
   settingsAccount: {

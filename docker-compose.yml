@@ -78,6 +78,8 @@ services:
       S3_PUBLIC_URL: http://localhost:9000/handy
       # STT 微服务地址（同 compose 网络内访问）
       STT_BASE_URL: http://stt:8000
+      # TTS 微服务地址（同 compose 网络内访问）
+      TTS_BASE_URL: http://tts:8000
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,6 +88,8 @@ services:
       minio-init:
         condition: service_completed_successfully
       stt:
+        condition: service_started
+      tts:
         condition: service_started
     ports:
       - "3005:3005"
@@ -108,6 +112,18 @@ services:
     ports:
       # 宿主机端口改为更普通的 8082（容器内仍是 8000）
       - "8082:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  tts:
+    build:
+      context: .
+      dockerfile: services/tts/Dockerfile
+    ports:
+      - "8083:8000"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
       interval: 10s
