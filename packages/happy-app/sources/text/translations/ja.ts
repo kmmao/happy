@@ -276,6 +276,9 @@ export const ja: TranslationStructure = {
     compactSessionView: "コンパクトセッション表示",
     compactSessionViewDescription:
       "アクティブなセッションをコンパクトなレイアウトで表示",
+    realtimeSessionSort: "リアルタイムセッション並び替え",
+    realtimeSessionSortDescription:
+      "最近のアクティビティでセッションを並び替え（オフにすると作成日時順で安定表示）",
     voiceInputLanguage: "音声認識言語",
     voiceInputLanguageDescription: "タップして音声入力の言語を変更",
     voiceInputLanguageOptions: {

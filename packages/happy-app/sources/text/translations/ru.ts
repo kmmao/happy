@@ -198,6 +198,9 @@ export const ru: TranslationStructure = {
     compactSessionView: "Компактный вид сессий",
     compactSessionViewDescription:
       "Отображать активные сессии в более компактном виде",
+    realtimeSessionSort: "Сортировка сессий в реальном времени",
+    realtimeSessionSortDescription:
+      "Сортировать сессии по недавней активности (отключите для стабильного порядка по времени создания)",
     voiceInputLanguage: "Язык распознавания речи",
     voiceInputLanguageDescription:
       "Нажмите, чтобы изменить язык голосового ввода",

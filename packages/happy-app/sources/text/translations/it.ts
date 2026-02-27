@@ -282,6 +282,9 @@ export const it: TranslationStructure = {
     compactSessionView: "Vista sessioni compatta",
     compactSessionViewDescription:
       "Mostra le sessioni attive in un layout più compatto",
+    realtimeSessionSort: "Ordinamento sessioni in tempo reale",
+    realtimeSessionSortDescription:
+      "Ordina le sessioni per attività recente (disattiva per ordine stabile per data di creazione)",
     voiceInputLanguage: "Lingua di riconoscimento vocale",
     voiceInputLanguageDescription:
       "Tocca per cambiare la lingua dell'input vocale",

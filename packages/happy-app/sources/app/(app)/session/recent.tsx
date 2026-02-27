@@ -1,7 +1,7 @@
 import React from "react";
 import { View, FlatList } from "react-native";
 import { Text } from "@/components/StyledText";
-import { useAllSessions } from "@/sync/storage";
+import { useAllSessions, useSetting } from "@/sync/storage";
 import { Session } from "@/sync/storageTypes";
 import { Avatar } from "@/components/Avatar";
 import {
@@ -128,17 +128,21 @@ function formatDateHeader(date: Date): string {
   }
 }
 
-function groupSessionsByDate(sessions: Session[]): SessionHistoryItem[] {
+function groupSessionsByDate(
+  sessions: Session[],
+  realtimeSessionSort: boolean,
+): SessionHistoryItem[] {
+  const sortKey = realtimeSessionSort ? "updatedAt" : "createdAt";
   const sortedSessions = sessions
     .slice()
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+    .sort((a, b) => b[sortKey] - a[sortKey]);
 
   const items: SessionHistoryItem[] = [];
   let currentDateGroup: Session[] = [];
   let currentDateString: string | null = null;
 
   for (const session of sortedSessions) {
-    const sessionDate = new Date(session.updatedAt);
+    const sessionDate = new Date(session[sortKey]);
     const dateString = sessionDate.toDateString();
 
     if (currentDateString !== dateString) {
@@ -178,11 +182,12 @@ function groupSessionsByDate(sessions: Session[]): SessionHistoryItem[] {
 export default function SessionHistory() {
   const safeArea = useSafeAreaInsets();
   const allSessions = useAllSessions();
+  const realtimeSessionSort = useSetting("realtimeSessionSort");
   const navigateToSession = useNavigateToSession();
 
   const groupedItems = React.useMemo(() => {
-    return groupSessionsByDate(allSessions);
-  }, [allSessions]);
+    return groupSessionsByDate(allSessions, realtimeSessionSort);
+  }, [allSessions, realtimeSessionSort]);
 
   const renderItem = React.useCallback(
     ({ item, index }: { item: SessionHistoryItem; index: number }) => {

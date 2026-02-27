@@ -207,6 +207,9 @@ export const zhHans: TranslationStructure = {
     showFlavorIconsDescription: "在会话头像上显示 AI 提供商图标",
     compactSessionView: "紧凑会话视图",
     compactSessionViewDescription: "以更紧凑的布局显示活跃会话",
+    realtimeSessionSort: "实时会话排序",
+    realtimeSessionSortDescription:
+      "按最近活动排序会话（关闭后按创建时间稳定排序）",
     voiceInputLanguage: "语音识别语言",
     voiceInputLanguageDescription: "点击切换语音输入使用的识别语言",
     voiceInputLanguageOptions: {

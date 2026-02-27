@@ -209,6 +209,7 @@ export function ActiveSessionsGroup({
   selectedSessionId,
 }: ActiveSessionsGroupProps) {
   const styles = stylesheet;
+  const realtimeSessionSort = useSetting("realtimeSessionSort");
   const machines = useAllMachines();
   const machinesMap = React.useMemo(() => {
     const map: Record<string, Machine> = {};
@@ -277,34 +278,36 @@ export function ActiveSessionsGroup({
       machineGroup.sessions.push(session);
     });
 
-    // Sort sessions within each machine group by last activity (newest first)
+    // Sort sessions within each machine group (by updatedAt or createdAt)
+    const sortKey = realtimeSessionSort ? "updatedAt" : "createdAt";
     groups.forEach((projectGroup) => {
       projectGroup.machines.forEach((machineGroup) => {
-        machineGroup.sessions.sort((a, b) => b.updatedAt - a.updatedAt);
+        machineGroup.sessions.sort((a, b) => b[sortKey] - a[sortKey]);
       });
     });
 
     return groups;
-  }, [sessions, machinesMap]);
+  }, [sessions, machinesMap, realtimeSessionSort]);
 
   // Sort project groups by most recent session activity (newest first)
   const sortedProjectGroups = React.useMemo(() => {
+    const sk = realtimeSessionSort ? "updatedAt" : "createdAt";
     return Array.from(projectGroups.entries()).sort(
       ([, groupA], [, groupB]) => {
         const latestA = Math.max(
           ...Array.from(groupA.machines.values()).flatMap((m) =>
-            m.sessions.map((s) => s.updatedAt),
+            m.sessions.map((s) => s[sk]),
           ),
         );
         const latestB = Math.max(
           ...Array.from(groupB.machines.values()).flatMap((m) =>
-            m.sessions.map((s) => s.updatedAt),
+            m.sessions.map((s) => s[sk]),
           ),
         );
         return latestB - latestA;
       },
     );
-  }, [projectGroups]);
+  }, [projectGroups, realtimeSessionSort]);
 
   return (
     <View style={styles.container}>

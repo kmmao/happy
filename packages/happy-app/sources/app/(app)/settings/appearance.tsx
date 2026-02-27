@@ -38,6 +38,9 @@ export default function AppearanceSettingsScreen() {
     useSettingMutable("showFlavorIcons");
   const [compactSessionView, setCompactSessionView] =
     useSettingMutable("compactSessionView");
+  const [realtimeSessionSort, setRealtimeSessionSort] = useSettingMutable(
+    "realtimeSessionSort",
+  );
   const [voiceInputLanguage, setVoiceInputLanguage] =
     useSettingMutable("voiceInputLanguage");
   const [themePreference, setThemePreference] =
@@ -185,6 +188,19 @@ export default function AppearanceSettingsScreen() {
             <Switch
               value={compactSessionView}
               onValueChange={setCompactSessionView}
+            />
+          }
+        />
+        <Item
+          title={t("settingsAppearance.realtimeSessionSort")}
+          subtitle={t("settingsAppearance.realtimeSessionSortDescription")}
+          icon={
+            <Ionicons name="swap-vertical-outline" size={29} color="#5856D6" />
+          }
+          rightElement={
+            <Switch
+              value={realtimeSessionSort}
+              onValueChange={setRealtimeSessionSort}
             />
           }
         />

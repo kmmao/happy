@@ -364,6 +364,11 @@ export const SettingsSchema = z.object({
   hideInactiveSessions: z
     .boolean()
     .describe("Hide inactive sessions in the main list"),
+  realtimeSessionSort: z
+    .boolean()
+    .describe(
+      "Sort sessions by last activity in real-time (when off, sessions use stable creation order)",
+    ),
   reviewPromptAnswered: z
     .boolean()
     .describe("Whether the review prompt has been answered"),
@@ -506,6 +511,7 @@ export const settingsDefaults: Settings = {
   showFlavorIcons: false,
   compactSessionView: false,
   hideInactiveSessions: false,
+  realtimeSessionSort: true,
   reviewPromptAnswered: false,
   reviewPromptLikedApp: null,
   voiceAssistantLanguage: null,

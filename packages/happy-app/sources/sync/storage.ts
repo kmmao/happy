@@ -232,6 +232,7 @@ interface StorageState {
 // Helper function to build unified list view data from sessions and machines
 function buildSessionListViewData(
   sessions: Record<string, Session>,
+  realtimeSessionSort: boolean = true,
 ): SessionListViewItem[] {
   // Separate active and inactive sessions
   const activeSessions: Session[] = [];
@@ -245,9 +246,10 @@ function buildSessionListViewData(
     }
   });
 
-  // Sort sessions by updated date (newest first)
-  activeSessions.sort((a, b) => b.updatedAt - a.updatedAt);
-  inactiveSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+  // Sort sessions (by updatedAt for real-time, createdAt for stable order)
+  const sortKey = realtimeSessionSort ? "updatedAt" : "createdAt";
+  activeSessions.sort((a, b) => b[sortKey] - a[sortKey]);
+  inactiveSessions.sort((a, b) => b[sortKey] - a[sortKey]);
 
   // Build unified list view data
   const listData: SessionListViewItem[] = [];
@@ -266,7 +268,7 @@ function buildSessionListViewData(
   let currentDateString: string | null = null;
 
   for (const session of inactiveSessions) {
-    const sessionDate = new Date(session.updatedAt);
+    const sessionDate = new Date(session[sortKey]);
     const dateString = sessionDate.toDateString();
 
     if (currentDateString !== dateString) {
@@ -652,7 +654,10 @@ export const storage = create<StorageState>()((set, get) => {
         saveSessionNeedsAttention(allNeedsAttention);
 
         // Build new unified list view data
-        const sessionListViewData = buildSessionListViewData(mergedSessions);
+        const sessionListViewData = buildSessionListViewData(
+          mergedSessions,
+          state.settings.realtimeSessionSort ?? true,
+        );
 
         // Update project manager with current sessions and machines
         const machineMetadataMap = new Map<string, any>();
@@ -911,23 +916,38 @@ export const storage = create<StorageState>()((set, get) => {
       }),
     applySettingsLocal: (settings: Partial<Settings>) =>
       set((state) => {
-        saveSettings(
-          applySettings(state.settings, settings),
-          state.settingsVersion ?? 0,
-        );
+        const newSettings = applySettings(state.settings, settings);
+        saveSettings(newSettings, state.settingsVersion ?? 0);
+        const sortChanged =
+          newSettings.realtimeSessionSort !==
+          state.settings.realtimeSessionSort;
         return {
           ...state,
-          settings: applySettings(state.settings, settings),
+          settings: newSettings,
+          ...(sortChanged && {
+            sessionListViewData: buildSessionListViewData(
+              state.sessions,
+              newSettings.realtimeSessionSort ?? true,
+            ),
+          }),
         };
       }),
     applySettings: (settings: Settings, version: number) =>
       set((state) => {
         if (state.settingsVersion === null || state.settingsVersion < version) {
           saveSettings(settings, version);
+          const sortChanged =
+            settings.realtimeSessionSort !== state.settings.realtimeSessionSort;
           return {
             ...state,
             settings,
             settingsVersion: version,
+            ...(sortChanged && {
+              sessionListViewData: buildSessionListViewData(
+                state.sessions,
+                settings.realtimeSessionSort ?? true,
+              ),
+            }),
           };
         } else {
           return state;
@@ -1071,7 +1091,10 @@ export const storage = create<StorageState>()((set, get) => {
         };
 
         // Rebuild sessionListViewData to update the UI immediately
-        const sessionListViewData = buildSessionListViewData(updatedSessions);
+        const sessionListViewData = buildSessionListViewData(
+          updatedSessions,
+          state.settings.realtimeSessionSort ?? true,
+        );
 
         return {
           ...state,
@@ -1229,7 +1252,10 @@ export const storage = create<StorageState>()((set, get) => {
         }
 
         // Rebuild sessionListViewData to reflect machine changes
-        const sessionListViewData = buildSessionListViewData(state.sessions);
+        const sessionListViewData = buildSessionListViewData(
+          state.sessions,
+          state.settings.realtimeSessionSort ?? true,
+        );
 
         return {
           ...state,
@@ -1329,7 +1355,10 @@ export const storage = create<StorageState>()((set, get) => {
         deleteSessionBookmarks(sessionId);
 
         // Rebuild sessionListViewData without the deleted session
-        const sessionListViewData = buildSessionListViewData(remainingSessions);
+        const sessionListViewData = buildSessionListViewData(
+          remainingSessions,
+          state.settings.realtimeSessionSort ?? true,
+        );
 
         return {
           ...state,

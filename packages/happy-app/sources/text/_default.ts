@@ -211,6 +211,9 @@ export const en = {
     compactSessionView: "Compact Session View",
     compactSessionViewDescription:
       "Show active sessions in a more compact layout",
+    realtimeSessionSort: "Real-Time Session Sorting",
+    realtimeSessionSortDescription:
+      "Sort sessions by recent activity (disable for stable order by creation time)",
     voiceInputLanguage: "Voice Input Language",
     voiceInputLanguageDescription:
       "Language for speech recognition (tap to change)",
