@@ -32,7 +32,11 @@ import { Modal } from "@/modal";
 import { sync } from "@/sync/sync";
 import { SessionTypeSelector } from "@/components/SessionTypeSelector";
 import { createWorktree } from "@/utils/createWorktree";
-import { getTempData, type NewSessionData } from "@/utils/tempDataStore";
+import {
+  getTempData,
+  storeTempData,
+  type NewSessionData,
+} from "@/utils/tempDataStore";
 import type {
   PermissionMode,
   ModelMode,
@@ -1046,16 +1050,16 @@ function NewSessionWizard() {
       updatedAt: Date.now(),
       version: "1.0.0",
     };
-    const profileData = encodeURIComponent(JSON.stringify(newProfile));
-    router.push(`/new/pick/profile-edit?profileData=${profileData}`);
+    const profileKey = storeTempData(newProfile);
+    router.push(`/new/pick/profile-edit?profileKey=${profileKey}`);
   }, [router]);
 
   const handleEditProfile = React.useCallback(
     (profile: AIBackendProfile) => {
-      const profileData = encodeURIComponent(JSON.stringify(profile));
+      const profileKey = storeTempData(profile);
       const machineId = selectedMachineId || "";
       router.push(
-        `/new/pick/profile-edit?profileData=${profileData}&machineId=${machineId}`,
+        `/new/pick/profile-edit?profileKey=${profileKey}&machineId=${machineId}`,
       );
     },
     [router, selectedMachineId],
@@ -1071,8 +1075,8 @@ function NewSessionWizard() {
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
-      const profileData = encodeURIComponent(JSON.stringify(duplicatedProfile));
-      router.push(`/new/pick/profile-edit?profileData=${profileData}`);
+      const profileKey = storeTempData(duplicatedProfile);
+      router.push(`/new/pick/profile-edit?profileKey=${profileKey}`);
     },
     [router],
   );

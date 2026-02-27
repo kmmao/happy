@@ -18,7 +18,6 @@ import { ToolError } from "./ToolError";
 import { knownTools } from "@/components/tools/knownTools";
 import { Metadata } from "@/sync/storageTypes";
 import { useRouter } from "expo-router";
-import { PermissionFooter } from "./PermissionFooter";
 import { parseToolUseError } from "@/utils/toolErrorParser";
 import { formatMCPTitle } from "./views/MCPToolView";
 import { useSetting } from "@/sync/storage";
@@ -26,7 +25,7 @@ import { t } from "@/text";
 import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal/ModalManager";
-import { sessionAllow, sessionDeny } from "@/sync/ops";
+import { sessionAllow } from "@/sync/ops";
 import { useToolReview } from "./useToolReview";
 
 interface ToolViewProps {
@@ -109,28 +108,17 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     sessionId,
   });
 
-  // Quick approve/deny for pending permissions
-  const [quickApproveLoading, setQuickApproveLoading] = React.useState(false);
-
-  const handleQuickApprove = React.useCallback(async () => {
-    if (!sessionId || !tool.permission?.id || quickApproveLoading) return;
-    setQuickApproveLoading(true);
-    try {
-      await sessionAllow(sessionId, tool.permission.id);
-    } finally {
-      setQuickApproveLoading(false);
+  // Auto-approve all tool permissions — no user confirmation needed
+  React.useEffect(() => {
+    if (
+      sessionId &&
+      tool.permission?.status === "pending" &&
+      tool.permission?.id &&
+      tool.name !== "AskUserQuestion"
+    ) {
+      sessionAllow(sessionId, tool.permission.id);
     }
-  }, [sessionId, tool.permission?.id, quickApproveLoading]);
-
-  const handleQuickDeny = React.useCallback(async () => {
-    if (!sessionId || !tool.permission?.id || quickApproveLoading) return;
-    setQuickApproveLoading(true);
-    try {
-      await sessionDeny(sessionId, tool.permission.id);
-    } finally {
-      setQuickApproveLoading(false);
-    }
-  }, [sessionId, tool.permission?.id, quickApproveLoading]);
+  }, [sessionId, tool.permission?.status, tool.permission?.id, tool.name]);
 
   let knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
 
@@ -408,39 +396,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     }
   }
 
-  // Override statusIcon with quick approve/deny buttons when permission is pending
-  if (
-    tool.permission?.status === "pending" &&
-    sessionId &&
-    tool.name !== "AskUserQuestion"
-  ) {
-    statusIcon = (
-      <View style={styles.quickApproveContainer}>
-        <Pressable
-          onPress={handleQuickApprove}
-          style={styles.quickApproveBtn}
-          disabled={quickApproveLoading}
-        >
-          <Ionicons
-            name="checkmark-circle"
-            size={24}
-            color={theme.colors.diff.success}
-          />
-        </Pressable>
-        <Pressable
-          onPress={handleQuickDeny}
-          style={styles.quickApproveBtn}
-          disabled={quickApproveLoading}
-        >
-          <Ionicons
-            name="close-circle"
-            size={24}
-            color={theme.colors.diff.error}
-          />
-        </Pressable>
-      </View>
-    );
-  }
+  // Quick approve/deny buttons removed — all tools are auto-approved
 
   const statsBar =
     diffStats && tool.state !== "running" ? (
@@ -565,11 +521,15 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         return (
           <View style={styles.content}>
             {/* Default content when no custom view available */}
-            {tool.input && (
-              <ToolSectionView title={t("toolView.input")}>
-                <CodeView code={JSON.stringify(tool.input, null, 2)} />
-              </ToolSectionView>
-            )}
+            {tool.input &&
+              !(
+                typeof tool.input === "object" &&
+                Object.keys(tool.input).length === 0
+              ) && (
+                <ToolSectionView title={t("toolView.input")}>
+                  <CodeView code={JSON.stringify(tool.input, null, 2)} />
+                </ToolSectionView>
+              )}
 
             {tool.state === "completed" && tool.result && (
               <ToolSectionView title={t("toolView.output")}>
@@ -586,17 +546,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         );
       })()}
 
-      {/* Permission footer - always renders when permission exists to maintain consistent height */}
-      {/* AskUserQuestion has its own Submit button UI - no permission footer needed */}
-      {tool.permission && sessionId && tool.name !== "AskUserQuestion" && (
-        <PermissionFooter
-          permission={tool.permission}
-          sessionId={sessionId}
-          toolName={tool.name}
-          toolInput={tool.input}
-          metadata={props.metadata}
-        />
-      )}
+      {/* Permission footer removed — all tools are auto-approved */}
     </View>
   );
 });
