@@ -56,6 +56,8 @@ export interface StartOptions {
   noSandbox?: boolean;
   /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
   jsRuntime?: JsRuntime;
+  /** Happy session ID for reconnecting to an existing session */
+  happySessionId?: string;
 }
 
 export async function runClaude(
@@ -120,8 +122,6 @@ export async function runClaude(
   }
   logger.debug(`Using machineId: ${machineId}`);
 
-  const sessionTag = randomUUID();
-
   // Create machine if it doesn't exist
   await api.getOrCreateMachine({
     machineId,
@@ -152,11 +152,26 @@ export async function runClaude(
     dangerouslySkipPermissions,
     packageScripts,
   };
-  const response = await api.getOrCreateSession({
-    tag: sessionTag,
-    metadata,
-    state,
-  });
+
+  // Session creation: reconnect to existing or create new
+  let response;
+  if (options.happySessionId) {
+    logger.debug(
+      `[CLAUDE] Reconnecting to existing session: ${options.happySessionId}`,
+    );
+    response = await api.reconnectSession({
+      sessionId: options.happySessionId,
+      metadata,
+      state,
+    });
+  } else {
+    const sessionTag = randomUUID();
+    response = await api.getOrCreateSession({
+      tag: sessionTag,
+      metadata,
+      state,
+    });
+  }
 
   // Handle server unreachable case - run Claude locally with hot reconnection
   // Note: connectionState.notifyOffline() was already called by api.ts with error details
@@ -166,11 +181,21 @@ export async function runClaude(
     const reconnection = startOfflineReconnection({
       serverUrl: configuration.serverUrl,
       onReconnected: async () => {
-        const resp = await api.getOrCreateSession({
-          tag: sessionTag,
-          metadata,
-          state,
-        });
+        let resp;
+        if (options.happySessionId) {
+          resp = await api.reconnectSession({
+            sessionId: options.happySessionId,
+            metadata,
+            state,
+          });
+        } else {
+          const sessionTag = randomUUID();
+          resp = await api.getOrCreateSession({
+            tag: sessionTag,
+            metadata,
+            state,
+          });
+        }
         if (!resp) throw new Error("Server unavailable");
         const session = api.sessionSyncClient(resp);
         const scanner = await createSessionScanner({

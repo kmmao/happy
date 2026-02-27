@@ -289,6 +289,7 @@ export async function startDaemon(): Promise<void> {
         sessionId,
         machineId,
         approvedNewDirectoryCreation = true,
+        happySessionId,
       } = options;
       let directoryCreated = false;
 
@@ -522,7 +523,10 @@ export async function startDaemon(): Promise<void> {
             sessionId && /^[0-9a-f-]+$/i.test(sessionId)
               ? ` --resume ${sessionId}`
               : "";
-          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeArg}`;
+          const happySessionArg = happySessionId
+            ? ` --happy-session-id ${happySessionId}`
+            : "";
+          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeArg}${happySessionArg}`;
 
           // Spawn in tmux with environment variables
           // IMPORTANT: Pass complete environment (process.env + extraEnv) because:
@@ -650,6 +654,14 @@ export async function startDaemon(): Promise<void> {
             args.push("--resume", sessionId);
             logger.debug(
               `[DAEMON RUN] Adding --resume ${sessionId} to spawn args`,
+            );
+          }
+
+          // Reconnect to existing Happy session if happySessionId provided
+          if (happySessionId) {
+            args.push("--happy-session-id", happySessionId);
+            logger.debug(
+              `[DAEMON RUN] Adding --happy-session-id ${happySessionId} to spawn args`,
             );
           }
 

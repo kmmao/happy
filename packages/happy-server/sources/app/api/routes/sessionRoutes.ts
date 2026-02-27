@@ -248,13 +248,65 @@ export function sessionRoutes(app: Fastify) {
           metadata: z.string(),
           agentState: z.string().nullish(),
           dataEncryptionKey: z.string().nullish(),
+          sessionId: z.string().nullish(),
         }),
       },
       preHandler: app.authenticate,
     },
     async (request, reply) => {
       const userId = request.userId;
-      const { tag, metadata, dataEncryptionKey } = request.body;
+      const { tag, metadata, dataEncryptionKey, sessionId } = request.body;
+
+      // Reconnect to existing session by ID (for resume functionality)
+      if (sessionId) {
+        const existing = await db.session.findFirst({
+          where: { id: sessionId, accountId: userId },
+        });
+        if (!existing) {
+          return reply.status(404).send({ error: "Session not found" });
+        }
+
+        log(
+          { module: "session-create", sessionId: existing.id, userId },
+          `Reconnecting to existing session: ${existing.id}`,
+        );
+
+        // Update metadata, encryption key, and reactivate
+        const updated = await db.session.update({
+          where: { id: sessionId },
+          data: {
+            metadata,
+            ...(dataEncryptionKey
+              ? {
+                  dataEncryptionKey: new Uint8Array(
+                    Buffer.from(dataEncryptionKey, "base64"),
+                  ),
+                }
+              : {}),
+            active: true,
+            lastActiveAt: new Date(),
+          },
+        });
+
+        return reply.send({
+          session: {
+            id: updated.id,
+            seq: updated.seq,
+            metadata: updated.metadata,
+            metadataVersion: updated.metadataVersion,
+            agentState: updated.agentState,
+            agentStateVersion: updated.agentStateVersion,
+            dataEncryptionKey: updated.dataEncryptionKey
+              ? Buffer.from(updated.dataEncryptionKey).toString("base64")
+              : null,
+            active: updated.active,
+            activeAt: updated.lastActiveAt.getTime(),
+            createdAt: updated.createdAt.getTime(),
+            updatedAt: updated.updatedAt.getTime(),
+            lastMessage: null,
+          },
+        });
+      }
 
       const session = await db.session.findFirst({
         where: {

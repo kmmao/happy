@@ -141,6 +141,7 @@ export class ApiMachineClient {
           agent,
           token,
           environmentVariables,
+          happySessionId,
         } = params || {};
         logger.debug(
           `[API MACHINE] Spawning session with params: ${JSON.stringify(params)}`,
@@ -158,6 +159,7 @@ export class ApiMachineClient {
           agent,
           token,
           environmentVariables,
+          happySessionId,
         });
 
         switch (result.type) {

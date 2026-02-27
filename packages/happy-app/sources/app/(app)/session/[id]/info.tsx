@@ -243,19 +243,21 @@ function SessionInfoContent({ session }: { session: Session }) {
     );
   }, [performDelete]);
 
-  // Use HappyAction for resume - spawns a new session with --resume
+  // Use HappyAction for resume - reconnects to the same Happy session with --resume
   const [resumingSession, performResume] = useHappyAction(async () => {
     const result = await machineSpawnNewSession({
       machineId: session.metadata!.machineId!,
       directory: session.metadata!.path!,
       claudeSessionId: session.metadata!.claudeSessionId!,
+      happySessionId: session.id,
       agent: "claude",
     });
     if (result.type === "error") {
       throw new HappyError(result.errorMessage, false);
     }
     if (result.type === "success") {
-      navigateToSession(result.sessionId);
+      // Same session reconnected — go back to the session view
+      router.back();
     }
   });
 
