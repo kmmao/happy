@@ -1559,7 +1559,7 @@ export function isReviewableTool(toolName: string): boolean {
     if ("isMutable" in tool) {
       return tool.isMutable === true;
     }
-    return false;
   }
-  return true;
+  // Unknown tools should not be reviewable by default
+  return false;
 }
