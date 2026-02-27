@@ -271,6 +271,9 @@ export function sessionRoutes(app: Fastify) {
           `Reconnecting to existing session: ${existing.id}`,
         );
 
+        // Resolve seq for the update event
+        const updSeq = await allocateUserSeq(userId);
+
         // Update metadata, encryption key, and reactivate
         const updated = await db.session.update({
           where: { id: sessionId },
@@ -286,6 +289,18 @@ export function sessionRoutes(app: Fastify) {
             active: true,
             lastActiveAt: new Date(),
           },
+        });
+
+        // Emit new-session event so App re-fetches sessions and picks up the new dataEncryptionKey
+        const updatePayload = buildNewSessionUpdate(
+          updated,
+          updSeq,
+          randomKeyNaked(12),
+        );
+        eventRouter.emitUpdate({
+          userId,
+          payload: updatePayload,
+          recipientFilter: { type: "user-scoped-only" },
         });
 
         return reply.send({
