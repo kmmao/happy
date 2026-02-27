@@ -490,8 +490,17 @@ export const storage = create<StorageState>()((set, get) => {
             savedNeedsAttention[session.id] ??
             false;
 
+          // Preserve metadata.summary when new metadata doesn't have one
+          // (e.g. after session reconnect, CLI sends fresh metadata without summary)
+          const existingSummary = state.sessions[session.id]?.metadata?.summary;
+          const resolvedMetadata =
+            session.metadata && !session.metadata.summary && existingSummary
+              ? { ...session.metadata, summary: existingSummary }
+              : session.metadata;
+
           mergedSessions[session.id] = {
             ...session,
+            metadata: resolvedMetadata,
             presence,
             draft: existingDraft || savedDraft || session.draft || null,
             permissionMode: resolvedPermissionMode,
