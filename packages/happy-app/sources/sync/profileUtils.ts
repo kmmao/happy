@@ -266,11 +266,12 @@ export MINIMAX_API_TIMEOUT_MS="600000"
 export MINIMAX_MODEL="MiniMax-M2.5"
 export MINIMAX_SMALL_FAST_MODEL="MiniMax-M2.5-highspeed"
 
-# Available models:
-# - MiniMax-M2.5: Most capable, coding + agent (204K context)
-# - MiniMax-M2.5-highspeed: Fast version (~100 TPS)
-# - MiniMax-M2.1: Previous gen, multilingual coding
-# - MiniMax-M2.1-highspeed: Previous gen fast`,
+# Model tier mappings (Opus/Sonnet/Haiku → MiniMax models):
+# These are set automatically by the profile via ANTHROPIC_DEFAULT_*_MODEL env vars.
+# Override if needed:
+# export MINIMAX_OPUS_MODEL="MiniMax-M2.5"
+# export MINIMAX_SONNET_MODEL="MiniMax-M2.5"
+# export MINIMAX_HAIKU_MODEL="MiniMax-M2.5-highspeed"`,
       };
     default:
       return null;
@@ -427,6 +428,10 @@ export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
         version: "1.0.0",
       };
     case "minimax":
+      // MiniMax profile: Uses Z.AI-style ANTHROPIC_DEFAULT_*_MODEL env vars
+      // so Claude Code internally maps Opus/Sonnet/Haiku → MiniMax models.
+      // Do NOT use App-side modelMappings — Claude Code rejects unknown model
+      // names passed via --model (e.g., "MiniMax-M2.5" causes 502 error).
       return {
         id: "minimax",
         name: "MiniMax (M2.5)",
@@ -453,19 +458,22 @@ export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
             value: "${MINIMAX_SMALL_FAST_MODEL:-MiniMax-M2.5-highspeed}",
           },
           {
+            name: "ANTHROPIC_DEFAULT_OPUS_MODEL",
+            value: "${MINIMAX_OPUS_MODEL:-MiniMax-M2.5}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            value: "${MINIMAX_SONNET_MODEL:-MiniMax-M2.5}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            value: "${MINIMAX_HAIKU_MODEL:-MiniMax-M2.5-highspeed}",
+          },
+          {
             name: "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
             value: "1",
           },
         ],
-        // UI keeps showing Opus/Sonnet/Haiku, but maps them to MiniMax models
-        modelMappings: {
-          haiku: "MiniMax-M2.5-highspeed",
-          sonnet: "MiniMax-M2.5",
-          "sonnet-1m": "MiniMax-M2.5",
-          opus: "MiniMax-M2.5",
-          "opus-1m": "MiniMax-M2.5",
-          opusplan: "MiniMax-M2.5",
-        },
         defaultPermissionMode: "default",
         compatibility: { claude: true, codex: false, gemini: false },
         isBuiltIn: true,
