@@ -6,9 +6,10 @@
       "summary": "Fixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.",
       "changes": [
         "Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor",
+        "Fixed session title reverting to project name after resume by preserving the summary field during metadata updates",
         "Added session resume V2 support — resume now reconnects to the same session instead of creating a new one"
       ],
-      "rawMarkdown": "## Version 2 - 2026-02-27\n\n\nFixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.\n\n- Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor\n- Added session resume V2 support — resume now reconnects to the same session instead of creating a new one"
+      "rawMarkdown": "## Version 2 - 2026-02-27\n\n\nFixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.\n\n- Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor\n- Fixed session title reverting to project name after resume by preserving the summary field during metadata updates\n- Added session resume V2 support — resume now reconnects to the same session instead of creating a new one"
     },
     {
       "version": 1,

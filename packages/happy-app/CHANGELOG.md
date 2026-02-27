@@ -5,6 +5,7 @@
 Fixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.
 
 - Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor
+- Fixed session title reverting to project name after resume by preserving the summary field during metadata updates
 - Added session resume V2 support — resume now reconnects to the same session instead of creating a new one
 
 ## Version 1 - 2026-02-27
