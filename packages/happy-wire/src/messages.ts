@@ -1,11 +1,11 @@
-import * as z from 'zod';
-import { sessionEnvelopeSchema } from './sessionProtocol';
-import { MessageMetaSchema, type MessageMeta } from './messageMeta';
-import { AgentMessageSchema, UserMessageSchema } from './legacyProtocol';
+import * as z from "zod";
+import { sessionEnvelopeSchema } from "./sessionProtocol";
+import { MessageMetaSchema, type MessageMeta } from "./messageMeta";
+import { AgentMessageSchema, UserMessageSchema } from "./legacyProtocol";
 
 export const SessionMessageContentSchema = z.object({
   c: z.string(),
-  t: z.literal('encrypted'),
+  t: z.literal("encrypted"),
 });
 export type SessionMessageContent = z.infer<typeof SessionMessageContentSchema>;
 
@@ -22,13 +22,15 @@ export { MessageMetaSchema };
 export type { MessageMeta };
 
 export const SessionProtocolMessageSchema = z.object({
-  role: z.literal('session'),
+  role: z.literal("session"),
   content: sessionEnvelopeSchema,
   meta: MessageMetaSchema.optional(),
 });
-export type SessionProtocolMessage = z.infer<typeof SessionProtocolMessageSchema>;
+export type SessionProtocolMessage = z.infer<
+  typeof SessionProtocolMessageSchema
+>;
 
-export const MessageContentSchema = z.discriminatedUnion('role', [
+export const MessageContentSchema = z.discriminatedUnion("role", [
   UserMessageSchema,
   AgentMessageSchema,
   SessionProtocolMessageSchema,
@@ -39,26 +41,31 @@ export const VersionedEncryptedValueSchema = z.object({
   version: z.number(),
   value: z.string(),
 });
-export type VersionedEncryptedValue = z.infer<typeof VersionedEncryptedValueSchema>;
+export type VersionedEncryptedValue = z.infer<
+  typeof VersionedEncryptedValueSchema
+>;
 
 export const VersionedNullableEncryptedValueSchema = z.object({
   version: z.number(),
   value: z.string().nullable(),
 });
-export type VersionedNullableEncryptedValue = z.infer<typeof VersionedNullableEncryptedValueSchema>;
+export type VersionedNullableEncryptedValue = z.infer<
+  typeof VersionedNullableEncryptedValueSchema
+>;
 
 export const UpdateNewMessageBodySchema = z.object({
-  t: z.literal('new-message'),
+  t: z.literal("new-message"),
   sid: z.string(),
   message: SessionMessageSchema,
 });
 export type UpdateNewMessageBody = z.infer<typeof UpdateNewMessageBodySchema>;
 
 export const UpdateSessionBodySchema = z.object({
-  t: z.literal('update-session'),
+  t: z.literal("update-session"),
   id: z.string(),
   metadata: VersionedEncryptedValueSchema.nullish(),
   agentState: VersionedNullableEncryptedValueSchema.nullish(),
+  preferences: VersionedNullableEncryptedValueSchema.nullish(),
 });
 export type UpdateSessionBody = z.infer<typeof UpdateSessionBodySchema>;
 
@@ -66,10 +73,12 @@ export const VersionedMachineEncryptedValueSchema = z.object({
   version: z.number(),
   value: z.string(),
 });
-export type VersionedMachineEncryptedValue = z.infer<typeof VersionedMachineEncryptedValueSchema>;
+export type VersionedMachineEncryptedValue = z.infer<
+  typeof VersionedMachineEncryptedValueSchema
+>;
 
 export const UpdateMachineBodySchema = z.object({
-  t: z.literal('update-machine'),
+  t: z.literal("update-machine"),
   machineId: z.string(),
   metadata: VersionedMachineEncryptedValueSchema.nullish(),
   daemonState: VersionedMachineEncryptedValueSchema.nullish(),
@@ -78,7 +87,7 @@ export const UpdateMachineBodySchema = z.object({
 });
 export type UpdateMachineBody = z.infer<typeof UpdateMachineBodySchema>;
 
-export const CoreUpdateBodySchema = z.discriminatedUnion('t', [
+export const CoreUpdateBodySchema = z.discriminatedUnion("t", [
   UpdateNewMessageBodySchema,
   UpdateSessionBodySchema,
   UpdateMachineBodySchema,
