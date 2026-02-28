@@ -124,13 +124,18 @@ class RecorderManager:
             "use_microphone": False,
             "spinner": False,
             "enable_realtime_transcription": True,
+            # Use "small" model for realtime (244M params, ~1s/pass on CPU).
+            # "tiny" (39M) can't do Chinese; "base" (74M) is faster but
+            # produces garbled Chinese text. "small" is slower but gives
+            # readable interim results. Final quality comes from turbo.
+            "realtime_model_type": "small",
             "on_realtime_transcription_stabilized": self._on_realtime_update,
             "silero_sensitivity": 0.4,
             "webrtc_sensitivity": 3,
             "post_speech_silence_duration": 0.7,
             "min_length_of_recording": 0.3,
             "min_gap_between_recordings": 0,
-            "realtime_processing_pause": 0.1,
+            "realtime_processing_pause": 0.2,
             "beam_size": 5,
         }
         self.recorder = AudioToTextRecorder(**recorder_config)
@@ -161,11 +166,14 @@ class RecorderManager:
         # Safe: no audio is flowing yet (client sends audio after receiving "ready").
         if self.recorder is not None:
             self.recorder.language = lang or ""
-            self.recorder.initial_prompt = _get_initial_prompt(lang, locale)
+            prompt = _get_initial_prompt(lang, locale)
+            self.recorder.initial_prompt = prompt
+            # Also set the realtime model's prompt (separate from main model)
+            self.recorder.initial_prompt_realtime = prompt
             logger.info(
                 "Recorder configured: lang=%s, prompt=%s",
                 lang or "auto",
-                self.recorder.initial_prompt or "(none)",
+                prompt or "(none)",
             )
         return True
 
@@ -223,7 +231,10 @@ _VALID_SAMPLE_RATES = frozenset((8000, 16000, 22050, 44100, 48000))
 
 async def _handle_connection(ws, path=None):
     """Handle a single WebSocket connection."""
-    parsed = urllib.parse.urlparse(ws.path if hasattr(ws, "path") else (path or ""))
+    # websockets 15+: path is on ws.request.path (includes query string)
+    # websockets <13: path is passed as second argument
+    raw_path = getattr(getattr(ws, "request", None), "path", None) or (path or "")
+    parsed = urllib.parse.urlparse(raw_path)
     params = urllib.parse.parse_qs(parsed.query)
     locale = params.get("lang", [None])[0]
     lang = _normalize_lang(locale)

@@ -291,6 +291,10 @@ export function sttRoutes(app: Fastify) {
     },
     async (request, reply) => {
       const { text, lang } = request.body;
+      log(
+        { module: "stt" },
+        `STT correct request: text="${text}", lang=${lang}`,
+      );
 
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
@@ -335,6 +339,10 @@ export function sttRoutes(app: Fastify) {
         };
 
         const corrected = data.content?.[0]?.text?.trim();
+        log(
+          { module: "stt" },
+          `STT correct result: input="${text}" → output="${corrected}"`,
+        );
         return reply.send({
           correctedText: corrected || text,
         });

@@ -64,6 +64,9 @@ function buildAudioFrame(
   return frame;
 }
 
+/** Max time to wait for the server's final transcription after stopping audio. */
+const DRAIN_TIMEOUT_MS = 6000;
+
 /**
  * WebSocket-based STT using AudioWorklet + RealtimeSTT server.
  *
@@ -71,8 +74,11 @@ function buildAudioFrame(
  * streams it over WebSocket to the server, receives real-time
  * interim and final transcription results.
  *
- * Designed for mobile browsers where Web Speech API produces
- * system sounds and MediaRecorder + HTTP has high latency.
+ * When the user stops listening, the audio pipeline is torn down
+ * but the WebSocket stays open briefly to receive the server's
+ * final high-quality transcription (from the main Whisper model).
+ * This avoids losing the final result which is far more accurate
+ * than the interim realtime transcription.
  */
 export function useWebSocketStt(
   onTranscript: (text: string) => void,
@@ -84,6 +90,8 @@ export function useWebSocketStt(
   onTranscriptRef.current = onTranscript;
   const langRef = useRef(lang);
   langRef.current = lang;
+  // Mirror of interimTranscript for synchronous access in stopListening
+  const interimTextRef = useRef("");
 
   // Resources
   const wsRef = useRef<WebSocket | null>(null);
@@ -99,10 +107,12 @@ export function useWebSocketStt(
   const wantListeningRef = useRef(false);
   const isPausedRef = useRef(false);
   const sampleRateRef = useRef(16000);
+  // When true, audio is stopped but we're waiting for the final transcription
+  const isDrainingRef = useRef(false);
+  const drainTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const cleanupAll = useCallback(() => {
-    wantListeningRef.current = false;
-
+  /** Stop audio capture pipeline without touching the WebSocket. */
+  const stopAudioPipeline = useCallback(() => {
     if (workletNodeRef.current) {
       workletNodeRef.current.port.onmessage = null;
       workletNodeRef.current.disconnect();
@@ -135,6 +145,20 @@ export function useWebSocketStt(
       mediaStreamRef.current = null;
     }
 
+    if (workletUrlRef.current) {
+      URL.revokeObjectURL(workletUrlRef.current);
+      workletUrlRef.current = null;
+    }
+  }, []);
+
+  /** Close the WebSocket and clear all remaining state. */
+  const closeWebSocket = useCallback(() => {
+    if (drainTimeoutRef.current) {
+      clearTimeout(drainTimeoutRef.current);
+      drainTimeoutRef.current = null;
+    }
+    isDrainingRef.current = false;
+
     if (wsRef.current) {
       wsRef.current.onopen = null;
       wsRef.current.onmessage = null;
@@ -144,13 +168,16 @@ export function useWebSocketStt(
       wsRef.current = null;
     }
 
-    if (workletUrlRef.current) {
-      URL.revokeObjectURL(workletUrlRef.current);
-      workletUrlRef.current = null;
-    }
-
+    interimTextRef.current = "";
     setInterimTranscript("");
   }, []);
+
+  /** Full cleanup: stop audio + close WebSocket. Used for errors/unmount. */
+  const cleanupAll = useCallback(() => {
+    wantListeningRef.current = false;
+    stopAudioPipeline();
+    closeWebSocket();
+  }, [stopAudioPipeline, closeWebSocket]);
 
   /** Set up AudioContext + AudioWorklet → WebSocket pipeline */
   const setupAudioPipeline = useCallback(
@@ -248,7 +275,27 @@ export function useWebSocketStt(
     [],
   );
 
+  /** Force-finish any active drain: flush interim text and close WS. */
+  const cancelDrain = useCallback(() => {
+    if (!isDrainingRef.current) return;
+    if (drainTimeoutRef.current) {
+      clearTimeout(drainTimeoutRef.current);
+      drainTimeoutRef.current = null;
+    }
+    isDrainingRef.current = false;
+    if (interimTextRef.current) {
+      onTranscriptRef.current(interimTextRef.current);
+      interimTextRef.current = "";
+    }
+    wantListeningRef.current = false;
+    closeWebSocket();
+  }, [closeWebSocket]);
+
   const startListening = useCallback(async () => {
+    // If draining from a previous stop, finish it first
+    if (isDrainingRef.current) {
+      cancelDrain();
+    }
     if (wantListeningRef.current) return;
     wantListeningRef.current = true;
 
@@ -301,6 +348,30 @@ export function useWebSocketStt(
     };
 
     ws.onmessage = (event) => {
+      // During draining, only accept fullSentence results
+      if (isDrainingRef.current) {
+        try {
+          const msg = JSON.parse(event.data as string);
+          if (msg.type === "fullSentence") {
+            // Got the final transcription — deliver it and close
+            if (drainTimeoutRef.current) {
+              clearTimeout(drainTimeoutRef.current);
+              drainTimeoutRef.current = null;
+            }
+            isDrainingRef.current = false;
+            if (msg.text) {
+              onTranscriptRef.current(msg.text);
+            }
+            wantListeningRef.current = false;
+            closeWebSocket();
+          }
+          // Ignore realtime updates during drain
+        } catch {
+          // Ignore malformed JSON
+        }
+        return;
+      }
+
       if (!wantListeningRef.current) return;
       try {
         const msg = JSON.parse(event.data as string);
@@ -314,9 +385,11 @@ export function useWebSocketStt(
           setInterimTranscript("");
         } else if (msg.type === "realtime" && msg.text) {
           if (!isPausedRef.current) {
+            interimTextRef.current = msg.text;
             setInterimTranscript(msg.text);
           }
         } else if (msg.type === "fullSentence") {
+          interimTextRef.current = "";
           setInterimTranscript("");
           if (msg.text && !isPausedRef.current) {
             onTranscriptRef.current(msg.text);
@@ -329,26 +402,65 @@ export function useWebSocketStt(
     };
 
     ws.onerror = () => {
-      if (wantListeningRef.current) {
+      if (wantListeningRef.current || isDrainingRef.current) {
         setIsListening(false);
         cleanupAll();
       }
     };
 
     ws.onclose = () => {
-      if (wantListeningRef.current) {
+      if (wantListeningRef.current || isDrainingRef.current) {
+        // Connection closed unexpectedly during drain — flush interim
+        if (isDrainingRef.current && interimTextRef.current) {
+          onTranscriptRef.current(interimTextRef.current);
+          interimTextRef.current = "";
+        }
         setIsListening(false);
         cleanupAll();
       }
     };
-  }, [cleanupAll, setupAudioPipeline]);
+  }, [cancelDrain, cleanupAll, closeWebSocket, setupAudioPipeline]);
 
   const stopListening = useCallback(() => {
-    wantListeningRef.current = false;
     isPausedRef.current = false;
     setIsListening(false);
-    cleanupAll();
-  }, [cleanupAll]);
+    setInterimTranscript("");
+
+    const ws = wsRef.current;
+    const hasOpenWs = ws && ws.readyState === WebSocket.OPEN;
+
+    // Stop audio capture — no more audio frames sent to server.
+    // The server's VAD will detect silence and trigger final transcription.
+    stopAudioPipeline();
+
+    if (hasOpenWs) {
+      // Enter drain mode: keep WebSocket open to receive the final
+      // high-quality transcription from the server's main Whisper model.
+      isDrainingRef.current = true;
+      wantListeningRef.current = true; // Keep accepting messages
+
+      // Safety timeout: if the final result doesn't arrive, fall back
+      // to the interim text and close.
+      drainTimeoutRef.current = setTimeout(() => {
+        drainTimeoutRef.current = null;
+        isDrainingRef.current = false;
+        if (interimTextRef.current) {
+          onTranscriptRef.current(interimTextRef.current);
+          interimTextRef.current = "";
+        }
+        wantListeningRef.current = false;
+        closeWebSocket();
+      }, DRAIN_TIMEOUT_MS);
+    } else {
+      // No open WebSocket — flush interim and clean up immediately
+      wantListeningRef.current = false;
+      if (interimTextRef.current) {
+        onTranscriptRef.current(interimTextRef.current);
+        interimTextRef.current = "";
+      }
+      closeWebSocket();
+    }
+  }, [stopAudioPipeline, closeWebSocket]);
 
   const pauseListening = useCallback(() => {
     if (!wantListeningRef.current || isPausedRef.current) return;
