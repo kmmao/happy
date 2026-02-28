@@ -41,8 +41,6 @@ export default function AppearanceSettingsScreen() {
   const [realtimeSessionSort, setRealtimeSessionSort] = useSettingMutable(
     "realtimeSessionSort",
   );
-  const [voiceInputLanguage, setVoiceInputLanguage] =
-    useSettingMutable("voiceInputLanguage");
   const [themePreference, setThemePreference] =
     useLocalSettingMutable("themePreference");
   const [preferredLanguage] = useSettingMutable("preferredLanguage");
@@ -318,31 +316,6 @@ export default function AppearanceSettingsScreen() {
               onValueChange={setShowFlavorIcons}
             />
           }
-        />
-        <Item
-          title={t("settingsAppearance.voiceInputLanguage")}
-          subtitle={t("settingsAppearance.voiceInputLanguageDescription")}
-          icon={<Ionicons name="language-outline" size={29} color="#5856D6" />}
-          detail={
-            voiceInputLanguage === null
-              ? t("settingsAppearance.voiceInputLanguageOptions.auto")
-              : voiceInputLanguage === "en-US"
-                ? t("settingsAppearance.voiceInputLanguageOptions.enUS")
-                : voiceInputLanguage === "zh-CN"
-                  ? t("settingsAppearance.voiceInputLanguageOptions.zhCN")
-                  : t("settingsAppearance.voiceInputLanguageOptions.zhTW")
-          }
-          onPress={() => {
-            const options: Array<string | null> = [
-              null,
-              "en-US",
-              "zh-CN",
-              "zh-TW",
-            ];
-            const currentIndex = options.indexOf(voiceInputLanguage);
-            const nextIndex = (currentIndex + 1) % options.length;
-            setVoiceInputLanguage(options[nextIndex] ?? null);
-          }}
         />
         {/* <Item
                     title="Compact Mode"

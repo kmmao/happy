@@ -6,6 +6,7 @@ import type { Duplex } from "stream";
 import { type Fastify } from "../types";
 import { log } from "@/utils/log";
 import { auth } from "@/app/auth/auth";
+import { sttCorrectionPrompt } from "./_prompts";
 
 /**
  * Set up STT WebSocket proxy on the raw HTTP server.
@@ -267,6 +268,84 @@ export function sttRoutes(app: Fastify) {
               ? error.message
               : "Failed to transcribe audio",
         });
+      }
+    },
+  );
+
+  // === Haiku STT 纠错 ===
+  app.post(
+    "/v1/stt/correct",
+    {
+      preHandler: app.authenticate,
+      schema: {
+        body: z.object({
+          text: z.string().min(1).max(2000),
+          lang: z.string().optional(),
+        }),
+        response: {
+          200: z.object({
+            correctedText: z.string(),
+          }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const { text, lang } = request.body;
+
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        // No API key configured — return original text
+        return reply.send({ correctedText: text });
+      }
+
+      const prompt = sttCorrectionPrompt(text, lang);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1500);
+
+      try {
+        const apiBase = (
+          process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com"
+        ).replace(/\/$/, "");
+        const response = await fetch(`${apiBase}/v1/messages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 200,
+            messages: [{ role: "user", content: prompt }],
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errBody = await response.text().catch(() => "");
+          log(
+            { module: "stt", level: "error" },
+            `Haiku correction API error: ${response.status} ${errBody}`,
+          );
+          return reply.send({ correctedText: text });
+        }
+
+        const data = (await response.json()) as {
+          content?: Array<{ type: string; text?: string }>;
+        };
+
+        const corrected = data.content?.[0]?.text?.trim();
+        return reply.send({
+          correctedText: corrected || text,
+        });
+      } catch (error) {
+        log(
+          { module: "stt" },
+          `Haiku correction failed (fallback to original): ${error}`,
+        );
+        return reply.send({ correctedText: text });
+      } finally {
+        clearTimeout(timeout);
       }
     },
   );

@@ -13,6 +13,7 @@ import {
   synthesizeSpeechElevenLabs,
   ElevenLabsAuthError,
 } from "@/sync/apiTts";
+import { correctTranscript } from "@/sync/apiStt";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getEdgeTtsVoice } from "@/constants/Languages";
 import type { VoiceSession, VoiceSessionConfig } from "./types";
@@ -70,6 +71,7 @@ const RealtimeVoiceSessionInner: React.FC = () => {
   // Transcript accumulation: collect multiple final results before sending
   const accumulatedTextRef = useRef("");
   const sendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFlushingRef = useRef(false);
 
   const processQueue = useCallback(async () => {
     if (isProcessingRef.current) return;
@@ -173,28 +175,50 @@ const RealtimeVoiceSessionInner: React.FC = () => {
   );
 
   // Flush accumulated transcript: send everything collected so far
-  const flushTranscript = useCallback(() => {
-    const sessionId = getCurrentRealtimeSessionId();
-    const fullText = accumulatedTextRef.current.trim();
-    accumulatedTextRef.current = "";
-    if (sendTimeoutRef.current) {
-      clearTimeout(sendTimeoutRef.current);
-      sendTimeoutRef.current = null;
-    }
-    if (!sessionId || !fullText) return;
+  const flushTranscript = useCallback(async () => {
+    if (isFlushingRef.current) return;
+    isFlushingRef.current = true;
 
-    // Timeout guard: if no TTS arrives within 30s, fall back to listening
-    clearThinkingTimeout();
-    thinkingTimeoutId = setTimeout(() => {
-      if (
-        realtimeStore.getState().isActive &&
-        storage.getState().realtimeMode === "thinking"
-      ) {
-        storage.getState().setRealtimeMode("listening", true);
+    try {
+      const sessionId = getCurrentRealtimeSessionId();
+      const fullText = accumulatedTextRef.current.trim();
+      accumulatedTextRef.current = "";
+      if (sendTimeoutRef.current) {
+        clearTimeout(sendTimeoutRef.current);
+        sendTimeoutRef.current = null;
       }
-    }, THINKING_TIMEOUT_MS);
+      if (!sessionId || !fullText) return;
 
-    sync.sendMessage(sessionId, fullText);
+      // Haiku correction (only when enabled in settings, silent fallback on failure)
+      let finalText = fullText;
+      if (storage.getState().settings.sttCorrection) {
+        try {
+          const credentials = await TokenStorage.getCredentials();
+          if (credentials) {
+            const lang =
+              storage.getState().settings.voiceAssistantLanguage ?? undefined;
+            finalText = await correctTranscript(credentials, finalText, lang);
+          }
+        } catch {
+          // Use original text
+        }
+      }
+
+      // Timeout guard: if no TTS arrives within 30s, fall back to listening
+      clearThinkingTimeout();
+      thinkingTimeoutId = setTimeout(() => {
+        if (
+          realtimeStore.getState().isActive &&
+          storage.getState().realtimeMode === "thinking"
+        ) {
+          storage.getState().setRealtimeMode("listening", true);
+        }
+      }, THINKING_TIMEOUT_MS);
+
+      sync.sendMessage(sessionId, finalText);
+    } finally {
+      isFlushingRef.current = false;
+    }
   }, []);
 
   // STT callback: accumulate transcribed text, debounce before sending

@@ -23,6 +23,7 @@ export default function FeaturesSettingsScreen() {
     useSettingMutable("useEnhancedSessionWizard");
   const [autoApprovePlan, setAutoApprovePlan] =
     useSettingMutable("autoApprovePlan");
+  const [sttCorrection, setSttCorrection] = useSettingMutable("sttCorrection");
 
   return (
     <ItemList style={{ paddingTop: 0 }}>
@@ -96,6 +97,19 @@ export default function FeaturesSettingsScreen() {
               value={autoApprovePlan}
               onValueChange={setAutoApprovePlan}
             />
+          }
+          showChevron={false}
+        />
+        <Item
+          title={t("settingsFeatures.sttCorrection")}
+          subtitle={
+            sttCorrection
+              ? t("settingsFeatures.sttCorrectionEnabled")
+              : t("settingsFeatures.sttCorrectionDisabled")
+          }
+          icon={<Ionicons name="mic-outline" size={29} color="#30B0C7" />}
+          rightElement={
+            <Switch value={sttCorrection} onValueChange={setSttCorrection} />
           }
           showChevron={false}
         />

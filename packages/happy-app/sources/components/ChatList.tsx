@@ -18,7 +18,15 @@ import { ToolGroupView } from "./ToolGroupView";
 import { knownTools } from "./tools/knownTools";
 
 // Tools that should NOT be grouped (they have special UI or require interaction)
-const UNGROUPABLE_TOOLS = new Set(["Task", "AskUserQuestion", "TodoWrite"]);
+const UNGROUPABLE_TOOLS = new Set([
+  "Task",
+  "AskUserQuestion",
+  "TodoWrite",
+  "Edit",
+  "MultiEdit",
+  "Write",
+  "NotebookEdit",
+]);
 
 function isToolGroupable(toolName: string): boolean {
   if (UNGROUPABLE_TOOLS.has(toolName)) return false;

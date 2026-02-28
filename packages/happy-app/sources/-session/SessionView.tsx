@@ -49,6 +49,8 @@ import { t } from "@/text";
 import { tracking, trackMessageSent } from "@/track";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { correctTranscript } from "@/sync/apiStt";
+import { TokenStorage } from "@/auth/tokenStorage";
 import { isRunningOnMac } from "@/utils/platform";
 import {
   useDeviceType,
@@ -444,18 +446,36 @@ function SessionViewInner({
   } = useImageUpload(sessionId);
 
   // Speech-to-text: append transcripts to the input field
-  const voiceInputLanguage = useSetting("voiceInputLanguage");
+  const voiceAssistantLanguage = useSetting("voiceAssistantLanguage");
 
-  const handleTranscript = React.useCallback((text: string) => {
-    setMessage((prev) => {
-      const trimmed = prev.trimEnd();
-      return trimmed ? `${trimmed} ${text}` : text;
-    });
-  }, []);
+  const handleTranscript = React.useCallback(
+    async (text: string) => {
+      let finalText = text;
+      if (storage.getState().settings.sttCorrection) {
+        try {
+          const credentials = await TokenStorage.getCredentials();
+          if (credentials) {
+            finalText = await correctTranscript(
+              credentials,
+              text,
+              voiceAssistantLanguage ?? undefined,
+            );
+          }
+        } catch {
+          // Use original text
+        }
+      }
+      setMessage((prev) => {
+        const trimmed = prev.trimEnd();
+        return trimmed ? `${trimmed} ${finalText}` : finalText;
+      });
+    },
+    [voiceAssistantLanguage],
+  );
 
   const stt = useSpeechToText(
     handleTranscript,
-    voiceInputLanguage ?? undefined,
+    voiceAssistantLanguage ?? undefined,
   );
 
   // Compute display value: message + real-time interim speech text

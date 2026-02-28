@@ -221,15 +221,6 @@ export const ca: TranslationStructure = {
     realtimeSessionSort: "Ordenació de sessions en temps real",
     realtimeSessionSortDescription:
       "Ordena les sessions per activitat recent (desactiveu per ordre estable per data de creació)",
-    voiceInputLanguage: "Idioma de reconeixement de veu",
-    voiceInputLanguageDescription:
-      "Toqueu per canviar l'idioma de l'entrada de veu",
-    voiceInputLanguageOptions: {
-      auto: "Auto",
-      enUS: "English",
-      zhCN: "中文（简体）",
-      zhTW: "中文（繁體）",
-    },
   },
 
   settingsFeatures: {
@@ -264,6 +255,9 @@ export const ca: TranslationStructure = {
     autoApprovePlanEnabled:
       "Els plans s'aproven automàticament sense confirmació",
     autoApprovePlanDisabled: "Els plans requereixen aprovació manual",
+    sttCorrection: "Correcció de transcripció de veu",
+    sttCorrectionEnabled: "La IA corregeix errors de reconeixement de veu",
+    sttCorrectionDisabled: "Usant el resultat brut del reconeixement de veu",
   },
 
   errors: {

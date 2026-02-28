@@ -210,14 +210,6 @@ export const zhHans: TranslationStructure = {
     realtimeSessionSort: "实时会话排序",
     realtimeSessionSortDescription:
       "按最近活动排序会话（关闭后按创建时间稳定排序）",
-    voiceInputLanguage: "语音识别语言",
-    voiceInputLanguageDescription: "点击切换语音输入使用的识别语言",
-    voiceInputLanguageOptions: {
-      auto: "自动（设备语言）",
-      enUS: "English",
-      zhCN: "中文（简体）",
-      zhTW: "中文（繁體）",
-    },
   },
 
   settingsFeatures: {
@@ -249,6 +241,9 @@ export const zhHans: TranslationStructure = {
     autoApprovePlan: "自动批准计划",
     autoApprovePlanEnabled: "计划将自动批准，无需手动确认",
     autoApprovePlanDisabled: "计划需要手动确认",
+    sttCorrection: "语音转写纠错",
+    sttCorrectionEnabled: "AI 自动纠正语音识别错误",
+    sttCorrectionDisabled: "使用原始语音识别结果",
   },
 
   errors: {

@@ -201,15 +201,6 @@ export const ru: TranslationStructure = {
     realtimeSessionSort: "Сортировка сессий в реальном времени",
     realtimeSessionSortDescription:
       "Сортировать сессии по недавней активности (отключите для стабильного порядка по времени создания)",
-    voiceInputLanguage: "Язык распознавания речи",
-    voiceInputLanguageDescription:
-      "Нажмите, чтобы изменить язык голосового ввода",
-    voiceInputLanguageOptions: {
-      auto: "Авто",
-      enUS: "English",
-      zhCN: "中文（简体）",
-      zhTW: "中文（繁體）",
-    },
   },
 
   settingsFeatures: {
@@ -245,6 +236,10 @@ export const ru: TranslationStructure = {
     autoApprovePlanEnabled:
       "Планы утверждаются автоматически без подтверждения",
     autoApprovePlanDisabled: "Планы требуют ручного подтверждения",
+    sttCorrection: "Коррекция голосовой транскрипции",
+    sttCorrectionEnabled: "ИИ исправляет ошибки распознавания речи",
+    sttCorrectionDisabled:
+      "Используется необработанный результат распознавания",
   },
 
   errors: {

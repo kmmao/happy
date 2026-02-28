@@ -82,6 +82,10 @@ services:
       STT_WS_URL: ws://stt:8001/ws
       # TTS 微服务地址（同 compose 网络内访问）
       TTS_BASE_URL: http://tts:8000
+      # Anthropic API（用于 STT 纠错等服务端直接调用）
+      # Key 必填；Base URL 可选，默认官方 API，代理场景改为如 http://host.docker.internal:8080    https://api.anthropic.com
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-quotio-local-A4DB6F36}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-http://host.docker.internal:8317}
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,9 +109,11 @@ services:
     build:
       context: .
       dockerfile: services/stt/Dockerfile
+      args:
+        STT_MODEL: turbo
     environment:
-      # faster-whisper model size: tiny/base/small/medium/large-v3
-      STT_MODEL: small
+      # faster-whisper model size: tiny/base/small/medium/turbo/large-v3
+      STT_MODEL: turbo
       STT_WS_PORT: "8001"
     volumes:
       # Persist downloaded Whisper models across container rebuilds

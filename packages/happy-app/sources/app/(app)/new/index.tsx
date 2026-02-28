@@ -521,7 +521,7 @@ function NewSessionWizard() {
   const [isCreating, setIsCreating] = React.useState(false);
 
   // STT (Speech-to-Text)
-  const voiceInputLanguage = useSetting("voiceInputLanguage");
+  const voiceAssistantLanguage = useSetting("voiceAssistantLanguage");
   const handleTranscript = React.useCallback((text: string) => {
     setSessionPrompt((prev) => {
       const trimmed = prev.trimEnd();
@@ -530,7 +530,7 @@ function NewSessionWizard() {
   }, []);
   const stt = useSpeechToText(
     handleTranscript,
-    voiceInputLanguage ?? undefined,
+    voiceAssistantLanguage ?? undefined,
   );
   const onSttToggle = React.useCallback(() => {
     if (stt.isListening) {

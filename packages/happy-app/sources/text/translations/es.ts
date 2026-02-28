@@ -221,15 +221,6 @@ export const es: TranslationStructure = {
     realtimeSessionSort: "Ordenación de sesiones en tiempo real",
     realtimeSessionSortDescription:
       "Ordenar sesiones por actividad reciente (desactivar para orden estable por fecha de creación)",
-    voiceInputLanguage: "Idioma de reconocimiento de voz",
-    voiceInputLanguageDescription:
-      "Toca para cambiar el idioma de la entrada de voz",
-    voiceInputLanguageOptions: {
-      auto: "Auto",
-      enUS: "English",
-      zhCN: "中文（简体）",
-      zhTW: "中文（繁體）",
-    },
   },
 
   settingsFeatures: {
@@ -264,6 +255,10 @@ export const es: TranslationStructure = {
     autoApprovePlanEnabled:
       "Los planes se aprueban automáticamente sin confirmación",
     autoApprovePlanDisabled: "Los planes requieren aprobación manual",
+    sttCorrection: "Corrección de transcripción de voz",
+    sttCorrectionEnabled: "IA corrige errores de reconocimiento de voz",
+    sttCorrectionDisabled:
+      "Usando resultado de reconocimiento de voz sin procesar",
   },
 
   errors: {

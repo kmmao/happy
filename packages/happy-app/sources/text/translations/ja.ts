@@ -279,14 +279,6 @@ export const ja: TranslationStructure = {
     realtimeSessionSort: "リアルタイムセッション並び替え",
     realtimeSessionSortDescription:
       "最近のアクティビティでセッションを並び替え（オフにすると作成日時順で安定表示）",
-    voiceInputLanguage: "音声認識言語",
-    voiceInputLanguageDescription: "タップして音声入力の言語を変更",
-    voiceInputLanguageOptions: {
-      auto: "自動",
-      enUS: "English",
-      zhCN: "中文（简体）",
-      zhTW: "中文（繁體）",
-    },
   },
 
   settingsFeatures: {
@@ -318,6 +310,9 @@ export const ja: TranslationStructure = {
     autoApprovePlan: "プランの自動承認",
     autoApprovePlanEnabled: "プランは確認なしで自動承認されます",
     autoApprovePlanDisabled: "プランには手動承認が必要です",
+    sttCorrection: "音声認識の補正",
+    sttCorrectionEnabled: "AIが音声認識のエラーを自動補正",
+    sttCorrectionDisabled: "音声認識の結果をそのまま使用",
   },
 
   errors: {

@@ -362,6 +362,11 @@ export const SettingsSchema = z.object({
     .describe(
       "Auto-approve plan proposals (ExitPlanMode) without showing confirmation buttons",
     ),
+  sttCorrection: z
+    .boolean()
+    .describe(
+      "Enable Haiku-based STT correction to fix homophones and punctuation errors in voice transcripts",
+    ),
   useEnhancedSessionWizard: z
     .boolean()
     .describe("A/B test flag: Use enhanced profile-based session wizard UI"),
@@ -535,6 +540,7 @@ export const settingsDefaults: Settings = {
   experiments: false,
   showAgentActivity: true,
   autoApprovePlan: false,
+  sttCorrection: false,
   useEnhancedSessionWizard: false,
   alwaysShowContextSize: true,
   agentInputEnterToSend: true,

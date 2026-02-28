@@ -138,6 +138,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         autoApprovePlan: false,
+        sttCorrection: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: Partial<Settings> = {
@@ -182,6 +183,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         autoApprovePlan: false,
+        sttCorrection: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       });
     });
@@ -226,6 +228,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         autoApprovePlan: false,
+        sttCorrection: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: Partial<Settings> = {};
@@ -272,6 +275,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         autoApprovePlan: false,
+        sttCorrection: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: Partial<Settings> = {
@@ -323,6 +327,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         autoApprovePlan: false,
+        sttCorrection: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       expect(applySettings(currentSettings, {})).toEqual(currentSettings);
@@ -383,6 +388,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         autoApprovePlan: false,
+        sttCorrection: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: any = {
@@ -454,6 +460,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         autoApprovePlan: false,
+        sttCorrection: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
         useEnhancedSessionWizard: false,
       });

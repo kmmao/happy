@@ -214,15 +214,6 @@ export const en = {
     realtimeSessionSort: "Real-Time Session Sorting",
     realtimeSessionSortDescription:
       "Sort sessions by recent activity (disable for stable order by creation time)",
-    voiceInputLanguage: "Voice Input Language",
-    voiceInputLanguageDescription:
-      "Language for speech recognition (tap to change)",
-    voiceInputLanguageOptions: {
-      auto: "Auto",
-      enUS: "English",
-      zhCN: "中文（简体）",
-      zhTW: "中文（繁體）",
-    },
   },
 
   settingsFeatures: {
@@ -255,6 +246,9 @@ export const en = {
     autoApprovePlan: "Auto-approve Plans",
     autoApprovePlanEnabled: "Plans are auto-approved without confirmation",
     autoApprovePlanDisabled: "Plans require manual approval",
+    sttCorrection: "Voice Transcript Correction",
+    sttCorrectionEnabled: "AI corrects speech recognition errors",
+    sttCorrectionDisabled: "Using raw speech recognition output",
   },
 
   errors: {

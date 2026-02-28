@@ -210,14 +210,6 @@ export const zhHant: TranslationStructure = {
     realtimeSessionSort: "即時工作階段排序",
     realtimeSessionSortDescription:
       "依最近活動排序工作階段（關閉後依建立時間穩定排序）",
-    voiceInputLanguage: "語音辨識語言",
-    voiceInputLanguageDescription: "點擊切換語音輸入使用的辨識語言",
-    voiceInputLanguageOptions: {
-      auto: "自動（裝置語言）",
-      enUS: "English",
-      zhCN: "中文（简体）",
-      zhTW: "中文（繁體）",
-    },
   },
 
   settingsFeatures: {
@@ -249,6 +241,9 @@ export const zhHant: TranslationStructure = {
     autoApprovePlan: "自動批准計劃",
     autoApprovePlanEnabled: "計劃將自動批准，無需手動確認",
     autoApprovePlanDisabled: "計劃需要手動確認",
+    sttCorrection: "語音轉寫糾錯",
+    sttCorrectionEnabled: "AI 自動糾正語音辨識錯誤",
+    sttCorrectionDisabled: "使用原始語音辨識結果",
   },
 
   errors: {
