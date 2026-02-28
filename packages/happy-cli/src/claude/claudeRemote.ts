@@ -27,22 +27,18 @@ import type { JsRuntime } from "./runClaude";
  */
 function resolveModelKey(modelKey: string | undefined): string | undefined {
   if (!modelKey) return undefined;
+  if (modelKey === "default") return undefined;
 
   switch (modelKey) {
-    case "default":
-      return undefined;
-    case "haiku":
-      return "claude-haiku-4-5-20251001";
-    case "sonnet":
-      return "claude-sonnet-4-6";
+    // Extended context variants need explicit IDs with [Nm] suffix
+    // because the SDK doesn't recognize App-level "-1m" keys.
     case "sonnet-1m":
       return "claude-sonnet-4-6[1m]";
-    case "opus":
-      return "claude-opus-4-6";
     case "opus-1m":
       return "claude-opus-4-6[1m]";
-    case "opusplan":
-      return "opusplan";
+    // All other keys (opus, sonnet, haiku, opusplan, etc.) pass through
+    // to the SDK which resolves them using ANTHROPIC_DEFAULT_*_MODEL
+    // env vars — enabling third-party provider model mapping.
     default:
       return modelKey;
   }
@@ -156,7 +152,9 @@ export async function claudeRemote(opts: {
     }
   }
 
-  // Set environment variables for Claude Code SDK
+  // Set environment variables for Claude Code SDK (pre-init)
+  // NOTE: These may be overridden when SDK reads ~/.claude/settings.json
+  // We re-apply them after query() initialization to ensure profile takes priority
   if (opts.claudeEnvVars) {
     Object.entries(opts.claudeEnvVars).forEach(([key, value]) => {
       process.env[key] = value;
@@ -303,6 +301,19 @@ export async function claudeRemote(opts: {
 
   // Expose the underlying SDK Query for runtime control (interrupt, stopTask, etc.)
   opts.onQueryReady?.((response as AdaptedQuery)._officialQuery);
+
+  // Re-apply profile env vars AFTER SDK initialization.
+  // The SDK reads ~/.claude/settings.json during query() and may overwrite
+  // process.env values set by the daemon profile (e.g., ANTHROPIC_BASE_URL,
+  // ANTHROPIC_DEFAULT_*_MODEL). Profile config must take priority.
+  if (opts.claudeEnvVars) {
+    Object.entries(opts.claudeEnvVars).forEach(([key, value]) => {
+      process.env[key] = value;
+    });
+    logger.debug(
+      `[claudeRemote] Re-applied ${Object.keys(opts.claudeEnvVars).length} profile env vars after SDK init`,
+    );
+  }
 
   updateThinking(true);
   try {

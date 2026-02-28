@@ -534,7 +534,16 @@ export async function startDaemon(): Promise<void> {
           const happySessionArg = happySessionId
             ? ` --happy-session-id ${happySessionId}`
             : "";
-          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeArg}${happySessionArg}`;
+          // Build --claude-env args for tmux command so profile env vars survive
+          // Claude Code SDK settings.json overrides
+          const claudeEnvArgs = Object.entries(extraEnv)
+            .map(([key, value]) => {
+              // Escape single quotes in values for shell safety
+              const escaped = value.replace(/'/g, "'\\''");
+              return ` --claude-env '${key}=${escaped}'`;
+            })
+            .join("");
+          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeArg}${happySessionArg}${claudeEnvArgs}`;
 
           // Spawn in tmux with environment variables
           // IMPORTANT: Pass complete environment (process.env + extraEnv) because:
@@ -671,6 +680,13 @@ export async function startDaemon(): Promise<void> {
             logger.debug(
               `[DAEMON RUN] Adding --happy-session-id ${happySessionId} to spawn args`,
             );
+          }
+
+          // Pass profile env vars via --claude-env so they survive
+          // Claude Code SDK settings.json overrides (SDK reads ~/.claude/settings.json
+          // and may overwrite process.env values set by the profile)
+          for (const [key, value] of Object.entries(extraEnv)) {
+            args.push("--claude-env", `${key}=${value}`);
           }
 
           const happyProcess = spawnHappyCLI(args, {
