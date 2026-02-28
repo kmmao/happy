@@ -318,6 +318,28 @@ export function saveSessionCustomModels(
   mmkv.set("session-custom-models", JSON.stringify(models));
 }
 
+// Session profile info (profileId + profileName for display in session info)
+type SessionProfileEntry = { profileId: string; profileName: string };
+
+export function loadSessionProfiles(): Record<string, SessionProfileEntry> {
+  const data = mmkv.getString("session-profiles");
+  if (data) {
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error("Failed to parse session profiles", e);
+      return {};
+    }
+  }
+  return {};
+}
+
+export function saveSessionProfiles(
+  profiles: Record<string, SessionProfileEntry>,
+) {
+  mmkv.set("session-profiles", JSON.stringify(profiles));
+}
+
 export function loadProfile(): Profile {
   const profile = mmkv.getString("profile");
   if (profile) {

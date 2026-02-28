@@ -34,6 +34,8 @@ import {
   saveSessionModelMappings,
   loadSessionCustomModels,
   saveSessionCustomModels,
+  loadSessionProfiles,
+  saveSessionProfiles,
   deleteSessionBookmarks,
 } from "./persistence";
 import type { PermissionModeKey } from "@/components/PermissionModeSelector";
@@ -368,6 +370,7 @@ export const storage = create<StorageState>()((set, get) => {
   let sessionNeedsAttention = loadSessionNeedsAttention();
   let sessionModelMappings = loadSessionModelMappings();
   let sessionCustomModels = loadSessionCustomModels();
+  let sessionProfiles = loadSessionProfiles();
   return {
     settings,
     settingsVersion: version,
@@ -456,6 +459,7 @@ export const storage = create<StorageState>()((set, get) => {
         const savedSdkSettings = isInitialLoad ? sessionSdkSettings : {};
         const savedModelMappingsAll = isInitialLoad ? sessionModelMappings : {};
         const savedCustomModelsAll = isInitialLoad ? sessionCustomModels : {};
+        const savedProfilesAll = isInitialLoad ? sessionProfiles : {};
         const savedNeedsAttention = isInitialLoad ? sessionNeedsAttention : {};
 
         // Merge new sessions with existing ones
@@ -545,6 +549,16 @@ export const storage = create<StorageState>()((set, get) => {
             savedCustomModelsAll[session.id] ??
             null;
 
+          // Resolve profile info: prefer existing in-memory, then saved from disk
+          const resolvedProfileId =
+            state.sessions[session.id]?.profileId ??
+            savedProfilesAll[session.id]?.profileId ??
+            null;
+          const resolvedProfileName =
+            state.sessions[session.id]?.profileName ??
+            savedProfilesAll[session.id]?.profileName ??
+            null;
+
           mergedSessions[session.id] = {
             ...session,
             metadata: resolvedMetadata,
@@ -554,6 +568,8 @@ export const storage = create<StorageState>()((set, get) => {
             modelMode: resolvedModelMode,
             modelMappings: resolvedModelMappings,
             customModels: resolvedCustomModels,
+            profileId: resolvedProfileId,
+            profileName: resolvedProfileName,
             thinkingMode: resolvedThinkingMode,
             thinkingBudget: resolvedThinkingBudget,
             effortLevel: resolvedEffortLevel,
@@ -1260,16 +1276,33 @@ export const storage = create<StorageState>()((set, get) => {
         const session = state.sessions[sessionId];
         if (!session) return state;
 
+        const updatedSessions = {
+          ...state.sessions,
+          [sessionId]: {
+            ...session,
+            profileId: profile.profileId,
+            profileName: profile.profileName,
+          },
+        };
+
+        // Persist profile info to disk
+        const allProfiles: Record<
+          string,
+          { profileId: string; profileName: string }
+        > = {};
+        Object.entries(updatedSessions).forEach(([id, sess]) => {
+          if (sess.profileId && sess.profileName) {
+            allProfiles[id] = {
+              profileId: sess.profileId,
+              profileName: sess.profileName,
+            };
+          }
+        });
+        saveSessionProfiles(allProfiles);
+
         return {
           ...state,
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...session,
-              profileId: profile.profileId,
-              profileName: profile.profileName,
-            },
-          },
+          sessions: updatedSessions,
         };
       }),
     updateSessionSdkSettings: (
@@ -1463,6 +1496,10 @@ export const storage = create<StorageState>()((set, get) => {
         saveSessionSdkSettings(remainingSdkSettings);
 
         deleteSessionBookmarks(sessionId);
+
+        const profiles = loadSessionProfiles();
+        delete profiles[sessionId];
+        saveSessionProfiles(profiles);
 
         // Rebuild sessionListViewData without the deleted session
         const sessionListViewData = buildSessionListViewData(
