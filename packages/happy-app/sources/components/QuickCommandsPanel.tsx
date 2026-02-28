@@ -33,9 +33,17 @@ interface QuickCommandsPanelProps {
 const FALLBACK_SHELL_COMMANDS = [
   "git status",
   "git diff",
-  "git log --oneline -5",
+  "git log --oneline -10",
+  "git branch -a",
+  "git stash list",
   "ls -la",
   "pwd",
+  "df -h",
+  "free -h || vm_stat",
+  "top -l 1 -n 5 || top -bn1 | head -20",
+  "docker ps",
+  "cat .env",
+  "env | sort",
 ];
 
 // ==================== Grouping Logic ====================
@@ -112,15 +120,7 @@ function groupCommands(
     }
   }
 
-  // Sort package groups: root first, then alphabetical
-  const packageGroups = Array.from(groupMap.values()).sort((a, b) => {
-    if (a.id === "root") return -1;
-    if (b.id === "root") return 1;
-    return a.id.localeCompare(b.id);
-  });
-  groups.push(...packageGroups);
-
-  // Shell group last
+  // Shell group first (after favorites)
   groups.push({
     id: "shell",
     label: t("quickCommands.groups.shell"),
@@ -131,6 +131,14 @@ function groupCommands(
       isScript: false,
     })),
   });
+
+  // Sort package groups: root first, then alphabetical
+  const packageGroups = Array.from(groupMap.values()).sort((a, b) => {
+    if (a.id === "root") return -1;
+    if (b.id === "root") return 1;
+    return a.id.localeCompare(b.id);
+  });
+  groups.push(...packageGroups);
 
   return groups;
 }
@@ -209,11 +217,23 @@ const stylesheet = StyleSheet.create((theme) => ({
       web: "monospace",
     }),
   },
+  commandContent: {
+    flex: 1,
+    gap: 2,
+  },
   commandLabel: {
     fontSize: 13,
     color: theme.colors.text,
-    flex: 1,
     ...Typography.default(),
+  },
+  commandDetail: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    fontFamily: Platform.select({
+      ios: "Menlo",
+      android: "monospace",
+      web: "monospace",
+    }),
   },
   favoriteButton: {
     paddingLeft: 8,
@@ -238,7 +258,7 @@ export const QuickCommandsPanel = React.memo(
 
     const [searchText, setSearchText] = React.useState("");
     const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(
-      () => new Set(["favorites"]),
+      () => new Set(["favorites", "shell"]),
     );
 
     const favoriteSet = React.useMemo(
@@ -409,9 +429,16 @@ export const QuickCommandsPanel = React.memo(
                         {cmd.isScript ? "\u25B6" : "$"}
                       </Text>
                     </View>
-                    <Text style={styles.commandLabel} numberOfLines={1}>
-                      {cmd.label}
-                    </Text>
+                    <View style={styles.commandContent}>
+                      <Text style={styles.commandLabel} numberOfLines={1}>
+                        {cmd.label}
+                      </Text>
+                      {cmd.isScript && cmd.command !== cmd.label && (
+                        <Text style={styles.commandDetail} numberOfLines={1}>
+                          {cmd.command}
+                        </Text>
+                      )}
+                    </View>
                     <Pressable
                       style={styles.favoriteButton}
                       onPress={() => handleToggleFavorite(cmd.command)}

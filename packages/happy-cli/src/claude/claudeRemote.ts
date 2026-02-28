@@ -457,10 +457,11 @@ export async function claudeRemote(opts: {
             opts.path,
           );
           if (opts.onShellResult) {
+            // onShellResult already closes the turn, so skip onReady()
+            // to avoid double-closing the turn which corrupts protocol state
             opts.onShellResult(output);
           }
           // Don't push to Claude, wait for next user message
-          await opts.onReady();
           continue;
         }
 
