@@ -510,6 +510,9 @@ export const zhHans: TranslationStructure = {
       "此操作无法撤销。与此会话相关的所有消息和数据将被永久删除。",
     failedToDeleteSession: "删除会话失败",
     sessionDeleted: "会话删除成功",
+    deleteAllArchivedSessions: "删除所有已归档会话",
+    deleteAllArchivedWarning: ({ count }: { count: number }) =>
+      `将永久删除 ${count} 个已归档会话及其所有消息。此操作无法撤销。`,
   },
 
   components: {

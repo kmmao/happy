@@ -510,6 +510,9 @@ export const zhHant: TranslationStructure = {
       "此操作無法復原。與此工作階段相關的所有訊息和資料將被永久刪除。",
     failedToDeleteSession: "刪除工作階段失敗",
     sessionDeleted: "工作階段刪除成功",
+    deleteAllArchivedSessions: "刪除所有已封存工作階段",
+    deleteAllArchivedWarning: ({ count }: { count: number }) =>
+      `將永久刪除 ${count} 個已封存工作階段及其所有訊息。此操作無法復原。`,
   },
 
   components: {

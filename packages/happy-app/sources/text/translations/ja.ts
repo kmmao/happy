@@ -595,6 +595,9 @@ export const ja: TranslationStructure = {
       "この操作は取り消せません。このセッションに関連するすべてのメッセージとデータが完全に削除されます。",
     failedToDeleteSession: "セッションの削除に失敗しました",
     sessionDeleted: "セッションが正常に削除されました",
+    deleteAllArchivedSessions: "アーカイブ済みセッションをすべて削除",
+    deleteAllArchivedWarning: ({ count }: { count: number }) =>
+      `${count}件のアーカイブ済みセッションとすべてのメッセージを完全に削除します。この操作は取り消せません。`,
   },
 
   components: {

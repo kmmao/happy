@@ -493,6 +493,9 @@ export const ru: TranslationStructure = {
       "Это действие нельзя отменить. Все сообщения и данные, связанные с этой сессией, будут удалены навсегда.",
     failedToDeleteSession: "Не удалось удалить сессию",
     sessionDeleted: "Сессия успешно удалена",
+    deleteAllArchivedSessions: "Удалить все архивные сессии",
+    deleteAllArchivedWarning: ({ count }: { count: number }) =>
+      `Это навсегда удалит ${count} архивных сессий и все их сообщения. Это действие нельзя отменить.`,
   },
 
   components: {

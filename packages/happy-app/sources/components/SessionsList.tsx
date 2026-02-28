@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Pressable, FlatList, Platform } from "react-native";
+import { View, Pressable, FlatList, ActivityIndicator } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { Text } from "@/components/StyledText";
 import { usePathname } from "expo-router";
@@ -16,7 +16,7 @@ import { Avatar } from "./Avatar";
 import { ActiveSessionsGroup } from "./ActiveSessionsGroup";
 import { ActiveSessionsGroupCompact } from "./ActiveSessionsGroupCompact";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useSetting } from "@/sync/storage";
+import { useSetting, useMachine } from "@/sync/storage";
 import { useVisibleSessionListViewData } from "@/hooks/useVisibleSessionListViewData";
 import { Typography } from "@/constants/Typography";
 import { Session } from "@/sync/storageTypes";
@@ -33,9 +33,10 @@ import { useRouter } from "expo-router";
 import { Item } from "./Item";
 import { ItemGroup } from "./ItemGroup";
 import { useHappyAction } from "@/hooks/useHappyAction";
-import { sessionDelete } from "@/sync/ops";
+import { sessionDelete, machineSpawnNewSession } from "@/sync/ops";
 import { HappyError } from "@/utils/errors";
 import { Modal } from "@/modal";
+import { isMachineOnline } from "@/utils/machineUtils";
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -202,17 +203,64 @@ const stylesheet = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.groupped.background,
   },
   swipeAction: {
-    width: 112,
+    width: 80,
     height: "100%",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: theme.colors.status.error,
+  },
+  swipeActionResume: {
+    width: 80,
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.success,
   },
   swipeActionText: {
     marginTop: 4,
     fontSize: 12,
     color: "#FFFFFF",
     textAlign: "center",
+    ...Typography.default("semiBold"),
+  },
+  hoverActions: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 12,
+    paddingLeft: 24,
+    gap: 4,
+    backgroundColor: theme.colors.surface,
+  },
+  hoverActionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteAllContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    alignItems: "center",
+  },
+  deleteAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: theme.colors.surface,
+    gap: 8,
+  },
+  deleteAllText: {
+    fontSize: 14,
+    color: theme.colors.status.error,
     ...Typography.default("semiBold"),
   },
 }));
@@ -349,7 +397,69 @@ export function SessionsList() {
     return <UpdateBanner />;
   }, []);
 
-  // Footer removed - all sessions now shown inline
+  // Count inactive sessions for "delete all" button
+  const inactiveSessionIds = React.useMemo(() => {
+    if (!data) return [];
+    return data
+      .filter((item) => item.type === "session")
+      .map(
+        (item) => (item as { type: "session"; session: Session }).session.id,
+      );
+  }, [data]);
+
+  const [deletingAll, performDeleteAll] = useHappyAction(async () => {
+    const errors: string[] = [];
+    for (const id of inactiveSessionIds) {
+      const result = await sessionDelete(id);
+      if (!result.success) {
+        errors.push(result.message || id);
+      }
+    }
+    if (errors.length > 0) {
+      throw new HappyError(t("sessionInfo.failedToDeleteSession"), false);
+    }
+  });
+
+  const handleDeleteAll = React.useCallback(() => {
+    Modal.alert(
+      t("sessionInfo.deleteAllArchivedSessions"),
+      t("sessionInfo.deleteAllArchivedWarning", {
+        count: inactiveSessionIds.length,
+      }),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("sessionInfo.deleteAllArchivedSessions"),
+          style: "destructive",
+          onPress: performDeleteAll,
+        },
+      ],
+    );
+  }, [performDeleteAll, inactiveSessionIds.length]);
+
+  const FooterComponent = React.useCallback(() => {
+    if (inactiveSessionIds.length === 0) return null;
+    return (
+      <View style={styles.deleteAllContainer}>
+        <Pressable
+          style={styles.deleteAllButton}
+          onPress={handleDeleteAll}
+          disabled={deletingAll}
+        >
+          <Ionicons
+            name="trash-outline"
+            size={16}
+            color={styles.deleteAllText.color}
+          />
+          <Text style={styles.deleteAllText}>
+            {deletingAll
+              ? t("common.loading")
+              : t("sessionInfo.deleteAllArchivedSessions")}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }, [inactiveSessionIds.length, handleDeleteAll, deletingAll]);
 
   return (
     <View style={styles.container}>
@@ -363,6 +473,7 @@ export function SessionsList() {
             maxWidth: layout.maxWidth,
           }}
           ListHeaderComponent={HeaderComponent}
+          ListFooterComponent={FooterComponent}
         />
       </View>
     </View>
@@ -391,7 +502,7 @@ const SessionItem = React.memo(
     const navigateToSession = useNavigateToSession();
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
-    const swipeEnabled = Platform.OS !== "web";
+    const [hovered, setHovered] = React.useState(false);
 
     const [deletingSession, performDelete] = useHappyAction(async () => {
       const result = await sessionDelete(session.id);
@@ -419,113 +530,179 @@ const SessionItem = React.memo(
       );
     }, [performDelete]);
 
+    const machine = useMachine(session.metadata?.machineId ?? "");
+    const canResume =
+      !session.active &&
+      !!session.metadata?.claudeSessionId &&
+      !!session.metadata?.machineId &&
+      !!session.metadata?.path &&
+      (!session.metadata?.flavor || session.metadata.flavor === "claude") &&
+      !!machine &&
+      isMachineOnline(machine);
+
+    const [resumingSession, performResume] = useHappyAction(async () => {
+      const result = await machineSpawnNewSession({
+        machineId: session.metadata!.machineId!,
+        directory: session.metadata!.path!,
+        claudeSessionId: session.metadata!.claudeSessionId!,
+        happySessionId: session.id,
+        agent: "claude",
+      });
+      if (result.type === "error") {
+        throw new HappyError(result.errorMessage, false);
+      }
+      if (result.type === "success") {
+        navigateToSession(session.id);
+      }
+    });
+
+    const handleResume = React.useCallback(() => {
+      swipeableRef.current?.close();
+      performResume();
+    }, [performResume]);
+
     const avatarId = React.useMemo(() => {
       return getSessionAvatarId(session);
     }, [session]);
 
     const itemContent = (
-      <Pressable
-        style={[
-          styles.sessionItem,
-          selected && styles.sessionItemSelected,
-          isSingle
-            ? styles.sessionItemSingle
-            : isFirst
-              ? styles.sessionItemFirst
-              : isLast
-                ? styles.sessionItemLast
-                : {},
-        ]}
-        onPressIn={() => {
-          if (isTablet) {
-            navigateToSession(session.id);
-          }
-        }}
-        onPress={() => {
-          if (!isTablet) {
-            navigateToSession(session.id);
-          }
-        }}
+      <View
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
       >
-        <View style={styles.avatarContainer}>
-          <Avatar
-            id={avatarId}
-            size={48}
-            monochrome={!sessionStatus.isConnected}
-            flavor={session.metadata?.flavor}
-          />
-          {session.draft && (
-            <View style={styles.draftIconContainer}>
-              <Ionicons
-                name="create-outline"
-                size={12}
-                style={styles.draftIconOverlay}
-              />
-            </View>
-          )}
-        </View>
-        <View style={styles.sessionContent}>
-          {/* Title line */}
-          <View style={styles.sessionTitleRow}>
-            <Text
-              style={[
-                styles.sessionTitle,
-                sessionStatus.isConnected
-                  ? styles.sessionTitleConnected
-                  : styles.sessionTitleDisconnected,
-              ]}
-              numberOfLines={1}
-            >
-              {" "}
-              {/* {variant !== 'no-path' ? 1 : 2} - issue is we don't have anything to take this space yet and it looks strange - if summaries were more reliably generated, we can add this. While no summary - add something like "New session" or "Empty session", and extend summary to 2 lines once we have it */}
-              {sessionName}
-            </Text>
-            <Text style={styles.sessionTimestamp}>
-              {formatLastSeen(session.updatedAt, false)}
-            </Text>
-          </View>
-
-          {/* Subtitle line */}
-          <Text style={styles.sessionSubtitle} numberOfLines={1}>
-            {[
-              sessionSubtitle,
-              session.metadata?.currentModelCode
-                ?.replace(/-\d{8}$/, "")
-                .replace(/^claude-/, ""),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </Text>
-
-          {/* Status line with dot and usage */}
-          <View style={styles.statusRow}>
-            <View style={styles.statusLeft}>
-              <View style={styles.statusDotContainer}>
-                <StatusDot
-                  color={sessionStatus.statusDotColor}
-                  isPulsing={sessionStatus.isPulsing}
+        <Pressable
+          style={[
+            styles.sessionItem,
+            selected && styles.sessionItemSelected,
+            isSingle
+              ? styles.sessionItemSingle
+              : isFirst
+                ? styles.sessionItemFirst
+                : isLast
+                  ? styles.sessionItemLast
+                  : {},
+          ]}
+          onPressIn={() => {
+            if (isTablet) {
+              navigateToSession(session.id);
+            }
+          }}
+          onPress={() => {
+            if (!isTablet) {
+              navigateToSession(session.id);
+            }
+          }}
+        >
+          <View style={styles.avatarContainer}>
+            <Avatar
+              id={avatarId}
+              size={48}
+              monochrome={!sessionStatus.isConnected}
+              flavor={session.metadata?.flavor}
+            />
+            {session.draft && (
+              <View style={styles.draftIconContainer}>
+                <Ionicons
+                  name="create-outline"
+                  size={12}
+                  style={styles.draftIconOverlay}
                 />
               </View>
+            )}
+          </View>
+          <View style={styles.sessionContent}>
+            {/* Title line */}
+            <View style={styles.sessionTitleRow}>
               <Text
                 style={[
-                  styles.statusText,
-                  { color: sessionStatus.statusColor },
+                  styles.sessionTitle,
+                  sessionStatus.isConnected
+                    ? styles.sessionTitleConnected
+                    : styles.sessionTitleDisconnected,
                 ]}
+                numberOfLines={1}
               >
-                {sessionStatus.statusText}
+                {" "}
+                {/* {variant !== 'no-path' ? 1 : 2} - issue is we don't have anything to take this space yet and it looks strange - if summaries were more reliably generated, we can add this. While no summary - add something like "New session" or "Empty session", and extend summary to 2 lines once we have it */}
+                {sessionName}
+              </Text>
+              <Text style={styles.sessionTimestamp}>
+                {formatLastSeen(session.updatedAt, false)}
               </Text>
             </View>
-            {session.latestUsage ? (
-              <Text style={styles.usageText}>
-                {formatTokenCountShort(
-                  session.latestUsage.totalInputTokens +
-                    session.latestUsage.totalOutputTokens,
-                )}
-              </Text>
-            ) : null}
+
+            {/* Subtitle line */}
+            <Text style={styles.sessionSubtitle} numberOfLines={1}>
+              {[
+                sessionSubtitle,
+                session.metadata?.currentModelCode
+                  ?.replace(/-\d{8}$/, "")
+                  .replace(/^claude-/, ""),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </Text>
+
+            {/* Status line with dot and usage */}
+            <View style={styles.statusRow}>
+              <View style={styles.statusLeft}>
+                <View style={styles.statusDotContainer}>
+                  <StatusDot
+                    color={sessionStatus.statusDotColor}
+                    isPulsing={sessionStatus.isPulsing}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: sessionStatus.statusColor },
+                  ]}
+                >
+                  {sessionStatus.statusText}
+                </Text>
+              </View>
+              {session.latestUsage ? (
+                <Text style={styles.usageText}>
+                  {formatTokenCountShort(
+                    session.latestUsage.totalInputTokens +
+                      session.latestUsage.totalOutputTokens,
+                  )}
+                </Text>
+              ) : null}
+            </View>
           </View>
-        </View>
-      </Pressable>
+        </Pressable>
+        {hovered && (
+          <View
+            style={[
+              styles.hoverActions,
+              selected && {
+                backgroundColor: styles.sessionItemSelected.backgroundColor,
+              },
+            ]}
+          >
+            {canResume && (
+              <Pressable
+                style={styles.hoverActionButton}
+                onPress={handleResume}
+              >
+                <Ionicons
+                  name="play-outline"
+                  size={18}
+                  color={styles.swipeActionResume.backgroundColor as string}
+                />
+              </Pressable>
+            )}
+            <Pressable style={styles.hoverActionButton} onPress={handleDelete}>
+              <Ionicons
+                name="trash-outline"
+                size={18}
+                color={styles.deleteAllText.color}
+              />
+            </Pressable>
+          </View>
+        )}
+      </View>
     );
 
     const containerStyles = [
@@ -539,21 +716,33 @@ const SessionItem = React.memo(
             : {},
     ];
 
-    if (!swipeEnabled) {
-      return <View style={containerStyles}>{itemContent}</View>;
-    }
+    const isBusy = deletingSession || resumingSession;
 
     const renderRightActions = () => (
-      <Pressable
-        style={styles.swipeAction}
-        onPress={handleDelete}
-        disabled={deletingSession}
-      >
-        <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.swipeActionText} numberOfLines={2}>
-          {t("sessionInfo.deleteSession")}
-        </Text>
-      </Pressable>
+      <View style={{ flexDirection: "row" }}>
+        {canResume && (
+          <Pressable
+            style={styles.swipeActionResume}
+            onPress={handleResume}
+            disabled={isBusy}
+          >
+            <Ionicons name="play-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.swipeActionText} numberOfLines={2}>
+              {t("sessionInfo.resumeSession")}
+            </Text>
+          </Pressable>
+        )}
+        <Pressable
+          style={styles.swipeAction}
+          onPress={handleDelete}
+          disabled={isBusy}
+        >
+          <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.swipeActionText} numberOfLines={2}>
+            {t("sessionInfo.deleteSession")}
+          </Text>
+        </Pressable>
+      </View>
     );
 
     return (
@@ -562,7 +751,7 @@ const SessionItem = React.memo(
           ref={swipeableRef}
           renderRightActions={renderRightActions}
           overshootRight={false}
-          enabled={!deletingSession}
+          enabled={!isBusy}
         >
           {itemContent}
         </Swipeable>

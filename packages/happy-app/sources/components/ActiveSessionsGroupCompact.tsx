@@ -18,7 +18,7 @@ import { StatusDot } from "./StatusDot";
 import { useAllMachines, useSetting } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
-import { machineSpawnNewSession, sessionKill } from "@/sync/ops";
+import { machineSpawnNewSession, sessionKill, sessionDelete } from "@/sync/ops";
 import { resolveAbsolutePath } from "@/utils/pathUtils";
 import { storage } from "@/sync/storage";
 import { Modal } from "@/modal";
@@ -146,8 +146,18 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     color: theme.colors.textSecondary,
     ...Typography.default("regular"),
   },
+  swipeActionsContainer: {
+    flexDirection: "row",
+  },
+  swipeActionArchive: {
+    width: 80,
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.warning,
+  },
   swipeAction: {
-    width: 112,
+    width: 80,
     height: "100%",
     alignItems: "center",
     justifyContent: "center",
@@ -155,10 +165,29 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   swipeActionText: {
     marginTop: 4,
-    fontSize: 12,
+    fontSize: 11,
     color: "#FFFFFF",
     textAlign: "center",
     ...Typography.default("semiBold"),
+  },
+  hoverActions: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 12,
+    paddingLeft: 24,
+    gap: 4,
+    backgroundColor: theme.colors.surface,
+  },
+  hoverActionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   worktreeBadge: {
     flexDirection: "row",
@@ -372,8 +401,8 @@ const CompactSessionRow = React.memo(
     const sessionName = getSessionName(session);
     const navigateToSession = useNavigateToSession();
     const isTablet = useIsTablet();
+    const [hovered, setHovered] = React.useState(false);
     const swipeableRef = React.useRef<Swipeable | null>(null);
-    const swipeEnabled = Platform.OS !== "web";
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
       const result = await sessionKill(session.id);
@@ -401,122 +430,192 @@ const CompactSessionRow = React.memo(
       );
     }, [performArchive]);
 
+    const [deletingSession, performDelete] = useHappyAction(async () => {
+      const result = await sessionDelete(session.id);
+      if (!result.success) {
+        throw new HappyError(
+          result.message || t("sessionInfo.failedToDeleteSession"),
+          false,
+        );
+      }
+    });
+
+    const handleDelete = React.useCallback(() => {
+      swipeableRef.current?.close();
+      Modal.alert(
+        t("sessionInfo.deleteSession"),
+        t("sessionInfo.deleteSessionWarning"),
+        [
+          { text: t("common.cancel"), style: "cancel" },
+          {
+            text: t("sessionInfo.deleteSession"),
+            style: "destructive",
+            onPress: performDelete,
+          },
+        ],
+      );
+    }, [performDelete]);
+
     const itemContent = (
-      <Pressable
-        style={[
-          styles.sessionRow,
-          showBorder && styles.sessionRowWithBorder,
-          selected && styles.sessionRowSelected,
-        ]}
-        onPressIn={() => {
-          if (isTablet) {
-            navigateToSession(session.id);
-          }
-        }}
-        onPress={() => {
-          if (!isTablet) {
-            navigateToSession(session.id);
-          }
-        }}
+      <View
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
       >
-        <View style={styles.sessionContent}>
-          {/* Title line with status */}
-          <View style={styles.sessionTitleRow}>
-            {/* Status dot or draft icon on the left */}
-            {(() => {
-              // Show draft icon when online with draft
-              if (sessionStatus.state === "waiting" && session.draft) {
-                return (
-                  <Ionicons
-                    name="create-outline"
-                    size={14}
-                    color={theme.colors.textSecondary}
-                    style={{ marginRight: 8 }}
-                  />
-                );
-              }
-
-              // Show status dot only for permission_required/thinking states
-              if (
-                sessionStatus.state === "permission_required" ||
-                sessionStatus.state === "thinking"
-              ) {
-                return (
-                  <View style={[styles.statusDotContainer, { marginRight: 8 }]}>
-                    <StatusDot
-                      color={sessionStatus.statusDotColor}
-                      isPulsing={sessionStatus.isPulsing}
-                    />
-                  </View>
-                );
-              }
-
-              // Show grey dot for online without draft
-              if (sessionStatus.state === "waiting") {
-                return (
-                  <View style={[styles.statusDotContainer, { marginRight: 8 }]}>
-                    <StatusDot
+        <Pressable
+          style={[
+            styles.sessionRow,
+            showBorder && styles.sessionRowWithBorder,
+            selected && styles.sessionRowSelected,
+          ]}
+          onPressIn={() => {
+            if (isTablet) {
+              navigateToSession(session.id);
+            }
+          }}
+          onPress={() => {
+            if (!isTablet) {
+              navigateToSession(session.id);
+            }
+          }}
+        >
+          <View style={styles.sessionContent}>
+            {/* Title line with status */}
+            <View style={styles.sessionTitleRow}>
+              {/* Status dot or draft icon on the left */}
+              {(() => {
+                // Show draft icon when online with draft
+                if (sessionStatus.state === "waiting" && session.draft) {
+                  return (
+                    <Ionicons
+                      name="create-outline"
+                      size={14}
                       color={theme.colors.textSecondary}
-                      isPulsing={false}
+                      style={{ marginRight: 8 }}
                     />
-                  </View>
-                );
-              }
+                  );
+                }
 
-              return null;
-            })()}
+                // Show status dot only for permission_required/thinking states
+                if (
+                  sessionStatus.state === "permission_required" ||
+                  sessionStatus.state === "thinking"
+                ) {
+                  return (
+                    <View
+                      style={[styles.statusDotContainer, { marginRight: 8 }]}
+                    >
+                      <StatusDot
+                        color={sessionStatus.statusDotColor}
+                        isPulsing={sessionStatus.isPulsing}
+                      />
+                    </View>
+                  );
+                }
 
-            <Text
-              style={[
-                styles.sessionTitle,
-                sessionStatus.isConnected
-                  ? styles.sessionTitleConnected
-                  : styles.sessionTitleDisconnected,
-              ]}
-              numberOfLines={2}
-            >
-              {sessionName}
-            </Text>
-            {session.metadata?.worktree?.isWorktree && (
-              <View style={styles.worktreeBadge}>
-                <Ionicons
-                  name="git-branch-outline"
-                  size={10}
-                  color={styles.worktreeBadgeText.color}
-                />
-                <Text style={styles.worktreeBadgeText} numberOfLines={1}>
-                  {session.metadata.worktree.branchName}
-                </Text>
-              </View>
-            )}
-            {session.latestUsage ? (
-              <Text style={styles.usageLabel}>
-                {formatTokenCountShort(
-                  session.latestUsage.totalInputTokens +
-                    session.latestUsage.totalOutputTokens,
-                )}
+                // Show grey dot for online without draft
+                if (sessionStatus.state === "waiting") {
+                  return (
+                    <View
+                      style={[styles.statusDotContainer, { marginRight: 8 }]}
+                    >
+                      <StatusDot
+                        color={theme.colors.textSecondary}
+                        isPulsing={false}
+                      />
+                    </View>
+                  );
+                }
+
+                return null;
+              })()}
+
+              <Text
+                style={[
+                  styles.sessionTitle,
+                  sessionStatus.isConnected
+                    ? styles.sessionTitleConnected
+                    : styles.sessionTitleDisconnected,
+                ]}
+                numberOfLines={2}
+              >
+                {sessionName}
               </Text>
-            ) : null}
+              {session.metadata?.worktree?.isWorktree && (
+                <View style={styles.worktreeBadge}>
+                  <Ionicons
+                    name="git-branch-outline"
+                    size={10}
+                    color={styles.worktreeBadgeText.color}
+                  />
+                  <Text style={styles.worktreeBadgeText} numberOfLines={1}>
+                    {session.metadata.worktree.branchName}
+                  </Text>
+                </View>
+              )}
+              {session.latestUsage ? (
+                <Text style={styles.usageLabel}>
+                  {formatTokenCountShort(
+                    session.latestUsage.totalInputTokens +
+                      session.latestUsage.totalOutputTokens,
+                  )}
+                </Text>
+              ) : null}
+            </View>
           </View>
-        </View>
-      </Pressable>
+        </Pressable>
+        {hovered && (
+          <View
+            style={[
+              styles.hoverActions,
+              selected && {
+                backgroundColor: styles.sessionRowSelected.backgroundColor,
+              },
+            ]}
+          >
+            <Pressable style={styles.hoverActionButton} onPress={handleArchive}>
+              <Ionicons
+                name="archive-outline"
+                size={18}
+                color={styles.swipeActionArchive.backgroundColor as string}
+              />
+            </Pressable>
+            <Pressable style={styles.hoverActionButton} onPress={handleDelete}>
+              <Ionicons
+                name="trash-outline"
+                size={18}
+                color={styles.swipeAction.backgroundColor as string}
+              />
+            </Pressable>
+          </View>
+        )}
+      </View>
     );
 
-    if (!swipeEnabled) {
-      return itemContent;
-    }
+    const isBusy = archivingSession || deletingSession;
 
     const renderRightActions = () => (
-      <Pressable
-        style={styles.swipeAction}
-        onPress={handleArchive}
-        disabled={archivingSession}
-      >
-        <Ionicons name="archive-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.swipeActionText} numberOfLines={2}>
-          {t("sessionInfo.archiveSession")}
-        </Text>
-      </Pressable>
+      <View style={styles.swipeActionsContainer}>
+        <Pressable
+          style={styles.swipeActionArchive}
+          onPress={handleArchive}
+          disabled={isBusy}
+        >
+          <Ionicons name="archive-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.swipeActionText} numberOfLines={1}>
+            {t("sessionInfo.archiveSession")}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={styles.swipeAction}
+          onPress={handleDelete}
+          disabled={isBusy}
+        >
+          <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.swipeActionText} numberOfLines={1}>
+            {t("sessionInfo.deleteSession")}
+          </Text>
+        </Pressable>
+      </View>
     );
 
     return (
@@ -524,7 +623,7 @@ const CompactSessionRow = React.memo(
         ref={swipeableRef}
         renderRightActions={renderRightActions}
         overshootRight={false}
-        enabled={!archivingSession}
+        enabled={!isBusy}
       >
         {itemContent}
       </Swipeable>

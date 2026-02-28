@@ -543,6 +543,9 @@ export const en: TranslationStructure = {
       "This action cannot be undone. All messages and data associated with this session will be permanently deleted.",
     failedToDeleteSession: "Failed to delete session",
     sessionDeleted: "Session deleted successfully",
+    deleteAllArchivedSessions: "Delete All Archived Sessions",
+    deleteAllArchivedWarning: ({ count }: { count: number }) =>
+      `This will permanently delete ${count} archived session(s) and all their messages. This cannot be undone.`,
   },
 
   components: {

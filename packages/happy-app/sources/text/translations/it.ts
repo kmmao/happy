@@ -605,6 +605,9 @@ export const it: TranslationStructure = {
       "Questa azione non può essere annullata. Tutti i messaggi e i dati associati a questa sessione verranno eliminati definitivamente.",
     failedToDeleteSession: "Impossibile eliminare la sessione",
     sessionDeleted: "Sessione eliminata con successo",
+    deleteAllArchivedSessions: "Elimina tutte le sessioni archiviate",
+    deleteAllArchivedWarning: ({ count }: { count: number }) =>
+      `Questo eliminerà definitivamente ${count} sessione/i archiviata/e e tutti i loro messaggi. Questa azione non può essere annullata.`,
   },
 
   components: {

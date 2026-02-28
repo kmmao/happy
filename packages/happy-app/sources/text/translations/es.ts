@@ -543,6 +543,9 @@ export const es: TranslationStructure = {
       "Esta acción no se puede deshacer. Todos los mensajes y datos asociados con esta sesión se eliminarán permanentemente.",
     failedToDeleteSession: "Error al eliminar la sesión",
     sessionDeleted: "Sesión eliminada exitosamente",
+    deleteAllArchivedSessions: "Eliminar todas las sesiones archivadas",
+    deleteAllArchivedWarning: ({ count }: { count: number }) =>
+      `Esto eliminará permanentemente ${count} sesión(es) archivada(s) y todos sus mensajes. Esta acción no se puede deshacer.`,
   },
 
   components: {

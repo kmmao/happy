@@ -543,6 +543,9 @@ export const ca: TranslationStructure = {
       "Aquesta acció no es pot desfer. Tots els missatges i dades associats amb aquesta sessió s'eliminaran permanentment.",
     failedToDeleteSession: "Error en eliminar la sessió",
     sessionDeleted: "Sessió eliminada amb èxit",
+    deleteAllArchivedSessions: "Elimina totes les sessions arxivades",
+    deleteAllArchivedWarning: ({ count }: { count: number }) =>
+      `Això eliminarà permanentment ${count} sessió/ns arxivada/es i tots els seus missatges. Aquesta acció no es pot desfer.`,
   },
 
   components: {

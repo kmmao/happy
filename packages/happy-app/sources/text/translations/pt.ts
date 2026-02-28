@@ -541,6 +541,9 @@ export const pt: TranslationStructure = {
       "Esta ação não pode ser desfeita. Todas as mensagens e dados associados a esta sessão serão excluídos permanentemente.",
     failedToDeleteSession: "Falha ao excluir sessão",
     sessionDeleted: "Sessão excluída com sucesso",
+    deleteAllArchivedSessions: "Excluir todas as sessões arquivadas",
+    deleteAllArchivedWarning: ({ count }: { count: number }) =>
+      `Isso excluirá permanentemente ${count} sessão(ões) arquivada(s) e todas as suas mensagens. Esta ação não pode ser desfeita.`,
   },
 
   components: {
