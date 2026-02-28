@@ -210,6 +210,7 @@ interface StorageState {
     sessionId: string,
     settings: SessionSdkSettings,
   ) => void;
+  updateSessionPreferencesVersion: (sessionId: string, version: number) => void;
   // Artifact methods
   applyArtifacts: (artifacts: DecryptedArtifact[]) => void;
   addArtifact: (artifact: DecryptedArtifact) => void;
@@ -358,6 +359,14 @@ function buildSessionListViewData(
   return listData;
 }
 
+// Callback for syncing preferences to server (registered by sync.ts to avoid circular dependency)
+let onPreferencesChanged: ((sessionId: string) => void) | null = null;
+export function registerPreferencesSyncCallback(
+  callback: (sessionId: string) => void,
+) {
+  onPreferencesChanged = callback;
+}
+
 export const storage = create<StorageState>()((set, get) => {
   let { settings, version } = loadSettings();
   let localSettings = loadLocalSettings();
@@ -481,44 +490,58 @@ export const storage = create<StorageState>()((set, get) => {
           )
             ? "bypassPermissions"
             : "default";
+          // Priority: 1) existing in-memory, 2) server preferences (from session), 3) saved MMKV (initial load), 4) default
           const resolvedPermissionMode: PermissionModeKey =
             (existingPermissionMode && existingPermissionMode !== "default"
               ? existingPermissionMode
               : undefined) ||
-            (savedPermissionMode && savedPermissionMode !== "default"
-              ? savedPermissionMode
-              : undefined) ||
             (session.permissionMode && session.permissionMode !== "default"
               ? session.permissionMode
+              : undefined) ||
+            (savedPermissionMode && savedPermissionMode !== "default"
+              ? savedPermissionMode
               : undefined) ||
             defaultPermissionMode;
 
           // Resolve modelMode: same priority as permissionMode
           const existingModelMode = state.sessions[session.id]?.modelMode;
           const savedModelMode = savedModelModes[session.id];
+          // Priority: 1) existing in-memory, 2) server preferences (from session), 3) saved MMKV (initial load), 4) default
           const resolvedModelMode: string =
             (existingModelMode && existingModelMode !== "default"
               ? existingModelMode
               : undefined) ||
-            (savedModelMode && savedModelMode !== "default"
-              ? savedModelMode
-              : undefined) ||
             (session.modelMode && session.modelMode !== "default"
               ? session.modelMode
               : undefined) ||
+            (savedModelMode && savedModelMode !== "default"
+              ? savedModelMode
+              : undefined) ||
             "default";
 
-          // Resolve SDK settings: prefer existing, then saved
+          // Resolve SDK settings: prefer existing, then server preferences, then saved MMKV
           const existingSdk = state.sessions[session.id];
           const savedSdk = savedSdkSettings[session.id];
           const resolvedThinkingMode =
-            existingSdk?.thinkingMode ?? savedSdk?.thinkingMode ?? null;
+            existingSdk?.thinkingMode ??
+            session.thinkingMode ??
+            savedSdk?.thinkingMode ??
+            null;
           const resolvedThinkingBudget =
-            existingSdk?.thinkingBudget ?? savedSdk?.thinkingBudget ?? null;
+            existingSdk?.thinkingBudget ??
+            session.thinkingBudget ??
+            savedSdk?.thinkingBudget ??
+            null;
           const resolvedEffortLevel =
-            existingSdk?.effortLevel ?? savedSdk?.effortLevel ?? null;
+            existingSdk?.effortLevel ??
+            session.effortLevel ??
+            savedSdk?.effortLevel ??
+            null;
           const resolvedMaxBudgetUsd =
-            existingSdk?.maxBudgetUsd ?? savedSdk?.maxBudgetUsd ?? null;
+            existingSdk?.maxBudgetUsd ??
+            session.maxBudgetUsd ??
+            savedSdk?.maxBudgetUsd ??
+            null;
 
           // Resolve needsAttention: prefer explicit value from update, then existing, then saved
           const existingNeedsAttention =
@@ -537,25 +560,29 @@ export const storage = create<StorageState>()((set, get) => {
               ? { ...session.metadata, summary: existingSummary }
               : session.metadata;
 
-          // Resolve modelMappings: prefer existing in-memory, then saved from disk
+          // Resolve modelMappings: prefer existing in-memory, then server preferences, then saved MMKV
           const resolvedModelMappings =
             state.sessions[session.id]?.modelMappings ??
+            session.modelMappings ??
             savedModelMappingsAll[session.id] ??
             null;
 
-          // Resolve customModels: prefer existing in-memory, then saved from disk
+          // Resolve customModels: prefer existing in-memory, then server preferences, then saved MMKV
           const resolvedCustomModels =
             state.sessions[session.id]?.customModels ??
+            session.customModels ??
             savedCustomModelsAll[session.id] ??
             null;
 
-          // Resolve profile info: prefer existing in-memory, then saved from disk
+          // Resolve profile info: prefer existing in-memory, then server preferences, then saved MMKV
           const resolvedProfileId =
             state.sessions[session.id]?.profileId ??
+            session.profileId ??
             savedProfilesAll[session.id]?.profileId ??
             null;
           const resolvedProfileName =
             state.sessions[session.id]?.profileName ??
+            session.profileName ??
             savedProfilesAll[session.id]?.profileName ??
             null;
 
@@ -1138,7 +1165,7 @@ export const storage = create<StorageState>()((set, get) => {
           sessionListViewData,
         };
       }),
-    updateSessionPermissionMode: (sessionId: string, mode: string) =>
+    updateSessionPermissionMode: (sessionId: string, mode: string) => {
       set((state) => {
         const session = state.sessions[sessionId];
         if (!session) return state;
@@ -1168,8 +1195,10 @@ export const storage = create<StorageState>()((set, get) => {
           ...state,
           sessions: updatedSessions,
         };
-      }),
-    updateSessionModelMode: (sessionId: string, mode: string) =>
+      });
+      onPreferencesChanged?.(sessionId);
+    },
+    updateSessionModelMode: (sessionId: string, mode: string) => {
       set((state) => {
         const session = state.sessions[sessionId];
         if (!session) return state;
@@ -1197,7 +1226,9 @@ export const storage = create<StorageState>()((set, get) => {
           ...state,
           sessions: updatedSessions,
         };
-      }),
+      });
+      onPreferencesChanged?.(sessionId);
+    },
     updateSessionCustomModels: (
       sessionId: string,
       customModels: Array<{
@@ -1205,7 +1236,7 @@ export const storage = create<StorageState>()((set, get) => {
         name: string;
         description?: string | null;
       }> | null,
-    ) =>
+    ) => {
       set((state) => {
         const session = state.sessions[sessionId];
         if (!session) return state;
@@ -1234,11 +1265,13 @@ export const storage = create<StorageState>()((set, get) => {
           ...state,
           sessions: updatedSessions,
         };
-      }),
+      });
+      onPreferencesChanged?.(sessionId);
+    },
     updateSessionModelMappings: (
       sessionId: string,
       modelMappings: Record<string, string> | null,
-    ) =>
+    ) => {
       set((state) => {
         const session = state.sessions[sessionId];
         if (!session) return state;
@@ -1267,11 +1300,13 @@ export const storage = create<StorageState>()((set, get) => {
           ...state,
           sessions: updatedSessions,
         };
-      }),
+      });
+      onPreferencesChanged?.(sessionId);
+    },
     updateSessionProfile: (
       sessionId: string,
       profile: { profileId: string | null; profileName: string | null },
-    ) =>
+    ) => {
       set((state) => {
         const session = state.sessions[sessionId];
         if (!session) return state;
@@ -1304,11 +1339,13 @@ export const storage = create<StorageState>()((set, get) => {
           ...state,
           sessions: updatedSessions,
         };
-      }),
+      });
+      onPreferencesChanged?.(sessionId);
+    },
     updateSessionSdkSettings: (
       sessionId: string,
       settings: SessionSdkSettings,
-    ) =>
+    ) => {
       set((state) => {
         const session = state.sessions[sessionId];
         if (!session) return state;
@@ -1350,6 +1387,24 @@ export const storage = create<StorageState>()((set, get) => {
         return {
           ...state,
           sessions: updatedSessions,
+        };
+      });
+      onPreferencesChanged?.(sessionId);
+    },
+    updateSessionPreferencesVersion: (sessionId: string, version: number) =>
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) return state;
+
+        return {
+          ...state,
+          sessions: {
+            ...state.sessions,
+            [sessionId]: {
+              ...session,
+              preferencesVersion: version,
+            },
+          },
         };
       }),
     // Project management methods
@@ -1500,6 +1555,18 @@ export const storage = create<StorageState>()((set, get) => {
         const profiles = loadSessionProfiles();
         delete profiles[sessionId];
         saveSessionProfiles(profiles);
+
+        const modelModes = loadSessionModelModes();
+        delete modelModes[sessionId];
+        saveSessionModelModes(modelModes);
+
+        const modelMappings = loadSessionModelMappings();
+        delete modelMappings[sessionId];
+        saveSessionModelMappings(modelMappings);
+
+        const customModels = loadSessionCustomModels();
+        delete customModels[sessionId];
+        saveSessionCustomModels(customModels);
 
         // Rebuild sessionListViewData without the deleted session
         const sessionListViewData = buildSessionListViewData(

@@ -3,7 +3,7 @@ import { apiSocket } from "@/sync/apiSocket";
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { Encryption } from "@/sync/encryption/encryption";
 import { decodeBase64, encodeBase64 } from "@/encryption/base64";
-import { storage } from "./storage";
+import { storage, registerPreferencesSyncCallback } from "./storage";
 import {
   ApiEphemeralUpdateSchema,
   ApiMessage,
@@ -124,6 +124,7 @@ class Sync {
   private friendRequestsSync: InvalidateSync;
   private feedSync: InvalidateSync;
   private activityAccumulator: ActivityUpdateAccumulator;
+  private preferencesMigrationDone = false;
   private pendingSettings: Partial<Settings> = loadPendingSettings();
   private appState: AppStateStatus = AppState.currentState;
   private backgroundSendTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -223,6 +224,11 @@ class Sync {
   }
 
   async #init() {
+    // Register preferences sync callback so storage.ts can trigger server sync
+    registerPreferencesSyncCallback((sessionId) => {
+      this.syncSessionPreferences(sessionId);
+    });
+
     // Subscribe to updates
     this.subscribeToUpdates();
 
@@ -814,6 +820,8 @@ class Sync {
       metadataVersion: number;
       agentState: string | null;
       agentStateVersion: number;
+      preferences: string | null;
+      preferencesVersion: number;
       dataEncryptionKey: string | null;
       active: boolean;
       activeAt: number;
@@ -870,6 +878,11 @@ class Sync {
         session.agentState,
       );
 
+      // Decrypt preferences using session-specific encryption
+      const preferences = await sessionEncryption.decryptPreferences(
+        session.preferences,
+      );
+
       // Put it all together
       const processedSession = {
         ...session,
@@ -877,6 +890,22 @@ class Sync {
         thinkingAt: 0,
         metadata,
         agentState,
+        preferencesVersion: session.preferencesVersion ?? 0,
+        // Spread server preferences into session fields if available
+        ...(preferences
+          ? {
+              permissionMode: preferences.permissionMode,
+              modelMode: preferences.modelMode,
+              customModels: preferences.customModels,
+              modelMappings: preferences.modelMappings,
+              profileId: preferences.profileId,
+              profileName: preferences.profileName,
+              thinkingMode: preferences.thinkingMode,
+              thinkingBudget: preferences.thinkingBudget,
+              effortLevel: preferences.effortLevel,
+              maxBudgetUsd: preferences.maxBudgetUsd,
+            }
+          : {}),
       };
       decryptedSessions.push(processedSession);
     }
@@ -886,6 +915,46 @@ class Sync {
     log.log(
       `📥 fetchSessions completed - processed ${decryptedSessions.length} sessions`,
     );
+
+    // Migrate local MMKV preferences to server for sessions that have never synced
+    this.migrateLocalPreferencesToServer();
+  };
+
+  /**
+   * One-time migration: push local MMKV preferences to server for sessions
+   * that have preferencesVersion === 0 (never synced from any device).
+   */
+  private migrateLocalPreferencesToServer = async () => {
+    if (this.preferencesMigrationDone) return;
+    this.preferencesMigrationDone = true;
+
+    const sessions = storage.getState().sessions;
+    let migratedCount = 0;
+    for (const [id, session] of Object.entries(sessions)) {
+      // Only migrate sessions that have never had preferences synced
+      if (session.preferencesVersion !== 0) continue;
+
+      // Check if there's any local preference data worth migrating
+      const hasLocalData =
+        (session.permissionMode && session.permissionMode !== "default") ||
+        (session.modelMode && session.modelMode !== "default") ||
+        session.customModels ||
+        session.modelMappings ||
+        session.profileId ||
+        session.thinkingMode ||
+        session.effortLevel ||
+        session.maxBudgetUsd != null;
+      if (!hasLocalData) continue;
+
+      // Trigger sync (debounced, will batch naturally)
+      this.syncSessionPreferences(id);
+      migratedCount++;
+    }
+    if (migratedCount > 0) {
+      log.log(
+        `📤 Preferences migration: queued ${migratedCount} sessions for server sync`,
+      );
+    }
   };
 
   public refreshMachines = async () => {
@@ -894,6 +963,88 @@ class Sync {
 
   public refreshSessions = async () => {
     return this.sessionsSync.invalidateAndAwait();
+  };
+
+  // Debounce timer for preferences sync
+  private preferencesSyncTimers = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
+
+  /**
+   * Sync session preferences to server (debounced 300ms per session).
+   * Encrypts all preference fields and pushes via update-preferences socket event.
+   */
+  public syncSessionPreferences = (sessionId: string) => {
+    // Clear any existing timer for this session
+    const existingTimer = this.preferencesSyncTimers.get(sessionId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    // Debounce: wait 300ms before syncing
+    const timer = setTimeout(async () => {
+      this.preferencesSyncTimers.delete(sessionId);
+      try {
+        const session = storage.getState().sessions[sessionId];
+        if (!session) return;
+
+        const sessionEncryption =
+          this.encryption.getSessionEncryption(sessionId);
+        if (!sessionEncryption) return;
+
+        const preferences = {
+          permissionMode: session.permissionMode,
+          modelMode: session.modelMode,
+          customModels: session.customModels,
+          modelMappings: session.modelMappings,
+          profileId: session.profileId,
+          profileName: session.profileName,
+          thinkingMode: session.thinkingMode,
+          thinkingBudget: session.thinkingBudget,
+          effortLevel: session.effortLevel,
+          maxBudgetUsd: session.maxBudgetUsd,
+        };
+
+        const encrypted =
+          await sessionEncryption.encryptPreferences(preferences);
+        const result = await apiSocket.emitWithAck<{
+          result: string;
+          version?: number;
+          preferences?: string;
+        }>("update-preferences", {
+          sid: sessionId,
+          preferences: encrypted,
+          expectedVersion: session.preferencesVersion,
+        });
+
+        if (result.result === "success" && result.version !== undefined) {
+          // Update preferencesVersion in storage
+          storage
+            .getState()
+            .updateSessionPreferencesVersion(sessionId, result.version);
+        } else if (result.result === "version-mismatch") {
+          // Retry with the latest version (simple retry, no backoff needed for user-driven changes)
+          log.log(
+            `⚠️ Preferences version mismatch for session ${sessionId}, retrying...`,
+          );
+          const freshSession = storage.getState().sessions[sessionId];
+          if (freshSession && result.version !== undefined) {
+            storage
+              .getState()
+              .updateSessionPreferencesVersion(sessionId, result.version);
+            // Re-trigger sync with updated version
+            this.syncSessionPreferences(sessionId);
+          }
+        }
+      } catch (error) {
+        log.log(
+          `❌ Failed to sync preferences for session ${sessionId}: ${error}`,
+        );
+      }
+    }, 300);
+
+    this.preferencesSyncTimers.set(sessionId, timer);
   };
 
   public getCredentials() {
@@ -2249,6 +2400,12 @@ class Sync {
               )
             : session.metadata;
 
+        // Decrypt preferences if included in the update
+        const preferencesData = updateData.body.preferences;
+        const preferences = preferencesData?.value
+          ? await sessionEncryption.decryptPreferences(preferencesData.value)
+          : null;
+
         this.applySessions([
           {
             ...session,
@@ -2260,6 +2417,24 @@ class Sync {
             metadataVersion: updateData.body.metadata
               ? updateData.body.metadata.version
               : session.metadataVersion,
+            preferencesVersion: preferencesData
+              ? preferencesData.version
+              : session.preferencesVersion,
+            // Spread server preferences into session fields if available
+            ...(preferences
+              ? {
+                  permissionMode: preferences.permissionMode,
+                  modelMode: preferences.modelMode,
+                  customModels: preferences.customModels,
+                  modelMappings: preferences.modelMappings,
+                  profileId: preferences.profileId,
+                  profileName: preferences.profileName,
+                  thinkingMode: preferences.thinkingMode,
+                  thinkingBudget: preferences.thinkingBudget,
+                  effortLevel: preferences.effortLevel,
+                  maxBudgetUsd: preferences.maxBudgetUsd,
+                }
+              : {}),
             updatedAt: updateData.createdAt,
             seq: updateData.seq,
           },

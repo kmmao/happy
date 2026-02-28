@@ -31,28 +31,17 @@ export function sessionRoutes(app: Fastify) {
           metadataVersion: true,
           agentState: true,
           agentStateVersion: true,
+          preferences: true,
+          preferencesVersion: true,
           dataEncryptionKey: true,
           active: true,
           lastActiveAt: true,
-          // messages: {
-          //     orderBy: { seq: 'desc' },
-          //     take: 1,
-          //     select: {
-          //         id: true,
-          //         seq: true,
-          //         content: true,
-          //         localId: true,
-          //         createdAt: true
-          //     }
-          // }
         },
       });
 
       return reply.send({
         sessions: sessions.map((v) => {
-          // const lastMessage = v.messages[0];
           const sessionUpdatedAt = v.updatedAt.getTime();
-          // const lastMessageCreatedAt = lastMessage ? lastMessage.createdAt.getTime() : 0;
 
           return {
             id: v.id,
@@ -65,6 +54,8 @@ export function sessionRoutes(app: Fastify) {
             metadataVersion: v.metadataVersion,
             agentState: v.agentState,
             agentStateVersion: v.agentStateVersion,
+            preferences: v.preferences,
+            preferencesVersion: v.preferencesVersion,
             dataEncryptionKey: v.dataEncryptionKey
               ? Buffer.from(v.dataEncryptionKey).toString("base64")
               : null,
@@ -111,6 +102,8 @@ export function sessionRoutes(app: Fastify) {
           metadataVersion: true,
           agentState: true,
           agentStateVersion: true,
+          preferences: true,
+          preferencesVersion: true,
           dataEncryptionKey: true,
           active: true,
           lastActiveAt: true,
@@ -129,6 +122,8 @@ export function sessionRoutes(app: Fastify) {
           metadataVersion: v.metadataVersion,
           agentState: v.agentState,
           agentStateVersion: v.agentStateVersion,
+          preferences: v.preferences,
+          preferencesVersion: v.preferencesVersion,
           dataEncryptionKey: v.dataEncryptionKey
             ? Buffer.from(v.dataEncryptionKey).toString("base64")
             : null,
@@ -199,6 +194,8 @@ export function sessionRoutes(app: Fastify) {
           metadataVersion: true,
           agentState: true,
           agentStateVersion: true,
+          preferences: true,
+          preferencesVersion: true,
           dataEncryptionKey: true,
           active: true,
           lastActiveAt: true,
@@ -228,6 +225,8 @@ export function sessionRoutes(app: Fastify) {
           metadataVersion: v.metadataVersion,
           agentState: v.agentState,
           agentStateVersion: v.agentStateVersion,
+          preferences: v.preferences,
+          preferencesVersion: v.preferencesVersion,
           dataEncryptionKey: v.dataEncryptionKey
             ? Buffer.from(v.dataEncryptionKey).toString("base64")
             : null,

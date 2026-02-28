@@ -28,6 +28,7 @@ function createSession(
     messages: [],
     permissionMode: "default",
     metadataVersion: 0,
+    preferencesVersion: 0,
   } as Session;
 }
 

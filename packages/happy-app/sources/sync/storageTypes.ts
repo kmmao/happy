@@ -122,6 +122,29 @@ export const AgentStateSchema = z.object({
 
 export type AgentState = z.infer<typeof AgentStateSchema>;
 
+export const SessionPreferencesSchema = z.object({
+  permissionMode: z.string().nullish(),
+  modelMode: z.string().nullish(),
+  customModels: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string().nullish(),
+      }),
+    )
+    .nullish(),
+  modelMappings: z.record(z.string(), z.string()).nullish(),
+  profileId: z.string().nullish(),
+  profileName: z.string().nullish(),
+  thinkingMode: z.string().nullish(),
+  thinkingBudget: z.number().nullish(),
+  effortLevel: z.string().nullish(),
+  maxBudgetUsd: z.number().nullish(),
+});
+
+export type SessionPreferences = z.infer<typeof SessionPreferencesSchema>;
+
 export interface Session {
   id: string;
   seq: number;
@@ -133,6 +156,7 @@ export interface Session {
   metadataVersion: number;
   agentState: AgentState | null;
   agentStateVersion: number;
+  preferencesVersion: number;
   thinking: boolean;
   thinkingAt: number;
   presence: "online" | number; // "online" when active, timestamp when last seen

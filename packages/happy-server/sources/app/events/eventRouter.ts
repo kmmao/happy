@@ -86,6 +86,13 @@ export type UpdateEvent =
           }
         | null
         | undefined;
+      preferences?:
+        | {
+            value: string | null;
+            version: number;
+          }
+        | null
+        | undefined;
     }
   | {
       type: "update-account";
@@ -450,6 +457,7 @@ export function buildUpdateSessionUpdate(
   updateId: string,
   metadata?: { value: string; version: number },
   agentState?: { value: string; version: number },
+  preferences?: { value: string; version: number },
 ): UpdatePayload {
   return {
     id: updateId,
@@ -459,6 +467,7 @@ export function buildUpdateSessionUpdate(
       id: sessionId,
       metadata,
       agentState,
+      preferences,
     },
     createdAt: Date.now(),
   };
