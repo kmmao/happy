@@ -553,6 +553,8 @@ export const ru: TranslationStructure = {
     compactionSummaryTitle: "Резюме сжатия",
     compactionSummaryEmpty:
       "Резюме сжатия отсутствует. Оно появится здесь после сжатия контекста.",
+    compactionSummaryDisconnected:
+      "Сессия не подключена. Резюме доступно только когда CLI онлайн.",
   },
 
   bookmark: {

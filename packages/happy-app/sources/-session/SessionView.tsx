@@ -146,6 +146,15 @@ export const SessionView = React.memo((props: { id: string }) => {
   }, [session, isDataReady, sessionId, router, showAgentActivity]);
 
   const handleSummaryPress = React.useCallback(async () => {
+    // Check if CLI is connected before attempting RPC
+    if (session?.presence !== "online") {
+      Modal.alert(
+        t("session.compactionSummaryTitle"),
+        t("session.compactionSummaryDisconnected"),
+      );
+      return;
+    }
+
     try {
       const { summary } = await sessionGetCompactionSummary(sessionId);
       if (!summary) {
@@ -156,10 +165,12 @@ export const SessionView = React.memo((props: { id: string }) => {
         return;
       }
       Modal.alert(t("session.compactionSummaryTitle"), summary);
-    } catch {
-      Modal.alert(t("common.error"), t("errors.operationFailed"));
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : t("errors.operationFailed");
+      Modal.alert(t("common.error"), message);
     }
-  }, [sessionId]);
+  }, [sessionId, session?.presence]);
 
   return (
     <>

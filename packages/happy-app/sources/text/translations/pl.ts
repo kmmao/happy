@@ -406,6 +406,8 @@ export const pl: TranslationStructure = {
     compactionSummaryTitle: "Podsumowanie kontekstu",
     compactionSummaryEmpty:
       "Brak podsumowania kompresji. Pojawi się tutaj po skompresowaniu kontekstu.",
+    compactionSummaryDisconnected:
+      "Sesja nie jest połączona. Podsumowanie jest dostępne tylko gdy CLI jest online.",
   },
 
   bookmark: {

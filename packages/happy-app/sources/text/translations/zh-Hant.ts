@@ -369,6 +369,7 @@ export const zhHant: TranslationStructure = {
     bookmarkOption: "收藏",
     compactionSummaryTitle: "背景摘要",
     compactionSummaryEmpty: "尚無背景摘要。在背景被壓縮後將出現在此處。",
+    compactionSummaryDisconnected: "會話未連線。摘要僅在 CLI 連線時可用。",
   },
 
   bookmark: {

@@ -459,6 +459,8 @@ export const it: TranslationStructure = {
     compactionSummaryTitle: "Riepilogo del contesto",
     compactionSummaryEmpty:
       "Nessun riepilogo di compattazione. Apparirà qui dopo la compattazione del contesto.",
+    compactionSummaryDisconnected:
+      "La sessione non è connessa. Il riepilogo è disponibile solo quando il CLI è online.",
   },
 
   bookmark: {

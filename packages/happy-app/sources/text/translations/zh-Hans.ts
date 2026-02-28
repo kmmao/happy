@@ -369,6 +369,7 @@ export const zhHans: TranslationStructure = {
     bookmarkOption: "收藏",
     compactionSummaryTitle: "上下文摘要",
     compactionSummaryEmpty: "暂无压缩摘要，当上下文被压缩后将在此显示。",
+    compactionSummaryDisconnected: "会话未连接。摘要仅在 CLI 在线时可用。",
   },
 
   bookmark: {

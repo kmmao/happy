@@ -22,6 +22,9 @@ import { getToolName } from "./utils/getToolName";
 import { createEnvelope } from "@kmmao/happy-wire";
 import { hashObject } from "@/utils/deterministicJson";
 import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
+import { getProjectPath } from "./utils/path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 interface PermissionsField {
   date: number;
@@ -141,6 +144,39 @@ export async function claudeRemoteLauncher(
   session.client.rpcHandlerManager.registerHandler("interrupt", doInterrupt); // Graceful interrupt
   session.client.rpcHandlerManager.registerHandler("stopTask", doStopTask); // Stop background task
   // Removed catch-all stdin handler - now handled by RemoteModeDisplay keyboard handlers
+
+  // Register RPC handler to allow App to fetch the latest compaction summary
+  // In remote mode, read from the JSONL file on demand (no scanner available)
+  session.client.rpcHandlerManager.registerHandler(
+    "getCompactionSummary",
+    async () => {
+      const currentSessionId = session.sessionId;
+      if (!currentSessionId) {
+        return { summary: null };
+      }
+      try {
+        const projectDir = getProjectPath(session.path);
+        const filePath = join(projectDir, `${currentSessionId}.jsonl`);
+        const content = await readFile(filePath, "utf-8");
+        const lines = content.split("\n");
+        let latestSummary: string | null = null;
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.type === "summary" && parsed.summary) {
+              latestSummary = parsed.summary;
+            }
+          } catch {
+            continue;
+          }
+        }
+        return { summary: latestSummary };
+      } catch {
+        return { summary: null };
+      }
+    },
+  );
 
   // Create permission handler
   const permissionHandler = new PermissionHandler(session);

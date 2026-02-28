@@ -446,6 +446,8 @@ export const ja: TranslationStructure = {
     compactionSummaryTitle: "コンテキストサマリー",
     compactionSummaryEmpty:
       "圧縮サマリーはまだありません。コンテキストが圧縮されるとここに表示されます。",
+    compactionSummaryDisconnected:
+      "セッションが接続されていません。サマリーはCLIがオンラインの時のみ利用可能です。",
   },
 
   bookmark: {

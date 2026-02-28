@@ -393,6 +393,8 @@ export const pt: TranslationStructure = {
     compactionSummaryTitle: "Resumo de Contexto",
     compactionSummaryEmpty:
       "Ainda não há resumo de compactação. Aparecerá aqui após o contexto ser compactado.",
+    compactionSummaryDisconnected:
+      "A sessão não está conectada. O resumo só está disponível quando o CLI está online.",
   },
 
   bookmark: {
