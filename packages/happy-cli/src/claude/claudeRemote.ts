@@ -19,6 +19,7 @@ import { PushableAsyncIterable } from "@/utils/PushableAsyncIterable";
 import { getProjectPath } from "./utils/path";
 import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { systemPrompt } from "./utils/systemPrompt";
+import { buildLocaleInstruction } from "./utils/localeInstruction";
 import { PermissionResult } from "./sdk/types";
 import type { JsRuntime } from "./runClaude";
 /**
@@ -219,6 +220,12 @@ export async function claudeRemote(opts: {
     opts.claudeEnvVars?.ANTHROPIC_MODEL ??
     process.env.ANTHROPIC_MODEL;
 
+  // Build effective system prompt with optional locale instruction
+  const localeInstruction = buildLocaleInstruction(initial.mode.locale);
+  const effectiveSystemPrompt = localeInstruction
+    ? systemPrompt + "\n\n" + localeInstruction
+    : systemPrompt;
+
   const sdkOptions: QueryOptions = {
     cwd: opts.path,
     resume: startFrom ?? undefined,
@@ -228,11 +235,11 @@ export async function claudeRemote(opts: {
     model: model || undefined,
     fallbackModel: initial.mode.fallbackModel,
     customSystemPrompt: initial.mode.customSystemPrompt
-      ? initial.mode.customSystemPrompt + "\n\n" + systemPrompt
+      ? initial.mode.customSystemPrompt + "\n\n" + effectiveSystemPrompt
       : undefined,
     appendSystemPrompt: initial.mode.appendSystemPrompt
-      ? initial.mode.appendSystemPrompt + "\n\n" + systemPrompt
-      : systemPrompt,
+      ? initial.mode.appendSystemPrompt + "\n\n" + effectiveSystemPrompt
+      : effectiveSystemPrompt,
     allowedTools: initial.mode.allowedTools
       ? initial.mode.allowedTools.concat(opts.allowedTools)
       : opts.allowedTools,

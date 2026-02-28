@@ -31,6 +31,8 @@ export interface EnhancedMode {
   effort?: "low" | "medium" | "high" | "max";
   /** When true, continue from last conversation without a new prompt (one-time flag) */
   continue?: boolean;
+  /** User's preferred UI language (e.g. 'en', 'zh-Hans', 'ja') */
+  locale?: string;
 }
 
 interface LoopOptions {

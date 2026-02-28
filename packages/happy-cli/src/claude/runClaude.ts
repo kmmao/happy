@@ -378,6 +378,7 @@ export async function runClaude(
   let currentMaxBudgetUsd: number | undefined = undefined; // Track current budget
   let currentThinking: EnhancedMode["thinking"] = undefined; // Track current thinking config
   let currentEffort: EnhancedMode["effort"] = undefined; // Track current effort level
+  let currentLocale: string | undefined = undefined; // Track current locale
   session.onUserMessage((message) => {
     // Resolve permission mode from meta - pass through as-is, mapping happens at SDK boundary
     let messagePermissionMode: PermissionMode | undefined =
@@ -528,6 +529,14 @@ export async function runClaude(
       logger.debug(`[loop] effort updated: ${messageEffort ?? "none"}`);
     }
 
+    // Resolve locale
+    let messageLocale = currentLocale;
+    if (message.meta?.hasOwnProperty("locale")) {
+      messageLocale = message.meta.locale ?? undefined;
+      currentLocale = messageLocale;
+      logger.debug(`[loop] locale updated: ${messageLocale ?? "none"}`);
+    }
+
     // Resolve continue (one-time flag, not persisted across messages)
     const messageContinue = !!message.meta?.continue;
     if (messageContinue) {
@@ -569,6 +578,7 @@ export async function runClaude(
         maxBudgetUsd: messageMaxBudgetUsd,
         thinking: messageThinking,
         effort: messageEffort,
+        locale: messageLocale,
       };
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
@@ -595,6 +605,7 @@ export async function runClaude(
         maxBudgetUsd: messageMaxBudgetUsd,
         thinking: messageThinking,
         effort: messageEffort,
+        locale: messageLocale,
       };
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
@@ -620,6 +631,7 @@ export async function runClaude(
       maxBudgetUsd: messageMaxBudgetUsd,
       thinking: messageThinking,
       effort: messageEffort,
+      locale: messageLocale,
       ...(messageContinue && { continue: true }),
     };
     messageQueue.push(message.content.text, enhancedMode);

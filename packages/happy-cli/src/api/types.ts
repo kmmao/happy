@@ -239,6 +239,7 @@ export const MessageMetaSchema = z.object({
     .optional(), // Thinking/reasoning behavior (null = reset)
   effort: z.enum(["low", "medium", "high", "max"]).nullable().optional(), // Effort level (null = reset)
   continue: z.boolean().optional(), // Continue from last conversation without new prompt (one-time flag)
+  locale: z.string().optional(), // User's preferred UI language (e.g. 'en', 'zh-Hans', 'ja')
 });
 
 export type MessageMeta = z.infer<typeof MessageMetaSchema>;

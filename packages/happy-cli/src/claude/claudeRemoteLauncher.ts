@@ -578,6 +578,7 @@ export async function claudeRemoteLauncher(
           maxBudgetUsd: m.maxBudgetUsd,
           thinking: m.thinking,
           effort: m.effort,
+          locale: m.locale,
         });
       let currentColdHash: string | null = null;
       try {
