@@ -154,6 +154,8 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     paddingVertical: 2,
     paddingBottom: 8,
     paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.divider,
   },
   inputContainer: {
     flexDirection: "row",
@@ -296,11 +298,12 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     paddingHorizontal: 0,
   },
   actionButtonsLeft: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    columnGap: 8,
-    rowGap: 4,
     flex: 1,
+  },
+  actionButtonsLeftContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   actionButton: {
     flexDirection: "row",
@@ -2045,11 +2048,16 @@ export const AgentInput = React.memo(
                 <View
                   style={{
                     flexDirection: "row",
-                    alignItems: "flex-start",
+                    alignItems: "center",
                     justifyContent: "space-between",
                   }}
                 >
-                  <View style={styles.actionButtonsLeft}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.actionButtonsLeft}
+                    contentContainerStyle={styles.actionButtonsLeftContent}
+                  >
                     {/* Settings button */}
                     {props.onPermissionModeChange && (
                       <Pressable
@@ -2351,7 +2359,7 @@ export const AgentInput = React.memo(
                       sessionId={props.sessionId}
                       onPress={props.onFileViewerPress}
                     />
-                  </View>
+                  </ScrollView>
 
                   {/* Send/Voice button - aligned with first row */}
                   <View

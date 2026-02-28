@@ -27,6 +27,12 @@ export const LocalSettingsSchema = z.object({
   favoriteCommands: z
     .array(z.string())
     .describe("User-pinned slash commands for quick access"),
+  // Tool detail view mode
+  toolDetailMode: z
+    .enum(["simple", "developer"])
+    .describe(
+      "Tool detail view mode: simple (human-readable) or developer (raw JSON)",
+    ),
 });
 
 //
@@ -50,6 +56,7 @@ export const localSettingsDefaults: LocalSettings = {
   markdownCopyV2: false,
   acknowledgedCliVersions: {},
   favoriteCommands: [],
+  toolDetailMode: "simple",
 };
 Object.freeze(localSettingsDefaults);
 

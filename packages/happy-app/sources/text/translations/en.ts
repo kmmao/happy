@@ -687,6 +687,42 @@ export const en: TranslationStructure = {
       noOutput: "No output was produced",
       running: "Tool is running...",
       rawJsonDevMode: "Raw JSON (Dev Mode)",
+      simpleMode: "Simple",
+      developerMode: "Developer",
+      simple: {
+        readFile: ({ file }: { file: string }) => `Read file ${file}`,
+        editFile: ({ file }: { file: string }) => `Modified file ${file}`,
+        writeFile: ({ file }: { file: string }) => `Created file ${file}`,
+        runCommand: "Executed command",
+        searchCode: ({ pattern }: { pattern: string }) =>
+          `Searched for "${pattern}"`,
+        findFiles: ({ pattern }: { pattern: string }) =>
+          `Found files matching "${pattern}"`,
+        launchAgent: ({ type }: { type: string }) => `Launched ${type} agent`,
+        webSearch: ({ query }: { query: string }) => `Searched: ${query}`,
+        fetchUrl: ({ host }: { host: string }) =>
+          `Fetched content from ${host}`,
+        updateTodos: ({ count }: { count: number }) =>
+          `Updated task list (${count} items)`,
+        mcpTool: ({ name }: { name: string }) => `Called tool ${name}`,
+        unknownTool: ({ name }: { name: string }) => `Executed ${name}`,
+        status: "Status",
+        duration: "Duration",
+        fileName: "File",
+        command: "Command",
+        pattern: "Pattern",
+        agent: "Agent",
+        query: "Query",
+        url: "URL",
+        description: "Description",
+        linesAdded: ({ count }: { count: number }) => `+${count} added`,
+        linesRemoved: ({ count }: { count: number }) => `-${count} removed`,
+        filesMatched: ({ count }: { count: number }) =>
+          `${count} files matched`,
+        succeeded: "Completed successfully",
+        failed: "Failed",
+        running: "Running...",
+      },
     },
     taskView: {
       initializing: "Initializing agent...",

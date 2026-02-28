@@ -3,6 +3,7 @@ import {
   Text,
   View,
   ScrollView,
+  Pressable,
   Platform,
   useWindowDimensions,
 } from "react-native";
@@ -12,10 +13,11 @@ import { CodeView } from "../CodeView";
 import { Metadata } from "@/sync/storageTypes";
 import { getToolFullViewComponent } from "./views/_all";
 import { layout } from "../layout";
-import { useLocalSetting } from "@/sync/storage";
-import { StyleSheet } from "react-native-unistyles";
+import { useLocalSetting, useLocalSettingMutable } from "@/sync/storage";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import { ReviewFooter } from "./ReviewFooter";
+import { ToolSimpleContent } from "./ToolSimpleContent";
 
 interface ToolFullViewProps {
   tool: ToolCall;
@@ -25,7 +27,7 @@ interface ToolFullViewProps {
   messageId?: string;
 }
 
-export function ToolFullView({
+export const ToolFullView = React.memo(function ToolFullView({
   tool,
   metadata,
   messages = [],
@@ -36,7 +38,18 @@ export function ToolFullView({
   const SpecializedFullView = getToolFullViewComponent(tool.name);
   const screenWidth = useWindowDimensions().width;
   const devModeEnabled = useLocalSetting("devModeEnabled") || __DEV__;
+  const [toolDetailMode, setToolDetailMode] =
+    useLocalSettingMutable("toolDetailMode");
   const scrollViewRef = React.useRef<ScrollView>(null);
+  const { theme } = useUnistyles();
+
+  // For tools with specialized full views (Bash, Edit, MultiEdit),
+  // always use the specialized view — they are already intuitive.
+  const hasSpecializedView = !!SpecializedFullView;
+
+  // Only show mode switcher for tools without specialized views
+  const showModeSwitcher = !hasSpecializedView;
+  const isSimpleMode = showModeSwitcher && toolDetailMode === "simple";
 
   return (
     <ScrollView
@@ -47,14 +60,77 @@ export function ToolFullView({
       ]}
     >
       <View style={styles.contentWrapper}>
+        {/* Mode Switcher */}
+        {showModeSwitcher && (
+          <View style={styles.modeSwitcherContainer}>
+            <View
+              style={[
+                styles.segmentContainer,
+                {
+                  backgroundColor: theme.colors.surfaceHighest,
+                },
+              ]}
+            >
+              <Pressable
+                onPress={() => setToolDetailMode("simple")}
+                style={[
+                  styles.segment,
+                  toolDetailMode === "simple" && {
+                    backgroundColor: theme.colors.surface,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.segmentText,
+                    {
+                      color:
+                        toolDetailMode === "simple"
+                          ? theme.colors.textLink
+                          : theme.colors.textSecondary,
+                    },
+                  ]}
+                >
+                  {t("tools.fullView.simpleMode")}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setToolDetailMode("developer")}
+                style={[
+                  styles.segment,
+                  toolDetailMode === "developer" && {
+                    backgroundColor: theme.colors.surface,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.segmentText,
+                    {
+                      color:
+                        toolDetailMode === "developer"
+                          ? theme.colors.textLink
+                          : theme.colors.textSecondary,
+                    },
+                  ]}
+                >
+                  {t("tools.fullView.developerMode")}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
         {/* Tool-specific content or generic fallback */}
-        {SpecializedFullView ? (
+        {hasSpecializedView ? (
           <SpecializedFullView
             tool={tool}
             metadata={metadata || null}
             messages={messages}
             scrollViewRef={scrollViewRef}
           />
+        ) : isSimpleMode ? (
+          <ToolSimpleContent tool={tool} metadata={metadata || null} />
         ) : (
           <>
             {/* Generic fallback for tools without specialized views */}
@@ -184,7 +260,7 @@ export function ToolFullView({
       </View>
     </ScrollView>
   );
-}
+});
 
 const styles = StyleSheet.create((theme) => ({
   container: {
@@ -196,6 +272,25 @@ const styles = StyleSheet.create((theme) => ({
     maxWidth: layout.maxWidth,
     alignSelf: "center",
     width: "100%",
+  },
+  modeSwitcherContainer: {
+    alignItems: "center",
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  segmentContainer: {
+    flexDirection: "row",
+    borderRadius: 8,
+    padding: 3,
+  },
+  segment: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   section: {
     marginBottom: 28,

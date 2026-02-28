@@ -13,7 +13,28 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MessageView } from "./MessageView";
 import { Metadata, Session } from "@/sync/storageTypes";
 import { ChatFooter } from "./ChatFooter";
-import { Message } from "@/sync/typesMessage";
+import { Message, ToolCallMessage } from "@/sync/typesMessage";
+import { ToolGroupView } from "./ToolGroupView";
+import { knownTools } from "./tools/knownTools";
+
+// Tools that should NOT be grouped (they have special UI or require interaction)
+const UNGROUPABLE_TOOLS = new Set(["Task", "AskUserQuestion"]);
+
+function isToolGroupable(toolName: string): boolean {
+  if (UNGROUPABLE_TOOLS.has(toolName)) return false;
+  const knownTool = knownTools[toolName as keyof typeof knownTools] as any;
+  if (knownTool?.hidden) return false;
+  return true;
+}
+const MIN_GROUP_SIZE = 3;
+
+type ToolGroup = {
+  kind: "tool-group";
+  id: string;
+  messages: ToolCallMessage[];
+};
+
+type DisplayItem = Message | ToolGroup;
 
 export interface ChatListHandle {
   scrollToBottom: () => void;
@@ -84,18 +105,75 @@ const ChatListInternal = React.memo(
     const isAwayRef = React.useRef(false);
     const currentUserMsgIndexRef = React.useRef(-1);
 
-    // Collect user-text message indices (in the inverted list)
+    // Pre-compute which agent-text messages should show an avatar.
+    // In an inverted list, index+1 is the visually "previous" (above) message.
+    // Show avatar on the first agent-text in a consecutive run.
+    const showAvatarMap = React.useMemo(() => {
+      const map = new Map<string, boolean>();
+      for (let i = 0; i < props.messages.length; i++) {
+        const msg = props.messages[i];
+        if (msg.kind === "agent-text") {
+          const prev = props.messages[i + 1];
+          map.set(msg.id, !prev || prev.kind !== "agent-text");
+        }
+      }
+      return map;
+    }, [props.messages]);
+
+    // Group consecutive tool-call messages (3+) into collapsible groups.
+    // The list is inverted (index 0 = newest), so we iterate normally
+    // and group consecutive groupable tool-calls.
+    const displayItems: DisplayItem[] = React.useMemo(() => {
+      const result: DisplayItem[] = [];
+      let currentGroup: ToolCallMessage[] = [];
+
+      const flushGroup = () => {
+        if (currentGroup.length >= MIN_GROUP_SIZE) {
+          result.push({
+            kind: "tool-group",
+            id: `group-${currentGroup[0].id}`,
+            messages: [...currentGroup],
+          });
+        } else {
+          for (const msg of currentGroup) {
+            result.push(msg);
+          }
+        }
+        currentGroup = [];
+      };
+
+      for (const msg of props.messages) {
+        const isGroupable =
+          msg.kind === "tool-call" && isToolGroupable(msg.tool.name);
+
+        if (isGroupable) {
+          currentGroup.push(msg as ToolCallMessage);
+        } else {
+          flushGroup();
+          result.push(msg);
+        }
+      }
+      flushGroup();
+
+      return result;
+    }, [props.messages]);
+
+    // Collect user-text message indices in displayItems (not props.messages)
+    // since the FlatList now uses displayItems as data.
     const userMessageIndices = React.useMemo(
       () =>
-        props.messages
-          .map((msg, i) => (msg.kind === "user-text" ? i : -1))
+        displayItems
+          .map((item, i) => (item.kind === "user-text" ? i : -1))
           .filter((i) => i !== -1),
-      [props.messages],
+      [displayItems],
     );
 
     React.useImperativeHandle(ref, () => ({
       scrollToBottom: () => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        flatListRef.current?.scrollToOffset({
+          offset: 0,
+          animated: true,
+        });
       },
       scrollToUserMessage: (direction: "prev" | "next") => {
         if (userMessageIndices.length === 0) return -1;
@@ -121,7 +199,7 @@ const ChatListInternal = React.memo(
         }
 
         const targetIndex = currentUserMsgIndexRef.current;
-        if (targetIndex >= 0 && targetIndex < props.messages.length) {
+        if (targetIndex >= 0 && targetIndex < displayItems.length) {
           flatListRef.current?.scrollToIndex({
             index: targetIndex,
             animated: true,
@@ -141,7 +219,7 @@ const ChatListInternal = React.memo(
           animated: true,
         });
         setTimeout(() => {
-          if (info.index >= 0 && info.index < props.messages.length) {
+          if (info.index >= 0 && info.index < displayItems.length) {
             flatListRef.current?.scrollToIndex({
               index: info.index,
               animated: true,
@@ -150,7 +228,7 @@ const ChatListInternal = React.memo(
           }
         }, 200);
       },
-      [props.messages.length],
+      [displayItems.length],
     );
 
     const handleScroll = useCallback(
@@ -166,37 +244,33 @@ const ChatListInternal = React.memo(
       [props.onScrollAwayFromBottom, props.onScrollActivity],
     );
 
-    // Pre-compute which agent-text messages should show an avatar.
-    // In an inverted list, index+1 is the visually "previous" (above) message.
-    // Show avatar on the first agent-text in a consecutive run.
-    const showAvatarMap = React.useMemo(() => {
-      const map = new Map<string, boolean>();
-      for (let i = 0; i < props.messages.length; i++) {
-        const msg = props.messages[i];
-        if (msg.kind === "agent-text") {
-          const prev = props.messages[i + 1];
-          map.set(msg.id, !prev || prev.kind !== "agent-text");
-        }
-      }
-      return map;
-    }, [props.messages]);
-
-    const keyExtractor = useCallback((item: any) => item.id, []);
+    const keyExtractor = useCallback((item: DisplayItem) => item.id, []);
     const renderItem = useCallback(
-      ({ item }: { item: Message }) => (
-        <MessageView
-          message={item}
-          metadata={props.metadata}
-          sessionId={props.sessionId}
-          showAvatar={showAvatarMap.get(item.id) ?? false}
-        />
-      ),
+      ({ item }: { item: DisplayItem }) => {
+        if (item.kind === "tool-group") {
+          return (
+            <ToolGroupView
+              messages={item.messages}
+              metadata={props.metadata}
+              sessionId={props.sessionId}
+            />
+          );
+        }
+        return (
+          <MessageView
+            message={item}
+            metadata={props.metadata}
+            sessionId={props.sessionId}
+            showAvatar={showAvatarMap.get(item.id) ?? false}
+          />
+        );
+      },
       [props.metadata, props.sessionId, showAvatarMap],
     );
     return (
       <FlatList
         ref={flatListRef}
-        data={props.messages}
+        data={displayItems}
         inverted={true}
         keyExtractor={keyExtractor}
         maintainVisibleContentPosition={{

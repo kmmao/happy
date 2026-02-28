@@ -739,6 +739,47 @@ export const ja: TranslationStructure = {
       noOutput: "出力がありません",
       running: "ツールを実行中...",
       rawJsonDevMode: "Raw JSON (開発モード)",
+      simpleMode: "シンプル",
+      developerMode: "開発者",
+      simple: {
+        readFile: ({ file }: { file: string }) =>
+          `ファイル ${file} を読み取りました`,
+        editFile: ({ file }: { file: string }) =>
+          `ファイル ${file} を変更しました`,
+        writeFile: ({ file }: { file: string }) =>
+          `ファイル ${file} を作成しました`,
+        runCommand: "コマンドを実行しました",
+        searchCode: ({ pattern }: { pattern: string }) =>
+          `"${pattern}" を検索しました`,
+        findFiles: ({ pattern }: { pattern: string }) =>
+          `"${pattern}" に一致するファイルを検索しました`,
+        launchAgent: ({ type }: { type: string }) =>
+          `${type} エージェントを起動しました`,
+        webSearch: ({ query }: { query: string }) => `検索: ${query}`,
+        fetchUrl: ({ host }: { host: string }) =>
+          `${host} のコンテンツを取得しました`,
+        updateTodos: ({ count }: { count: number }) =>
+          `タスクリストを更新しました（${count} 件）`,
+        mcpTool: ({ name }: { name: string }) =>
+          `ツール ${name} を呼び出しました`,
+        unknownTool: ({ name }: { name: string }) => `${name} を実行しました`,
+        status: "ステータス",
+        duration: "所要時間",
+        fileName: "ファイル",
+        command: "コマンド",
+        pattern: "パターン",
+        agent: "エージェント",
+        query: "クエリ",
+        url: "URL",
+        description: "説明",
+        linesAdded: ({ count }: { count: number }) => `+${count} 行追加`,
+        linesRemoved: ({ count }: { count: number }) => `-${count} 行削除`,
+        filesMatched: ({ count }: { count: number }) =>
+          `${count} ファイルが一致`,
+        succeeded: "正常に完了しました",
+        failed: "失敗",
+        running: "実行中...",
+      },
     },
     taskView: {
       initializing: "エージェントを初期化中...",
