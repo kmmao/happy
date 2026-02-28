@@ -297,9 +297,10 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   actionButtonsLeft: {
     flexDirection: "row",
-    gap: 8,
+    flexWrap: "wrap",
+    columnGap: 8,
+    rowGap: 4,
     flex: 1,
-    overflow: "hidden",
   },
   actionButton: {
     flexDirection: "row",
@@ -2044,7 +2045,7 @@ export const AgentInput = React.memo(
                 <View
                   style={{
                     flexDirection: "row",
-                    alignItems: "center",
+                    alignItems: "flex-start",
                     justifyContent: "space-between",
                   }}
                 >
