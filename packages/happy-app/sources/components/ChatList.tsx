@@ -18,7 +18,7 @@ import { ToolGroupView } from "./ToolGroupView";
 import { knownTools } from "./tools/knownTools";
 
 // Tools that should NOT be grouped (they have special UI or require interaction)
-const UNGROUPABLE_TOOLS = new Set(["Task", "AskUserQuestion"]);
+const UNGROUPABLE_TOOLS = new Set(["Task", "AskUserQuestion", "TodoWrite"]);
 
 function isToolGroupable(toolName: string): boolean {
   if (UNGROUPABLE_TOOLS.has(toolName)) return false;
@@ -32,6 +32,8 @@ type ToolGroup = {
   kind: "tool-group";
   id: string;
   messages: ToolCallMessage[];
+  model?: string;
+  turnTokens?: number;
 };
 
 type DisplayItem = Message | ToolGroup;
@@ -126,13 +128,51 @@ const ChatListInternal = React.memo(
     const displayItems: DisplayItem[] = React.useMemo(() => {
       const result: DisplayItem[] = [];
       let currentGroup: ToolCallMessage[] = [];
+      let groupStartIdx = -1;
 
       const flushGroup = () => {
         if (currentGroup.length >= MIN_GROUP_SIZE) {
+          let model: string | undefined;
+          let turnTokens: number | undefined;
+
+          // Search backward in the original messages (toward newer / index 0)
+          // for the same-turn ready event (includes model + per-turn tokens).
+          for (let i = groupStartIdx - 1; i >= 0; i--) {
+            const m = props.messages[i];
+            if (m.kind === "user-text") break;
+            if (m.kind === "agent-event" && m.event.type === "ready") {
+              model = m.event.model;
+              if (m.event.usage) {
+                turnTokens =
+                  m.event.usage.input_tokens +
+                  m.event.usage.output_tokens +
+                  (m.event.usage.cache_creation_input_tokens ?? 0) +
+                  (m.event.usage.cache_read_input_tokens ?? 0);
+              }
+              break;
+            }
+          }
+
+          // Fallback: if no ready event found (running turn), search forward
+          // (toward older messages) for a previous turn's ready event.
+          // Only take the model name — tokens belong to a different turn.
+          if (!model) {
+            const afterGroup = groupStartIdx + currentGroup.length;
+            for (let i = afterGroup; i < props.messages.length; i++) {
+              const m = props.messages[i];
+              if (m.kind === "agent-event" && m.event.type === "ready") {
+                model = m.event.model;
+                break;
+              }
+            }
+          }
+
           result.push({
             kind: "tool-group",
             id: `group-${currentGroup[0].id}`,
             messages: [...currentGroup],
+            model,
+            turnTokens,
           });
         } else {
           for (const msg of currentGroup) {
@@ -140,13 +180,16 @@ const ChatListInternal = React.memo(
           }
         }
         currentGroup = [];
+        groupStartIdx = -1;
       };
 
-      for (const msg of props.messages) {
+      for (let idx = 0; idx < props.messages.length; idx++) {
+        const msg = props.messages[idx];
         const isGroupable =
           msg.kind === "tool-call" && isToolGroupable(msg.tool.name);
 
         if (isGroupable) {
+          if (currentGroup.length === 0) groupStartIdx = idx;
           currentGroup.push(msg as ToolCallMessage);
         } else {
           flushGroup();
@@ -253,6 +296,8 @@ const ChatListInternal = React.memo(
               messages={item.messages}
               metadata={props.metadata}
               sessionId={props.sessionId}
+              model={item.model}
+              turnTokens={item.turnTokens}
             />
           );
         }

@@ -438,7 +438,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: 4,
     borderRadius: 12,
     marginBottom: 12,
-    maxWidth: "100%",
+    flexShrink: 1,
   },
   agentMessageRow: {
     flexDirection: "row",

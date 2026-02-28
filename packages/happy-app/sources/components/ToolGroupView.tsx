@@ -12,7 +12,9 @@ import { useRouter } from "expo-router";
 import { ToolCallMessage } from "@/sync/typesMessage";
 import { Metadata } from "@/sync/storageTypes";
 import { knownTools } from "./tools/knownTools";
+import { layout } from "./layout";
 import { t } from "@/text";
+import { sessionAllow } from "@/sync/ops";
 
 interface ToolGroupItem {
   message: ToolCallMessage;
@@ -48,16 +50,42 @@ function extractToolTitle(
   return toolName;
 }
 
+function formatTokenCount(count: number): string {
+  if (count >= 1000000) {
+    return `${(count / 1000000).toFixed(1)}M`;
+  }
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}k`;
+  }
+  return String(count);
+}
+
 export const ToolGroupView = React.memo(
   (props: {
     messages: ToolCallMessage[];
     metadata: Metadata | null;
     sessionId: string;
+    model?: string;
+    turnTokens?: number;
   }) => {
     const { theme } = useUnistyles();
     const router = useRouter();
     const [collapsed, setCollapsed] = React.useState(true);
     const [showAllTools, setShowAllTools] = React.useState(false);
+
+    // Auto-approve pending permissions for grouped tools (ToolView is not
+    // rendered inside groups, so its own auto-approve useEffect never fires).
+    React.useEffect(() => {
+      for (const m of props.messages) {
+        if (
+          m.tool.permission?.status === "pending" &&
+          m.tool.permission?.id &&
+          m.tool.name !== "AskUserQuestion"
+        ) {
+          sessionAllow(props.sessionId, m.tool.permission.id);
+        }
+      }
+    }, [props.messages, props.sessionId]);
 
     const items: ToolGroupItem[] = React.useMemo(
       () =>
@@ -80,8 +108,15 @@ export const ToolGroupView = React.memo(
       if (completedCount > 0) parts.push(`${completedCount}✓`);
       if (runningCount > 0) parts.push(`${runningCount}⟳`);
       if (errorCount > 0) parts.push(`${errorCount}✗`);
+      if (props.model) {
+        const displayModel = props.model.replace(/-\d{8}$/, "");
+        parts.push(displayModel);
+      }
+      if (props.turnTokens !== undefined) {
+        parts.push(formatTokenCount(props.turnTokens));
+      }
       return parts.join(" · ");
-    }, [items]);
+    }, [items, props.model, props.turnTokens]);
 
     if (items.length === 0) {
       return null;
@@ -90,17 +125,19 @@ export const ToolGroupView = React.memo(
     if (collapsed) {
       return (
         <View style={styles.outerContainer}>
-          <Pressable
-            onPress={() => setCollapsed(false)}
-            style={styles.summaryRow}
-          >
-            <Ionicons
-              name="chevron-forward"
-              size={14}
-              color={theme.colors.textSecondary}
-            />
-            <Text style={styles.summaryText}>{summaryLabel}</Text>
-          </Pressable>
+          <View style={styles.contentWrapper}>
+            <Pressable
+              onPress={() => setCollapsed(false)}
+              style={styles.summaryRow}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={14}
+                color={theme.colors.textSecondary}
+              />
+              <Text style={styles.summaryText}>{summaryLabel}</Text>
+            </Pressable>
+          </View>
         </View>
       );
     }
@@ -113,87 +150,87 @@ export const ToolGroupView = React.memo(
 
     return (
       <View style={styles.outerContainer}>
-        <View style={styles.container}>
-          <Pressable
-            onPress={() => {
-              setCollapsed(true);
-              setShowAllTools(false);
-            }}
-            style={styles.summaryRow}
-          >
-            <Ionicons
-              name="chevron-down"
-              size={14}
-              color={theme.colors.textSecondary}
-            />
-            <Text style={styles.summaryText}>{summaryLabel}</Text>
-          </Pressable>
-          {displayItems.map((item, index) => {
-            const isLast =
-              index === displayItems.length - 1 && remainingCount <= 0;
-            return (
+        <View style={styles.contentWrapper}>
+          <View style={styles.container}>
+            <Pressable
+              onPress={() => {
+                setCollapsed(true);
+                setShowAllTools(false);
+              }}
+              style={styles.summaryRow}
+            >
+              <Ionicons
+                name="chevron-down"
+                size={14}
+                color={theme.colors.textSecondary}
+              />
+              <Text style={styles.summaryText}>{summaryLabel}</Text>
+            </Pressable>
+            {displayItems.map((item, index) => {
+              const isLast =
+                index === displayItems.length - 1 && remainingCount <= 0;
+              return (
+                <Pressable
+                  key={item.message.id}
+                  style={styles.toolItem}
+                  onPress={() => {
+                    router.push(
+                      `/session/${props.sessionId}/message/${item.message.id}` as any,
+                    );
+                  }}
+                >
+                  <Text style={styles.treeLine}>{isLast ? "└─" : "├─"}</Text>
+                  <Text style={styles.toolTitle}>{item.title}</Text>
+                  <View style={styles.statusContainer}>
+                    {item.state === "running" && (
+                      <ActivityIndicator
+                        size={Platform.OS === "ios" ? "small" : (14 as any)}
+                        color={theme.colors.warning}
+                      />
+                    )}
+                    {item.state === "completed" && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={16}
+                        color={theme.colors.success}
+                      />
+                    )}
+                    {item.state === "error" && (
+                      <Ionicons
+                        name="close-circle"
+                        size={16}
+                        color={theme.colors.textDestructive}
+                      />
+                    )}
+                  </View>
+                </Pressable>
+              );
+            })}
+            {remainingCount > 0 && (
               <Pressable
-                key={item.message.id}
                 style={styles.toolItem}
-                onPress={() => {
-                  router.push(
-                    `/session/${props.sessionId}/message/${item.message.id}` as any,
-                  );
-                }}
+                onPress={() => setShowAllTools(true)}
               >
-                <Text style={styles.treeLine}>{isLast ? "└─" : "├─"}</Text>
-                <Text style={styles.toolTitle} numberOfLines={1}>
-                  {item.title}
+                <Text style={styles.treeLine}>└─</Text>
+                <Text style={styles.moreToolsText}>
+                  {t("tools.taskView.moreTools", {
+                    count: remainingCount,
+                  })}
                 </Text>
-                <View style={styles.statusContainer}>
-                  {item.state === "running" && (
-                    <ActivityIndicator
-                      size={Platform.OS === "ios" ? "small" : (14 as any)}
-                      color={theme.colors.warning}
-                    />
-                  )}
-                  {item.state === "completed" && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={16}
-                      color={theme.colors.success}
-                    />
-                  )}
-                  {item.state === "error" && (
-                    <Ionicons
-                      name="close-circle"
-                      size={16}
-                      color={theme.colors.textDestructive}
-                    />
-                  )}
-                </View>
               </Pressable>
-            );
-          })}
-          {remainingCount > 0 && (
-            <Pressable
-              style={styles.toolItem}
-              onPress={() => setShowAllTools(true)}
-            >
-              <Text style={styles.treeLine}>└─</Text>
-              <Text style={styles.moreToolsText}>
-                {t("tools.taskView.moreTools", {
-                  count: remainingCount,
-                })}
-              </Text>
-            </Pressable>
-          )}
-          {showAllTools && items.length > maxVisible && (
-            <Pressable
-              style={styles.toolItem}
-              onPress={() => setShowAllTools(false)}
-            >
-              <Text style={styles.treeLine}>└─</Text>
-              <Text style={styles.moreToolsText}>
-                {t("tools.taskView.collapseTools")}
-              </Text>
-            </Pressable>
-          )}
+            )}
+            {showAllTools && items.length > maxVisible && (
+              <Pressable
+                style={styles.toolItem}
+                onPress={() => setShowAllTools(false)}
+              >
+                <Text style={styles.treeLine}>└─</Text>
+                <Text style={styles.moreToolsText}>
+                  {t("tools.taskView.collapseTools")}
+                </Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       </View>
     );
@@ -202,6 +239,14 @@ export const ToolGroupView = React.memo(
 
 const styles = StyleSheet.create((theme) => ({
   outerContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  contentWrapper: {
+    flexDirection: "column",
+    flexGrow: 1,
+    flexBasis: 0,
+    maxWidth: layout.maxWidth,
     marginHorizontal: 8,
   },
   container: {
@@ -222,7 +267,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   toolItem: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingVertical: 3,
     paddingLeft: 4,
     paddingRight: 2,
