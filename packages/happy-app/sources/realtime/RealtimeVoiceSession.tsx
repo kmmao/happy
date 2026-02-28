@@ -25,8 +25,8 @@ const THINKING_TIMEOUT_MS = 30_000;
 /** Delay after TTS playback ends before resuming STT (AEC stabilization). */
 const AEC_RESUME_DELAY_MS = 200;
 /** Delay after last transcript before sending accumulated text.
- * Shorter than VAD delay since server STT already adds latency. */
-const TRANSCRIPT_DEBOUNCE_MS = 800;
+ * Keep short: VAD (0.4s) + turbo inference already provide a natural gap. */
+const TRANSCRIPT_DEBOUNCE_MS = 400;
 
 function clearThinkingTimeout() {
   if (thinkingTimeoutId) {
@@ -302,13 +302,19 @@ const RealtimeVoiceSessionInner: React.FC = () => {
     hasRegistered.current = true;
   }, []);
 
-  // Expose enqueueTts via store for voiceHooks
+  // Interrupt TTS: stop playback and clear queue
+  const interruptTts = useCallback(() => {
+    ttsPlayerRef.current.stop();
+    ttsQueueRef.current = [];
+  }, []);
+
+  // Expose enqueueTts and interruptTts via store for voiceHooks / sync
   useEffect(() => {
-    realtimeStore.setState({ ttsEnqueue: enqueueTts });
+    realtimeStore.setState({ ttsEnqueue: enqueueTts, interruptTts });
     return () => {
-      realtimeStore.setState({ ttsEnqueue: null });
+      realtimeStore.setState({ ttsEnqueue: null, interruptTts: null });
     };
-  }, [enqueueTts]);
+  }, [enqueueTts, interruptTts]);
 
   return null;
 };

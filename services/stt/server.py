@@ -132,7 +132,7 @@ class RecorderManager:
             "on_realtime_transcription_stabilized": self._on_realtime_update,
             "silero_sensitivity": 0.4,
             "webrtc_sensitivity": 3,
-            "post_speech_silence_duration": 0.7,
+            "post_speech_silence_duration": 0.4,
             "min_length_of_recording": 0.3,
             "min_gap_between_recordings": 0,
             "realtime_processing_pause": 0.2,

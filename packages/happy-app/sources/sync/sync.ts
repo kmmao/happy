@@ -52,6 +52,7 @@ import { gitStatusSync } from "./gitStatusSync";
 import { projectManager } from "./projectManager";
 import { AsyncLock } from "@/utils/lock";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
+import { realtimeStore } from "@/realtime/realtimeStore";
 import { Message } from "./typesMessage";
 import { EncryptionCache } from "./encryption/encryptionCache";
 import { systemPrompt } from "./prompt/systemPrompt";
@@ -514,6 +515,12 @@ class Sync {
     // Clear any existing prompt suggestion and needsContinue when user sends a message
     storage.getState().setPromptSuggestion(sessionId, null);
     storage.getState().setNeedsContinue(sessionId, false);
+
+    // Interrupt TTS if voice session is active (user typed while AI was speaking)
+    const rt = realtimeStore.getState();
+    if (rt.isActive) {
+      rt.interruptTts?.();
+    }
 
     // Get encryption
     const encryption = this.encryption.getSessionEncryption(sessionId);
