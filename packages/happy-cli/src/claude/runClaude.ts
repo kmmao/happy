@@ -558,7 +558,8 @@ export async function runClaude(
         const output = await executeShellCommand(shellCmd, workingDirectory);
         const envelope = createEnvelope("agent", { t: "text", text: output });
         session.sendSessionProtocolMessage(envelope);
-        logger.debug("[start] Shell command executed");
+        session.closeClaudeSessionTurn("completed");
+        logger.debug("[start] Shell command executed and turn closed");
       })();
 
       return;
