@@ -6,6 +6,7 @@ import {
   isBrowserSpeechRecognitionSupported,
   useBrowserSpeechRecognition,
 } from "./useBrowserSpeechRecognition";
+import { useWebSocketStt } from "./useWebSocketStt";
 
 function mimeTypeToFileName(mimeType: string): string {
   if (mimeType.includes("ogg")) return "speech.ogg";
@@ -13,11 +14,17 @@ function mimeTypeToFileName(mimeType: string): string {
   return "speech.webm";
 }
 
+/** Detect mobile browsers — they produce system sounds with Web Speech API. */
+function isMobileBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 /** Average byte frequency level (0–255) below which audio is silence. */
 const SILENCE_THRESHOLD = 15;
 /** Milliseconds of silence after speech before ending an utterance.
- * 1200ms balances responsiveness (vs 2000ms original) and false trigger avoidance. */
-const SPEECH_END_DELAY_MS = 1200;
+ * 2500ms allows natural pauses (thinking, breathing) without cutting off speech. */
+const SPEECH_END_DELAY_MS = 2500;
 /** How often to sample volume levels (ms). */
 const VAD_POLL_INTERVAL_MS = 100;
 /** Minimum blob size (bytes) worth sending to STT. */
@@ -45,22 +52,30 @@ export interface UseSpeechToTextReturn {
  * recording segment — mirroring the native `continuous: false` behavior.
  */
 /**
- * Prefer browser-native SpeechRecognition (Chrome/Edge/Safari) for zero-latency
- * real-time results. Falls back to server-side MediaRecorder + Whisper for Firefox
- * and other unsupported browsers.
+ * Prefer browser-native SpeechRecognition (Chrome/Edge/Safari desktop) for
+ * zero-latency real-time results.
+ *
+ * On mobile browsers, bypass browser SpeechRecognition because it produces
+ * system sounds (microphone activation "ding") on every start/restart cycle,
+ * even in continuous mode. Use server-side MediaRecorder + Whisper instead —
+ * MediaRecorder is silent and produces no system UI or audio feedback.
+ *
+ * Falls back to server-side for Firefox and other unsupported browsers.
  */
 export function useSpeechToText(
   onTranscript: (text: string) => void,
   lang?: string,
 ): UseSpeechToTextReturn {
-  const useBrowser = isBrowserSpeechRecognitionSupported();
+  const useBrowser =
+    isBrowserSpeechRecognitionSupported() && !isMobileBrowser();
   const browserResult = useBrowserSpeechRecognition(onTranscript, lang);
-  const serverResult = useServerSpeechToText(onTranscript, lang);
+  const wsResult = useWebSocketStt(onTranscript, lang);
 
   if (useBrowser && browserResult) {
     return browserResult;
   }
-  return serverResult;
+  // Mobile + Firefox: use WebSocket streaming STT (low latency, no system sounds)
+  return wsResult;
 }
 
 /**
@@ -321,7 +336,7 @@ function useServerSpeechToText(
     };
 
     mediaRecorderRef.current = recorder;
-    recorder.start(3000); // 3-second timeslice for interim transcription
+    recorder.start(1500); // 1.5-second timeslice for faster interim transcription
   }, [cleanupAll]);
 
   // Keep the ref updated so onstop can always call the latest version

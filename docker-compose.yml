@@ -78,6 +78,8 @@ services:
       S3_PUBLIC_URL: http://localhost:9000/handy
       # STT 微服务地址（同 compose 网络内访问）
       STT_BASE_URL: http://stt:8000
+      # STT WebSocket 地址（流式语音识别）
+      STT_WS_URL: ws://stt:8001/ws
       # TTS 微服务地址（同 compose 网络内访问）
       TTS_BASE_URL: http://tts:8000
     depends_on:
@@ -106,12 +108,15 @@ services:
     environment:
       # faster-whisper model size: tiny/base/small/medium/large-v3
       STT_MODEL: small
+      STT_WS_PORT: "8001"
     volumes:
       # Persist downloaded Whisper models across container rebuilds
       - happy_stt_models:/root/.cache/huggingface
     ports:
       # 宿主机端口改为更普通的 8082（容器内仍是 8000）
       - "8082:8000"
+      # WebSocket 流式语音识别
+      - "8084:8001"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
       interval: 10s

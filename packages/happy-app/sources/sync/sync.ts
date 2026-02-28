@@ -25,6 +25,7 @@ import {
   extractNeedsContinueFromRaw,
   RawRecord,
 } from "./typesRaw";
+import { getCurrentLanguage } from "@/text";
 import {
   applySettings,
   Settings,
@@ -574,6 +575,7 @@ class Sync {
         model,
         fallbackModel,
         appendSystemPrompt: systemPrompt,
+        locale: getCurrentLanguage(),
         ...(autoApprovePlan && { autoApprovePlan }),
         ...(displayText && { displayText }),
         ...(thinking && { thinking }),

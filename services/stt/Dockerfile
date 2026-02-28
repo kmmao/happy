@@ -9,13 +9,19 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
+    portaudio19-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 COPY services/stt/requirements.txt /app/requirements.txt
-RUN pip install -r /app/requirements.txt
+# Install PyTorch CPU-only first to avoid pulling CUDA (~2GB savings)
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install -r /app/requirements.txt
 
 COPY services/stt/app.py /app/app.py
+COPY services/stt/server.py /app/server.py
+COPY services/stt/supervisord.conf /etc/supervisord.conf
 
-EXPOSE 8000
+EXPOSE 8000 8001
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["supervisord", "-c", "/etc/supervisord.conf"]

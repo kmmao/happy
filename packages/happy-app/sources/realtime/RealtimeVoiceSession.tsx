@@ -23,6 +23,9 @@ let thinkingTimeoutId: ReturnType<typeof setTimeout> | null = null;
 const THINKING_TIMEOUT_MS = 30_000;
 /** Delay after TTS playback ends before resuming STT (AEC stabilization). */
 const AEC_RESUME_DELAY_MS = 200;
+/** Delay after last transcript before sending accumulated text.
+ * Shorter than VAD delay since server STT already adds latency. */
+const TRANSCRIPT_DEBOUNCE_MS = 800;
 
 function clearThinkingTimeout() {
   if (thinkingTimeoutId) {
@@ -63,6 +66,10 @@ const RealtimeVoiceSessionInner: React.FC = () => {
 
   const ttsQueueRef = useRef<Array<{ text: string; messageId: string }>>([]);
   const isProcessingRef = useRef(false);
+
+  // Transcript accumulation: collect multiple final results before sending
+  const accumulatedTextRef = useRef("");
+  const sendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const processQueue = useCallback(async () => {
     if (isProcessingRef.current) return;
@@ -165,15 +172,16 @@ const RealtimeVoiceSessionInner: React.FC = () => {
     [processQueue],
   );
 
-  // STT callback: send transcribed text to Claude Code
-  const onTranscript = useCallback((text: string) => {
+  // Flush accumulated transcript: send everything collected so far
+  const flushTranscript = useCallback(() => {
     const sessionId = getCurrentRealtimeSessionId();
-    if (!sessionId || !text.trim()) return;
-
-    // Stop any currently playing TTS when user speaks
-    ttsPlayerRef.current.stop();
-    ttsQueueRef.current = [];
-    storage.getState().setRealtimeMode("thinking", true);
+    const fullText = accumulatedTextRef.current.trim();
+    accumulatedTextRef.current = "";
+    if (sendTimeoutRef.current) {
+      clearTimeout(sendTimeoutRef.current);
+      sendTimeoutRef.current = null;
+    }
+    if (!sessionId || !fullText) return;
 
     // Timeout guard: if no TTS arrives within 30s, fall back to listening
     clearThinkingTimeout();
@@ -186,8 +194,35 @@ const RealtimeVoiceSessionInner: React.FC = () => {
       }
     }, THINKING_TIMEOUT_MS);
 
-    sync.sendMessage(sessionId, text.trim());
+    sync.sendMessage(sessionId, fullText);
   }, []);
+
+  // STT callback: accumulate transcribed text, debounce before sending
+  const onTranscript = useCallback(
+    (text: string) => {
+      const sessionId = getCurrentRealtimeSessionId();
+      if (!sessionId || !text.trim()) return;
+
+      // Stop any currently playing TTS when user speaks
+      ttsPlayerRef.current.stop();
+      ttsQueueRef.current = [];
+      storage.getState().setRealtimeMode("thinking", true);
+
+      // Accumulate text (space-separated)
+      accumulatedTextRef.current +=
+        (accumulatedTextRef.current ? " " : "") + text.trim();
+
+      // Reset debounce: wait for user to stop speaking before sending
+      if (sendTimeoutRef.current) {
+        clearTimeout(sendTimeoutRef.current);
+      }
+      sendTimeoutRef.current = setTimeout(
+        flushTranscript,
+        TRANSCRIPT_DEBOUNCE_MS,
+      );
+    },
+    [flushTranscript],
+  );
 
   // Extract ISO 639-1 lang code (e.g. "zh" from "zh-CN") for STT
   const sttLang =
@@ -207,6 +242,11 @@ const RealtimeVoiceSessionInner: React.FC = () => {
         isProcessingRef.current = false;
         spokenMessageIds.clear();
         ttsQueueRef.current = [];
+        accumulatedTextRef.current = "";
+        if (sendTimeoutRef.current) {
+          clearTimeout(sendTimeoutRef.current);
+          sendTimeoutRef.current = null;
+        }
 
         storage.getState().setRealtimeStatus("connected");
         storage.getState().setRealtimeMode("listening");
@@ -217,6 +257,11 @@ const RealtimeVoiceSessionInner: React.FC = () => {
       async endSession() {
         isProcessingRef.current = false;
         ttsQueueRef.current = [];
+        accumulatedTextRef.current = "";
+        if (sendTimeoutRef.current) {
+          clearTimeout(sendTimeoutRef.current);
+          sendTimeoutRef.current = null;
+        }
         clearThinkingTimeout();
 
         sttRef.current.stopListening();
