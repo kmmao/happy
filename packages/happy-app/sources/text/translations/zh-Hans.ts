@@ -799,6 +799,20 @@ export const zhHans: TranslationStructure = {
     elevenLabsVoiceIdSubtitle: "留空使用默认语音（Rachel）",
   },
 
+  voiceStatusBar: {
+    connecting: "连接中...",
+    connectionError: "连接错误",
+    listening: "正在聆听...",
+    processing: "处理中...",
+    speaking: "播放中",
+    voiceAssistantActive: "语音助手已激活",
+    voiceAssistant: "语音助手",
+    tapToEnd: "点击结束",
+    permissionRequested: ({ toolName }: { toolName: string }) =>
+      `${toolName} 请求权限`,
+    done: "完成。",
+  },
+
   settingsAccount: {
     // Account settings screen
     accountInformation: "账户信息",

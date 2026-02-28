@@ -3,6 +3,7 @@ import {
   registerVoiceSession,
   getCurrentRealtimeSessionId,
 } from "./RealtimeSession";
+import { realtimeStore } from "./realtimeStore";
 import { storage } from "@/sync/storage";
 import { sync } from "@/sync/sync";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
@@ -16,11 +17,44 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { getEdgeTtsVoice } from "@/constants/Languages";
 import type { VoiceSession, VoiceSessionConfig } from "./types";
 
-// Module-level state
-let isSessionActive = false;
+// Module-level imperative state (not suited for stores)
 const spokenMessageIds = new Set<string>();
 let thinkingTimeoutId: ReturnType<typeof setTimeout> | null = null;
 const THINKING_TIMEOUT_MS = 30_000;
+/** Delay after TTS playback ends before resuming STT (AEC stabilization). */
+const AEC_RESUME_DELAY_MS = 200;
+
+function clearThinkingTimeout() {
+  if (thinkingTimeoutId) {
+    clearTimeout(thinkingTimeoutId);
+    thinkingTimeoutId = null;
+  }
+}
+
+/**
+ * Synthesize speech for a text string using the user's preferred TTS provider.
+ * Returns audio ArrayBuffer or null on failure.
+ */
+async function synthesizeTts(text: string): Promise<ArrayBuffer | null> {
+  const settings = storage.getState().settings;
+  const voicePref = settings.voiceAssistantLanguage;
+
+  if (settings.ttsProvider === "elevenlabs" && settings.elevenLabsApiKey) {
+    const langCode = voicePref?.split("-")[0] ?? undefined;
+    return synthesizeSpeechElevenLabs({
+      text,
+      apiKey: settings.elevenLabsApiKey,
+      voiceId: settings.elevenLabsVoiceId ?? undefined,
+      languageCode: langCode,
+    });
+  }
+
+  const credentials = await TokenStorage.getCredentials();
+  if (!credentials) return null;
+
+  const voice = getEdgeTtsVoice(voicePref);
+  return synthesizeSpeechEdge(credentials, { text, voice });
+}
 
 const RealtimeVoiceSessionInner: React.FC = () => {
   const ttsPlayer = useTtsPlayer();
@@ -34,60 +68,88 @@ const RealtimeVoiceSessionInner: React.FC = () => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
-    while (ttsQueueRef.current.length > 0 && isSessionActive) {
+    let prefetchedAudio: ArrayBuffer | null = null;
+    let didPauseStt = false;
+
+    while (
+      ttsQueueRef.current.length > 0 &&
+      realtimeStore.getState().isActive
+    ) {
       const item = ttsQueueRef.current.shift();
       if (!item) break;
 
       try {
-        const settings = storage.getState().settings;
-        const voicePref = settings.voiceAssistantLanguage;
+        // Use prefetched audio if available, otherwise synthesize
+        let audioData: ArrayBuffer | null;
+        if (prefetchedAudio) {
+          audioData = prefetchedAudio;
+          prefetchedAudio = null;
+        } else {
+          audioData = await synthesizeTts(item.text);
+        }
 
-        let audioData: ArrayBuffer | null = null;
+        if (!audioData || !realtimeStore.getState().isActive) {
+          prefetchedAudio = null;
+          break;
+        }
+
+        // Pause STT before first TTS play to prevent echo
+        if (!didPauseStt) {
+          sttRef.current.pauseListening();
+          didPauseStt = true;
+        }
+
+        // Clear thinking timeout, enter speaking mode
+        clearThinkingTimeout();
+        storage.getState().setRealtimeMode("speaking");
+
+        // Start prefetching next item while playing current
+        const nextItem = ttsQueueRef.current[0];
+        const prefetchPromise =
+          nextItem && realtimeStore.getState().isActive
+            ? synthesizeTts(nextItem.text).catch(() => null)
+            : Promise.resolve(null);
+
+        // Play current audio (now properly waits for playback to finish)
+        await ttsPlayerRef.current.play(audioData);
+
+        // Collect prefetched result
+        const prefetchResult = await prefetchPromise;
+        if (prefetchResult && ttsQueueRef.current[0] === nextItem) {
+          prefetchedAudio = prefetchResult;
+        } else {
+          prefetchedAudio = null;
+        }
 
         if (
-          settings.ttsProvider === "elevenlabs" &&
-          settings.elevenLabsApiKey
+          realtimeStore.getState().isActive &&
+          ttsQueueRef.current.length === 0
         ) {
-          // ElevenLabs TTS (paid, direct API call with user's own key)
-          const langCode = voicePref?.split("-")[0] ?? undefined;
-          audioData = await synthesizeSpeechElevenLabs({
-            text: item.text,
-            apiKey: settings.elevenLabsApiKey,
-            voiceId: settings.elevenLabsVoiceId ?? undefined,
-            languageCode: langCode,
-          });
-        } else {
-          // Edge TTS (free, through server proxy)
-          const credentials = await TokenStorage.getCredentials();
-          if (!credentials) break;
-
-          const voice = getEdgeTtsVoice(voicePref);
-          audioData = await synthesizeSpeechEdge(credentials, {
-            text: item.text,
-            voice,
-          });
-        }
-
-        if (audioData && isSessionActive) {
-          if (thinkingTimeoutId) {
-            clearTimeout(thinkingTimeoutId);
-            thinkingTimeoutId = null;
-          }
-          storage.getState().setRealtimeMode("speaking");
-          await ttsPlayerRef.current.play(audioData);
-          if (isSessionActive) {
-            storage.getState().setRealtimeMode("listening");
-          }
+          storage.getState().setRealtimeMode("listening");
         }
       } catch (error) {
+        prefetchedAudio = null;
         if (error instanceof ElevenLabsAuthError) {
-          // Auth failed — fallback to Edge TTS for remaining queue items
           sync.applySettings({ ttsProvider: "edge" });
           ttsQueueRef.current = [];
           break;
         }
-        // Skip other TTS failures, continue with queue
       }
+    }
+
+    // Resume STT after all TTS playback with AEC stabilization delay
+    if (didPauseStt && realtimeStore.getState().isActive) {
+      await new Promise((resolve) => setTimeout(resolve, AEC_RESUME_DELAY_MS));
+      sttRef.current.resumeListening();
+    }
+
+    // Return to listening only if we're still in "speaking" mode.
+    // If user interrupted (mode is "thinking"), don't override.
+    if (
+      realtimeStore.getState().isActive &&
+      storage.getState().realtimeMode === "speaking"
+    ) {
+      storage.getState().setRealtimeMode("listening");
     }
 
     isProcessingRef.current = false;
@@ -114,9 +176,12 @@ const RealtimeVoiceSessionInner: React.FC = () => {
     storage.getState().setRealtimeMode("thinking", true);
 
     // Timeout guard: if no TTS arrives within 30s, fall back to listening
-    if (thinkingTimeoutId) clearTimeout(thinkingTimeoutId);
+    clearThinkingTimeout();
     thinkingTimeoutId = setTimeout(() => {
-      if (isSessionActive && storage.getState().realtimeMode === "thinking") {
+      if (
+        realtimeStore.getState().isActive &&
+        storage.getState().realtimeMode === "thinking"
+      ) {
         storage.getState().setRealtimeMode("listening", true);
       }
     }, THINKING_TIMEOUT_MS);
@@ -139,7 +204,6 @@ const RealtimeVoiceSessionInner: React.FC = () => {
 
     const session: VoiceSession = {
       async startSession(_config: VoiceSessionConfig) {
-        isSessionActive = true;
         isProcessingRef.current = false;
         spokenMessageIds.clear();
         ttsQueueRef.current = [];
@@ -151,13 +215,9 @@ const RealtimeVoiceSessionInner: React.FC = () => {
       },
 
       async endSession() {
-        isSessionActive = false;
         isProcessingRef.current = false;
         ttsQueueRef.current = [];
-        if (thinkingTimeoutId) {
-          clearTimeout(thinkingTimeoutId);
-          thinkingTimeoutId = null;
-        }
+        clearThinkingTimeout();
 
         sttRef.current.stopListening();
         ttsPlayerRef.current.stop();
@@ -173,19 +233,15 @@ const RealtimeVoiceSessionInner: React.FC = () => {
     hasRegistered.current = true;
   }, []);
 
-  // Expose enqueueTts globally for voiceHooks
+  // Expose enqueueTts via store for voiceHooks
   useEffect(() => {
-    voiceTtsEnqueue = enqueueTts;
+    realtimeStore.setState({ ttsEnqueue: enqueueTts });
     return () => {
-      voiceTtsEnqueue = null;
+      realtimeStore.setState({ ttsEnqueue: null });
     };
   }, [enqueueTts]);
 
   return null;
 };
-
-// Global function for voiceHooks to enqueue TTS playback
-export let voiceTtsEnqueue: ((text: string, messageId: string) => void) | null =
-  null;
 
 export const RealtimeVoiceSession = React.memo(RealtimeVoiceSessionInner);

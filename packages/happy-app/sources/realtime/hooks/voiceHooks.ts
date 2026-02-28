@@ -1,9 +1,12 @@
 import {
-  getCurrentRealtimeSessionId,
-  isVoiceSessionStarted,
+    getCurrentRealtimeSessionId,
+    isVoiceSessionStarted,
 } from "../RealtimeSession";
-import { voiceTtsEnqueue } from "../RealtimeVoiceSession";
+import { realtimeStore } from "../realtimeStore";
 import { Message } from "@/sync/typesMessage";
+import { t } from "@/text";
+import { preprocessTtsText } from "@/utils/ttsTextPreprocess";
+import { splitIntoSentences } from "@/utils/sentenceSplitter";
 
 /**
  * Voice hooks for the direct pipeline architecture.
@@ -11,72 +14,82 @@ import { Message } from "@/sync/typesMessage";
  */
 
 export const voiceHooks = {
-  onSessionOnline(_sessionId: string, _metadata?: Record<string, any>) {
-    // No-op in direct pipeline mode
-  },
+    onSessionOnline(_sessionId: string, _metadata?: Record<string, any>) {
+        // No-op in direct pipeline mode
+    },
 
-  onSessionOffline(_sessionId: string, _metadata?: Record<string, any>) {
-    // No-op in direct pipeline mode
-  },
+    onSessionOffline(_sessionId: string, _metadata?: Record<string, any>) {
+        // No-op in direct pipeline mode
+    },
 
-  onSessionFocus(_sessionId: string, _metadata?: Record<string, any>) {
-    // No-op in direct pipeline mode
-  },
+    onSessionFocus(_sessionId: string, _metadata?: Record<string, any>) {
+        // No-op in direct pipeline mode
+    },
 
-  onPermissionRequested(
-    sessionId: string,
-    _requestId: string,
-    toolName: string,
-    _toolArgs: any,
-  ) {
-    if (!isVoiceSessionStarted()) return;
-    if (getCurrentRealtimeSessionId() !== sessionId) return;
+    onPermissionRequested(
+        sessionId: string,
+        _requestId: string,
+        toolName: string,
+        _toolArgs: any,
+    ) {
+        if (!isVoiceSessionStarted()) return;
+        if (getCurrentRealtimeSessionId() !== sessionId) return;
 
-    // Announce permission requests via TTS
-    if (voiceTtsEnqueue) {
-      voiceTtsEnqueue(
-        `Permission requested for ${toolName}`,
-        `perm_${_requestId}`,
-      );
-    }
-  },
+        const { ttsEnqueue } = realtimeStore.getState();
+        if (ttsEnqueue) {
+            ttsEnqueue(
+                t("voiceStatusBar.permissionRequested", { toolName }),
+                `perm_${_requestId}`,
+            );
+        }
+    },
 
-  onMessages(sessionId: string, messages: Message[]) {
-    if (!isVoiceSessionStarted()) return;
-    if (getCurrentRealtimeSessionId() !== sessionId) return;
-    if (!voiceTtsEnqueue) return;
+    onMessages(sessionId: string, messages: Message[]) {
+        if (!isVoiceSessionStarted()) return;
+        if (getCurrentRealtimeSessionId() !== sessionId) return;
 
-    // Only speak agent-text messages (Claude Code responses)
-    const agentMessages = messages
-      .filter(
-        (m): m is Extract<Message, { kind: "agent-text" }> =>
-          m.kind === "agent-text" && !m.isThinking,
-      )
-      .sort((a, b) => a.createdAt - b.createdAt);
+        const { ttsEnqueue } = realtimeStore.getState();
+        if (!ttsEnqueue) return;
 
-    for (const msg of agentMessages) {
-      if (msg.text.trim()) {
-        voiceTtsEnqueue(msg.text.trim(), msg.id);
-      }
-    }
-  },
+        // Only speak agent-text messages (Claude Code responses)
+        const agentMessages = messages
+            .filter(
+                (m): m is Extract<Message, { kind: "agent-text" }> =>
+                    m.kind === "agent-text" && !m.isThinking,
+            )
+            .sort((a, b) => a.createdAt - b.createdAt);
 
-  onVoiceStarted(_sessionId: string): string {
-    // No initial prompt needed in direct pipeline mode
-    return "";
-  },
+        for (const msg of agentMessages) {
+            const cleaned = preprocessTtsText(msg.text);
+            if (cleaned) {
+                // Split into sentence-level segments for streaming TTS playback
+                const sentences = splitIntoSentences(cleaned);
+                for (let i = 0; i < sentences.length; i++) {
+                    ttsEnqueue(sentences[i], `${msg.id}_s${i}`);
+                }
+            }
+        }
+    },
 
-  onReady(sessionId: string) {
-    if (!isVoiceSessionStarted()) return;
-    if (getCurrentRealtimeSessionId() !== sessionId) return;
+    onVoiceStarted(_sessionId: string): string {
+        // No initial prompt needed in direct pipeline mode
+        return "";
+    },
 
-    // Optionally announce readiness
-    if (voiceTtsEnqueue) {
-      voiceTtsEnqueue("Done.", `ready_${sessionId}_${Date.now()}`);
-    }
-  },
+    onReady(sessionId: string) {
+        if (!isVoiceSessionStarted()) return;
+        if (getCurrentRealtimeSessionId() !== sessionId) return;
 
-  onVoiceStopped() {
-    // Cleanup handled by RealtimeVoiceSession.endSession()
-  },
+        const { ttsEnqueue } = realtimeStore.getState();
+        if (ttsEnqueue) {
+            ttsEnqueue(
+                t("voiceStatusBar.done"),
+                `ready_${sessionId}_${Date.now()}`,
+            );
+        }
+    },
+
+    onVoiceStopped() {
+        // Cleanup handled by RealtimeVoiceSession.endSession()
+    },
 };

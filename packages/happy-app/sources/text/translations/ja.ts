@@ -884,6 +884,20 @@ export const ja: TranslationStructure = {
     elevenLabsVoiceIdSubtitle: "空欄でデフォルト音声（Rachel）を使用",
   },
 
+  voiceStatusBar: {
+    connecting: "接続中...",
+    connectionError: "接続エラー",
+    listening: "聞いています...",
+    processing: "処理中...",
+    speaking: "再生中",
+    voiceAssistantActive: "音声アシスタント有効",
+    voiceAssistant: "音声アシスタント",
+    tapToEnd: "タップして終了",
+    permissionRequested: ({ toolName }: { toolName: string }) =>
+      `${toolName} の権限リクエスト`,
+    done: "完了。",
+  },
+
   settingsAccount: {
     // Account settings screen
     accountInformation: "アカウント情報",

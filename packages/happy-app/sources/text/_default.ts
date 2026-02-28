@@ -820,6 +820,21 @@ export const en = {
     elevenLabsVoiceIdSubtitle: "Leave empty for default voice (Rachel)",
   },
 
+  voiceStatusBar: {
+    // Voice assistant status bar
+    connecting: "Connecting...",
+    connectionError: "Connection Error",
+    listening: "Listening...",
+    processing: "Processing...",
+    speaking: "Speaking",
+    voiceAssistantActive: "Voice Assistant Active",
+    voiceAssistant: "Voice Assistant",
+    tapToEnd: "Tap to end",
+    permissionRequested: ({ toolName }: { toolName: string }) =>
+      `Permission requested for ${toolName}`,
+    done: "Done.",
+  },
+
   settingsAccount: {
     // Account settings screen
     accountInformation: "Account Information",

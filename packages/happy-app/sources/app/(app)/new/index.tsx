@@ -1657,6 +1657,7 @@ function NewSessionWizard() {
                 onMachineClick={handleMachineClick}
                 currentPath={selectedPath}
                 onPathClick={handlePathClick}
+                profileId={selectedProfileId}
                 onSlashCommandPress={() => setShowCommandList(true)}
                 showCommandList={showCommandList}
                 onCommandSelect={handleCommandSelect}

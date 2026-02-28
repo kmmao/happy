@@ -799,6 +799,20 @@ export const zhHant: TranslationStructure = {
     elevenLabsVoiceIdSubtitle: "留空使用預設語音（Rachel）",
   },
 
+  voiceStatusBar: {
+    connecting: "連線中...",
+    connectionError: "連線錯誤",
+    listening: "正在聆聽...",
+    processing: "處理中...",
+    speaking: "播放中",
+    voiceAssistantActive: "語音助手已啟用",
+    voiceAssistant: "語音助手",
+    tapToEnd: "點擊結束",
+    permissionRequested: ({ toolName }: { toolName: string }) =>
+      `${toolName} 請求權限`,
+    done: "完成。",
+  },
+
   settingsAccount: {
     // Account settings screen
     accountInformation: "帳戶資訊",

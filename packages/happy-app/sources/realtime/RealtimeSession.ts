@@ -1,94 +1,84 @@
 import type { VoiceSession } from "./types";
+import { realtimeStore } from "./realtimeStore";
 import { storage } from "@/sync/storage";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 import {
-    requestMicrophonePermission,
-    showMicrophonePermissionDeniedAlert,
+  requestMicrophonePermission,
+  showMicrophonePermissionDeniedAlert,
 } from "@/utils/microphonePermissions";
 
 const SESSION_START_TIMEOUT_MS = 15000;
 
 function withTimeout<T>(
-    promise: Promise<T>,
-    timeoutMs: number,
-    operation: string,
+  promise: Promise<T>,
+  timeoutMs: number,
+  operation: string,
 ): Promise<T> {
-    return Promise.race([
-        promise,
-        new Promise<T>((_, reject) =>
-            setTimeout(
-                () => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)),
-                timeoutMs,
-            ),
-        ),
-    ]);
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)),
+        timeoutMs,
+      ),
+    ),
+  ]);
 }
 
-let voiceSession: VoiceSession | null = null;
-let voiceSessionStarted: boolean = false;
-let currentSessionId: string | null = null;
-
 export async function startRealtimeSession(sessionId: string) {
-    if (!voiceSession) {
-        console.warn("No voice session registered");
-        return;
-    }
+  const { voiceSession } = realtimeStore.getState();
+  if (!voiceSession) {
+    return;
+  }
 
-    const permissionResult = await requestMicrophonePermission();
-    if (!permissionResult.granted) {
-        showMicrophonePermissionDeniedAlert(permissionResult.canAskAgain);
-        return;
-    }
+  const permissionResult = await requestMicrophonePermission();
+  if (!permissionResult.granted) {
+    showMicrophonePermissionDeniedAlert(permissionResult.canAskAgain);
+    return;
+  }
 
-    try {
-        currentSessionId = sessionId;
-        voiceSessionStarted = true;
-        storage.getState().setRealtimeStatus('connecting');
+  try {
+    realtimeStore.setState({ sessionId, isActive: true });
+    storage.getState().setRealtimeStatus("connecting");
 
-        await withTimeout(
-            voiceSession.startSession({ sessionId }),
-            SESSION_START_TIMEOUT_MS,
-            "Voice session start",
-        );
-    } catch (error) {
-        currentSessionId = null;
-        voiceSessionStarted = false;
-        storage.getState().setRealtimeStatus('disconnected');
-        Modal.alert(t("common.error"), t("errors.voiceServiceUnavailable"));
-    }
+    await withTimeout(
+      voiceSession.startSession({ sessionId }),
+      SESSION_START_TIMEOUT_MS,
+      "Voice session start",
+    );
+  } catch {
+    realtimeStore.setState({ sessionId: null, isActive: false });
+    storage.getState().setRealtimeStatus("disconnected");
+    Modal.alert(t("common.error"), t("errors.voiceServiceUnavailable"));
+  }
 }
 
 export async function stopRealtimeSession() {
-    if (!voiceSession) {
-        return;
-    }
+  const { voiceSession } = realtimeStore.getState();
+  if (!voiceSession) {
+    return;
+  }
 
-    try {
-        await voiceSession.endSession();
-    } catch (error) {
-        console.error("Failed to stop realtime session:", error);
-    } finally {
-        currentSessionId = null;
-        voiceSessionStarted = false;
-    }
+  try {
+    await voiceSession.endSession();
+  } finally {
+    realtimeStore.setState({ sessionId: null, isActive: false });
+  }
 }
 
 export function registerVoiceSession(session: VoiceSession) {
-    if (voiceSession) {
-        console.warn("Voice session already registered, replacing with new one");
-    }
-    voiceSession = session;
+  realtimeStore.setState({ voiceSession: session });
 }
 
 export function isVoiceSessionStarted(): boolean {
-    return voiceSessionStarted;
+  return realtimeStore.getState().isActive;
 }
 
 export function getVoiceSession(): VoiceSession | null {
-    return voiceSession;
+  return realtimeStore.getState().voiceSession;
 }
 
 export function getCurrentRealtimeSessionId(): string | null {
-    return currentSessionId;
+  return realtimeStore.getState().sessionId;
 }

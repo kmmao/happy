@@ -850,6 +850,20 @@ export const ru: TranslationStructure = {
       "Оставьте пустым для голоса по умолчанию (Rachel)",
   },
 
+  voiceStatusBar: {
+    connecting: "Подключение...",
+    connectionError: "Ошибка подключения",
+    listening: "Слушаю...",
+    processing: "Обработка...",
+    speaking: "Говорю",
+    voiceAssistantActive: "Голосовой помощник активен",
+    voiceAssistant: "Голосовой помощник",
+    tapToEnd: "Нажмите для завершения",
+    permissionRequested: ({ toolName }: { toolName: string }) =>
+      `Запрошено разрешение для ${toolName}`,
+    done: "Готово.",
+  },
+
   settingsAccount: {
     // Account settings screen
     accountInformation: "Информация об аккаунте",

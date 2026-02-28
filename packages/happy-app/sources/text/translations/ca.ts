@@ -839,6 +839,20 @@ export const ca: TranslationStructure = {
       "Deixa buit per a la veu predeterminada (Rachel)",
   },
 
+  voiceStatusBar: {
+    connecting: "Connectant...",
+    connectionError: "Error de connexió",
+    listening: "Escoltant...",
+    processing: "Processant...",
+    speaking: "Parlant",
+    voiceAssistantActive: "Assistent de veu actiu",
+    voiceAssistant: "Assistent de veu",
+    tapToEnd: "Toca per finalitzar",
+    permissionRequested: ({ toolName }: { toolName: string }) =>
+      `Permís sol·licitat per a ${toolName}`,
+    done: "Fet.",
+  },
+
   settingsAccount: {
     // Account settings screen
     accountInformation: "Informació del compte",

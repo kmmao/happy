@@ -850,6 +850,20 @@ export const pl: TranslationStructure = {
     elevenLabsVoiceIdSubtitle: "Pozostaw puste dla domyślnego głosu (Rachel)",
   },
 
+  voiceStatusBar: {
+    connecting: "Łączenie...",
+    connectionError: "Błąd połączenia",
+    listening: "Słucham...",
+    processing: "Przetwarzanie...",
+    speaking: "Mówię",
+    voiceAssistantActive: "Asystent głosowy aktywny",
+    voiceAssistant: "Asystent głosowy",
+    tapToEnd: "Dotknij, aby zakończyć",
+    permissionRequested: ({ toolName }: { toolName: string }) =>
+      `Prośba o uprawnienie dla ${toolName}`,
+    done: "Gotowe.",
+  },
+
   settingsAccount: {
     // Account settings screen
     accountInformation: "Informacje o koncie",

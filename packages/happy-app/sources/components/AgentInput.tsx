@@ -2116,6 +2116,42 @@ export const AgentInput = React.memo(
                         </Text>
                       </Pressable>
                     )}
+                    {/* Profile label (read-only) - shown when profileId is set but no click handler */}
+                    {props.profileId &&
+                      !props.onProfileClick &&
+                      currentProfile && (
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            borderRadius: Platform.select({
+                              default: 16,
+                              android: 20,
+                            }),
+                            paddingHorizontal: 10,
+                            paddingVertical: 6,
+                            justifyContent: "center",
+                            height: 32,
+                            gap: 6,
+                          }}
+                        >
+                          <Ionicons
+                            name="person-outline"
+                            size={14}
+                            color={theme.colors.button.secondary.tint}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              color: theme.colors.button.secondary.tint,
+                              fontWeight: "600",
+                              ...Typography.default("semiBold"),
+                            }}
+                          >
+                            {currentProfile.name}
+                          </Text>
+                        </View>
+                      )}
 
                     {/* Agent selector button */}
                     {props.agentType && props.onAgentClick && (

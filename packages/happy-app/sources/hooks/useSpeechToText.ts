@@ -15,6 +15,10 @@ export interface UseSpeechToTextReturn {
   interimTranscript: string;
   startListening: () => Promise<void>;
   stopListening: () => void;
+  /** Temporarily pause recognition (for echo suppression during TTS playback). */
+  pauseListening: () => void;
+  /** Resume recognition after a pause (re-enters listening without re-requesting permissions). */
+  resumeListening: () => void;
 }
 
 /**
@@ -39,6 +43,8 @@ export function useSpeechToText(
   // True = user wants to keep listening (restart after each natural end).
   // Only `startListening` sets this to true; `stopListening` sets it to false.
   const wantListeningRef = useRef(false);
+  // True = temporarily paused for echo suppression (keeps wantListening true).
+  const isPausedRef = useRef(false);
   // Prevents double-calls while awaiting permissions in startListening.
   const isStartingRef = useRef(false);
   // Stores the resolved language so the "end" handler can restart with it.
@@ -72,18 +78,22 @@ export function useSpeechToText(
 
   useSpeechRecognitionEvent("end", () => {
     isStartingRef.current = false;
-    if (wantListeningRef.current) {
+    if (wantListeningRef.current && !isPausedRef.current) {
       // Session ended naturally (pause / single utterance) but user still
       // wants to listen → seamlessly restart for the next utterance.
       doStart();
-    } else {
+    } else if (!wantListeningRef.current) {
       setIsListening(false);
       setInterimTranscript("");
       interimTextRef.current = "";
     }
+    // If paused, don't restart — resumeListening will restart when ready
   });
 
   useSpeechRecognitionEvent("result", (event) => {
+    // Ignore results arriving after stopListening was called
+    if (!wantListeningRef.current) return;
+
     const text = event.results[0]?.transcript?.trim() ?? "";
     if (event.isFinal) {
       if (text) {
@@ -143,6 +153,7 @@ export function useSpeechToText(
 
   const stopListening = useCallback(() => {
     wantListeningRef.current = false;
+    isPausedRef.current = false;
     isStartingRef.current = false;
     setIsListening(false);
     // Flush any pending interim transcript before aborting
@@ -151,16 +162,44 @@ export function useSpeechToText(
       interimTextRef.current = "";
     }
     setInterimTranscript("");
-    ExpoSpeechRecognitionModule.stop();
+    // Only abort — calling stop() then abort() causes conflicts on iOS
+    // because stop() triggers a final "result" event while abort() discards it.
     ExpoSpeechRecognitionModule.abort();
   }, []);
+
+  const pauseListening = useCallback(() => {
+    if (!wantListeningRef.current || isPausedRef.current) return;
+    isPausedRef.current = true;
+    // Discard interim (likely mixed with TTS audio)
+    setInterimTranscript("");
+    interimTextRef.current = "";
+    ExpoSpeechRecognitionModule.abort();
+  }, []);
+
+  const resumeListening = useCallback(() => {
+    if (!isPausedRef.current) return;
+    isPausedRef.current = false;
+    if (wantListeningRef.current) {
+      setInterimTranscript("");
+      interimTextRef.current = "";
+      doStart();
+    }
+  }, [doStart]);
 
   useEffect(() => {
     return () => {
       wantListeningRef.current = false;
+      isPausedRef.current = false;
       ExpoSpeechRecognitionModule.abort();
     };
   }, []);
 
-  return { isListening, interimTranscript, startListening, stopListening };
+  return {
+    isListening,
+    interimTranscript,
+    startListening,
+    stopListening,
+    pauseListening,
+    resumeListening,
+  };
 }

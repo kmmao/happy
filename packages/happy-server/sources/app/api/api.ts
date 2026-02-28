@@ -45,6 +45,9 @@ export async function startApi() {
     allowedHeaders: "*",
     methods: ["GET", "POST", "DELETE"],
   });
+  app.register(import("@fastify/multipart"), {
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max audio file
+  });
   app.get("/", function (request, reply) {
     reply.send("Welcome to Happy Server!");
   });
