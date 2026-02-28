@@ -62,6 +62,7 @@ interface AgentInputProps {
   isMicActive?: boolean;
   onSttPress?: () => void;
   isSttListening?: boolean;
+  isSttCorrecting?: boolean;
   permissionMode?: PermissionMode | null;
   availableModes?: PermissionMode[];
   onPermissionModeChange?: (mode: PermissionMode) => void;
@@ -2437,7 +2438,7 @@ export const AgentInput = React.memo(
               </View>
             </View>
             {/* STT progress shimmer — absolutely pinned to bottom edge of panel */}
-            {props.isSttListening && (
+            {(props.isSttListening || props.isSttCorrecting) && (
               <View
                 style={{
                   position: "absolute",
@@ -2447,8 +2448,9 @@ export const AgentInput = React.memo(
                 }}
               >
                 <SttProgressLine
-                  active={!!props.isSttListening}
+                  active={!!props.isSttListening || !!props.isSttCorrecting}
                   value={props.value}
+                  correcting={!!props.isSttCorrecting}
                 />
               </View>
             )}

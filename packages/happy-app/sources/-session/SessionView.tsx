@@ -447,36 +447,62 @@ function SessionViewInner({
 
   // Speech-to-text: append transcripts to the input field
   const voiceAssistantLanguage = useSetting("voiceAssistantLanguage");
+  const [isSttCorrecting, setIsSttCorrecting] = React.useState(false);
 
-  const handleTranscript = React.useCallback(
-    async (text: string) => {
-      let finalText = text;
-      if (storage.getState().settings.sttCorrection) {
-        try {
-          const credentials = await TokenStorage.getCredentials();
-          if (credentials) {
-            finalText = await correctTranscript(
-              credentials,
-              text,
-              voiceAssistantLanguage ?? undefined,
-            );
-          }
-        } catch {
-          // Use original text
-        }
-      }
-      setMessage((prev) => {
-        const trimmed = prev.trimEnd();
-        return trimmed ? `${trimmed} ${finalText}` : finalText;
-      });
-    },
-    [voiceAssistantLanguage],
-  );
+  const handleTranscript = React.useCallback((text: string) => {
+    setMessage((prev) => {
+      const trimmed = prev.trimEnd();
+      return trimmed ? `${trimmed} ${text}` : text;
+    });
+  }, []);
 
   const stt = useSpeechToText(
     handleTranscript,
     voiceAssistantLanguage ?? undefined,
   );
+
+  // Correct full input content when STT stops listening
+  const prevListeningRef = React.useRef(false);
+  const messageRef = React.useRef(message);
+  messageRef.current = message;
+  React.useEffect(() => {
+    const wasListening = prevListeningRef.current;
+    prevListeningRef.current = stt.isListening;
+    if (
+      wasListening &&
+      !stt.isListening &&
+      storage.getState().settings.sttCorrection
+    ) {
+      const text = messageRef.current.trim();
+      if (!text) return;
+      let cancelled = false;
+      setIsSttCorrecting(true);
+      (async () => {
+        try {
+          const credentials = await TokenStorage.getCredentials();
+          if (credentials && !cancelled) {
+            const corrected = await correctTranscript(
+              credentials,
+              text,
+              voiceAssistantLanguage ?? undefined,
+            );
+            if (!cancelled && corrected !== text) {
+              setMessage(corrected);
+            }
+          }
+        } catch {
+          // Keep original text
+        } finally {
+          if (!cancelled) {
+            setIsSttCorrecting(false);
+          }
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [stt.isListening, voiceAssistantLanguage]);
 
   // Compute display value: message + real-time interim speech text
   const displayMessage = stt.interimTranscript
@@ -723,6 +749,7 @@ function SessionViewInner({
         isMicActive={micButtonState.isMicActive}
         onSttPress={onSttToggle}
         isSttListening={stt.isListening}
+        isSttCorrecting={isSttCorrecting}
         onAbort={() => sessionInterrupt(sessionId).catch(() => {})}
         showAbortButton={
           sessionStatus.state === "thinking" ||

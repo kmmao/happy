@@ -59,6 +59,8 @@ import { getSuggestions } from "@/components/autocomplete/suggestions";
 import { StyleSheet } from "react-native-unistyles";
 import { randomUUID } from "expo-crypto";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { correctTranscript } from "@/sync/apiStt";
+import { TokenStorage } from "@/auth/tokenStorage";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import {
   pickImagesAsBase64,
@@ -522,6 +524,7 @@ function NewSessionWizard() {
 
   // STT (Speech-to-Text)
   const voiceAssistantLanguage = useSetting("voiceAssistantLanguage");
+  const [isSttCorrecting, setIsSttCorrecting] = React.useState(false);
   const handleTranscript = React.useCallback((text: string) => {
     setSessionPrompt((prev) => {
       const trimmed = prev.trimEnd();
@@ -532,6 +535,48 @@ function NewSessionWizard() {
     handleTranscript,
     voiceAssistantLanguage ?? undefined,
   );
+  // Correct full input content when STT stops listening
+  const prevListeningRef = React.useRef(false);
+  const promptRef = React.useRef(sessionPrompt);
+  promptRef.current = sessionPrompt;
+  React.useEffect(() => {
+    const wasListening = prevListeningRef.current;
+    prevListeningRef.current = stt.isListening;
+    if (
+      wasListening &&
+      !stt.isListening &&
+      storage.getState().settings.sttCorrection
+    ) {
+      const text = promptRef.current.trim();
+      if (!text) return;
+      let cancelled = false;
+      setIsSttCorrecting(true);
+      (async () => {
+        try {
+          const credentials = await TokenStorage.getCredentials();
+          if (credentials && !cancelled) {
+            const corrected = await correctTranscript(
+              credentials,
+              text,
+              voiceAssistantLanguage ?? undefined,
+            );
+            if (!cancelled && corrected !== text) {
+              setSessionPrompt(corrected);
+            }
+          }
+        } catch {
+          // Keep original text
+        } finally {
+          if (!cancelled) {
+            setIsSttCorrecting(false);
+          }
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [stt.isListening, voiceAssistantLanguage]);
   const onSttToggle = React.useCallback(() => {
     if (stt.isListening) {
       stt.stopListening();
@@ -1664,6 +1709,7 @@ function NewSessionWizard() {
                 onCommandListClose={() => setShowCommandList(false)}
                 onSttPress={onSttToggle}
                 isSttListening={stt.isListening}
+                isSttCorrecting={isSttCorrecting}
                 onImagePaste={handleNewSessionImagePaste}
                 onImagePickPress={doPickImage}
                 isPickingImage={isPickingImage}

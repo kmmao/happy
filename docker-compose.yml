@@ -83,9 +83,9 @@ services:
       # TTS 微服务地址（同 compose 网络内访问）
       TTS_BASE_URL: http://tts:8000
       # Anthropic API（用于 STT 纠错等服务端直接调用）
-      # Key 必填；Base URL 可选，默认官方 API，代理场景改为如 http://host.docker.internal:8080    https://api.anthropic.com
+      # 注意：容器内 127.0.0.1 指向自身，必须用 host.docker.internal 访问宿主机服务
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-quotio-local-A4DB6F36}
-      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-http://host.docker.internal:8317}
+      ANTHROPIC_BASE_URL: http://host.docker.internal:8317
     depends_on:
       postgres:
         condition: service_healthy
