@@ -1382,6 +1382,13 @@ export const zhHant: TranslationStructure = {
     sessionInactive: "不活躍",
     deleteConfirmTitle: "刪除任務",
     deleteConfirmMessage: "確定要刪除這個任務嗎？",
+    actions: {
+      moveTo: "移動到",
+    },
+    stats: {
+      totalTasks: ({ count }: { count: number }) => `${count} 個任務`,
+      activeSessions: ({ count }: { count: number }) => `${count} 個活躍`,
+    },
     columns: {
       backlog: "待定",
       todo: "待辦",

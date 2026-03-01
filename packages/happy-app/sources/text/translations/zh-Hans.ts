@@ -1380,6 +1380,13 @@ export const zhHans: TranslationStructure = {
     sessionInactive: "不活跃",
     deleteConfirmTitle: "删除任务",
     deleteConfirmMessage: "确定要删除这个任务吗？",
+    actions: {
+      moveTo: "移动到",
+    },
+    stats: {
+      totalTasks: ({ count }: { count: number }) => `${count} 个任务`,
+      activeSessions: ({ count }: { count: number }) => `${count} 个活跃`,
+    },
     columns: {
       backlog: "待定",
       todo: "待办",

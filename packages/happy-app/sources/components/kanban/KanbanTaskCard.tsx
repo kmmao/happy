@@ -9,11 +9,13 @@ import {
   KANBAN_PRIORITY_LABELS,
   type KanbanPriority,
 } from "@/sync/kanbanTypes";
+import { SessionStatusDots } from "./SessionStatusDots";
 
 interface KanbanTaskCardProps {
   task: KanbanTask;
   onPress: (taskId: string) => void;
   onLongPress?: (taskId: string) => void;
+  dragHandle?: React.ReactNode;
 }
 
 const PRIORITY_COLORS: Record<KanbanPriority, string> = {
@@ -24,7 +26,7 @@ const PRIORITY_COLORS: Record<KanbanPriority, string> = {
 };
 
 export const KanbanTaskCard = React.memo(
-  ({ task, onPress, onLongPress }: KanbanTaskCardProps) => {
+  ({ task, onPress, onLongPress, dragHandle }: KanbanTaskCardProps) => {
     const { theme } = useUnistyles();
     const priorityColor = PRIORITY_COLORS[task.priority];
     const hasLinkedSessions = task.sessionIds.length > 0;
@@ -49,6 +51,7 @@ export const KanbanTaskCard = React.memo(
           >
             {task.title}
           </Text>
+          {dragHandle}
         </View>
 
         {task.description.length > 0 && (
@@ -102,6 +105,7 @@ export const KanbanTaskCard = React.memo(
                 size={14}
                 color={theme.colors.textSecondary}
               />
+              <SessionStatusDots sessionIds={task.sessionIds} />
               <Text
                 style={[
                   styles.sessionCount,

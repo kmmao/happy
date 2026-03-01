@@ -1473,6 +1473,13 @@ export const ru: TranslationStructure = {
     sessionInactive: "Неактивна",
     deleteConfirmTitle: "Удалить задачу",
     deleteConfirmMessage: "Вы уверены, что хотите удалить эту задачу?",
+    actions: {
+      moveTo: "Переместить в",
+    },
+    stats: {
+      totalTasks: ({ count }: { count: number }) => `${count} задач`,
+      activeSessions: ({ count }: { count: number }) => `${count} активных`,
+    },
     columns: {
       backlog: "Бэклог",
       todo: "К выполнению",

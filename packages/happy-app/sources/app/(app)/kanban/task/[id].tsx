@@ -29,6 +29,7 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { useAllMachines, useSession } from "@/sync/storage";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { machineSpawnNewSession } from "@/sync/ops";
+import { sync } from "@/sync/sync";
 import { Modal } from "@/modal";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -154,6 +155,13 @@ const KanbanTaskDetail = React.memo(() => {
     if (result.type === "success" && result.sessionId) {
       await kanbanStore.getState().linkSession(task.id, result.sessionId);
       await kanbanStore.getState().moveTask(task.id, "in_progress");
+
+      // Auto-send session prompt if available
+      const prompt = (sessionPrompt || task.sessionPrompt || "").trim();
+      if (prompt) {
+        await sync.sendMessage(result.sessionId, prompt);
+      }
+
       router.replace(`/session/${result.sessionId}`);
     }
   });
@@ -285,7 +293,7 @@ const KanbanTaskDetail = React.memo(() => {
         )}
 
         {/* Start Session */}
-        <ItemGroup title={t("kanban.actions")}>
+        <ItemGroup title={t("kanban.actionsLabel")}>
           <Item
             title={t("kanban.startSession")}
             icon={

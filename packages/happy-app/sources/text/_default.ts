@@ -1424,7 +1424,7 @@ export const en = {
     sessionPromptHint:
       "Pre-filled prompt when creating a session from this task",
     linkedSessions: "Linked Sessions",
-    actions: "Actions",
+    actionsLabel: "Actions",
     startSession: "Start Session",
     noMachineSelected: "Please select a machine first",
     machineNotOnline: "Selected machine is not online",
@@ -1435,6 +1435,13 @@ export const en = {
     sessionInactive: "Inactive",
     deleteConfirmTitle: "Delete Task",
     deleteConfirmMessage: "Are you sure you want to delete this task?",
+    actions: {
+      moveTo: "Move To",
+    },
+    stats: {
+      totalTasks: ({ count }: { count: number }) => `${count} tasks`,
+      activeSessions: ({ count }: { count: number }) => `${count} active`,
+    },
     columns: {
       backlog: "Backlog",
       todo: "To Do",

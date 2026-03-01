@@ -1450,6 +1450,13 @@ export const es: TranslationStructure = {
     sessionInactive: "Inactiva",
     deleteConfirmTitle: "Eliminar tarea",
     deleteConfirmMessage: "¿Estás seguro de que quieres eliminar esta tarea?",
+    actions: {
+      moveTo: "Mover a",
+    },
+    stats: {
+      totalTasks: ({ count }: { count: number }) => `${count} tareas`,
+      activeSessions: ({ count }: { count: number }) => `${count} activas`,
+    },
     columns: {
       backlog: "Pendientes",
       todo: "Por hacer",

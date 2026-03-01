@@ -1432,6 +1432,13 @@ export const ja: TranslationStructure = {
     sessionInactive: "非アクティブ",
     deleteConfirmTitle: "タスクを削除",
     deleteConfirmMessage: "このタスクを削除してもよろしいですか？",
+    actions: {
+      moveTo: "移動先",
+    },
+    stats: {
+      totalTasks: ({ count }: { count: number }) => `${count} タスク`,
+      activeSessions: ({ count }: { count: number }) => `${count} アクティブ`,
+    },
     columns: {
       backlog: "バックログ",
       todo: "ToDo",
