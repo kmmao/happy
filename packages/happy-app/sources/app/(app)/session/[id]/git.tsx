@@ -30,7 +30,7 @@ export default React.memo(function GitScreen() {
     null,
   );
   const [isRepoSelectorExpanded, setIsRepoSelectorExpanded] =
-    React.useState(true);
+    React.useState(false);
   const { theme } = useUnistyles();
 
   const projectGitStatus = useSessionProjectGitStatus(sessionId);

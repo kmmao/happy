@@ -200,6 +200,32 @@ export const GitRepoSelector = React.memo<GitRepoSelectorProps>(
                         >
                           {gs.branch}
                         </Text>
+                        {(gs.aheadCount ?? 0) > 0 && (
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: "600",
+                              color: theme.colors.textLink,
+                              marginLeft: 6,
+                              ...Typography.mono(),
+                            }}
+                          >
+                            ↑{gs.aheadCount}
+                          </Text>
+                        )}
+                        {(gs.behindCount ?? 0) > 0 && (
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: "600",
+                              color: theme.colors.box.warning.text,
+                              marginLeft: (gs.aheadCount ?? 0) > 0 ? 4 : 6,
+                              ...Typography.mono(),
+                            }}
+                          >
+                            ↓{gs.behindCount}
+                          </Text>
+                        )}
                       </View>
                     )}
                   </View>
