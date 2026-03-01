@@ -67,6 +67,8 @@ export const ToolGroupView = React.memo(
     sessionId: string;
     model?: string;
     turnTokens?: number;
+    cacheRead?: number;
+    totalInput?: number;
   }) => {
     const { theme } = useUnistyles();
     const router = useRouter();
@@ -113,10 +115,27 @@ export const ToolGroupView = React.memo(
         parts.push(displayModel);
       }
       if (props.turnTokens !== undefined) {
-        parts.push(formatTokenCount(props.turnTokens));
+        const tokenStr = formatTokenCount(props.turnTokens);
+        if (
+          props.cacheRead !== undefined &&
+          props.cacheRead > 0 &&
+          props.totalInput !== undefined &&
+          props.totalInput > 0
+        ) {
+          const rate = Math.round((props.cacheRead / props.totalInput) * 100);
+          parts.push(`${tokenStr} (↓${rate}%)`);
+        } else {
+          parts.push(tokenStr);
+        }
       }
       return parts.join(" · ");
-    }, [items, props.model, props.turnTokens]);
+    }, [
+      items,
+      props.model,
+      props.turnTokens,
+      props.cacheRead,
+      props.totalInput,
+    ]);
 
     if (items.length === 0) {
       return null;

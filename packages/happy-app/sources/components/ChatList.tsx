@@ -43,6 +43,8 @@ type ToolGroup = {
   messages: ToolCallMessage[];
   model?: string;
   turnTokens?: number;
+  cacheRead?: number;
+  totalInput?: number;
 };
 
 type DisplayItem = Message | ToolGroup;
@@ -146,6 +148,8 @@ const ChatListInternal = React.memo(
         if (currentGroup.length >= MIN_GROUP_SIZE) {
           let model: string | undefined;
           let turnTokens: number | undefined;
+          let cacheRead: number | undefined;
+          let totalInput: number | undefined;
 
           // Search backward in the original messages (toward newer / index 0)
           // for the same-turn ready event (includes model + per-turn tokens).
@@ -155,11 +159,15 @@ const ChatListInternal = React.memo(
             if (m.kind === "agent-event" && m.event.type === "ready") {
               model = m.event.model;
               if (m.event.usage) {
+                const cr = m.event.usage.cache_read_input_tokens ?? 0;
+                const cc = m.event.usage.cache_creation_input_tokens ?? 0;
                 turnTokens =
                   m.event.usage.input_tokens +
                   m.event.usage.output_tokens +
-                  (m.event.usage.cache_creation_input_tokens ?? 0) +
-                  (m.event.usage.cache_read_input_tokens ?? 0);
+                  cc +
+                  cr;
+                cacheRead = cr;
+                totalInput = m.event.usage.input_tokens + cc + cr;
               }
               break;
             }
@@ -185,6 +193,8 @@ const ChatListInternal = React.memo(
             messages: [...currentGroup],
             model,
             turnTokens,
+            cacheRead,
+            totalInput,
           });
         } else {
           for (const msg of currentGroup) {
@@ -368,6 +378,8 @@ const ChatListInternal = React.memo(
               sessionId={props.sessionId}
               model={item.model}
               turnTokens={item.turnTokens}
+              cacheRead={item.cacheRead}
+              totalInput={item.totalInput}
             />
           );
         }

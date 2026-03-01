@@ -326,8 +326,10 @@ function AgentEventBlock(props: {
 
     // Session total tokens: prefer SDK modelUsage, fallback to reducer cumulative
     let sessionTotalTokens: number | null = null;
+    let sessionCacheHitRate: number | null = null;
     if (props.event.modelUsage) {
-      sessionTotalTokens = Object.values(props.event.modelUsage).reduce(
+      const modelValues = Object.values(props.event.modelUsage);
+      sessionTotalTokens = modelValues.reduce(
         (sum, m) =>
           sum +
           m.inputTokens +
@@ -336,6 +338,23 @@ function AgentEventBlock(props: {
           m.cacheCreationInputTokens,
         0,
       );
+      const totalCacheRead = modelValues.reduce(
+        (sum, m) => sum + m.cacheReadInputTokens,
+        0,
+      );
+      const totalAllInput = modelValues.reduce(
+        (sum, m) =>
+          sum +
+          m.inputTokens +
+          m.cacheReadInputTokens +
+          m.cacheCreationInputTokens,
+        0,
+      );
+      if (totalCacheRead > 0 && totalAllInput > 0) {
+        sessionCacheHitRate = Math.round(
+          (totalCacheRead / totalAllInput) * 100,
+        );
+      }
     } else if (props.sessionUsage) {
       sessionTotalTokens =
         props.sessionUsage.totalInputTokens +
@@ -350,11 +369,14 @@ function AgentEventBlock(props: {
     if (modelStr) parts.push(modelStr);
     if (durationStr) parts.push(durationStr);
     if (sessionTotalTokens !== null) {
-      parts.push(
-        t("message.sessionSummary", {
-          tokens: formatTokenCount(sessionTotalTokens),
-        }),
-      );
+      const summary = t("message.sessionSummary", {
+        tokens: formatTokenCount(sessionTotalTokens),
+      });
+      if (sessionCacheHitRate !== null) {
+        parts.push(`${summary} (↓${sessionCacheHitRate}%)`);
+      } else {
+        parts.push(summary);
+      }
     }
     if (sessionCost !== undefined && sessionCost > 0) {
       parts.push(formatCost(sessionCost));
