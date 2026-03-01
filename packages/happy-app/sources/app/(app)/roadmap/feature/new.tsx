@@ -70,16 +70,17 @@ const NewFeature = React.memo(() => {
         headerRight={() => (
           <Pressable
             onPress={performSave}
-            disabled={saving || !title.trim()}
+            disabled={saving || !title.trim() || !milestoneId}
             hitSlop={15}
           >
             <Text
               style={[
                 styles.saveButton,
                 {
-                  color: title.trim()
-                    ? theme.colors.header.tint
-                    : theme.colors.textSecondary,
+                  color:
+                    title.trim() && milestoneId
+                      ? theme.colors.header.tint
+                      : theme.colors.textSecondary,
                 },
               ]}
             >

@@ -15,7 +15,11 @@ import { t } from "@/text";
 import { Header } from "@/components/navigation/Header";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
-import { ideationStore, useIdeationIdea } from "@/sync/ideationStore";
+import {
+  ideationStore,
+  useIdeationIdea,
+  useIdeationLoaded,
+} from "@/sync/ideationStore";
 import { useKanbanTask } from "@/sync/kanbanStore";
 import { StartSessionSheet } from "@/components/project/StartSessionSheet";
 import {
@@ -40,6 +44,7 @@ const IdeaDetail = React.memo(() => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const idea = useIdeationIdea(id);
+  const isStoreLoaded = useIdeationLoaded();
   const existingTask = useKanbanTask(idea?.convertedTaskId ?? "");
 
   // Form state
@@ -143,7 +148,11 @@ const IdeaDetail = React.memo(() => {
           { backgroundColor: theme.colors.groupped.background },
         ]}
       >
-        <Header title={t("ideation.ideaNotFound")} />
+        <Header
+          title={
+            isStoreLoaded ? t("ideation.ideaNotFound") : t("common.loading")
+          }
+        />
         <View style={styles.centered}>
           <ActivityIndicator size="small" color={theme.colors.textSecondary} />
         </View>

@@ -5,11 +5,9 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
 import type { KanbanTask } from "@/sync/kanbanTypes";
-import {
-  KANBAN_PRIORITY_LABELS,
-  type KanbanPriority,
-} from "@/sync/kanbanTypes";
+import { KANBAN_PRIORITY_LABELS } from "@/sync/kanbanTypes";
 import { SessionStatusDots } from "./SessionStatusDots";
+import { PRIORITY_COLORS } from "@/components/project/designTokens";
 
 interface KanbanTaskCardProps {
   task: KanbanTask;
@@ -17,13 +15,6 @@ interface KanbanTaskCardProps {
   onLongPress?: (taskId: string) => void;
   dragHandle?: React.ReactNode;
 }
-
-const PRIORITY_COLORS: Record<KanbanPriority, string> = {
-  low: "#6B7280",
-  medium: "#3B82F6",
-  high: "#F59E0B",
-  urgent: "#EF4444",
-};
 
 export const KanbanTaskCard = React.memo(
   ({ task, onPress, onLongPress, dragHandle }: KanbanTaskCardProps) => {
@@ -35,6 +26,8 @@ export const KanbanTaskCard = React.memo(
       <Pressable
         onPress={() => onPress(task.id)}
         onLongPress={() => onLongPress?.(task.id)}
+        accessibilityRole="button"
+        accessibilityLabel={task.title}
         style={({ pressed }) => [
           styles.card,
           { backgroundColor: theme.colors.surface },

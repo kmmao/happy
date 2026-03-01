@@ -1567,6 +1567,7 @@ export const ru: TranslationStructure = {
     featureNotFound: "Функция не найдена",
     details: "Детали",
     titlePlaceholder: "Название",
+    titleRequired: "Название обязательно",
     descriptionPlaceholder: "Описание...",
     targetDate: "Целевая дата",
     targetDateNone: "Нет целевой даты",
@@ -1595,6 +1596,7 @@ export const ru: TranslationStructure = {
     complexityLabel: "Сложность",
     features: "Функции",
     noFeatures: "В этой вехе нет функций",
+    milestoneOptions: "Настройки вехи",
     convertToTask: "Преобразовать в задачу",
     convertConfirmTitle: "Преобразовать в задачу",
     convertConfirmMessage:

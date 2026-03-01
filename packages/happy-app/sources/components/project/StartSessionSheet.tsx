@@ -195,6 +195,11 @@ export const StartSessionSheet = React.memo(
               <Pressable
                 key={m.id}
                 onPress={() => setMachineId(m.id)}
+                accessibilityRole="radio"
+                accessibilityLabel={
+                  m.metadata?.displayName ?? m.id.substring(0, 8)
+                }
+                accessibilityState={{ selected: m.id === machineId }}
                 style={({ pressed }) => [
                   styles.machineItem,
                   pressed && { opacity: 0.6 },
@@ -276,6 +281,9 @@ export const StartSessionSheet = React.memo(
           <Pressable
             onPress={() => performStart()}
             disabled={!canStart}
+            accessibilityRole="button"
+            accessibilityLabel={t("kanban.startSession")}
+            accessibilityState={{ disabled: !canStart }}
             style={({ pressed }) => [
               styles.startButton,
               {
@@ -287,9 +295,14 @@ export const StartSessionSheet = React.memo(
             ]}
           >
             {isStarting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={theme.colors.surface} />
             ) : (
-              <Text style={styles.startButtonText}>
+              <Text
+                style={[
+                  styles.startButtonText,
+                  { color: theme.colors.surface },
+                ]}
+              >
                 {t("kanban.startSession")}
               </Text>
             )}
@@ -298,6 +311,8 @@ export const StartSessionSheet = React.memo(
           {/* Cancel */}
           <Pressable
             onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel={t("common.cancel")}
             style={({ pressed }) => [
               styles.cancelItem,
               pressed && { opacity: 0.6 },
@@ -385,7 +400,6 @@ const styles = StyleSheet.create(() => ({
     justifyContent: "center",
   },
   startButtonText: {
-    color: "#fff",
     fontSize: 16,
     ...Typography.default("semiBold"),
   },

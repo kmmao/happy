@@ -19,6 +19,7 @@ import {
   roadmapStore,
   useRoadmapFeature,
   useRoadmapMilestones,
+  useRoadmapLoaded,
 } from "@/sync/roadmapStore";
 import {
   ROADMAP_FEATURE_STATUSES,
@@ -44,6 +45,7 @@ const FeatureDetail = React.memo(() => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const feature = useRoadmapFeature(id);
+  const isStoreLoaded = useRoadmapLoaded();
   const milestones = useRoadmapMilestones();
   const existingTask = useKanbanTask(feature?.convertedTaskId ?? "");
 
@@ -157,7 +159,11 @@ const FeatureDetail = React.memo(() => {
           },
         ]}
       >
-        <Header title={t("roadmap.featureNotFound")} />
+        <Header
+          title={
+            isStoreLoaded ? t("roadmap.featureNotFound") : t("common.loading")
+          }
+        />
         <View style={styles.centered}>
           <ActivityIndicator size="small" color={theme.colors.textSecondary} />
         </View>

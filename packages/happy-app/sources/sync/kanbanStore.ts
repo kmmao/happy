@@ -128,14 +128,23 @@ export const kanbanStore = create<KanbanStore>()((set, get) => ({
       // Decrypt all tasks in parallel
       const decrypted = await Promise.all(response.items.map(decryptKvItem));
 
-      const tasks: Record<string, KanbanTask> = {};
+      const loaded: Record<string, KanbanTask> = {};
       for (const task of decrypted) {
         if (task) {
-          tasks[task.id] = task;
+          loaded[task.id] = task;
         }
       }
 
-      set({ tasks, isLoading: false, isLoaded: true });
+      // Merge: keep any task that has a newer kvVersion from real-time updates
+      set((prev) => {
+        const merged = { ...loaded };
+        for (const [id, existing] of Object.entries(prev.tasks)) {
+          if (existing.kvVersion > (merged[id]?.kvVersion ?? -1)) {
+            merged[id] = existing;
+          }
+        }
+        return { tasks: merged, isLoading: false, isLoaded: true };
+      });
     } catch (error) {
       set({ isLoading: false });
       throw error;
@@ -358,15 +367,16 @@ export const kanbanStore = create<KanbanStore>()((set, get) => ({
         return;
       }
 
-      // Update kvVersions from server response
-      const taskIds = Object.keys(updates);
+      // Update kvVersions from server response — match by key
       const versionUpdates: Record<string, KanbanTask> = {};
-      for (let i = 0; i < taskIds.length; i++) {
-        const id = taskIds[i];
-        versionUpdates[id] = {
-          ...get().tasks[id],
-          kvVersion: result.results[i].version,
-        };
+      for (const resultItem of result.results) {
+        const taskId = parseKanbanTaskKey(resultItem.key);
+        if (taskId && get().tasks[taskId]) {
+          versionUpdates[taskId] = {
+            ...get().tasks[taskId],
+            kvVersion: resultItem.version,
+          };
+        }
       }
       set((prev) => ({
         tasks: { ...prev.tasks, ...versionUpdates },
@@ -423,7 +433,7 @@ export const kanbanStore = create<KanbanStore>()((set, get) => ({
   },
 
   handleKvUpdate: (changes) => {
-    const tasks = { ...get().tasks };
+    let newTasks = get().tasks;
     let changed = false;
 
     for (const change of changes) {
@@ -433,13 +443,12 @@ export const kanbanStore = create<KanbanStore>()((set, get) => ({
       }
 
       if (change.value === null) {
-        // Deleted
-        if (tasks[taskId]) {
-          delete tasks[taskId];
+        if (newTasks[taskId]) {
+          const { [taskId]: _, ...rest } = newTasks;
+          newTasks = rest;
           changed = true;
         }
       } else {
-        // Created or updated — decrypt async
         decryptTaskData(change.value).then((data) => {
           if (!data) {
             return;
@@ -457,7 +466,7 @@ export const kanbanStore = create<KanbanStore>()((set, get) => ({
     }
 
     if (changed) {
-      set({ tasks });
+      set({ tasks: newTasks });
     }
   },
 

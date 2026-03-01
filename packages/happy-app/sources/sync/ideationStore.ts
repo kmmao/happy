@@ -123,14 +123,23 @@ export const ideationStore = create<IdeationStore>()((set, get) => ({
       // Decrypt all ideas in parallel
       const decrypted = await Promise.all(response.items.map(decryptKvItem));
 
-      const ideas: Record<string, IdeationIdea> = {};
+      const loaded: Record<string, IdeationIdea> = {};
       for (const idea of decrypted) {
         if (idea) {
-          ideas[idea.id] = idea;
+          loaded[idea.id] = idea;
         }
       }
 
-      set({ ideas, isLoading: false, isLoaded: true });
+      // Merge: keep any idea that has a newer kvVersion from real-time updates
+      set((prev) => {
+        const merged = { ...loaded };
+        for (const [id, existing] of Object.entries(prev.ideas)) {
+          if (existing.kvVersion > (merged[id]?.kvVersion ?? -1)) {
+            merged[id] = existing;
+          }
+        }
+        return { ideas: merged, isLoading: false, isLoaded: true };
+      });
     } catch (error) {
       set({ isLoading: false });
       throw error;
@@ -299,15 +308,39 @@ export const ideationStore = create<IdeationStore>()((set, get) => ({
     try {
       await get().saveIdea(updatedIdea);
     } catch {
-      // Task was already created successfully
-      // If save fails, idea stays in old state but task exists
+      // Task was created but idea save failed (version conflict).
+      // saveIdea reloads ideas on conflict, so retry with fresh version.
+      const freshIdea = get().ideas[ideaId];
+      if (freshIdea && !freshIdea.convertedTaskId) {
+        try {
+          await get().saveIdea({
+            ...freshIdea,
+            status: "converted",
+            convertedTaskId: task.id,
+            updatedAt: Date.now(),
+          });
+        } catch {
+          // Keep local state updated even if retry fails
+        }
+      }
+      // Ensure local state reflects the conversion
+      set((prev) => ({
+        ideas: {
+          ...prev.ideas,
+          [ideaId]: {
+            ...(prev.ideas[ideaId] ?? updatedIdea),
+            status: "converted" as const,
+            convertedTaskId: task.id,
+          },
+        },
+      }));
     }
 
     return task.id;
   },
 
   handleKvUpdate: (changes) => {
-    const ideas = { ...get().ideas };
+    let newIdeas = get().ideas;
     let changed = false;
 
     for (const change of changes) {
@@ -317,15 +350,12 @@ export const ideationStore = create<IdeationStore>()((set, get) => ({
       }
 
       if (change.value === null) {
-        // Deleted
-        if (ideas[ideaId]) {
-          const { [ideaId]: _, ...rest } = ideas;
-          Object.assign(ideas, rest);
-          delete ideas[ideaId];
+        if (newIdeas[ideaId]) {
+          const { [ideaId]: _, ...rest } = newIdeas;
+          newIdeas = rest;
           changed = true;
         }
       } else {
-        // Created or updated — decrypt async
         decryptIdeaData(change.value).then((data) => {
           if (!data) {
             return;
@@ -343,7 +373,7 @@ export const ideationStore = create<IdeationStore>()((set, get) => ({
     }
 
     if (changed) {
-      set({ ideas });
+      set({ ideas: newIdeas });
     }
   },
 

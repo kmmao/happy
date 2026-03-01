@@ -1535,6 +1535,7 @@ export const en: TranslationStructure = {
     featureNotFound: "Feature Not Found",
     details: "Details",
     titlePlaceholder: "Title",
+    titleRequired: "Title is required",
     descriptionPlaceholder: "Description...",
     targetDate: "Target Date",
     targetDateNone: "No target date",
@@ -1563,6 +1564,7 @@ export const en: TranslationStructure = {
     complexityLabel: "Complexity",
     features: "Features",
     noFeatures: "No features in this milestone",
+    milestoneOptions: "Milestone Options",
     convertToTask: "Convert to Task",
     convertConfirmTitle: "Convert to Task",
     convertConfirmMessage:

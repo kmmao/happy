@@ -1547,6 +1547,7 @@ export const ca: TranslationStructure = {
     featureNotFound: "Funcionalitat no trobada",
     details: "Detalls",
     titlePlaceholder: "Títol",
+    titleRequired: "El títol és obligatori",
     descriptionPlaceholder: "Descripció...",
     targetDate: "Data objectiu",
     targetDateNone: "Sense data objectiu",
@@ -1575,6 +1576,7 @@ export const ca: TranslationStructure = {
     complexityLabel: "Complexitat",
     features: "Funcionalitats",
     noFeatures: "No hi ha funcionalitats en aquesta fita",
+    milestoneOptions: "Opcions de la fita",
     convertToTask: "Convertir en tasca",
     convertConfirmTitle: "Convertir en tasca",
     convertConfirmMessage:

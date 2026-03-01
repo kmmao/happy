@@ -1570,6 +1570,7 @@ export const pl: TranslationStructure = {
     featureNotFound: "Nie znaleziono funkcji",
     details: "Szczegóły",
     titlePlaceholder: "Tytuł",
+    titleRequired: "Tytuł jest wymagany",
     descriptionPlaceholder: "Opis...",
     targetDate: "Data docelowa",
     targetDateNone: "Brak daty docelowej",
@@ -1598,6 +1599,7 @@ export const pl: TranslationStructure = {
     complexityLabel: "Złożoność",
     features: "Funkcje",
     noFeatures: "Brak funkcji w tym kamieniu milowym",
+    milestoneOptions: "Opcje kamienia milowego",
     convertToTask: "Przekonwertuj na zadanie",
     convertConfirmTitle: "Przekonwertuj na zadanie",
     convertConfirmMessage:

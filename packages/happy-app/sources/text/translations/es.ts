@@ -1544,6 +1544,7 @@ export const es: TranslationStructure = {
     featureNotFound: "Función no encontrada",
     details: "Detalles",
     titlePlaceholder: "Título",
+    titleRequired: "El título es obligatorio",
     descriptionPlaceholder: "Descripción...",
     targetDate: "Fecha objetivo",
     targetDateNone: "Sin fecha objetivo",
@@ -1572,6 +1573,7 @@ export const es: TranslationStructure = {
     complexityLabel: "Complejidad",
     features: "Funciones",
     noFeatures: "No hay funciones en este hito",
+    milestoneOptions: "Opciones del hito",
     convertToTask: "Convertir en tarea",
     convertConfirmTitle: "Convertir en tarea",
     convertConfirmMessage:

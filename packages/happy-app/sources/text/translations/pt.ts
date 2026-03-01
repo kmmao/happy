@@ -1545,6 +1545,7 @@ export const pt: TranslationStructure = {
     featureNotFound: "Funcionalidade não encontrada",
     details: "Detalhes",
     titlePlaceholder: "Título",
+    titleRequired: "O título é obrigatório",
     descriptionPlaceholder: "Descrição...",
     targetDate: "Data alvo",
     targetDateNone: "Sem data alvo",
@@ -1573,6 +1574,7 @@ export const pt: TranslationStructure = {
     complexityLabel: "Complexidade",
     features: "Funcionalidades",
     noFeatures: "Nenhuma funcionalidade neste marco",
+    milestoneOptions: "Opções do marco",
     convertToTask: "Converter em tarefa",
     convertConfirmTitle: "Converter em tarefa",
     convertConfirmMessage:

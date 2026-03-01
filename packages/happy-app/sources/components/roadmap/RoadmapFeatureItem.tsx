@@ -7,10 +7,13 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   type RoadmapFeature,
   type RoadmapFeatureStatus,
-  type RoadmapMoscow,
   ROADMAP_FEATURE_STATUS_LABELS,
   ROADMAP_MOSCOW_LABELS,
 } from "@/sync/roadmapTypes";
+import {
+  FEATURE_STATUS_COLORS,
+  MOSCOW_COLORS,
+} from "@/components/project/designTokens";
 
 interface RoadmapFeatureItemProps {
   feature: RoadmapFeature;
@@ -25,24 +28,10 @@ const STATUS_ICONS: Record<RoadmapFeatureStatus, string> = {
   cancelled: "close-circle-outline",
 };
 
-const STATUS_COLORS: Record<RoadmapFeatureStatus, string> = {
-  planned: "#6B7280",
-  in_progress: "#3B82F6",
-  completed: "#10B981",
-  cancelled: "#9CA3AF",
-};
-
-const MOSCOW_COLORS: Record<RoadmapMoscow, string> = {
-  must_have: "#EF4444",
-  should_have: "#F59E0B",
-  could_have: "#3B82F6",
-  wont_have: "#6B7280",
-};
-
 export const RoadmapFeatureItem = React.memo(
   ({ feature, onPress, showDivider = true }: RoadmapFeatureItemProps) => {
     const { theme } = useUnistyles();
-    const statusColor = STATUS_COLORS[feature.status];
+    const statusColor = FEATURE_STATUS_COLORS[feature.status];
     const moscowColor = MOSCOW_COLORS[feature.moscow];
     const dimmed =
       feature.status === "completed" || feature.status === "cancelled";
@@ -50,6 +39,8 @@ export const RoadmapFeatureItem = React.memo(
     return (
       <Pressable
         onPress={() => onPress(feature.id)}
+        accessibilityRole="button"
+        accessibilityLabel={feature.title}
         style={({ pressed }) => [
           styles.container,
           {

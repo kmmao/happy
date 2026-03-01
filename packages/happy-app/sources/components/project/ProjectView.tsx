@@ -1,6 +1,7 @@
 import * as React from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { create } from "zustand";
 import {
   ProjectSegmentControl,
   type ProjectSegment,
@@ -9,10 +10,13 @@ import { KanbanViewWrapper } from "@/components/kanban/KanbanView";
 import { IdeationView } from "@/components/ideation/IdeationView";
 import { RoadmapView } from "@/components/roadmap/RoadmapView";
 
-/** Current segment, shared with HeaderRight via getter */
-let currentSegment: ProjectSegment = "board";
+/** Tiny store to share current segment with HeaderRight imperatively */
+const projectSegmentStore = create<{ segment: ProjectSegment }>(() => ({
+  segment: "board",
+}));
+
 export function getProjectSegment(): ProjectSegment {
-  return currentSegment;
+  return projectSegmentStore.getState().segment;
 }
 
 /**
@@ -20,11 +24,10 @@ export function getProjectSegment(): ProjectSegment {
  * Switches between Ideas / Board / Roadmap views.
  */
 export const ProjectView = React.memo(() => {
-  const [segment, setSegment] = React.useState<ProjectSegment>("board");
+  const segment = projectSegmentStore((s) => s.segment);
 
   const handleSegmentChange = React.useCallback((seg: ProjectSegment) => {
-    currentSegment = seg;
-    setSegment(seg);
+    projectSegmentStore.setState({ segment: seg });
   }, []);
 
   return (

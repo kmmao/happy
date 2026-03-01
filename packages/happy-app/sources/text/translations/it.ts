@@ -1543,6 +1543,7 @@ export const it: TranslationStructure = {
     featureNotFound: "Funzionalità non trovata",
     details: "Dettagli",
     titlePlaceholder: "Titolo",
+    titleRequired: "Il titolo è obbligatorio",
     descriptionPlaceholder: "Descrizione...",
     targetDate: "Data obiettivo",
     targetDateNone: "Nessuna data obiettivo",
@@ -1571,6 +1572,7 @@ export const it: TranslationStructure = {
     complexityLabel: "Complessità",
     features: "Funzionalità",
     noFeatures: "Nessuna funzionalità in questa milestone",
+    milestoneOptions: "Opzioni milestone",
     convertToTask: "Converti in attività",
     convertConfirmTitle: "Converti in attività",
     convertConfirmMessage:

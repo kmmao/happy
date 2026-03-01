@@ -15,7 +15,11 @@ import { t } from "@/text";
 import { Header } from "@/components/navigation/Header";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
-import { kanbanStore, useKanbanTask } from "@/sync/kanbanStore";
+import {
+  kanbanStore,
+  useKanbanTask,
+  useKanbanLoaded,
+} from "@/sync/kanbanStore";
 import {
   KANBAN_COLUMNS,
   KANBAN_COLUMN_LABELS,
@@ -39,6 +43,7 @@ const KanbanTaskDetail = React.memo(() => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const task = useKanbanTask(id);
+  const isStoreLoaded = useKanbanLoaded();
   const machines = useAllMachines();
 
   // Form state — init from task
@@ -124,47 +129,62 @@ const KanbanTaskDetail = React.memo(() => {
     );
   });
 
-  const [spawning, performSpawnSession] = useHappyAction(async () => {
-    if (!task) return;
+  const spawnWithApproval = React.useCallback(
+    async (approvedDirCreation = false) => {
+      if (!task) return;
 
-    const targetMachineId = machineId ?? task.machineId;
-    if (!targetMachineId) {
-      throw { message: t("kanban.noMachineSelected") };
-    }
-
-    const machine = machines.find((m) => m.id === targetMachineId);
-    if (!machine || !isMachineOnline(machine)) {
-      throw { message: t("kanban.machineNotOnline") };
-    }
-
-    const targetDir = (directory || task.directory || "").trim();
-    if (!targetDir) {
-      throw { message: t("kanban.noDirectory") };
-    }
-
-    const result = await machineSpawnNewSession({
-      machineId: targetMachineId,
-      directory: targetDir,
-    });
-
-    if (result.type === "error") {
-      throw { message: result.errorMessage ?? t("kanban.spawnFailed") };
-    }
-
-    // Link session and move to in_progress
-    if (result.type === "success" && result.sessionId) {
-      await kanbanStore.getState().linkSession(task.id, result.sessionId);
-      await kanbanStore.getState().moveTask(task.id, "in_progress");
-
-      // Auto-send session prompt if available
-      const prompt = (sessionPrompt || task.sessionPrompt || "").trim();
-      if (prompt) {
-        await sync.sendMessage(result.sessionId, prompt);
+      const targetMachineId = machineId ?? task.machineId;
+      if (!targetMachineId) {
+        throw new Error(t("kanban.noMachineSelected"));
       }
 
-      router.replace(`/session/${result.sessionId}`);
-    }
-  });
+      const machine = machines.find((m) => m.id === targetMachineId);
+      if (!machine || !isMachineOnline(machine)) {
+        throw new Error(t("kanban.machineNotOnline"));
+      }
+
+      const targetDir = (directory || task.directory || "").trim();
+      if (!targetDir) {
+        throw new Error(t("kanban.noDirectory"));
+      }
+
+      const result = await machineSpawnNewSession({
+        machineId: targetMachineId,
+        directory: targetDir,
+        approvedNewDirectoryCreation: approvedDirCreation,
+      });
+
+      if (result.type === "requestToApproveDirectoryCreation") {
+        const confirmed = await Modal.confirm(
+          t("kanban.directory"),
+          result.directory,
+        );
+        if (confirmed) {
+          await spawnWithApproval(true);
+        }
+        return;
+      }
+
+      if (result.type === "error") {
+        throw new Error(result.errorMessage ?? t("kanban.spawnFailed"));
+      }
+
+      if (result.type === "success" && result.sessionId) {
+        await kanbanStore.getState().linkSession(task.id, result.sessionId);
+        await kanbanStore.getState().moveTask(task.id, "in_progress");
+
+        const prompt = (sessionPrompt || task.sessionPrompt || "").trim();
+        if (prompt) {
+          await sync.sendMessage(result.sessionId, prompt);
+        }
+
+        router.replace(`/session/${result.sessionId}`);
+      }
+    },
+    [task, machineId, directory, sessionPrompt, machines, router],
+  );
+
+  const [spawning, performSpawnSession] = useHappyAction(spawnWithApproval);
 
   if (!task) {
     return (
@@ -174,7 +194,9 @@ const KanbanTaskDetail = React.memo(() => {
           { backgroundColor: theme.colors.groupped.background },
         ]}
       >
-        <Header title={t("kanban.taskNotFound")} />
+        <Header
+          title={isStoreLoaded ? t("kanban.taskNotFound") : t("common.loading")}
+        />
         <View style={styles.centered}>
           <ActivityIndicator size="small" color={theme.colors.textSecondary} />
         </View>

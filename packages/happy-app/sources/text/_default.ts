@@ -1556,6 +1556,7 @@ export const en = {
     complexityLabel: "Complexity",
     features: "Features",
     noFeatures: "No features in this milestone",
+    milestoneOptions: "Milestone Options",
     convertToTask: "Convert to Task",
     convertConfirmTitle: "Convert to Task",
     convertConfirmMessage:

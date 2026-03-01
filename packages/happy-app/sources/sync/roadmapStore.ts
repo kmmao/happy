@@ -155,25 +155,40 @@ export const roadmapStore = create<RoadmapStore>()((set, get) => ({
         Promise.all(featureResponse.items.map(decryptFeatureKvItem)),
       ]);
 
-      const milestones: Record<string, RoadmapMilestone> = {};
+      const loadedMs: Record<string, RoadmapMilestone> = {};
       for (const ms of decryptedMilestones) {
         if (ms) {
-          milestones[ms.id] = ms;
+          loadedMs[ms.id] = ms;
         }
       }
 
-      const features: Record<string, RoadmapFeature> = {};
+      const loadedFt: Record<string, RoadmapFeature> = {};
       for (const f of decryptedFeatures) {
         if (f) {
-          features[f.id] = f;
+          loadedFt[f.id] = f;
         }
       }
 
-      set({
-        milestones,
-        features,
-        isLoading: false,
-        isLoaded: true,
+      // Merge: keep any entity that has a newer kvVersion from real-time updates
+      set((prev) => {
+        const mergedMs = { ...loadedMs };
+        for (const [id, existing] of Object.entries(prev.milestones)) {
+          if (existing.kvVersion > (mergedMs[id]?.kvVersion ?? -1)) {
+            mergedMs[id] = existing;
+          }
+        }
+        const mergedFt = { ...loadedFt };
+        for (const [id, existing] of Object.entries(prev.features)) {
+          if (existing.kvVersion > (mergedFt[id]?.kvVersion ?? -1)) {
+            mergedFt[id] = existing;
+          }
+        }
+        return {
+          milestones: mergedMs,
+          features: mergedFt,
+          isLoading: false,
+          isLoaded: true,
+        };
       });
     } catch (error) {
       set({ isLoading: false });
@@ -449,10 +464,29 @@ export const roadmapStore = create<RoadmapStore>()((set, get) => ({
         features: { ...prev.features, [featureId]: saved },
       }));
     } catch {
-      // Task already created; feature stays in old state on server
-      // Still update local state so UI reflects the conversion
+      // Task was created but feature save failed (version conflict).
+      // saveFeature reloads roadmap on conflict, so retry with fresh version.
+      const freshFeature = get().features[featureId];
+      if (freshFeature && !freshFeature.convertedTaskId) {
+        try {
+          await get().saveFeature({
+            ...freshFeature,
+            convertedTaskId: task.id,
+            updatedAt: Date.now(),
+          });
+        } catch {
+          // Keep local state updated even if retry fails
+        }
+      }
+      // Ensure local state reflects the conversion
       set((prev) => ({
-        features: { ...prev.features, [featureId]: updatedFeature },
+        features: {
+          ...prev.features,
+          [featureId]: {
+            ...(prev.features[featureId] ?? updatedFeature),
+            convertedTaskId: task.id,
+          },
+        },
       }));
     }
 
