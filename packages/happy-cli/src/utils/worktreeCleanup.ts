@@ -36,10 +36,7 @@ export interface WorktreeCleanupInput {
 export async function cleanupWorktreeOnSessionEnd(
   worktreeInfo: WorktreeCleanupInput,
 ): Promise<WorktreeCleanupResult> {
-  if (
-    worktreeInfo.state === "cleaned" ||
-    worktreeInfo.state === "cleaning"
-  ) {
+  if (worktreeInfo.state === "cleaned" || worktreeInfo.state === "cleaning") {
     return {
       action: "skipped-already-cleaned",
       message: "Worktree already cleaned or cleaning",
@@ -82,20 +79,43 @@ async function checkBranchMerged(
   branchName: string,
   parentBranch: string,
 ): Promise<boolean> {
+  // Method 1: Standard merge detection (fast-forward and regular merge)
   try {
     const { stdout } = await execAsync(
       `git branch --merged "${parentBranch}"`,
       { cwd: repoPath, timeout: 10000 },
     );
-    // Each line is a branch name (possibly with leading * or spaces)
     const mergedBranches = stdout
       .split("\n")
       .map((line) => line.replace(/^\*?\s+/, "").trim())
       .filter(Boolean);
-    return mergedBranches.includes(branchName);
+    if (mergedBranches.includes(branchName)) {
+      return true;
+    }
   } catch {
-    return false;
+    // Fall through to squash merge check
   }
+
+  // Method 2: Squash merge detection using git cherry.
+  // git cherry compares patches: lines starting with '-' are already applied,
+  // '+' means not yet applied. Empty output or all '-' = fully merged.
+  try {
+    const { stdout: cherryOutput } = await execAsync(
+      `git cherry "${parentBranch}" "${branchName}"`,
+      { cwd: repoPath, timeout: 10000 },
+    );
+    const cherryLines = cherryOutput.trim().split("\n").filter(Boolean);
+    if (
+      cherryLines.length === 0 ||
+      cherryLines.every((line) => line.startsWith("- "))
+    ) {
+      return true;
+    }
+  } catch {
+    // If git cherry fails, assume not merged
+  }
+
+  return false;
 }
 
 async function performCleanup(

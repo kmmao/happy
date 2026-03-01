@@ -635,6 +635,9 @@ export async function runClaude(
     logger.debugLargeJson("User message pushed to queue:", message);
   });
 
+  // Guard flag to prevent double worktree cleanup (signal handler vs normal exit)
+  let worktreeCleanedUp = false;
+
   // Setup signal handlers for graceful shutdown
   const cleanup = async () => {
     logger.debug("[START] Received termination signal, cleaning up...");
@@ -654,7 +657,8 @@ export async function runClaude(
         currentSession?.cleanup();
 
         // Cleanup worktree if applicable
-        if (metadata.worktree?.isWorktree) {
+        if (metadata.worktree?.isWorktree && !worktreeCleanedUp) {
+          worktreeCleanedUp = true;
           const cleanupResult = await cleanupWorktreeOnSessionEnd(
             metadata.worktree as WorktreeCleanupInput,
           );
@@ -753,7 +757,8 @@ export async function runClaude(
   (currentSession as Session | null)?.cleanup();
 
   // Cleanup worktree if applicable
-  if (metadata.worktree?.isWorktree) {
+  if (metadata.worktree?.isWorktree && !worktreeCleanedUp) {
+    worktreeCleanedUp = true;
     const cleanupResult = await cleanupWorktreeOnSessionEnd(
       metadata.worktree as WorktreeCleanupInput,
     );

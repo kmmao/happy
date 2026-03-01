@@ -419,6 +419,9 @@ export async function runGemini(opts: {
     }
   }
 
+  // Guard flag to prevent double worktree cleanup (signal handler vs normal exit)
+  let worktreeCleanedUp = false;
+
   const handleKillSession = async () => {
     logger.debug("[Gemini] Kill session requested - terminating process");
     await handleAbort();
@@ -435,7 +438,8 @@ export async function runGemini(opts: {
         }));
 
         // Cleanup worktree if applicable
-        if (metadata.worktree?.isWorktree) {
+        if (metadata.worktree?.isWorktree && !worktreeCleanedUp) {
+          worktreeCleanedUp = true;
           const cleanupResult = await cleanupWorktreeOnSessionEnd(
             metadata.worktree as WorktreeCleanupInput,
           );
@@ -1566,7 +1570,8 @@ export async function runGemini(opts: {
 
     try {
       // Cleanup worktree if applicable
-      if (metadata.worktree?.isWorktree) {
+      if (metadata.worktree?.isWorktree && !worktreeCleanedUp) {
+        worktreeCleanedUp = true;
         const cleanupResult = await cleanupWorktreeOnSessionEnd(
           metadata.worktree as WorktreeCleanupInput,
         );
