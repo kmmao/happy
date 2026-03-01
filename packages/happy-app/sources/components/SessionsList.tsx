@@ -85,10 +85,11 @@ const stylesheet = StyleSheet.create((theme) => ({
     ...Typography.default(),
   },
   sessionItem: {
-    height: 88,
+    minHeight: 88,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: theme.colors.surface,
   },
   sessionItemContainer: {
@@ -149,6 +150,25 @@ const stylesheet = StyleSheet.create((theme) => ({
     fontSize: 13,
     color: theme.colors.textSecondary,
     marginBottom: 4,
+    ...Typography.default(),
+  },
+  tagsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  tag: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    backgroundColor: theme.colors.groupped.background,
+  },
+  tagText: {
+    fontSize: 10,
+    color: theme.colors.textSecondary,
     ...Typography.default(),
   },
   sessionTimestamp: {
@@ -636,6 +656,24 @@ const SessionItem = React.memo(
                 {formatLastSeen(session.updatedAt, false)}
               </Text>
             </View>
+
+            {/* Tags line */}
+            {(session.metadata?.host || session.metadata?.version) && (
+              <View style={styles.tagsRow}>
+                {session.metadata?.host && (
+                  <View style={styles.tag}>
+                    <Text style={styles.tagText}>{session.metadata.host}</Text>
+                  </View>
+                )}
+                {session.metadata?.version && (
+                  <View style={styles.tag}>
+                    <Text style={styles.tagText}>
+                      {session.metadata.version}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Subtitle line */}
             <Text style={styles.sessionSubtitle} numberOfLines={1}>

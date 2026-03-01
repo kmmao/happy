@@ -78,10 +78,11 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     flex: 1,
   },
   sessionRow: {
-    height: 56,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
+    paddingVertical: 8,
     backgroundColor: theme.colors.surface,
   },
   sessionRowWithBorder: {
@@ -192,6 +193,25 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+  },
+  tagsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+  },
+  tag: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    backgroundColor: theme.colors.groupped.background,
+  },
+  tagText: {
+    fontSize: 10,
+    color: theme.colors.textSecondary,
+    ...Typography.default(),
   },
   worktreeBadge: {
     flexDirection: "row",
@@ -587,6 +607,23 @@ const CompactSessionRow = React.memo(
                 </Text>
               ) : null}
             </View>
+            {/* Tags line */}
+            {(session.metadata?.host || session.metadata?.version) && (
+              <View style={styles.tagsRow}>
+                {session.metadata?.host && (
+                  <View style={styles.tag}>
+                    <Text style={styles.tagText}>{session.metadata.host}</Text>
+                  </View>
+                )}
+                {session.metadata?.version && (
+                  <View style={styles.tag}>
+                    <Text style={styles.tagText}>
+                      {session.metadata.version}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         </Pressable>
         {hovered && (
