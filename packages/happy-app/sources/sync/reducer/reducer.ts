@@ -1398,8 +1398,10 @@ function processUsageData(
   usage: UsageData,
   timestamp: number,
 ) {
-  // Only update if this is newer than the current latest usage
-  if (!state.latestUsage || timestamp > state.latestUsage.timestamp) {
+  // Only update if this is newer than (or same timestamp as) the current latest usage.
+  // Using >= to handle multiple usage events with the same timestamp (messageIds
+  // deduplication prevents the same event from being processed twice).
+  if (!state.latestUsage || timestamp >= state.latestUsage.timestamp) {
     const prevTotal = state.latestUsage ?? {
       totalInputTokens: 0,
       totalOutputTokens: 0,
@@ -1420,6 +1422,11 @@ function processUsageData(
         (usage.cache_read_input_tokens || 0),
       totalOutputTokens: prevTotal.totalOutputTokens + usage.output_tokens,
       timestamp: timestamp,
+      // Preserve SDK-level fields from previous ready event so they don't
+      // disappear mid-turn when usage-stats events arrive before the next ready.
+      totalCostUsd: state.latestUsage?.totalCostUsd,
+      contextWindow: state.latestUsage?.contextWindow,
+      modelUsage: state.latestUsage?.modelUsage,
     };
   }
 }
