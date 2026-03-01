@@ -83,25 +83,33 @@ export const TaskView = React.memo<ToolViewProps>(
     // Aggregate usage stats from agent-event children (one line instead of many)
     const usageByModel = new Map<
       string,
-      { tokens: number; durationMs: number }
+      {
+        tokens: number;
+        durationMs: number;
+        cacheRead: number;
+        totalInput: number;
+      }
     >();
     for (const m of messages) {
       if (m.kind === "agent-event") {
         const evt = m.event as AgentEvent;
         if ((evt.type === "usage-stats" || evt.type === "ready") && evt.usage) {
           const model = evt.model ?? "unknown";
+          const cr = evt.usage.cache_read_input_tokens ?? 0;
+          const cc = evt.usage.cache_creation_input_tokens ?? 0;
           const totalTokens =
-            evt.usage.input_tokens +
-            evt.usage.output_tokens +
-            (evt.usage.cache_creation_input_tokens ?? 0) +
-            (evt.usage.cache_read_input_tokens ?? 0);
+            evt.usage.input_tokens + evt.usage.output_tokens + cc + cr;
           const existing = usageByModel.get(model) ?? {
             tokens: 0,
             durationMs: 0,
+            cacheRead: 0,
+            totalInput: 0,
           };
           usageByModel.set(model, {
             tokens: existing.tokens + totalTokens,
             durationMs: existing.durationMs + (evt.durationMs ?? 0),
+            cacheRead: existing.cacheRead + cr,
+            totalInput: existing.totalInput + evt.usage.input_tokens + cc + cr,
           });
         }
       }
@@ -109,10 +117,14 @@ export const TaskView = React.memo<ToolViewProps>(
     const usageSummary =
       usageByModel.size > 0
         ? Array.from(usageByModel.entries())
-            .map(
-              ([model, data]) =>
-                `${model.replace(/-\d{8}$/, "")} · ${formatTokenCount(data.tokens)}`,
-            )
+            .map(([model, data]) => {
+              const tokenStr = formatTokenCount(data.tokens);
+              const cacheHit =
+                data.cacheRead > 0 && data.totalInput > 0
+                  ? ` (↓${Math.round((data.cacheRead / data.totalInput) * 100)}%)`
+                  : "";
+              return `${model.replace(/-\d{8}$/, "")} · ${tokenStr}${cacheHit}`;
+            })
             .join(" · ")
         : null;
 

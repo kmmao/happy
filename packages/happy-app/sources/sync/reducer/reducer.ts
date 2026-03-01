@@ -176,6 +176,8 @@ export type ReducerState = {
       {
         inputTokens: number;
         outputTokens: number;
+        cacheReadInputTokens: number;
+        cacheCreationInputTokens: number;
         costUSD: number;
         contextWindow: number;
       }
@@ -224,6 +226,8 @@ export type ReducerResult = {
       {
         inputTokens: number;
         outputTokens: number;
+        cacheReadInputTokens: number;
+        cacheCreationInputTokens: number;
         costUSD: number;
         contextWindow: number;
       }
@@ -337,6 +341,12 @@ export function reducer(
                 {
                   inputTokens: (val as { inputTokens: number }).inputTokens,
                   outputTokens: (val as { outputTokens: number }).outputTokens,
+                  cacheReadInputTokens:
+                    (val as { cacheReadInputTokens: number })
+                      .cacheReadInputTokens ?? 0,
+                  cacheCreationInputTokens:
+                    (val as { cacheCreationInputTokens: number })
+                      .cacheCreationInputTokens ?? 0,
                   costUSD: (val as { costUSD: number }).costUSD,
                   contextWindow: (val as { contextWindow: number })
                     .contextWindow,

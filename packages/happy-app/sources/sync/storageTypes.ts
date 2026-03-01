@@ -202,6 +202,8 @@ export interface Session {
       {
         inputTokens: number;
         outputTokens: number;
+        cacheReadInputTokens: number;
+        cacheCreationInputTokens: number;
         costUSD: number;
         contextWindow: number;
       }
