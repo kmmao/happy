@@ -423,6 +423,11 @@ export const roadmapStore = create<RoadmapStore>()((set, get) => ({
       throw new Error("Feature not found");
     }
 
+    // Idempotent: if already converted, return existing taskId
+    if (feature.convertedTaskId) {
+      return feature.convertedTaskId;
+    }
+
     // Step 1: Create kanban task
     const task = await kanbanStore.getState().createTask({
       title: feature.title,
