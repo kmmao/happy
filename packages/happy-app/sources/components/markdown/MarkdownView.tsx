@@ -247,16 +247,15 @@ function RenderCodeBlock(props: {
   selectable: boolean;
 }) {
   const [isHovered, setIsHovered] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
 
   const copyCode = React.useCallback(async () => {
     try {
       await Clipboard.setStringAsync(props.content);
-      Modal.toast(t("markdown.codeCopied"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     } catch (error) {
       console.error("Failed to copy code:", error);
-      Modal.alert(t("common.error"), t("markdown.copyFailed"), [
-        { text: t("common.ok"), style: "cancel" },
-      ]);
     }
   }, [props.content]);
 
@@ -281,7 +280,7 @@ function RenderCodeBlock(props: {
         style={{ flexGrow: 0, flexShrink: 0 }}
         horizontal={true}
         contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}
-        showsHorizontalScrollIndicator={false}
+        showsHorizontalScrollIndicator={true}
       >
         <SimpleSyntaxHighlighter
           code={props.content}
@@ -298,8 +297,16 @@ function RenderCodeBlock(props: {
           ? ({ className: "copy-button-wrapper" } as any)
           : {})}
       >
-        <Pressable style={style.copyButton} onPress={copyCode}>
-          <Text style={style.copyButtonText}>{t("common.copy")}</Text>
+        <Pressable
+          style={style.copyButton}
+          onPress={copyCode}
+          disabled={copied}
+        >
+          <Text
+            style={[style.copyButtonText, copied && style.copyButtonTextCopied]}
+          >
+            {copied ? t("common.copied") : t("common.copy")}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -654,6 +661,9 @@ const style = StyleSheet.create((theme) => ({
     color: theme.colors.text,
     fontSize: 12,
     lineHeight: 16,
+  },
+  copyButtonTextCopied: {
+    color: theme.colors.success,
   },
 
   //

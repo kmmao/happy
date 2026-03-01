@@ -425,9 +425,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                 ) : null}
               </Text>
               {description && (
-                <Text style={styles.toolDescription} numberOfLines={1}>
-                  {description}
-                </Text>
+                <Text style={styles.toolDescription}>{description}</Text>
               )}
             </View>
             {statsBar}
@@ -451,9 +449,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                 ) : null}
               </Text>
               {description && (
-                <Text style={styles.toolDescription} numberOfLines={1}>
-                  {description}
-                </Text>
+                <Text style={styles.toolDescription}>{description}</Text>
               )}
             </View>
             {statsBar}
