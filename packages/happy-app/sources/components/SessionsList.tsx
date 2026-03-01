@@ -3,7 +3,12 @@ import { View, Pressable, FlatList, ActivityIndicator } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { Text } from "@/components/StyledText";
 import { usePathname } from "expo-router";
-import { SessionListViewItem } from "@/sync/storage";
+import {
+  SessionListViewItem,
+  useHasUnreadMessages,
+  useSetting,
+  useMachine,
+} from "@/sync/storage";
 import { Ionicons } from "@expo/vector-icons";
 import {
   getSessionName,
@@ -16,7 +21,6 @@ import { Avatar } from "./Avatar";
 import { ActiveSessionsGroup } from "./ActiveSessionsGroup";
 import { ActiveSessionsGroupCompact } from "./ActiveSessionsGroupCompact";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useSetting, useMachine } from "@/sync/storage";
 import { useVisibleSessionListViewData } from "@/hooks/useVisibleSessionListViewData";
 import { Typography } from "@/constants/Typography";
 import { Session } from "@/sync/storageTypes";
@@ -564,6 +568,7 @@ const SessionItem = React.memo(
     const avatarId = React.useMemo(() => {
       return getSessionAvatarId(session);
     }, [session]);
+    const hasUnreadMessages = useHasUnreadMessages(session.id);
 
     const itemContent = (
       <View
@@ -599,6 +604,7 @@ const SessionItem = React.memo(
               size={48}
               monochrome={!sessionStatus.isConnected}
               flavor={session.metadata?.flavor}
+              hasUnreadMessages={hasUnreadMessages}
             />
             {session.draft && (
               <View style={styles.draftIconContainer}>

@@ -38,11 +38,11 @@ import {
   usePromptSuggestion,
   useNeedsContinue,
   useRealtimeStatus,
+  useSession,
   useSessionMessages,
   useSessionUsage,
   useSetting,
 } from "@/sync/storage";
-import { useSession } from "@/sync/storage";
 import { Session } from "@/sync/storageTypes";
 import { sync } from "@/sync/sync";
 import { t } from "@/text";
@@ -431,6 +431,10 @@ function SessionViewInner({
 
   // Use draft hook for auto-saving message drafts
   const { clearDraft } = useDraft(sessionId, message, setMessage);
+
+  React.useEffect(() => {
+    storage.getState().markSessionViewed(sessionId);
+  }, [sessionId]);
 
   // Image sending state (pick, paste, pending paths)
   const {

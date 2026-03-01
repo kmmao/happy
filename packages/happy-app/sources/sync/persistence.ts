@@ -225,6 +225,36 @@ export function saveSessionModelModes(modes: Record<string, string>) {
   mmkv.set("session-model-modes", JSON.stringify(modes));
 }
 
+export function loadSessionLastViewed(): Record<string, number> {
+  const raw = mmkv.getString("session-last-viewed");
+  if (raw) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return {};
+      }
+
+      const result: Record<string, number> = {};
+      for (const [sessionId, value] of Object.entries(
+        parsed as Record<string, unknown>,
+      )) {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          result[sessionId] = value;
+        }
+      }
+      return result;
+    } catch (e) {
+      console.error("Failed to parse session last viewed timestamps", e);
+      return {};
+    }
+  }
+  return {};
+}
+
+export function saveSessionLastViewed(data: Record<string, number>) {
+  mmkv.set("session-last-viewed", JSON.stringify(data));
+}
+
 // SDK settings per session (thinking, effort, budget)
 export interface SessionSdkSettings {
   thinkingMode?: string | null;

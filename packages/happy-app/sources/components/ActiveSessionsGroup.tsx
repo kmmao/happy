@@ -15,7 +15,11 @@ import {
 import { Avatar } from "./Avatar";
 import { Typography } from "@/constants/Typography";
 import { StatusDot } from "./StatusDot";
-import { useAllMachines, useSetting } from "@/sync/storage";
+import {
+  useAllMachines,
+  useHasUnreadMessages,
+  useSetting,
+} from "@/sync/storage";
 import { StyleSheet } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { machineSpawnNewSession, sessionKill, sessionDelete } from "@/sync/ops";
@@ -497,6 +501,7 @@ const CompactSessionRow = React.memo(
     const avatarId = React.useMemo(() => {
       return getSessionAvatarId(session);
     }, [session]);
+    const hasUnreadMessages = useHasUnreadMessages(session.id);
 
     const itemContent = (
       <View
@@ -526,6 +531,7 @@ const CompactSessionRow = React.memo(
               size={48}
               monochrome={!sessionStatus.isConnected}
               flavor={session.metadata?.flavor}
+              hasUnreadMessages={hasUnreadMessages}
             />
           </View>
           <View style={styles.sessionContent}>

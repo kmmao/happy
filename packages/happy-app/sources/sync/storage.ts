@@ -25,6 +25,8 @@ import {
   saveSessionPermissionModes,
   loadSessionModelModes,
   saveSessionModelModes,
+  loadSessionLastViewed,
+  saveSessionLastViewed,
   loadSessionSdkSettings,
   saveSessionSdkSettings,
   type SessionSdkSettings,
@@ -46,6 +48,7 @@ import { isMutableTool } from "@/components/tools/knownTools";
 import { projectManager } from "./projectManager";
 import { DecryptedArtifact } from "./artifactTypes";
 import { FeedItem } from "./feedTypes";
+import { hasUnreadMessages as computeHasUnreadMessages } from "./unread";
 
 // Debounce timer for realtimeMode changes
 let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -140,6 +143,7 @@ interface StorageState {
   isDataReady: boolean;
   nativeUpdateStatus: { available: boolean; updateUrl?: string } | null;
   // Code review state (in-memory only, not persisted)
+  sessionLastViewed: Record<string, number>;
   reviewedTools: Record<string, "accepted" | "rejected">;
   setToolReview: (messageId: string, state: "accepted" | "rejected") => void;
   getToolReview: (messageId: string) => "accepted" | "rejected" | undefined;
@@ -188,6 +192,7 @@ interface StorageState {
   ) => void;
   getActiveSessions: () => Session[];
   updateSessionDraft: (sessionId: string, draft: string | null) => void;
+  markSessionViewed: (sessionId: string) => void;
   updateSessionPermissionMode: (sessionId: string, mode: string) => void;
   updateSessionModelMode: (sessionId: string, mode: string) => void;
   updateSessionCustomModels: (
@@ -380,6 +385,7 @@ export const storage = create<StorageState>()((set, get) => {
   let sessionModelMappings = loadSessionModelMappings();
   let sessionCustomModels = loadSessionCustomModels();
   let sessionProfiles = loadSessionProfiles();
+  let sessionLastViewed = loadSessionLastViewed();
   return {
     settings,
     settingsVersion: version,
@@ -424,6 +430,7 @@ export const storage = create<StorageState>()((set, get) => {
     socketLastDisconnectedAt: null,
     isDataReady: false,
     nativeUpdateStatus: null,
+    sessionLastViewed,
     reviewedTools: {},
     setToolReview: (messageId: string, state: "accepted" | "rejected") =>
       set((prev) => ({
@@ -1165,6 +1172,15 @@ export const storage = create<StorageState>()((set, get) => {
           sessionListViewData,
         };
       }),
+    markSessionViewed: (sessionId: string) => {
+      const now = Date.now();
+      sessionLastViewed[sessionId] = now;
+      saveSessionLastViewed(sessionLastViewed);
+      set((state) => ({
+        ...state,
+        sessionLastViewed: { ...sessionLastViewed },
+      }));
+    },
     updateSessionPermissionMode: (sessionId: string, mode: string) => {
       set((state) => {
         const session = state.sessions[sessionId];
@@ -1568,6 +1584,9 @@ export const storage = create<StorageState>()((set, get) => {
         delete customModels[sessionId];
         saveSessionCustomModels(customModels);
 
+        delete sessionLastViewed[sessionId];
+        saveSessionLastViewed(sessionLastViewed);
+
         // Rebuild sessionListViewData without the deleted session
         const sessionListViewData = buildSessionListViewData(
           remainingSessions,
@@ -1580,6 +1599,7 @@ export const storage = create<StorageState>()((set, get) => {
           sessionMessages: remainingSessionMessages,
           sessionGitStatus: remainingGitStatus,
           sessionPromptSuggestions: remainingPromptSuggestions,
+          sessionLastViewed: { ...sessionLastViewed },
           sessionListViewData,
         };
       }),
@@ -1729,6 +1749,14 @@ export function useSession(id: string): Session | null {
 }
 
 const emptyArray: unknown[] = [];
+
+export function useHasUnreadMessages(sessionId: string): boolean {
+  return storage((state) => {
+    const lastViewedAt = state.sessionLastViewed[sessionId];
+    const messages = state.sessionMessages[sessionId]?.messages;
+    return computeHasUnreadMessages({ lastViewedAt, messages });
+  });
+}
 
 export function useSessionMessages(sessionId: string): {
   messages: Message[];

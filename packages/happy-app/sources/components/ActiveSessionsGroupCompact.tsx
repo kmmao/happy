@@ -15,7 +15,11 @@ import {
 import { Avatar } from "./Avatar";
 import { Typography } from "@/constants/Typography";
 import { StatusDot } from "./StatusDot";
-import { useAllMachines, useSetting } from "@/sync/storage";
+import {
+  useAllMachines,
+  useHasUnreadMessages,
+  useSetting,
+} from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { machineSpawnNewSession, sessionKill, sessionDelete } from "@/sync/ops";
@@ -332,12 +336,12 @@ export function ActiveSessionsGroupCompact({
             {/* Section header on grouped background */}
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
-                {avatarId && (
+                {avatarId && firstSession && (
                   <View style={styles.sectionHeaderAvatar}>
-                    <Avatar
-                      id={avatarId}
-                      size={24}
-                      flavor={firstSession?.metadata?.flavor}
+                    <ProjectHeaderAvatar
+                      avatarId={avatarId}
+                      flavor={firstSession.metadata?.flavor}
+                      sessionId={firstSession.id}
                     />
                   </View>
                 )}
@@ -383,6 +387,28 @@ export function ActiveSessionsGroupCompact({
     </View>
   );
 }
+
+const ProjectHeaderAvatar = React.memo(
+  ({
+    avatarId,
+    flavor,
+    sessionId,
+  }: {
+    avatarId: string;
+    flavor?: string | null;
+    sessionId: string;
+  }) => {
+    const hasUnreadMessages = useHasUnreadMessages(sessionId);
+    return (
+      <Avatar
+        id={avatarId}
+        size={24}
+        flavor={flavor}
+        hasUnreadMessages={hasUnreadMessages}
+      />
+    );
+  },
+);
 
 // Compact session row component with status line
 const CompactSessionRow = React.memo(
