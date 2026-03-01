@@ -1,13 +1,13 @@
 import * as React from "react";
-import { KanbanViewWrapper } from "@/components/kanban/KanbanView";
+import { ProjectView } from "@/components/project/ProjectView";
 
 /**
- * Standalone kanban page route.
- * The primary kanban view is rendered in the tab via MainView,
- * but this route exists for deep-linking and navigation.
+ * Project page route.
+ * On phone, the primary project view is rendered in the tab via MainView.
+ * On tablet/web, this route is used from the sidebar project icon.
  */
-const KanbanPage = React.memo(() => {
-    return <KanbanViewWrapper />;
+const ProjectPage = React.memo(() => {
+  return <ProjectView />;
 });
 
-export default KanbanPage;
+export default ProjectPage;

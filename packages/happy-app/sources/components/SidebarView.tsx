@@ -194,9 +194,8 @@ export const SidebarView = React.memo(() => {
     Math.max(Math.floor(windowWidth * 0.3), 250),
     360,
   );
-  // With experiments: 4 icons (148px total), threshold 408px > max 360px → always left-justify
-  // Without experiments: 3 icons (108px total), threshold 328px → left-justify below ~340px
-  const shouldLeftJustify = settings.experiments || sidebarWidth < 340;
+  // 4 icons (inbox, project, settings, +) = ~148px total, threshold 408px > max 360px → always left-justify
+  const shouldLeftJustify = true;
 
   const handleNewSession = React.useCallback(() => {
     router.push("/new");
@@ -269,6 +268,14 @@ export const SidebarView = React.memo(() => {
               {inboxHasContent && friendRequests.length === 0 && (
                 <View style={styles.indicatorDot} />
               )}
+            </Pressable>
+            <Pressable onPress={() => router.push("/kanban")} hitSlop={15}>
+              <Image
+                source={require("@/assets/images/brutalist/Brutalism 22.png")}
+                contentFit="contain"
+                style={[{ width: 32, height: 32 }]}
+                tintColor={theme.colors.header.tint}
+              />
             </Pressable>
             <Pressable onPress={() => router.push("/settings")} hitSlop={15}>
               <Image
