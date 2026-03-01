@@ -2960,15 +2960,46 @@ class Sync {
   private applySessionDiff = (active: Session[], newActive: Session[]) => {
     let wasActive = new Set(active.map((s) => s.id));
     let isActive = new Set(newActive.map((s) => s.id));
+    const endedSessionIds: string[] = [];
     for (let s of active) {
       if (!isActive.has(s.id)) {
         voiceHooks.onSessionOffline(s.id, s.metadata ?? undefined);
+        endedSessionIds.push(s.id);
       }
     }
     for (let s of newActive) {
       if (!wasActive.has(s.id)) {
         voiceHooks.onSessionOnline(s.id, s.metadata ?? undefined);
       }
+    }
+    // Auto-complete kanban tasks when their last linked session ends
+    if (endedSessionIds.length > 0) {
+      this.autoCompleteTasksForEndedSessions(endedSessionIds, isActive);
+    }
+  };
+
+  private autoCompleteTasksForEndedSessions = (
+    endedSessionIds: string[],
+    activeSessionIds: Set<string>,
+  ) => {
+    const endedSet = new Set(endedSessionIds);
+    const tasks = Object.values(kanbanStore.getState().tasks);
+
+    for (const task of tasks) {
+      // Only auto-complete tasks that are in_progress
+      if (task.columnId !== "in_progress") continue;
+      // Task must have linked sessions
+      if (task.sessionIds.length === 0) continue;
+      // Check if any of the ended sessions belong to this task
+      const hasEndedSession = task.sessionIds.some((id) => endedSet.has(id));
+      if (!hasEndedSession) continue;
+      // Only move to done if the task has NO remaining active sessions
+      const hasActiveSession = task.sessionIds.some((id) =>
+        activeSessionIds.has(id),
+      );
+      if (hasActiveSession) continue;
+
+      kanbanStore.getState().moveTask(task.id, "done");
     }
   };
 }
