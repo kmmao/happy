@@ -502,7 +502,7 @@ export async function claudeRemoteLauncher(
         for (let c of umessage.message.content) {
           if (
             c.type === "tool_use" &&
-            c.name === "Task" &&
+            (c.name === "Task" || c.name === "Agent") &&
             c.input &&
             typeof (c.input as any).prompt === "string"
           ) {

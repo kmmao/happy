@@ -52,57 +52,61 @@ function extractDisplayName(path: string): string {
   return basename;
 }
 
-export const knownTools = {
-  Task: {
-    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
-      const subagentType =
-        typeof opts.tool.input?.subagent_type === "string"
-          ? opts.tool.input.subagent_type
-          : null;
-      const desc =
-        typeof opts.tool.input?.description === "string"
-          ? opts.tool.input.description
-          : null;
-      if (subagentType && desc) {
-        return `${subagentType} · ${desc}`;
-      }
-      if (desc) return desc;
-      if (subagentType) return subagentType;
-      return t("tools.names.task");
-    },
-    icon: (size: number = 24, color: string = "#000") => (
-      <Octicons name="copilot" size={size} color={color} />
-    ),
-    minimal: (opts: {
-      metadata: Metadata | null;
-      tool: ToolCall;
-      messages?: Message[];
-    }) => {
-      // Check if there would be any filtered tasks
-      const messages = opts.messages || [];
-      for (let m of messages) {
-        if (
-          m.kind === "tool-call" &&
-          (m.tool.state === "running" ||
-            m.tool.state === "completed" ||
-            m.tool.state === "error")
-        ) {
-          return false; // Has active sub-tasks, show expanded
-        }
-      }
-      return true; // No active sub-tasks, render as minimal
-    },
-    input: z
-      .object({
-        prompt: z.string().describe("The task for the agent to perform"),
-        subagent_type: z
-          .string()
-          .optional()
-          .describe("The type of specialized agent to use"),
-      })
-      .partial()
-      .passthrough(),
+// Shared definition for Task/Agent tool (SDK renamed Task → Agent)
+const taskToolDef = {
+  title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+    const subagentType =
+      typeof opts.tool.input?.subagent_type === "string"
+        ? opts.tool.input.subagent_type
+        : null;
+    const desc =
+      typeof opts.tool.input?.description === "string"
+        ? opts.tool.input.description
+        : null;
+    if (subagentType && desc) {
+      return `${subagentType} · ${desc}`;
+    }
+    if (desc) return desc;
+    if (subagentType) return subagentType;
+    return t("tools.names.task");
   },
+  icon: (size: number = 24, color: string = "#000") => (
+    <Octicons name="copilot" size={size} color={color} />
+  ),
+  minimal: (opts: {
+    metadata: Metadata | null;
+    tool: ToolCall;
+    messages?: Message[];
+  }) => {
+    // Check if there would be any filtered tasks
+    const messages = opts.messages || [];
+    for (let m of messages) {
+      if (
+        m.kind === "tool-call" &&
+        (m.tool.state === "running" ||
+          m.tool.state === "completed" ||
+          m.tool.state === "error")
+      ) {
+        return false; // Has active sub-tasks, show expanded
+      }
+    }
+    return true; // No active sub-tasks, render as minimal
+  },
+  input: z
+    .object({
+      prompt: z.string().describe("The task for the agent to perform"),
+      subagent_type: z
+        .string()
+        .optional()
+        .describe("The type of specialized agent to use"),
+    })
+    .partial()
+    .passthrough(),
+};
+
+export const knownTools = {
+  Task: taskToolDef,
+  Agent: taskToolDef,
   Bash: {
     title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
       if (opts.tool.description) {

@@ -190,7 +190,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
 
   // For Task tool: derive subtitle from the currently running child tool
   // This provides real-time feedback about what the subagent is doing
-  if (tool.name === "Task" && !description && props.messages) {
+  if (
+    (tool.name === "Task" || tool.name === "Agent") &&
+    !description &&
+    props.messages
+  ) {
     for (let i = props.messages.length - 1; i >= 0; i--) {
       const m = props.messages[i];
       if (m.kind === "tool-call" && m.tool.state === "running") {
@@ -229,7 +233,8 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     showAgentActivity &&
     tool.state === "running" &&
     !description &&
-    tool.name !== "Task"
+    tool.name !== "Task" &&
+    tool.name !== "Agent"
   ) {
     if (tool.description) {
       description = tool.description;

@@ -21,6 +21,7 @@ import { knownTools } from "./tools/knownTools";
 // Tools that should NOT be grouped (they have special UI or require interaction)
 const UNGROUPABLE_TOOLS = new Set([
   "Task",
+  "Agent",
   "AskUserQuestion",
   "TodoWrite",
   "Edit",

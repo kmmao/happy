@@ -191,7 +191,10 @@ export function traceMessages(
             results.push(...subagentOrphans);
           }
         }
-        if (content.type === "tool-call" && content.name === "Task") {
+        if (
+          content.type === "tool-call" &&
+          (content.name === "Task" || content.name === "Agent")
+        ) {
           if (
             content.input &&
             typeof content.input === "object" &&

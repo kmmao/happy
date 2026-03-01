@@ -618,7 +618,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
         const title = toolTitle(name, block.input);
         const sessionSubagentForCall =
           ensureSessionSubagentIdForProviderSubagent(state, call);
-        if (name === "Task") {
+        if (name === "Task" || name === "Agent") {
           const prompt = pickTaskPrompt(block.input);
           if (prompt) {
             queueTaskPromptSubagent(state, prompt, call);

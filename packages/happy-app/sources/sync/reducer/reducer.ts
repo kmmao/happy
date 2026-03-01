@@ -1321,7 +1321,7 @@ export function reducer(
           continue;
         }
         // Skip sidechain tools — they may still be running in nested conversations
-        if (msg.tool.name === "Task") {
+        if (msg.tool.name === "Task" || msg.tool.name === "Agent") {
           continue;
         }
         msg.tool.state = "completed";

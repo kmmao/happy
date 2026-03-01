@@ -184,7 +184,8 @@ function generateSimpleContent(
       return { title, rows };
     }
 
-    case "Task": {
+    case "Task":
+    case "Agent": {
       const subagentType =
         typeof tool.input?.subagent_type === "string"
           ? tool.input.subagent_type
