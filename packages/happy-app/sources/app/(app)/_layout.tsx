@@ -339,6 +339,24 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="kanban/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="kanban/task/new"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="kanban/task/[id]"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="openclaw/index"
         options={{
           headerShown: true,

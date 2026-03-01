@@ -8,7 +8,7 @@ import { Typography } from "@/constants/Typography";
 import { layout } from "@/components/layout";
 import { useInboxHasContent } from "@/hooks/useInboxHasContent";
 
-export type TabType = "inbox" | "sessions" | "openclaw" | "settings";
+export type TabType = "inbox" | "sessions" | "kanban" | "openclaw" | "settings";
 
 interface TabBarProps {
   activeTab: TabType;
@@ -104,6 +104,11 @@ export const TabBar = React.memo(
             key: "sessions",
             icon: require("@/assets/images/brutalist/Brutalism 15.png"),
             label: t("tabs.sessions"),
+          },
+          {
+            key: "kanban",
+            icon: require("@/assets/images/brutalist/Brutalism 22.png"),
+            label: t("tabs.kanban"),
           },
           {
             key: "openclaw",

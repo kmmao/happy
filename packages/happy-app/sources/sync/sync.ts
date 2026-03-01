@@ -26,6 +26,8 @@ import {
   RawRecord,
 } from "./typesRaw";
 import { getCurrentLanguage } from "@/text";
+import { kanbanStore } from "./kanbanStore";
+import { isKanbanKey } from "./kanbanTypes";
 import {
   applySettings,
   Settings,
@@ -2785,6 +2787,17 @@ class Sync {
 
       // Apply to storage (will handle repeatKey replacement)
       storage.getState().applyFeedItems([feedItem]);
+    } else if (updateData.body.t === "kv-batch-update") {
+      log.log("📋 Received kv-batch-update");
+      const kvUpdate = updateData.body;
+
+      // Filter kanban-related changes and forward to kanban store
+      const kanbanChanges = kvUpdate.changes.filter((c: { key: string }) =>
+        isKanbanKey(c.key),
+      );
+      if (kanbanChanges.length > 0) {
+        kanbanStore.getState().handleKvUpdate(kanbanChanges);
+      }
     }
   };
 

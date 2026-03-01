@@ -17,6 +17,7 @@ import { InboxView } from "./InboxView";
 import { SettingsViewWrapper } from "./SettingsViewWrapper";
 import { SessionsListWrapper } from "./SessionsListWrapper";
 import { OpenClawViewWrapper } from "./OpenClawViewWrapper";
+import { KanbanViewWrapper } from "./kanban/KanbanView";
 import { hasOpenClawConfig } from "@/openclaw";
 import { Header } from "./navigation/Header";
 import { HeaderLogo } from "./HeaderLogo";
@@ -108,12 +109,13 @@ const styles = StyleSheet.create((theme) => ({
 const TAB_TITLES = {
   sessions: "tabs.sessions",
   inbox: "tabs.inbox",
+  kanban: "tabs.kanban",
   openclaw: "tabs.openclaw",
   settings: "tabs.settings",
 } as const;
 
 // Active tabs
-type ActiveTabType = "sessions" | "inbox" | "openclaw" | "settings";
+type ActiveTabType = "sessions" | "inbox" | "kanban" | "openclaw" | "settings";
 
 // Header title component with connection status
 const HeaderTitle = React.memo(
@@ -222,6 +224,22 @@ const HeaderRight = React.memo(
       );
     }
 
+    if (activeTab === "kanban") {
+      return (
+        <Pressable
+          onPress={() => router.push("/kanban/task/new")}
+          hitSlop={15}
+          style={styles.headerButton}
+        >
+          <Ionicons
+            name="add-outline"
+            size={28}
+            color={theme.colors.header.tint}
+          />
+        </Pressable>
+      );
+    }
+
     if (activeTab === "settings") {
       if (!isCustomServer) {
         // Empty view to maintain header centering
@@ -278,6 +296,8 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
     switch (activeTab) {
       case "inbox":
         return <InboxView />;
+      case "kanban":
+        return <KanbanViewWrapper />;
       case "openclaw":
         return <OpenClawViewWrapper />;
       case "settings":
