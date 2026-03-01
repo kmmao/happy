@@ -782,6 +782,34 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
+   * Send a direct text result to the session (bypasses Claude).
+   * Creates its own turn lifecycle (turn-start → text → turn-end).
+   * Used for shell commands and other direct results that don't go through the AI model.
+   */
+  sendDirectResult(text: string) {
+    // Open a new turn
+    const turnId = randomUUID();
+    const turnStartEnvelope = createEnvelope(
+      "agent",
+      { t: "turn-start" },
+      { turn: turnId },
+    );
+    this.sendSessionProtocolMessage(turnStartEnvelope);
+    this.claudeSessionProtocolState.currentTurnId = turnId;
+
+    // Send the text result
+    const textEnvelope = createEnvelope(
+      "agent",
+      { t: "text", text },
+      { turn: turnId },
+    );
+    this.sendSessionProtocolMessage(textEnvelope);
+
+    // Close the turn
+    this.closeClaudeSessionTurn("completed");
+  }
+
+  /**
    * Send a generic agent message to the session using ACP (Agent Communication Protocol) format.
    * Works for any agent type (Gemini, Codex, Claude, etc.) - CLI normalizes to unified ACP format.
    *

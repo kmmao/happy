@@ -683,12 +683,7 @@ export async function claudeRemoteLauncher(
           },
           onShellResult: (output: string) => {
             logger.debug("[remote]: Shell command result received");
-            const envelope = createEnvelope("agent", {
-              t: "text",
-              text: output,
-            });
-            session.client.sendSessionProtocolMessage(envelope);
-            session.client.closeClaudeSessionTurn("completed");
+            session.client.sendDirectResult(output);
           },
           onQueryReady: (query) => {
             currentQuery = query;

@@ -45,8 +45,6 @@ import {
   applySandboxPermissionPolicy,
   resolveInitialClaudePermissionMode,
 } from "./utils/permissionMode";
-import { createEnvelope } from "@kmmao/happy-wire";
-
 /** JavaScript runtime to use for spawning Claude Code */
 export type JsRuntime = "node" | "bun";
 
@@ -556,9 +554,7 @@ export async function runClaude(
       const shellCmd = specialCommand.shellCommand;
       (async () => {
         const output = await executeShellCommand(shellCmd, workingDirectory);
-        const envelope = createEnvelope("agent", { t: "text", text: output });
-        session.sendSessionProtocolMessage(envelope);
-        session.closeClaudeSessionTurn("completed");
+        session.sendDirectResult(output);
         logger.debug("[start] Shell command executed and turn closed");
       })();
 
