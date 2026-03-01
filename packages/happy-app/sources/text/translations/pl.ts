@@ -40,7 +40,7 @@ export const pl: TranslationStructure = {
     // Tab navigation labels
     inbox: "Skrzynka",
     sessions: "Terminale",
-    kanban: "Tablica",
+    project: "Projekt",
     openclaw: "OpenClaw",
     settings: "Ustawienia",
   },
@@ -1464,7 +1464,7 @@ export const pl: TranslationStructure = {
     sessionPromptHint:
       "Wstępnie wypełniony prompt przy tworzeniu sesji z zadania",
     linkedSessions: "Powiązane sesje",
-    actions: "Akcje",
+    actionsLabel: "Akcje",
     startSession: "Rozpocznij sesję",
     noMachineSelected: "Najpierw wybierz maszynę",
     machineNotOnline: "Wybrana maszyna jest offline",
@@ -1494,6 +1494,127 @@ export const pl: TranslationStructure = {
       medium: "Średni",
       high: "Wysoki",
       urgent: "Pilny",
+    },
+  },
+
+  project: {
+    segments: {
+      ideas: "Pomysły",
+      board: "Tablica",
+      roadmap: "Plan działania",
+    },
+  },
+
+  ideation: {
+    // Zarządzanie pomysłami
+    emptyTitle: "Brak pomysłów",
+    emptySubtitle: "Zapisuj pomysły i zamieniaj najlepsze w zadania",
+    newIdea: "Nowy pomysł",
+    ideaDetail: "Szczegóły pomysłu",
+    ideaNotFound: "Nie znaleziono pomysłu",
+    details: "Szczegóły",
+    titlePlaceholder: "Tytuł pomysłu",
+    titleRequired: "Tytuł jest wymagany",
+    descriptionPlaceholder: "Opisz swój pomysł...",
+    categoryLabel: "Kategoria",
+    categories: {
+      feature: "Funkcja",
+      improvement: "Ulepszenie",
+      bugfix: "Poprawka",
+      refactor: "Refaktoryzacja",
+      documentation: "Dokumentacja",
+      other: "Inne",
+    },
+    statusLabel: "Status",
+    statuses: {
+      draft: "Szkic",
+      active: "Aktywny",
+      converted: "Przekonwertowany",
+      dismissed: "Odrzucony",
+    },
+    priorityLabel: "Priorytet",
+    convertToTask: "Konwertuj na zadanie",
+    convertConfirmTitle: "Konwertuj na zadanie",
+    convertConfirmMessage:
+      "Spowoduje to utworzenie nowego zadania kanban z tego pomysłu.",
+    dismiss: "Odrzuć",
+    dismissConfirmTitle: "Odrzuć pomysł",
+    dismissConfirmMessage: "Czy na pewno chcesz odrzucić ten pomysł?",
+    deleteConfirmTitle: "Usuń pomysł",
+    deleteConfirmMessage: "Czy na pewno chcesz usunąć ten pomysł?",
+    converted: "Przekonwertowano na zadanie",
+    viewTask: "Zobacz zadanie",
+    actions: {
+      changeStatus: "Zmień status",
+    },
+    stats: {
+      totalIdeas: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, one: "pomysł", few: "pomysły", many: "pomysłów" })}`,
+      activeIdeas: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, one: "aktywny", few: "aktywne", many: "aktywnych" })}`,
+    },
+    filter: {
+      all: "Wszystkie",
+    },
+  },
+
+  roadmap: {
+    emptyTitle: "Brak kamieni milowych",
+    emptySubtitle:
+      "Utwórz kamienie milowe, aby zaplanować mapę drogową projektu",
+    newMilestone: "Nowy kamień milowy",
+    milestoneDetail: "Szczegóły kamienia milowego",
+    milestoneNotFound: "Nie znaleziono kamienia milowego",
+    newFeature: "Nowa funkcja",
+    featureDetail: "Szczegóły funkcji",
+    featureNotFound: "Nie znaleziono funkcji",
+    details: "Szczegóły",
+    titlePlaceholder: "Tytuł",
+    descriptionPlaceholder: "Opis...",
+    targetDate: "Data docelowa",
+    targetDateNone: "Brak daty docelowej",
+    milestoneLabel: "Kamień milowy",
+    moscow: {
+      mustHave: "Musi mieć",
+      shouldHave: "Powinien mieć",
+      couldHave: "Mógłby mieć",
+      wontHave: "Nie będzie",
+    },
+    moscowLabel: "Priorytet (MoSCoW)",
+    featureStatuses: {
+      planned: "Zaplanowane",
+      inProgress: "W toku",
+      completed: "Ukończone",
+      cancelled: "Anulowane",
+    },
+    statusLabel: "Status",
+    complexity: {
+      trivial: "Trywialne",
+      simple: "Proste",
+      moderate: "Umiarkowane",
+      complex: "Złożone",
+      veryComplex: "Bardzo złożone",
+    },
+    complexityLabel: "Złożoność",
+    features: "Funkcje",
+    noFeatures: "Brak funkcji w tym kamieniu milowym",
+    convertToTask: "Przekonwertuj na zadanie",
+    convertConfirmTitle: "Przekonwertuj na zadanie",
+    convertConfirmMessage:
+      "Z tej funkcji zostanie utworzone nowe zadanie na tablicy kanban.",
+    viewTask: "Zobacz zadanie",
+    deleteMilestoneConfirmTitle: "Usuń kamień milowy",
+    deleteMilestoneConfirmMessage:
+      "Wszystkie funkcje w tym kamieniu milowym również zostaną usunięte. Czy na pewno?",
+    deleteFeatureConfirmTitle: "Usuń funkcję",
+    deleteFeatureConfirmMessage: "Czy na pewno chcesz usunąć tę funkcję?",
+    progress: ({ completed, total }: { completed: number; total: number }) =>
+      `${completed}/${total} ukończone`,
+    stats: {
+      totalMilestones: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, one: "kamień milowy", few: "kamienie milowe", many: "kamieni milowych" })}`,
+      totalFeatures: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, one: "funkcja", few: "funkcje", many: "funkcji" })}`,
     },
   },
 

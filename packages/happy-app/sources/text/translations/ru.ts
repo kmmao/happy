@@ -40,7 +40,7 @@ export const ru: TranslationStructure = {
     // Tab navigation labels
     inbox: "Входящие",
     sessions: "Терминалы",
-    kanban: "Доска",
+    project: "Проект",
     openclaw: "OpenClaw",
     settings: "Настройки",
   },
@@ -1462,7 +1462,7 @@ export const ru: TranslationStructure = {
     sessionPromptPlaceholder: "Инструкции для Claude при запуске задачи...",
     sessionPromptHint: "Предзаполненный промпт при создании сессии из задачи",
     linkedSessions: "Связанные сессии",
-    actions: "Действия",
+    actionsLabel: "Действия",
     startSession: "Начать сессию",
     noMachineSelected: "Сначала выберите машину",
     machineNotOnline: "Выбранная машина не в сети",
@@ -1492,6 +1492,126 @@ export const ru: TranslationStructure = {
       medium: "Средний",
       high: "Высокий",
       urgent: "Срочный",
+    },
+  },
+
+  project: {
+    segments: {
+      ideas: "Идеи",
+      board: "Доска",
+      roadmap: "Дорожная карта",
+    },
+  },
+
+  ideation: {
+    // Управление идеями
+    emptyTitle: "Идей пока нет",
+    emptySubtitle: "Фиксируйте идеи и превращайте лучшие в задачи",
+    newIdea: "Новая идея",
+    ideaDetail: "Детали идеи",
+    ideaNotFound: "Идея не найдена",
+    details: "Детали",
+    titlePlaceholder: "Название идеи",
+    titleRequired: "Название обязательно",
+    descriptionPlaceholder: "Опишите вашу идею...",
+    categoryLabel: "Категория",
+    categories: {
+      feature: "Функция",
+      improvement: "Улучшение",
+      bugfix: "Исправление",
+      refactor: "Рефакторинг",
+      documentation: "Документация",
+      other: "Другое",
+    },
+    statusLabel: "Статус",
+    statuses: {
+      draft: "Черновик",
+      active: "Активная",
+      converted: "Преобразована",
+      dismissed: "Отклонена",
+    },
+    priorityLabel: "Приоритет",
+    convertToTask: "Преобразовать в задачу",
+    convertConfirmTitle: "Преобразовать в задачу",
+    convertConfirmMessage:
+      "Из этой идеи будет создана новая задача на канбан-доске.",
+    dismiss: "Отклонить",
+    dismissConfirmTitle: "Отклонить идею",
+    dismissConfirmMessage: "Вы уверены, что хотите отклонить эту идею?",
+    deleteConfirmTitle: "Удалить идею",
+    deleteConfirmMessage: "Вы уверены, что хотите удалить эту идею?",
+    converted: "Преобразовано в задачу",
+    viewTask: "Просмотр задачи",
+    actions: {
+      changeStatus: "Изменить статус",
+    },
+    stats: {
+      totalIdeas: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, one: "идея", few: "идеи", many: "идей" })}`,
+      activeIdeas: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, one: "активная", few: "активные", many: "активных" })}`,
+    },
+    filter: {
+      all: "Все",
+    },
+  },
+
+  roadmap: {
+    emptyTitle: "Вех пока нет",
+    emptySubtitle: "Создайте вехи для планирования дорожной карты проекта",
+    newMilestone: "Новая веха",
+    milestoneDetail: "Детали вехи",
+    milestoneNotFound: "Веха не найдена",
+    newFeature: "Новая функция",
+    featureDetail: "Детали функции",
+    featureNotFound: "Функция не найдена",
+    details: "Детали",
+    titlePlaceholder: "Название",
+    descriptionPlaceholder: "Описание...",
+    targetDate: "Целевая дата",
+    targetDateNone: "Нет целевой даты",
+    milestoneLabel: "Веха",
+    moscow: {
+      mustHave: "Обязательно",
+      shouldHave: "Желательно",
+      couldHave: "Возможно",
+      wontHave: "Не будет",
+    },
+    moscowLabel: "Приоритет (MoSCoW)",
+    featureStatuses: {
+      planned: "Запланировано",
+      inProgress: "В работе",
+      completed: "Завершено",
+      cancelled: "Отменено",
+    },
+    statusLabel: "Статус",
+    complexity: {
+      trivial: "Тривиально",
+      simple: "Просто",
+      moderate: "Умеренно",
+      complex: "Сложно",
+      veryComplex: "Очень сложно",
+    },
+    complexityLabel: "Сложность",
+    features: "Функции",
+    noFeatures: "В этой вехе нет функций",
+    convertToTask: "Преобразовать в задачу",
+    convertConfirmTitle: "Преобразовать в задачу",
+    convertConfirmMessage:
+      "Из этой функции будет создана новая задача на канбан-доске.",
+    viewTask: "Просмотр задачи",
+    deleteMilestoneConfirmTitle: "Удалить веху",
+    deleteMilestoneConfirmMessage:
+      "Все функции в этой вехе также будут удалены. Вы уверены?",
+    deleteFeatureConfirmTitle: "Удалить функцию",
+    deleteFeatureConfirmMessage: "Вы уверены, что хотите удалить эту функцию?",
+    progress: ({ completed, total }: { completed: number; total: number }) =>
+      `${completed}/${total} завершено`,
+    stats: {
+      totalMilestones: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, one: "веха", few: "вехи", many: "вех" })}`,
+      totalFeatures: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, one: "функция", few: "функции", many: "функций" })}`,
     },
   },
 

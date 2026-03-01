@@ -27,7 +27,7 @@ export const it: TranslationStructure = {
     // Tab navigation labels
     inbox: "Posta",
     sessions: "Terminali",
-    kanban: "Bacheca",
+    project: "Progetto",
     openclaw: "OpenClaw",
     settings: "Impostazioni",
   },
@@ -1438,7 +1438,7 @@ export const it: TranslationStructure = {
     sessionPromptHint:
       "Prompt precompilato quando si crea una sessione da questa attività",
     linkedSessions: "Sessioni collegate",
-    actions: "Azioni",
+    actionsLabel: "Azioni",
     startSession: "Avvia sessione",
     noMachineSelected: "Seleziona prima una macchina",
     machineNotOnline: "La macchina selezionata non è online",
@@ -1468,6 +1468,127 @@ export const it: TranslationStructure = {
       medium: "Media",
       high: "Alta",
       urgent: "Urgente",
+    },
+  },
+
+  project: {
+    segments: {
+      ideas: "Idee",
+      board: "Bacheca",
+      roadmap: "Roadmap",
+    },
+  },
+
+  ideation: {
+    // Gestione idee
+    emptyTitle: "Nessuna idea ancora",
+    emptySubtitle: "Cattura le tue idee e converti le migliori in attività",
+    newIdea: "Nuova idea",
+    ideaDetail: "Dettaglio idea",
+    ideaNotFound: "Idea non trovata",
+    details: "Dettagli",
+    titlePlaceholder: "Titolo dell'idea",
+    titleRequired: "Il titolo è obbligatorio",
+    descriptionPlaceholder: "Descrivi la tua idea...",
+    categoryLabel: "Categoria",
+    categories: {
+      feature: "Funzionalità",
+      improvement: "Miglioramento",
+      bugfix: "Correzione",
+      refactor: "Refactoring",
+      documentation: "Documentazione",
+      other: "Altro",
+    },
+    statusLabel: "Stato",
+    statuses: {
+      draft: "Bozza",
+      active: "Attivo",
+      converted: "Convertito",
+      dismissed: "Scartato",
+    },
+    priorityLabel: "Priorità",
+    convertToTask: "Converti in attività",
+    convertConfirmTitle: "Converti in attività",
+    convertConfirmMessage:
+      "Questo creerà una nuova attività kanban da questa idea.",
+    dismiss: "Scarta",
+    dismissConfirmTitle: "Scarta idea",
+    dismissConfirmMessage: "Sei sicuro di voler scartare questa idea?",
+    deleteConfirmTitle: "Elimina idea",
+    deleteConfirmMessage: "Sei sicuro di voler eliminare questa idea?",
+    converted: "Convertito in attività",
+    viewTask: "Vedi attività",
+    actions: {
+      changeStatus: "Cambia stato",
+    },
+    stats: {
+      totalIdeas: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "idea", plural: "idee" })}`,
+      activeIdeas: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "attivo", plural: "attivi" })}`,
+    },
+    filter: {
+      all: "Tutte",
+    },
+  },
+
+  roadmap: {
+    emptyTitle: "Nessuna milestone ancora",
+    emptySubtitle: "Crea milestone per pianificare la roadmap del tuo progetto",
+    newMilestone: "Nuova milestone",
+    milestoneDetail: "Dettaglio milestone",
+    milestoneNotFound: "Milestone non trovata",
+    newFeature: "Nuova funzionalità",
+    featureDetail: "Dettaglio funzionalità",
+    featureNotFound: "Funzionalità non trovata",
+    details: "Dettagli",
+    titlePlaceholder: "Titolo",
+    descriptionPlaceholder: "Descrizione...",
+    targetDate: "Data obiettivo",
+    targetDateNone: "Nessuna data obiettivo",
+    milestoneLabel: "Milestone",
+    moscow: {
+      mustHave: "Deve avere",
+      shouldHave: "Dovrebbe avere",
+      couldHave: "Potrebbe avere",
+      wontHave: "Non avrà",
+    },
+    moscowLabel: "Priorità (MoSCoW)",
+    featureStatuses: {
+      planned: "Pianificato",
+      inProgress: "In corso",
+      completed: "Completato",
+      cancelled: "Annullato",
+    },
+    statusLabel: "Stato",
+    complexity: {
+      trivial: "Banale",
+      simple: "Semplice",
+      moderate: "Moderato",
+      complex: "Complesso",
+      veryComplex: "Molto complesso",
+    },
+    complexityLabel: "Complessità",
+    features: "Funzionalità",
+    noFeatures: "Nessuna funzionalità in questa milestone",
+    convertToTask: "Converti in attività",
+    convertConfirmTitle: "Converti in attività",
+    convertConfirmMessage:
+      "Verrà creata una nuova attività kanban da questa funzionalità.",
+    viewTask: "Visualizza attività",
+    deleteMilestoneConfirmTitle: "Elimina milestone",
+    deleteMilestoneConfirmMessage:
+      "Anche tutte le funzionalità di questa milestone verranno eliminate. Sei sicuro?",
+    deleteFeatureConfirmTitle: "Elimina funzionalità",
+    deleteFeatureConfirmMessage:
+      "Sei sicuro di voler eliminare questa funzionalità?",
+    progress: ({ completed, total }: { completed: number; total: number }) =>
+      `${completed}/${total} completato`,
+    stats: {
+      totalMilestones: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "milestone", plural: "milestone" })}`,
+      totalFeatures: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "funzionalità", plural: "funzionalità" })}`,
     },
   },
 

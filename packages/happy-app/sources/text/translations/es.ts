@@ -27,7 +27,7 @@ export const es: TranslationStructure = {
     // Tab navigation labels
     inbox: "Bandeja",
     sessions: "Terminales",
-    kanban: "Tablero",
+    project: "Proyecto",
     openclaw: "OpenClaw",
     settings: "Configuración",
   },
@@ -1439,7 +1439,7 @@ export const es: TranslationStructure = {
       "Instrucciones para Claude al iniciar esta tarea...",
     sessionPromptHint: "Prompt prellenado al crear una sesión desde esta tarea",
     linkedSessions: "Sesiones vinculadas",
-    actions: "Acciones",
+    actionsLabel: "Acciones",
     startSession: "Iniciar sesión",
     noMachineSelected: "Selecciona una máquina primero",
     machineNotOnline: "La máquina seleccionada no está en línea",
@@ -1469,6 +1469,127 @@ export const es: TranslationStructure = {
       medium: "Media",
       high: "Alta",
       urgent: "Urgente",
+    },
+  },
+
+  project: {
+    segments: {
+      ideas: "Ideas",
+      board: "Tablero",
+      roadmap: "Hoja de ruta",
+    },
+  },
+
+  ideation: {
+    // Gestión de ideas
+    emptyTitle: "Aún no hay ideas",
+    emptySubtitle: "Captura tus ideas y convierte las mejores en tareas",
+    newIdea: "Nueva idea",
+    ideaDetail: "Detalle de la idea",
+    ideaNotFound: "Idea no encontrada",
+    details: "Detalles",
+    titlePlaceholder: "Título de la idea",
+    titleRequired: "El título es obligatorio",
+    descriptionPlaceholder: "Describe tu idea...",
+    categoryLabel: "Categoría",
+    categories: {
+      feature: "Función",
+      improvement: "Mejora",
+      bugfix: "Corrección",
+      refactor: "Refactorización",
+      documentation: "Documentación",
+      other: "Otro",
+    },
+    statusLabel: "Estado",
+    statuses: {
+      draft: "Borrador",
+      active: "Activo",
+      converted: "Convertido",
+      dismissed: "Descartado",
+    },
+    priorityLabel: "Prioridad",
+    convertToTask: "Convertir en tarea",
+    convertConfirmTitle: "Convertir en tarea",
+    convertConfirmMessage:
+      "Esto creará una nueva tarea kanban a partir de esta idea.",
+    dismiss: "Descartar",
+    dismissConfirmTitle: "Descartar idea",
+    dismissConfirmMessage: "¿Estás seguro de que quieres descartar esta idea?",
+    deleteConfirmTitle: "Eliminar idea",
+    deleteConfirmMessage: "¿Estás seguro de que quieres eliminar esta idea?",
+    converted: "Convertido en tarea",
+    viewTask: "Ver tarea",
+    actions: {
+      changeStatus: "Cambiar estado",
+    },
+    stats: {
+      totalIdeas: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "idea", plural: "ideas" })}`,
+      activeIdeas: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "activo", plural: "activos" })}`,
+    },
+    filter: {
+      all: "Todas",
+    },
+  },
+
+  roadmap: {
+    emptyTitle: "Aún no hay hitos",
+    emptySubtitle: "Crea hitos para planificar la hoja de ruta de tu proyecto",
+    newMilestone: "Nuevo hito",
+    milestoneDetail: "Detalle del hito",
+    milestoneNotFound: "Hito no encontrado",
+    newFeature: "Nueva función",
+    featureDetail: "Detalle de la función",
+    featureNotFound: "Función no encontrada",
+    details: "Detalles",
+    titlePlaceholder: "Título",
+    descriptionPlaceholder: "Descripción...",
+    targetDate: "Fecha objetivo",
+    targetDateNone: "Sin fecha objetivo",
+    milestoneLabel: "Hito",
+    moscow: {
+      mustHave: "Imprescindible",
+      shouldHave: "Debería tener",
+      couldHave: "Podría tener",
+      wontHave: "No tendrá",
+    },
+    moscowLabel: "Prioridad (MoSCoW)",
+    featureStatuses: {
+      planned: "Planificado",
+      inProgress: "En progreso",
+      completed: "Completado",
+      cancelled: "Cancelado",
+    },
+    statusLabel: "Estado",
+    complexity: {
+      trivial: "Trivial",
+      simple: "Simple",
+      moderate: "Moderado",
+      complex: "Complejo",
+      veryComplex: "Muy complejo",
+    },
+    complexityLabel: "Complejidad",
+    features: "Funciones",
+    noFeatures: "No hay funciones en este hito",
+    convertToTask: "Convertir en tarea",
+    convertConfirmTitle: "Convertir en tarea",
+    convertConfirmMessage:
+      "Se creará una nueva tarea de kanban a partir de esta función.",
+    viewTask: "Ver tarea",
+    deleteMilestoneConfirmTitle: "Eliminar hito",
+    deleteMilestoneConfirmMessage:
+      "También se eliminarán todas las funciones de este hito. ¿Estás seguro?",
+    deleteFeatureConfirmTitle: "Eliminar función",
+    deleteFeatureConfirmMessage:
+      "¿Estás seguro de que quieres eliminar esta función?",
+    progress: ({ completed, total }: { completed: number; total: number }) =>
+      `${completed}/${total} completado`,
+    stats: {
+      totalMilestones: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "hito", plural: "hitos" })}`,
+      totalFeatures: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "función", plural: "funciones" })}`,
     },
   },
 

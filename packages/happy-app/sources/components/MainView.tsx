@@ -17,7 +17,7 @@ import { InboxView } from "./InboxView";
 import { SettingsViewWrapper } from "./SettingsViewWrapper";
 import { SessionsListWrapper } from "./SessionsListWrapper";
 import { OpenClawViewWrapper } from "./OpenClawViewWrapper";
-import { KanbanViewWrapper } from "./kanban/KanbanView";
+import { ProjectView, getProjectSegment } from "./project/ProjectView";
 import { hasOpenClawConfig } from "@/openclaw";
 import { Header } from "./navigation/Header";
 import { HeaderLogo } from "./HeaderLogo";
@@ -109,13 +109,13 @@ const styles = StyleSheet.create((theme) => ({
 const TAB_TITLES = {
   sessions: "tabs.sessions",
   inbox: "tabs.inbox",
-  kanban: "tabs.kanban",
+  project: "tabs.project",
   openclaw: "tabs.openclaw",
   settings: "tabs.settings",
 } as const;
 
 // Active tabs
-type ActiveTabType = "sessions" | "inbox" | "kanban" | "openclaw" | "settings";
+type ActiveTabType = "sessions" | "inbox" | "project" | "openclaw" | "settings";
 
 // Header title component with connection status
 const HeaderTitle = React.memo(
@@ -224,10 +224,21 @@ const HeaderRight = React.memo(
       );
     }
 
-    if (activeTab === "kanban") {
+    if (activeTab === "project") {
+      const handleProjectAdd = () => {
+        const seg = getProjectSegment();
+        if (seg === "ideas") {
+          router.push("/ideation/idea/new");
+        } else if (seg === "roadmap") {
+          router.push("/roadmap/milestone/new");
+        } else {
+          router.push("/kanban/task/new");
+        }
+      };
+
       return (
         <Pressable
-          onPress={() => router.push("/kanban/task/new")}
+          onPress={handleProjectAdd}
           hitSlop={15}
           style={styles.headerButton}
         >
@@ -296,8 +307,8 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
     switch (activeTab) {
       case "inbox":
         return <InboxView />;
-      case "kanban":
-        return <KanbanViewWrapper />;
+      case "project":
+        return <ProjectView />;
       case "openclaw":
         return <OpenClawViewWrapper />;
       case "settings":

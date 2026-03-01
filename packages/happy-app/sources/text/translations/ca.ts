@@ -27,7 +27,7 @@ export const ca: TranslationStructure = {
     // Tab navigation labels
     inbox: "Safata",
     sessions: "Terminals",
-    kanban: "Tauler",
+    project: "Projecte",
     openclaw: "OpenClaw",
     settings: "Configuració",
   },
@@ -1441,7 +1441,7 @@ export const ca: TranslationStructure = {
     sessionPromptHint:
       "Prompt preomplert en crear una sessió des d'aquesta tasca",
     linkedSessions: "Sessions vinculades",
-    actions: "Accions",
+    actionsLabel: "Accions",
     startSession: "Iniciar sessió",
     noMachineSelected: "Selecciona una màquina primer",
     machineNotOnline: "La màquina seleccionada no està en línia",
@@ -1471,6 +1471,128 @@ export const ca: TranslationStructure = {
       medium: "Mitjana",
       high: "Alta",
       urgent: "Urgent",
+    },
+  },
+
+  project: {
+    segments: {
+      ideas: "Idees",
+      board: "Tauler",
+      roadmap: "Full de ruta",
+    },
+  },
+
+  ideation: {
+    // Gestió d'idees
+    emptyTitle: "Encara no hi ha idees",
+    emptySubtitle:
+      "Captura les teves idees i converteix les millors en tasques",
+    newIdea: "Nova idea",
+    ideaDetail: "Detall de la idea",
+    ideaNotFound: "Idea no trobada",
+    details: "Detalls",
+    titlePlaceholder: "Títol de la idea",
+    titleRequired: "El títol és obligatori",
+    descriptionPlaceholder: "Descriu la teva idea...",
+    categoryLabel: "Categoria",
+    categories: {
+      feature: "Funcionalitat",
+      improvement: "Millora",
+      bugfix: "Correcció",
+      refactor: "Refactorització",
+      documentation: "Documentació",
+      other: "Altre",
+    },
+    statusLabel: "Estat",
+    statuses: {
+      draft: "Esborrany",
+      active: "Actiu",
+      converted: "Convertit",
+      dismissed: "Descartat",
+    },
+    priorityLabel: "Prioritat",
+    convertToTask: "Convertir en tasca",
+    convertConfirmTitle: "Convertir en tasca",
+    convertConfirmMessage:
+      "Això crearà una nova tasca kanban a partir d'aquesta idea.",
+    dismiss: "Descartar",
+    dismissConfirmTitle: "Descartar idea",
+    dismissConfirmMessage: "Estàs segur que vols descartar aquesta idea?",
+    deleteConfirmTitle: "Eliminar idea",
+    deleteConfirmMessage: "Estàs segur que vols eliminar aquesta idea?",
+    converted: "Convertit en tasca",
+    viewTask: "Veure tasca",
+    actions: {
+      changeStatus: "Canviar estat",
+    },
+    stats: {
+      totalIdeas: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "idea", plural: "idees" })}`,
+      activeIdeas: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "actiu", plural: "actius" })}`,
+    },
+    filter: {
+      all: "Totes",
+    },
+  },
+
+  roadmap: {
+    emptyTitle: "Encara no hi ha fites",
+    emptySubtitle: "Crea fites per planificar el full de ruta del teu projecte",
+    newMilestone: "Nova fita",
+    milestoneDetail: "Detall de la fita",
+    milestoneNotFound: "Fita no trobada",
+    newFeature: "Nova funcionalitat",
+    featureDetail: "Detall de la funcionalitat",
+    featureNotFound: "Funcionalitat no trobada",
+    details: "Detalls",
+    titlePlaceholder: "Títol",
+    descriptionPlaceholder: "Descripció...",
+    targetDate: "Data objectiu",
+    targetDateNone: "Sense data objectiu",
+    milestoneLabel: "Fita",
+    moscow: {
+      mustHave: "Ha de tenir",
+      shouldHave: "Hauria de tenir",
+      couldHave: "Podria tenir",
+      wontHave: "No tindrà",
+    },
+    moscowLabel: "Prioritat (MoSCoW)",
+    featureStatuses: {
+      planned: "Planificat",
+      inProgress: "En curs",
+      completed: "Completat",
+      cancelled: "Cancel·lat",
+    },
+    statusLabel: "Estat",
+    complexity: {
+      trivial: "Trivial",
+      simple: "Simple",
+      moderate: "Moderat",
+      complex: "Complex",
+      veryComplex: "Molt complex",
+    },
+    complexityLabel: "Complexitat",
+    features: "Funcionalitats",
+    noFeatures: "No hi ha funcionalitats en aquesta fita",
+    convertToTask: "Convertir en tasca",
+    convertConfirmTitle: "Convertir en tasca",
+    convertConfirmMessage:
+      "Es crearà una nova tasca kanban a partir d'aquesta funcionalitat.",
+    viewTask: "Veure tasca",
+    deleteMilestoneConfirmTitle: "Eliminar fita",
+    deleteMilestoneConfirmMessage:
+      "Totes les funcionalitats d'aquesta fita també s'eliminaran. N'estàs segur?",
+    deleteFeatureConfirmTitle: "Eliminar funcionalitat",
+    deleteFeatureConfirmMessage:
+      "Estàs segur que vols eliminar aquesta funcionalitat?",
+    progress: ({ completed, total }: { completed: number; total: number }) =>
+      `${completed}/${total} completat`,
+    stats: {
+      totalMilestones: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "fita", plural: "fites" })}`,
+      totalFeatures: ({ count }: { count: number }) =>
+        `${count} ${plural({ count, singular: "funcionalitat", plural: "funcionalitats" })}`,
     },
   },
 

@@ -357,6 +357,42 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="ideation/idea/new"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="ideation/idea/[id]"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="roadmap/milestone/new"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="roadmap/milestone/[id]"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="roadmap/feature/new"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="roadmap/feature/[id]"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="openclaw/index"
         options={{
           headerShown: true,

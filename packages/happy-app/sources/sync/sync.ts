@@ -28,6 +28,10 @@ import {
 import { getCurrentLanguage } from "@/text";
 import { kanbanStore } from "./kanbanStore";
 import { isKanbanKey } from "./kanbanTypes";
+import { ideationStore } from "./ideationStore";
+import { isIdeationKey } from "./ideationTypes";
+import { roadmapStore } from "./roadmapStore";
+import { isRoadmapKey } from "./roadmapTypes";
 import {
   applySettings,
   Settings,
@@ -2797,6 +2801,22 @@ class Sync {
       );
       if (kanbanChanges.length > 0) {
         kanbanStore.getState().handleKvUpdate(kanbanChanges);
+      }
+
+      // Filter ideation-related changes and forward to ideation store
+      const ideationChanges = kvUpdate.changes.filter((c: { key: string }) =>
+        isIdeationKey(c.key),
+      );
+      if (ideationChanges.length > 0) {
+        ideationStore.getState().handleKvUpdate(ideationChanges);
+      }
+
+      // Filter roadmap-related changes and forward to roadmap store
+      const roadmapChanges = kvUpdate.changes.filter((c: { key: string }) =>
+        isRoadmapKey(c.key),
+      );
+      if (roadmapChanges.length > 0) {
+        roadmapStore.getState().handleKvUpdate(roadmapChanges);
       }
     }
   };

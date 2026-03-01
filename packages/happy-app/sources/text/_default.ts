@@ -27,7 +27,7 @@ export const en = {
     // Tab navigation labels
     inbox: "Inbox",
     sessions: "Terminals",
-    kanban: "Board",
+    project: "Project",
     openclaw: "OpenClaw",
     settings: "Settings",
   },
@@ -1454,6 +1454,124 @@ export const en = {
       medium: "Medium",
       high: "High",
       urgent: "Urgent",
+    },
+  },
+
+  project: {
+    segments: {
+      ideas: "Ideas",
+      board: "Board",
+      roadmap: "Roadmap",
+    },
+  },
+
+  ideation: {
+    // Ideation - idea management
+    emptyTitle: "No Ideas Yet",
+    emptySubtitle: "Capture your ideas and convert the best ones to tasks",
+    newIdea: "New Idea",
+    ideaDetail: "Idea Detail",
+    ideaNotFound: "Idea Not Found",
+    details: "Details",
+    titlePlaceholder: "Idea title",
+    titleRequired: "Title is required",
+    descriptionPlaceholder: "Describe your idea...",
+    categoryLabel: "Category",
+    categories: {
+      feature: "Feature",
+      improvement: "Improvement",
+      bugfix: "Bug Fix",
+      refactor: "Refactor",
+      documentation: "Documentation",
+      other: "Other",
+    },
+    statusLabel: "Status",
+    statuses: {
+      draft: "Draft",
+      active: "Active",
+      converted: "Converted",
+      dismissed: "Dismissed",
+    },
+    priorityLabel: "Priority",
+    convertToTask: "Convert to Task",
+    convertConfirmTitle: "Convert to Task",
+    convertConfirmMessage: "This will create a new kanban task from this idea.",
+    dismiss: "Dismiss",
+    dismissConfirmTitle: "Dismiss Idea",
+    dismissConfirmMessage: "Are you sure you want to dismiss this idea?",
+    deleteConfirmTitle: "Delete Idea",
+    deleteConfirmMessage: "Are you sure you want to delete this idea?",
+    converted: "Converted to task",
+    viewTask: "View Task",
+    actions: {
+      changeStatus: "Change Status",
+    },
+    stats: {
+      totalIdeas: ({ count }: { count: number }) => `${count} ideas`,
+      activeIdeas: ({ count }: { count: number }) => `${count} active`,
+    },
+    filter: {
+      all: "All",
+    },
+  },
+
+  roadmap: {
+    // Roadmap - milestone & feature planning
+    emptyTitle: "No Milestones Yet",
+    emptySubtitle: "Create milestones to plan your project roadmap",
+    newMilestone: "New Milestone",
+    milestoneDetail: "Milestone Detail",
+    milestoneNotFound: "Milestone Not Found",
+    newFeature: "New Feature",
+    featureDetail: "Feature Detail",
+    featureNotFound: "Feature Not Found",
+    details: "Details",
+    titlePlaceholder: "Title",
+    titleRequired: "Title is required",
+    descriptionPlaceholder: "Description...",
+    targetDate: "Target Date",
+    targetDateNone: "No target date",
+    milestoneLabel: "Milestone",
+    moscow: {
+      mustHave: "Must Have",
+      shouldHave: "Should Have",
+      couldHave: "Could Have",
+      wontHave: "Won't Have",
+    },
+    moscowLabel: "Priority (MoSCoW)",
+    featureStatuses: {
+      planned: "Planned",
+      inProgress: "In Progress",
+      completed: "Completed",
+      cancelled: "Cancelled",
+    },
+    statusLabel: "Status",
+    complexity: {
+      trivial: "Trivial",
+      simple: "Simple",
+      moderate: "Moderate",
+      complex: "Complex",
+      veryComplex: "Very Complex",
+    },
+    complexityLabel: "Complexity",
+    features: "Features",
+    noFeatures: "No features in this milestone",
+    convertToTask: "Convert to Task",
+    convertConfirmTitle: "Convert to Task",
+    convertConfirmMessage:
+      "This will create a new kanban task from this feature.",
+    viewTask: "View Task",
+    deleteMilestoneConfirmTitle: "Delete Milestone",
+    deleteMilestoneConfirmMessage:
+      "This will also delete all features under this milestone. Are you sure?",
+    deleteFeatureConfirmTitle: "Delete Feature",
+    deleteFeatureConfirmMessage:
+      "Are you sure you want to delete this feature?",
+    progress: ({ completed, total }: { completed: number; total: number }) =>
+      `${completed}/${total} completed`,
+    stats: {
+      totalMilestones: ({ count }: { count: number }) => `${count} milestones`,
+      totalFeatures: ({ count }: { count: number }) => `${count} features`,
     },
   },
 
