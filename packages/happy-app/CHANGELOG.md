@@ -1,5 +1,52 @@
 # Changelog
 
+## Version 3 - 2026-03-01
+
+语音交互全面升级，新增 Worktree 支持、工具分组与简洁模式，大幅优化会话管理与 UI 体验。
+
+### 语音助手
+- 全新语音管线：Edge TTS 语音合成、Web VAD 语音活动检测、状态动画
+- 新增 WebSocket 实时语音转文字服务
+- Haiku 模型智能纠错 STT 结果，提升识别准确率
+- 修复移动端 Web 中文转写问题
+- 降低语音交互延迟，支持 TTS 打断
+- 移除 Claude Code 完成后多余的"Done"语音提示
+
+### Worktree
+- 新增 Worktree 检测与会话元数据支持
+- Worktree 会话类型移出实验性功能
+- 新增 9 语言 i18n 翻译
+- 修复合并冲突时自动中止、命令注入漏洞及生命周期管理
+
+### 工具与权限
+- 新增工具分组显示与简洁模式
+- 分组工具内自动批准权限，TodoWrite 排除在外
+- 未知工具不再显示审核按钮
+- 新增 dontAsk 权限模式与 opusplan 模型支持
+
+### 会话管理
+- 会话列表支持滑动归档与删除
+- 会话偏好（权限模式、模型模式）同步至服务端
+- 新增会话 Profile 追踪与持久化
+- 远程模式下注册 getCompactionSummary RPC
+- 新增实时会话排序开关
+
+### UI/UX
+- 改进代码块交互与工具描述展示
+- Task 工具卡片显示 Agent 类型、实时副标题与 Copilot 图标
+- 新增 Modal.toast 自动消失通知
+- 工具栏窄屏自动换行
+- 用量面板宽度约束
+
+### CLI
+- 修复 Shell 命令结果无法在 App 中显示
+- App 语言偏好传递给 Claude 系统提示
+- 升级 SDK 至 0.2.62
+- CLI 版本升级至 0.29.27
+
+### 安全
+- 修补 22 个 Dependabot 安全漏洞
+
 ## Version 2 - 2026-02-27
 
 Fixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.
