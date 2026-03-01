@@ -22,19 +22,19 @@ const stylesheet = StyleSheet.create((theme) => ({
   inner: {
     maxWidth: layout.maxWidth,
     width: "100%",
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
     alignItems: "flex-end" as const,
     paddingHorizontal: 16,
+  },
+  column: {
+    alignItems: "center" as const,
     gap: 6,
   },
-  row: {
-    flexDirection: "row" as const,
-    justifyContent: "flex-end" as const,
-    alignItems: "center" as const,
-    gap: 8,
-  },
   statusColumn: {
-    alignItems: "flex-end" as const,
+    alignItems: "flex-start" as const,
     gap: 2,
+    flex: 1,
   },
   statusLine: {
     flexDirection: "row" as const,
@@ -154,11 +154,15 @@ export const InputFAB = React.memo(function InputFAB({
   return (
     <Animated.View style={[styles.container, { opacity }]}>
       <View style={styles.inner}>
-        <View style={styles.row}>
-          {/* Status info column — sits left of buttons */}
-          {statusInfo && <CompactStatus info={statusInfo} theme={theme} />}
+        {/* Status info — left-aligned, bottom-aligned */}
+        {statusInfo ? (
+          <CompactStatus info={statusInfo} theme={theme} />
+        ) : (
+          <View />
+        )}
 
-          {/* Action buttons */}
+        {/* Vertical button column — right side */}
+        <View style={styles.column}>
           {showOptions && (
             <FABButton
               key="options"
@@ -220,7 +224,7 @@ export const InputFAB = React.memo(function InputFAB({
           {/* Expand input button */}
           <FABButton
             key="expand"
-            icon="create-outline"
+            icon="expand-outline"
             onPress={onExpandPress}
             styles={styles}
             iconColor={iconColor}

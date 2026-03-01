@@ -225,7 +225,7 @@ export const ScrollToBottomButton = React.memo(
               </View>
             )}
             {onCollapseInput &&
-              renderButton("create-outline", onCollapseInput, 18)}
+              renderButton("contract-outline", onCollapseInput, 18)}
           </View>
         </View>
       </Animated.View>
