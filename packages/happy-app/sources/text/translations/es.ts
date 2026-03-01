@@ -27,6 +27,7 @@ export const es: TranslationStructure = {
     // Tab navigation labels
     inbox: "Bandeja",
     sessions: "Terminales",
+    openclaw: "OpenClaw",
     settings: "Configuración",
   },
 
@@ -1413,6 +1414,72 @@ export const es: TranslationStructure = {
       root: "Scripts del proyecto",
       shell: "Comandos Shell",
     },
+  },
+
+  openclaw: {
+    title: "OpenClaw",
+    connect: "Conectar",
+    connecting: "Conectando...",
+    connected: "Conectado",
+    disconnect: "Desconectar",
+    notConnected: "No conectado",
+    notConnectedDescription:
+      "Conéctate a tu puerta de enlace OpenClaw para comenzar a chatear.",
+    connectToGateway: "Conectar a la puerta de enlace",
+    connectTitle: "Conectar a OpenClaw",
+    connectDescription:
+      "Introduce la URL de tu puerta de enlace OpenClaw. La puerta de enlace se ejecuta localmente en tu computadora.",
+    connectionSettings: "Configuración de conexión",
+    gatewayUrl: "URL de la puerta de enlace",
+    token: "Token de acceso",
+    tokenDescription: "Generar desde CLI o panel de control de OpenClaw",
+    tokenPlaceholder: "Introduce el token de acceso",
+    password: "Contraseña",
+    passwordOptional: "Para puertas de enlace protegidas con contraseña",
+    passwordPlaceholder: "Introduce la contraseña si es necesario",
+    connectionFailed: "Error de conexión",
+    checkSettings: "Verifica la configuración de conexión e intenta de nuevo.",
+    connectFooter:
+      "Tu conexión es directa a tu puerta de enlace local. Los datos no pasan por servidores externos.",
+    localConnection: "Conexión local",
+    localConnectionDescription:
+      "Toda la comunicación ocurre directamente con tu puerta de enlace.",
+    viewSessions: "Ver sesiones",
+    connectedTo: "Conectado a",
+    newChat: "Nuevo chat",
+    recentSessions: "Sesiones recientes",
+    noSessions: "No hay sesiones todavía. Inicia un nuevo chat para comenzar.",
+    chat: "Chat",
+    startConversation: "Inicia una conversación con OpenClaw",
+    messagePlaceholder: "Escribe un mensaje...",
+    pairingRequired: "Emparejamiento requerido",
+    pairingDescription:
+      "Este dispositivo debe ser aprobado antes de conectarse a la puerta de enlace.",
+    pairingInstructions: "Cómo aprobar",
+    pairingStep1Title: "Abre OpenClaw",
+    pairingStep1Description:
+      "Haz clic en el icono de OpenClaw en la barra de menú",
+    pairingStep2Title: "Encuentra la solicitud de emparejamiento",
+    pairingStep2Description:
+      'Busca "Happy" en la lista de dispositivos pendientes',
+    pairingStep3Title: "Aprueba el dispositivo",
+    pairingStep3Description: 'Haz clic en "Aprobar" para permitir la conexión',
+    retryConnection: "Reintentar conexión",
+    deviceInfo: "Información del dispositivo",
+    deviceId: "ID del dispositivo",
+    newSession: "Nueva sesión",
+    newSessionTitle: "Iniciar una nueva conversación",
+    newSessionDescription:
+      "Escribe tu mensaje abajo para empezar a chatear con OpenClaw.",
+    newSessionPlaceholder: "¿De qué te gustaría hablar?",
+    tokenCommand: "Comando para obtener token",
+    tokenCommandHint: "Ejecuta este comando en tu terminal:",
+    tokenCommandValue: "clawdbot dashboard --no-open",
+    tokenCommandDescription:
+      'Esto mostrará una URL con tu token. Copia el valor después de "?token="',
+    thinking: "Pensando",
+    usingTools: "Usando herramientas",
+    errorOccurred: "Se produjo un error",
   },
 } as const;
 

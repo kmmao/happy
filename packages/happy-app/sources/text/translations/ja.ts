@@ -30,6 +30,7 @@ export const ja: TranslationStructure = {
     // Tab navigation labels
     inbox: "受信トレイ",
     sessions: "ターミナル",
+    openclaw: "OpenClaw",
     settings: "設定",
   },
 
@@ -1395,5 +1396,70 @@ export const ja: TranslationStructure = {
       root: "プロジェクトスクリプト",
       shell: "シェルコマンド",
     },
+  },
+
+  openclaw: {
+    title: "OpenClaw",
+    connect: "接続",
+    connecting: "接続中...",
+    connected: "接続済み",
+    disconnect: "切断",
+    notConnected: "未接続",
+    notConnectedDescription:
+      "OpenClawゲートウェイに接続してチャットを開始してください。",
+    connectToGateway: "ゲートウェイに接続",
+    connectTitle: "OpenClawに接続",
+    connectDescription:
+      "OpenClawゲートウェイのURLを入力してください。ゲートウェイはローカルコンピュータ上で動作します。",
+    connectionSettings: "接続設定",
+    gatewayUrl: "ゲートウェイURL",
+    token: "アクセストークン",
+    tokenDescription: "OpenClaw CLIまたはコントロールUIから生成",
+    tokenPlaceholder: "アクセストークンを入力",
+    password: "パスワード",
+    passwordOptional: "パスワード保護されたゲートウェイ用",
+    passwordPlaceholder: "必要な場合はパスワードを入力",
+    connectionFailed: "接続失敗",
+    checkSettings: "接続設定を確認して再試行してください。",
+    connectFooter:
+      "接続はローカルゲートウェイへの直接接続です。データは外部サーバーを経由しません。",
+    localConnection: "ローカル接続",
+    localConnectionDescription: "すべての通信はゲートウェイと直接行われます。",
+    viewSessions: "セッションを表示",
+    connectedTo: "接続先",
+    newChat: "新しいチャット",
+    recentSessions: "最近のセッション",
+    noSessions: "セッションがありません。新しいチャットを開始してください。",
+    chat: "チャット",
+    startConversation: "OpenClawとの会話を開始",
+    messagePlaceholder: "メッセージを入力...",
+    pairingRequired: "ペアリングが必要",
+    pairingDescription:
+      "このデバイスは接続前にOpenClawゲートウェイで承認される必要があります。これは初回のみの設定です。",
+    pairingInstructions: "承認方法",
+    pairingStep1Title: "OpenClawを開く",
+    pairingStep1Description:
+      "メニューバーまたはシステムトレイのOpenClawアイコンをクリック",
+    pairingStep2Title: "ペアリングリクエストを探す",
+    pairingStep2Description:
+      "保留中のデバイスリストで「Happy」を探してください",
+    pairingStep3Title: "デバイスを承認",
+    pairingStep3Description: "「承認」をクリックしてこのデバイスの接続を許可",
+    retryConnection: "再接続",
+    deviceInfo: "デバイス情報",
+    deviceId: "デバイスID",
+    newSession: "新しいセッション",
+    newSessionTitle: "新しい会話を始める",
+    newSessionDescription:
+      "下にメッセージを入力してOpenClawとチャットを始めましょう。",
+    newSessionPlaceholder: "何について話したいですか？",
+    tokenCommand: "トークン取得コマンド",
+    tokenCommandHint: "ターミナルでこのコマンドを実行:",
+    tokenCommandValue: "clawdbot dashboard --no-open",
+    tokenCommandDescription:
+      'トークン付きのURLが表示されます。"?token="の後の値をコピーしてください',
+    thinking: "思考中",
+    usingTools: "ツールを使用中",
+    errorOccurred: "エラーが発生しました",
   },
 } as const;

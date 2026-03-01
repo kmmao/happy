@@ -40,6 +40,7 @@ export const ru: TranslationStructure = {
     // Tab navigation labels
     inbox: "Входящие",
     sessions: "Терминалы",
+    openclaw: "OpenClaw",
     settings: "Настройки",
   },
 
@@ -1437,6 +1438,71 @@ export const ru: TranslationStructure = {
       root: "Скрипты проекта",
       shell: "Команды Shell",
     },
+  },
+
+  openclaw: {
+    title: "OpenClaw",
+    connect: "Подключить",
+    connecting: "Подключение...",
+    connected: "Подключено",
+    disconnect: "Отключить",
+    notConnected: "Не подключено",
+    notConnectedDescription:
+      "Подключитесь к шлюзу OpenClaw, чтобы начать общение.",
+    connectToGateway: "Подключиться к шлюзу",
+    connectTitle: "Подключение к OpenClaw",
+    connectDescription:
+      "Введите URL вашего шлюза OpenClaw. Шлюз работает локально на вашем компьютере.",
+    connectionSettings: "Настройки подключения",
+    gatewayUrl: "URL шлюза",
+    token: "Токен доступа",
+    tokenDescription: "Получите через CLI или панель управления OpenClaw",
+    tokenPlaceholder: "Введите токен доступа к шлюзу",
+    password: "Пароль",
+    passwordOptional: "Для шлюзов, защищённых паролем",
+    passwordPlaceholder: "Введите пароль, если требуется",
+    connectionFailed: "Ошибка подключения",
+    checkSettings: "Проверьте настройки подключения и попробуйте снова.",
+    connectFooter:
+      "Подключение напрямую к вашему локальному шлюзу. Данные не проходят через внешние серверы.",
+    localConnection: "Локальное подключение",
+    localConnectionDescription:
+      "Вся коммуникация происходит напрямую с вашим шлюзом.",
+    viewSessions: "Просмотр сессий",
+    connectedTo: "Подключено к",
+    newChat: "Новый чат",
+    recentSessions: "Недавние сессии",
+    noSessions: "Сессий пока нет. Начните новый чат.",
+    chat: "Чат",
+    startConversation: "Начните разговор с OpenClaw",
+    messagePlaceholder: "Введите сообщение...",
+    pairingRequired: "Требуется сопряжение",
+    pairingDescription:
+      "Это устройство должно быть одобрено для подключения к шлюзу.",
+    pairingInstructions: "Как одобрить",
+    pairingStep1Title: "Откройте OpenClaw",
+    pairingStep1Description: "Нажмите на значок OpenClaw в строке меню",
+    pairingStep2Title: "Найдите запрос на сопряжение",
+    pairingStep2Description: 'Найдите "Happy" в списке ожидающих устройств',
+    pairingStep3Title: "Одобрите устройство",
+    pairingStep3Description:
+      'Нажмите "Одобрить" для подключения этого устройства',
+    retryConnection: "Повторить подключение",
+    deviceInfo: "Информация об устройстве",
+    deviceId: "ID устройства",
+    newSession: "Новая сессия",
+    newSessionTitle: "Начать новый разговор",
+    newSessionDescription:
+      "Введите сообщение ниже, чтобы начать общение с OpenClaw.",
+    newSessionPlaceholder: "О чём вы хотите поговорить?",
+    tokenCommand: "Команда для получения токена",
+    tokenCommandHint: "Выполните эту команду в терминале:",
+    tokenCommandValue: "clawdbot dashboard --no-open",
+    tokenCommandDescription:
+      'Это выведет URL с вашим токеном. Скопируйте значение после "?token="',
+    thinking: "Думаю",
+    usingTools: "Использую инструменты",
+    errorOccurred: "Произошла ошибка",
   },
 } as const;
 

@@ -338,6 +338,38 @@ export default function RootLayout() {
           headerBackTitle: t("common.back"),
         }}
       />
+      <Stack.Screen
+        name="openclaw/index"
+        options={{
+          headerShown: true,
+          headerTitle: t("openclaw.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="openclaw/connect"
+        options={{
+          headerShown: true,
+          headerTitle: t("openclaw.connect"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="openclaw/chat/[sessionKey]"
+        options={{
+          headerShown: true,
+          headerTitle: t("openclaw.chat"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="openclaw/new"
+        options={{
+          headerShown: true,
+          headerTitle: t("openclaw.newSession"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
     </Stack>
   );
 }

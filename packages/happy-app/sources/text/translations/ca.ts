@@ -27,6 +27,7 @@ export const ca: TranslationStructure = {
     // Tab navigation labels
     inbox: "Safata",
     sessions: "Terminals",
+    openclaw: "OpenClaw",
     settings: "Configuració",
   },
 
@@ -1414,6 +1415,74 @@ export const ca: TranslationStructure = {
       root: "Scripts del projecte",
       shell: "Comandes Shell",
     },
+  },
+
+  openclaw: {
+    title: "OpenClaw",
+    connect: "Connectar",
+    connecting: "Connectant...",
+    connected: "Connectat",
+    disconnect: "Desconnectar",
+    notConnected: "No connectat",
+    notConnectedDescription:
+      "Connecta't a la passarel\u00b7la OpenClaw per comen\u00e7ar a xatejar.",
+    connectToGateway: "Connectar a la passarel\u00b7la",
+    connectTitle: "Connectar a OpenClaw",
+    connectDescription:
+      "Introdueix l'URL de la teva passarel\u00b7la OpenClaw. La passarel\u00b7la s'executa localment al teu ordinador.",
+    connectionSettings: "Configuraci\u00f3 de connexi\u00f3",
+    gatewayUrl: "URL de la passarel\u00b7la",
+    token: "Token d'acc\u00e9s",
+    tokenDescription: "Genera des del CLI o panell de control de OpenClaw",
+    tokenPlaceholder: "Introdueix el token d'acc\u00e9s",
+    password: "Contrasenya",
+    passwordOptional: "Per a passarel\u00b7les protegides amb contrasenya",
+    passwordPlaceholder: "Introdueix la contrasenya si cal",
+    connectionFailed: "Error de connexi\u00f3",
+    checkSettings:
+      "Comprova la configuraci\u00f3 de connexi\u00f3 i torna-ho a provar.",
+    connectFooter:
+      "La teva connexi\u00f3 \u00e9s directa a la passarel\u00b7la local. Les dades no passen per servidors externs.",
+    localConnection: "Connexi\u00f3 local",
+    localConnectionDescription:
+      "Tota la comunicaci\u00f3 es fa directament amb la teva passarel\u00b7la.",
+    viewSessions: "Veure sessions",
+    connectedTo: "Connectat a",
+    newChat: "Nou xat",
+    recentSessions: "Sessions recents",
+    noSessions: "Encara no hi ha sessions. Comen\u00e7a un nou xat.",
+    chat: "Xat",
+    startConversation: "Comen\u00e7a una conversa amb OpenClaw",
+    messagePlaceholder: "Escriu un missatge...",
+    pairingRequired: "Emparellament requerit",
+    pairingDescription:
+      "Aquest dispositiu ha de ser aprovat abans de connectar-se a la passarel\u00b7la.",
+    pairingInstructions: "Com aprovar",
+    pairingStep1Title: "Obre OpenClaw",
+    pairingStep1Description:
+      "Fes clic a la icona de OpenClaw a la barra de men\u00fa",
+    pairingStep2Title: "Troba la sol\u00b7licitud d'emparellament",
+    pairingStep2Description:
+      'Cerca "Happy" a la llista de dispositius pendents',
+    pairingStep3Title: "Aprova el dispositiu",
+    pairingStep3Description:
+      'Fes clic a "Aprovar" per permetre la connexi\u00f3',
+    retryConnection: "Reintentar connexi\u00f3",
+    deviceInfo: "Informaci\u00f3 del dispositiu",
+    deviceId: "ID del dispositiu",
+    newSession: "Nova sessi\u00f3",
+    newSessionTitle: "Iniciar una nova conversa",
+    newSessionDescription:
+      "Escriu el teu missatge a continuaci\u00f3 per comen\u00e7ar a xatejar amb OpenClaw.",
+    newSessionPlaceholder: "De qu\u00e8 voldries parlar?",
+    tokenCommand: "Comanda per obtenir el token",
+    tokenCommandHint: "Executa aquesta comanda al terminal:",
+    tokenCommandValue: "clawdbot dashboard --no-open",
+    tokenCommandDescription:
+      'Aix\u00f2 mostrar\u00e0 una URL amb el teu token. Copia el valor despr\u00e9s de "?token="',
+    thinking: "Pensant",
+    usingTools: "Utilitzant eines",
+    errorOccurred: "S'ha produ\u00eft un error",
   },
 } as const;
 

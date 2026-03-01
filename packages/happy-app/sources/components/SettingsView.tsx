@@ -370,6 +370,22 @@ export const SettingsView = React.memo(function SettingsView() {
         )}
       </ItemGroup>
 
+      {/* OpenClaw */}
+      <ItemGroup title={t("openclaw.title")}>
+        <Item
+          title={t("openclaw.title")}
+          subtitle={t("openclaw.connectDescription")}
+          icon={
+            <Image
+              source={require("@/assets/images/openclaw-icon-color.png")}
+              contentFit="contain"
+              style={{ width: 29, height: 29 }}
+            />
+          }
+          onPress={() => router.push("/(app)/openclaw")}
+        />
+      </ItemGroup>
+
       {/* Developer */}
       {(__DEV__ || devModeEnabled) && (
         <ItemGroup title={t("settings.developer")}>

@@ -2653,6 +2653,11 @@
   dependencies:
     "@noble/hashes" "1.8.0"
 
+"@noble/ed25519@^3.0.0":
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/@noble/ed25519/-/ed25519-3.0.0.tgz#720d4cdb6b5f632e29164a7e9d5cdfeb82a7ac86"
+  integrity sha512-QyteqMNm0GLqfa5SoYbSC3+Pvykwpn95Zgth4MFVSMKBB75ELl9tX1LAVsN4c3HXOrakHsF2gL4zWDAYCcsnzg==
+
 "@noble/hashes@1.4.0":
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-1.4.0.tgz#45814aa329f30e4fe0ba49426f49dfccdd066426"

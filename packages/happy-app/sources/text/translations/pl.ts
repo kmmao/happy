@@ -40,6 +40,7 @@ export const pl: TranslationStructure = {
     // Tab navigation labels
     inbox: "Skrzynka",
     sessions: "Terminale",
+    openclaw: "OpenClaw",
     settings: "Ustawienia",
   },
 
@@ -1437,6 +1438,70 @@ export const pl: TranslationStructure = {
       root: "Skrypty projektu",
       shell: "Polecenia Shell",
     },
+  },
+
+  openclaw: {
+    title: "OpenClaw",
+    connect: "Połącz",
+    connecting: "Łączenie...",
+    connected: "Połączono",
+    disconnect: "Rozłącz",
+    notConnected: "Nie połączono",
+    notConnectedDescription:
+      "Połącz się z bramką OpenClaw, aby rozpocząć rozmowę.",
+    connectToGateway: "Połącz z bramką",
+    connectTitle: "Połącz z OpenClaw",
+    connectDescription:
+      "Wprowadź adres URL bramki OpenClaw. Bramka działa lokalnie na twoim komputerze.",
+    connectionSettings: "Ustawienia połączenia",
+    gatewayUrl: "Adres URL bramki",
+    token: "Token dostępu",
+    tokenDescription: "Wygeneruj przez CLI lub panel sterowania OpenClaw",
+    tokenPlaceholder: "Wprowadź token dostępu do bramki",
+    password: "Hasło",
+    passwordOptional: "Dla bramek chronionych hasłem",
+    passwordPlaceholder: "Wprowadź hasło, jeśli wymagane",
+    connectionFailed: "Połączenie nie powiodło się",
+    checkSettings: "Sprawdź ustawienia połączenia i spróbuj ponownie.",
+    connectFooter:
+      "Połączenie jest bezpośrednie z lokalną bramką. Dane nie przechodzą przez zewnętrzne serwery.",
+    localConnection: "Połączenie lokalne",
+    localConnectionDescription:
+      "Cała komunikacja odbywa się bezpośrednio z twoją bramką.",
+    viewSessions: "Zobacz sesje",
+    connectedTo: "Połączono z",
+    newChat: "Nowy czat",
+    recentSessions: "Ostatnie sesje",
+    noSessions: "Brak sesji. Rozpocznij nowy czat.",
+    chat: "Czat",
+    startConversation: "Rozpocznij rozmowę z OpenClaw",
+    messagePlaceholder: "Wpisz wiadomość...",
+    pairingRequired: "Wymagane parowanie",
+    pairingDescription:
+      "To urządzenie musi zostać zatwierdzone przed połączeniem z bramką.",
+    pairingInstructions: "Jak zatwierdzić",
+    pairingStep1Title: "Otwórz OpenClaw",
+    pairingStep1Description: "Kliknij ikonę OpenClaw na pasku menu",
+    pairingStep2Title: "Znajdź żądanie parowania",
+    pairingStep2Description: 'Poszukaj "Happy" na liście oczekujących urządzeń',
+    pairingStep3Title: "Zatwierdź urządzenie",
+    pairingStep3Description: 'Kliknij "Zatwierdź" aby zezwolić na połączenie',
+    retryConnection: "Ponów połączenie",
+    deviceInfo: "Informacje o urządzeniu",
+    deviceId: "ID urządzenia",
+    newSession: "Nowa sesja",
+    newSessionTitle: "Rozpocznij nową rozmowę",
+    newSessionDescription:
+      "Wpisz wiadomość poniżej, aby rozpocząć czat z OpenClaw.",
+    newSessionPlaceholder: "O czym chcesz porozmawiać?",
+    tokenCommand: "Polecenie do pobrania tokena",
+    tokenCommandHint: "Uruchom to polecenie w terminalu:",
+    tokenCommandValue: "clawdbot dashboard --no-open",
+    tokenCommandDescription:
+      'To wyświetli URL z twoim tokenem. Skopiuj wartość po "?token="',
+    thinking: "Myślę",
+    usingTools: "Używam narzędzi",
+    errorOccurred: "Wystąpił błąd",
   },
 } as const;
 

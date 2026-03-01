@@ -1,5 +1,11 @@
 import React from "react";
-import { View, Text, Pressable } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+} from "react-native";
 import { BaseModal } from "./BaseModal";
 import { AlertModalConfig, ConfirmModalConfig } from "../types";
 import { Typography } from "@/constants/Typography";
@@ -18,7 +24,10 @@ export function WebAlertModal({
   onConfirm,
 }: WebAlertModalProps) {
   const { theme } = useUnistyles();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const isConfirm = config.type === "confirm";
+  const modalWidth = Math.min(Math.max(270, windowWidth * 0.85), 480);
+  const maxMessageHeight = windowHeight * 0.5;
 
   const handleButtonPress = (buttonIndex: number) => {
     if (isConfirm && onConfirm) {
@@ -45,7 +54,8 @@ export function WebAlertModal({
     container: {
       backgroundColor: theme.colors.surface,
       borderRadius: 14,
-      width: 270,
+      width: modalWidth,
+      maxHeight: windowHeight * 0.8,
       overflow: "hidden",
       shadowColor: theme.colors.shadow.color,
       shadowOffset: {
@@ -113,9 +123,15 @@ export function WebAlertModal({
             {config.title}
           </Text>
           {config.message && (
-            <Text style={[styles.message, Typography.default()]}>
-              {config.message}
-            </Text>
+            <ScrollView
+              style={{ maxHeight: maxMessageHeight }}
+              bounces={false}
+              showsVerticalScrollIndicator
+            >
+              <Text style={[styles.message, Typography.default()]}>
+                {config.message}
+              </Text>
+            </ScrollView>
           )}
         </View>
 
