@@ -33,6 +33,10 @@ export const LocalSettingsSchema = z.object({
     .describe(
       "Tool detail view mode: simple (human-readable) or developer (raw JSON)",
     ),
+  // Sessions where the user has manually expanded the input
+  inputExpandedSessions: z
+    .record(z.string(), z.boolean())
+    .describe("Sessions with manually expanded input, keyed by session ID"),
 });
 
 //
@@ -57,6 +61,7 @@ export const localSettingsDefaults: LocalSettings = {
   acknowledgedCliVersions: {},
   favoriteCommands: [],
   toolDetailMode: "simple",
+  inputExpandedSessions: {},
 };
 Object.freeze(localSettingsDefaults);
 

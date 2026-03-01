@@ -1,5 +1,7 @@
 import { AgentContentView } from "@/components/AgentContentView";
 import { AgentInput } from "@/components/AgentInput";
+import { InputFAB, InputFABStatusInfo } from "@/components/InputFAB";
+import { useCollapsibleInput } from "@/hooks/useCollapsibleInput";
 import {
   getAvailableModels,
   getAvailablePermissionModes,
@@ -395,11 +397,15 @@ function SessionViewInner({
     setScrollTick((prev) => prev + 1);
   }, []);
 
-  // Navigation anchor for user message jumping (-1 = latest)
-  const [navigatedIndex, setNavigatedIndex] = React.useState(-1);
+  // Anchor for options detection — updated by both scroll and nav buttons
+  const [scrollAnchor, setScrollAnchor] = React.useState(-1);
+  const handleVisibleUserMessage = React.useCallback((msgIndex: number) => {
+    setScrollAnchor(msgIndex);
+  }, []);
 
-  // Floating options from AI reply at navigated position (or latest)
-  const latestOptions = useLatestOptions(messages, navigatedIndex);
+  // Floating options from AI reply at visible/navigated position (or latest)
+  const effectiveAnchor = showScrollToBottom ? scrollAnchor : -1;
+  const latestOptions = useLatestOptions(messages, effectiveAnchor);
   const [showOptionsPopover, setShowOptionsPopover] = React.useState(false);
   const handleFloatingOptionPress = React.useCallback(
     (option: string) => {
@@ -507,6 +513,16 @@ function SessionViewInner({
       };
     }
   }, [stt.isListening, voiceAssistantLanguage]);
+
+  // Collapsible input state
+  const collapsibleInput = useCollapsibleInput({
+    sessionId,
+    hasMessages: messages.length > 0,
+    promptSuggestion,
+    needsContinue,
+    isSttListening: stt.isListening,
+    hasPendingImages: pendingImagePaths.length > 0,
+  });
 
   // Compute display value: message + real-time interim speech text
   const displayMessage = stt.interimTranscript
@@ -631,6 +647,67 @@ function SessionViewInner({
     gitStatusSync.getSync(sessionId);
   }, [sessionId, realtimeStatus]);
 
+  const scrollNavProps = {
+    onPrevUserMessage: () => {
+      chatListRef.current?.scrollToUserMessage("next");
+    },
+    onNextUserMessage: () => {
+      chatListRef.current?.scrollToUserMessage("prev");
+    },
+    hasUserMessages: (chatListRef.current?.getUserMessageCount() ?? 0) > 0,
+    optionCount: latestOptions.length,
+    onOptionsPress: () => setShowOptionsPopover(true),
+    bookmarkCount: bookmarks.length,
+    onBookmarksPress: () => setShowBookmarksPopover(true),
+  };
+
+  const handleScrollDown = React.useCallback(() => {
+    chatListRef.current?.scrollToBottom();
+    setScrollAnchor(-1);
+  }, []);
+
+  // Permission mode color mapping
+  const permissionModeKey = permissionMode?.key;
+  const permissionColor = permissionModeKey
+    ? ((theme.colors.permission as Record<string, string>)[permissionModeKey] ??
+      theme.colors.textSecondary)
+    : undefined;
+
+  const usageSource = sessionUsage ?? session.latestUsage;
+  const fabStatusInfo = React.useMemo<InputFABStatusInfo>(
+    () => ({
+      statusText: sessionStatus.statusText,
+      statusColor: sessionStatus.statusColor,
+      statusDotColor: sessionStatus.statusDotColor,
+      isPulsing: sessionStatus.isPulsing ?? false,
+      permissionLabel: permissionMode?.name,
+      permissionColor,
+      modelLabel: modelMode?.name,
+      contextSize: usageSource?.contextSize,
+      contextWindow: usageSource?.contextWindow,
+      totalSessionTokens:
+        usageSource && "totalInputTokens" in usageSource
+          ? (usageSource.totalInputTokens ?? 0) +
+            (usageSource.totalOutputTokens ?? 0)
+          : undefined,
+      totalCostUsd: usageSource?.totalCostUsd,
+      alwaysShowContext: alwaysShowContextSize,
+      modelCode: effectiveModelCode,
+    }),
+    [
+      sessionStatus.statusText,
+      sessionStatus.statusColor,
+      sessionStatus.statusDotColor,
+      sessionStatus.isPulsing,
+      permissionMode?.name,
+      permissionColor,
+      modelMode?.name,
+      usageSource,
+      alwaysShowContextSize,
+      effectiveModelCode,
+    ],
+  );
+
   let content = (
     <>
       <Deferred>
@@ -640,30 +717,23 @@ function SessionViewInner({
             session={session}
             onScrollAwayFromBottom={setShowScrollToBottom}
             onScrollActivity={handleScrollActivity}
+            onVisibleUserMessageChange={handleVisibleUserMessage}
           />
         )}
       </Deferred>
-      <ScrollToBottomButton
-        visible={showScrollToBottom && messages.length > 0}
-        onPress={() => {
-          chatListRef.current?.scrollToBottom();
-          setNavigatedIndex(-1);
-        }}
-        onPrevUserMessage={() => {
-          const idx = chatListRef.current?.scrollToUserMessage("next") ?? -1;
-          setNavigatedIndex(idx);
-        }}
-        onNextUserMessage={() => {
-          const idx = chatListRef.current?.scrollToUserMessage("prev") ?? -1;
-          setNavigatedIndex(idx);
-        }}
-        hasUserMessages={(chatListRef.current?.getUserMessageCount() ?? 0) > 0}
-        optionCount={latestOptions.length}
-        onOptionsPress={() => setShowOptionsPopover(true)}
-        bookmarkCount={bookmarks.length}
-        onBookmarksPress={() => setShowBookmarksPopover(true)}
-        scrollTick={scrollTick}
-      />
+      {!collapsibleInput.collapsed && (
+        <ScrollToBottomButton
+          visible={showScrollToBottom && messages.length > 0}
+          onPress={handleScrollDown}
+          {...scrollNavProps}
+          scrollTick={scrollTick}
+          onCollapseInput={collapsibleInput.collapse}
+          hasPendingAction={
+            !showScrollToBottom && collapsibleInput.hasPendingAction
+          }
+          onPendingActionPress={collapsibleInput.expand}
+        />
+      )}
     </>
   );
   const placeholder =
@@ -881,6 +951,20 @@ function SessionViewInner({
           content={content}
           input={input}
           placeholder={placeholder}
+          inputCollapsed={collapsibleInput.collapsed}
+          collapsedOverlay={
+            <InputFAB
+              visible={collapsibleInput.collapsed}
+              onExpandPress={collapsibleInput.expand}
+              hasPendingAction={
+                !showScrollToBottom && collapsibleInput.hasPendingAction
+              }
+              showScrollDown={showScrollToBottom && messages.length > 0}
+              onScrollDown={handleScrollDown}
+              {...scrollNavProps}
+              statusInfo={fabStatusInfo}
+            />
+          }
         />
         <OptionsPopover
           visible={showOptionsPopover && latestOptions.length > 0}

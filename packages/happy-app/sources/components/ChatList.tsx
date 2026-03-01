@@ -6,6 +6,7 @@ import {
   NativeSyntheticEvent,
   Platform,
   View,
+  ViewToken,
 } from "react-native";
 import { useCallback } from "react";
 import { useHeaderHeight } from "@/utils/responsive";
@@ -59,6 +60,7 @@ export const ChatList = React.memo(
       session: Session;
       onScrollAwayFromBottom?: (isAway: boolean) => void;
       onScrollActivity?: () => void;
+      onVisibleUserMessageChange?: (msgIndex: number) => void;
     }
   >((props, ref) => {
     const { messages } = useSessionMessages(props.session.id);
@@ -70,6 +72,7 @@ export const ChatList = React.memo(
         messages={messages}
         onScrollAwayFromBottom={props.onScrollAwayFromBottom}
         onScrollActivity={props.onScrollActivity}
+        onVisibleUserMessageChange={props.onVisibleUserMessageChange}
       />
     );
   }),
@@ -109,6 +112,7 @@ const ChatListInternal = React.memo(
       messages: Message[];
       onScrollAwayFromBottom?: (isAway: boolean) => void;
       onScrollActivity?: () => void;
+      onVisibleUserMessageChange?: (msgIndex: number) => void;
     }
   >((props, ref) => {
     const flatListRef = React.useRef<FlatList>(null);
@@ -219,6 +223,25 @@ const ChatListInternal = React.memo(
       [displayItems],
     );
 
+    // Map displayItems index → original messages index.
+    // ToolGroups collapse N tool-call messages into 1 displayItem,
+    // so the indices diverge. useLatestOptions needs messages indices.
+    const displayToMsgIndex = React.useMemo(() => {
+      const map = new Map<number, number>();
+      let msgIdx = 0;
+      for (let di = 0; di < displayItems.length; di++) {
+        const item = displayItems[di];
+        if (item.kind === "tool-group") {
+          map.set(di, msgIdx);
+          msgIdx += item.messages.length;
+        } else {
+          map.set(di, msgIdx);
+          msgIdx++;
+        }
+      }
+      return map;
+    }, [displayItems]);
+
     React.useImperativeHandle(ref, () => ({
       scrollToBottom: () => {
         flatListRef.current?.scrollToOffset({
@@ -257,7 +280,8 @@ const ChatListInternal = React.memo(
             viewPosition: 0.5,
           });
         }
-        return targetIndex;
+        // Return the original messages array index (not displayItems index)
+        return displayToMsgIndex.get(targetIndex) ?? -1;
       },
       getUserMessageCount: () => userMessageIndices.length,
     }));
@@ -294,6 +318,44 @@ const ChatListInternal = React.memo(
       },
       [props.onScrollAwayFromBottom, props.onScrollActivity],
     );
+
+    // Track visible user messages for scroll-based options detection.
+    // Use refs so the callback is stable (FlatList requirement).
+    const onVisibleUserMsgRef = React.useRef(props.onVisibleUserMessageChange);
+    onVisibleUserMsgRef.current = props.onVisibleUserMessageChange;
+    const displayToMsgIndexRef = React.useRef(displayToMsgIndex);
+    displayToMsgIndexRef.current = displayToMsgIndex;
+    const displayItemsRef = React.useRef(displayItems);
+    displayItemsRef.current = displayItems;
+
+    const viewabilityPairs = React.useRef([
+      {
+        viewabilityConfig: { itemVisiblePercentThreshold: 30 },
+        onViewableItemsChanged: ({
+          viewableItems,
+        }: {
+          viewableItems: ViewToken[];
+        }) => {
+          const cb = onVisibleUserMsgRef.current;
+          if (!cb) return;
+          const items = displayItemsRef.current;
+          const map = displayToMsgIndexRef.current;
+          // Find the lowest-index (most recent) user-text in viewable area
+          for (const vt of viewableItems) {
+            if (vt.index == null) continue;
+            const item = items[vt.index];
+            if (item?.kind === "user-text") {
+              const msgIdx = map.get(vt.index);
+              if (msgIdx !== undefined) {
+                cb(msgIdx);
+                return;
+              }
+            }
+          }
+          cb(-1);
+        },
+      },
+    ]);
 
     const keyExtractor = useCallback((item: DisplayItem) => item.id, []);
     const renderItem = useCallback(
@@ -336,6 +398,7 @@ const ChatListInternal = React.memo(
         onScrollToIndexFailed={handleScrollToIndexFailed}
         onScroll={handleScroll}
         scrollEventThrottle={400}
+        viewabilityConfigCallbackPairs={viewabilityPairs.current}
         ListHeaderComponent={<ListFooter sessionId={props.sessionId} />}
         ListFooterComponent={<ListHeader />}
       />

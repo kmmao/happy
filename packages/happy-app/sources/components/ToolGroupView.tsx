@@ -70,7 +70,7 @@ export const ToolGroupView = React.memo(
   }) => {
     const { theme } = useUnistyles();
     const router = useRouter();
-    const [collapsed, setCollapsed] = React.useState(true);
+    const [collapsed, setCollapsed] = React.useState(false);
     const [showAllTools, setShowAllTools] = React.useState(false);
 
     // Auto-approve pending permissions for grouped tools (ToolView is not

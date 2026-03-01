@@ -63,6 +63,12 @@ interface ScrollToBottomButtonProps {
   onBookmarksPress?: () => void;
   /** Bump this counter on every scroll event to wake buttons from idle fade */
   scrollTick?: number;
+  /** Callback to collapse the input area */
+  onCollapseInput?: () => void;
+  /** Whether there is a pending AI suggestion or needsContinue */
+  hasPendingAction?: boolean;
+  /** Callback when the pending action button is pressed */
+  onPendingActionPress?: () => void;
 }
 
 export const ScrollToBottomButton = React.memo(
@@ -77,6 +83,9 @@ export const ScrollToBottomButton = React.memo(
     bookmarkCount = 0,
     onBookmarksPress,
     scrollTick = 0,
+    onCollapseInput,
+    hasPendingAction,
+    onPendingActionPress,
   }: ScrollToBottomButtonProps) => {
     const { theme } = useUnistyles();
     const styles = stylesheet;
@@ -153,7 +162,9 @@ export const ScrollToBottomButton = React.memo(
       !shouldRenderScrollBtn &&
       !showNavButtons &&
       !showOptionsButton &&
-      !showBookmarkButton
+      !showBookmarkButton &&
+      !onCollapseInput &&
+      !hasPendingAction
     ) {
       return null;
     }
@@ -193,6 +204,12 @@ export const ScrollToBottomButton = React.memo(
                 <View style={styles.badge} />
               </View>
             )}
+            {hasPendingAction && onPendingActionPress && (
+              <View>
+                {renderButton("sparkles-outline", onPendingActionPress, 18)}
+                <View style={styles.badge} />
+              </View>
+            )}
             {showNavButtons && renderButton("arrow-up", onPrevUserMessage, 18)}
             {shouldRenderScrollBtn && (
               <Animated.View style={{ opacity: scrollBtnOpacity }}>
@@ -207,6 +224,8 @@ export const ScrollToBottomButton = React.memo(
                 <View style={styles.badge} />
               </View>
             )}
+            {onCollapseInput &&
+              renderButton("create-outline", onCollapseInput, 18)}
           </View>
         </View>
       </Animated.View>
