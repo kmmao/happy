@@ -64,7 +64,9 @@ ${chalk.bold("Examples:")}
 `);
 }
 
-async function parseWorktreeList(cwd: string): Promise<readonly WorktreeEntry[]> {
+async function parseWorktreeList(
+  cwd: string,
+): Promise<readonly WorktreeEntry[]> {
   const { stdout } = await execAsync("git worktree list --porcelain", {
     cwd,
     timeout: 10000,
@@ -117,9 +119,7 @@ async function handleWorktreeList(): Promise<void> {
 
   if (happyEntries.length === 0) {
     console.log(chalk.dim("No Happy-managed worktrees found."));
-    console.log(
-      chalk.dim("Use `happy worktree create` to create one."),
-    );
+    console.log(chalk.dim("Use `happy worktree create` to create one."));
     return;
   }
 
@@ -157,40 +157,42 @@ async function handleWorktreeCreate(repoPath?: string): Promise<void> {
   );
 
   try {
-    await execAsync(`git worktree add -b ${name} ${worktreePath}`, {
+    await execAsync(`git worktree add -b "${name}" "${worktreePath}"`, {
       cwd,
       timeout: 30000,
     });
   } catch (error) {
-    // Try with suffix if name collision
-    for (let i = 2; i <= 4; i++) {
-      const retryName = `${name}-${i}`;
-      const retryPath = `.dev/worktree/${retryName}`;
-      try {
-        await execAsync(`git worktree add -b ${retryName} ${retryPath}`, {
-          cwd,
-          timeout: 30000,
-        });
-        console.log(chalk.green(`Worktree created: ${retryName}`));
-        console.log(chalk.dim(`  Path: ${cwd}/${retryPath}`));
-        console.log(chalk.dim(`  Branch: ${retryName}`));
-        console.log(
-          chalk.dim(`  Parent: ${parentBranch.trim()}`),
-        );
-        console.log(
-          `\nTo start a session: ${chalk.cyan(`cd ${cwd}/${retryPath} && happy`)}`,
-        );
-        return;
-      } catch {
-        continue;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
+    // Only retry on name/path collision errors
+    const isCollision =
+      errorMsg.includes("already exists") ||
+      errorMsg.includes("is already checked out");
+
+    if (isCollision) {
+      for (let i = 2; i <= 4; i++) {
+        const retryName = `${name}-${i}`;
+        const retryPath = `.dev/worktree/${retryName}`;
+        try {
+          await execAsync(`git worktree add -b "${retryName}" "${retryPath}"`, {
+            cwd,
+            timeout: 30000,
+          });
+          console.log(chalk.green(`Worktree created: ${retryName}`));
+          console.log(chalk.dim(`  Path: ${cwd}/${retryPath}`));
+          console.log(chalk.dim(`  Branch: ${retryName}`));
+          console.log(chalk.dim(`  Parent: ${parentBranch.trim()}`));
+          console.log(
+            `\nTo start a session: ${chalk.cyan(`cd ${cwd}/${retryPath} && happy`)}`,
+          );
+          return;
+        } catch {
+          continue;
+        }
       }
     }
 
-    console.error(
-      chalk.red(
-        `Failed to create worktree: ${error instanceof Error ? error.message : "Unknown error"}`,
-      ),
-    );
+    console.error(chalk.red(`Failed to create worktree: ${errorMsg}`));
     process.exit(1);
   }
 
@@ -207,7 +209,9 @@ async function handleWorktreeRemove(name?: string): Promise<void> {
   if (!name) {
     console.error(chalk.red("Please specify the worktree name to remove."));
     console.error(chalk.dim("Usage: happy worktree remove <name>"));
-    console.error(chalk.dim("Use `happy worktree list` to see available worktrees."));
+    console.error(
+      chalk.dim("Use `happy worktree list` to see available worktrees."),
+    );
     process.exit(1);
   }
 
@@ -231,14 +235,13 @@ async function handleWorktreeRemove(name?: string): Promise<void> {
 
   // Remove the worktree
   try {
-    await execAsync(`git worktree remove ${worktreePath}`, {
+    await execAsync(`git worktree remove "${worktreePath}"`, {
       cwd,
       timeout: 30000,
     });
     console.log(chalk.green(`Worktree removed: ${name}`));
   } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
     if (errorMsg.includes("not a working tree")) {
       console.error(chalk.red(`Worktree '${name}' not found.`));
       console.error(
@@ -261,11 +264,10 @@ async function handleWorktreeRemove(name?: string): Promise<void> {
 
   // Try to delete the branch (safe delete — fails if not merged)
   try {
-    await execAsync(`git branch -d ${name}`, { cwd, timeout: 10000 });
+    await execAsync(`git branch -d "${name}"`, { cwd, timeout: 10000 });
     console.log(chalk.green(`Branch deleted: ${name}`));
   } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : "";
+    const errorMsg = error instanceof Error ? error.message : "";
     if (errorMsg.includes("not fully merged")) {
       console.log(
         chalk.yellow(

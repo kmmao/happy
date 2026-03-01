@@ -334,6 +334,9 @@ export async function runCodex(opts: {
    * Abort stops the current inference but keeps the session alive.
    * Kill terminates the entire process.
    */
+  // Guard flag to prevent double worktree cleanup (signal handler vs normal exit)
+  let worktreeCleanedUp = false;
+
   const handleKillSession = async () => {
     logger.debug("[Codex] Kill session requested - terminating process");
     await handleAbort();
@@ -351,7 +354,8 @@ export async function runCodex(opts: {
         }));
 
         // Cleanup worktree if applicable
-        if (metadata.worktree?.isWorktree) {
+        if (metadata.worktree?.isWorktree && !worktreeCleanedUp) {
+          worktreeCleanedUp = true;
           const cleanupResult = await cleanupWorktreeOnSessionEnd(
             metadata.worktree as WorktreeCleanupInput,
           );
@@ -848,7 +852,8 @@ export async function runCodex(opts: {
 
     try {
       // Cleanup worktree if applicable
-      if (metadata.worktree?.isWorktree) {
+      if (metadata.worktree?.isWorktree && !worktreeCleanedUp) {
+        worktreeCleanedUp = true;
         const cleanupResult = await cleanupWorktreeOnSessionEnd(
           metadata.worktree as WorktreeCleanupInput,
         );

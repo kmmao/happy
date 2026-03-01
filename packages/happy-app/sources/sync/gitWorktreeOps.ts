@@ -88,12 +88,12 @@ export async function getWorktreeDiff(
   readonly stats: DiffStats;
 }> {
   const statsResult = await sessionBash(sessionId, {
-    command: `git diff --stat ${parentBranch}...HEAD 2>&1`,
+    command: `git diff --stat "${parentBranch}"...HEAD 2>&1`,
     timeout: 15000,
   });
 
   const diffResult = await sessionBash(sessionId, {
-    command: `git diff ${parentBranch}...HEAD 2>&1`,
+    command: `git diff "${parentBranch}"...HEAD 2>&1`,
     timeout: 30000,
   });
 
@@ -130,7 +130,7 @@ export async function getWorktreeCommits(
   readonly commits: readonly CommitInfo[];
 }> {
   const result = await sessionBash(sessionId, {
-    command: `git log ${parentBranch}..HEAD --format="%H|%s|%an|%ad" --date=short 2>&1`,
+    command: `git log "${parentBranch}"..HEAD --format="%H|%s|%an|%ad" --date=short 2>&1`,
     timeout: 15000,
   });
 
@@ -185,7 +185,7 @@ export async function createPullRequest(
 
   // Push the branch
   const pushResult = await sessionBash(sessionId, {
-    command: `git push -u origin ${branchName} 2>&1`,
+    command: `git push -u origin "${branchName}" 2>&1`,
     timeout: 60000,
   });
 
@@ -223,6 +223,7 @@ export async function createPullRequest(
 
 /**
  * Direct merge: merge worktree branch into parent branch.
+ * Ensures parent repo is left in a clean state even on failure.
  */
 export async function directMerge(
   machineId: string,
@@ -230,19 +231,53 @@ export async function directMerge(
   parentBranch: string,
   repoPath: string,
 ): Promise<WorktreeOpResult> {
-  // Merge from the parent repo (not from inside the worktree)
+  // Step 1: Check for dirty working tree before attempting merge
+  const statusResult = await machineBash(
+    machineId,
+    `git status --porcelain 2>&1`,
+    repoPath,
+  );
+
+  if (statusResult.success && statusResult.stdout.trim()) {
+    return {
+      success: false,
+      error:
+        "Working tree has uncommitted changes. Please commit or stash them before merging.",
+    };
+  }
+
+  // Step 2: Ensure we're on the correct parent branch
+  const checkoutResult = await machineBash(
+    machineId,
+    `git checkout "${parentBranch}" 2>&1`,
+    repoPath,
+  );
+
+  if (!checkoutResult.success || checkoutResult.exitCode !== 0) {
+    const output = checkoutResult.stdout.trim() || checkoutResult.stderr.trim();
+    return {
+      success: false,
+      error: `Failed to checkout '${parentBranch}': ${output}`,
+    };
+  }
+
+  // Step 3: Perform the merge
   const result = await machineBash(
     machineId,
-    `git merge ${branchName} --no-ff -m "Merge worktree branch '${branchName}'" 2>&1`,
+    `git merge "${branchName}" --no-ff -m "Merge worktree branch '${branchName}'" 2>&1`,
     repoPath,
   );
 
   if (!result.success || result.exitCode !== 0) {
     const output = result.stdout.trim() || result.stderr.trim();
+
+    // Always abort a failed merge to leave repo in clean state
+    await machineBash(machineId, "git merge --abort 2>&1", repoPath);
+
     if (output.includes("CONFLICT")) {
       return {
         success: false,
-        error: `Merge conflicts detected. Please resolve them manually in ${repoPath}`,
+        error: `Merge conflicts detected between '${parentBranch}' and '${branchName}'. Merge was aborted.`,
       };
     }
     return {
