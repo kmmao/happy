@@ -12,6 +12,7 @@ import {
   Modal as RNModal,
 } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { layout } from "./layout";
 import { MultiTextInput, KeyPressEvent } from "./MultiTextInput";
 import { Typography } from "@/constants/Typography";
@@ -30,7 +31,11 @@ import { applySuggestion } from "./autocomplete/applySuggestion";
 import { GitStatusBadge, useHasMeaningfulGitStatus } from "./GitStatusBadge";
 import { useUserMessageHistory } from "@/hooks/useUserMessageHistory";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { useSetting, useSettingMutable } from "@/sync/storage";
+import {
+  useSetting,
+  useSettingMutable,
+  useLocalSettingMutable,
+} from "@/sync/storage";
 import { hackMode, hackModes } from "@/sync/modeHacks";
 import { Theme } from "@/theme";
 import { t } from "@/text";
@@ -137,6 +142,15 @@ interface AgentInputProps {
   needsContinue?: boolean;
   onContinuePress?: () => void;
 }
+
+const FAVORITE_CHIP_GRADIENTS: [string, string][] = [
+  ["#6366f1", "#8b5cf6"], // indigo → violet
+  ["#3b82f6", "#06b6d4"], // blue → cyan
+  ["#f59e0b", "#f97316"], // amber → orange
+  ["#10b981", "#14b8a6"], // emerald → teal
+  ["#ec4899", "#f43f5e"], // pink → rose
+  ["#8b5cf6", "#a855f7"], // violet → purple
+];
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
   container: {
@@ -459,39 +473,16 @@ const ContextProgressBar: React.FC<{
           }}
         />
       </View>
-      <View
+      <Text
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: 4,
+          fontSize: 10,
+          color: barColor,
+          textAlign: "right",
+          ...Typography.default(),
         }}
       >
-        <Text
-          style={{
-            fontSize: 10,
-            color: barColor,
-            ...Typography.default(),
-          }}
-        >
-          {label}
-        </Text>
-        <Pressable
-          onPress={() =>
-            Modal.alert(
-              t("agentInput.context.breakdownTitle"),
-              t("agentInput.context.breakdownMessage"),
-            )
-          }
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-        >
-          <Ionicons
-            name="help-circle-outline"
-            size={12}
-            color={theme.colors.textSecondary}
-          />
-        </Pressable>
-      </View>
+        {label}
+      </Text>
     </View>
   );
 };
@@ -668,7 +659,7 @@ export const AgentInput = React.memo(
     const [showSettings, setShowSettings] = React.useState(false);
     const [showQuickCommands, setShowQuickCommands] = React.useState(false);
 
-    // Favorite commands
+    // Favorite commands (synced Settings — for QuickCommandsPanel shell commands)
     const [favoriteCommands, setFavoriteCommands] =
       useSettingMutable("favoriteCommands");
     const handleToggleFavorite = React.useCallback(
@@ -681,6 +672,9 @@ export const AgentInput = React.memo(
       },
       [favoriteCommands, setFavoriteCommands],
     );
+
+    // Favorite slash commands (local — for quick chips above input)
+    const [favoriteSlashCommands] = useLocalSettingMutable("favoriteCommands");
 
     // Handle settings button press
     const handleSettingsPress = React.useCallback(() => {
@@ -1768,7 +1762,7 @@ export const AgentInput = React.memo(
           {/* Box 2: Action Area (Input + Send) */}
           <View style={[styles.unifiedPanel, { position: "relative" }]}>
             {/* Context progress bar */}
-            {props.usageData?.contextSize ? (
+            {props.usageData ? (
               <ContextProgressBar
                 contextSize={props.usageData.contextSize}
                 alwaysShow={props.alwaysShowContextSize ?? false}
@@ -1922,6 +1916,62 @@ export const AgentInput = React.memo(
                 )}
               </Pressable>
             </RNModal>
+
+            {/* Favorite slash command chips */}
+            {favoriteSlashCommands.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{
+                  paddingHorizontal: 8,
+                  paddingTop: 6,
+                  paddingBottom: 2,
+                  gap: 6,
+                }}
+              >
+                {favoriteSlashCommands.map((cmd, index) => (
+                  <Pressable
+                    key={cmd}
+                    onPress={() => {
+                      hapticsLight();
+                      props.onCommandSelect?.(cmd);
+                    }}
+                    style={({ pressed }) => ({
+                      borderRadius: 16,
+                      overflow: "hidden",
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <LinearGradient
+                      colors={
+                        FAVORITE_CHIP_GRADIENTS[
+                          index % FAVORITE_CHIP_GRADIENTS.length
+                        ]
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 16,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "#fff",
+                          ...Typography.default("semiBold"),
+                        }}
+                        numberOfLines={1}
+                      >
+                        /{cmd}
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
 
             {/* Continue chip — shown when max turns reached and no prompt suggestion */}
             {props.needsContinue &&

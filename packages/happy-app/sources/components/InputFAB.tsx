@@ -255,7 +255,7 @@ const CompactStatus = React.memo(function CompactStatus({
   const percentageUsed = Math.min(100, (contextSize / contextWindowSize) * 100);
   const percentageRemaining = Math.max(0, 100 - percentageUsed);
   const shouldShowContext =
-    contextSize > 0 && (info.alwaysShowContext || percentageRemaining <= 10);
+    info.alwaysShowContext || (contextSize > 0 && percentageRemaining <= 10);
 
   const barColor =
     percentageRemaining <= 5

@@ -80,17 +80,23 @@ export const CommandListPopover = React.memo(
 
     const { favoriteItems, otherItems } = React.useMemo(() => {
       const favSet = new Set(favorites);
-      const favItems: CommandItem[] = [];
-      const others: CommandItem[] = [];
-      for (const cmd of filteredCommands) {
-        if (favSet.has(cmd.command)) {
-          favItems.push(cmd);
-        } else {
-          others.push(cmd);
-        }
-      }
+      const commandMap = new Map(
+        filteredCommands.map((cmd) => [cmd.command, cmd]),
+      );
+      // Always show favorites, even if not in current session's command list
+      const favItems: CommandItem[] = favorites
+        .map(
+          (fav) =>
+            commandMap.get(fav) ?? { command: fav, description: undefined },
+        )
+        .filter((cmd) =>
+          query.trim()
+            ? cmd.command.toLowerCase().includes(query.trim().toLowerCase())
+            : true,
+        );
+      const others = filteredCommands.filter((cmd) => !favSet.has(cmd.command));
       return { favoriteItems: favItems, otherItems: others };
-    }, [filteredCommands, favorites]);
+    }, [filteredCommands, favorites, query]);
 
     const toggleFavorite = React.useCallback(
       (command: string) => {
