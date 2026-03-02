@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View } from "react-native";
+import { View, ScrollView } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import {
   KANBAN_COLUMNS,
@@ -56,7 +56,12 @@ export const KanbanBoardView = React.memo(
           columnCounts={columnCounts}
           onAddTask={onAddTask}
         />
-        <View style={styles.columnsRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.columnsRow}
+          style={styles.scrollView}
+        >
           {KANBAN_COLUMNS.map((col) => (
             <KanbanBoardColumn
               key={col}
@@ -66,7 +71,7 @@ export const KanbanBoardView = React.memo(
               onTaskLongPress={onTaskLongPress}
             />
           ))}
-        </View>
+        </ScrollView>
       </View>
     );
   },
@@ -77,10 +82,12 @@ const styles = StyleSheet.create(() => ({
     width: "100%",
     alignSelf: "stretch",
   },
-  columnsRow: {
+  scrollView: {
     flex: 1,
+  },
+  columnsRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 16,
     paddingTop: 4,
     paddingBottom: 16,

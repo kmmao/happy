@@ -31,19 +31,25 @@ export const KanbanBoardColumn = React.memo(
 
     return (
       <View
-        style={[styles.columnBorder, { borderColor: theme.colors.divider }]}
+        style={[
+          styles.columnOuter,
+          {
+            backgroundColor: theme.colors.surface,
+            shadowColor: theme.colors.shadow.color,
+            shadowOpacity: theme.colors.shadow.opacity,
+          },
+        ]}
       >
         <View
-          style={[
-            styles.columnInner,
-            { backgroundColor: theme.colors.surface },
-          ]}
+          style={[styles.columnInner, { backgroundColor: `${columnColor}0A` }]}
         >
           {/* Colored top border */}
           <View style={[styles.colorBar, { backgroundColor: columnColor }]} />
 
           {/* Header */}
-          <View style={styles.header}>
+          <View
+            style={[styles.header, { backgroundColor: `${columnColor}14` }]}
+          >
             <Text
               style={[styles.headerTitle, { color: theme.colors.text }]}
               numberOfLines={1}
@@ -82,18 +88,21 @@ export const KanbanBoardColumn = React.memo(
 );
 
 const styles = StyleSheet.create(() => ({
-  columnBorder: {
+  columnOuter: {
     flex: 1,
+    minWidth: 160,
     borderRadius: 12,
-    borderWidth: 1,
+    shadowOffset: { width: 0, height: 0.33 },
+    shadowRadius: 0,
+    elevation: 1,
   },
   columnInner: {
     flex: 1,
-    borderRadius: 11,
+    borderRadius: 12,
     overflow: "hidden",
   },
   colorBar: {
-    height: 3,
+    height: 4,
   },
   header: {
     flexDirection: "row",

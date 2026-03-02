@@ -348,6 +348,7 @@ export default function RootLayout() {
         name="kanban/task/new"
         options={{
           headerShown: false,
+          presentation: "formSheet",
         }}
       />
       <Stack.Screen

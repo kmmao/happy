@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Pressable, ActivityIndicator } from "react-native";
+import { View, Pressable, ActivityIndicator, Platform } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { useRouter } from "expo-router";
@@ -28,6 +28,7 @@ import { KanbanTaskCard } from "./KanbanTaskCard";
 import { KanbanStatsBar } from "./KanbanStatsBar";
 import { KanbanBoardView } from "./KanbanBoardView";
 import { KanbanTaskActionSheet } from "./KanbanTaskActionSheet";
+import { NewKanbanTaskSheet } from "./NewKanbanTaskSheet";
 import { useIsBoardLayout } from "@/hooks/useIsBoardLayout";
 import { Modal } from "@/modal";
 
@@ -129,7 +130,11 @@ export const KanbanViewWrapper = React.memo(() => {
   );
 
   const handleAddTask = React.useCallback(() => {
-    router.push("/kanban/task/new");
+    if (Platform.OS === "web") {
+      Modal.show({ component: NewKanbanTaskSheet });
+    } else {
+      router.push("/kanban/task/new");
+    }
   }, [router]);
 
   const handleTaskLongPress = React.useCallback((taskId: string) => {
@@ -207,6 +212,7 @@ export const KanbanViewWrapper = React.memo(() => {
           totalTasks={totalCount}
           activeSessionCount={activeSessionCount}
           columnCounts={counts}
+          onAddTask={handleAddTask}
         />
         <KanbanColumnSelector
           activeColumn={activeColumn}

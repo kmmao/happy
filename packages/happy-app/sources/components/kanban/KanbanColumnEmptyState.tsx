@@ -41,25 +41,24 @@ export const KanbanColumnEmptyState = React.memo(
 
 const styles = StyleSheet.create(() => ({
   container: {
-    flex: 1,
     alignItems: "center",
-    justifyContent: "center",
+    paddingTop: 32,
     paddingHorizontal: 12,
   },
   icon: {
-    marginBottom: 6,
-    opacity: 0.5,
+    marginBottom: 4,
+    opacity: 0.4,
   },
   title: {
-    fontSize: 12,
+    fontSize: 11,
     textAlign: "center",
     ...Typography.default("semiBold"),
   },
   subtitle: {
-    fontSize: 11,
+    fontSize: 10,
     textAlign: "center",
     marginTop: 2,
-    opacity: 0.6,
+    opacity: 0.5,
     ...Typography.default(),
   },
 }));
