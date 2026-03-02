@@ -12,7 +12,7 @@ describe("resolveMessageModeMeta", () => {
     expect(meta).toEqual({
       permissionMode: "read-only",
       model: "gpt-5-high",
-      thinking: null,
+      thinking: { type: "adaptive" },
       effort: null,
       maxBudgetUsd: null,
     });
@@ -30,7 +30,7 @@ describe("resolveMessageModeMeta", () => {
     expect(meta).toEqual({
       permissionMode: "bypassPermissions",
       model: null,
-      thinking: null,
+      thinking: { type: "adaptive" },
       effort: null,
       maxBudgetUsd: null,
     });
@@ -48,7 +48,7 @@ describe("resolveMessageModeMeta", () => {
     expect(meta).toEqual({
       permissionMode: "default",
       model: null,
-      thinking: null,
+      thinking: { type: "adaptive" },
       effort: null,
       maxBudgetUsd: null,
     });

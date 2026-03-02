@@ -53,12 +53,14 @@ export function resolveMessageModeMeta(
       : rawModel;
 
   // Resolve thinking configuration
+  // Default to "adaptive" when not set, matching native Claude Code behavior
   const thinkingMode = session.thinkingMode;
+  const effectiveThinkingMode = thinkingMode ?? "adaptive";
   const thinking =
-    thinkingMode && thinkingMode !== "disabled"
+    effectiveThinkingMode !== "disabled"
       ? {
-          type: thinkingMode as "adaptive" | "enabled",
-          ...(thinkingMode === "enabled" && session.thinkingBudget
+          type: effectiveThinkingMode as "adaptive" | "enabled",
+          ...(effectiveThinkingMode === "enabled" && session.thinkingBudget
             ? { budgetTokens: session.thinkingBudget }
             : {}),
         }

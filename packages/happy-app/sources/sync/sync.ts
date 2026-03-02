@@ -552,6 +552,7 @@ class Sync {
 
     const { permissionMode, model, thinking, effort, maxBudgetUsd } =
       resolveMessageModeMeta(session);
+
     const autoApprovePlan =
       storage.getState().settings.autoApprovePlan || false;
 
