@@ -19,6 +19,9 @@ export { MAX_IMAGES } from "@/utils/imageUpload.shared";
 export type { MultiImageUploadResult } from "@/utils/imageUpload.shared";
 export { uploadImage as uploadBase64Image } from "@/utils/imageUpload.shared";
 
+// Progressive quality steps: start high, fall back if result exceeds size limit.
+const QUALITY_STEPS = [JPEG_QUALITY, 0.6, 0.4];
+
 /** Convert a Blob (from clipboard) to resized JPEG base64 string (without data URI prefix). */
 export async function blobToResizedBase64(blob: Blob): Promise<string> {
   let bitmap: ImageBitmap;
@@ -40,8 +43,6 @@ export async function blobToResizedBase64(blob: Blob): Promise<string> {
       targetH = Math.round(height * scale);
     }
 
-    let base64: string;
-
     // Use OffscreenCanvas to avoid blocking the main thread (supported in most modern browsers)
     if (typeof OffscreenCanvas !== "undefined") {
       const offscreen = new OffscreenCanvas(targetW, targetH);
@@ -50,14 +51,24 @@ export async function blobToResizedBase64(blob: Blob): Promise<string> {
         throw new HappyError("Failed to create canvas context", false);
       }
       ctx.drawImage(bitmap, 0, 0, targetW, targetH);
-      const outputBlob = await offscreen.convertToBlob({
-        type: "image/jpeg",
-        quality: JPEG_QUALITY,
-      });
-      const buffer = await outputBlob.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      // Use shared chunked encoder to avoid O(n^2) string concatenation
-      base64 = encodeBase64(bytes);
+
+      // Try progressively lower quality until result fits within size limit
+      for (const quality of QUALITY_STEPS) {
+        const outputBlob = await offscreen.convertToBlob({
+          type: "image/jpeg",
+          quality,
+        });
+        const buffer = await outputBlob.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        // Use shared chunked encoder to avoid O(n^2) string concatenation
+        const base64 = encodeBase64(bytes);
+        if (base64.length <= MAX_BASE64_SIZE) {
+          if (!isValidImageBase64(base64)) {
+            throw new HappyError("Invalid image format", false);
+          }
+          return base64;
+        }
+      }
     } else {
       // Fallback: main-thread canvas for older browsers
       const canvas = document.createElement("canvas");
@@ -68,26 +79,29 @@ export async function blobToResizedBase64(blob: Blob): Promise<string> {
         throw new HappyError("Failed to create canvas context", false);
       }
       ctx.drawImage(bitmap, 0, 0, targetW, targetH);
-      const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
-      // Release canvas pixel buffer immediately (4MB for 1024x1024 RGBA)
+
+      for (const quality of QUALITY_STEPS) {
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        const parts = dataUrl.split(",");
+        if (parts.length < 2) {
+          throw new HappyError("Failed to encode image", false);
+        }
+        const base64 = parts[1];
+        if (base64.length <= MAX_BASE64_SIZE) {
+          // Release canvas pixel buffer
+          canvas.width = 0;
+          canvas.height = 0;
+          if (!isValidImageBase64(base64)) {
+            throw new HappyError("Invalid image format", false);
+          }
+          return base64;
+        }
+      }
       canvas.width = 0;
       canvas.height = 0;
-      const parts = dataUrl.split(",");
-      if (parts.length < 2) {
-        throw new HappyError("Failed to encode image", false);
-      }
-      base64 = parts[1];
     }
 
-    if (base64.length > MAX_BASE64_SIZE) {
-      throw new HappyError("Image is too large to send", false);
-    }
-
-    if (!isValidImageBase64(base64)) {
-      throw new HappyError("Invalid image format", false);
-    }
-
-    return base64;
+    throw new HappyError("Image is too large to send", false);
   } finally {
     bitmap.close();
   }

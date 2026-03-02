@@ -20,6 +20,9 @@ export { MAX_IMAGES } from "@/utils/imageUpload.shared";
 export type { MultiImageUploadResult } from "@/utils/imageUpload.shared";
 export { uploadImage as uploadBase64Image } from "@/utils/imageUpload.shared";
 
+// Progressive quality steps: start high, fall back if result exceeds size limit.
+const QUALITY_STEPS = [JPEG_QUALITY, 0.6, 0.4];
+
 /** Resize image URI via expo-image-manipulator, return JPEG base64 */
 async function resizeAndEncode(
   uri: string,
@@ -37,25 +40,29 @@ async function resizeAndEncode(
   }
 
   const ref = await context.renderAsync();
-  const result = await ref.saveAsync({
-    base64: true,
-    compress: JPEG_QUALITY,
-    format: SaveFormat.JPEG,
-  });
 
-  if (!result.base64) {
-    throw new HappyError("Failed to process image", false);
+  // Try progressively lower quality until result fits within size limit
+  for (const quality of QUALITY_STEPS) {
+    const result = await ref.saveAsync({
+      base64: true,
+      compress: quality,
+      format: SaveFormat.JPEG,
+    });
+
+    if (!result.base64) {
+      throw new HappyError("Failed to process image", false);
+    }
+
+    if (!isValidImageBase64(result.base64)) {
+      throw new HappyError("Invalid image format", false);
+    }
+
+    if (result.base64.length <= MAX_BASE64_SIZE) {
+      return result.base64;
+    }
   }
 
-  if (!isValidImageBase64(result.base64)) {
-    throw new HappyError("Invalid image format", false);
-  }
-
-  if (result.base64.length > MAX_BASE64_SIZE) {
-    throw new HappyError("Image is too large to send", false);
-  }
-
-  return result.base64;
+  throw new HappyError("Image is too large to send", false);
 }
 
 /** Pick multiple images from gallery and return base64 data (no upload). Returns null if canceled. */
@@ -67,7 +74,7 @@ export async function pickImagesAsBase64(
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
-    quality: JPEG_QUALITY,
+    quality: 1, // Get lossless from picker; resizeAndEncode does the single JPEG compression
     allowsMultipleSelection: true,
     selectionLimit: remaining,
   });
@@ -102,7 +109,7 @@ export async function pickAndUploadImages(
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
-    quality: JPEG_QUALITY,
+    quality: 1, // Get lossless from picker; resizeAndEncode does the single JPEG compression
     allowsMultipleSelection: true,
     selectionLimit: remaining,
   });

@@ -60,3 +60,4 @@ __pycache__/
 
 # Service output/artifacts
 services/*/output/
+.history/

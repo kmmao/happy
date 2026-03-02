@@ -19,9 +19,9 @@ export type MultiImageUploadResult = {
   failedCount: number;
 };
 
-export const MAX_DIMENSION = 1024;
-export const JPEG_QUALITY = 0.7;
-export const MAX_BASE64_SIZE = 400_000; // 400KB — safe after encryption re-encoding (~533KB) stays well under Socket.IO 1MB limit
+export const MAX_DIMENSION = 2048;
+export const JPEG_QUALITY = 0.85;
+export const MAX_BASE64_SIZE = 650_000; // 650KB — after encryption re-encoding (~865KB) stays under Socket.IO 1MB default
 
 /** Per-session cache of the CLI's upload directory. Evicts when session disappears. */
 const uploadDirCache = new Map<string, string>();
