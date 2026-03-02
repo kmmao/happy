@@ -25,7 +25,6 @@ import {
 } from "@/sync/kanbanTypes";
 import { KanbanColumnSelector } from "./KanbanColumnSelector";
 import { KanbanTaskCard } from "./KanbanTaskCard";
-import { KanbanEmptyState } from "./KanbanEmptyState";
 import { KanbanStatsBar } from "./KanbanStatsBar";
 import { KanbanBoardView } from "./KanbanBoardView";
 import { KanbanTaskActionSheet } from "./KanbanTaskActionSheet";
@@ -129,6 +128,10 @@ export const KanbanViewWrapper = React.memo(() => {
     [router],
   );
 
+  const handleAddTask = React.useCallback(() => {
+    router.push("/kanban/task/new");
+  }, [router]);
+
   const handleTaskLongPress = React.useCallback((taskId: string) => {
     const task = kanbanStore.getState().tasks[taskId];
     if (!task) return;
@@ -168,11 +171,7 @@ export const KanbanViewWrapper = React.memo(() => {
     );
   }
 
-  // Empty board (no tasks at all)
   const totalCount = allTasks.length;
-  if (totalCount === 0) {
-    return <KanbanEmptyState />;
-  }
 
   // Board layout for wide screens (web, tablet, Mac)
   if (isBoardLayout) {
@@ -189,6 +188,7 @@ export const KanbanViewWrapper = React.memo(() => {
           activeSessionCount={activeSessionCount}
           onTaskPress={handleTaskPress}
           onTaskLongPress={handleTaskLongPress}
+          onAddTask={handleAddTask}
         />
       </View>
     );
@@ -206,6 +206,7 @@ export const KanbanViewWrapper = React.memo(() => {
         <KanbanStatsBar
           totalTasks={totalCount}
           activeSessionCount={activeSessionCount}
+          columnCounts={counts}
         />
         <KanbanColumnSelector
           activeColumn={activeColumn}

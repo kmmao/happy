@@ -1,11 +1,11 @@
 import * as React from "react";
 import { View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { layout } from "@/components/layout";
 import {
   KANBAN_COLUMNS,
   type KanbanTask,
   tasksForColumn,
+  taskCountByColumn,
 } from "@/sync/kanbanTypes";
 import { KanbanStatsBar } from "./KanbanStatsBar";
 import { KanbanBoardColumn } from "./KanbanBoardColumn";
@@ -16,6 +16,7 @@ interface KanbanBoardViewProps {
   readonly activeSessionCount: number;
   readonly onTaskPress: (taskId: string) => void;
   readonly onTaskLongPress: (taskId: string) => void;
+  readonly onAddTask: () => void;
 }
 
 export const KanbanBoardView = React.memo(
@@ -25,6 +26,7 @@ export const KanbanBoardView = React.memo(
     activeSessionCount,
     onTaskPress,
     onTaskLongPress,
+    onAddTask,
   }: KanbanBoardViewProps) => {
     const { theme } = useUnistyles();
 
@@ -36,6 +38,11 @@ export const KanbanBoardView = React.memo(
       return map;
     }, [allTasks]);
 
+    const columnCounts = React.useMemo(
+      () => taskCountByColumn(allTasks),
+      [allTasks],
+    );
+
     return (
       <View
         style={[
@@ -46,6 +53,8 @@ export const KanbanBoardView = React.memo(
         <KanbanStatsBar
           totalTasks={totalCount}
           activeSessionCount={activeSessionCount}
+          columnCounts={columnCounts}
+          onAddTask={onAddTask}
         />
         <View style={styles.columnsRow}>
           {KANBAN_COLUMNS.map((col) => (
@@ -65,16 +74,15 @@ export const KanbanBoardView = React.memo(
 
 const styles = StyleSheet.create(() => ({
   container: {
-    flex: 1,
-    maxWidth: layout.maxWidth === Infinity ? 1400 : layout.maxWidth,
     width: "100%",
-    alignSelf: "center",
+    alignSelf: "stretch",
   },
   columnsRow: {
     flex: 1,
     flexDirection: "row",
     gap: 8,
-    paddingHorizontal: 8,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 16,
   },
 }));

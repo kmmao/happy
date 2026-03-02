@@ -1518,6 +1518,16 @@ function NewSessionWizard() {
           }
         }
 
+        // Mark input as expanded for the new session so it doesn't collapse on entry
+        const expandedSessions =
+          storage.getState().localSettings.inputExpandedSessions ?? {};
+        storage.getState().applyLocalSettings({
+          inputExpandedSessions: {
+            ...expandedSessions,
+            [result.sessionId]: true,
+          },
+        });
+
         router.replace(`/session/${result.sessionId}`, {
           dangerouslySingular() {
             return "session";

@@ -38,7 +38,10 @@ export const KanbanTaskCard = React.memo(
         style={({ pressed }) => [
           styles.card,
           compact && styles.cardCompact,
-          { backgroundColor: theme.colors.surface },
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.divider,
+          },
           pressed && { opacity: 0.7 },
         ]}
       >
@@ -136,6 +139,7 @@ const styles = StyleSheet.create((theme) => ({
     marginHorizontal: 16,
     marginVertical: 4,
     borderRadius: 12,
+    borderWidth: 1,
     padding: 14,
     gap: 8,
   },
@@ -198,7 +202,7 @@ const styles = StyleSheet.create((theme) => ({
     ...Typography.default(),
   },
   cardCompact: {
-    marginHorizontal: 6,
+    marginHorizontal: 4,
     padding: 10,
     gap: 6,
   },
