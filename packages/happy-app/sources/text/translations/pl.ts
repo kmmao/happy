@@ -270,6 +270,8 @@ export const pl: TranslationStructure = {
     sttCorrection: "Korekta transkrypcji głosowej",
     sttCorrectionEnabled: "AI koryguje błędy rozpoznawania mowy",
     sttCorrectionDisabled: "Używanie surowego wyniku rozpoznawania mowy",
+    showProjectTab: "Karta projektu",
+    showProjectTabSubtitle: "Pokaż kartę projektu (kanban) na pasku kart",
   },
 
   errors: {

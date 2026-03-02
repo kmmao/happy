@@ -139,6 +139,7 @@ describe("settings", () => {
         showAgentActivity: false,
         autoApprovePlan: false,
         sttCorrection: false,
+        showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: Partial<Settings> = {
@@ -184,6 +185,7 @@ describe("settings", () => {
         showAgentActivity: false,
         autoApprovePlan: false,
         sttCorrection: false,
+        showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       });
     });
@@ -229,6 +231,7 @@ describe("settings", () => {
         showAgentActivity: false,
         autoApprovePlan: false,
         sttCorrection: false,
+        showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: Partial<Settings> = {};
@@ -276,6 +279,7 @@ describe("settings", () => {
         showAgentActivity: false,
         autoApprovePlan: false,
         sttCorrection: false,
+        showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: Partial<Settings> = {
@@ -328,6 +332,7 @@ describe("settings", () => {
         showAgentActivity: false,
         autoApprovePlan: false,
         sttCorrection: false,
+        showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       expect(applySettings(currentSettings, {})).toEqual(currentSettings);
@@ -389,6 +394,7 @@ describe("settings", () => {
         showAgentActivity: false,
         autoApprovePlan: false,
         sttCorrection: false,
+        showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
       const delta: any = {
@@ -461,6 +467,7 @@ describe("settings", () => {
         showAgentActivity: false,
         autoApprovePlan: false,
         sttCorrection: false,
+        showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
         useEnhancedSessionWizard: false,
       });

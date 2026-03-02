@@ -260,6 +260,9 @@ export const ca: TranslationStructure = {
     sttCorrection: "Correcció de transcripció de veu",
     sttCorrectionEnabled: "La IA corregeix errors de reconeixement de veu",
     sttCorrectionDisabled: "Usant el resultat brut del reconeixement de veu",
+    showProjectTab: "Pestanya de projecte",
+    showProjectTabSubtitle:
+      "Mostra la pestanya de projecte (kanban) a la barra de pestanyes",
   },
 
   errors: {

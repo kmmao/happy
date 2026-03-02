@@ -261,6 +261,9 @@ export const es: TranslationStructure = {
     sttCorrectionEnabled: "IA corrige errores de reconocimiento de voz",
     sttCorrectionDisabled:
       "Usando resultado de reconocimiento de voz sin procesar",
+    showProjectTab: "Pestaña de proyecto",
+    showProjectTabSubtitle:
+      "Mostrar la pestaña de proyecto (kanban) en la barra de pestañas",
   },
 
   errors: {

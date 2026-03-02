@@ -246,6 +246,8 @@ export const zhHans: TranslationStructure = {
     sttCorrection: "语音转写纠错",
     sttCorrectionEnabled: "AI 自动纠正语音识别错误",
     sttCorrectionDisabled: "使用原始语音识别结果",
+    showProjectTab: "项目标签页",
+    showProjectTabSubtitle: "在标签栏中显示项目（看板）标签页",
   },
 
   errors: {

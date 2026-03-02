@@ -324,6 +324,9 @@ export const it: TranslationStructure = {
     sttCorrection: "Correzione trascrizione vocale",
     sttCorrectionEnabled: "L'IA corregge gli errori di riconoscimento vocale",
     sttCorrectionDisabled: "Uso del risultato grezzo del riconoscimento vocale",
+    showProjectTab: "Scheda progetto",
+    showProjectTabSubtitle:
+      "Mostra la scheda progetto (kanban) nella barra delle schede",
   },
 
   errors: {

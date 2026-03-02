@@ -24,6 +24,8 @@ export default function FeaturesSettingsScreen() {
   const [autoApprovePlan, setAutoApprovePlan] =
     useSettingMutable("autoApprovePlan");
   const [sttCorrection, setSttCorrection] = useSettingMutable("sttCorrection");
+  const [showProjectTab, setShowProjectTab] =
+    useSettingMutable("showProjectTab");
 
   return (
     <ItemList style={{ paddingTop: 0 }}>
@@ -97,6 +99,15 @@ export default function FeaturesSettingsScreen() {
               value={autoApprovePlan}
               onValueChange={setAutoApprovePlan}
             />
+          }
+          showChevron={false}
+        />
+        <Item
+          title={t("settingsFeatures.showProjectTab")}
+          subtitle={t("settingsFeatures.showProjectTabSubtitle")}
+          icon={<Ionicons name="folder-outline" size={29} color="#3B82F6" />}
+          rightElement={
+            <Switch value={showProjectTab} onValueChange={setShowProjectTab} />
           }
           showChevron={false}
         />

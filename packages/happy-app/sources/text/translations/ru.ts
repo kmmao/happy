@@ -242,6 +242,9 @@ export const ru: TranslationStructure = {
     sttCorrectionEnabled: "ИИ исправляет ошибки распознавания речи",
     sttCorrectionDisabled:
       "Используется необработанный результат распознавания",
+    showProjectTab: "Вкладка проекта",
+    showProjectTabSubtitle:
+      "Показывать вкладку проекта (канбан) в панели вкладок",
   },
 
   errors: {

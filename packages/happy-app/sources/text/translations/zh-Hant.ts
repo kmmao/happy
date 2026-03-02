@@ -246,6 +246,8 @@ export const zhHant: TranslationStructure = {
     sttCorrection: "語音轉寫糾錯",
     sttCorrectionEnabled: "AI 自動糾正語音辨識錯誤",
     sttCorrectionDisabled: "使用原始語音辨識結果",
+    showProjectTab: "專案標籤頁",
+    showProjectTabSubtitle: "在標籤列中顯示專案（看板）標籤頁",
   },
 
   errors: {

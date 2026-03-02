@@ -483,6 +483,9 @@ export const SettingsSchema = z.object({
     .array(z.string())
     .describe("User-defined favorite shell commands for quick access"),
   // Dismissed CLI warning banners (supports both per-machine and global dismissal)
+  showProjectTab: z
+    .boolean()
+    .describe("Whether to show the project (kanban) tab in the tab bar"),
   dismissedCLIWarnings: z
     .object({
       perMachine: z
@@ -572,6 +575,8 @@ export const settingsDefaults: Settings = {
   favoriteMachines: [],
   // Favorite commands (empty by default)
   favoriteCommands: [],
+  // Project tab visibility (hidden by default)
+  showProjectTab: false,
   // Dismissed CLI warnings (empty by default)
   dismissedCLIWarnings: { perMachine: {}, global: {} },
 };

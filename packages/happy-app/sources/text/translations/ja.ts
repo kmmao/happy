@@ -315,6 +315,8 @@ export const ja: TranslationStructure = {
     sttCorrection: "音声認識の補正",
     sttCorrectionEnabled: "AIが音声認識のエラーを自動補正",
     sttCorrectionDisabled: "音声認識の結果をそのまま使用",
+    showProjectTab: "プロジェクトタブ",
+    showProjectTabSubtitle: "タブバーにプロジェクト（カンバン）タブを表示",
   },
 
   errors: {
