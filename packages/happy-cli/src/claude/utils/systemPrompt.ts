@@ -34,10 +34,10 @@ const CO_AUTHORED_CREDITS = (() =>
     <main commit message>
 
     Generated with [Claude Code](https://claude.ai/code)
-    via [Happy](https://happy.engineering)
+    via [Sangreal](https://sangreal.cc)
 
     Co-Authored-By: Claude <noreply@anthropic.com>
-    Co-Authored-By: Happy <yesreply@happy.engineering>
+    Co-Authored-By: Sangreal <noreply@sangreal.cc>
 `))();
 
 /**
