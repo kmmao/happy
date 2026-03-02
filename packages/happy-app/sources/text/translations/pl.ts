@@ -1489,11 +1489,53 @@ export const pl: TranslationStructure = {
       review: "Przegląd",
       done: "Gotowe",
     },
+    columnEmpty: {
+      backlog: {
+        title: "Brak zaległości",
+        subtitle: "Zadania oczekujące na planowanie pojawią się tutaj",
+      },
+      todo: {
+        title: "Nic do zrobienia",
+        subtitle: "Dodaj zadania gotowe do pracy",
+      },
+      inProgress: {
+        title: "Nic w toku",
+        subtitle: "Przenieś zadania tutaj, gdy zaczniesz pracę",
+      },
+      review: {
+        title: "Nic do przeglądu",
+        subtitle: "Zadania oczekujące na przegląd pojawią się tutaj",
+      },
+      done: {
+        title: "Brak ukończonych zadań",
+        subtitle: "Ukończone zadania będą wyświetlane tutaj",
+      },
+    },
     priority: {
       low: "Niski",
       medium: "Średni",
       high: "Wysoki",
       urgent: "Pilny",
+    },
+    templates: {
+      pickTitle: "Wybierz szablon",
+      useTemplate: "Użyj szablonu",
+      manage: "Zarządzaj szablonami",
+      title: "Szablony promptów",
+      newTemplate: "Nowy szablon",
+      editing: "Edytuj szablon",
+      namePlaceholder: "Nazwa szablonu",
+      contentPlaceholder:
+        "Treść szablonu...\nUżyj {{title}}, {{description}}, {{directory}}, {{tags}} jako zmiennych",
+      deleteTitle: "Usuń szablon",
+      deleteMessage: "Czy na pewno chcesz usunąć ten szablon?",
+      builtInBadge: "Wbudowany",
+      empty: "Brak szablonów",
+      builtIn: {
+        coding: "Rozwój kodu",
+        bugfix: "Naprawa błędów",
+        review: "Przegląd kodu",
+      },
     },
   },
 

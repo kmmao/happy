@@ -6,12 +6,9 @@
  * constant across light/dark modes for consistent badge/dot semantics.
  */
 
-import type { KanbanPriority } from "@/sync/kanbanTypes";
+import type { KanbanPriority, KanbanColumnId } from "@/sync/kanbanTypes";
 import type { IdeationPriority, IdeationCategory } from "@/sync/ideationTypes";
-import type {
-  RoadmapFeatureStatus,
-  RoadmapMoscow,
-} from "@/sync/roadmapTypes";
+import type { RoadmapFeatureStatus, RoadmapMoscow } from "@/sync/roadmapTypes";
 
 // Shared priority colors (kanban + ideation)
 export const PRIORITY_COLORS: Record<
@@ -52,6 +49,15 @@ export const MOSCOW_COLORS: Record<RoadmapMoscow, string> = {
 
 // "Converted" status color (ideation)
 export const CONVERTED_COLOR = "#10B981";
+
+// Kanban column accent colors (header borders and badges)
+export const KANBAN_COLUMN_COLORS: Record<KanbanColumnId, string> = {
+  backlog: "#6B7280",
+  todo: "#3B82F6",
+  in_progress: "#F59E0B",
+  review: "#8B5CF6",
+  done: "#10B981",
+};
 
 // Active session indicator color
 export const ACTIVE_SESSION_COLOR = "#34C759";

@@ -27,6 +27,33 @@ export const KANBAN_COLUMN_LABELS = {
   done: "kanban.columns.done",
 } as const;
 
+/** Ionicons icon names per column, used in action sheets and board empty states */
+export const KANBAN_COLUMN_ICONS = {
+  backlog: "file-tray-outline",
+  todo: "list-outline",
+  in_progress: "play-circle-outline",
+  review: "eye-outline",
+  done: "checkmark-circle-outline",
+} as const;
+
+/** Per-column empty state i18n title keys */
+export const KANBAN_COLUMN_EMPTY_TITLES = {
+  backlog: "kanban.columnEmpty.backlog.title",
+  todo: "kanban.columnEmpty.todo.title",
+  in_progress: "kanban.columnEmpty.inProgress.title",
+  review: "kanban.columnEmpty.review.title",
+  done: "kanban.columnEmpty.done.title",
+} as const;
+
+/** Per-column empty state i18n subtitle keys */
+export const KANBAN_COLUMN_EMPTY_SUBTITLES = {
+  backlog: "kanban.columnEmpty.backlog.subtitle",
+  todo: "kanban.columnEmpty.todo.subtitle",
+  in_progress: "kanban.columnEmpty.inProgress.subtitle",
+  review: "kanban.columnEmpty.review.subtitle",
+  done: "kanban.columnEmpty.done.subtitle",
+} as const;
+
 //
 // Priority definitions
 //

@@ -1487,11 +1487,53 @@ export const ru: TranslationStructure = {
       review: "На проверке",
       done: "Готово",
     },
+    columnEmpty: {
+      backlog: {
+        title: "Нет задач в очереди",
+        subtitle: "Задачи, ожидающие планирования, появятся здесь",
+      },
+      todo: {
+        title: "Нет задач к выполнению",
+        subtitle: "Добавьте задачи, готовые к работе",
+      },
+      inProgress: {
+        title: "Нет задач в работе",
+        subtitle: "Переместите задачи сюда, когда начнёте работу",
+      },
+      review: {
+        title: "Нет задач на проверке",
+        subtitle: "Задачи на проверке появятся здесь",
+      },
+      done: {
+        title: "Нет завершённых задач",
+        subtitle: "Завершённые задачи будут показаны здесь",
+      },
+    },
     priority: {
       low: "Низкий",
       medium: "Средний",
       high: "Высокий",
       urgent: "Срочный",
+    },
+    templates: {
+      pickTitle: "Выбрать шаблон",
+      useTemplate: "Использовать шаблон",
+      manage: "Управление шаблонами",
+      title: "Шаблоны промптов",
+      newTemplate: "Новый шаблон",
+      editing: "Редактировать шаблон",
+      namePlaceholder: "Название шаблона",
+      contentPlaceholder:
+        "Содержимое шаблона...\nИспользуйте {{title}}, {{description}}, {{directory}}, {{tags}} как переменные",
+      deleteTitle: "Удалить шаблон",
+      deleteMessage: "Вы уверены, что хотите удалить этот шаблон?",
+      builtInBadge: "Встроенный",
+      empty: "Шаблонов пока нет",
+      builtIn: {
+        coding: "Разработка кода",
+        bugfix: "Исправление ошибок",
+        review: "Обзор кода",
+      },
     },
   },
 

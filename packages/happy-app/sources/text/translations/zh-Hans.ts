@@ -1394,11 +1394,53 @@ export const zhHans: TranslationStructure = {
       review: "审查",
       done: "完成",
     },
+    columnEmpty: {
+      backlog: {
+        title: "暂无待定项",
+        subtitle: "等待规划的任务将显示在这里",
+      },
+      todo: {
+        title: "暂无待办",
+        subtitle: "准备好开始的任务放在这里",
+      },
+      inProgress: {
+        title: "暂无进行中",
+        subtitle: "开始工作时将任务移到这里",
+      },
+      review: {
+        title: "暂无待审查",
+        subtitle: "等待审查的任务将显示在这里",
+      },
+      done: {
+        title: "暂无已完成",
+        subtitle: "完成的任务将显示在这里",
+      },
+    },
     priority: {
       low: "低",
       medium: "中",
       high: "高",
       urgent: "紧急",
+    },
+    templates: {
+      pickTitle: "选择模板",
+      useTemplate: "使用模板",
+      manage: "管理模板",
+      title: "提示词模板",
+      newTemplate: "新建模板",
+      editing: "编辑模板",
+      namePlaceholder: "模板名称",
+      contentPlaceholder:
+        "模板内容...\n支持变量 {{title}}, {{description}}, {{directory}}, {{tags}}",
+      deleteTitle: "删除模板",
+      deleteMessage: "确定要删除这个模板吗？",
+      builtInBadge: "内置",
+      empty: "暂无模板",
+      builtIn: {
+        coding: "代码开发",
+        bugfix: "Bug 修复",
+        review: "代码审查",
+      },
     },
   },
 

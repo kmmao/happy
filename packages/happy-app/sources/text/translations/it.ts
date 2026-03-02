@@ -1463,11 +1463,53 @@ export const it: TranslationStructure = {
       review: "Revisione",
       done: "Fatto",
     },
+    columnEmpty: {
+      backlog: {
+        title: "Nessun arretrato",
+        subtitle: "Le attività da pianificare appariranno qui",
+      },
+      todo: {
+        title: "Niente da fare",
+        subtitle: "Aggiungi attività pronte per essere lavorate",
+      },
+      inProgress: {
+        title: "Niente in corso",
+        subtitle: "Sposta le attività qui quando inizi a lavorare",
+      },
+      review: {
+        title: "Niente in revisione",
+        subtitle: "Le attività in revisione appariranno qui",
+      },
+      done: {
+        title: "Nessuna attività completata",
+        subtitle: "Le attività completate saranno mostrate qui",
+      },
+    },
     priority: {
       low: "Bassa",
       medium: "Media",
       high: "Alta",
       urgent: "Urgente",
+    },
+    templates: {
+      pickTitle: "Scegli modello",
+      useTemplate: "Usa modello",
+      manage: "Gestisci modelli",
+      title: "Modelli di prompt",
+      newTemplate: "Nuovo modello",
+      editing: "Modifica modello",
+      namePlaceholder: "Nome del modello",
+      contentPlaceholder:
+        "Contenuto del modello...\nUsa {{title}}, {{description}}, {{directory}}, {{tags}} come variabili",
+      deleteTitle: "Elimina modello",
+      deleteMessage: "Sei sicuro di voler eliminare questo modello?",
+      builtInBadge: "Integrato",
+      empty: "Nessun modello ancora",
+      builtIn: {
+        coding: "Sviluppo codice",
+        bugfix: "Correzione bug",
+        review: "Revisione codice",
+      },
     },
   },
 

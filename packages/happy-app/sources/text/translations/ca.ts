@@ -1466,11 +1466,53 @@ export const ca: TranslationStructure = {
       review: "Revisió",
       done: "Fet",
     },
+    columnEmpty: {
+      backlog: {
+        title: "Sense pendents",
+        subtitle: "Les tasques per planificar apareixeran aquí",
+      },
+      todo: {
+        title: "Res per fer",
+        subtitle: "Afegeix tasques preparades per treballar",
+      },
+      inProgress: {
+        title: "Res en curs",
+        subtitle: "Mou tasques aquí quan comencis a treballar",
+      },
+      review: {
+        title: "Res en revisió",
+        subtitle: "Les tasques en revisió apareixeran aquí",
+      },
+      done: {
+        title: "Sense tasques completades",
+        subtitle: "Les tasques completades es mostraran aquí",
+      },
+    },
     priority: {
       low: "Baixa",
       medium: "Mitjana",
       high: "Alta",
       urgent: "Urgent",
+    },
+    templates: {
+      pickTitle: "Triar plantilla",
+      useTemplate: "Usar plantilla",
+      manage: "Gestionar plantilles",
+      title: "Plantilles de prompt",
+      newTemplate: "Nova plantilla",
+      editing: "Editar plantilla",
+      namePlaceholder: "Nom de la plantilla",
+      contentPlaceholder:
+        "Contingut de la plantilla...\nFes servir {{title}}, {{description}}, {{directory}}, {{tags}} com a variables",
+      deleteTitle: "Eliminar plantilla",
+      deleteMessage: "Estàs segur que vols eliminar aquesta plantilla?",
+      builtInBadge: "Integrada",
+      empty: "Encara no hi ha plantilles",
+      builtIn: {
+        coding: "Desenvolupament de codi",
+        bugfix: "Correcció d'errors",
+        review: "Revisió de codi",
+      },
     },
   },
 

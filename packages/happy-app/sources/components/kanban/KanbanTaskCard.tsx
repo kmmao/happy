@@ -14,10 +14,17 @@ interface KanbanTaskCardProps {
   onPress: (taskId: string) => void;
   onLongPress?: (taskId: string) => void;
   dragHandle?: React.ReactNode;
+  compact?: boolean;
 }
 
 export const KanbanTaskCard = React.memo(
-  ({ task, onPress, onLongPress, dragHandle }: KanbanTaskCardProps) => {
+  ({
+    task,
+    onPress,
+    onLongPress,
+    dragHandle,
+    compact,
+  }: KanbanTaskCardProps) => {
     const { theme } = useUnistyles();
     const priorityColor = PRIORITY_COLORS[task.priority];
     const hasLinkedSessions = task.sessionIds.length > 0;
@@ -30,6 +37,7 @@ export const KanbanTaskCard = React.memo(
         accessibilityLabel={task.title}
         style={({ pressed }) => [
           styles.card,
+          compact && styles.cardCompact,
           { backgroundColor: theme.colors.surface },
           pressed && { opacity: 0.7 },
         ]}
@@ -39,7 +47,11 @@ export const KanbanTaskCard = React.memo(
             style={[styles.priorityDot, { backgroundColor: priorityColor }]}
           />
           <Text
-            style={[styles.title, { color: theme.colors.text }]}
+            style={[
+              styles.title,
+              compact && styles.titleCompact,
+              { color: theme.colors.text },
+            ]}
             numberOfLines={2}
           >
             {task.title}
@@ -49,8 +61,12 @@ export const KanbanTaskCard = React.memo(
 
         {task.description.length > 0 && (
           <Text
-            style={[styles.description, { color: theme.colors.textSecondary }]}
-            numberOfLines={2}
+            style={[
+              styles.description,
+              compact && styles.descriptionCompact,
+              { color: theme.colors.textSecondary },
+            ]}
+            numberOfLines={compact ? 1 : 2}
           >
             {task.description}
           </Text>
@@ -180,5 +196,17 @@ const styles = StyleSheet.create((theme) => ({
   sessionCount: {
     fontSize: 12,
     ...Typography.default(),
+  },
+  cardCompact: {
+    marginHorizontal: 6,
+    padding: 10,
+    gap: 6,
+  },
+  titleCompact: {
+    fontSize: 14,
+  },
+  descriptionCompact: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 }));

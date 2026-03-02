@@ -1446,11 +1446,53 @@ export const ja: TranslationStructure = {
       review: "レビュー",
       done: "完了",
     },
+    columnEmpty: {
+      backlog: {
+        title: "バックログなし",
+        subtitle: "計画待ちのタスクがここに表示されます",
+      },
+      todo: {
+        title: "未着手のタスクなし",
+        subtitle: "作業準備ができたタスクを追加してください",
+      },
+      inProgress: {
+        title: "進行中のタスクなし",
+        subtitle: "作業開始時にタスクをここに移動します",
+      },
+      review: {
+        title: "レビュー待ちなし",
+        subtitle: "レビュー待ちのタスクがここに表示されます",
+      },
+      done: {
+        title: "完了タスクなし",
+        subtitle: "完了したタスクがここに表示されます",
+      },
+    },
     priority: {
       low: "低",
       medium: "中",
       high: "高",
       urgent: "緊急",
+    },
+    templates: {
+      pickTitle: "テンプレートを選択",
+      useTemplate: "テンプレートを使用",
+      manage: "テンプレート管理",
+      title: "プロンプトテンプレート",
+      newTemplate: "新規テンプレート",
+      editing: "テンプレートを編集",
+      namePlaceholder: "テンプレート名",
+      contentPlaceholder:
+        "テンプレート内容...\n{{title}}、{{description}}、{{directory}}、{{tags}} を変数として使用",
+      deleteTitle: "テンプレートを削除",
+      deleteMessage: "このテンプレートを削除してもよろしいですか？",
+      builtInBadge: "組み込み",
+      empty: "テンプレートはまだありません",
+      builtIn: {
+        coding: "コード開発",
+        bugfix: "バグ修正",
+        review: "コードレビュー",
+      },
     },
   },
 

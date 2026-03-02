@@ -357,6 +357,12 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="kanban/templates"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="ideation/idea/new"
         options={{
           headerShown: false,

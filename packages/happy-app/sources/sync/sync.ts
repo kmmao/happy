@@ -28,6 +28,8 @@ import {
 import { getCurrentLanguage } from "@/text";
 import { kanbanStore } from "./kanbanStore";
 import { isKanbanKey } from "./kanbanTypes";
+import { promptTemplateStore } from "./promptTemplateStore";
+import { isTemplateKey } from "./promptTemplateTypes";
 import { ideationStore } from "./ideationStore";
 import { isIdeationKey } from "./ideationTypes";
 import { roadmapStore } from "./roadmapStore";
@@ -2801,6 +2803,14 @@ class Sync {
       );
       if (kanbanChanges.length > 0) {
         kanbanStore.getState().handleKvUpdate(kanbanChanges);
+      }
+
+      // Filter prompt template changes and forward to template store
+      const templateChanges = kvUpdate.changes.filter((c: { key: string }) =>
+        isTemplateKey(c.key),
+      );
+      if (templateChanges.length > 0) {
+        promptTemplateStore.getState().handleKvUpdate(templateChanges);
       }
 
       // Filter ideation-related changes and forward to ideation store

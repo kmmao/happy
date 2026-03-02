@@ -1458,11 +1458,53 @@ export const en: TranslationStructure = {
       review: "Review",
       done: "Done",
     },
+    columnEmpty: {
+      backlog: {
+        title: "No Backlog Items",
+        subtitle: "Items waiting to be planned will appear here",
+      },
+      todo: {
+        title: "Nothing To Do",
+        subtitle: "Add tasks that are ready to be worked on",
+      },
+      inProgress: {
+        title: "Nothing Running",
+        subtitle: "Move tasks here when you start working",
+      },
+      review: {
+        title: "Nothing In Review",
+        subtitle: "Tasks waiting for review will appear here",
+      },
+      done: {
+        title: "No Completed Tasks",
+        subtitle: "Completed tasks will be shown here",
+      },
+    },
     priority: {
       low: "Low",
       medium: "Medium",
       high: "High",
       urgent: "Urgent",
+    },
+    templates: {
+      pickTitle: "Choose Template",
+      useTemplate: "Use Template",
+      manage: "Manage Templates",
+      title: "Prompt Templates",
+      newTemplate: "New Template",
+      editing: "Edit Template",
+      namePlaceholder: "Template name",
+      contentPlaceholder:
+        "Template content...\nUse {{title}}, {{description}}, {{directory}}, {{tags}} as variables",
+      deleteTitle: "Delete Template",
+      deleteMessage: "Are you sure you want to delete this template?",
+      builtInBadge: "Built-in",
+      empty: "No templates yet",
+      builtIn: {
+        coding: "Code Development",
+        bugfix: "Bug Fix",
+        review: "Code Review",
+      },
     },
   },
 

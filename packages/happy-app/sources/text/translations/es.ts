@@ -1464,11 +1464,53 @@ export const es: TranslationStructure = {
       review: "Revisión",
       done: "Hecho",
     },
+    columnEmpty: {
+      backlog: {
+        title: "Sin pendientes",
+        subtitle: "Las tareas por planificar aparecerán aquí",
+      },
+      todo: {
+        title: "Nada por hacer",
+        subtitle: "Agrega tareas listas para trabajar",
+      },
+      inProgress: {
+        title: "Nada en progreso",
+        subtitle: "Mueve tareas aquí cuando comiences a trabajar",
+      },
+      review: {
+        title: "Nada en revisión",
+        subtitle: "Las tareas en revisión aparecerán aquí",
+      },
+      done: {
+        title: "Sin tareas completadas",
+        subtitle: "Las tareas completadas se mostrarán aquí",
+      },
+    },
     priority: {
       low: "Baja",
       medium: "Media",
       high: "Alta",
       urgent: "Urgente",
+    },
+    templates: {
+      pickTitle: "Elegir plantilla",
+      useTemplate: "Usar plantilla",
+      manage: "Gestionar plantillas",
+      title: "Plantillas de prompt",
+      newTemplate: "Nueva plantilla",
+      editing: "Editar plantilla",
+      namePlaceholder: "Nombre de la plantilla",
+      contentPlaceholder:
+        "Contenido de la plantilla...\nUsa {{title}}, {{description}}, {{directory}}, {{tags}} como variables",
+      deleteTitle: "Eliminar plantilla",
+      deleteMessage: "¿Estás seguro de que quieres eliminar esta plantilla?",
+      builtInBadge: "Integrada",
+      empty: "Aún no hay plantillas",
+      builtIn: {
+        coding: "Desarrollo de código",
+        bugfix: "Corrección de errores",
+        review: "Revisión de código",
+      },
     },
   },
 

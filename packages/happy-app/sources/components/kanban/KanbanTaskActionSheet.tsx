@@ -12,6 +12,7 @@ import { kanbanStore } from "@/sync/kanbanStore";
 import {
   KANBAN_COLUMNS,
   KANBAN_COLUMN_LABELS,
+  KANBAN_COLUMN_ICONS,
   type KanbanTask,
   type KanbanColumnId,
 } from "@/sync/kanbanTypes";
@@ -20,14 +21,6 @@ interface KanbanTaskActionSheetProps {
   task: KanbanTask;
   onClose: () => void;
 }
-
-const COLUMN_ICONS: Record<KanbanColumnId, string> = {
-  backlog: "file-tray-outline",
-  todo: "list-outline",
-  in_progress: "play-circle-outline",
-  review: "eye-outline",
-  done: "checkmark-circle-outline",
-};
 
 export const KanbanTaskActionSheet = React.memo(
   ({ task, onClose }: KanbanTaskActionSheetProps) => {
@@ -101,7 +94,9 @@ export const KanbanTaskActionSheet = React.memo(
               ]}
             >
               <Ionicons
-                name={COLUMN_ICONS[col] as keyof typeof Ionicons.glyphMap}
+                name={
+                  KANBAN_COLUMN_ICONS[col] as keyof typeof Ionicons.glyphMap
+                }
                 size={18}
                 color={theme.colors.text}
               />

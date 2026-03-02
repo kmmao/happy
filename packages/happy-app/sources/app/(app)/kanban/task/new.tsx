@@ -18,14 +18,22 @@ import {
   type KanbanPriority,
 } from "@/sync/kanbanTypes";
 import { useHappyAction } from "@/hooks/useHappyAction";
-import { useAllMachines } from "@/sync/storage";
+import { useAllMachines, useSetting, useAllSessions } from "@/sync/storage";
 import { isMachineOnline } from "@/utils/machineUtils";
+import { StatusDot } from "@/components/StatusDot";
+import { Ionicons } from "@expo/vector-icons";
+import { Modal } from "@/modal";
+import { PromptTemplatePicker } from "@/components/kanban/PromptTemplatePicker";
+import type { PromptTemplate } from "@/sync/promptTemplateTypes";
+import { expandTemplate } from "@/sync/promptTemplateExpand";
 
 const NewKanbanTask = React.memo(() => {
   const { theme } = useUnistyles();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const machines = useAllMachines();
+  const recentMachinePaths = useSetting("recentMachinePaths");
+  const allSessions = useAllSessions();
 
   // Form state
   const [title, setTitle] = React.useState("");
@@ -45,6 +53,45 @@ const NewKanbanTask = React.memo(() => {
       }
     }
   }, [machines, machineId]);
+
+  const pathSuggestions = React.useMemo(() => {
+    if (!machineId) return [];
+
+    const paths = new Set<string>();
+
+    for (const entry of recentMachinePaths ?? []) {
+      if (entry.machineId === machineId && entry.path) {
+        paths.add(entry.path);
+      }
+    }
+
+    for (const s of allSessions) {
+      if (s.metadata?.machineId === machineId && s.metadata?.path) {
+        paths.add(s.metadata.path);
+      }
+    }
+
+    const current = directory.trim();
+    return Array.from(paths)
+      .filter((p) => p !== current)
+      .slice(0, 5);
+  }, [machineId, recentMachinePaths, allSessions, directory]);
+
+  const handlePickTemplate = React.useCallback(() => {
+    const onSelect = (template: PromptTemplate) => {
+      const expanded = expandTemplate(template.content, {
+        title,
+        description,
+        directory: directory || null,
+        tags: [],
+      });
+      setSessionPrompt(expanded);
+    };
+    Modal.show({
+      component: PromptTemplatePicker,
+      props: { onSelect },
+    });
+  }, [title, description, directory]);
 
   const [saving, performSave] = useHappyAction(async () => {
     if (!title.trim()) {
@@ -166,20 +213,42 @@ const NewKanbanTask = React.memo(() => {
         {/* Machine selection */}
         {machines.length > 0 && (
           <ItemGroup title={t("kanban.machine")}>
-            {machines.map((m) => (
-              <Item
-                key={m.id}
-                title={m.metadata?.displayName ?? m.id.substring(0, 8)}
-                subtitle={
-                  isMachineOnline(m)
-                    ? t("kanban.machineOnline")
-                    : t("kanban.machineOffline")
-                }
-                onPress={() => setMachineId(m.id)}
-                selected={m.id === machineId}
-                showDivider
-              />
-            ))}
+            {machines.map((m) => {
+              const online = isMachineOnline(m);
+              return (
+                <Item
+                  key={m.id}
+                  title={m.metadata?.displayName ?? m.id.substring(0, 8)}
+                  subtitle={
+                    online
+                      ? t("kanban.machineOnline")
+                      : t("kanban.machineOffline")
+                  }
+                  leftElement={
+                    <View style={styles.machineIcon}>
+                      <Ionicons
+                        name="desktop-outline"
+                        size={20}
+                        color={theme.colors.textSecondary}
+                      />
+                      <StatusDot
+                        color={
+                          online
+                            ? theme.colors.status.connected
+                            : theme.colors.textSecondary
+                        }
+                        isPulsing={online}
+                        size={8}
+                        style={styles.machineStatusDot}
+                      />
+                    </View>
+                  }
+                  onPress={() => setMachineId(m.id)}
+                  selected={m.id === machineId}
+                  showDivider
+                />
+              );
+            })}
           </ItemGroup>
         )}
 
@@ -204,6 +273,36 @@ const NewKanbanTask = React.memo(() => {
               autoCorrect={false}
             />
           </View>
+          {pathSuggestions.length > 0 && (
+            <View style={styles.pathSuggestions}>
+              {pathSuggestions.map((path) => (
+                <Pressable
+                  key={path}
+                  onPress={() => setDirectory(path)}
+                  style={({ pressed }) => [
+                    styles.pathSuggestionItem,
+                    { backgroundColor: theme.colors.surface },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <Ionicons
+                    name="folder-outline"
+                    size={16}
+                    color={theme.colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.pathSuggestionText,
+                      { color: theme.colors.text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {path}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </ItemGroup>
 
         {/* Session Prompt */}
@@ -211,6 +310,28 @@ const NewKanbanTask = React.memo(() => {
           title={t("kanban.sessionPromptLabel")}
           footer={t("kanban.sessionPromptHint")}
         >
+          <Pressable
+            onPress={handlePickTemplate}
+            style={({ pressed }) => [
+              styles.templateButton,
+              { backgroundColor: theme.colors.surface },
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Ionicons
+              name="document-text-outline"
+              size={18}
+              color={theme.colors.header.tint}
+            />
+            <Text
+              style={[
+                styles.templateButtonText,
+                { color: theme.colors.header.tint },
+              ]}
+            >
+              {t("kanban.templates.useTemplate")}
+            </Text>
+          </Pressable>
           <View
             style={[
               styles.inputWrapper,
@@ -270,5 +391,46 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: 16,
     paddingVertical: 12,
     ...Typography.default(),
+  },
+  machineIcon: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  machineStatusDot: {
+    position: "absolute",
+    bottom: -1,
+    right: -1,
+  },
+  pathSuggestions: {
+    marginTop: 4,
+    gap: 2,
+  },
+  pathSuggestionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 8,
+  },
+  pathSuggestionText: {
+    flex: 1,
+    fontSize: 13,
+    ...Typography.mono(),
+  },
+  templateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginBottom: 8,
+    gap: 6,
+  },
+  templateButtonText: {
+    fontSize: 14,
+    ...Typography.default("semiBold"),
   },
 }));

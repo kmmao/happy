@@ -1,6 +1,7 @@
 import * as React from "react";
 import { View, Pressable, ActivityIndicator } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { layout } from "@/components/layout";
 import { useRouter } from "expo-router";
 import { useShallow } from "zustand/react/shallow";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,7 +27,9 @@ import { KanbanColumnSelector } from "./KanbanColumnSelector";
 import { KanbanTaskCard } from "./KanbanTaskCard";
 import { KanbanEmptyState } from "./KanbanEmptyState";
 import { KanbanStatsBar } from "./KanbanStatsBar";
+import { KanbanBoardView } from "./KanbanBoardView";
 import { KanbanTaskActionSheet } from "./KanbanTaskActionSheet";
+import { useIsBoardLayout } from "@/hooks/useIsBoardLayout";
 import { Modal } from "@/modal";
 
 /**
@@ -74,6 +77,7 @@ const DraggableTaskCard = React.memo(
 export const KanbanViewWrapper = React.memo(() => {
   const { theme } = useUnistyles();
   const router = useRouter();
+  const isBoardLayout = useIsBoardLayout();
   const allTasks = useKanbanTasks();
   const isLoading = useKanbanLoading();
   const isLoaded = useKanbanLoaded();
@@ -170,37 +174,66 @@ export const KanbanViewWrapper = React.memo(() => {
     return <KanbanEmptyState />;
   }
 
+  // Board layout for wide screens (web, tablet, Mac)
+  if (isBoardLayout) {
+    return (
+      <View
+        style={[
+          styles.outerContainer,
+          { backgroundColor: theme.colors.groupped.background },
+        ]}
+      >
+        <KanbanBoardView
+          allTasks={allTasks}
+          totalCount={totalCount}
+          activeSessionCount={activeSessionCount}
+          onTaskPress={handleTaskPress}
+          onTaskLongPress={handleTaskLongPress}
+        />
+      </View>
+    );
+  }
+
+  // Mobile tab layout
   return (
     <View
       style={[
-        styles.container,
+        styles.outerContainer,
         { backgroundColor: theme.colors.groupped.background },
       ]}
     >
-      <KanbanStatsBar
-        totalTasks={totalCount}
-        activeSessionCount={activeSessionCount}
-      />
-      <KanbanColumnSelector
-        activeColumn={activeColumn}
-        counts={counts}
-        onSelect={handleColumnSelect}
-      />
-      <ReorderableList
-        data={columnTasks as KanbanTask[]}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        onReorder={handleReorder}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={styles.container}>
+        <KanbanStatsBar
+          totalTasks={totalCount}
+          activeSessionCount={activeSessionCount}
+        />
+        <KanbanColumnSelector
+          activeColumn={activeColumn}
+          counts={counts}
+          onSelect={handleColumnSelect}
+        />
+        <ReorderableList
+          data={columnTasks as KanbanTask[]}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          onReorder={handleReorder}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
     </View>
   );
 });
 
 const styles = StyleSheet.create((theme) => ({
+  outerContainer: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+  },
   container: {
     flex: 1,
+    maxWidth: layout.maxWidth,
   },
   loadingContainer: {
     flex: 1,

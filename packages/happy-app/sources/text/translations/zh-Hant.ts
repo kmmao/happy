@@ -1396,11 +1396,53 @@ export const zhHant: TranslationStructure = {
       review: "審查",
       done: "完成",
     },
+    columnEmpty: {
+      backlog: {
+        title: "暫無待定項",
+        subtitle: "等待規劃的任務將顯示在這裡",
+      },
+      todo: {
+        title: "暫無待辦",
+        subtitle: "準備好開始的任務放在這裡",
+      },
+      inProgress: {
+        title: "暫無進行中",
+        subtitle: "開始工作時將任務移到這裡",
+      },
+      review: {
+        title: "暫無待審查",
+        subtitle: "等待審查的任務將顯示在這裡",
+      },
+      done: {
+        title: "暫無已完成",
+        subtitle: "完成的任務將顯示在這裡",
+      },
+    },
     priority: {
       low: "低",
       medium: "中",
       high: "高",
       urgent: "緊急",
+    },
+    templates: {
+      pickTitle: "選擇範本",
+      useTemplate: "使用範本",
+      manage: "管理範本",
+      title: "提示詞範本",
+      newTemplate: "新建範本",
+      editing: "編輯範本",
+      namePlaceholder: "範本名稱",
+      contentPlaceholder:
+        "範本內容...\n使用 {{title}}、{{description}}、{{directory}}、{{tags}} 作為變數",
+      deleteTitle: "刪除範本",
+      deleteMessage: "確定要刪除此範本嗎？",
+      builtInBadge: "內建",
+      empty: "暫無範本",
+      builtIn: {
+        coding: "程式開發",
+        bugfix: "問題修復",
+        review: "程式碼審查",
+      },
     },
   },
 
