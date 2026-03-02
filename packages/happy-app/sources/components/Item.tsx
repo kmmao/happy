@@ -277,7 +277,7 @@ export const Item = React.memo<ItemProps>((props) => {
             <Ionicons
               name="checkmark"
               size={22}
-              color={theme.colors.accent}
+              color={theme.colors.header.tint}
               style={{ marginRight: showAccessory ? 6 : 0 }}
             />
           )}
