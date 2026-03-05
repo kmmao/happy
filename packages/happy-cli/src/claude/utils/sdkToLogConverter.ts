@@ -111,7 +111,7 @@ export class SDKToLogConverter {
     const timestamp = new Date().toISOString();
     let parentUuid = this.lastUuid;
     let isSidechain = false;
-    if (sdkMessage.parent_tool_use_id) {
+    if ((sdkMessage as any).parent_tool_use_id) {
       isSidechain = true;
       parentUuid =
         this.sidechainLastUUID.get((sdkMessage as any).parent_tool_use_id) ??
@@ -215,36 +215,8 @@ export class SDKToLogConverter {
         break;
       }
 
-      // Handle tool use results (often comes as user messages)
-      case "tool_result": {
-        const toolMsg = sdkMessage as any;
-        const baseLogMessage: any = {
-          ...baseFields,
-          type: "user",
-          message: {
-            role: "user",
-            content: [
-              {
-                type: "tool_result",
-                tool_use_id: toolMsg.tool_use_id,
-                content: toolMsg.content,
-              },
-            ],
-          },
-          toolUseResult: toolMsg.content,
-        };
-
-        // Add mode if available from responses
-        if (toolMsg.tool_use_id && this.responses?.has(toolMsg.tool_use_id)) {
-          const response = this.responses.get(toolMsg.tool_use_id);
-          if (response?.mode) {
-            baseLogMessage.mode = response.mode;
-          }
-        }
-
-        logMessage = baseLogMessage;
-        break;
-      }
+      // Note: "tool_result" is not a standalone SDKMessage type in the SDK;
+      // tool results arrive as content inside "user" messages (handled above).
 
       default:
         // Unknown message type - pass through with all fields

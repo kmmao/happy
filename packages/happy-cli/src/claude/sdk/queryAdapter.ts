@@ -74,9 +74,12 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
     };
   }
 
-  // ── settingsPath → extraArgs ──
-  if (opts.settingsPath) {
-    result.extraArgs = { ...result.extraArgs, settings: opts.settingsPath };
+  // ── settings (path or inline object) ──
+  if (opts.settings != null) {
+    result.settings = opts.settings;
+  } else if (opts.settingsPath) {
+    // Legacy: settingsPath kept for backwards compat, maps to the new settings field
+    result.settings = opts.settingsPath;
   }
 
   // ── Budget, thinking, effort, and prompt suggestions ──

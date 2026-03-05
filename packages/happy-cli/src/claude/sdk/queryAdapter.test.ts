@@ -96,11 +96,22 @@ describe("queryAdapter", () => {
       );
     });
 
-    it("should map settingsPath to extraArgs", () => {
+    it("should map settingsPath to settings field (legacy compat)", () => {
       const opts: QueryOptions = { settingsPath: "/tmp/settings.json" };
       const result = mapOptions(opts);
 
-      expect(result.extraArgs).toEqual({ settings: "/tmp/settings.json" });
+      expect(result.settings).toBe("/tmp/settings.json");
+      expect(result.extraArgs).toBeUndefined();
+    });
+
+    it("should prefer settings over settingsPath when both provided", () => {
+      const opts: QueryOptions = {
+        settings: "/tmp/new-settings.json",
+        settingsPath: "/tmp/old-settings.json",
+      };
+      const result = mapOptions(opts);
+
+      expect(result.settings).toBe("/tmp/new-settings.json");
     });
 
     it("should map customSystemPrompt to systemPrompt string", () => {

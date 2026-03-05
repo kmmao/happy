@@ -14,6 +14,7 @@ export type {
   SDKResultError,
   PermissionResult,
   ThinkingConfig,
+  Settings,
 } from "@anthropic-ai/claude-agent-sdk";
 
 export { AbortError } from "@anthropic-ai/claude-agent-sdk";
@@ -54,7 +55,13 @@ export interface QueryOptions {
   fallbackModel?: string;
   strictMcpConfig?: boolean;
   canCallTool?: CanCallToolCallback;
-  /** Path to a settings JSON file to pass to Claude via --settings */
+  /**
+   * Settings to pass to Claude — path to a JSON file or an inline settings object.
+   * Maps to the SDK's `settings` option (highest-priority flag settings layer).
+   * Prefer this over `settingsPath`.
+   */
+  settings?: string | import("@anthropic-ai/claude-agent-sdk").Settings;
+  /** @deprecated Use `settings` instead. Path to a settings JSON file. */
   settingsPath?: string;
   /** Maximum USD budget for this query — SDK returns error_max_budget_usd when exceeded */
   maxBudgetUsd?: number;

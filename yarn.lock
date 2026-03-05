@@ -58,10 +58,10 @@
     package-manager-detector "^1.3.0"
     tinyexec "^1.0.1"
 
-"@anthropic-ai/claude-agent-sdk@^0.2.62":
-  version "0.2.62"
-  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk/-/claude-agent-sdk-0.2.62.tgz#fc0f10f1a983ff89a1541cf406e6c249bba126af"
-  integrity sha512-exRJ2djKP6erRpUrtnVf5iXzqeS9dAie9d1ghODZVVXdLqieSqCpaAhZhe0hL1yvP33OL0J5CgT9RAyPzhYY9A==
+"@anthropic-ai/claude-agent-sdk@^0.2.69":
+  version "0.2.69"
+  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk/-/claude-agent-sdk-0.2.69.tgz#bc2139aa891b57e5ebc8a9f80afcd6cf0cd6548a"
+  integrity sha512-d1ZadIwC5PUBMQRK4Y/EC/Fm9xv/nvZ4g0XXa+vC0p+vKOCxhf4USdVKjuDzPM0z0f2qqZZZdxMjFuwa7paKRA==
   optionalDependencies:
     "@img/sharp-darwin-arm64" "^0.34.2"
     "@img/sharp-darwin-x64" "^0.34.2"
