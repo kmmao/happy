@@ -28,6 +28,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     paddingHorizontal: 16,
   },
   column: {
+    flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 6,
   },
