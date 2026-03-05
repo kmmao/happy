@@ -1039,6 +1039,7 @@ export const es: TranslationStructure = {
     createAccount: "Crear cuenta",
     linkOrRestoreAccount: "Vincular o restaurar cuenta",
     loginWithMobileApp: "Iniciar sesión con aplicación móvil",
+    loginWithSecretKey: "Iniciar sesión con clave secreta",
   },
 
   review: {

@@ -1037,6 +1037,7 @@ export const ru: TranslationStructure = {
     createAccount: "Создать аккаунт",
     linkOrRestoreAccount: "Связать или восстановить аккаунт",
     loginWithMobileApp: "Войти через мобильное приложение",
+    loginWithSecretKey: "Войти с помощью секретного ключа",
   },
 
   review: {

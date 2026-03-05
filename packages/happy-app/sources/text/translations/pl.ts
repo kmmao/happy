@@ -1050,6 +1050,7 @@ export const pl: TranslationStructure = {
     createAccount: "Utwórz konto",
     linkOrRestoreAccount: "Połącz lub przywróć konto",
     loginWithMobileApp: "Zaloguj się przez aplikację mobilną",
+    loginWithSecretKey: "Zaloguj się kluczem tajnym",
   },
 
   review: {

@@ -1104,6 +1104,7 @@ export const it: TranslationStructure = {
     createAccount: "Crea account",
     linkOrRestoreAccount: "Collega o ripristina account",
     loginWithMobileApp: "Accedi con l'app mobile",
+    loginWithSecretKey: "Accedi con chiave segreta",
   },
 
   review: {

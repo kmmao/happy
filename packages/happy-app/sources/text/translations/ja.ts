@@ -1088,6 +1088,7 @@ export const ja: TranslationStructure = {
     createAccount: "アカウントを作成",
     linkOrRestoreAccount: "アカウントをリンクまたは復元",
     loginWithMobileApp: "モバイルアプリでログイン",
+    loginWithSecretKey: "シークレットキーでログイン",
   },
 
   review: {

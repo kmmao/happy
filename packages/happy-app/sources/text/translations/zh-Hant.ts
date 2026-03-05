@@ -989,6 +989,7 @@ export const zhHant: TranslationStructure = {
     createAccount: "建立帳戶",
     linkOrRestoreAccount: "連結或恢復帳戶",
     loginWithMobileApp: "使用行動應用程式登入",
+    loginWithSecretKey: "使用密鑰登入",
   },
 
   review: {
