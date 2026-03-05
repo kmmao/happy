@@ -51,6 +51,7 @@ const PillSelector = React.memo(function PillSelectorInner({
   onSelect,
 }: PillSelectorProps<string>) {
   const { theme } = useUnistyles();
+  const styles = stylesheet;
 
   return (
     <View
@@ -91,6 +92,7 @@ const PillSelector = React.memo(function PillSelectorInner({
 
 const NewKanbanTask = React.memo(() => {
   const { theme } = useUnistyles();
+  const styles = stylesheet;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const machines = useAllMachines();
@@ -248,7 +250,10 @@ const NewKanbanTask = React.memo(() => {
             ]}
           >
             <TextInput
-              style={[styles.titleInput, { color: theme.colors.text }]}
+              style={[
+                styles.titleInput,
+                { color: theme.colors.text, outlineStyle: "none" as any },
+              ]}
               placeholder={t("kanban.titlePlaceholder")}
               placeholderTextColor={theme.colors.textSecondary}
               value={title}
@@ -264,7 +269,10 @@ const NewKanbanTask = React.memo(() => {
               ]}
             />
             <TextInput
-              style={[styles.descInput, { color: theme.colors.text }]}
+              style={[
+                styles.descInput,
+                { color: theme.colors.text, outlineStyle: "none" as any },
+              ]}
               placeholder={t("kanban.descriptionPlaceholder")}
               placeholderTextColor={theme.colors.textSecondary}
               value={description}
@@ -340,7 +348,10 @@ const NewKanbanTask = React.memo(() => {
             ]}
           >
             <TextInput
-              style={[styles.singleInput, { color: theme.colors.text }]}
+              style={[
+                styles.singleInput,
+                { color: theme.colors.text, outlineStyle: "none" as any },
+              ]}
               placeholder="/path/to/project"
               placeholderTextColor={theme.colors.textSecondary}
               value={directory}
@@ -414,7 +425,10 @@ const NewKanbanTask = React.memo(() => {
             ]}
           >
             <TextInput
-              style={[styles.descInput, { color: theme.colors.text }]}
+              style={[
+                styles.descInput,
+                { color: theme.colors.text, outlineStyle: "none" as any },
+              ]}
               placeholder={t("kanban.sessionPromptPlaceholder")}
               placeholderTextColor={theme.colors.textSecondary}
               value={sessionPrompt}
@@ -432,7 +446,7 @@ const NewKanbanTask = React.memo(() => {
 
 export default NewKanbanTask;
 
-const styles = StyleSheet.create(() => ({
+const stylesheet = StyleSheet.create((_theme) => ({
   container: {
     flex: 1,
   },
@@ -472,7 +486,6 @@ const styles = StyleSheet.create(() => ({
     fontSize: 17,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    outlineStyle: "none",
     ...Typography.default(),
   },
   divider: {
@@ -484,14 +497,12 @@ const styles = StyleSheet.create(() => ({
     paddingHorizontal: 16,
     paddingVertical: 12,
     minHeight: 80,
-    outlineStyle: "none",
     ...Typography.default(),
   },
   singleInput: {
     fontSize: 15,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    outlineStyle: "none",
     ...Typography.default(),
   },
 

@@ -174,16 +174,6 @@ export const InputFAB = React.memo(function InputFAB({
               iconColor={iconColor}
             />
           )}
-          {hasPendingAction && !showOptions && (
-            <FABButton
-              key="suggestion"
-              icon="sparkles-outline"
-              onPress={onExpandPress}
-              badgeColor={badgeColor}
-              styles={styles}
-              iconColor={iconColor}
-            />
-          )}
           {showBookmarks && (
             <FABButton
               key="bookmarks"
@@ -227,6 +217,7 @@ export const InputFAB = React.memo(function InputFAB({
             key="expand"
             icon="expand-outline"
             onPress={onExpandPress}
+            badgeColor={hasPendingAction && !showOptions ? badgeColor : undefined}
             styles={styles}
             iconColor={iconColor}
           />
