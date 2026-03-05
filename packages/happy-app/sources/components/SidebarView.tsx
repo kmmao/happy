@@ -5,10 +5,11 @@ import {
   useSettingMutable,
 } from "@/sync/storage";
 import * as React from "react";
-import { Text, View, Pressable, useWindowDimensions } from "react-native";
+import { Text, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useHeaderHeight } from "@/utils/responsive";
+import { useIsTablet } from "@/utils/responsive";
 import { Typography } from "@/constants/Typography";
 import { StatusDot } from "./StatusDot";
 import { FABWide } from "./FABWide";
@@ -20,8 +21,9 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import { useInboxHasContent } from "@/hooks/useInboxHasContent";
 import { Ionicons } from "@expo/vector-icons";
+import { useSidebarState } from "./SidebarStateContext";
 
-const stylesheet = StyleSheet.create((theme, runtime) => ({
+const stylesheet = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
     borderStyle: "solid",
@@ -38,10 +40,18 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   logoContainer: {
     width: 32,
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
   },
   logo: {
     height: 24,
     width: 24,
+  },
+  statusDotOverlay: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
   },
   titleContainer: {
     position: "absolute",
@@ -107,7 +117,6 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     fontSize: 10,
     ...Typography.default("semiBold"),
   },
-  // Status colors
   statusConnected: {
     color: theme.colors.status.connected,
   },
@@ -132,6 +141,64 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     borderRadius: 3,
     backgroundColor: theme.colors.text,
   },
+  // Collapsed rail styles
+  railContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.groupped.background,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: theme.colors.divider,
+    alignItems: "center",
+  },
+  railLogoButton: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  railDivider: {
+    width: 28,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.divider,
+    marginVertical: 8,
+  },
+  railNavSection: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+    paddingTop: 4,
+  },
+  railButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  railBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    backgroundColor: theme.colors.status.error,
+    borderRadius: 6,
+    minWidth: 12,
+    height: 12,
+    paddingHorizontal: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  railBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    ...Typography.default("semiBold"),
+  },
+  railIndicatorDot: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.text,
+  },
 }));
 
 export const SidebarView = React.memo(() => {
@@ -140,12 +207,14 @@ export const SidebarView = React.memo(() => {
   const safeArea = useSafeAreaInsets();
   const router = useRouter();
   const headerHeight = useHeaderHeight();
+  const isTablet = useIsTablet();
   const socketStatus = useSocketStatus();
   const realtimeStatus = useRealtimeStatus();
   const friendRequests = useFriendRequests();
   const inboxHasContent = useInboxHasContent();
   const settings = useSettings();
   const [showProjectTab] = useSettingMutable("showProjectTab");
+  const { collapsed, toggleCollapsed } = useSidebarState();
 
   // Compute connection status once per render (theme-reactive, no stale memoization)
   const connectionStatus = (() => {
@@ -189,48 +258,131 @@ export const SidebarView = React.memo(() => {
     }
   })();
 
-  // Calculate sidebar width and determine title positioning
-  // Uses same formula as SidebarNavigator.tsx:18 for consistency
-  const { width: windowWidth } = useWindowDimensions();
-  const sidebarWidth = Math.min(
-    Math.max(Math.floor(windowWidth * 0.3), 250),
-    360,
-  );
-  // 4 icons (inbox, project, settings, +) = ~148px total, threshold 408px > max 360px → always left-justify
-  const shouldLeftJustify = true;
-
   const handleNewSession = React.useCallback(() => {
     router.push("/new");
   }, [router]);
 
-  // Title content used in both centered and left-justified modes (DRY)
-  const titleContent = (
-    <>
-      <Text style={styles.titleText}>{t("sidebar.sessionsTitle")}</Text>
-      {connectionStatus.text && (
-        <View style={styles.statusContainer}>
-          <StatusDot
-            color={connectionStatus.color}
-            isPulsing={connectionStatus.isPulsing}
-            size={6}
-            style={styles.statusDot}
+  // Collapsed rail - narrow 52px icon strip
+  if (isTablet && collapsed) {
+    return (
+      <View style={[styles.railContainer, { paddingTop: safeArea.top }]}>
+        {/* Logo area - same height as header, tappable to expand */}
+        <Pressable
+          onPress={toggleCollapsed}
+          hitSlop={8}
+          style={[
+            styles.railLogoButton,
+            { height: headerHeight, justifyContent: "center" },
+          ]}
+        >
+          <Image
+            source={
+              theme.dark
+                ? require("@/assets/images/logo-white.png")
+                : require("@/assets/images/logo-black.png")
+            }
+            contentFit="contain"
+            style={{ height: 24, width: 24 }}
           />
-          <Text
-            style={[styles.statusText, { color: connectionStatus.textColor }]}
-          >
-            {connectionStatus.text}
-          </Text>
-        </View>
-      )}
-    </>
-  );
+          {connectionStatus.color && (
+            <View style={styles.statusDotOverlay}>
+              <StatusDot
+                color={connectionStatus.color}
+                isPulsing={connectionStatus.isPulsing}
+                size={6}
+              />
+            </View>
+          )}
+        </Pressable>
 
+        <View style={styles.railDivider} />
+
+        {/* Navigation icons */}
+        <View style={styles.railNavSection}>
+          {/* Inbox */}
+          <Pressable
+            onPress={() => router.push("/(app)/inbox")}
+            hitSlop={8}
+            style={styles.railButton}
+          >
+            <Image
+              source={require("@/assets/images/brutalist/Brutalism 27.png")}
+              contentFit="contain"
+              style={{ width: 28, height: 28 }}
+              tintColor={theme.colors.header.tint}
+            />
+            {friendRequests.length > 0 && (
+              <View style={styles.railBadge}>
+                <Text style={styles.railBadgeText}>
+                  {friendRequests.length > 9 ? "9+" : friendRequests.length}
+                </Text>
+              </View>
+            )}
+            {inboxHasContent && friendRequests.length === 0 && (
+              <View style={styles.railIndicatorDot} />
+            )}
+          </Pressable>
+
+          {/* Project (conditional) */}
+          {showProjectTab && (
+            <Pressable
+              onPress={() => router.push("/kanban")}
+              hitSlop={8}
+              style={styles.railButton}
+            >
+              <Image
+                source={require("@/assets/images/brutalist/Brutalism 22.png")}
+                contentFit="contain"
+                style={{ width: 28, height: 28 }}
+                tintColor={theme.colors.header.tint}
+              />
+            </Pressable>
+          )}
+
+          {/* Settings */}
+          <Pressable
+            onPress={() => router.push("/settings")}
+            hitSlop={8}
+            style={styles.railButton}
+          >
+            <Image
+              source={require("@/assets/images/brutalist/Brutalism 9.png")}
+              contentFit="contain"
+              style={{ width: 28, height: 28 }}
+              tintColor={theme.colors.header.tint}
+            />
+          </Pressable>
+
+          <View style={{ flex: 1 }} />
+
+          {/* New session */}
+          <Pressable
+            onPress={handleNewSession}
+            hitSlop={8}
+            style={[styles.railButton, { marginBottom: safeArea.bottom + 12 }]}
+          >
+            <Ionicons
+              name="add-outline"
+              size={26}
+              color={theme.colors.header.tint}
+            />
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  // Expanded full sidebar
   return (
     <>
       <View style={[styles.container, { paddingTop: safeArea.top }]}>
         <View style={[styles.header, { height: headerHeight }]}>
-          {/* Logo - always first */}
-          <View style={styles.logoContainer}>
+          {/* Logo - tappable to collapse */}
+          <Pressable
+            onPress={isTablet ? toggleCollapsed : undefined}
+            hitSlop={8}
+            style={styles.logoContainer}
+          >
             <Image
               source={
                 theme.dark
@@ -240,12 +392,16 @@ export const SidebarView = React.memo(() => {
               contentFit="contain"
               style={[styles.logo, { height: 24, width: 24 }]}
             />
-          </View>
-
-          {/* Left-justified title - in document flow, prevents overlap */}
-          {shouldLeftJustify && (
-            <View style={styles.titleContainerLeft}>{titleContent}</View>
-          )}
+            {connectionStatus.color && (
+              <View style={styles.statusDotOverlay}>
+                <StatusDot
+                  color={connectionStatus.color}
+                  isPulsing={connectionStatus.isPulsing}
+                  size={6}
+                />
+              </View>
+            )}
+          </Pressable>
 
           {/* Navigation icons */}
           <View style={styles.rightContainer}>
@@ -297,11 +453,6 @@ export const SidebarView = React.memo(() => {
               />
             </Pressable>
           </View>
-
-          {/* Centered title - absolute positioned over full header */}
-          {!shouldLeftJustify && (
-            <View style={styles.titleContainer}>{titleContent}</View>
-          )}
         </View>
         {realtimeStatus !== "disconnected" && (
           <VoiceAssistantStatusBar variant="sidebar" />
