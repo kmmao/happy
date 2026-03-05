@@ -71,6 +71,12 @@ export interface QueryOptions {
   effort?: "low" | "medium" | "high" | "max";
   /** Enable prompt suggestions — agent emits a prompt_suggestion after each turn */
   promptSuggestions?: boolean;
+  /**
+   * Per-tool configuration for built-in tools.
+   * Currently supports AskUserQuestion preview format ('markdown' | 'html').
+   * Use 'html' for web-based SDK consumers (happy-cli default).
+   */
+  toolConfig?: import("@anthropic-ai/claude-agent-sdk").ToolConfig;
 }
 
 /** Query prompt — string or async stream of user messages */
