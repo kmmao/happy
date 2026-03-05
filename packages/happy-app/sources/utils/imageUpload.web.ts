@@ -201,25 +201,35 @@ export async function pickAndUploadImages(
 
   const selected = Array.from(files).slice(0, remaining);
 
-  const results = await Promise.allSettled(
-    selected.map(async (file) => {
-      const base64 = await blobToResizedBase64(file);
-      const path = await uploadImage(sessionId, base64);
-      return { path, displayUri: `data:image/jpeg;base64,${base64}` };
-    }),
+  // Encode concurrently (local CPU work), then upload serially to avoid
+  // overwhelming the server→CLI forwarding with multiple large payloads at once.
+  const encodeResults = await Promise.allSettled(
+    selected.map(async (file) => ({
+      base64: await blobToResizedBase64(file),
+      displayUri: `data:image/jpeg;base64,`,
+    })),
   );
 
   const paths: string[] = [];
   const displayUris: string[] = [];
   let failedCount = 0;
-  for (const r of results) {
-    if (r.status === "fulfilled") {
-      paths.push(r.value.path);
-      displayUris.push(r.value.displayUri);
-    } else {
+  for (const r of encodeResults) {
+    if (r.status === "rejected") {
+      console.warn(
+        "Image encode failed:",
+        r.reason instanceof Error ? r.reason.message : r.reason,
+      );
+      failedCount++;
+      continue;
+    }
+    try {
+      const path = await uploadImage(sessionId, r.value.base64);
+      paths.push(path);
+      displayUris.push(`data:image/jpeg;base64,${r.value.base64}`);
+    } catch (err) {
       console.warn(
         "Image upload failed:",
-        r.reason instanceof Error ? r.reason.message : r.reason,
+        err instanceof Error ? err.message : err,
       );
       failedCount++;
     }

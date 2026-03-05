@@ -124,12 +124,17 @@ export async function uploadImage(
   evictStaleCache();
 
   const filename = randomFilename();
+  console.log(
+    `[imageUpload] uploading ${filename} (${(base64.length / 1024).toFixed(0)}KB) for session ${sessionId.slice(-8)}`,
+  );
 
   // Use cache if available (the CLI already returns a session-scoped directory)
   const cached = uploadDirCache.get(sessionId);
   if (cached) {
     const remotePath = `${cached}/${filename}`;
+    console.log(`[imageUpload] using cached dir, writing to ${remotePath}`);
     if (await writeImageFile(sessionId, remotePath, base64)) {
+      console.log(`[imageUpload] cached dir write succeeded`);
       return remotePath;
     }
     // Cached dir failed — clear and retry below
@@ -140,11 +145,14 @@ export async function uploadImage(
   }
 
   // Upload to OS temp dir via getUploadDir RPC (cleaned by OS on reboot)
+  console.log(`[imageUpload] calling getUploadDir RPC...`);
   const tempDir = await getUploadDir(sessionId);
   if (tempDir) {
     const remotePath = `${tempDir}/${filename}`;
+    console.log(`[imageUpload] got dir ${tempDir}, writing file...`);
     if (await writeImageFile(sessionId, remotePath, base64)) {
       uploadDirCache.set(sessionId, tempDir);
+      console.log(`[imageUpload] write succeeded: ${remotePath}`);
       return remotePath;
     }
     console.error("[imageUpload] fresh dir write also failed");
