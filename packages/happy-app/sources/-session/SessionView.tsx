@@ -824,7 +824,7 @@ function SessionViewInner({
         onSttPress={onSttToggle}
         isSttListening={stt.isListening}
         isSttCorrecting={isSttCorrecting}
-        onAbort={() => sessionInterrupt(sessionId).catch(() => {})}
+        onAbort={() => sessionInterrupt(sessionId)}
         showAbortButton={
           sessionStatus.state === "thinking" ||
           sessionStatus.state === "waiting"

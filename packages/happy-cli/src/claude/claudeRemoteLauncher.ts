@@ -115,16 +115,13 @@ export async function claudeRemoteLauncher(
       try {
         await currentQuery.interrupt();
       } catch (e) {
-        // Do not fall back to abort() — interrupt() may have partially succeeded
-        // and already sent a signal to Claude. Hard abort would kill the process.
-        // User can press the abort button explicitly if they need a hard stop.
-        logger.debug(
-          "[remote]: interrupt() threw — not falling back to abort",
-          e,
-        );
+        logger.debug("[remote]: interrupt() threw — falling back to abort", e);
+        await abort();
       }
+    } else {
+      logger.debug("[remote]: no active query — falling back to abort");
+      await abort();
     }
-    // If no active query, interrupt is a no-op (nothing to interrupt)
   }
 
   async function doStopTask(args: { taskId: string }) {
