@@ -57,6 +57,7 @@ const SidebarNavigatorInner = React.memo(() => {
 
   return (
     <Drawer
+      key={showPermanentDrawer ? "permanent" : "front"}
       screenOptions={drawerNavigationOptions}
       drawerContent={showPermanentDrawer ? drawerContent : undefined}
     />

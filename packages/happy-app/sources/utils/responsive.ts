@@ -60,19 +60,13 @@ export function useDeviceType(): "phone" | "tablet" {
       pointsPerInch: Platform.OS === "ios" ? 163 : 160,
     });
 
-    // For web, use screen dimensions for minWidth (viewport is reduced by browser chrome)
-    const minWidthSource =
-      Platform.OS === "web" ? Dimensions.get("screen") : { width, height };
-
     return determineDeviceType({
       diagonalInches: dimensions.diagonalInches,
       platform: Platform.OS,
       // @ts-ignore - isPad is not in the type definitions but exists at runtime on iOS
       isPad: Platform.OS === "ios" ? Platform.isPad : false,
       minWidthPoints:
-        Platform.OS !== "ios"
-          ? Math.min(minWidthSource.width, minWidthSource.height)
-          : undefined,
+        Platform.OS !== "ios" ? Math.min(width, height) : undefined,
     });
   }, [width, height]);
 }
