@@ -49,6 +49,9 @@ const stylesheet = StyleSheet.create((theme) => ({
   buttonPressed: {
     backgroundColor: theme.colors.fab.backgroundPressed,
   },
+  buttonDisabled: {
+    backgroundColor: theme.colors.fab.background,
+  },
 }));
 
 interface ScrollToBottomButtonProps {
@@ -157,39 +160,26 @@ export const ScrollToBottomButton = React.memo(
       hasUserMessages && onPrevUserMessage && onNextUserMessage;
     const showOptionsButton = optionCount > 0 && onOptionsPress;
     const showBookmarkButton = bookmarkCount > 0 && onBookmarksPress;
+    const showPendingAction =
+      !showOptionsButton && hasPendingAction && onPendingActionPress;
 
-    if (
-      !shouldRenderScrollBtn &&
-      !showNavButtons &&
-      !showOptionsButton &&
-      !showBookmarkButton &&
-      !onCollapseInput &&
-      !hasPendingAction
-    ) {
-      return null;
-    }
+    const noop = () => {};
 
     const wrapWithIdleReset = (handler: () => void) => () => {
       resetIdleTimer();
       handler();
     };
 
-    const renderButton = (
-      icon: React.ComponentProps<typeof Ionicons>["name"],
-      onButtonPress: () => void,
-      size = 20,
-    ) => (
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          pressed ? styles.buttonPressed : styles.buttonDefault,
-        ]}
-        onPress={wrapWithIdleReset(onButtonPress)}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Ionicons name={icon} size={size} color={theme.colors.fab.icon} />
-      </Pressable>
-    );
+    // sparkles button: active if options available OR pending action
+    const sparklesActive = showOptionsButton || showPendingAction;
+    const sparklesHandler = showOptionsButton
+      ? onOptionsPress!
+      : showPendingAction
+        ? onPendingActionPress!
+        : noop;
+
+    const iconColor = theme.colors.fab.icon;
+    const disabledIconColor = theme.colors.textSecondary;
 
     return (
       <Animated.View
@@ -198,37 +188,137 @@ export const ScrollToBottomButton = React.memo(
       >
         <View style={styles.scrollBtnWrapper}>
           <View style={styles.scrollBtnRow}>
-            {showOptionsButton && (
-              <View>
-                {renderButton("sparkles", onOptionsPress, 18)}
-                <View style={styles.badge} />
-              </View>
-            )}
-            {hasPendingAction && onPendingActionPress && (
-              <View>
-                {renderButton("sparkles-outline", onPendingActionPress, 18)}
-                <View style={styles.badge} />
-              </View>
-            )}
-            {showNavButtons && renderButton("arrow-up", onPrevUserMessage, 18)}
-            {shouldRenderScrollBtn && (
+            <PulseButton
+              icon={showPendingAction ? "sparkles-outline" : "sparkles"}
+              onPress={wrapWithIdleReset(sparklesHandler)}
+              size={18}
+              styles={styles}
+              iconColor={iconColor}
+              disabledIconColor={disabledIconColor}
+              disabled={!sparklesActive}
+            />
+            <PulseButton
+              icon="bookmark"
+              onPress={wrapWithIdleReset(onBookmarksPress ?? noop)}
+              size={18}
+              styles={styles}
+              iconColor={iconColor}
+              disabledIconColor={disabledIconColor}
+              disabled={!showBookmarkButton}
+            />
+            <PulseButton
+              icon="arrow-up"
+              onPress={wrapWithIdleReset(onPrevUserMessage ?? noop)}
+              size={18}
+              styles={styles}
+              iconColor={iconColor}
+              disabledIconColor={disabledIconColor}
+              disabled={!showNavButtons}
+            />
+            {shouldRenderScrollBtn ? (
               <Animated.View style={{ opacity: scrollBtnOpacity }}>
-                {renderButton("chevron-down", onPress)}
+                <PulseButton
+                  icon="chevron-down"
+                  onPress={wrapWithIdleReset(onPress)}
+                  size={20}
+                  styles={styles}
+                  iconColor={iconColor}
+                  disabledIconColor={disabledIconColor}
+                />
               </Animated.View>
+            ) : (
+              <PulseButton
+                icon="chevron-down"
+                onPress={noop}
+                size={20}
+                styles={styles}
+                iconColor={iconColor}
+                disabledIconColor={disabledIconColor}
+                disabled
+              />
             )}
-            {showNavButtons &&
-              renderButton("arrow-down", onNextUserMessage, 18)}
-            {showBookmarkButton && (
-              <View>
-                {renderButton("bookmark", onBookmarksPress!, 18)}
-                <View style={styles.badge} />
-              </View>
+            <PulseButton
+              icon="arrow-down"
+              onPress={wrapWithIdleReset(onNextUserMessage ?? noop)}
+              size={18}
+              styles={styles}
+              iconColor={iconColor}
+              disabledIconColor={disabledIconColor}
+              disabled={!showNavButtons}
+            />
+            {onCollapseInput && (
+              <PulseButton
+                icon="contract-outline"
+                onPress={wrapWithIdleReset(onCollapseInput)}
+                size={18}
+                styles={styles}
+                iconColor={iconColor}
+                disabledIconColor={disabledIconColor}
+              />
             )}
-            {onCollapseInput &&
-              renderButton("contract-outline", onCollapseInput, 18)}
           </View>
         </View>
       </Animated.View>
     );
   },
 );
+
+const PulseButton = React.memo(function PulseButton({
+  icon,
+  onPress,
+  size = 20,
+  styles,
+  iconColor,
+  disabledIconColor,
+  disabled = false,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  onPress: () => void;
+  size?: number;
+  styles: typeof stylesheet;
+  iconColor: string;
+  disabledIconColor: string;
+  disabled?: boolean;
+}) {
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const wasDisabled = React.useRef(disabled);
+
+  React.useEffect(() => {
+    if (wasDisabled.current && !disabled) {
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.25,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    wasDisabled.current = disabled;
+  }, [disabled, scaleAnim]);
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          pressed && !disabled ? styles.buttonPressed : styles.buttonDefault,
+          disabled ? styles.buttonDisabled : undefined,
+        ]}
+        onPress={disabled ? undefined : onPress}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        disabled={disabled}
+      >
+        <Ionicons
+          name={icon}
+          size={size}
+          color={disabled ? disabledIconColor : iconColor}
+        />
+      </Pressable>
+    </Animated.View>
+  );
+});

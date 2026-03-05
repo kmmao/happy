@@ -60,6 +60,9 @@ const stylesheet = StyleSheet.create((theme) => ({
   buttonPressed: {
     backgroundColor: theme.colors.fab.backgroundPressed,
   },
+  buttonDisabled: {
+    backgroundColor: theme.colors.fab.background,
+  },
   badge: {
     position: "absolute" as const,
     top: 0,
@@ -150,7 +153,11 @@ export const InputFAB = React.memo(function InputFAB({
   const showOptions = optionCount > 0 && onOptionsPress;
   const showBookmarks = bookmarkCount > 0 && onBookmarksPress;
   const iconColor = theme.colors.fab.icon;
+  const disabledIconColor = theme.colors.textSecondary;
   const badgeColor = theme.colors.radio.dot;
+
+  // noop for disabled buttons
+  const noop = () => {};
 
   return (
     <Animated.View style={[styles.container, { opacity }]}>
@@ -164,62 +171,74 @@ export const InputFAB = React.memo(function InputFAB({
 
         {/* Vertical button column — right side */}
         <View style={styles.column}>
-          {showOptions && (
-            <FABButton
-              key="options"
-              icon="sparkles"
-              onPress={onOptionsPress}
-              badgeColor={badgeColor}
-              styles={styles}
-              iconColor={iconColor}
-            />
-          )}
-          {showBookmarks && (
-            <FABButton
-              key="bookmarks"
-              icon="bookmark"
-              onPress={onBookmarksPress}
-              badgeColor={badgeColor}
-              styles={styles}
-              iconColor={iconColor}
-            />
-          )}
-          {showNavButtons && (
-            <FABButton
-              key="prev"
-              icon="arrow-up"
-              onPress={onPrevUserMessage}
-              styles={styles}
-              iconColor={iconColor}
-            />
-          )}
-          {showScrollDown && (
+          <FABButton
+            key="options"
+            icon="sparkles"
+            onPress={onOptionsPress ?? noop}
+            styles={styles}
+            iconColor={iconColor}
+            disabledIconColor={disabledIconColor}
+            disabled={!showOptions}
+          />
+          <FABButton
+            key="bookmarks"
+            icon="bookmark"
+            onPress={onBookmarksPress ?? noop}
+            styles={styles}
+            iconColor={iconColor}
+            disabledIconColor={disabledIconColor}
+            disabled={!showBookmarks}
+          />
+          <FABButton
+            key="prev"
+            icon="arrow-up"
+            onPress={onPrevUserMessage ?? noop}
+            styles={styles}
+            iconColor={iconColor}
+            disabledIconColor={disabledIconColor}
+            disabled={!showNavButtons}
+          />
+          {showScrollDown ? (
             <FABButton
               key="scroll-down"
               icon="chevron-down"
               onPress={onScrollDown}
               styles={styles}
               iconColor={iconColor}
+              disabledIconColor={disabledIconColor}
             />
-          )}
-          {showNavButtons && (
+          ) : (
             <FABButton
-              key="next"
-              icon="arrow-down"
-              onPress={onNextUserMessage}
+              key="scroll-down"
+              icon="chevron-down"
+              onPress={noop}
               styles={styles}
               iconColor={iconColor}
+              disabledIconColor={disabledIconColor}
+              disabled
             />
           )}
+          <FABButton
+            key="next"
+            icon="arrow-down"
+            onPress={onNextUserMessage ?? noop}
+            styles={styles}
+            iconColor={iconColor}
+            disabledIconColor={disabledIconColor}
+            disabled={!showNavButtons}
+          />
 
           {/* Expand input button */}
           <FABButton
             key="expand"
             icon="expand-outline"
             onPress={onExpandPress}
-            badgeColor={hasPendingAction && !showOptions ? badgeColor : undefined}
+            badgeColor={
+              hasPendingAction && !showOptions ? badgeColor : undefined
+            }
             styles={styles}
             iconColor={iconColor}
+            disabledIconColor={disabledIconColor}
           />
         </View>
       </View>
@@ -336,6 +355,8 @@ const FABButton = React.memo(function FABButton({
   badgeColor,
   styles,
   iconColor,
+  disabledIconColor,
+  disabled = false,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   onPress: () => void;
@@ -343,23 +364,53 @@ const FABButton = React.memo(function FABButton({
   badgeColor?: string;
   styles: typeof stylesheet;
   iconColor: string;
+  disabledIconColor: string;
+  disabled?: boolean;
 }) {
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const wasDisabled = React.useRef(disabled);
+
+  React.useEffect(() => {
+    if (wasDisabled.current && !disabled) {
+      // Pulse animation when becoming enabled
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.25,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    wasDisabled.current = disabled;
+  }, [disabled, scaleAnim]);
+
   return (
-    <View>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <Pressable
         style={({ pressed }) => [
           styles.button,
-          pressed ? styles.buttonPressed : styles.buttonDefault,
+          pressed && !disabled ? styles.buttonPressed : styles.buttonDefault,
+          disabled ? styles.buttonDisabled : undefined,
         ]}
-        onPress={onPress}
+        onPress={disabled ? undefined : onPress}
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         accessibilityRole="button"
+        disabled={disabled}
       >
-        <Ionicons name={icon} size={size} color={iconColor} />
+        <Ionicons
+          name={icon}
+          size={size}
+          color={disabled ? disabledIconColor : iconColor}
+        />
       </Pressable>
-      {badgeColor && (
+      {badgeColor && !disabled && (
         <View style={[styles.badge, { backgroundColor: badgeColor }]} />
       )}
-    </View>
+    </Animated.View>
   );
 });
