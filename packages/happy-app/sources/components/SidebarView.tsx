@@ -117,21 +117,6 @@ const stylesheet = StyleSheet.create((theme) => ({
     fontSize: 10,
     ...Typography.default("semiBold"),
   },
-  statusConnected: {
-    color: theme.colors.status.connected,
-  },
-  statusConnecting: {
-    color: theme.colors.status.connecting,
-  },
-  statusDisconnected: {
-    color: theme.colors.status.disconnected,
-  },
-  statusError: {
-    color: theme.colors.status.error,
-  },
-  statusDefault: {
-    color: theme.colors.status.default,
-  },
   indicatorDot: {
     position: "absolute",
     top: 0,
@@ -216,47 +201,41 @@ export const SidebarView = React.memo(() => {
   const [showProjectTab] = useSettingMutable("showProjectTab");
   const { collapsed, toggleCollapsed } = useSidebarState();
 
-  // Compute connection status once per render (theme-reactive, no stale memoization)
-  const connectionStatus = (() => {
+  const connectionStatus = React.useMemo(() => {
     const { status } = socketStatus;
     switch (status) {
       case "connected":
         return {
-          color: styles.statusConnected.color,
+          color: theme.colors.status.connected,
           isPulsing: false,
           text: t("status.connected"),
-          textColor: styles.statusConnected.color,
         };
       case "connecting":
         return {
-          color: styles.statusConnecting.color,
+          color: theme.colors.status.connecting,
           isPulsing: true,
           text: t("status.connecting"),
-          textColor: styles.statusConnecting.color,
         };
       case "disconnected":
         return {
-          color: styles.statusDisconnected.color,
+          color: theme.colors.status.disconnected,
           isPulsing: false,
           text: t("status.disconnected"),
-          textColor: styles.statusDisconnected.color,
         };
       case "error":
         return {
-          color: styles.statusError.color,
+          color: theme.colors.status.error,
           isPulsing: false,
           text: t("status.error"),
-          textColor: styles.statusError.color,
         };
       default:
         return {
-          color: styles.statusDefault.color,
+          color: theme.colors.status.default,
           isPulsing: false,
           text: "",
-          textColor: styles.statusDefault.color,
         };
     }
-  })();
+  }, [socketStatus, theme.colors.status]);
 
   const handleNewSession = React.useCallback(() => {
     router.push("/new");
@@ -380,6 +359,7 @@ export const SidebarView = React.memo(() => {
           {/* Logo - tappable to collapse */}
           <Pressable
             onPress={isTablet ? toggleCollapsed : undefined}
+            disabled={!isTablet}
             hitSlop={8}
             style={styles.logoContainer}
           >
