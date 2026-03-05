@@ -44,7 +44,7 @@ export default {
         NSBonjourServices: ["_http._tcp", "_https._tcp"],
       },
       associatedDomains:
-        variant === "production" ? ["applinks:app.happy.engineering"] : [],
+        variant === "production" ? ["applinks:happy.xycloud.info"] : [],
     },
     android: {
       adaptiveIcon: {
@@ -71,7 +71,7 @@ export default {
                 data: [
                   {
                     scheme: "https",
-                    host: "app.happy.engineering",
+                    host: "happy.xycloud.info",
                     pathPrefix: "/",
                   },
                 ],
