@@ -225,17 +225,24 @@ export async function claudeRemoteLauncher(
     // Write to permission handler for tool id resolving
     permissionHandler.onMessage(message);
 
-    // Detect plan mode tool call
+    // Detect plan mode tool calls
     if (message.type === "assistant") {
       let umessage = message as SDKAssistantMessage;
       if (umessage.message.content && Array.isArray(umessage.message.content)) {
         for (let c of umessage.message.content) {
-          if (
-            c.type === "tool_use" &&
-            (c.name === "exit_plan_mode" || c.name === "ExitPlanMode")
-          ) {
-            logger.debug("[remote]: detected plan mode tool call " + c.id!);
-            planModeToolCalls.add(c.id! as string);
+          if (c.type === "tool_use") {
+            if (c.name === "exit_plan_mode" || c.name === "ExitPlanMode") {
+              logger.debug("[remote]: detected plan mode tool call " + c.id!);
+              planModeToolCalls.add(c.id! as string);
+            }
+            // When SDK enters plan mode via EnterPlanMode tool, sync permissionHandler
+            // so ExitPlanMode goes through the normal approval flow instead of auto-approving
+            if (c.name === "enter_plan_mode" || c.name === "EnterPlanMode") {
+              logger.debug(
+                "[remote]: detected EnterPlanMode — syncing permissionHandler to plan mode",
+              );
+              permissionHandler.handleModeChange("plan");
+            }
           }
         }
       }
