@@ -21,8 +21,6 @@ export default function FeaturesSettingsScreen() {
   );
   const [useEnhancedSessionWizard, setUseEnhancedSessionWizard] =
     useSettingMutable("useEnhancedSessionWizard");
-  const [autoApprovePlan, setAutoApprovePlan] =
-    useSettingMutable("autoApprovePlan");
   const [sttCorrection, setSttCorrection] = useSettingMutable("sttCorrection");
   const [showProjectTab, setShowProjectTab] =
     useSettingMutable("showProjectTab");
@@ -80,24 +78,6 @@ export default function FeaturesSettingsScreen() {
             <Switch
               value={useEnhancedSessionWizard}
               onValueChange={setUseEnhancedSessionWizard}
-            />
-          }
-          showChevron={false}
-        />
-        <Item
-          title={t("settingsFeatures.autoApprovePlan")}
-          subtitle={
-            autoApprovePlan
-              ? t("settingsFeatures.autoApprovePlanEnabled")
-              : t("settingsFeatures.autoApprovePlanDisabled")
-          }
-          icon={
-            <Ionicons name="checkmark-done-outline" size={29} color="#FF3B30" />
-          }
-          rightElement={
-            <Switch
-              value={autoApprovePlan}
-              onValueChange={setAutoApprovePlan}
             />
           }
           showChevron={false}

@@ -253,10 +253,6 @@ export const ca: TranslationStructure = {
     showAgentActivity: "Activitat de l'agent",
     showAgentActivityEnabled: "Mostra l'activitat de l'agent en temps real",
     showAgentActivityDisabled: "Detalls de l'activitat de l'agent ocults",
-    autoApprovePlan: "Aprovació automàtica de plans",
-    autoApprovePlanEnabled:
-      "Els plans s'aproven automàticament sense confirmació",
-    autoApprovePlanDisabled: "Els plans requereixen aprovació manual",
     sttCorrection: "Correcció de transcripció de veu",
     sttCorrectionEnabled: "La IA corregeix errors de reconeixement de veu",
     sttCorrectionDisabled: "Usant el resultat brut del reconeixement de veu",

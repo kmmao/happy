@@ -553,9 +553,6 @@ class Sync {
     const { permissionMode, model, thinking, effort, maxBudgetUsd } =
       resolveMessageModeMeta(session);
 
-    const autoApprovePlan =
-      storage.getState().settings.autoApprovePlan || false;
-
     // Generate local ID
     const localId = randomUUID();
 
@@ -592,7 +589,6 @@ class Sync {
         fallbackModel,
         appendSystemPrompt: systemPrompt,
         locale: getCurrentLanguage(),
-        ...(autoApprovePlan && { autoApprovePlan }),
         ...(displayText && { displayText }),
         ...(thinking && { thinking }),
         ...(effort && { effort }),

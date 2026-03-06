@@ -372,7 +372,6 @@ export async function runClaude(
   let currentAppendSystemPrompt: string | undefined = undefined; // Track current append system prompt
   let currentAllowedTools: string[] | undefined = undefined; // Track current allowed tools
   let currentDisallowedTools: string[] | undefined = undefined; // Track current disallowed tools
-  let currentAutoApprovePlan = false; // Track auto-approve plan setting
   let currentMaxBudgetUsd: number | undefined = undefined; // Track current budget
   let currentThinking: EnhancedMode["thinking"] = undefined; // Track current thinking config
   let currentEffort: EnhancedMode["effort"] = undefined; // Track current effort level
@@ -489,16 +488,6 @@ export async function runClaude(
       );
     }
 
-    // Resolve auto-approve plan setting
-    let messageAutoApprovePlan = currentAutoApprovePlan;
-    if (message.meta?.hasOwnProperty("autoApprovePlan")) {
-      messageAutoApprovePlan = !!message.meta.autoApprovePlan;
-      currentAutoApprovePlan = messageAutoApprovePlan;
-      logger.debug(
-        `[loop] Auto-approve plan updated from user message: ${messageAutoApprovePlan}`,
-      );
-    }
-
     // Resolve maxBudgetUsd
     let messageMaxBudgetUsd = currentMaxBudgetUsd;
     if (message.meta?.hasOwnProperty("maxBudgetUsd")) {
@@ -571,7 +560,6 @@ export async function runClaude(
         appendSystemPrompt: messageAppendSystemPrompt,
         allowedTools: messageAllowedTools,
         disallowedTools: messageDisallowedTools,
-        autoApprovePlan: messageAutoApprovePlan,
         maxBudgetUsd: messageMaxBudgetUsd,
         thinking: messageThinking,
         effort: messageEffort,
@@ -598,7 +586,6 @@ export async function runClaude(
         appendSystemPrompt: messageAppendSystemPrompt,
         allowedTools: messageAllowedTools,
         disallowedTools: messageDisallowedTools,
-        autoApprovePlan: messageAutoApprovePlan,
         maxBudgetUsd: messageMaxBudgetUsd,
         thinking: messageThinking,
         effort: messageEffort,
@@ -624,7 +611,6 @@ export async function runClaude(
       appendSystemPrompt: messageAppendSystemPrompt,
       allowedTools: messageAllowedTools,
       disallowedTools: messageDisallowedTools,
-      autoApprovePlan: messageAutoApprovePlan,
       maxBudgetUsd: messageMaxBudgetUsd,
       thinking: messageThinking,
       effort: messageEffort,

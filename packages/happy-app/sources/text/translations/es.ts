@@ -253,10 +253,6 @@ export const es: TranslationStructure = {
     showAgentActivity: "Actividad del agente",
     showAgentActivityEnabled: "Mostrar actividad del agente en tiempo real",
     showAgentActivityDisabled: "Detalles de actividad del agente ocultos",
-    autoApprovePlan: "Aprobar planes automáticamente",
-    autoApprovePlanEnabled:
-      "Los planes se aprueban automáticamente sin confirmación",
-    autoApprovePlanDisabled: "Los planes requieren aprobación manual",
     sttCorrection: "Corrección de transcripción de voz",
     sttCorrectionEnabled: "IA corrige errores de reconocimiento de voz",
     sttCorrectionDisabled:

@@ -228,7 +228,6 @@ export const MessageMetaSchema = z.object({
   appendSystemPrompt: z.string().nullable().optional(), // Append to system prompt for this message (null = reset)
   allowedTools: z.array(z.string()).nullable().optional(), // Allowed tools for this message (null = reset)
   disallowedTools: z.array(z.string()).nullable().optional(), // Disallowed tools for this message (null = reset)
-  autoApprovePlan: z.boolean().optional(), // Auto-approve ExitPlanMode without showing confirmation buttons
   maxBudgetUsd: z.number().nullable().optional(), // Maximum USD budget for this session (null = reset)
   thinking: z
     .object({
@@ -390,6 +389,7 @@ export type AgentState = {
       mode?: PermissionMode;
       decision?: "approved" | "approved_for_session" | "denied" | "abort";
       allowTools?: string[];
+      answers?: Record<string, string>;
     };
   };
 };

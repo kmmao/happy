@@ -22,7 +22,6 @@ export interface EnhancedMode {
   appendSystemPrompt?: string;
   allowedTools?: string[];
   disallowedTools?: string[];
-  autoApprovePlan?: boolean;
   /** Maximum USD budget — SDK returns error_max_budget_usd when exceeded */
   maxBudgetUsd?: number;
   /** Controls thinking/reasoning behavior (adaptive, enabled, disabled) */

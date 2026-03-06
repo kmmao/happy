@@ -357,11 +357,6 @@ export const SettingsSchema = z.object({
     .describe(
       "Show real-time agent activity details in chat (thinking state, subagent info, tool descriptions)",
     ),
-  autoApprovePlan: z
-    .boolean()
-    .describe(
-      "Auto-approve plan proposals (ExitPlanMode) without showing confirmation buttons",
-    ),
   sttCorrection: z
     .boolean()
     .describe(
@@ -542,7 +537,6 @@ export const settingsDefaults: Settings = {
   analyticsOptOut: false,
   experiments: false,
   showAgentActivity: true,
-  autoApprovePlan: false,
   sttCorrection: false,
   useEnhancedSessionWizard: false,
   alwaysShowContextSize: true,

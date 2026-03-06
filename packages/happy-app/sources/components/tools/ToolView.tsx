@@ -27,6 +27,7 @@ import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal/ModalManager";
 import { sessionAllow } from "@/sync/ops";
 import { useToolReview } from "./useToolReview";
+import { PermissionFooter } from "./PermissionFooter";
 
 interface ToolViewProps {
   metadata: Metadata | null;
@@ -108,17 +109,20 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     sessionId,
   });
 
-  // Auto-approve all tool permissions — no user confirmation needed
+  // Auto-approve tool permissions — ExitPlanMode and AskUserQuestion require manual approval
+  const isExitPlanMode =
+    tool.name === "ExitPlanMode" || tool.name === "exit_plan_mode";
   React.useEffect(() => {
     if (
       sessionId &&
       tool.permission?.status === "pending" &&
       tool.permission?.id &&
-      tool.name !== "AskUserQuestion"
+      tool.name !== "AskUserQuestion" &&
+      !isExitPlanMode
     ) {
       sessionAllow(sessionId, tool.permission.id);
     }
-  }, [sessionId, tool.permission?.status, tool.permission?.id, tool.name]);
+  }, [sessionId, tool.permission?.status, tool.permission?.id, tool.name, isExitPlanMode]);
 
   let knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
 
@@ -547,7 +551,16 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         );
       })()}
 
-      {/* Permission footer removed — all tools are auto-approved */}
+      {/* Permission footer for ExitPlanMode — requires manual approval */}
+      {isExitPlanMode && sessionId && tool.permission && (
+        <PermissionFooter
+          permission={tool.permission}
+          sessionId={sessionId}
+          toolName={tool.name}
+          toolInput={tool.input}
+          metadata={props.metadata}
+        />
+      )}
     </View>
   );
 });

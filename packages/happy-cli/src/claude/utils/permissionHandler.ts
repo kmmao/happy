@@ -156,8 +156,8 @@ export class PermissionHandler {
     // Without it, isAborted() returns true for ExitPlanMode and claudeRemote exits,
     // but the restart message is never queued, causing the session to hang forever.
     if (descriptor.exitPlan) {
-      // Auto-approve in bypassPermissions/Yolo mode or when autoApprovePlan setting is enabled
-      if (this.permissionMode === "bypassPermissions" || mode.autoApprovePlan) {
+      // Auto-approve in bypassPermissions/Yolo mode
+      if (this.permissionMode === "bypassPermissions") {
         return this.autoApproveExitPlan(toolName, input);
       }
 
@@ -580,6 +580,7 @@ export class PermissionHandler {
               reason: message.reason,
               mode: message.mode,
               allowTools: message.allowTools,
+              ...(message.answers && { answers: message.answers }),
             },
           },
         };
