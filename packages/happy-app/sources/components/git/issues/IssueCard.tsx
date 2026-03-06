@@ -4,16 +4,18 @@ import { Octicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
-import type { Issue } from "@/sync/issueTypes";
+import type { Issue, AggregatedIssue } from "@/sync/issueTypes";
 
 interface IssueCardProps {
-  readonly issue: Issue;
-  readonly onPress: (issue: Issue) => void;
+  readonly issue: Issue | AggregatedIssue;
+  readonly onPress: (issue: any) => void;
+  readonly repoLabel?: string;
 }
 
 export const IssueCard = React.memo<IssueCardProps>(function IssueCard({
   issue,
   onPress,
+  repoLabel,
 }) {
   const { theme } = useUnistyles();
   const isOpen = issue.state === "open";
@@ -53,6 +55,18 @@ export const IssueCard = React.memo<IssueCardProps>(function IssueCard({
           </Text>
         </View>
         <View style={styles.meta}>
+          {repoLabel && (
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.colors.textLink,
+                ...Typography.mono(),
+              }}
+              numberOfLines={1}
+            >
+              {repoLabel}
+            </Text>
+          )}
           <Text
             style={{
               fontSize: 13,

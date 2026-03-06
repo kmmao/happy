@@ -43,3 +43,9 @@ export interface IssueFilters {
   readonly state: IssueFilterState;
   readonly search: string;
 }
+
+/** Issue with source repo label — used in aggregated multi-repo view */
+export interface AggregatedIssue extends Issue {
+  readonly repoLabel: string; // "owner/repo"
+  readonly projectKey: string;
+}

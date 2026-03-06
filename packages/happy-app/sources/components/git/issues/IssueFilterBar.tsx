@@ -22,6 +22,7 @@ interface IssueFilterBarProps {
   readonly closedCount?: number;
   readonly loading?: boolean;
   readonly onRefresh?: () => void;
+  readonly onCreateIssue?: () => void;
 }
 
 const FILTERS: readonly {
@@ -40,6 +41,7 @@ export const IssueFilterBar = React.memo<IssueFilterBarProps>(
     closedCount,
     loading,
     onRefresh,
+    onCreateIssue,
   }) {
     const { theme } = useUnistyles();
     const rotation = useSharedValue(0);
@@ -114,6 +116,22 @@ export const IssueFilterBar = React.memo<IssueFilterBarProps>(
           );
         })}
         <View style={{ flex: 1 }} />
+        {onCreateIssue && (
+          <Pressable
+            onPress={onCreateIssue}
+            hitSlop={8}
+            style={{
+              paddingHorizontal: 4,
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons
+              name="add-outline"
+              size={20}
+              color={theme.colors.textLink}
+            />
+          </Pressable>
+        )}
         {onRefresh && (
           <Pressable
             onPress={onRefresh}

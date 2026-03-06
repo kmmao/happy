@@ -6,6 +6,7 @@
  * Uses page-based pagination (not infinite scroll).
  */
 
+import * as React from "react";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import type {
@@ -14,9 +15,16 @@ import type {
   IssueFilters,
   IssueFilterState,
   GitHostMapping,
+  AggregatedIssue,
 } from "./issueTypes";
 import { parseRemoteUrl } from "./issueUtils";
-import { fetchIssues, checkGhCliAvailable } from "./issueFetch";
+import {
+  fetchIssues,
+  checkGhCliAvailable,
+  updateIssueState as apiUpdateIssueState,
+  addIssueComment as apiAddIssueComment,
+  createIssue as apiCreateIssue,
+} from "./issueFetch";
 
 //
 // State
@@ -59,9 +67,35 @@ interface IssueActions {
     sessionId: string,
     repoPath?: string,
   ) => Promise<void>;
+  refreshAllIssues: (
+    projectKeys: readonly string[],
+    sessionId: string,
+    repoPathByKey?: Readonly<Record<string, string | undefined>>,
+  ) => Promise<void>;
   setFilterState: (state: IssueFilterState) => void;
   setSearch: (search: string) => void;
   checkGhAvailable: (sessionId: string, repoPath?: string) => Promise<boolean>;
+  updateIssueState: (
+    projectKey: string,
+    issueNumber: number,
+    newState: "open" | "closed",
+    sessionId: string,
+    repoPath?: string,
+  ) => Promise<void>;
+  addComment: (
+    projectKey: string,
+    issueNumber: number,
+    body: string,
+    sessionId: string,
+    repoPath?: string,
+  ) => Promise<void>;
+  createIssue: (
+    projectKey: string,
+    title: string,
+    body: string,
+    sessionId: string,
+    repoPath?: string,
+  ) => Promise<void>;
   reset: () => void;
 }
 
@@ -197,6 +231,27 @@ export const issueStore = create<IssueStore>()((set, get) => ({
     await get().loadIssues(projectKey, sessionId, currentPage, repoPath);
   },
 
+  refreshAllIssues: async (
+    projectKeys: readonly string[],
+    sessionId: string,
+    repoPathByKey?: Readonly<Record<string, string | undefined>>,
+  ) => {
+    // Clear cooldown for all keys
+    set((prev) => {
+      const cleared = { ...prev.lastFetchedAt };
+      for (const key of projectKeys) {
+        cleared[key] = 0;
+      }
+      return { lastFetchedAt: cleared };
+    });
+    // Load all in parallel
+    await Promise.all(
+      projectKeys.map((key) =>
+        get().loadIssues(key, sessionId, 1, repoPathByKey?.[key]),
+      ),
+    );
+  },
+
   setFilterState: (state: IssueFilterState) => {
     set((prev) => ({
       filters: { ...prev.filters, state },
@@ -223,6 +278,97 @@ export const issueStore = create<IssueStore>()((set, get) => ({
       ghAvailable: { ...prev.ghAvailable, [key]: available },
     }));
     return available;
+  },
+
+  updateIssueState: async (
+    projectKey: string,
+    issueNumber: number,
+    newState: "open" | "closed",
+    sessionId: string,
+    repoPath?: string,
+  ) => {
+    const repoInfo = get().repoInfoByProject[projectKey];
+    if (!repoInfo || repoInfo.provider === "unknown") {
+      throw new Error("Repository info not found");
+    }
+    await apiUpdateIssueState(
+      sessionId,
+      repoInfo,
+      issueNumber,
+      newState,
+      repoPath,
+    );
+    // Update local state immediately
+    set((prev) => {
+      const issues = prev.issuesByProject[projectKey] ?? [];
+      const updated = issues.map((i) =>
+        i.number === issueNumber
+          ? { ...i, state: newState, updatedAt: Date.now() }
+          : i,
+      );
+      return {
+        issuesByProject: { ...prev.issuesByProject, [projectKey]: updated },
+      };
+    });
+  },
+
+  addComment: async (
+    projectKey: string,
+    issueNumber: number,
+    body: string,
+    sessionId: string,
+    repoPath?: string,
+  ) => {
+    const repoInfo = get().repoInfoByProject[projectKey];
+    if (!repoInfo || repoInfo.provider === "unknown") {
+      throw new Error("Repository info not found");
+    }
+    await apiAddIssueComment(sessionId, repoInfo, issueNumber, body, repoPath);
+    // Update local commentCount
+    set((prev) => {
+      const issues = prev.issuesByProject[projectKey] ?? [];
+      const updated = issues.map((i) =>
+        i.number === issueNumber
+          ? { ...i, commentCount: i.commentCount + 1, updatedAt: Date.now() }
+          : i,
+      );
+      return {
+        issuesByProject: { ...prev.issuesByProject, [projectKey]: updated },
+      };
+    });
+  },
+
+  createIssue: async (
+    projectKey: string,
+    title: string,
+    body: string,
+    sessionId: string,
+    repoPath?: string,
+  ) => {
+    const repoInfo = get().repoInfoByProject[projectKey];
+    if (!repoInfo || repoInfo.provider === "unknown") {
+      throw new Error("Repository info not found");
+    }
+    const newIssue = await apiCreateIssue(
+      sessionId,
+      repoInfo,
+      title,
+      body,
+      repoPath,
+    );
+    // Prepend to local list if filter is "open" or "all"
+    const currentFilter = get().filters.state;
+    if (currentFilter === "open" || currentFilter === "all") {
+      set((prev) => {
+        const issues = prev.issuesByProject[projectKey] ?? [];
+        return {
+          issuesByProject: {
+            ...prev.issuesByProject,
+            [projectKey]: [newIssue, ...issues],
+          },
+        };
+      });
+    }
   },
 
   reset: () => {
@@ -288,5 +434,105 @@ export function useIssueClosedCount(projectKey: string): number {
     (s) =>
       (s.issuesByProject[projectKey] ?? []).filter((i) => i.state === "closed")
         .length,
+  );
+}
+
+//
+// Aggregated multi-repo selectors
+//
+
+/**
+ * Aggregated hook — single zustand subscription for all multi-repo data.
+ * Returns a snapshot string that changes only when underlying data changes,
+ * then useMemo builds AggregatedIssue objects outside the selector.
+ */
+export function useAggregatedIssues(
+  projectKeys: readonly string[],
+): readonly AggregatedIssue[] {
+  // Single subscription: extract raw stable references
+  const snapshot = issueStore((s) => {
+    // Build a fingerprint from the data we care about.
+    // If none of the relevant slices changed, return the same string → no re-render.
+    let fp = s.filters.search;
+    for (const key of projectKeys) {
+      const issues = s.issuesByProject[key];
+      const info = s.repoInfoByProject[key];
+      // Use the array reference identity via length + first/last id as a cheap fingerprint
+      if (issues && issues.length > 0) {
+        fp += `|${key}:${issues.length}:${issues[0]!.number}:${issues[issues.length - 1]!.number}:${issues[0]!.updatedAt}`;
+      } else {
+        fp += `|${key}:0`;
+      }
+      if (info) {
+        fp += `:${info.owner}/${info.repo}`;
+      }
+    }
+    return fp;
+  });
+
+  // Read store state directly (not via hook) for the actual data
+  return React.useMemo(() => {
+    // Touch snapshot to register as dependency
+    void snapshot;
+    const s = issueStore.getState();
+    const result: AggregatedIssue[] = [];
+    for (const key of projectKeys) {
+      const issues = s.issuesByProject[key] ?? [];
+      const info = s.repoInfoByProject[key];
+      const repoLabel = info ? `${info.owner}/${info.repo}` : key;
+      for (const issue of issues) {
+        result.push({ ...issue, repoLabel, projectKey: key });
+      }
+    }
+    const { search } = s.filters;
+    const filtered = search
+      ? result.filter((i) => {
+          const lower = search.toLowerCase();
+          return (
+            i.title.toLowerCase().includes(lower) ||
+            String(i.number).includes(lower) ||
+            i.author.toLowerCase().includes(lower) ||
+            i.repoLabel.toLowerCase().includes(lower)
+          );
+        })
+      : result;
+    return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [projectKeys, snapshot]);
+}
+
+export function useAggregatedLoading(projectKeys: readonly string[]): boolean {
+  return issueStore((s) => projectKeys.some((k) => s.isLoading[k]));
+}
+
+export function useAggregatedError(projectKeys: readonly string[]): string {
+  return issueStore((s) => {
+    const errors = projectKeys
+      .map((k) => s.errors[k])
+      .filter((e) => e && e.length > 0);
+    return errors.join("\n");
+  });
+}
+
+export function useAggregatedOpenCount(projectKeys: readonly string[]): number {
+  return issueStore((s) =>
+    projectKeys.reduce(
+      (sum, k) =>
+        sum +
+        (s.issuesByProject[k] ?? []).filter((i) => i.state === "open").length,
+      0,
+    ),
+  );
+}
+
+export function useAggregatedClosedCount(
+  projectKeys: readonly string[],
+): number {
+  return issueStore((s) =>
+    projectKeys.reduce(
+      (sum, k) =>
+        sum +
+        (s.issuesByProject[k] ?? []).filter((i) => i.state === "closed").length,
+      0,
+    ),
   );
 }

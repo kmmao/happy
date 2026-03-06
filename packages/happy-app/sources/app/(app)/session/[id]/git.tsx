@@ -45,17 +45,40 @@ export default React.memo(function GitScreen() {
 
   const hasSubmodules = submodules !== undefined && submodules.length > 0;
 
-  // Issue count for tab badge
-  const projectKey = React.useMemo(() => {
+  // Issue count for tab badge — aggregate all repos
+  const computedIssueKeys = React.useMemo(() => {
     const session = storage.getState().sessions[sessionId];
-    if (!session?.metadata?.machineId || !session?.metadata?.path) return "";
-    return `${session.metadata.machineId}:${session.metadata.path}`;
-  }, [sessionId]);
+    if (!session?.metadata?.machineId || !session?.metadata?.path) return [];
+    const mid = session.metadata.machineId;
+    const path = session.metadata.path;
+    const keys: string[] = [];
+    if (gitStatus?.remoteUrl) {
+      keys.push(`${mid}:${path}`);
+    }
+    if (submodules) {
+      for (const sub of submodules) {
+        if (!sub.gitStatus?.remoteUrl) continue;
+        keys.push(`${mid}:${path}|${sub.path}`);
+      }
+    }
+    return keys;
+  }, [sessionId, gitStatus?.remoteUrl, submodules]);
 
-  const issueCount = issueStore(
-    (s) =>
-      (s.issuesByProject[projectKey] ?? []).filter((i) => i.state === "open")
-        .length,
+  // Stabilize reference to avoid unnecessary selector re-subscriptions
+  const issueKeysStr = computedIssueKeys.join("\n");
+  const stableIssueKeysRef = React.useRef<readonly string[]>([]);
+  if (stableIssueKeysRef.current.join("\n") !== issueKeysStr) {
+    stableIssueKeysRef.current = computedIssueKeys;
+  }
+  const allIssueKeys = stableIssueKeysRef.current;
+
+  const issueCount = issueStore((s) =>
+    allIssueKeys.reduce(
+      (sum, k) =>
+        sum +
+        (s.issuesByProject[k] ?? []).filter((i) => i.state === "open").length,
+      0,
+    ),
   );
 
   // Resolve git status for selected repo (root or submodule)
@@ -230,8 +253,8 @@ export default React.memo(function GitScreen() {
       >
         <GitIssuesTab
           sessionId={sessionId}
-          repoPath={selectedRepoPath ?? undefined}
-          gitStatus={activeGitStatus}
+          gitStatus={gitStatus}
+          submodules={submodules}
           onPullDown={hasSubmodules ? handlePullDown : undefined}
           onScrollUp={hasSubmodules ? handleScrollUp : undefined}
         />

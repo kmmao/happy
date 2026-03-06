@@ -202,6 +202,190 @@ export async function fetchIssues(
 }
 
 /**
+ * Update issue state (close or reopen).
+ */
+export async function updateIssueState(
+  sessionId: string,
+  repoInfo: RepoInfo,
+  issueNumber: number,
+  newState: "open" | "closed",
+  repoPath?: string,
+): Promise<void> {
+  if (repoInfo.provider === "github") {
+    const cwd = resolveRepoPath(sessionId, repoPath);
+    if (!cwd) throw new Error("Session path not found");
+    const stateReason =
+      newState === "closed" ? ' -f state_reason="completed"' : "";
+    const command = `gh api -X PATCH "repos/${repoInfo.owner}/${repoInfo.repo}/issues/${issueNumber}" -f state="${newState}"${stateReason} 2>&1`;
+    const result = await sessionBash(sessionId, {
+      command,
+      cwd,
+      timeout: ISSUE_FETCH_TIMEOUT,
+    });
+    if (!result.success || result.exitCode !== 0) {
+      throw new Error(
+        result.stdout.trim() || result.error || "Failed to update issue state",
+      );
+    }
+    return;
+  }
+
+  if (repoInfo.provider === "gitea") {
+    if (!repoInfo.apiBase) {
+      throw new Error("Gitea API base URL not configured.");
+    }
+    const url = `${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/issues/${issueNumber}`;
+    const authHeader = repoInfo.apiToken
+      ? `-H "Authorization: token ${repoInfo.apiToken}"`
+      : "";
+    const command = `curl -s -X PATCH ${authHeader} -H "Content-Type: application/json" -d '{"state":"${newState}"}' -w "\\n%{http_code}" "${url}" 2>&1`;
+    const result = await sessionBash(sessionId, {
+      command,
+      timeout: ISSUE_FETCH_TIMEOUT,
+    });
+    if (!result.success || result.exitCode !== 0) {
+      throw new Error(
+        result.stdout.trim() || result.error || "Failed to update issue state",
+      );
+    }
+    const lines = result.stdout.trim().split("\n");
+    const httpStatus = lines.pop()?.trim() ?? "";
+    if (httpStatus && !httpStatus.startsWith("2")) {
+      throw new Error(`Gitea API returned HTTP ${httpStatus}`);
+    }
+    return;
+  }
+
+  throw new Error(`Unsupported provider: ${repoInfo.provider}`);
+}
+
+/**
+ * Add a comment to an issue.
+ */
+export async function addIssueComment(
+  sessionId: string,
+  repoInfo: RepoInfo,
+  issueNumber: number,
+  body: string,
+  repoPath?: string,
+): Promise<void> {
+  if (repoInfo.provider === "github") {
+    const cwd = resolveRepoPath(sessionId, repoPath);
+    if (!cwd) throw new Error("Session path not found");
+    const command = `gh api -X POST "repos/${repoInfo.owner}/${repoInfo.repo}/issues/${issueNumber}/comments" -f body=${JSON.stringify(body)} 2>&1`;
+    const result = await sessionBash(sessionId, {
+      command,
+      cwd,
+      timeout: ISSUE_FETCH_TIMEOUT,
+    });
+    if (!result.success || result.exitCode !== 0) {
+      throw new Error(
+        result.stdout.trim() || result.error || "Failed to add comment",
+      );
+    }
+    return;
+  }
+
+  if (repoInfo.provider === "gitea") {
+    if (!repoInfo.apiBase) {
+      throw new Error("Gitea API base URL not configured.");
+    }
+    const url = `${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/issues/${issueNumber}/comments`;
+    const authHeader = repoInfo.apiToken
+      ? `-H "Authorization: token ${repoInfo.apiToken}"`
+      : "";
+    const escapedBody = JSON.stringify(body);
+    const command = `curl -s -X POST ${authHeader} -H "Content-Type: application/json" -d '{"body":${escapedBody}}' -w "\\n%{http_code}" "${url}" 2>&1`;
+    const result = await sessionBash(sessionId, {
+      command,
+      timeout: ISSUE_FETCH_TIMEOUT,
+    });
+    if (!result.success || result.exitCode !== 0) {
+      throw new Error(
+        result.stdout.trim() || result.error || "Failed to add comment",
+      );
+    }
+    const lines = result.stdout.trim().split("\n");
+    const httpStatus = lines.pop()?.trim() ?? "";
+    if (httpStatus && !httpStatus.startsWith("2")) {
+      throw new Error(`Gitea API returned HTTP ${httpStatus}`);
+    }
+    return;
+  }
+
+  throw new Error(`Unsupported provider: ${repoInfo.provider}`);
+}
+
+/**
+ * Create a new issue.
+ */
+export async function createIssue(
+  sessionId: string,
+  repoInfo: RepoInfo,
+  title: string,
+  body: string,
+  repoPath?: string,
+): Promise<Issue> {
+  if (repoInfo.provider === "github") {
+    const cwd = resolveRepoPath(sessionId, repoPath);
+    if (!cwd) throw new Error("Session path not found");
+    const bodyArg = body ? ` -f body=${JSON.stringify(body)}` : "";
+    const command = `gh api -X POST "repos/${repoInfo.owner}/${repoInfo.repo}/issues" -f title=${JSON.stringify(title)}${bodyArg} 2>&1`;
+    const result = await sessionBash(sessionId, {
+      command,
+      cwd,
+      timeout: ISSUE_FETCH_TIMEOUT,
+    });
+    if (!result.success || result.exitCode !== 0) {
+      throw new Error(
+        result.stdout.trim() || result.error || "Failed to create issue",
+      );
+    }
+    try {
+      const raw = JSON.parse(result.stdout.trim());
+      return parseGitHubIssue(raw);
+    } catch {
+      throw new Error("Failed to parse create issue response");
+    }
+  }
+
+  if (repoInfo.provider === "gitea") {
+    if (!repoInfo.apiBase) {
+      throw new Error("Gitea API base URL not configured.");
+    }
+    const url = `${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/issues`;
+    const authHeader = repoInfo.apiToken
+      ? `-H "Authorization: token ${repoInfo.apiToken}"`
+      : "";
+    const payload = JSON.stringify({ title, body });
+    const command = `curl -s -X POST ${authHeader} -H "Content-Type: application/json" -d ${JSON.stringify(payload)} -w "\\n%{http_code}" "${url}" 2>&1`;
+    const result = await sessionBash(sessionId, {
+      command,
+      timeout: ISSUE_FETCH_TIMEOUT,
+    });
+    if (!result.success || result.exitCode !== 0) {
+      throw new Error(
+        result.stdout.trim() || result.error || "Failed to create issue",
+      );
+    }
+    const lines = result.stdout.trim().split("\n");
+    const httpStatus = lines.pop()?.trim() ?? "";
+    const responseBody = lines.join("\n").trim();
+    if (httpStatus && !httpStatus.startsWith("2")) {
+      throw new Error(`Gitea API returned HTTP ${httpStatus}`);
+    }
+    try {
+      const raw = JSON.parse(responseBody);
+      return parseGiteaIssue(raw);
+    } catch {
+      throw new Error("Failed to parse create issue response");
+    }
+  }
+
+  throw new Error(`Unsupported provider: ${repoInfo.provider}`);
+}
+
+/**
  * Check if `gh` CLI is available and authenticated.
  */
 export async function checkGhCliAvailable(

@@ -1,24 +1,42 @@
 import * as React from "react";
-import { View, Pressable, ScrollView, Linking } from "react-native";
+import {
+  View,
+  Pressable,
+  ScrollView,
+  Linking,
+  ActivityIndicator,
+} from "react-native";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { t } from "@/text";
-import type { Issue } from "@/sync/issueTypes";
+import { Modal } from "@/modal";
+import { useHappyAction } from "@/hooks/useHappyAction";
+import { issueStore } from "@/sync/issueStore";
+import type { AggregatedIssue } from "@/sync/issueTypes";
 
 interface IssueDetailSheetProps {
-  readonly issue: Issue;
+  readonly issue: AggregatedIssue;
+  readonly sessionId: string;
+  readonly repoPath?: string;
   readonly onClose: () => void;
   readonly onSendToChat?: (text: string) => void;
 }
 
 export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
-  function IssueDetailSheet({ issue, onClose, onSendToChat }) {
+  function IssueDetailSheet({
+    issue,
+    sessionId,
+    repoPath,
+    onClose,
+    onSendToChat,
+  }) {
     const { theme } = useUnistyles();
     const insets = useSafeAreaInsets();
-    const isOpen = issue.state === "open";
+    const [issueState, setIssueState] = React.useState(issue.state);
+    const isOpen = issueState === "open";
 
     const handleOpenInBrowser = React.useCallback(() => {
       if (issue.url) {
@@ -32,6 +50,40 @@ export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
       }
       onClose();
     }, [issue.number, issue.title, onSendToChat, onClose]);
+
+    const [stateLoading, doToggleState] = useHappyAction(
+      React.useCallback(async () => {
+        const newState = issueState === "open" ? "closed" : "open";
+        await issueStore
+          .getState()
+          .updateIssueState(
+            issue.projectKey,
+            issue.number,
+            newState,
+            sessionId,
+            repoPath,
+          );
+        setIssueState(newState);
+      }, [issueState, issue.projectKey, issue.number, sessionId, repoPath]),
+    );
+
+    const [commentLoading, doAddComment] = useHappyAction(
+      React.useCallback(async () => {
+        const body = await Modal.prompt(t("issues.addComment"), "", {
+          placeholder: t("issues.commentPlaceholder"),
+        });
+        if (!body || body.trim() === "") return;
+        await issueStore
+          .getState()
+          .addComment(
+            issue.projectKey,
+            issue.number,
+            body.trim(),
+            sessionId,
+            repoPath,
+          );
+      }, [issue.projectKey, issue.number, sessionId, repoPath]),
+    );
 
     const formattedDate =
       issue.createdAt > 0 ? new Date(issue.createdAt).toLocaleDateString() : "";
@@ -201,6 +253,64 @@ export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
 
           {/* Actions */}
           <View style={styles.actions}>
+            {/* Close / Reopen */}
+            <Pressable
+              onPress={doToggleState}
+              disabled={stateLoading}
+              style={styles.actionItem}
+            >
+              {stateLoading ? (
+                <ActivityIndicator size={18} color={theme.colors.text} />
+              ) : (
+                <Octicons
+                  name={isOpen ? "issue-closed" : "issue-reopened"}
+                  size={18}
+                  color={
+                    isOpen
+                      ? theme.colors.box.warning.text
+                      : theme.colors.success
+                  }
+                />
+              )}
+              <Text
+                style={{
+                  fontSize: 15,
+                  color: isOpen
+                    ? theme.colors.box.warning.text
+                    : theme.colors.success,
+                  ...Typography.default(),
+                }}
+              >
+                {isOpen ? t("issues.closeIssue") : t("issues.reopenIssue")}
+              </Text>
+            </Pressable>
+
+            {/* Add Comment */}
+            <Pressable
+              onPress={doAddComment}
+              disabled={commentLoading}
+              style={styles.actionItem}
+            >
+              {commentLoading ? (
+                <ActivityIndicator size={18} color={theme.colors.text} />
+              ) : (
+                <Octicons
+                  name="comment-discussion"
+                  size={18}
+                  color={theme.colors.text}
+                />
+              )}
+              <Text
+                style={{
+                  fontSize: 15,
+                  color: theme.colors.text,
+                  ...Typography.default(),
+                }}
+              >
+                {t("issues.addComment")}
+              </Text>
+            </Pressable>
+
             {onSendToChat && (
               <Pressable onPress={handleSendToChat} style={styles.actionItem}>
                 <Ionicons
