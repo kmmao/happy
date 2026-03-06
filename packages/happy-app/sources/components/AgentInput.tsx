@@ -47,6 +47,7 @@ import {
 } from "@/sync/settings";
 import { getBuiltInProfile } from "@/sync/profileUtils";
 import { MAX_IMAGES } from "@/utils/imageUpload";
+import { AnimatedTokensCost } from "./AnimatedTokensCost";
 import {
   formatTokenCount,
   formatTokenCountShort,
@@ -141,6 +142,7 @@ interface AgentInputProps {
   onPromptSuggestionPress?: (text: string) => void;
   needsContinue?: boolean;
   onContinuePress?: () => void;
+  totalDurationMs?: number;
 }
 
 const FAVORITE_CHIP_GRADIENTS: [string, string][] = [
@@ -420,18 +422,8 @@ const ContextProgressBar: React.FC<{
   alwaysShow: boolean;
   modelCode?: string | null;
   sdkContextWindow?: number;
-  totalCostUsd?: number;
-  totalSessionTokens?: number;
   theme: Theme;
-}> = ({
-  contextSize,
-  alwaysShow,
-  modelCode,
-  sdkContextWindow,
-  totalCostUsd,
-  totalSessionTokens,
-  theme,
-}) => {
+}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme }) => {
   // Use SDK-provided window size if available; fall back to model-aware heuristic
   const knownWindowSize = getContextWindowSize(modelCode, sdkContextWindow);
   const contextWindowSize =
@@ -440,18 +432,13 @@ const ContextProgressBar: React.FC<{
   const percentageRemaining = Math.max(0, 100 - percentageUsed);
   const shouldShow = alwaysShow || percentageRemaining <= 10;
 
-  if (!shouldShow) return null;
+  // When context bar is hidden, return null — CompactStatus (InputFAB) already shows tokens/cost
+  if (!shouldShow) {
+    return null;
+  }
 
   const barColor = getProgressBarColor(percentageRemaining, theme);
-  const sessionTokensSuffix =
-    totalSessionTokens !== undefined && totalSessionTokens > 0
-      ? ` · Σ${formatTokenCountShort(totalSessionTokens)}`
-      : "";
-  const costSuffix =
-    totalCostUsd !== undefined && totalCostUsd > 0
-      ? ` · $${totalCostUsd < 0.01 ? totalCostUsd.toFixed(4) : totalCostUsd.toFixed(2)}`
-      : "";
-  const label = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}${sessionTokensSuffix}${costSuffix}`;
+  const label = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}`;
 
   return (
     <View style={{ paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2 }}>
@@ -1497,8 +1484,22 @@ export const AgentInput = React.memo(
                           color: props.connectionStatus.color,
                           ...Typography.default(),
                         }}
+                        numberOfLines={1}
                       >
                         {props.connectionStatus.text}
+                        {props.usageData &&
+                          props.usageData.totalInputTokens +
+                            props.usageData.totalOutputTokens >
+                            0 && (
+                            <AnimatedTokensCost
+                              totalTokens={
+                                props.usageData.totalInputTokens +
+                                props.usageData.totalOutputTokens
+                              }
+                              totalCostUsd={props.usageData.totalCostUsd}
+                              totalDurationMs={props.totalDurationMs}
+                            />
+                          )}
                       </Text>
                     </View>
                     {/* CLI Status - only shown when provided (wizard only) */}
@@ -1777,11 +1778,6 @@ export const AgentInput = React.memo(
                 alwaysShow={props.alwaysShowContextSize ?? false}
                 modelCode={props.currentModelCode}
                 sdkContextWindow={props.usageData.contextWindow}
-                totalCostUsd={props.usageData.totalCostUsd}
-                totalSessionTokens={
-                  props.usageData.totalInputTokens +
-                  props.usageData.totalOutputTokens
-                }
                 theme={theme}
               />
             ) : null}

@@ -140,6 +140,31 @@ const ChatListInternal = React.memo(
       return { showAvatarMap: map, latestAgentId: latestId };
     }, [props.messages]);
 
+    // For each "ready" agent-event, check if the same turn had thinking messages.
+    // In the inverted list (index 0 = newest), a turn's ready event precedes
+    // (lower index) the agent-text/tool-call messages of that turn (higher index).
+    // Scan forward (higher index = older) from each ready event until the next
+    // user-text or another ready event, looking for isThinking agent-text messages.
+    const thinkingTurnIds = React.useMemo(() => {
+      const set = new Set<string>();
+      for (let i = 0; i < props.messages.length; i++) {
+        const msg = props.messages[i];
+        if (msg.kind === "agent-event" && msg.event.type === "ready") {
+          // Scan forward (older messages in the same turn)
+          for (let j = i + 1; j < props.messages.length; j++) {
+            const m = props.messages[j];
+            if (m.kind === "user-text") break;
+            if (m.kind === "agent-event" && m.event.type === "ready") break;
+            if (m.kind === "agent-text" && m.isThinking) {
+              set.add(msg.id);
+              break;
+            }
+          }
+        }
+      }
+      return set;
+    }, [props.messages]);
+
     // Group consecutive tool-call messages (3+) into collapsible groups.
     // The list is inverted (index 0 = newest), so we iterate normally
     // and group consecutive groupable tool-calls.
@@ -387,6 +412,10 @@ const ChatListInternal = React.memo(
             />
           );
         }
+        const hasThinking =
+          item.kind === "agent-event" &&
+          item.event.type === "ready" &&
+          thinkingTurnIds.has(item.id);
         return (
           <MessageView
             message={item}
@@ -394,10 +423,17 @@ const ChatListInternal = React.memo(
             sessionId={props.sessionId}
             showAvatar={showAvatarMap.get(item.id) ?? false}
             isLatestAgent={item.id === latestAgentId}
+            hasTurnsWithThinking={hasThinking}
           />
         );
       },
-      [props.metadata, props.sessionId, showAvatarMap, latestAgentId],
+      [
+        props.metadata,
+        props.sessionId,
+        showAvatarMap,
+        latestAgentId,
+        thinkingTurnIds,
+      ],
     );
     return (
       <FlatList

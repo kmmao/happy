@@ -1061,6 +1061,8 @@ export const zhHans: TranslationStructure = {
       duration: string;
     }) => `${tokens} tokens · ${duration}`,
     sessionSummary: ({ tokens }: { tokens: string }) => `Σ${tokens} tokens`,
+    turnCount: ({ count }: { count: number }) => `${count} 轮`,
+    thinkingMarker: "思考中",
   },
 
   codex: {
@@ -1356,6 +1358,14 @@ export const zhHans: TranslationStructure = {
     noBody: "暂无描述",
     sendToChat: "发送到聊天",
     openInBrowser: "在浏览器中打开",
+    closeIssue: "关闭工单",
+    reopenIssue: "重新打开工单",
+    addComment: "添加评论",
+    commentPlaceholder: "输入评论内容...",
+    newIssue: "新建工单",
+    newIssueTitlePlaceholder: "工单标题...",
+    newIssueBody: "工单描述（可选）",
+    newIssueBodyPlaceholder: "描述问题...",
     pageOf: ({ page }: { page: number }) => `第 ${page} 页`,
   },
 

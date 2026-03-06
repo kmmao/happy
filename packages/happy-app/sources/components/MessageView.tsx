@@ -30,6 +30,7 @@ export const MessageView = (props: {
   getMessageById?: (id: string) => Message | null;
   showAvatar?: boolean;
   isLatestAgent?: boolean;
+  hasTurnsWithThinking?: boolean;
 }) => {
   return (
     <View style={styles.messageContainer} renderToHardwareTextureAndroid={true}>
@@ -41,6 +42,7 @@ export const MessageView = (props: {
           getMessageById={props.getMessageById}
           showAvatar={props.showAvatar}
           isLatestAgent={props.isLatestAgent}
+          hasTurnsWithThinking={props.hasTurnsWithThinking}
         />
       </View>
     </View>
@@ -55,6 +57,7 @@ function RenderBlock(props: {
   getMessageById?: (id: string) => Message | null;
   showAvatar?: boolean;
   isLatestAgent?: boolean;
+  hasTurnsWithThinking?: boolean;
 }): React.ReactElement {
   switch (props.message.kind) {
     case "user-text":
@@ -89,6 +92,7 @@ function RenderBlock(props: {
           event={props.message.event}
           metadata={props.metadata}
           sessionUsage={props.message.sessionUsage}
+          hasTurnsWithThinking={props.hasTurnsWithThinking}
         />
       );
 
@@ -309,6 +313,7 @@ function AgentEventBlock(props: {
     totalOutputTokens: number;
     totalCostUsd?: number;
   };
+  hasTurnsWithThinking?: boolean;
 }) {
   if (props.event.type === "switch") {
     return (
@@ -402,8 +407,14 @@ function AgentEventBlock(props: {
       props.event.totalCostUsd ?? props.sessionUsage?.totalCostUsd;
 
     const parts: string[] = [];
+    if (props.hasTurnsWithThinking) {
+      parts.push(t("message.thinkingMarker"));
+    }
     if (modelStr) parts.push(modelStr);
     if (durationStr) parts.push(durationStr);
+    if (props.event.numTurns !== undefined && props.event.numTurns > 0) {
+      parts.push(t("message.turnCount", { count: props.event.numTurns }));
+    }
     if (sessionTotalTokens !== null) {
       const summary = t("message.sessionSummary", {
         tokens: formatTokenCount(sessionTotalTokens),

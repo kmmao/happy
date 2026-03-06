@@ -1115,6 +1115,9 @@ export const ru: TranslationStructure = {
       duration: string;
     }) => `${tokens} tokens · ${duration}`,
     sessionSummary: ({ tokens }: { tokens: string }) => `Σ${tokens} tokens`,
+    turnCount: ({ count }: { count: number }) =>
+      count === 1 ? `${count} ход` : `${count} ходов`,
+    thinkingMarker: "Мышление",
   },
 
   codex: {
@@ -1451,6 +1454,14 @@ export const ru: TranslationStructure = {
     noBody: "Описание отсутствует",
     sendToChat: "Отправить в чат",
     openInBrowser: "Открыть в браузере",
+    closeIssue: "Закрыть issue",
+    reopenIssue: "Переоткрыть issue",
+    addComment: "Добавить комментарий",
+    commentPlaceholder: "Введите комментарий...",
+    newIssue: "Новый тикет",
+    newIssueTitlePlaceholder: "Заголовок тикета...",
+    newIssueBody: "Описание (необязательно)",
+    newIssueBodyPlaceholder: "Опишите проблему...",
     pageOf: ({ page }: { page: number }) => `Страница ${page}`,
   },
 

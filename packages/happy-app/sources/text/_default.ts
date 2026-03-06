@@ -1097,6 +1097,9 @@ export const en = {
       duration: string;
     }) => `${tokens} tokens · ${duration}`,
     sessionSummary: ({ tokens }: { tokens: string }) => `Σ${tokens} tokens`,
+    turnCount: ({ count }: { count: number }) =>
+      `${plural({ count, singular: `${count} turn`, plural: `${count} turns` })}`,
+    thinkingMarker: "Thinking",
   },
 
   codex: {
@@ -1409,6 +1412,14 @@ export const en = {
     noBody: "No description provided",
     sendToChat: "Send to Chat",
     openInBrowser: "Open in Browser",
+    closeIssue: "Close Issue",
+    reopenIssue: "Reopen Issue",
+    addComment: "Add Comment",
+    commentPlaceholder: "Enter your comment...",
+    newIssue: "New Issue",
+    newIssueTitlePlaceholder: "Issue title...",
+    newIssueBody: "Issue Description (Optional)",
+    newIssueBodyPlaceholder: "Describe the issue...",
     pageOf: ({ page }: { page: number }) => `Page ${page}`,
   },
 

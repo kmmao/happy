@@ -1128,6 +1128,9 @@ export const pl: TranslationStructure = {
       duration: string;
     }) => `${tokens} tokens · ${duration}`,
     sessionSummary: ({ tokens }: { tokens: string }) => `Σ${tokens} tokens`,
+    turnCount: ({ count }: { count: number }) =>
+      count === 1 ? `${count} tura` : `${count} tur`,
+    thinkingMarker: "Myślenie",
   },
 
   codex: {
@@ -1450,6 +1453,14 @@ export const pl: TranslationStructure = {
     noBody: "Brak opisu",
     sendToChat: "Wyślij do czatu",
     openInBrowser: "Otwórz w przeglądarce",
+    closeIssue: "Zamknij issue",
+    reopenIssue: "Otwórz ponownie issue",
+    addComment: "Dodaj komentarz",
+    commentPlaceholder: "Wpisz komentarz...",
+    newIssue: "Nowy problem",
+    newIssueTitlePlaceholder: "Tytuł problemu...",
+    newIssueBody: "Opis (opcjonalnie)",
+    newIssueBodyPlaceholder: "Opisz problem...",
     pageOf: ({ page }: { page: number }) => `Strona ${page}`,
   },
 

@@ -1165,6 +1165,8 @@ export const ja: TranslationStructure = {
       duration: string;
     }) => `${tokens} tokens · ${duration}`,
     sessionSummary: ({ tokens }: { tokens: string }) => `Σ${tokens} tokens`,
+    turnCount: ({ count }: { count: number }) => `${count} ターン`,
+    thinkingMarker: "思考中",
   },
 
   codex: {
@@ -1408,6 +1410,14 @@ export const ja: TranslationStructure = {
     noBody: "説明はありません",
     sendToChat: "チャットに送信",
     openInBrowser: "ブラウザで開く",
+    closeIssue: "Issue をクローズ",
+    reopenIssue: "Issue を再オープン",
+    addComment: "コメントを追加",
+    commentPlaceholder: "コメントを入力...",
+    newIssue: "新規Issue",
+    newIssueTitlePlaceholder: "Issueのタイトル...",
+    newIssueBody: "説明（任意）",
+    newIssueBodyPlaceholder: "問題を説明してください...",
     pageOf: ({ page }: { page: number }) => `${page} ページ`,
   },
 

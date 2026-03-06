@@ -87,6 +87,7 @@ export interface InputFABStatusInfo {
   totalCostUsd?: number;
   alwaysShowContext?: boolean;
   modelCode?: string | null;
+  totalDurationMs?: number;
 }
 
 interface InputFABProps {
@@ -255,6 +256,20 @@ const CompactStatus = React.memo(function CompactStatus({
 }) {
   const styles = stylesheet;
 
+  // API duration label — computed directly from totalDurationMs, no ticking needed
+  const elapsedLabel = React.useMemo(() => {
+    const ms = info.totalDurationMs;
+    if (!ms || ms <= 0) return null;
+    const totalSeconds = Math.floor(ms / 1000);
+    if (totalSeconds < 60) return `${totalSeconds}s`;
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    if (mins < 60) return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }, [info.totalDurationMs]);
+
   // Context bar computation
   const contextSize = info.contextSize ?? 0;
   const knownWindowSize = getContextWindowSize(
@@ -283,7 +298,15 @@ const CompactStatus = React.memo(function CompactStatus({
     info.totalCostUsd && info.totalCostUsd > 0
       ? ` · $${info.totalCostUsd < 0.01 ? info.totalCostUsd.toFixed(4) : info.totalCostUsd.toFixed(2)}`
       : "";
-  const contextLabel = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}${sessionTokensSuffix}${costSuffix}`;
+  const elapsedSuffix = elapsedLabel ? ` · ${elapsedLabel}` : "";
+  const contextLabel = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}${sessionTokensSuffix}${costSuffix}${elapsedSuffix}`;
+
+  // Always-visible session tokens line (shown even when context bar is hidden)
+  const sessionTokens = info.totalSessionTokens;
+  const sessionTokensLabel =
+    sessionTokens != null && sessionTokens > 0
+      ? `Σ${formatTokenCountShort(sessionTokens)}${costSuffix}${elapsedSuffix}`
+      : null;
 
   // Build status segments: "● status · permission · model"
   const segments: { text: string; color: string }[] = [
@@ -331,7 +354,7 @@ const CompactStatus = React.memo(function CompactStatus({
         ))}
       </View>
 
-      {/* Context usage */}
+      {/* Context usage (shown when context is running low) */}
       {shouldShowContext && (
         <Text
           style={{
@@ -342,6 +365,20 @@ const CompactStatus = React.memo(function CompactStatus({
           numberOfLines={1}
         >
           {contextLabel}
+        </Text>
+      )}
+
+      {/* Session tokens (shown when context bar is hidden but tokens exist) */}
+      {!shouldShowContext && sessionTokensLabel != null && (
+        <Text
+          style={{
+            fontSize: 9,
+            color: theme.colors.textSecondary,
+            ...Typography.default(),
+          }}
+          numberOfLines={1}
+        >
+          {sessionTokensLabel}
         </Text>
       )}
     </View>

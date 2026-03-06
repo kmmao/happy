@@ -171,6 +171,7 @@ export type ReducerState = {
     timestamp: number;
     totalCostUsd?: number;
     contextWindow?: number;
+    totalDurationMs?: number;
     modelUsage?: Record<
       string,
       {
@@ -221,6 +222,7 @@ export type ReducerResult = {
     totalOutputTokens: number;
     totalCostUsd?: number;
     contextWindow?: number;
+    totalDurationMs?: number;
     modelUsage?: Record<
       string,
       {
@@ -318,6 +320,7 @@ export function reducer(
             cache_read_input_tokens: msg.content.usage.cache_read_input_tokens,
           },
           msg.createdAt,
+          msg.content.durationMs,
         );
       }
 
@@ -388,7 +391,12 @@ export function reducer(
       state.messageIds.set(msg.id, msg.id);
       state.turnHadUsageStats = true;
       if (msg.content.usage) {
-        processUsageData(state, msg.content.usage, msg.createdAt);
+        processUsageData(
+          state,
+          msg.content.usage,
+          msg.createdAt,
+          msg.content.durationMs,
+        );
       }
       continue;
     }
@@ -1384,6 +1392,7 @@ export function reducer(
           totalCostUsd: state.latestUsage.totalCostUsd,
           contextWindow: state.latestUsage.contextWindow,
           modelUsage: state.latestUsage.modelUsage,
+          totalDurationMs: state.latestUsage.totalDurationMs,
         }
       : undefined,
     hasReadyEvent: hasReadyEvent || undefined,
@@ -1402,6 +1411,7 @@ function processUsageData(
   state: ReducerState,
   usage: UsageData,
   timestamp: number,
+  durationMs?: number,
 ) {
   // Only update if this is newer than (or same timestamp as) the current latest usage.
   // Using >= to handle multiple usage events with the same timestamp (messageIds
@@ -1432,6 +1442,8 @@ function processUsageData(
       totalCostUsd: state.latestUsage?.totalCostUsd,
       contextWindow: state.latestUsage?.contextWindow,
       modelUsage: state.latestUsage?.modelUsage,
+      totalDurationMs:
+        (state.latestUsage?.totalDurationMs ?? 0) + (durationMs ?? 0),
     };
   }
 }

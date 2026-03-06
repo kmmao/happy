@@ -703,6 +703,7 @@ function SessionViewInner({
       totalCostUsd: usageSource?.totalCostUsd,
       alwaysShowContext: alwaysShowContextSize,
       modelCode: effectiveModelCode,
+      totalDurationMs: usageSource?.totalDurationMs,
     }),
     [
       sessionStatus.statusText,
@@ -902,6 +903,7 @@ function SessionViewInner({
         onContinuePress={() => {
           sync.sendMessage(sessionId, "", undefined, { continue: true });
         }}
+        totalDurationMs={usageSource?.totalDurationMs}
       />
     </>
   );
