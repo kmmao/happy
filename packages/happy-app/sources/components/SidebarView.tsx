@@ -184,6 +184,13 @@ const stylesheet = StyleSheet.create((theme) => ({
     borderRadius: 3,
     backgroundColor: theme.colors.text,
   },
+  railStatusDotCenter: {
+    position: "absolute",
+    bottom: -2,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
 }));
 
 export const SidebarView = React.memo(() => {
@@ -264,7 +271,7 @@ export const SidebarView = React.memo(() => {
             style={{ height: 24, width: 24 }}
           />
           {connectionStatus.color && (
-            <View style={styles.statusDotOverlay}>
+            <View style={styles.railStatusDotCenter}>
               <StatusDot
                 color={connectionStatus.color}
                 isPulsing={connectionStatus.isPulsing}
