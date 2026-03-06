@@ -518,7 +518,7 @@ class Sync {
     sessionId: string,
     text: string,
     displayText?: string,
-    options?: { continue?: boolean },
+    options?: { continue?: boolean; localId?: string },
   ) {
     // Clear any existing prompt suggestion and needsContinue when user sends a message
     storage.getState().setPromptSuggestion(sessionId, null);
@@ -553,8 +553,8 @@ class Sync {
     const { permissionMode, model, thinking, effort, maxBudgetUsd } =
       resolveMessageModeMeta(session);
 
-    // Generate local ID
-    const localId = randomUUID();
+    // Generate local ID (or use provided one)
+    const localId = options?.localId ?? randomUUID();
 
     // Determine sentFrom based on platform
     let sentFrom: string;

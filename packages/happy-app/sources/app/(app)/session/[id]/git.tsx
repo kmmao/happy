@@ -7,6 +7,7 @@ import { GitBrowseTab } from "@/components/git/GitBrowseTab";
 import { GitHistoryTab } from "@/components/git/GitHistoryTab";
 import { GitBranchesTab } from "@/components/git/GitBranchesTab";
 import { GitStashTab } from "@/components/git/GitStashTab";
+import { GitIssuesTab } from "@/components/git/issues/GitIssuesTab";
 import { GitRepoSelector } from "@/components/git/GitRepoSelector";
 import { GitBranchHeader } from "@/components/git/GitBranchHeader";
 import {
@@ -15,6 +16,7 @@ import {
   useSessionProjectSubmodules,
 } from "@/sync/storage";
 import { storage } from "@/sync/storage";
+import { issueStore } from "@/sync/issueStore";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { Text } from "@/components/StyledText";
@@ -42,6 +44,19 @@ export default React.memo(function GitScreen() {
     storage.getState().sessions[sessionId]?.metadata?.path ?? "";
 
   const hasSubmodules = submodules !== undefined && submodules.length > 0;
+
+  // Issue count for tab badge
+  const projectKey = React.useMemo(() => {
+    const session = storage.getState().sessions[sessionId];
+    if (!session?.metadata?.machineId || !session?.metadata?.path) return "";
+    return `${session.metadata.machineId}:${session.metadata.path}`;
+  }, [sessionId]);
+
+  const issueCount = issueStore(
+    (s) =>
+      (s.issuesByProject[projectKey] ?? []).filter((i) => i.state === "open")
+        .length,
+  );
 
   // Resolve git status for selected repo (root or submodule)
   const activeGitStatus = React.useMemo(() => {
@@ -94,6 +109,7 @@ export default React.memo(function GitScreen() {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         stashCount={gitStatus?.stashCount}
+        issueCount={issueCount}
       />
 
       {/* Changes / Browse sub-toggle — only visible on the Changes tab */}
@@ -202,6 +218,20 @@ export default React.memo(function GitScreen() {
         <GitStashTab
           sessionId={sessionId}
           repoPath={selectedRepoPath ?? undefined}
+          onPullDown={hasSubmodules ? handlePullDown : undefined}
+          onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+        />
+      </View>
+      <View
+        style={{
+          flex: 1,
+          display: activeTab === "issues" ? "flex" : "none",
+        }}
+      >
+        <GitIssuesTab
+          sessionId={sessionId}
+          repoPath={selectedRepoPath ?? undefined}
+          gitStatus={activeGitStatus}
           onPullDown={hasSubmodules ? handlePullDown : undefined}
           onScrollUp={hasSubmodules ? handleScrollUp : undefined}
         />

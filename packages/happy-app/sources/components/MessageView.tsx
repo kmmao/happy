@@ -17,7 +17,7 @@ import { ToolView } from "./tools/ToolView";
 import { AgentEvent } from "@/sync/typesRaw";
 import { sync } from "@/sync/sync";
 import { Option } from "./markdown/MarkdownView";
-import { useSetting } from "@/sync/storage";
+import { useSetting, storage } from "@/sync/storage";
 import { AgentDot } from "./AgentDot";
 import { MessageImage } from "./MessageImage";
 import { parseImageRefs } from "@/utils/parseImageRefs";
@@ -103,6 +103,11 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const { theme } = useUnistyles();
 
+  const queuedIds = storage((s) => s.queuedMessageLocalIds[props.sessionId]);
+  const isQueued =
+    props.message.localId != null &&
+    (queuedIds ?? []).includes(props.message.localId);
+
   const handleOptionPress = React.useCallback(
     (option: Option) => {
       sync.sendMessage(props.sessionId, option.title);
@@ -161,6 +166,20 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
               onOptionPress={handleOptionPress}
             />
           </View>
+        </View>
+      )}
+      {isQueued && (
+        <View style={styles.queuedIndicator}>
+          <Ionicons
+            name="time-outline"
+            size={11}
+            color={theme.colors.textSecondary}
+          />
+          <Text
+            style={[styles.queuedText, { color: theme.colors.textSecondary }]}
+          >
+            {t("session.messageQueued")}
+          </Text>
         </View>
       )}
     </View>
@@ -478,6 +497,18 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 12,
     marginBottom: 12,
     flexShrink: 1,
+  },
+  queuedIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginBottom: 12,
+    marginRight: 4,
+    opacity: 0.6,
+  },
+  queuedText: {
+    fontSize: 11,
+    ...Typography.default(),
   },
   agentMessageRow: {
     flexDirection: "row",

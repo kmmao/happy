@@ -165,6 +165,8 @@ export const en: TranslationStructure = {
     usageSubtitle: "View your API usage and costs",
     profiles: "Profiles",
     profilesSubtitle: "Manage environment variable profiles for sessions",
+    gitHosts: "Git Hosts",
+    gitHostsSubtitle: "Configure Git host provider mappings",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -397,6 +399,11 @@ export const en: TranslationStructure = {
       "No compaction summary yet. A summary will appear here after the context is compressed.",
     compactionSummaryDisconnected:
       "Session is not connected. The summary is only available when the CLI is online.",
+    messageQueued: "Queued",
+    interruptConfirmTitle: "Interrupt current task?",
+    interruptConfirmMessage:
+      "This will stop the current task. Queued messages will be processed next.",
+    interruptAndSend: "Interrupt & Send",
   },
 
   bookmark: {
@@ -1331,6 +1338,7 @@ export const en: TranslationStructure = {
     tabHistory: "History",
     tabBranches: "Branches",
     tabStash: "Stash",
+    tabIssues: "Issues",
     historyEmpty: "No commits yet",
     historyLoading: "Loading commits...",
     historyLoadMore: "Loading more...",
@@ -1400,6 +1408,40 @@ export const en: TranslationStructure = {
     selectedCount: ({ count }) => `${count} selected`,
     commitMessagePlaceholder: "Enter commit message...",
     noStagedFiles: "No staged files to commit",
+  },
+
+  issues: {
+    open: "Open",
+    closed: "Closed",
+    loading: "Loading issues...",
+    noIssues: "No issues found",
+    noRepo: "No GitHub/Gitea repository detected",
+    noBody: "No description provided",
+    sendToChat: "Send to Chat",
+    openInBrowser: "Open in Browser",
+    pageOf: ({ page }: { page: number }) => `Page ${page}`,
+  },
+
+  gitHosts: {
+    title: "Git Hosts",
+    description:
+      "Configure which Git hosts use GitHub API vs Gitea API. GitHub.com is detected automatically. Other hosts default to Gitea.",
+    empty:
+      "No custom hosts configured. GitHub.com is detected automatically, other hosts default to Gitea.",
+    addHost: "Add Host",
+    editHost: "Edit Host",
+    hostLabel: "Host",
+    providerLabel: "Provider",
+    tokenLabel: "API Token",
+    tokenPlaceholder: "Optional — required for private repos",
+    tokenHint:
+      "Generate at Settings → Applications → Access Tokens in your Gitea instance.",
+    deleteTitle: "Delete Host",
+    deleteMessage: ({ host }: { host: string }) =>
+      `Remove "${host}" from configured hosts?`,
+    duplicateTitle: "Duplicate Host",
+    duplicateMessage: ({ host }: { host: string }) =>
+      `"${host}" is already configured.`,
   },
 
   quickCommands: {

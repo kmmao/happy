@@ -482,6 +482,18 @@ export const SettingsSchema = z.object({
   showProjectTab: z
     .boolean()
     .describe("Whether to show the project (kanban) tab in the tab bar"),
+  // Git host → provider mappings (user-configured overrides for host detection)
+  gitHosts: z
+    .array(
+      z.object({
+        host: z.string(),
+        provider: z.enum(["github", "gitea"]),
+        apiToken: z.string().optional(),
+      }),
+    )
+    .describe(
+      "Custom Git host provider mappings (e.g. GitHub Enterprise → github, self-hosted Gitea → gitea)",
+    ),
   dismissedCLIWarnings: z
     .object({
       perMachine: z
@@ -571,6 +583,8 @@ export const settingsDefaults: Settings = {
   favoriteMachines: [],
   // Favorite commands (empty by default)
   favoriteCommands: [],
+  // Git host provider mappings (empty by default, uses built-in detection as fallback)
+  gitHosts: [],
   // Project tab visibility (hidden by default)
   showProjectTab: false,
   // Dismissed CLI warnings (empty by default)

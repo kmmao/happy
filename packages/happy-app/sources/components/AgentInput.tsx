@@ -696,6 +696,15 @@ export const AgentInput = React.memo(
     const handleAbortPress = React.useCallback(async () => {
       if (!props.onAbort) return;
 
+      const confirmed = await Modal.confirm(
+        t("session.interruptConfirmTitle"),
+        t("session.interruptConfirmMessage"),
+        {
+          confirmText: t("session.interruptAndSend"),
+        },
+      );
+      if (!confirmed) return;
+
       hapticsError();
       setIsAborting(true);
       const startTime = Date.now();

@@ -46,6 +46,7 @@ import {
   useSetting,
 } from "@/sync/storage";
 import { Session } from "@/sync/storageTypes";
+import { randomUUID } from "expo-crypto";
 import { sync } from "@/sync/sync";
 import { t } from "@/text";
 import { tracking, trackMessageSent } from "@/track";
@@ -385,6 +386,15 @@ function SessionViewInner({
 
   const sessionStatus = useSessionStatus(session);
   const sessionUsage = useSessionUsage(sessionId);
+
+  // Clear queued message markers when AI finishes thinking
+  const prevThinkingRef = React.useRef(session.thinking);
+  React.useEffect(() => {
+    if (prevThinkingRef.current && !session.thinking) {
+      storage.getState().clearQueuedMessageIds(sessionId);
+    }
+    prevThinkingRef.current = session.thinking;
+  }, [session.thinking, sessionId]);
   const promptSuggestion = usePromptSuggestion(sessionId);
   const needsContinue = useNeedsContinue(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
@@ -804,6 +814,11 @@ function SessionViewInner({
 
           if (!finalMessage) return;
 
+          const localIdForSend = randomUUID();
+          // Mark as queued before sending if AI is currently thinking
+          if (sessionStatus.state === "thinking") {
+            storage.getState().addQueuedMessageId(sessionId, localIdForSend);
+          }
           Keyboard.dismiss();
           setMessage("");
           clearDraft();
@@ -816,7 +831,9 @@ function SessionViewInner({
                   ? t("session.sentImage")
                   : t("session.sentImages", { count: imageCount }))
               : undefined;
-          sync.sendMessage(sessionId, finalMessage, displayText);
+          sync.sendMessage(sessionId, finalMessage, displayText, {
+            localId: localIdForSend,
+          });
           trackMessageSent();
         }}
         onMicPress={micButtonState.onMicPress}

@@ -125,6 +125,10 @@ interface StorageState {
   setPromptSuggestion: (sessionId: string, suggestion: string | null) => void;
   sessionNeedsContinue: Record<string, boolean>;
   setNeedsContinue: (sessionId: string, value: boolean) => void;
+  // Queued message tracking (in-memory only, not persisted)
+  queuedMessageLocalIds: Record<string, string[]>;
+  addQueuedMessageId: (sessionId: string, localId: string) => void;
+  clearQueuedMessageIds: (sessionId: string) => void;
   machines: Record<string, Machine>;
   artifacts: Record<string, DecryptedArtifact>; // New artifacts storage
   friends: Record<string, UserProfile>; // All relationships (friends, pending, requested, etc.)
@@ -423,6 +427,22 @@ export const storage = create<StorageState>()((set, get) => {
           [sessionId]: value,
         },
       })),
+    queuedMessageLocalIds: {},
+    addQueuedMessageId: (sessionId: string, localId: string) =>
+      set((prev) => ({
+        queuedMessageLocalIds: {
+          ...prev.queuedMessageLocalIds,
+          [sessionId]: [
+            ...(prev.queuedMessageLocalIds[sessionId] ?? []),
+            localId,
+          ],
+        },
+      })),
+    clearQueuedMessageIds: (sessionId: string) =>
+      set((prev) => {
+        const { [sessionId]: _, ...rest } = prev.queuedMessageLocalIds;
+        return { queuedMessageLocalIds: rest };
+      }),
     realtimeStatus: "disconnected",
     realtimeMode: "idle",
     socketStatus: "disconnected",

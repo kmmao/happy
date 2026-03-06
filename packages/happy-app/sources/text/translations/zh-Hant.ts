@@ -150,6 +150,8 @@ export const zhHant: TranslationStructure = {
     usageSubtitle: "查看 API 使用情況和費用",
     profiles: "設定檔",
     profilesSubtitle: "管理工作階段的環境變數設定檔",
+    gitHosts: "Git 主機",
+    gitHostsSubtitle: "設定 Git 主機供應商",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -368,6 +370,10 @@ export const zhHant: TranslationStructure = {
     compactionSummaryTitle: "背景摘要",
     compactionSummaryEmpty: "尚無背景摘要。在背景被壓縮後將出現在此處。",
     compactionSummaryDisconnected: "會話未連線。摘要僅在 CLI 連線時可用。",
+    messageQueued: "已排隊",
+    interruptConfirmTitle: "中斷當前任務？",
+    interruptConfirmMessage: "將停止當前任務，排隊訊息將在下一輪處理。",
+    interruptAndSend: "中斷並傳送",
   },
 
   bookmark: {
@@ -1277,6 +1283,7 @@ export const zhHant: TranslationStructure = {
     tabHistory: "歷史",
     tabBranches: "分支",
     tabStash: "暫存",
+    tabIssues: "工單",
     historyEmpty: "尚無提交記錄",
     historyLoading: "正在載入提交...",
     historyLoadMore: "載入更多...",
@@ -1340,6 +1347,37 @@ export const zhHant: TranslationStructure = {
     selectedCount: ({ count }) => `已選擇 ${count} 項`,
     commitMessagePlaceholder: "輸入提交訊息...",
     noStagedFiles: "沒有已暫存的檔案可提交",
+  },
+
+  issues: {
+    open: "未關閉",
+    closed: "已關閉",
+    loading: "載入工單中...",
+    noIssues: "暫無工單",
+    noRepo: "未偵測到 GitHub/Gitea 儲存庫",
+    noBody: "暫無描述",
+    sendToChat: "傳送到聊天",
+    openInBrowser: "在瀏覽器中開啟",
+    pageOf: ({ page }: { page: number }) => `第 ${page} 頁`,
+  },
+
+  gitHosts: {
+    title: "Git 主機",
+    description:
+      "設定哪些 Git 主機使用 GitHub API 或 Gitea API。GitHub.com 會自動偵測，其他主機預設使用 Gitea。",
+    empty: "尚未設定自訂主機。GitHub.com 會自動偵測，其他主機預設使用 Gitea。",
+    addHost: "新增主機",
+    editHost: "編輯主機",
+    hostLabel: "主機位址",
+    providerLabel: "供應商",
+    tokenLabel: "API Token",
+    tokenPlaceholder: "可選 — 私有倉庫必填",
+    tokenHint: "在 Gitea 的 設定 → 應用程式 → 存取權杖 中產生。",
+    deleteTitle: "刪除主機",
+    deleteMessage: ({ host }: { host: string }) =>
+      `確定從設定中移除「${host}」？`,
+    duplicateTitle: "主機重複",
+    duplicateMessage: ({ host }: { host: string }) => `「${host}」已設定過了。`,
   },
 
   quickCommands: {

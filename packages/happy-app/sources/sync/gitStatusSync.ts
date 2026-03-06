@@ -206,37 +206,50 @@ export class GitStatusSync {
 
       // Get git status in porcelain v2 format (includes branch info)
       // --untracked-files=all ensures we get individual files, not directories
-      const statusResult = await sessionBash(sessionId, {
-        command:
-          "git status --porcelain=v2 --branch --show-stash --untracked-files=all",
-        cwd: session.metadata.path,
-        timeout: 10000,
-      });
+      const [
+        statusResult,
+        diffStatResult,
+        stagedDiffStatResult,
+        remoteUrlResult,
+      ] = await Promise.all([
+        sessionBash(sessionId, {
+          command:
+            "git status --porcelain=v2 --branch --show-stash --untracked-files=all",
+          cwd: session.metadata.path,
+          timeout: 10000,
+        }),
+        sessionBash(sessionId, {
+          command: "git diff --numstat",
+          cwd: session.metadata.path,
+          timeout: 10000,
+        }),
+        sessionBash(sessionId, {
+          command: "git diff --cached --numstat",
+          cwd: session.metadata.path,
+          timeout: 10000,
+        }),
+        sessionBash(sessionId, {
+          command: "git remote get-url origin 2>/dev/null",
+          cwd: session.metadata.path,
+          timeout: 5000,
+        }),
+      ]);
 
       if (!statusResult.success) {
         console.error("Failed to get git status:", statusResult.error);
         return;
       }
 
-      // Get git diff statistics for unstaged changes
-      const diffStatResult = await sessionBash(sessionId, {
-        command: "git diff --numstat",
-        cwd: session.metadata.path,
-        timeout: 10000,
-      });
-
-      // Get git diff statistics for staged changes
-      const stagedDiffStatResult = await sessionBash(sessionId, {
-        command: "git diff --cached --numstat",
-        cwd: session.metadata.path,
-        timeout: 10000,
-      });
-
       // Parse the git status output with diff statistics
+      const remoteUrl =
+        remoteUrlResult.success && remoteUrlResult.exitCode === 0
+          ? remoteUrlResult.stdout.trim() || null
+          : null;
       const gitStatus = this.parseGitStatusV2(
         statusResult.stdout,
         diffStatResult.success ? diffStatResult.stdout : "",
         stagedDiffStatResult.success ? stagedDiffStatResult.stdout : "",
+        remoteUrl,
       );
 
       // Apply to storage (this also updates the project git status via the modified applyGitStatus)
@@ -470,34 +483,45 @@ export class GitStatusSync {
         return { path: submodulePath, gitStatus: null };
       }
 
-      // Fetch status and diffs in parallel
-      const [statusResult, diffResult, stagedDiffResult] = await Promise.all([
-        sessionBash(sessionId, {
-          command:
-            "git status --porcelain=v2 --branch --show-stash --untracked-files=all",
-          cwd: fullPath,
-          timeout: 10000,
-        }),
-        sessionBash(sessionId, {
-          command: "git diff --numstat",
-          cwd: fullPath,
-          timeout: 10000,
-        }),
-        sessionBash(sessionId, {
-          command: "git diff --cached --numstat",
-          cwd: fullPath,
-          timeout: 10000,
-        }),
-      ]);
+      // Fetch status, diffs, and remote URL in parallel
+      const [statusResult, diffResult, stagedDiffResult, remoteUrlResult] =
+        await Promise.all([
+          sessionBash(sessionId, {
+            command:
+              "git status --porcelain=v2 --branch --show-stash --untracked-files=all",
+            cwd: fullPath,
+            timeout: 10000,
+          }),
+          sessionBash(sessionId, {
+            command: "git diff --numstat",
+            cwd: fullPath,
+            timeout: 10000,
+          }),
+          sessionBash(sessionId, {
+            command: "git diff --cached --numstat",
+            cwd: fullPath,
+            timeout: 10000,
+          }),
+          sessionBash(sessionId, {
+            command: "git remote get-url origin 2>/dev/null",
+            cwd: fullPath,
+            timeout: 5000,
+          }),
+        ]);
 
       if (!statusResult.success) {
         return { path: submodulePath, gitStatus: null };
       }
 
+      const subRemoteUrl =
+        remoteUrlResult.success && remoteUrlResult.exitCode === 0
+          ? remoteUrlResult.stdout.trim() || null
+          : null;
       const gitStatus = this.parseGitStatusV2(
         statusResult.stdout,
         diffResult.success ? diffResult.stdout : "",
         stagedDiffResult.success ? stagedDiffResult.stdout : "",
+        subRemoteUrl,
       );
 
       return { path: submodulePath, gitStatus };
@@ -513,6 +537,7 @@ export class GitStatusSync {
     porcelainV2Output: string,
     diffStatOutput: string = "",
     stagedDiffStatOutput: string = "",
+    remoteUrl: string | null = null,
   ): GitStatus {
     // Parse status using v2 parser
     const statusSummary = parseStatusSummaryV2(porcelainV2Output);
@@ -551,6 +576,7 @@ export class GitStatusSync {
       aheadCount: trackingInfo?.ahead,
       behindCount: trackingInfo?.behind,
       stashCount: statusSummary.stashCount,
+      remoteUrl,
     };
   }
 

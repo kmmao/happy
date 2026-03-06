@@ -150,6 +150,8 @@ export const zhHans: TranslationStructure = {
     usageSubtitle: "查看 API 使用情况和费用",
     profiles: "配置文件",
     profilesSubtitle: "管理环境配置文件和变量",
+    gitHosts: "Git 主机",
+    gitHostsSubtitle: "配置 Git 主机提供商",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -368,6 +370,10 @@ export const zhHans: TranslationStructure = {
     compactionSummaryTitle: "上下文摘要",
     compactionSummaryEmpty: "暂无压缩摘要，当上下文被压缩后将在此显示。",
     compactionSummaryDisconnected: "会话未连接。摘要仅在 CLI 在线时可用。",
+    messageQueued: "已排队",
+    interruptConfirmTitle: "中断当前任务？",
+    interruptConfirmMessage: "将停止当前任务，排队消息将在下一轮处理。",
+    interruptAndSend: "中断并发送",
   },
 
   bookmark: {
@@ -1275,6 +1281,7 @@ export const zhHans: TranslationStructure = {
     tabHistory: "历史",
     tabBranches: "分支",
     tabStash: "暂存",
+    tabIssues: "工单",
     historyEmpty: "暂无提交记录",
     historyLoading: "正在加载提交...",
     historyLoadMore: "加载更多...",
@@ -1338,6 +1345,38 @@ export const zhHans: TranslationStructure = {
     selectedCount: ({ count }) => `已选择 ${count} 项`,
     commitMessagePlaceholder: "输入提交信息...",
     noStagedFiles: "没有已暂存的文件可提交",
+  },
+
+  issues: {
+    open: "未关闭",
+    closed: "已关闭",
+    loading: "加载工单中...",
+    noIssues: "暂无工单",
+    noRepo: "未检测到 GitHub/Gitea 仓库",
+    noBody: "暂无描述",
+    sendToChat: "发送到聊天",
+    openInBrowser: "在浏览器中打开",
+    pageOf: ({ page }: { page: number }) => `第 ${page} 页`,
+  },
+
+  gitHosts: {
+    title: "Git 主机",
+    description:
+      "配置哪些 Git 主机使用 GitHub API 或 Gitea API。GitHub.com 会自动识别，其他主机默认使用 Gitea。",
+    empty:
+      "暂无自定义主机配置。GitHub.com 会自动识别，其他主机默认使用 Gitea。",
+    addHost: "添加主机",
+    editHost: "编辑主机",
+    hostLabel: "主机地址",
+    providerLabel: "提供商",
+    tokenLabel: "API Token",
+    tokenPlaceholder: "可选 — 私有仓库必填",
+    tokenHint: "在 Gitea 的 设置 → 应用 → 访问令牌 中生成。",
+    deleteTitle: "删除主机",
+    deleteMessage: ({ host }: { host: string }) =>
+      `确定从配置中移除"${host}"？`,
+    duplicateTitle: "主机重复",
+    duplicateMessage: ({ host }: { host: string }) => `"${host}"已经配置过了。`,
   },
 
   quickCommands: {

@@ -214,6 +214,8 @@ export const ja: TranslationStructure = {
     usageSubtitle: "API使用量とコストを確認",
     profiles: "プロファイル",
     profilesSubtitle: "セッション用の環境変数プロファイルを管理",
+    gitHosts: "Git ホスト",
+    gitHostsSubtitle: "Git ホストプロバイダーの設定",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -446,6 +448,11 @@ export const ja: TranslationStructure = {
       "圧縮サマリーはまだありません。コンテキストが圧縮されるとここに表示されます。",
     compactionSummaryDisconnected:
       "セッションが接続されていません。サマリーはCLIがオンラインの時のみ利用可能です。",
+    messageQueued: "キュー中",
+    interruptConfirmTitle: "現在のタスクを中断しますか？",
+    interruptConfirmMessage:
+      "現在のタスクを停止します。キュー中のメッセージは次に処理されます。",
+    interruptAndSend: "中断して送信",
   },
 
   bookmark: {
@@ -1323,6 +1330,7 @@ export const ja: TranslationStructure = {
     tabHistory: "履歴",
     tabBranches: "ブランチ",
     tabStash: "スタッシュ",
+    tabIssues: "Issues",
     historyEmpty: "コミットはまだありません",
     historyLoading: "コミットを読み込み中...",
     historyLoadMore: "さらに読み込み中...",
@@ -1389,6 +1397,40 @@ export const ja: TranslationStructure = {
     selectedCount: ({ count }) => `${count}件選択中`,
     commitMessagePlaceholder: "コミットメッセージを入力...",
     noStagedFiles: "コミットするステージ済みファイルがありません",
+  },
+
+  issues: {
+    open: "オープン",
+    closed: "クローズ",
+    loading: "Issue を読み込み中...",
+    noIssues: "Issue が見つかりません",
+    noRepo: "GitHub/Gitea リポジトリが検出されません",
+    noBody: "説明はありません",
+    sendToChat: "チャットに送信",
+    openInBrowser: "ブラウザで開く",
+    pageOf: ({ page }: { page: number }) => `${page} ページ`,
+  },
+
+  gitHosts: {
+    title: "Git ホスト",
+    description:
+      "どの Git ホストが GitHub API または Gitea API を使用するかを設定します。GitHub.com は自動的に検出されます。その他のホストはデフォルトで Gitea を使用します。",
+    empty:
+      "カスタムホストは設定されていません。GitHub.com は自動的に検出され、その他のホストはデフォルトで Gitea を使用します。",
+    addHost: "ホストを追加",
+    editHost: "ホストを編集",
+    hostLabel: "ホスト",
+    providerLabel: "プロバイダー",
+    tokenLabel: "API Token",
+    tokenPlaceholder: "任意 — プライベートリポジトリには必須",
+    tokenHint:
+      "Giteaの 設定 → アプリケーション → アクセストークン で生成してください。",
+    deleteTitle: "ホストを削除",
+    deleteMessage: ({ host }: { host: string }) =>
+      `"${host}" を設定済みホストから削除しますか？`,
+    duplicateTitle: "重複するホスト",
+    duplicateMessage: ({ host }: { host: string }) =>
+      `"${host}" はすでに設定されています。`,
   },
 
   quickCommands: {

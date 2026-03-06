@@ -342,6 +342,14 @@ export const SettingsView = React.memo(function SettingsView() {
           icon={<Ionicons name="person-outline" size={29} color="#AF52DE" />}
           onPress={() => router.push("/settings/profiles")}
         />
+        <Item
+          title={t("settings.gitHosts")}
+          subtitle={t("settings.gitHostsSubtitle")}
+          icon={
+            <Ionicons name="git-branch-outline" size={29} color="#64748B" />
+          }
+          onPress={() => router.push("/settings/git-hosts")}
+        />
         {experiments && (
           <Item
             title={t("settings.usage")}

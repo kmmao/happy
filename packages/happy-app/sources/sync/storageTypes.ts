@@ -283,4 +283,6 @@ export interface GitStatus {
   aheadCount?: number; // Commits ahead of upstream
   behindCount?: number; // Commits behind upstream
   stashCount?: number; // Number of stash entries
+  // Remote URL for provider detection (GitHub/Gitea)
+  remoteUrl?: string | null;
 }

@@ -8,6 +8,7 @@ import { t } from "@/text";
 import { gitFetch, gitPull, gitPush } from "@/sync/gitRemoteOps";
 import { Modal } from "@/modal";
 import type { GitStatus } from "@/sync/storageTypes";
+import { parseRemoteUrl } from "@/sync/issueUtils";
 
 interface GitBranchHeaderProps {
   readonly sessionId: string;
@@ -92,11 +93,16 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
       [sessionId, repoPath, activeOp],
     );
 
+    const hasUpstream = upstream !== null;
+
+    const repoProvider = React.useMemo(() => {
+      if (!gitStatus?.remoteUrl) return null;
+      return parseRemoteUrl(gitStatus.remoteUrl);
+    }, [gitStatus?.remoteUrl]);
+
     if (!gitStatus || gitStatus.lastUpdatedAt === 0 || !branch) {
       return null;
     }
-
-    const hasUpstream = upstream !== null;
 
     return (
       <View
@@ -110,6 +116,20 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
       >
         {/* Branch info */}
         <View style={styles.branchInfo}>
+          {repoProvider?.provider === "github" && (
+            <Octicons
+              name="mark-github"
+              size={14}
+              color={theme.colors.textSecondary}
+            />
+          )}
+          {repoProvider?.provider === "gitea" && (
+            <Ionicons
+              name="git-network-outline"
+              size={14}
+              color={theme.colors.textSecondary}
+            />
+          )}
           <Octicons name="git-branch" size={16} color={theme.colors.textLink} />
           <Text
             style={{

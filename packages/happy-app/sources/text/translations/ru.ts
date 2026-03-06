@@ -133,6 +133,8 @@ export const ru: TranslationStructure = {
     usageSubtitle: "Просмотр использования API и затрат",
     profiles: "Профили",
     profilesSubtitle: "Управление профилями переменных окружения для сессий",
+    gitHosts: "Git-хосты",
+    gitHostsSubtitle: "Настройка провайдеров Git-хостов",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -557,6 +559,11 @@ export const ru: TranslationStructure = {
       "Резюме сжатия отсутствует. Оно появится здесь после сжатия контекста.",
     compactionSummaryDisconnected:
       "Сессия не подключена. Резюме доступно только когда CLI онлайн.",
+    messageQueued: "В очереди",
+    interruptConfirmTitle: "Прервать текущую задачу?",
+    interruptConfirmMessage:
+      "Текущая задача будет остановлена. Сообщения в очереди будут обработаны далее.",
+    interruptAndSend: "Прервать и отправить",
   },
 
   bookmark: {
@@ -1364,6 +1371,7 @@ export const ru: TranslationStructure = {
     tabHistory: "История",
     tabBranches: "Ветки",
     tabStash: "Тайник",
+    tabIssues: "Issues",
     historyEmpty: "Коммитов пока нет",
     historyLoading: "Загрузка коммитов...",
     historyLoadMore: "Загрузка...",
@@ -1432,6 +1440,39 @@ export const ru: TranslationStructure = {
     selectedCount: ({ count }) => `Выбрано: ${count}`,
     commitMessagePlaceholder: "Введите сообщение коммита...",
     noStagedFiles: "Нет проиндексированных файлов для фиксации",
+  },
+
+  issues: {
+    open: "Открытые",
+    closed: "Закрытые",
+    loading: "Загрузка issues...",
+    noIssues: "Issues не найдены",
+    noRepo: "Репозиторий GitHub/Gitea не обнаружен",
+    noBody: "Описание отсутствует",
+    sendToChat: "Отправить в чат",
+    openInBrowser: "Открыть в браузере",
+    pageOf: ({ page }: { page: number }) => `Страница ${page}`,
+  },
+
+  gitHosts: {
+    title: "Git-хосты",
+    description:
+      "Настройте, какие Git-хосты используют GitHub API или Gitea API. GitHub.com определяется автоматически. Остальные хосты по умолчанию используют Gitea.",
+    empty:
+      "Нет настроенных хостов. GitHub.com определяется автоматически, остальные хосты используют Gitea.",
+    addHost: "Добавить хост",
+    editHost: "Редактировать хост",
+    hostLabel: "Хост",
+    providerLabel: "Провайдер",
+    tokenLabel: "API Token",
+    tokenPlaceholder: "Необязательно — требуется для приватных репозиториев",
+    tokenHint:
+      "Создайте в Настройки → Приложения → Токены доступа вашего Gitea.",
+    deleteTitle: "Удалить хост",
+    deleteMessage: ({ host }: { host: string }) =>
+      `Удалить "${host}" из настроенных хостов?`,
+    duplicateTitle: "Дублирующий хост",
+    duplicateMessage: ({ host }: { host: string }) => `"${host}" уже настроен.`,
   },
 
   quickCommands: {

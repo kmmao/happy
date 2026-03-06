@@ -139,6 +139,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         sttCorrection: false,
+        gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
@@ -185,6 +186,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         sttCorrection: false,
+        gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       });
@@ -231,6 +233,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         sttCorrection: false,
+        gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
@@ -279,6 +282,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         sttCorrection: false,
+        gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
@@ -332,6 +336,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         sttCorrection: false,
+        gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
@@ -394,6 +399,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         sttCorrection: false,
+        gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
       };
@@ -467,6 +473,7 @@ describe("settings", () => {
         favoriteCommands: [],
         showAgentActivity: false,
         sttCorrection: false,
+        gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
         useEnhancedSessionWizard: false,

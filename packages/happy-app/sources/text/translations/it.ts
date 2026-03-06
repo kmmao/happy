@@ -217,6 +217,8 @@ export const it: TranslationStructure = {
     profiles: "Profili",
     profilesSubtitle:
       "Gestisci i profili delle variabili ambiente per le sessioni",
+    gitHosts: "Host Git",
+    gitHostsSubtitle: "Configura i provider degli host Git",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -459,6 +461,11 @@ export const it: TranslationStructure = {
       "Nessun riepilogo di compattazione. Apparirà qui dopo la compattazione del contesto.",
     compactionSummaryDisconnected:
       "La sessione non è connessa. Il riepilogo è disponibile solo quando il CLI è online.",
+    messageQueued: "In coda",
+    interruptConfirmTitle: "Interrompere il compito attuale?",
+    interruptConfirmMessage:
+      "Il compito attuale verrà interrotto. I messaggi in coda verranno elaborati successivamente.",
+    interruptAndSend: "Interrompi e invia",
   },
 
   bookmark: {
@@ -1338,6 +1345,7 @@ export const it: TranslationStructure = {
     tabHistory: "Cronologia",
     tabBranches: "Branch",
     tabStash: "Stash",
+    tabIssues: "Issues",
     historyEmpty: "Nessun commit ancora",
     historyLoading: "Caricamento commit...",
     historyLoadMore: "Caricamento...",
@@ -1405,6 +1413,40 @@ export const it: TranslationStructure = {
     selectedCount: ({ count }) => `${count} selezionati`,
     commitMessagePlaceholder: "Inserisci il messaggio del commit...",
     noStagedFiles: "Nessun file preparato da confermare",
+  },
+
+  issues: {
+    open: "Aperte",
+    closed: "Chiuse",
+    loading: "Caricamento issues...",
+    noIssues: "Nessuna issue trovata",
+    noRepo: "Nessun repository GitHub/Gitea rilevato",
+    noBody: "Nessuna descrizione",
+    sendToChat: "Invia alla chat",
+    openInBrowser: "Apri nel browser",
+    pageOf: ({ page }: { page: number }) => `Pagina ${page}`,
+  },
+
+  gitHosts: {
+    title: "Host Git",
+    description:
+      "Configura quali host Git utilizzano GitHub API o Gitea API. GitHub.com viene rilevato automaticamente. Gli altri host utilizzano Gitea per impostazione predefinita.",
+    empty:
+      "Nessun host configurato. GitHub.com viene rilevato automaticamente, gli altri host utilizzano Gitea per impostazione predefinita.",
+    addHost: "Aggiungi host",
+    editHost: "Modifica host",
+    hostLabel: "Host",
+    providerLabel: "Provider",
+    tokenLabel: "API Token",
+    tokenPlaceholder: "Opzionale — necessario per repo privati",
+    tokenHint:
+      "Generalo in Impostazioni → Applicazioni → Token di accesso del tuo Gitea.",
+    deleteTitle: "Elimina host",
+    deleteMessage: ({ host }: { host: string }) =>
+      `Rimuovere "${host}" dagli host configurati?`,
+    duplicateTitle: "Host duplicato",
+    duplicateMessage: ({ host }: { host: string }) =>
+      `"${host}" è già configurato.`,
   },
 
   quickCommands: {

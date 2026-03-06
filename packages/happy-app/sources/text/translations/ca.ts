@@ -152,6 +152,8 @@ export const ca: TranslationStructure = {
     usageSubtitle: "Veure l'ús de l'API i costos",
     profiles: "Perfils",
     profilesSubtitle: "Gestiona els perfils d'entorn i variables",
+    gitHosts: "Hosts Git",
+    gitHostsSubtitle: "Configura els proveïdors de hosts Git",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -394,6 +396,11 @@ export const ca: TranslationStructure = {
       "Encara no hi ha cap resum de compressió. Apareixerà aquí després de comprimir el context.",
     compactionSummaryDisconnected:
       "La sessió no està connectada. El resum només està disponible quan el CLI està en línia.",
+    messageQueued: "En cua",
+    interruptConfirmTitle: "Interrompre la tasca actual?",
+    interruptConfirmMessage:
+      "S'aturarà la tasca actual. Els missatges en cua es processaran a continuació.",
+    interruptAndSend: "Interrompre i enviar",
   },
 
   bookmark: {
@@ -1342,6 +1349,7 @@ export const ca: TranslationStructure = {
     tabHistory: "Historial",
     tabBranches: "Branques",
     tabStash: "Stash",
+    tabIssues: "Issues",
     historyEmpty: "Encara no hi ha commits",
     historyLoading: "Carregant commits...",
     historyLoadMore: "Carregant més...",
@@ -1409,6 +1417,40 @@ export const ca: TranslationStructure = {
     selectedCount: ({ count }) => `${count} seleccionats`,
     commitMessagePlaceholder: "Introdueix el missatge del commit...",
     noStagedFiles: "No hi ha fitxers preparats per confirmar",
+  },
+
+  issues: {
+    open: "Obertes",
+    closed: "Tancades",
+    loading: "Carregant issues...",
+    noIssues: "No s'han trobat issues",
+    noRepo: "No s'ha detectat cap repositori GitHub/Gitea",
+    noBody: "Sense descripció",
+    sendToChat: "Enviar al xat",
+    openInBrowser: "Obrir al navegador",
+    pageOf: ({ page }: { page: number }) => `Pàgina ${page}`,
+  },
+
+  gitHosts: {
+    title: "Hosts Git",
+    description:
+      "Configura quins hosts Git usen GitHub API o Gitea API. GitHub.com es detecta automàticament. Altres hosts usen Gitea per defecte.",
+    empty:
+      "No hi ha hosts configurats. GitHub.com es detecta automàticament, altres hosts usen Gitea per defecte.",
+    addHost: "Afegir host",
+    editHost: "Editar host",
+    hostLabel: "Host",
+    providerLabel: "Proveïdor",
+    tokenLabel: "API Token",
+    tokenPlaceholder: "Opcional — necessari per a repos privats",
+    tokenHint:
+      "Genera'l a Configuració → Aplicacions → Tokens d'accés del teu Gitea.",
+    deleteTitle: "Eliminar host",
+    deleteMessage: ({ host }: { host: string }) =>
+      `Eliminar "${host}" dels hosts configurats?`,
+    duplicateTitle: "Host duplicat",
+    duplicateMessage: ({ host }: { host: string }) =>
+      `"${host}" ja està configurat.`,
   },
 
   quickCommands: {
