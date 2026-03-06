@@ -27,7 +27,7 @@ export async function blobToResizedBase64(blob: Blob): Promise<string> {
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(blob);
-  } catch {
+  } catch (e) {
     throw new HappyError("Failed to process image", false);
   }
 
@@ -44,7 +44,9 @@ export async function blobToResizedBase64(blob: Blob): Promise<string> {
     }
 
     // Use OffscreenCanvas to avoid blocking the main thread (supported in most modern browsers)
-    if (typeof OffscreenCanvas !== "undefined") {
+    const hasOffscreen = typeof OffscreenCanvas !== "undefined";
+
+    if (hasOffscreen) {
       const offscreen = new OffscreenCanvas(targetW, targetH);
       const ctx = offscreen.getContext("2d");
       if (!ctx) {
@@ -144,6 +146,7 @@ export async function pickImagesAsBase64(
   if (!files || files.length === 0) return null;
 
   const selected = Array.from(files).slice(0, remaining);
+
   const results = await Promise.allSettled(
     selected.map(async (file, i) => {
       const base64 = await blobToResizedBase64(file);
@@ -151,12 +154,12 @@ export async function pickImagesAsBase64(
     }),
   );
 
-  return results
-    .filter(
-      (r): r is PromiseFulfilledResult<{ id: string; base64: string }> =>
-        r.status === "fulfilled",
-    )
-    .map((r) => r.value);
+  const fulfilled = results.filter(
+    (r): r is PromiseFulfilledResult<{ id: string; base64: string }> =>
+      r.status === "fulfilled",
+  );
+
+  return fulfilled.map((r) => r.value);
 }
 
 /** Open a native file picker dialog, resize selected images, and upload each. */
@@ -212,13 +215,15 @@ export async function pickAndUploadImages(
 
   const paths: string[] = [];
   const displayUris: string[] = [];
+  const errorDetails: string[] = [];
   let failedCount = 0;
   for (const r of encodeResults) {
     if (r.status === "rejected") {
-      console.warn(
-        "Image encode failed:",
-        r.reason instanceof Error ? r.reason.message : r.reason,
-      );
+      const detail =
+        r.reason instanceof Error
+          ? `encode: ${r.reason.message}`
+          : `encode: ${String(r.reason)}`;
+      errorDetails.push(detail);
       failedCount++;
       continue;
     }
@@ -227,13 +232,14 @@ export async function pickAndUploadImages(
       paths.push(path);
       displayUris.push(`data:image/jpeg;base64,${r.value.base64}`);
     } catch (err) {
-      console.warn(
-        "Image upload failed:",
-        err instanceof Error ? err.message : err,
-      );
+      const detail =
+        err instanceof Error
+          ? `upload: ${err.message}`
+          : `upload: ${String(err)}`;
+      errorDetails.push(detail);
       failedCount++;
     }
   }
 
-  return { paths, displayUris, failedCount };
+  return { paths, displayUris, failedCount, errorDetails };
 }

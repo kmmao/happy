@@ -17,6 +17,8 @@ export type MultiImageUploadResult = {
   /** Displayable URIs parallel to paths (local asset URIs or data URIs) */
   displayUris: string[];
   failedCount: number;
+  /** Detailed error messages for failed images (for debugging). */
+  errorDetails?: string[];
 };
 
 export const MAX_DIMENSION = 2048;
@@ -49,45 +51,30 @@ async function getUploadDir(sessionId: string): Promise<string | null> {
       Record<string, never>
     >(sessionId, "getUploadDir", {});
     if (!result.success || !result.path) {
-      console.error(
-        "[imageUpload] getUploadDir RPC returned unsuccessful:",
-        result,
-      );
       return null;
     }
     return result.path;
   } catch (error) {
-    console.error("[imageUpload] getUploadDir RPC failed:", error);
     return null;
   }
 }
 
 /** Write base64 image data to a file on the CLI machine via the writeFile RPC.
- *  Returns true on success. */
+ *  Returns null on success, or an error string on failure. */
 async function writeImageFile(
   sessionId: string,
   remotePath: string,
   base64: string,
-): Promise<boolean> {
+): Promise<string | null> {
   try {
     // expectedHash=null tells the CLI this is a new file (creates parent dirs automatically)
     const result = await sessionWriteFile(sessionId, remotePath, base64, null);
     if (!result.success) {
-      console.error(
-        "[imageUpload] writeImageFile failed for path:",
-        remotePath,
-        "result:",
-        result,
-      );
+      return result.error || "unknown";
     }
-    return result.success;
+    return null;
   } catch (error) {
-    console.error(
-      "[imageUpload] writeImageFile threw error for path:",
-      remotePath,
-      error,
-    );
-    return false;
+    return error instanceof Error ? error.message : "unknown throw";
   }
 }
 
@@ -124,41 +111,33 @@ export async function uploadImage(
   evictStaleCache();
 
   const filename = randomFilename();
-  console.log(
-    `[imageUpload] uploading ${filename} (${(base64.length / 1024).toFixed(0)}KB) for session ${sessionId.slice(-8)}`,
-  );
 
   // Use cache if available (the CLI already returns a session-scoped directory)
   const cached = uploadDirCache.get(sessionId);
   if (cached) {
     const remotePath = `${cached}/${filename}`;
-    console.log(`[imageUpload] using cached dir, writing to ${remotePath}`);
-    if (await writeImageFile(sessionId, remotePath, base64)) {
-      console.log(`[imageUpload] cached dir write succeeded`);
+    const cacheErr = await writeImageFile(sessionId, remotePath, base64);
+    if (cacheErr === null) {
       return remotePath;
     }
     // Cached dir failed — clear and retry below
-    console.error(
-      "[imageUpload] cached dir write failed, retrying with fresh dir",
-    );
     uploadDirCache.delete(sessionId);
   }
 
   // Upload to OS temp dir via getUploadDir RPC (cleaned by OS on reboot)
-  console.log(`[imageUpload] calling getUploadDir RPC...`);
   const tempDir = await getUploadDir(sessionId);
   if (tempDir) {
     const remotePath = `${tempDir}/${filename}`;
-    console.log(`[imageUpload] got dir ${tempDir}, writing file...`);
-    if (await writeImageFile(sessionId, remotePath, base64)) {
+    const writeErr = await writeImageFile(sessionId, remotePath, base64);
+    if (writeErr === null) {
       uploadDirCache.set(sessionId, tempDir);
-      console.log(`[imageUpload] write succeeded: ${remotePath}`);
       return remotePath;
     }
-    console.error("[imageUpload] fresh dir write also failed");
+    throw new HappyError(`Failed to upload image (write: ${writeErr})`, false);
   } else {
-    console.error("[imageUpload] getUploadDir returned null — cannot upload");
+    throw new HappyError(
+      "Failed to upload image (getUploadDir RPC failed)",
+      false,
+    );
   }
-
-  throw new HappyError("Failed to upload image", false);
 }

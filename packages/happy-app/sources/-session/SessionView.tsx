@@ -944,7 +944,7 @@ function SessionViewInner({
           flexGrow: 1,
           paddingBottom:
             safeArea.bottom +
-            (isRunningOnMac() || Platform.OS === "web" ? 32 : 0),
+            (isRunningOnMac() || Platform.OS === "web" ? 16 : 0),
         }}
       >
         <AgentContentView

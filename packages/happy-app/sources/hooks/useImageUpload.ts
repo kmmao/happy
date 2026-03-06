@@ -81,12 +81,15 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
           ]);
           if (result.failedCount > 0) {
             const total = result.paths.length + result.failedCount;
+            const details = result.errorDetails?.length
+              ? `\n\n[Debug] ${result.errorDetails.join("; ")}`
+              : "";
             Modal.alert(
               t("common.error"),
               t("session.imageUploadFailed", {
                 failed: result.failedCount,
                 total,
-              }),
+              }) + details,
             );
           }
         }
