@@ -125,16 +125,19 @@ const ChatListInternal = React.memo(
     // Pre-compute which agent-text messages should show an avatar.
     // In an inverted list, index+1 is the visually "previous" (above) message.
     // Show avatar on the first agent-text in a consecutive run.
-    const showAvatarMap = React.useMemo(() => {
+    // Also find the latest (newest) agent-text message ID (index 0 = newest).
+    const { showAvatarMap, latestAgentId } = React.useMemo(() => {
       const map = new Map<string, boolean>();
+      let latestId: string | null = null;
       for (let i = 0; i < props.messages.length; i++) {
         const msg = props.messages[i];
         if (msg.kind === "agent-text") {
+          if (!latestId) latestId = msg.id;
           const prev = props.messages[i + 1];
           map.set(msg.id, !prev || prev.kind !== "agent-text");
         }
       }
-      return map;
+      return { showAvatarMap: map, latestAgentId: latestId };
     }, [props.messages]);
 
     // Group consecutive tool-call messages (3+) into collapsible groups.
@@ -390,10 +393,11 @@ const ChatListInternal = React.memo(
             metadata={props.metadata}
             sessionId={props.sessionId}
             showAvatar={showAvatarMap.get(item.id) ?? false}
+            isLatestAgent={item.id === latestAgentId}
           />
         );
       },
-      [props.metadata, props.sessionId, showAvatarMap],
+      [props.metadata, props.sessionId, showAvatarMap, latestAgentId],
     );
     return (
       <FlatList

@@ -611,7 +611,8 @@ export function reducer(
               message.tool.permission?.mode !== completed.mode ||
               message.tool.permission?.allowedTools !==
                 completed.allowedTools ||
-              message.tool.permission?.decision !== completed.decision;
+              message.tool.permission?.decision !== completed.decision ||
+              message.tool.permission?.answers !== completed.answers;
 
             if (!needsUpdate) {
               continue;
@@ -628,6 +629,7 @@ export function reducer(
                 allowedTools: completed.allowedTools || undefined,
                 decision: completed.decision || undefined,
                 reason: completed.reason || undefined,
+                answers: completed.answers || undefined,
               };
               hasChanged = true;
             } else {
@@ -640,6 +642,9 @@ export function reducer(
                 completed.decision || undefined;
               if (completed.reason) {
                 message.tool.permission.reason = completed.reason;
+              }
+              if (completed.answers) {
+                message.tool.permission.answers = completed.answers;
               }
               hasChanged = true;
             }

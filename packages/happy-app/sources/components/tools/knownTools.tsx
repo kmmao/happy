@@ -1475,11 +1475,20 @@ export const knownTools = {
         opts.tool.input?.questions &&
         Array.isArray(opts.tool.input.questions)
       ) {
-        const count = opts.tool.input.questions.length;
-        if (count === 1) {
-          return opts.tool.input.questions[0].question;
+        const qs = opts.tool.input.questions;
+        if (qs.length === 1) {
+          return qs[0].question;
         }
-        return t("tools.askUserQuestion.multipleQuestions", { count });
+        // Multi-question: show headers joined for more context
+        const headers = qs
+          .map((q: { header?: string }) => q.header)
+          .filter(Boolean);
+        if (headers.length > 0) {
+          return headers.join(" · ");
+        }
+        return t("tools.askUserQuestion.multipleQuestions", {
+          count: qs.length,
+        });
       }
       return null;
     },

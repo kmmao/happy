@@ -183,22 +183,44 @@ const OptionRow = React.memo<{
 
 // ─── Submitted View ──────────────────────────────────────────────────
 
+/**
+ * Find the description of the selected option by matching the answer label.
+ */
+function getSelectedDescription(
+  question: Question,
+  answerLabel: string,
+): string | undefined {
+  // Try exact match first, then match individual labels for multi-select
+  const labels = answerLabel.split(", ");
+  const descriptions: string[] = [];
+  for (const lbl of labels) {
+    const opt = question.options.find((o) => {
+      const { cleanLabel } = parseRecommended(o.label);
+      return cleanLabel === lbl || o.label === lbl;
+    });
+    if (opt?.description) {
+      descriptions.push(opt.description);
+    }
+  }
+  return descriptions.length > 0 ? descriptions.join("; ") : undefined;
+}
+
 const SubmittedView = React.memo<{
   questions: Question[];
   selections: Map<number, Set<number>>;
   otherTexts: Map<number, string>;
-}>(({ questions, selections, otherTexts }) => {
+  permissionAnswers?: Record<string, string>;
+}>(({ questions, selections, otherTexts, permissionAnswers }) => {
   const { theme } = useUnistyles();
   return (
     <ToolSectionView>
       <View style={styles.submittedContainer}>
         {questions.map((q, qIndex) => {
-          const label = getSelectedLabels(
-            q,
-            selections.get(qIndex),
-            otherTexts,
-            qIndex,
-          );
+          // Prefer server-persisted answers (survives re-mount) over local state
+          const label =
+            permissionAnswers?.[q.question] ||
+            getSelectedLabels(q, selections.get(qIndex), otherTexts, qIndex);
+          const description = getSelectedDescription(q, label);
           return (
             <View key={qIndex} style={styles.submittedCard}>
               <View style={styles.submittedCardHeader}>
@@ -209,7 +231,13 @@ const SubmittedView = React.memo<{
                 />
                 <Text style={styles.submittedHeader}>{q.header}</Text>
               </View>
-              <Text style={styles.submittedValue}>{label}</Text>
+              <Text style={styles.submittedQuestion}>{q.question}</Text>
+              <View style={styles.submittedAnswer}>
+                <Text style={styles.submittedValue}>{label}</Text>
+                {description && (
+                  <Text style={styles.submittedDescription}>{description}</Text>
+                )}
+              </View>
             </View>
           );
         })}
@@ -278,8 +306,15 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
           } else {
             newMap.set(questionIndex, new Set([optionIndex]));
 
-            // Auto-advance to next unanswered question for single-select
-            if (questions && questionIndex < questions.length - 1) {
+            // Auto-advance to next unanswered question for single-select,
+            // but skip when "Other" is selected (user needs to type custom text)
+            const isOtherOption =
+              optionIndex === questions[questionIndex].options.length;
+            if (
+              !isOtherOption &&
+              questions &&
+              questionIndex < questions.length - 1
+            ) {
               const nextUnanswered = questions.findIndex(
                 (_, i) => i > questionIndex && (newMap.get(i)?.size ?? 0) === 0,
               );
@@ -356,6 +391,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
           questions={questions}
           selections={selections}
           otherTexts={otherTexts}
+          permissionAnswers={tool.permission?.answers}
         />
       );
     }
@@ -803,9 +839,25 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: "600",
     color: theme.colors.textSecondary,
   },
-  submittedValue: {
-    fontSize: 13,
+  submittedQuestion: {
+    fontSize: 14,
     color: theme.colors.text,
     paddingLeft: 22,
+    marginTop: 2,
+  },
+  submittedAnswer: {
+    paddingLeft: 22,
+    marginTop: 4,
+    gap: 2,
+  },
+  submittedValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.radio.active,
+  },
+  submittedDescription: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: 1,
   },
 }));

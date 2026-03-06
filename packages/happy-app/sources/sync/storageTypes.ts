@@ -115,6 +115,7 @@ export const AgentStateSchema = z.object({
         decision: z
           .enum(["approved", "approved_for_session", "denied", "abort"])
           .nullish(),
+        answers: z.record(z.string(), z.string()).nullish(),
       }),
     )
     .nullish(),

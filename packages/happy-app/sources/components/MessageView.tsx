@@ -18,7 +18,7 @@ import { AgentEvent } from "@/sync/typesRaw";
 import { sync } from "@/sync/sync";
 import { Option } from "./markdown/MarkdownView";
 import { useSetting } from "@/sync/storage";
-import { FlavorIcon } from "./FlavorIcon";
+import { AgentDot } from "./AgentDot";
 import { MessageImage } from "./MessageImage";
 import { parseImageRefs } from "@/utils/parseImageRefs";
 import { useBookmarks } from "@/hooks/useBookmarks";
@@ -29,6 +29,7 @@ export const MessageView = (props: {
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
   showAvatar?: boolean;
+  isLatestAgent?: boolean;
 }) => {
   return (
     <View style={styles.messageContainer} renderToHardwareTextureAndroid={true}>
@@ -39,6 +40,7 @@ export const MessageView = (props: {
           sessionId={props.sessionId}
           getMessageById={props.getMessageById}
           showAvatar={props.showAvatar}
+          isLatestAgent={props.isLatestAgent}
         />
       </View>
     </View>
@@ -52,6 +54,7 @@ function RenderBlock(props: {
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
   showAvatar?: boolean;
+  isLatestAgent?: boolean;
 }): React.ReactElement {
   switch (props.message.kind) {
     case "user-text":
@@ -66,6 +69,7 @@ function RenderBlock(props: {
           sessionId={props.sessionId}
           showAvatar={props.showAvatar}
           flavor={props.metadata?.flavor}
+          isLatestAgent={props.isLatestAgent}
         />
       );
 
@@ -168,6 +172,7 @@ function AgentTextBlock(props: {
   sessionId: string;
   showAvatar?: boolean;
   flavor?: string | null;
+  isLatestAgent?: boolean;
 }) {
   const experiments = useSetting("experiments");
   const { theme } = useUnistyles();
@@ -189,7 +194,13 @@ function AgentTextBlock(props: {
     return (
       <View style={styles.agentMessageRow}>
         <View style={styles.avatarSlot}>
-          {props.showAvatar && <FlavorIcon flavor={props.flavor} size={24} />}
+          {props.showAvatar && (
+            <AgentDot
+              flavor={props.flavor}
+              size={12}
+              animated={props.isLatestAgent}
+            />
+          )}
         </View>
         <View style={styles.agentMessageContainer}>
           <Pressable
@@ -224,7 +235,13 @@ function AgentTextBlock(props: {
   return (
     <View style={styles.agentMessageRow}>
       <View style={styles.avatarSlot}>
-        {props.showAvatar && <FlavorIcon flavor={props.flavor} size={24} />}
+        {props.showAvatar && (
+          <AgentDot
+            flavor={props.flavor}
+            size={12}
+            animated={props.isLatestAgent}
+          />
+        )}
       </View>
       <View style={styles.agentMessageContainer}>
         <MarkdownView
@@ -469,7 +486,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   avatarSlot: {
     width: 32,
-    paddingTop: 8,
+    paddingTop: 14,
     alignItems: "center",
     flexShrink: 0,
   },
