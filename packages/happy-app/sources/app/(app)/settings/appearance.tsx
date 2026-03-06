@@ -24,6 +24,7 @@ export default function AppearanceSettingsScreen() {
   const router = useRouter();
   const [viewInline, setViewInline] = useSettingMutable("viewInline");
   const [expandTodos, setExpandTodos] = useSettingMutable("expandTodos");
+  const [expandTools, setExpandTools] = useSettingMutable("expandTools");
   const [showLineNumbers, setShowLineNumbers] =
     useSettingMutable("showLineNumbers");
   const [showLineNumbersInToolViews, setShowLineNumbersInToolViews] =
@@ -220,6 +221,14 @@ export default function AppearanceSettingsScreen() {
           }
           rightElement={
             <Switch value={expandTodos} onValueChange={setExpandTodos} />
+          }
+        />
+        <Item
+          title={t("settingsAppearance.expandToolDetails")}
+          subtitle={t("settingsAppearance.expandToolDetailsDescription")}
+          icon={<Ionicons name="build-outline" size={29} color="#5856D6" />}
+          rightElement={
+            <Switch value={expandTools} onValueChange={setExpandTools} />
           }
         />
         <Item

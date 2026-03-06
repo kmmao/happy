@@ -205,6 +205,9 @@ export const pl: TranslationStructure = {
       "Wyświetlaj wywołania narzędzi bezpośrednio w wiadomościach czatu",
     expandTodoLists: "Rozwiń listy zadań",
     expandTodoListsDescription: "Pokazuj wszystkie zadania zamiast tylko zmian",
+    expandToolDetails: "Rozwiń szczegóły narzędzi",
+    expandToolDetailsDescription:
+      "Domyślnie pokazuj rozwinięte szczegóły wywołań narzędzi",
     showLineNumbersInDiffs: "Pokaż numery linii w różnicach",
     showLineNumbersInDiffsDescription:
       "Wyświetlaj numery linii w różnicach kodu",

@@ -259,6 +259,9 @@ export const it: TranslationStructure = {
     expandTodoLists: "Espandi liste di attività",
     expandTodoListsDescription:
       "Mostra tutte le attività invece dei soli cambiamenti",
+    expandToolDetails: "Espandi dettagli strumenti",
+    expandToolDetailsDescription:
+      "Mostra i dettagli delle chiamate agli strumenti espansi per impostazione predefinita",
     showLineNumbersInDiffs: "Mostra numeri di riga nelle differenze",
     showLineNumbersInDiffsDescription:
       "Mostra i numeri di riga nei diff del codice",

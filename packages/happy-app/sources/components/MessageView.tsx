@@ -193,7 +193,7 @@ function AgentTextBlock(props: {
   if (props.message.isThinking) {
     return (
       <View style={styles.agentMessageRow}>
-        <View style={styles.avatarSlot}>
+        <View style={[styles.avatarSlot, { paddingTop: 7 }]}>
           {props.showAvatar && (
             <AgentDot
               flavor={props.flavor}

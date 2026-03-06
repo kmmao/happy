@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { ToolCallMessage } from "@/sync/typesMessage";
 import { Metadata } from "@/sync/storageTypes";
+import { useSetting } from "@/sync/storage";
 import { knownTools } from "./tools/knownTools";
 import { layout } from "./layout";
 import { t } from "@/text";
@@ -72,7 +73,8 @@ export const ToolGroupView = React.memo(
   }) => {
     const { theme } = useUnistyles();
     const router = useRouter();
-    const [collapsed, setCollapsed] = React.useState(false);
+    const expandTools = useSetting("expandTools");
+    const [collapsed, setCollapsed] = React.useState(!expandTools);
     const [showAllTools, setShowAllTools] = React.useState(false);
 
     // Auto-approve pending permissions for grouped tools (ToolView is not

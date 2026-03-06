@@ -673,7 +673,7 @@ const style = StyleSheet.create((theme) => ({
   optionsContainer: {
     flexDirection: "column",
     gap: 8,
-    marginVertical: 8,
+    marginBottom: 8,
   },
   optionItem: {
     backgroundColor: theme.colors.surfaceHighest,

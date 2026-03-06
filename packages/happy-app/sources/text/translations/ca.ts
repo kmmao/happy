@@ -194,6 +194,9 @@ export const ca: TranslationStructure = {
     expandTodoLists: "Expandeix les llistes de tasques",
     expandTodoListsDescription:
       "Mostra totes les tasques en lloc de només els canvis",
+    expandToolDetails: "Expandir detalls d'eines",
+    expandToolDetailsDescription:
+      "Mostra els detalls de les crides a eines expandits per defecte",
     showLineNumbersInDiffs: "Mostra els números de línia a les diferències",
     showLineNumbersInDiffsDescription:
       "Mostra els números de línia a les diferències de codi",

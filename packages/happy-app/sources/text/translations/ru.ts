@@ -174,6 +174,9 @@ export const ru: TranslationStructure = {
       "Отображать вызовы инструментов прямо в сообщениях чата",
     expandTodoLists: "Развернуть списки задач",
     expandTodoListsDescription: "Показывать все задачи вместо только изменений",
+    expandToolDetails: "Развернуть детали инструментов",
+    expandToolDetailsDescription:
+      "Показывать развёрнутые детали вызовов инструментов по умолчанию",
     showLineNumbersInDiffs: "Показывать номера строк в различиях",
     showLineNumbersInDiffsDescription:
       "Отображать номера строк в различиях кода",

@@ -194,6 +194,9 @@ export const pt: TranslationStructure = {
     expandTodoLists: "Expandir listas de tarefas",
     expandTodoListsDescription:
       "Mostrar todas as tarefas em vez de apenas as mudanças",
+    expandToolDetails: "Expandir detalhes de ferramentas",
+    expandToolDetailsDescription:
+      "Mostrar detalhes de chamadas de ferramentas expandidos por padrão",
     showLineNumbersInDiffs: "Mostrar números de linha nos diffs",
     showLineNumbersInDiffsDescription:
       "Exibir números de linha nos diffs de código",

@@ -255,6 +255,8 @@ export const ja: TranslationStructure = {
       "チャットメッセージ内にツール呼び出しを直接表示",
     expandTodoLists: "Todoリストを展開",
     expandTodoListsDescription: "変更点だけでなくすべてのTodoを表示",
+    expandToolDetails: "ツール詳細を展開",
+    expandToolDetailsDescription: "ツール呼び出しの詳細をデフォルトで展開表示",
     showLineNumbersInDiffs: "差分に行番号を表示",
     showLineNumbersInDiffsDescription: "コード差分に行番号を表示",
     showLineNumbersInToolViews: "ツールビューに行番号を表示",
