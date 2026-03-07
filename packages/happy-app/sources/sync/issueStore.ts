@@ -3,7 +3,12 @@
  *
  * NOT in storage.ts to keep it manageable.
  * Issues are fetched on-demand via sessionBash, not persisted locally.
- * Uses page-based pagination (not infinite scroll).
+ * Supports infinite scroll pagination with append mode.
+ *
+ * Auto-polling: implemented via useIssuePolling hook (sources/hooks/useIssuePolling.ts).
+ * - 60s setInterval gated by AppState === "active"
+ * - Pauses when tab/app is backgrounded, resumes on foreground
+ * - Deduplicates with FETCH_COOLDOWN (30s) below
  */
 
 import * as React from "react";
@@ -14,6 +19,8 @@ import type {
   RepoInfo,
   IssueFilters,
   IssueFilterState,
+  IssueSortField,
+  IssueSortDirection,
   GitHostMapping,
   AggregatedIssue,
 } from "./issueTypes";
@@ -24,6 +31,7 @@ import {
   updateIssueState as apiUpdateIssueState,
   addIssueComment as apiAddIssueComment,
   createIssue as apiCreateIssue,
+  editIssue as apiEditIssue,
 } from "./issueFetch";
 
 //
@@ -48,12 +56,19 @@ interface IssueActions {
     remoteUrl: string,
     gitHosts?: readonly GitHostMapping[],
   ) => void;
-  /** Load issues for a specific page (replaces current list) */
+  /** Load issues for a specific page. When append=true, concatenates to existing list (infinite scroll). */
   loadIssues: (
     projectKey: string,
     sessionId: string,
     page?: number,
     repoPath?: string,
+    append?: boolean,
+  ) => Promise<void>;
+  /** Load next page for all projects that still have more issues */
+  loadMoreIssues: (
+    projectKeys: readonly string[],
+    sessionId: string,
+    repoPathByKey?: Readonly<Record<string, string | undefined>>,
   ) => Promise<void>;
   /** Navigate to a specific page */
   goToPage: (
@@ -74,6 +89,8 @@ interface IssueActions {
   ) => Promise<void>;
   setFilterState: (state: IssueFilterState) => void;
   setSearch: (search: string) => void;
+  setSort: (sort: IssueSortField, direction: IssueSortDirection) => void;
+  setLabelFilter: (labels: readonly string[]) => void;
   checkGhAvailable: (sessionId: string, repoPath?: string) => Promise<boolean>;
   updateIssueState: (
     projectKey: string,
@@ -95,6 +112,16 @@ interface IssueActions {
     body: string,
     sessionId: string,
     repoPath?: string,
+    labels?: readonly string[],
+  ) => Promise<void>;
+  editIssue: (
+    projectKey: string,
+    issueNumber: number,
+    title: string,
+    body: string,
+    sessionId: string,
+    repoPath?: string,
+    labels?: readonly string[],
   ) => Promise<void>;
   reset: () => void;
 }
@@ -109,7 +136,13 @@ const initialState: IssueState = {
   isLoading: {},
   lastFetchedAt: {},
   errors: {},
-  filters: { state: "open", search: "" },
+  filters: {
+    state: "open",
+    search: "",
+    sort: "created",
+    direction: "desc",
+    labels: [],
+  },
   ghAvailable: {},
   pageByProject: {},
   hasMoreByProject: {},
@@ -154,14 +187,15 @@ export const issueStore = create<IssueStore>()((set, get) => ({
     sessionId: string,
     page: number = 1,
     repoPath?: string,
+    append: boolean = false,
   ) => {
     const { isLoading, lastFetchedAt, repoInfoByProject } = get();
 
     if (isLoading[projectKey]) return;
 
-    // Only apply cooldown for same-page re-fetches
+    // Only apply cooldown for same-page re-fetches (not for append/load-more)
     const currentPage = get().pageByProject[projectKey] ?? 1;
-    if (page === currentPage) {
+    if (page === currentPage && !append) {
       const lastFetched = lastFetchedAt[projectKey] ?? 0;
       if (Date.now() - lastFetched < FETCH_COOLDOWN) return;
     }
@@ -175,19 +209,24 @@ export const issueStore = create<IssueStore>()((set, get) => ({
     }));
 
     try {
-      const state = get().filters.state;
+      const { state, sort, direction, labels } = get().filters;
       const result = await fetchIssues(
         sessionId,
         repoInfo,
         state,
         page,
         repoPath,
+        sort,
+        direction,
+        labels,
       );
 
       set((prev) => ({
         issuesByProject: {
           ...prev.issuesByProject,
-          [projectKey]: result.issues,
+          [projectKey]: append
+            ? [...(prev.issuesByProject[projectKey] ?? []), ...result.issues]
+            : result.issues,
         },
         lastFetchedAt: { ...prev.lastFetchedAt, [projectKey]: Date.now() },
         isLoading: { ...prev.isLoading, [projectKey]: false },
@@ -204,6 +243,30 @@ export const issueStore = create<IssueStore>()((set, get) => ({
         errors: { ...prev.errors, [projectKey]: message },
       }));
     }
+  },
+
+  loadMoreIssues: async (
+    projectKeys: readonly string[],
+    sessionId: string,
+    repoPathByKey?: Readonly<Record<string, string | undefined>>,
+  ) => {
+    const promises = projectKeys
+      .filter((key) => get().hasMoreByProject[key])
+      .map((key) => {
+        const currentPage = get().pageByProject[key] ?? 1;
+        // Clear cooldown so the next page load isn't blocked
+        set((prev) => ({
+          lastFetchedAt: { ...prev.lastFetchedAt, [key]: 0 },
+        }));
+        return get().loadIssues(
+          key,
+          sessionId,
+          currentPage + 1,
+          repoPathByKey?.[key],
+          true,
+        );
+      });
+    await Promise.all(promises);
   },
 
   goToPage: async (
@@ -236,13 +299,24 @@ export const issueStore = create<IssueStore>()((set, get) => ({
     sessionId: string,
     repoPathByKey?: Readonly<Record<string, string | undefined>>,
   ) => {
-    // Clear cooldown for all keys
+    // Clear cooldown, pagination state, and existing issues for all keys (reset to page 1)
     set((prev) => {
       const cleared = { ...prev.lastFetchedAt };
+      const clearedPages = { ...prev.pageByProject };
+      const clearedHasMore = { ...prev.hasMoreByProject };
+      const clearedIssues = { ...prev.issuesByProject };
       for (const key of projectKeys) {
         cleared[key] = 0;
+        clearedPages[key] = 1;
+        clearedHasMore[key] = false;
+        delete clearedIssues[key];
       }
-      return { lastFetchedAt: cleared };
+      return {
+        lastFetchedAt: cleared,
+        pageByProject: clearedPages,
+        hasMoreByProject: clearedHasMore,
+        issuesByProject: clearedIssues,
+      };
     });
     // Load all in parallel
     await Promise.all(
@@ -265,6 +339,26 @@ export const issueStore = create<IssueStore>()((set, get) => ({
   setSearch: (search: string) => {
     set((prev) => ({
       filters: { ...prev.filters, search },
+    }));
+  },
+
+  setSort: (sort: IssueSortField, direction: IssueSortDirection) => {
+    set((prev) => ({
+      filters: { ...prev.filters, sort, direction },
+      lastFetchedAt: {},
+      pageByProject: {},
+      hasMoreByProject: {},
+      issuesByProject: {},
+    }));
+  },
+
+  setLabelFilter: (labels: readonly string[]) => {
+    set((prev) => ({
+      filters: { ...prev.filters, labels },
+      lastFetchedAt: {},
+      pageByProject: {},
+      hasMoreByProject: {},
+      issuesByProject: {},
     }));
   },
 
@@ -310,6 +404,18 @@ export const issueStore = create<IssueStore>()((set, get) => ({
         issuesByProject: { ...prev.issuesByProject, [projectKey]: updated },
       };
     });
+    // Remove from visible list if new state doesn't match active filter
+    const currentFilter = get().filters.state;
+    if (currentFilter !== "all" && newState !== currentFilter) {
+      set((prev) => ({
+        issuesByProject: {
+          ...prev.issuesByProject,
+          [projectKey]: (prev.issuesByProject[projectKey] ?? []).filter(
+            (i) => i.number !== issueNumber,
+          ),
+        },
+      }));
+    }
   },
 
   addComment: async (
@@ -344,6 +450,7 @@ export const issueStore = create<IssueStore>()((set, get) => ({
     body: string,
     sessionId: string,
     repoPath?: string,
+    labels?: readonly string[],
   ) => {
     const repoInfo = get().repoInfoByProject[projectKey];
     if (!repoInfo || repoInfo.provider === "unknown") {
@@ -355,6 +462,7 @@ export const issueStore = create<IssueStore>()((set, get) => ({
       title,
       body,
       repoPath,
+      labels,
     );
     // Prepend to local list if filter is "open" or "all"
     const currentFilter = get().filters.state;
@@ -369,6 +477,55 @@ export const issueStore = create<IssueStore>()((set, get) => ({
         };
       });
     }
+  },
+
+  editIssue: async (
+    projectKey: string,
+    issueNumber: number,
+    title: string,
+    body: string,
+    sessionId: string,
+    repoPath?: string,
+    labels?: readonly string[],
+  ) => {
+    const repoInfo = get().repoInfoByProject[projectKey];
+    if (!repoInfo || repoInfo.provider === "unknown") {
+      throw new Error("Repository info not found");
+    }
+    await apiEditIssue(
+      sessionId,
+      repoInfo,
+      issueNumber,
+      title,
+      body,
+      repoPath,
+      labels,
+    );
+    // Update local state
+    set((prev) => {
+      const issues = prev.issuesByProject[projectKey] ?? [];
+      const updated = issues.map((i) =>
+        i.number === issueNumber
+          ? {
+              ...i,
+              title,
+              body,
+              updatedAt: Date.now(),
+              ...(labels
+                ? {
+                    labels: labels.map((name) => ({
+                      name,
+                      color: i.labels.find((l) => l.name === name)?.color ?? "",
+                    })),
+                  }
+                : {}),
+            }
+          : i,
+      );
+      return {
+        issuesByProject: { ...prev.issuesByProject, [projectKey]: updated },
+      };
+    });
   },
 
   reset: () => {
@@ -453,7 +610,7 @@ export function useAggregatedIssues(
   const snapshot = issueStore((s) => {
     // Build a fingerprint from the data we care about.
     // If none of the relevant slices changed, return the same string → no re-render.
-    let fp = s.filters.search;
+    let fp = `${s.filters.search}|${s.filters.sort}|${s.filters.direction}|${s.filters.labels.join(",")}`;
     for (const key of projectKeys) {
       const issues = s.issuesByProject[key];
       const info = s.repoInfoByProject[key];
@@ -484,7 +641,7 @@ export function useAggregatedIssues(
         result.push({ ...issue, repoLabel, projectKey: key });
       }
     }
-    const { search } = s.filters;
+    const { search, sort: sortField, direction: sortDir } = s.filters;
     const filtered = search
       ? result.filter((i) => {
           const lower = search.toLowerCase();
@@ -496,7 +653,22 @@ export function useAggregatedIssues(
           );
         })
       : result;
-    return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
+    // Sort based on current filter settings
+    const sortFn = (a: AggregatedIssue, b: AggregatedIssue) => {
+      let aVal: number, bVal: number;
+      if (sortField === "comments") {
+        aVal = a.commentCount;
+        bVal = b.commentCount;
+      } else if (sortField === "updated") {
+        aVal = a.updatedAt;
+        bVal = b.updatedAt;
+      } else {
+        aVal = a.createdAt;
+        bVal = b.createdAt;
+      }
+      return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+    };
+    return filtered.sort(sortFn);
   }, [projectKeys, snapshot]);
 }
 
@@ -535,4 +707,8 @@ export function useAggregatedClosedCount(
       0,
     ),
   );
+}
+
+export function useAggregatedHasMore(projectKeys: readonly string[]): boolean {
+  return issueStore((s) => projectKeys.some((k) => s.hasMoreByProject[k]));
 }

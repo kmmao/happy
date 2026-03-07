@@ -1,7 +1,8 @@
 import * as React from "react";
-import { View, Pressable } from "react-native";
+import { View, Pressable, ActionSheetIOS, Alert, Platform } from "react-native";
 import { Text } from "@/components/StyledText";
 import { Ionicons } from "@expo/vector-icons";
+import { Octicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { t } from "@/text";
@@ -13,7 +14,11 @@ import Animated, {
   cancelAnimation,
   Easing,
 } from "react-native-reanimated";
-import type { IssueFilterState } from "@/sync/issueTypes";
+import type {
+  IssueFilterState,
+  IssueSortField,
+  IssueSortDirection,
+} from "@/sync/issueTypes";
 
 interface IssueFilterBarProps {
   readonly activeState: IssueFilterState;
@@ -23,6 +28,12 @@ interface IssueFilterBarProps {
   readonly loading?: boolean;
   readonly onRefresh?: () => void;
   readonly onCreateIssue?: () => void;
+  readonly sort?: IssueSortField;
+  readonly direction?: IssueSortDirection;
+  readonly onSortChange?: (
+    sort: IssueSortField,
+    direction: IssueSortDirection,
+  ) => void;
 }
 
 const FILTERS: readonly {
@@ -42,9 +53,55 @@ export const IssueFilterBar = React.memo<IssueFilterBarProps>(
     loading,
     onRefresh,
     onCreateIssue,
+    sort,
+    direction,
+    onSortChange,
   }) {
     const { theme } = useUnistyles();
     const rotation = useSharedValue(0);
+
+    const handleSortPress = React.useCallback(() => {
+      if (!onSortChange) return;
+      const options: Array<{
+        label: string;
+        sort: IssueSortField;
+        dir: IssueSortDirection;
+      }> = [
+        { label: `${t("issues.sortCreated")} ↓`, sort: "created", dir: "desc" },
+        { label: `${t("issues.sortCreated")} ↑`, sort: "created", dir: "asc" },
+        { label: `${t("issues.sortUpdated")} ↓`, sort: "updated", dir: "desc" },
+        { label: `${t("issues.sortUpdated")} ↑`, sort: "updated", dir: "asc" },
+        {
+          label: `${t("issues.sortComments")} ↓`,
+          sort: "comments",
+          dir: "desc",
+        },
+      ];
+      const cancelLabel = t("common.cancel");
+      if (Platform.OS === "ios") {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            title: t("issues.sortBy"),
+            options: [...options.map((o) => o.label), cancelLabel],
+            cancelButtonIndex: options.length,
+          },
+          (index) => {
+            if (index < options.length) {
+              const chosen = options[index]!;
+              onSortChange(chosen.sort, chosen.dir);
+            }
+          },
+        );
+      } else {
+        Alert.alert(t("issues.sortBy"), undefined, [
+          ...options.map((o) => ({
+            text: o.label,
+            onPress: () => onSortChange(o.sort, o.dir),
+          })),
+          { text: cancelLabel, style: "cancel" as const },
+        ]);
+      }
+    }, [onSortChange]);
 
     React.useEffect(() => {
       if (loading) {
@@ -98,7 +155,7 @@ export const IssueFilterBar = React.memo<IssueFilterBarProps>(
               >
                 {t(filter.labelKey)}
               </Text>
-              {count !== undefined && count > 0 && (
+              {count !== undefined && (
                 <Text
                   style={{
                     fontSize: 12,
@@ -116,6 +173,26 @@ export const IssueFilterBar = React.memo<IssueFilterBarProps>(
           );
         })}
         <View style={{ flex: 1 }} />
+        {onSortChange && (
+          <Pressable
+            onPress={handleSortPress}
+            hitSlop={8}
+            style={{
+              paddingHorizontal: 4,
+              justifyContent: "center",
+            }}
+          >
+            <Octicons
+              name="sort-desc"
+              size={16}
+              color={
+                sort && sort !== "created"
+                  ? theme.colors.textLink
+                  : theme.colors.textSecondary
+              }
+            />
+          </Pressable>
+        )}
         {onCreateIssue && (
           <Pressable
             onPress={onCreateIssue}

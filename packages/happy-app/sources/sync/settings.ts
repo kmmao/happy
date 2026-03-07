@@ -489,11 +489,15 @@ export const SettingsSchema = z.object({
         host: z.string(),
         provider: z.enum(["github", "gitea"]),
         apiToken: z.string().optional(),
+        autoIssueEnabled: z.boolean().optional(),
+        autoIssueLabel: z.string().optional(),
+        autoIssueAllowedAuthors: z.array(z.string()).optional(),
       }),
     )
     .describe(
       "Custom Git host provider mappings (e.g. GitHub Enterprise → github, self-hosted Gitea → gitea)",
     ),
+  // Auto issue session: configured per-host in gitHosts array
   dismissedCLIWarnings: z
     .object({
       perMachine: z

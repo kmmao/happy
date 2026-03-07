@@ -122,7 +122,13 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     ) {
       sessionAllow(sessionId, tool.permission.id);
     }
-  }, [sessionId, tool.permission?.status, tool.permission?.id, tool.name, isExitPlanMode]);
+  }, [
+    sessionId,
+    tool.permission?.status,
+    tool.permission?.id,
+    tool.name,
+    isExitPlanMode,
+  ]);
 
   let knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
 
@@ -438,11 +444,18 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
               )}
             </View>
             {statsBar}
-            {tool.state === "running" && (
+            {tool.state === "running" ? (
               <View style={styles.elapsedContainer}>
                 <ElapsedView from={tool.createdAt} />
               </View>
-            )}
+            ) : tool.completedAt ? (
+              <View style={styles.elapsedContainer}>
+                <CompletedDurationView
+                  from={tool.createdAt}
+                  to={tool.completedAt}
+                />
+              </View>
+            ) : null}
             {statusIcon}
           </View>
         </TouchableOpacity>
@@ -462,11 +475,18 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
               )}
             </View>
             {statsBar}
-            {tool.state === "running" && (
+            {tool.state === "running" ? (
               <View style={styles.elapsedContainer}>
                 <ElapsedView from={tool.createdAt} />
               </View>
-            )}
+            ) : tool.completedAt ? (
+              <View style={styles.elapsedContainer}>
+                <CompletedDurationView
+                  from={tool.createdAt}
+                  to={tool.completedAt}
+                />
+              </View>
+            ) : null}
             {statusIcon}
           </View>
         </Pressable>
@@ -569,6 +589,17 @@ function ElapsedView(props: { from: number }) {
   const { from } = props;
   const elapsed = useElapsedTime(from);
   return <Text style={styles.elapsedText}>{elapsed.toFixed(1)}s</Text>;
+}
+
+function CompletedDurationView(props: { from: number; to: number }) {
+  const seconds = (props.to - props.from) / 1000;
+  const text =
+    seconds < 1
+      ? `${Math.round(seconds * 1000)}ms`
+      : seconds < 60
+        ? `${seconds.toFixed(1)}s`
+        : `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+  return <Text style={styles.elapsedText}>{text}</Text>;
 }
 
 const styles = StyleSheet.create((theme) => ({

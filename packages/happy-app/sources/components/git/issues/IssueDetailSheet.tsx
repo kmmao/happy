@@ -15,14 +15,19 @@ import { t } from "@/text";
 import { Modal } from "@/modal";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { issueStore } from "@/sync/issueStore";
+import { useIssueSessionStatus } from "@/hooks/useIssueSessionStatus";
 import type { AggregatedIssue } from "@/sync/issueTypes";
+import { IssueEditSheet } from "./IssueEditSheet";
 
 interface IssueDetailSheetProps {
   readonly issue: AggregatedIssue;
   readonly sessionId: string;
   readonly repoPath?: string;
+  readonly machineId?: string;
   readonly onClose: () => void;
   readonly onSendToChat?: (text: string) => void;
+  readonly onLaunchSession?: () => void;
+  readonly onViewSession?: (sessionId: string) => void;
 }
 
 export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
@@ -30,13 +35,27 @@ export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
     issue,
     sessionId,
     repoPath,
+    machineId,
     onClose,
     onSendToChat,
+    onLaunchSession,
+    onViewSession,
   }) {
     const { theme } = useUnistyles();
     const insets = useSafeAreaInsets();
     const [issueState, setIssueState] = React.useState(issue.state);
     const isOpen = issueState === "open";
+    const [title, setTitle] = React.useState(issue.title);
+    const [body, setBody] = React.useState(issue.body);
+
+    // Check if this issue has an associated session
+    const issueSessionLink = useIssueSessionStatus(
+      issue.projectKey,
+      issue.number,
+    );
+    const isProcessing = issueSessionLink?.status === "processing";
+    const hasSession =
+      issueSessionLink != null && issueSessionLink.sessionId !== "pending";
 
     const handleOpenInBrowser = React.useCallback(() => {
       if (issue.url) {
@@ -50,6 +69,15 @@ export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
       }
       onClose();
     }, [issue.number, issue.title, onSendToChat, onClose]);
+
+    const handleLaunchOrView = React.useCallback(() => {
+      if (hasSession && onViewSession && issueSessionLink) {
+        onViewSession(issueSessionLink.sessionId);
+      } else if (onLaunchSession) {
+        onLaunchSession();
+      }
+      onClose();
+    }, [hasSession, onViewSession, onLaunchSession, issueSessionLink, onClose]);
 
     const [stateLoading, doToggleState] = useHappyAction(
       React.useCallback(async () => {
@@ -85,8 +113,47 @@ export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
       }, [issue.projectKey, issue.number, sessionId, repoPath]),
     );
 
+    const [editLoading, doEditIssue] = useHappyAction(
+      React.useCallback(async () => {
+        // Close detail sheet first, then show edit sheet
+        onClose();
+        Modal.show({
+          component: IssueEditSheet,
+          props: {
+            sessionId,
+            projectKey: issue.projectKey,
+            issueNumber: issue.number,
+            initialTitle: title,
+            initialBody: body,
+            initialLabels: issue.labels.map((l) => l.name),
+            repoPath,
+            onEdited: (
+              newTitle: string,
+              newBody: string,
+              _labels: readonly string[],
+            ) => {
+              setTitle(newTitle);
+              setBody(newBody);
+            },
+          },
+        });
+      }, [
+        title,
+        body,
+        issue.projectKey,
+        issue.number,
+        issue.labels,
+        sessionId,
+        repoPath,
+        onClose,
+      ]),
+    );
+
     const formattedDate =
       issue.createdAt > 0 ? new Date(issue.createdAt).toLocaleDateString() : "";
+
+    const canLaunch = isOpen && machineId && (onLaunchSession || onViewSession);
+    const showViewButton = hasSession && onViewSession;
 
     return (
       <View style={styles.overlay}>
@@ -138,11 +205,33 @@ export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
                 {isOpen ? t("issues.open") : t("issues.closed")}
               </Text>
             </View>
+            {isProcessing && (
+              <View
+                style={[
+                  styles.stateBadge,
+                  {
+                    backgroundColor:
+                      theme.colors.button.primary.background + "20",
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "600",
+                    color: theme.colors.button.primary.background,
+                    ...Typography.default(),
+                  }}
+                >
+                  {t("issues.processing")}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Title */}
           <Text style={[styles.title, { color: theme.colors.text }]}>
-            {issue.title}
+            {title}
           </Text>
 
           {/* Meta row: author + date + comments */}
@@ -212,14 +301,14 @@ export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
             </View>
           )}
 
-          {/* Body — always rendered with consistent container */}
+          {/* Body */}
           <View
             style={[
               styles.bodyContainer,
               { backgroundColor: theme.colors.surfaceHigh },
             ]}
           >
-            {issue.body !== "" ? (
+            {body !== "" ? (
               <ScrollView
                 style={styles.bodyScroll}
                 contentContainerStyle={styles.bodyContent}
@@ -232,7 +321,7 @@ export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
                     ...Typography.default(),
                   }}
                 >
-                  {issue.body}
+                  {body}
                 </Text>
               </ScrollView>
             ) : (
@@ -253,6 +342,29 @@ export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
 
           {/* Actions */}
           <View style={styles.actions}>
+            {/* Launch Session / View Processing Session */}
+            {canLaunch && (
+              <Pressable onPress={handleLaunchOrView} style={styles.actionItem}>
+                <Octicons
+                  name={showViewButton ? "eye" : "rocket"}
+                  size={18}
+                  color={theme.colors.button.primary.background}
+                />
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "600",
+                    color: theme.colors.button.primary.background,
+                    ...Typography.default("semiBold"),
+                  }}
+                >
+                  {showViewButton
+                    ? t("issues.viewProcessingSession")
+                    : t("issues.launchSession")}
+                </Text>
+              </Pressable>
+            )}
+
             {/* Close / Reopen */}
             <Pressable
               onPress={doToggleState}
@@ -282,6 +394,28 @@ export const IssueDetailSheet = React.memo<IssueDetailSheetProps>(
                 }}
               >
                 {isOpen ? t("issues.closeIssue") : t("issues.reopenIssue")}
+              </Text>
+            </Pressable>
+
+            {/* Edit Issue */}
+            <Pressable
+              onPress={doEditIssue}
+              disabled={editLoading}
+              style={styles.actionItem}
+            >
+              {editLoading ? (
+                <ActivityIndicator size={18} color={theme.colors.text} />
+              ) : (
+                <Octicons name="pencil" size={18} color={theme.colors.text} />
+              )}
+              <Text
+                style={{
+                  fontSize: 15,
+                  color: theme.colors.text,
+                  ...Typography.default(),
+                }}
+              >
+                {t("issues.editIssue")}
               </Text>
             </Pressable>
 

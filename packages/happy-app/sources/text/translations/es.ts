@@ -399,10 +399,6 @@ export const es: TranslationStructure = {
     compactionSummaryDisconnected:
       "La sesión no está conectada. El resumen solo está disponible cuando el CLI está en línea.",
     messageQueued: "En cola",
-    interruptConfirmTitle: "¿Interrumpir la tarea actual?",
-    interruptConfirmMessage:
-      "Se detendrá la tarea actual. Los mensajes en cola se procesarán a continuación.",
-    interruptAndSend: "Interrumpir y enviar",
   },
 
   bookmark: {
@@ -1439,6 +1435,30 @@ export const es: TranslationStructure = {
     newIssueBody: "Descripción (opcional)",
     newIssueBodyPlaceholder: "Describe el problema...",
     pageOf: ({ page }: { page: number }) => `Página ${page}`,
+    launchSession: "Iniciar sesión",
+    viewProcessingSession: "Ver sesión en proceso",
+    processing: "En proceso",
+    launchFailed: ({ error }: { error: string }) =>
+      `Error al iniciar sesión: ${error}`,
+    autoClosedComment: ({ branchName }: { branchName: string }) =>
+      `Este issue fue procesado por Happy Coder. Rama: ${branchName}`,
+    editIssue: "Editar issue",
+    editTitle: "Editar título del issue",
+    editTitlePlaceholder: "Título del issue...",
+    editBody: "Editar descripción del issue",
+    editBodyPlaceholder: "Describe el issue...",
+    sortBy: "Ordenar por",
+    sortCreated: "Fecha de creación",
+    sortUpdated: "Fecha de actualización",
+    sortComments: "Comentarios",
+    noOpenIssues: "No hay incidencias abiertas",
+    noClosedIssues: "No hay incidencias cerradas",
+    tryClosedHint: "Prueba a ver las incidencias cerradas",
+    createFirstIssue: "Crear incidencia",
+    createIssueTitle: "Crear incidencia",
+    labelSelect: "Etiquetas",
+    noLabelsAvailable: "No hay etiquetas disponibles",
+    createButton: "Crear",
   },
 
   gitHosts: {
@@ -1461,6 +1481,13 @@ export const es: TranslationStructure = {
     duplicateTitle: "Host duplicado",
     duplicateMessage: ({ host }: { host: string }) =>
       `"${host}" ya está configurado.`,
+    autoIssueSectionTitle: "Sesión automática de incidencias",
+    autoIssueDescription:
+      "Iniciar automáticamente una sesión de Claude Code al detectar una incidencia con una etiqueta específica. Solo se activará para incidencias creadas por autores permitidos.",
+    autoIssueLabel: "Etiqueta de activación",
+    autoIssueLabelPlaceholder: "ej. claude, auto-fix",
+    autoIssueAllowedAuthors: "Autores permitidos",
+    autoIssueAllowedAuthorsPlaceholder: "usuario1, usuario2",
   },
 
   quickCommands: {

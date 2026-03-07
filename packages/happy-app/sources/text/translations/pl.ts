@@ -408,10 +408,6 @@ export const pl: TranslationStructure = {
     compactionSummaryDisconnected:
       "Sesja nie jest połączona. Podsumowanie jest dostępne tylko gdy CLI jest online.",
     messageQueued: "W kolejce",
-    interruptConfirmTitle: "Przerwać bieżące zadanie?",
-    interruptConfirmMessage:
-      "Bieżące zadanie zostanie zatrzymane. Wiadomości w kolejce zostaną przetworzone następnie.",
-    interruptAndSend: "Przerwij i wyślij",
   },
 
   bookmark: {
@@ -1462,6 +1458,30 @@ export const pl: TranslationStructure = {
     newIssueBody: "Opis (opcjonalnie)",
     newIssueBodyPlaceholder: "Opisz problem...",
     pageOf: ({ page }: { page: number }) => `Strona ${page}`,
+    launchSession: "Uruchom sesję",
+    viewProcessingSession: "Zobacz sesję przetwarzania",
+    processing: "Przetwarzanie",
+    launchFailed: ({ error }: { error: string }) =>
+      `Nie udało się uruchomić sesji: ${error}`,
+    autoClosedComment: ({ branchName }: { branchName: string }) =>
+      `Ten issue został obsłużony przez Happy Coder. Gałąź: ${branchName}`,
+    editIssue: "Edytuj zgłoszenie",
+    editTitle: "Edytuj tytuł zgłoszenia",
+    editTitlePlaceholder: "Tytuł zgłoszenia...",
+    editBody: "Edytuj opis zgłoszenia",
+    editBodyPlaceholder: "Opisz zgłoszenie...",
+    sortBy: "Sortuj według",
+    sortCreated: "Daty utworzenia",
+    sortUpdated: "Daty aktualizacji",
+    sortComments: "Komentarzy",
+    noOpenIssues: "Brak otwartych zgłoszeń",
+    noClosedIssues: "Brak zamkniętych zgłoszeń",
+    tryClosedHint: "Spróbuj wyświetlić zamknięte zgłoszenia",
+    createFirstIssue: "Utwórz zgłoszenie",
+    createIssueTitle: "Utwórz zgłoszenie",
+    labelSelect: "Etykiety",
+    noLabelsAvailable: "Brak dostępnych etykiet",
+    createButton: "Utwórz",
   },
 
   gitHosts: {
@@ -1484,6 +1504,13 @@ export const pl: TranslationStructure = {
     duplicateTitle: "Zduplikowany host",
     duplicateMessage: ({ host }: { host: string }) =>
       `"${host}" jest już skonfigurowany.`,
+    autoIssueSectionTitle: "Automatyczna sesja zgłoszeń",
+    autoIssueDescription:
+      "Automatycznie uruchom sesję Claude Code po wykryciu zgłoszenia z określoną etykietą. Wyzwalane tylko dla zgłoszeń utworzonych przez dozwolonych autorów.",
+    autoIssueLabel: "Etykieta wyzwalająca",
+    autoIssueLabelPlaceholder: "np. claude, auto-fix",
+    autoIssueAllowedAuthors: "Dozwoleni autorzy",
+    autoIssueAllowedAuthorsPlaceholder: "nazwa1, nazwa2",
   },
 
   quickCommands: {

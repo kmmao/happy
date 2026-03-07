@@ -449,10 +449,6 @@ export const ja: TranslationStructure = {
     compactionSummaryDisconnected:
       "セッションが接続されていません。サマリーはCLIがオンラインの時のみ利用可能です。",
     messageQueued: "キュー中",
-    interruptConfirmTitle: "現在のタスクを中断しますか？",
-    interruptConfirmMessage:
-      "現在のタスクを停止します。キュー中のメッセージは次に処理されます。",
-    interruptAndSend: "中断して送信",
   },
 
   bookmark: {
@@ -1419,6 +1415,30 @@ export const ja: TranslationStructure = {
     newIssueBody: "説明（任意）",
     newIssueBodyPlaceholder: "問題を説明してください...",
     pageOf: ({ page }: { page: number }) => `${page} ページ`,
+    launchSession: "セッションを開始",
+    viewProcessingSession: "処理中のセッションを表示",
+    processing: "処理中",
+    launchFailed: ({ error }: { error: string }) =>
+      `セッションの開始に失敗しました：${error}`,
+    autoClosedComment: ({ branchName }: { branchName: string }) =>
+      `このIssueはHappy Coderによって処理されました。ブランチ：${branchName}`,
+    editIssue: "Issueを編集",
+    editTitle: "Issueタイトルを編集",
+    editTitlePlaceholder: "Issueタイトル...",
+    editBody: "Issue本文を編集",
+    editBodyPlaceholder: "Issueの詳細を記述...",
+    sortBy: "並び替え",
+    sortCreated: "作成日",
+    sortUpdated: "更新日",
+    sortComments: "コメント数",
+    noOpenIssues: "未解決の課題はありません",
+    noClosedIssues: "解決済みの課題はありません",
+    tryClosedHint: "解決済みの課題を見てみましょう",
+    createFirstIssue: "課題を作成",
+    createIssueTitle: "課題を作成",
+    labelSelect: "ラベル",
+    noLabelsAvailable: "利用可能なラベルがありません",
+    createButton: "作成",
   },
 
   gitHosts: {
@@ -1441,6 +1461,13 @@ export const ja: TranslationStructure = {
     duplicateTitle: "重複するホスト",
     duplicateMessage: ({ host }: { host: string }) =>
       `"${host}" はすでに設定されています。`,
+    autoIssueSectionTitle: "自動課題セッション",
+    autoIssueDescription:
+      "指定されたラベルの付いた課題を検出すると、Claude Code セッションを自動的に起動します。許可された作成者の課題のみがトリガーされます。",
+    autoIssueLabel: "トリガーラベル",
+    autoIssueLabelPlaceholder: "例: claude, auto-fix",
+    autoIssueAllowedAuthors: "許可された作成者",
+    autoIssueAllowedAuthorsPlaceholder: "ユーザー名1, ユーザー名2",
   },
 
   quickCommands: {

@@ -53,7 +53,6 @@ import {
   formatTokenCountShort,
   getContextWindowSize,
 } from "@/utils/formatUsage";
-import { Modal } from "@/modal";
 import { SttWaveIndicator } from "./SttWaveIndicator";
 import { SttProgressLine } from "./SttProgressLine";
 
@@ -679,18 +678,9 @@ export const AgentInput = React.memo(
       [props.onPermissionModeChange],
     );
 
-    // Handle abort button press
+    // Handle abort button press — interrupt immediately without confirmation
     const handleAbortPress = React.useCallback(async () => {
       if (!props.onAbort) return;
-
-      const confirmed = await Modal.confirm(
-        t("session.interruptConfirmTitle"),
-        t("session.interruptConfirmMessage"),
-        {
-          confirmText: t("session.interruptAndSend"),
-        },
-      );
-      if (!confirmed) return;
 
       hapticsError();
       setIsAborting(true);

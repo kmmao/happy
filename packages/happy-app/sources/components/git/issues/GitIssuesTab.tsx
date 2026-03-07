@@ -4,15 +4,17 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Pressable,
 } from "react-native";
 import { Text } from "@/components/StyledText";
+import { Octicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { t } from "@/text";
 import { Modal } from "@/modal";
-import { useHappyAction } from "@/hooks/useHappyAction";
 import { IssueFilterBar } from "./IssueFilterBar";
 import { IssueCard } from "./IssueCard";
+import { IssueCreateSheet } from "./IssueCreateSheet";
 import { IssueDetailSheet } from "./IssueDetailSheet";
 import {
   issueStore,
@@ -21,12 +23,22 @@ import {
   useAggregatedError,
   useAggregatedOpenCount,
   useAggregatedClosedCount,
+  useAggregatedHasMore,
   useIssueFilters,
 } from "@/sync/issueStore";
 import { storage, useSetting } from "@/sync/storage";
 import type { GitStatus } from "@/sync/storageTypes";
 import type { SubmoduleInfo } from "@/sync/projectManager";
-import type { AggregatedIssue, IssueFilterState } from "@/sync/issueTypes";
+import type {
+  Issue,
+  AggregatedIssue,
+  IssueFilterState,
+  IssueSortField,
+  IssueSortDirection,
+} from "@/sync/issueTypes";
+import { launchIssueSession } from "@/utils/launchIssueSession";
+import { useIssuePolling } from "@/hooks/useIssuePolling";
+import { useRouter } from "expo-router";
 
 interface GitIssuesTabProps {
   readonly sessionId: string;
@@ -120,6 +132,7 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
     onScrollUp,
   }) {
     const { theme } = useUnistyles();
+    const router = useRouter();
     const gitHosts = useSetting("gitHosts");
     const { allKeys, repoPathByKey } = useProjectKeys(
       sessionId,
@@ -134,6 +147,7 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
     const filters = useIssueFilters();
     const openCount = useAggregatedOpenCount(allKeys);
     const closedCount = useAggregatedClosedCount(allKeys);
+    const hasMore = useAggregatedHasMore(allKeys);
 
     // Detect repo info for all projects — use stable gitHosts ref
     const gitHostsRef = React.useRef(gitHosts);
@@ -197,61 +211,125 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
         if (!repoInfo || repoInfo.provider === "unknown") continue;
         issueStore.getState().loadIssues(key, sessionId, 1, repoPathByKey[key]);
       }
-    }, [allKeys, sessionId, repoPathByKey, filters.state]);
+    }, [
+      allKeys,
+      sessionId,
+      repoPathByKey,
+      filters.state,
+      filters.sort,
+      filters.direction,
+      filters.labels,
+    ]);
+
+    // Auto-poll issues every 60s while mounted & app is active
+    useIssuePolling(allKeys, sessionId, repoPathByKey, issues.length > 0);
 
     const handleRefresh = React.useCallback(() => {
       issueStore.getState().refreshAllIssues(allKeys, sessionId, repoPathByKey);
     }, [allKeys, sessionId, repoPathByKey]);
 
+    const loadingMoreRef = React.useRef(false);
+    const handleLoadMore = React.useCallback(async () => {
+      if (loadingMoreRef.current || loading || !hasMore) return;
+      loadingMoreRef.current = true;
+      try {
+        await issueStore
+          .getState()
+          .loadMoreIssues(allKeys, sessionId, repoPathByKey);
+      } finally {
+        loadingMoreRef.current = false;
+      }
+    }, [allKeys, sessionId, repoPathByKey, loading, hasMore]);
+
+    const renderFooter = React.useCallback(() => {
+      if (!hasMore) return null;
+      return (
+        <View style={{ paddingVertical: 16, alignItems: "center" }}>
+          <ActivityIndicator size="small" color={theme.colors.textLink} />
+        </View>
+      );
+    }, [hasMore, theme.colors.textLink]);
+
     const handleFilterChange = React.useCallback((state: IssueFilterState) => {
       issueStore.getState().setFilterState(state);
     }, []);
+
+    const handleSortChange = React.useCallback(
+      (sort: IssueSortField, direction: IssueSortDirection) => {
+        issueStore.getState().setSort(sort, direction);
+      },
+      [],
+    );
 
     // Use the first project key for creating issues (root repo)
     const primaryKey = allKeys[0] ?? "";
     const primaryRepoPath = repoPathByKey[primaryKey];
 
-    const [, doCreateIssue] = useHappyAction(
-      React.useCallback(async () => {
-        const title = await Modal.prompt(t("issues.newIssue"), "", {
-          placeholder: t("issues.newIssueTitlePlaceholder"),
-        });
-        if (!title || title.trim() === "") return;
-
-        const body = await Modal.prompt(t("issues.newIssueBody"), "", {
-          placeholder: t("issues.newIssueBodyPlaceholder"),
-        });
-
-        await issueStore
-          .getState()
-          .createIssue(
-            primaryKey,
-            title.trim(),
-            body?.trim() ?? "",
-            sessionId,
-            primaryRepoPath,
-          );
-      }, [primaryKey, sessionId, primaryRepoPath]),
-    );
+    const doCreateIssue = React.useCallback(() => {
+      if (!primaryKey) return;
+      Modal.show({
+        component: IssueCreateSheet,
+        props: {
+          sessionId,
+          projectKey: primaryKey,
+          repoPath: primaryRepoPath,
+          onCreated: () => {
+            issueStore
+              .getState()
+              .refreshAllIssues(allKeys, sessionId, repoPathByKey);
+          },
+        },
+      });
+    }, [primaryKey, sessionId, primaryRepoPath, allKeys, repoPathByKey]);
 
     const handleIssuePress = React.useCallback(
-      (issue: AggregatedIssue) => {
+      (issue: Issue | AggregatedIssue) => {
+        if (!("projectKey" in issue)) return;
+        const aggIssue = issue as AggregatedIssue;
+        const meta = getSessionMeta(sessionId);
         Modal.show({
           component: IssueDetailSheet,
           props: {
-            issue,
+            issue: aggIssue,
             sessionId,
-            repoPath: repoPathByKey[issue.projectKey],
+            repoPath: repoPathByKey[aggIssue.projectKey],
+            machineId: meta?.machineId,
             onSendToChat: (text: string) => {
               const session = storage.getState().sessions[sessionId];
               const currentDraft = session?.draft ?? "";
               const newDraft = currentDraft ? `${currentDraft}\n${text}` : text;
               storage.getState().updateSessionDraft(sessionId, newDraft);
             },
+            onLaunchSession: async () => {
+              if (!meta) return;
+              const result = await launchIssueSession({
+                issue: aggIssue,
+                machineId: meta.machineId,
+                repoPath: meta.path,
+              });
+              if (result.success && result.newSessionId) {
+                router.push(`/session/${result.newSessionId}`);
+              } else if (
+                result.error?.startsWith("ALREADY_EXISTS:") &&
+                result.newSessionId &&
+                result.newSessionId !== "pending"
+              ) {
+                // Issue already has a session — navigate to it
+                router.push(`/session/${result.newSessionId}`);
+              } else if (result.error) {
+                Modal.alert(
+                  t("common.error"),
+                  t("issues.launchFailed", { error: result.error }),
+                );
+              }
+            },
+            onViewSession: (linkedSessionId: string) => {
+              router.push(`/session/${linkedSessionId}`);
+            },
           },
         });
       },
-      [sessionId, repoPathByKey],
+      [sessionId, repoPathByKey, router],
     );
 
     const renderItem = React.useCallback(
@@ -308,6 +386,9 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
           loading={loading}
           onRefresh={handleRefresh}
           onCreateIssue={primaryKey ? doCreateIssue : undefined}
+          sort={filters.sort}
+          direction={filters.direction}
+          onSortChange={handleSortChange}
         />
 
         {loading && issues.length === 0 && (
@@ -343,6 +424,12 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
 
         {!loading && error === "" && issues.length === 0 && (
           <View style={styles.emptyContainer}>
+            <Octicons
+              name="issue-opened"
+              size={40}
+              color={theme.colors.textSecondary + "60"}
+              style={{ marginBottom: 12 }}
+            />
             <Text
               style={{
                 fontSize: 15,
@@ -351,8 +438,58 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
                 ...Typography.default(),
               }}
             >
-              {t("issues.noIssues")}
+              {filters.state === "open"
+                ? t("issues.noOpenIssues")
+                : t("issues.noClosedIssues")}
             </Text>
+            {filters.state === "open" && (
+              <Pressable
+                onPress={() => handleFilterChange("closed")}
+                style={{ marginTop: 8 }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: theme.colors.textLink,
+                    textAlign: "center",
+                    ...Typography.default(),
+                  }}
+                >
+                  {t("issues.tryClosedHint")}
+                </Text>
+              </Pressable>
+            )}
+            {primaryKey && (
+              <Pressable
+                onPress={doCreateIssue}
+                style={{
+                  marginTop: 16,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  backgroundColor: theme.colors.button.primary.background,
+                }}
+              >
+                <Octicons
+                  name="plus"
+                  size={14}
+                  color={theme.colors.button.primary.tint}
+                />
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "600",
+                    color: theme.colors.button.primary.tint,
+                    ...Typography.default(),
+                  }}
+                >
+                  {t("issues.createFirstIssue")}
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -363,6 +500,9 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
             renderItem={renderItem}
             onScroll={handleScroll}
             scrollEventThrottle={16}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.3}
+            ListFooterComponent={renderFooter}
             refreshControl={
               <RefreshControl
                 refreshing={loading}

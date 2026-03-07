@@ -386,6 +386,23 @@ export async function claudeRemote(opts: {
         updateThinking(false);
         logger.debug("[claudeRemote] Result received");
 
+        // Surface local command results (e.g., "Unknown skill: ...") that
+        // were handled by the SDK without calling the API (num_turns === 0).
+        // These would otherwise be silently dropped since result messages
+        // are not converted to log messages by sdkToLogConverter.
+        const resultData = message as { result?: string; num_turns?: number };
+        if (
+          resultData.num_turns === 0 &&
+          resultData.result &&
+          resultData.result.trim().length > 0
+        ) {
+          logger.debug(
+            "[claudeRemote] Forwarding local command result:",
+            resultData.result,
+          );
+          opts.onCompletionEvent?.(resultData.result);
+        }
+
         // Detect error_max_turns for continue support
         const resultSubtype = (message as any).subtype;
         if (resultSubtype === "error_max_turns") {

@@ -397,10 +397,6 @@ export const ca: TranslationStructure = {
     compactionSummaryDisconnected:
       "La sessió no està connectada. El resum només està disponible quan el CLI està en línia.",
     messageQueued: "En cua",
-    interruptConfirmTitle: "Interrompre la tasca actual?",
-    interruptConfirmMessage:
-      "S'aturarà la tasca actual. Els missatges en cua es processaran a continuació.",
-    interruptAndSend: "Interrompre i enviar",
   },
 
   bookmark: {
@@ -1440,6 +1436,30 @@ export const ca: TranslationStructure = {
     newIssueBody: "Descripció (opcional)",
     newIssueBodyPlaceholder: "Descriu el problema...",
     pageOf: ({ page }: { page: number }) => `Pàgina ${page}`,
+    launchSession: "Iniciar sessió",
+    viewProcessingSession: "Veure sessió en procés",
+    processing: "En procés",
+    launchFailed: ({ error }: { error: string }) =>
+      `Error en iniciar la sessió: ${error}`,
+    autoClosedComment: ({ branchName }: { branchName: string }) =>
+      `Aquesta issue ha estat processada per Happy Coder. Branca: ${branchName}`,
+    editIssue: "Edita el problema",
+    editTitle: "Edita el títol del problema",
+    editTitlePlaceholder: "Títol del problema...",
+    editBody: "Edita la descripció del problema",
+    editBodyPlaceholder: "Descriu el problema...",
+    sortBy: "Ordena per",
+    sortCreated: "Data de creació",
+    sortUpdated: "Data d'actualització",
+    sortComments: "Comentaris",
+    noOpenIssues: "No hi ha incidències obertes",
+    noClosedIssues: "No hi ha incidències tancades",
+    tryClosedHint: "Prova de veure les incidències tancades",
+    createFirstIssue: "Crear incidència",
+    createIssueTitle: "Crear incidència",
+    labelSelect: "Etiquetes",
+    noLabelsAvailable: "No hi ha etiquetes disponibles",
+    createButton: "Crear",
   },
 
   gitHosts: {
@@ -1462,6 +1482,13 @@ export const ca: TranslationStructure = {
     duplicateTitle: "Host duplicat",
     duplicateMessage: ({ host }: { host: string }) =>
       `"${host}" ja està configurat.`,
+    autoIssueSectionTitle: "Sessió automàtica d'incidències",
+    autoIssueDescription:
+      "Inicia automàticament una sessió de Claude Code en detectar una incidència amb una etiqueta específica. Només s'activarà per a incidències creades per autors permesos.",
+    autoIssueLabel: "Etiqueta d'activació",
+    autoIssueLabelPlaceholder: "p. ex. claude, auto-fix",
+    autoIssueAllowedAuthors: "Autors permesos",
+    autoIssueAllowedAuthorsPlaceholder: "usuari1, usuari2",
   },
 
   quickCommands: {

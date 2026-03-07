@@ -400,10 +400,6 @@ export const en: TranslationStructure = {
     compactionSummaryDisconnected:
       "Session is not connected. The summary is only available when the CLI is online.",
     messageQueued: "Queued",
-    interruptConfirmTitle: "Interrupt current task?",
-    interruptConfirmMessage:
-      "This will stop the current task. Queued messages will be processed next.",
-    interruptAndSend: "Interrupt & Send",
   },
 
   bookmark: {
@@ -1431,6 +1427,30 @@ export const en: TranslationStructure = {
     newIssueBody: "Issue Description (Optional)",
     newIssueBodyPlaceholder: "Describe the issue...",
     pageOf: ({ page }: { page: number }) => `Page ${page}`,
+    launchSession: "Launch Session",
+    viewProcessingSession: "View Processing Session",
+    processing: "Processing",
+    launchFailed: ({ error }: { error: string }) =>
+      `Failed to launch session: ${error}`,
+    autoClosedComment: ({ branchName }: { branchName: string }) =>
+      `This issue was addressed by Happy Coder. Branch: ${branchName}`,
+    editIssue: "Edit Issue",
+    editTitle: "Edit Issue Title",
+    editTitlePlaceholder: "Issue title...",
+    editBody: "Edit Issue Body",
+    editBodyPlaceholder: "Describe the issue...",
+    sortBy: "Sort By",
+    sortCreated: "Created",
+    sortUpdated: "Updated",
+    sortComments: "Comments",
+    noOpenIssues: "No open issues",
+    noClosedIssues: "No closed issues",
+    tryClosedHint: "Try viewing closed issues",
+    createFirstIssue: "Create Issue",
+    createIssueTitle: "Create Issue",
+    labelSelect: "Labels",
+    noLabelsAvailable: "No labels available",
+    createButton: "Create",
   },
 
   gitHosts: {
@@ -1453,6 +1473,13 @@ export const en: TranslationStructure = {
     duplicateTitle: "Duplicate Host",
     duplicateMessage: ({ host }: { host: string }) =>
       `"${host}" is already configured.`,
+    autoIssueSectionTitle: "Auto Issue Session",
+    autoIssueDescription:
+      "Automatically launch a Claude Code session when an issue with a specific label is detected. Only issues created by allowed authors will trigger.",
+    autoIssueLabel: "Trigger Label",
+    autoIssueLabelPlaceholder: "e.g. claude, auto-fix",
+    autoIssueAllowedAuthors: "Allowed Authors",
+    autoIssueAllowedAuthorsPlaceholder: "username1, username2",
   },
 
   quickCommands: {

@@ -35,13 +35,22 @@ export interface GitHostMapping {
   readonly host: string;
   readonly provider: "github" | "gitea";
   readonly apiToken?: string;
+  readonly autoIssueEnabled?: boolean;
+  readonly autoIssueLabel?: string;
+  readonly autoIssueAllowedAuthors?: readonly string[];
 }
 
 export type IssueFilterState = "open" | "closed" | "all";
 
+export type IssueSortField = "created" | "updated" | "comments";
+export type IssueSortDirection = "asc" | "desc";
+
 export interface IssueFilters {
   readonly state: IssueFilterState;
   readonly search: string;
+  readonly sort: IssueSortField;
+  readonly direction: IssueSortDirection;
+  readonly labels: readonly string[];
 }
 
 /** Issue with source repo label — used in aggregated multi-repo view */

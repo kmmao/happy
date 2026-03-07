@@ -60,7 +60,7 @@ function stripPort(host: string): string {
  * This handles the case where SSH remotes have no port (e.g. "10.10.10.234")
  * but the gitHosts config has a port (e.g. "http://10.10.10.234:8418").
  */
-function findGitHostMapping(
+export function findGitHostMapping(
   host: string,
   gitHosts: readonly GitHostMapping[],
 ): GitHostMapping | undefined {

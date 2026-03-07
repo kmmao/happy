@@ -462,10 +462,6 @@ export const it: TranslationStructure = {
     compactionSummaryDisconnected:
       "La sessione non è connessa. Il riepilogo è disponibile solo quando il CLI è online.",
     messageQueued: "In coda",
-    interruptConfirmTitle: "Interrompere il compito attuale?",
-    interruptConfirmMessage:
-      "Il compito attuale verrà interrotto. I messaggi in coda verranno elaborati successivamente.",
-    interruptAndSend: "Interrompi e invia",
   },
 
   bookmark: {
@@ -1436,6 +1432,30 @@ export const it: TranslationStructure = {
     newIssueBody: "Descrizione (opzionale)",
     newIssueBodyPlaceholder: "Descrivi il problema...",
     pageOf: ({ page }: { page: number }) => `Pagina ${page}`,
+    launchSession: "Avvia sessione",
+    viewProcessingSession: "Vedi sessione in corso",
+    processing: "In elaborazione",
+    launchFailed: ({ error }: { error: string }) =>
+      `Impossibile avviare la sessione: ${error}`,
+    autoClosedComment: ({ branchName }: { branchName: string }) =>
+      `Questo issue è stato gestito da Happy Coder. Branch: ${branchName}`,
+    editIssue: "Modifica issue",
+    editTitle: "Modifica titolo issue",
+    editTitlePlaceholder: "Titolo issue...",
+    editBody: "Modifica descrizione issue",
+    editBodyPlaceholder: "Descrivi l'issue...",
+    sortBy: "Ordina per",
+    sortCreated: "Data di creazione",
+    sortUpdated: "Data di aggiornamento",
+    sortComments: "Commenti",
+    noOpenIssues: "Nessuna segnalazione aperta",
+    noClosedIssues: "Nessuna segnalazione chiusa",
+    tryClosedHint: "Prova a visualizzare le segnalazioni chiuse",
+    createFirstIssue: "Crea segnalazione",
+    createIssueTitle: "Crea segnalazione",
+    labelSelect: "Etichette",
+    noLabelsAvailable: "Nessuna etichetta disponibile",
+    createButton: "Crea",
   },
 
   gitHosts: {
@@ -1458,6 +1478,13 @@ export const it: TranslationStructure = {
     duplicateTitle: "Host duplicato",
     duplicateMessage: ({ host }: { host: string }) =>
       `"${host}" è già configurato.`,
+    autoIssueSectionTitle: "Sessione automatica segnalazioni",
+    autoIssueDescription:
+      "Avvia automaticamente una sessione Claude Code quando viene rilevata una segnalazione con un'etichetta specifica. Attivata solo per segnalazioni create da autori consentiti.",
+    autoIssueLabel: "Etichetta di attivazione",
+    autoIssueLabelPlaceholder: "es. claude, auto-fix",
+    autoIssueAllowedAuthors: "Autori consentiti",
+    autoIssueAllowedAuthorsPlaceholder: "utente1, utente2",
   },
 
   quickCommands: {

@@ -7,6 +7,7 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Modal as HappyModal } from "@/modal/ModalManager";
 import { layout } from "@/components/layout";
+import { Switch } from "@/components/Switch";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWindowDimensions } from "react-native";
 
@@ -16,6 +17,9 @@ interface GitHost {
   readonly host: string;
   readonly provider: Provider;
   readonly apiToken?: string;
+  readonly autoIssueEnabled?: boolean;
+  readonly autoIssueLabel?: string;
+  readonly autoIssueAllowedAuthors?: string[];
 }
 
 export default function GitHostsScreen() {
@@ -26,6 +30,9 @@ export default function GitHostsScreen() {
   const [formHost, setFormHost] = React.useState("");
   const [formProvider, setFormProvider] = React.useState<Provider>("github");
   const [formToken, setFormToken] = React.useState("");
+  const [formAutoLabel, setFormAutoLabel] = React.useState("");
+  const [formAutoAuthors, setFormAutoAuthors] = React.useState("");
+  const [formAutoEnabled, setFormAutoEnabled] = React.useState(false);
   const safeArea = useSafeAreaInsets();
   const screenWidth = useWindowDimensions().width;
 
@@ -33,6 +40,9 @@ export default function GitHostsScreen() {
     setFormHost("");
     setFormProvider("github");
     setFormToken("");
+    setFormAutoLabel("");
+    setFormAutoAuthors("");
+    setFormAutoEnabled(false);
     setEditIndex(null);
     setShowAddForm(true);
   };
@@ -42,6 +52,9 @@ export default function GitHostsScreen() {
     setFormHost(entry.host);
     setFormProvider(entry.provider);
     setFormToken(entry.apiToken ?? "");
+    setFormAutoLabel(entry.autoIssueLabel ?? "");
+    setFormAutoAuthors((entry.autoIssueAllowedAuthors ?? []).join(", "));
+    setFormAutoEnabled(entry.autoIssueEnabled ?? Boolean(entry.autoIssueLabel));
     setEditIndex(index);
     setShowAddForm(true);
   };
@@ -79,10 +92,18 @@ export default function GitHostsScreen() {
     }
 
     const trimmedToken = formToken.trim();
+    const trimmedLabel = formAutoLabel.trim();
+    const authors = formAutoAuthors
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
     const newEntry: GitHost = {
       host: trimmedHost,
       provider: formProvider,
       ...(trimmedToken ? { apiToken: trimmedToken } : {}),
+      autoIssueEnabled: formAutoEnabled,
+      ...(trimmedLabel ? { autoIssueLabel: trimmedLabel } : {}),
+      ...(authors.length > 0 ? { autoIssueAllowedAuthors: authors } : {}),
     };
 
     if (editIndex !== null) {
@@ -347,6 +368,105 @@ export default function GitHostsScreen() {
                   >
                     {t("gitHosts.tokenHint")}
                   </Text>
+                </>
+              )}
+
+              {/* Auto Issue fields */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginTop: 4,
+                  marginBottom: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "600",
+                    color: theme.colors.text,
+                    ...Typography.default("semiBold"),
+                  }}
+                >
+                  {t("gitHosts.autoIssueSectionTitle")}
+                </Text>
+                <Switch
+                  value={formAutoEnabled}
+                  onValueChange={setFormAutoEnabled}
+                />
+              </View>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: theme.colors.textSecondary,
+                  marginBottom: 12,
+                  lineHeight: 16,
+                  ...Typography.default(),
+                }}
+              >
+                {t("gitHosts.autoIssueDescription")}
+              </Text>
+
+              {formAutoEnabled && (
+                <>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: theme.colors.textSecondary,
+                      marginBottom: 6,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {t("gitHosts.autoIssueLabel")}
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 15,
+                      color: theme.colors.text,
+                      marginBottom: 12,
+                      ...Typography.mono(),
+                    }}
+                    value={formAutoLabel}
+                    onChangeText={setFormAutoLabel}
+                    placeholder={t("gitHosts.autoIssueLabelPlaceholder")}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: theme.colors.textSecondary,
+                      marginBottom: 6,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {t("gitHosts.autoIssueAllowedAuthors")}
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 15,
+                      color: theme.colors.text,
+                      marginBottom: 16,
+                      ...Typography.mono(),
+                    }}
+                    value={formAutoAuthors}
+                    onChangeText={setFormAutoAuthors}
+                    placeholder={t(
+                      "gitHosts.autoIssueAllowedAuthorsPlaceholder",
+                    )}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
                 </>
               )}
 

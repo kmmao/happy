@@ -396,10 +396,6 @@ export const pt: TranslationStructure = {
     compactionSummaryDisconnected:
       "A sessão não está conectada. O resumo só está disponível quando o CLI está online.",
     messageQueued: "Na fila",
-    interruptConfirmTitle: "Interromper a tarefa atual?",
-    interruptConfirmMessage:
-      "A tarefa atual será interrompida. As mensagens na fila serão processadas em seguida.",
-    interruptAndSend: "Interromper e enviar",
   },
 
   bookmark: {
@@ -1438,6 +1434,30 @@ export const pt: TranslationStructure = {
     newIssueBody: "Descrição (opcional)",
     newIssueBodyPlaceholder: "Descreva o problema...",
     pageOf: ({ page }: { page: number }) => `Página ${page}`,
+    launchSession: "Iniciar sessão",
+    viewProcessingSession: "Ver sessão em processamento",
+    processing: "Processando",
+    launchFailed: ({ error }: { error: string }) =>
+      `Falha ao iniciar sessão: ${error}`,
+    autoClosedComment: ({ branchName }: { branchName: string }) =>
+      `Este issue foi tratado pelo Happy Coder. Branch: ${branchName}`,
+    editIssue: "Editar issue",
+    editTitle: "Editar título do issue",
+    editTitlePlaceholder: "Título do issue...",
+    editBody: "Editar descrição do issue",
+    editBodyPlaceholder: "Descreva o issue...",
+    sortBy: "Ordenar por",
+    sortCreated: "Data de criação",
+    sortUpdated: "Data de atualização",
+    sortComments: "Comentários",
+    noOpenIssues: "Sem issues abertas",
+    noClosedIssues: "Sem issues fechadas",
+    tryClosedHint: "Tente ver as issues fechadas",
+    createFirstIssue: "Criar issue",
+    createIssueTitle: "Criar issue",
+    labelSelect: "Etiquetas",
+    noLabelsAvailable: "Nenhuma etiqueta disponível",
+    createButton: "Criar",
   },
 
   gitHosts: {
@@ -1460,6 +1480,13 @@ export const pt: TranslationStructure = {
     duplicateTitle: "Host duplicado",
     duplicateMessage: ({ host }: { host: string }) =>
       `"${host}" já está configurado.`,
+    autoIssueSectionTitle: "Sessão automática de issues",
+    autoIssueDescription:
+      "Iniciar automaticamente uma sessão do Claude Code ao detectar uma issue com uma etiqueta específica. Apenas issues criadas por autores permitidos serão acionadas.",
+    autoIssueLabel: "Etiqueta de ativação",
+    autoIssueLabelPlaceholder: "ex. claude, auto-fix",
+    autoIssueAllowedAuthors: "Autores permitidos",
+    autoIssueAllowedAuthorsPlaceholder: "utilizador1, utilizador2",
   },
 
   quickCommands: {

@@ -28,6 +28,8 @@ import {
 import { getCurrentLanguage } from "@/text";
 import { kanbanStore } from "./kanbanStore";
 import { isKanbanKey } from "./kanbanTypes";
+import { issueSessionStore } from "./issueSessionStore";
+import { isIssueSessionKey } from "./issueSessionTypes";
 import { promptTemplateStore } from "./promptTemplateStore";
 import { isTemplateKey } from "./promptTemplateTypes";
 import { ideationStore } from "./ideationStore";
@@ -57,7 +59,9 @@ import { getServerUrl } from "./serverConfig";
 import { config } from "@/config";
 import { log } from "@/log";
 import { gitStatusSync } from "./gitStatusSync";
+import { autoIssueService } from "./autoIssueService";
 import { projectManager } from "./projectManager";
+import { removeWorktree } from "./gitWorktreeOps";
 import { AsyncLock } from "@/utils/lock";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import { realtimeStore } from "@/realtime/realtimeStore";
@@ -199,6 +203,7 @@ class Sync {
         this.friendsSync.invalidate();
         this.friendRequestsSync.invalidate();
         this.feedSync.invalidate();
+        autoIssueService.triggerNow();
       } else {
         log.log(`📱 App state changed to: ${nextAppState}`);
         this.maybeStartBackgroundSendWatchdog();
@@ -274,6 +279,10 @@ class Sync {
     ])
       .then(() => {
         storage.getState().applyReady();
+        // Load issue-session links so UI can show processing status
+        void issueSessionStore.getState().loadLinks();
+        // Start auto-issue background service after sessions are loaded
+        autoIssueService.start();
       })
       .catch((error) => {
         console.error("Failed to load initial data:", error);
@@ -2305,6 +2314,22 @@ class Sync {
                   : {}),
               },
             ]);
+
+            // Auto-detect issue session completion: when a turn ends,
+            // mark the associated issue-session link as "completed".
+            if (isTaskComplete) {
+              const link = issueSessionStore
+                .getState()
+                .findBySessionId(updateData.body.sid);
+              if (link && link.status === "processing") {
+                void issueSessionStore
+                  .getState()
+                  .updateStatus(link.issueKey, "completed")
+                  .catch(() => {
+                    // Best-effort — don't block message processing
+                  });
+              }
+            }
           } else {
             // Fetch sessions again if we don't have this session
             this.fetchSessions();
@@ -2364,6 +2389,33 @@ class Sync {
     } else if (updateData.body.t === "delete-session") {
       log.log("🗑️ Delete session update received");
       const sessionId = updateData.body.sid;
+
+      // Update any issue-session link associated with this session
+      const issueLink = issueSessionStore.getState().findBySessionId(sessionId);
+      if (issueLink && issueLink.status === "processing") {
+        void issueSessionStore
+          .getState()
+          .updateStatus(issueLink.issueKey, "cancelled")
+          .catch(() => {
+            // Best-effort — don't block session deletion
+          });
+      }
+
+      // Clean up worktree if this was a worktree session
+      const sessionToDelete = storage.getState().sessions[sessionId];
+      const wt = sessionToDelete?.metadata?.worktree;
+      if (wt?.isWorktree && wt.name && sessionToDelete?.metadata?.machineId) {
+        const parentPath =
+          wt.parentRepoPath ?? sessionToDelete.metadata.path ?? "";
+        void removeWorktree(
+          sessionToDelete.metadata.machineId,
+          wt.name,
+          parentPath,
+          true,
+        ).catch((err) => {
+          log.log(`⚠️ Worktree cleanup failed for ${wt.name}: ${err}`);
+        });
+      }
 
       // Remove session from storage
       storage.getState().deleteSession(sessionId);
@@ -2825,6 +2877,14 @@ class Sync {
       if (roadmapChanges.length > 0) {
         roadmapStore.getState().handleKvUpdate(roadmapChanges);
       }
+
+      // Filter issue-session link changes and forward to issueSession store
+      const issueSessionChanges = kvUpdate.changes.filter(
+        (c: { key: string }) => isIssueSessionKey(c.key),
+      );
+      if (issueSessionChanges.length > 0) {
+        await issueSessionStore.getState().handleKvUpdate(issueSessionChanges);
+      }
     }
   };
 
@@ -2982,6 +3042,7 @@ class Sync {
     // Auto-complete kanban tasks when their last linked session ends
     if (endedSessionIds.length > 0) {
       this.autoCompleteTasksForEndedSessions(endedSessionIds, isActive);
+      void this.markFailedIssueSessionsForEndedSessions(endedSessionIds);
     }
   };
 
@@ -3007,6 +3068,25 @@ class Sync {
       if (hasActiveSession) continue;
 
       kanbanStore.getState().moveTask(task.id, "done");
+    }
+  };
+
+  /**
+   * Mark issue-session links as "failed" when their session ends
+   * without the worktree being merged (i.e., status is still "processing").
+   */
+  private markFailedIssueSessionsForEndedSessions = async (
+    endedSessionIds: string[],
+  ) => {
+    const endedSet = new Set(endedSessionIds);
+    const processingLinks = issueSessionStore.getState().getProcessingLinks();
+
+    for (const link of processingLinks) {
+      if (!endedSet.has(link.sessionId)) continue;
+      // Session ended while still "processing" — mark as failed
+      await issueSessionStore.getState().updateStatus(link.issueKey, "failed", {
+        errorMessage: "Session ended before worktree was merged",
+      });
     }
   };
 }

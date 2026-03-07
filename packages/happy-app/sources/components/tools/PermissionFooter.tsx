@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Platform,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { sessionAllow, sessionDeny } from "@/sync/ops";
@@ -46,6 +47,10 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
   // Check if this is a Codex session - check both metadata.flavor and tool name prefix
   const isCodex = metadata?.flavor === "codex" || toolName.startsWith("Codex");
 
+  // Detect ExitPlanMode early so handleApprove can update permission mode
+  const isExitPlan =
+    toolName === "exit_plan_mode" || toolName === "ExitPlanMode";
+
   const handleApprove = async () => {
     if (
       permission.status !== "pending" ||
@@ -58,6 +63,11 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
     setLoadingButton("allow");
     try {
       await sessionAllow(sessionId, permission.id);
+      // When approving ExitPlanMode, update App-side permission mode to "default"
+      // so subsequent messages no longer carry permissionMode: "plan"
+      if (isExitPlan) {
+        storage.getState().updateSessionPermissionMode(sessionId, "default");
+      }
     } catch (error) {
       console.error("Failed to approve permission:", error);
     } finally {
@@ -233,8 +243,12 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
   const isApprovedViaAllow =
     isApproved &&
     permission.mode !== "acceptEdits" &&
+    permission.mode !== "bypassPermissions" &&
     !isToolAllowed(toolName, toolInput, permission.allowedTools);
-  const isApprovedViaAllEdits = isApproved && permission.mode === "acceptEdits";
+  const isApprovedViaAllEdits =
+    isApproved &&
+    (permission.mode === "acceptEdits" ||
+      permission.mode === "bypassPermissions");
   const isApprovedForSession =
     isApproved && isToolAllowed(toolName, toolInput, permission.allowedTools);
 
@@ -478,8 +492,6 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
   }
 
   // Render ExitPlanMode-specific buttons
-  const isExitPlan =
-    toolName === "exit_plan_mode" || toolName === "ExitPlanMode";
 
   if (isExitPlan) {
     const handlePlanApproveAll = async () => {
@@ -503,23 +515,14 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
       }
     };
 
-    const handleDenyWithReason = async () => {
+    const handleSubmitFeedback = async (feedbackText: string) => {
       if (
         permission.status !== "pending" ||
         loadingButton !== null ||
-        loadingAllEdits
+        loadingAllEdits ||
+        !feedbackText.trim()
       )
         return;
-
-      const reason = await Modal.prompt(
-        t("plan.rejectTitle"),
-        t("plan.rejectMessage"),
-        {
-          placeholder: t("plan.rejectPlaceholder"),
-          confirmText: t("common.submit"),
-        },
-      );
-      if (reason === null) return;
 
       setLoadingButton("deny");
       try {
@@ -529,7 +532,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
           undefined,
           undefined,
           undefined,
-          reason,
+          feedbackText.trim(),
         );
       } catch (error) {
         console.error("Failed to deny plan with reason:", error);
@@ -539,132 +542,20 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
     };
 
     return (
-      <View style={styles.container}>
-        <View style={styles.buttonContainer}>
-          {/* Approve Plan */}
-          <TouchableOpacity
-            style={[
-              styles.button,
-              isPending && styles.buttonAllow,
-              isApprovedViaAllow && styles.buttonSelected,
-              (isDenied || isApprovedViaAllEdits) && styles.buttonInactive,
-            ]}
-            onPress={handleApprove}
-            disabled={!isPending || loadingButton !== null || loadingAllEdits}
-            activeOpacity={isPending ? 0.7 : 1}
-          >
-            {loadingButton === "allow" && isPending ? (
-              <View
-                style={[
-                  styles.buttonContent,
-                  { width: 40, height: 20, justifyContent: "center" },
-                ]}
-              >
-                <ActivityIndicator
-                  size={Platform.OS === "ios" ? "small" : (14 as any)}
-                  color={styles.loadingIndicatorAllow.color}
-                />
-              </View>
-            ) : (
-              <View style={styles.buttonContent}>
-                <Text
-                  style={[
-                    styles.buttonText,
-                    isPending && styles.buttonTextAllow,
-                    isApprovedViaAllow && styles.buttonTextSelected,
-                  ]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {t("plan.approve")}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Approve & Auto-approve All (bypassPermissions) */}
-          <TouchableOpacity
-            style={[
-              styles.button,
-              isPending && styles.buttonAllowAll,
-              isApprovedViaAllEdits && styles.buttonSelected,
-              (isDenied || isApprovedViaAllow) && styles.buttonInactive,
-            ]}
-            onPress={handlePlanApproveAll}
-            disabled={!isPending || loadingButton !== null || loadingAllEdits}
-            activeOpacity={isPending ? 0.7 : 1}
-          >
-            {loadingAllEdits && isPending ? (
-              <View
-                style={[
-                  styles.buttonContent,
-                  { width: 40, height: 20, justifyContent: "center" },
-                ]}
-              >
-                <ActivityIndicator
-                  size={Platform.OS === "ios" ? "small" : (14 as any)}
-                  color={styles.loadingIndicatorAllowAll.color}
-                />
-              </View>
-            ) : (
-              <View style={styles.buttonContent}>
-                <Text
-                  style={[
-                    styles.buttonText,
-                    isPending && styles.buttonTextAllowAll,
-                    isApprovedViaAllEdits && styles.buttonTextSelected,
-                  ]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {t("plan.approveAutoEdits")}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Reject with Feedback */}
-          <TouchableOpacity
-            style={[
-              styles.button,
-              isPending && styles.buttonDeny,
-              isDenied && styles.buttonSelected,
-              isApproved && styles.buttonInactive,
-            ]}
-            onPress={handleDenyWithReason}
-            disabled={!isPending || loadingButton !== null || loadingAllEdits}
-            activeOpacity={isPending ? 0.7 : 1}
-          >
-            {loadingButton === "deny" && isPending ? (
-              <View
-                style={[
-                  styles.buttonContent,
-                  { width: 40, height: 20, justifyContent: "center" },
-                ]}
-              >
-                <ActivityIndicator
-                  size={Platform.OS === "ios" ? "small" : (14 as any)}
-                  color={styles.loadingIndicatorDeny.color}
-                />
-              </View>
-            ) : (
-              <View style={styles.buttonContent}>
-                <Text
-                  style={[
-                    styles.buttonText,
-                    isPending && styles.buttonTextDeny,
-                    isDenied && styles.buttonTextSelected,
-                  ]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {t("plan.rejectWithFeedback")}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ExitPlanButtons
+        permission={permission}
+        isPending={isPending}
+        isApproved={isApproved}
+        isDenied={isDenied}
+        isApprovedViaAllow={isApprovedViaAllow}
+        isApprovedViaAllEdits={isApprovedViaAllEdits}
+        loadingButton={loadingButton}
+        loadingAllEdits={loadingAllEdits}
+        handleApprove={handleApprove}
+        handlePlanApproveAll={handlePlanApproveAll}
+        handleSubmitFeedback={handleSubmitFeedback}
+        styles={styles}
+      />
     );
   }
 
@@ -867,6 +758,241 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
             </View>
           )}
         </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+/**
+ * ExitPlanMode-specific buttons with inline feedback input.
+ * Extracted to isolate the feedback TextInput state from the parent component.
+ */
+const ExitPlanButtons: React.FC<{
+  permission: PermissionFooterProps["permission"];
+  isPending: boolean;
+  isApproved: boolean;
+  isDenied: boolean;
+  isApprovedViaAllow: boolean;
+  isApprovedViaAllEdits: boolean;
+  loadingButton: "allow" | "deny" | "abort" | null;
+  loadingAllEdits: boolean;
+  handleApprove: () => void;
+  handlePlanApproveAll: () => void;
+  handleSubmitFeedback: (text: string) => void;
+  styles: any;
+}> = ({
+  permission,
+  isPending,
+  isApproved,
+  isDenied,
+  isApprovedViaAllow,
+  isApprovedViaAllEdits,
+  loadingButton,
+  loadingAllEdits,
+  handleApprove,
+  handlePlanApproveAll,
+  handleSubmitFeedback,
+  styles,
+}) => {
+  const { theme } = useUnistyles();
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+
+  const onRejectPress = () => {
+    if (!isPending || loadingButton !== null || loadingAllEdits) return;
+    setShowFeedbackInput(true);
+  };
+
+  const onSubmitFeedback = () => {
+    if (!feedbackText.trim()) return;
+    handleSubmitFeedback(feedbackText);
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.buttonContainer}>
+        {/* Approve Plan */}
+        <TouchableOpacity
+          style={[
+            styles.button,
+            isPending && styles.buttonAllow,
+            isApprovedViaAllow && styles.buttonSelected,
+            (isDenied || isApprovedViaAllEdits) && styles.buttonInactive,
+          ]}
+          onPress={handleApprove}
+          disabled={!isPending || loadingButton !== null || loadingAllEdits}
+          activeOpacity={isPending ? 0.7 : 1}
+        >
+          {loadingButton === "allow" && isPending ? (
+            <View
+              style={[
+                styles.buttonContent,
+                { width: 40, height: 20, justifyContent: "center" },
+              ]}
+            >
+              <ActivityIndicator
+                size={Platform.OS === "ios" ? "small" : (14 as any)}
+                color={(styles as any).loadingIndicatorAllow?.color}
+              />
+            </View>
+          ) : (
+            <View style={styles.buttonContent}>
+              <Text
+                style={[
+                  styles.buttonText,
+                  isPending && styles.buttonTextAllow,
+                  isApprovedViaAllow && styles.buttonTextSelected,
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("plan.approve")}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Approve & Auto-approve All (bypassPermissions) */}
+        <TouchableOpacity
+          style={[
+            styles.button,
+            isPending && styles.buttonAllowAll,
+            isApprovedViaAllEdits && styles.buttonSelected,
+            (isDenied || isApprovedViaAllow) && styles.buttonInactive,
+          ]}
+          onPress={handlePlanApproveAll}
+          disabled={!isPending || loadingButton !== null || loadingAllEdits}
+          activeOpacity={isPending ? 0.7 : 1}
+        >
+          {loadingAllEdits && isPending ? (
+            <View
+              style={[
+                styles.buttonContent,
+                { width: 40, height: 20, justifyContent: "center" },
+              ]}
+            >
+              <ActivityIndicator
+                size={Platform.OS === "ios" ? "small" : (14 as any)}
+                color={(styles as any).loadingIndicatorAllowAll?.color}
+              />
+            </View>
+          ) : (
+            <View style={styles.buttonContent}>
+              <Text
+                style={[
+                  styles.buttonText,
+                  isPending && styles.buttonTextAllowAll,
+                  isApprovedViaAllEdits && styles.buttonTextSelected,
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("plan.approveAutoEdits")}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Reject with Feedback - inline input */}
+        {isDenied && permission.reason ? (
+          // Show submitted feedback
+          <View style={[styles.button, styles.buttonSelected]}>
+            <View style={styles.buttonContent}>
+              <Text
+                style={[styles.buttonText, styles.buttonTextSelected]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("plan.rejectWithFeedback")}
+              </Text>
+            </View>
+            <Text
+              style={{
+                fontSize: 13,
+                color: theme.colors.textSecondary,
+                marginTop: 4,
+              }}
+            >
+              {permission.reason}
+            </Text>
+          </View>
+        ) : showFeedbackInput && isPending ? (
+          // Inline feedback input
+          <View style={{ paddingHorizontal: 12, paddingVertical: 4 }}>
+            <TextInput
+              style={{
+                fontSize: 14,
+                color: theme.colors.text,
+                borderWidth: 1,
+                borderColor: theme.colors.divider,
+                borderRadius: 6,
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+                minHeight: 36,
+              }}
+              placeholder={t("plan.rejectPlaceholder")}
+              placeholderTextColor={theme.colors.textSecondary}
+              value={feedbackText}
+              onChangeText={setFeedbackText}
+              onSubmitEditing={onSubmitFeedback}
+              returnKeyType="send"
+              autoFocus
+              multiline={false}
+            />
+            {loadingButton === "deny" ? (
+              <ActivityIndicator
+                size={Platform.OS === "ios" ? "small" : (14 as any)}
+                color={theme.colors.permissionButton.deny.background}
+                style={{ marginTop: 6 }}
+              />
+            ) : (
+              <TouchableOpacity
+                onPress={onSubmitFeedback}
+                disabled={!feedbackText.trim()}
+                style={{ marginTop: 6 }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "500",
+                    color: feedbackText.trim()
+                      ? theme.colors.permissionButton.deny.background
+                      : theme.colors.textSecondary,
+                  }}
+                >
+                  {t("common.submit")}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          // Reject button
+          <TouchableOpacity
+            style={[
+              styles.button,
+              isPending && styles.buttonDeny,
+              isDenied && styles.buttonSelected,
+              isApproved && styles.buttonInactive,
+            ]}
+            onPress={onRejectPress}
+            disabled={!isPending || loadingButton !== null || loadingAllEdits}
+            activeOpacity={isPending ? 0.7 : 1}
+          >
+            <View style={styles.buttonContent}>
+              <Text
+                style={[
+                  styles.buttonText,
+                  isPending && styles.buttonTextDeny,
+                  isDenied && styles.buttonTextSelected,
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("plan.rejectWithFeedback")}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

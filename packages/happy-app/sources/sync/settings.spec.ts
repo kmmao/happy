@@ -476,6 +476,7 @@ describe("settings", () => {
         gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
+
         useEnhancedSessionWizard: false,
       });
     });

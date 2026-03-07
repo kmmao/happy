@@ -560,10 +560,6 @@ export const ru: TranslationStructure = {
     compactionSummaryDisconnected:
       "Сессия не подключена. Резюме доступно только когда CLI онлайн.",
     messageQueued: "В очереди",
-    interruptConfirmTitle: "Прервать текущую задачу?",
-    interruptConfirmMessage:
-      "Текущая задача будет остановлена. Сообщения в очереди будут обработаны далее.",
-    interruptAndSend: "Прервать и отправить",
   },
 
   bookmark: {
@@ -1463,6 +1459,30 @@ export const ru: TranslationStructure = {
     newIssueBody: "Описание (необязательно)",
     newIssueBodyPlaceholder: "Опишите проблему...",
     pageOf: ({ page }: { page: number }) => `Страница ${page}`,
+    launchSession: "Запустить сессию",
+    viewProcessingSession: "Просмотреть сессию",
+    processing: "В обработке",
+    launchFailed: ({ error }: { error: string }) =>
+      `Не удалось запустить сессию: ${error}`,
+    autoClosedComment: ({ branchName }: { branchName: string }) =>
+      `Эта задача обработана Happy Coder. Ветка: ${branchName}`,
+    editIssue: "Редактировать задачу",
+    editTitle: "Изменить заголовок задачи",
+    editTitlePlaceholder: "Заголовок задачи...",
+    editBody: "Изменить описание задачи",
+    editBodyPlaceholder: "Описание задачи...",
+    sortBy: "Сортировка",
+    sortCreated: "По дате создания",
+    sortUpdated: "По дате обновления",
+    sortComments: "По комментариям",
+    noOpenIssues: "Нет открытых задач",
+    noClosedIssues: "Нет закрытых задач",
+    tryClosedHint: "Попробуйте просмотреть закрытые задачи",
+    createFirstIssue: "Создать задачу",
+    createIssueTitle: "Создать задачу",
+    labelSelect: "Метки",
+    noLabelsAvailable: "Нет доступных меток",
+    createButton: "Создать",
   },
 
   gitHosts: {
@@ -1484,6 +1504,13 @@ export const ru: TranslationStructure = {
       `Удалить "${host}" из настроенных хостов?`,
     duplicateTitle: "Дублирующий хост",
     duplicateMessage: ({ host }: { host: string }) => `"${host}" уже настроен.`,
+    autoIssueSectionTitle: "Авто-сессия задач",
+    autoIssueDescription:
+      "Автоматически запускать сессию Claude Code при обнаружении задачи с указанной меткой. Триггер срабатывает только для задач, созданных разрешёнными авторами.",
+    autoIssueLabel: "Метка-триггер",
+    autoIssueLabelPlaceholder: "напр. claude, auto-fix",
+    autoIssueAllowedAuthors: "Разрешённые авторы",
+    autoIssueAllowedAuthorsPlaceholder: "имя1, имя2",
   },
 
   quickCommands: {

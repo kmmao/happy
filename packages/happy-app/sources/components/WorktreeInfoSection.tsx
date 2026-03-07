@@ -25,6 +25,12 @@ import {
   type CommitInfo,
 } from "@/sync/gitWorktreeOps";
 import { sessionKill } from "@/sync/ops";
+import { issueSessionStore } from "@/sync/issueSessionStore";
+import { issueStore } from "@/sync/issueStore";
+import {
+  updateIssueStateViaMachine,
+  addIssueCommentViaMachine,
+} from "@/sync/issueFetch";
 
 interface WorktreeInfoSectionProps {
   readonly sessionId: string;
@@ -103,6 +109,51 @@ export const WorktreeInfoSection = React.memo(function WorktreeInfoSection({
 
   const effectiveState = localState ?? worktree.state;
 
+  /**
+   * After a successful merge, check if this session has an associated issue
+   * and auto-close it with a comment.
+   */
+  const closeLinkedIssue = useCallback(async () => {
+    const link = issueSessionStore.getState().findBySessionId(sessionId);
+    if (!link || link.status !== "processing") return;
+
+    try {
+      const repoInfo = issueStore.getState().repoInfoByProject[link.projectKey];
+      if (!repoInfo) return;
+
+      // Add completion comment
+      const comment = t("issues.autoClosedComment", {
+        branchName: worktree.branchName,
+      });
+      await addIssueCommentViaMachine(
+        machineId,
+        repoInfo,
+        link.issueNumber,
+        comment,
+        link.repoPath,
+      );
+
+      // Close the issue
+      await updateIssueStateViaMachine(
+        machineId,
+        repoInfo,
+        link.issueNumber,
+        "closed",
+        link.repoPath,
+      );
+
+      // Update link status
+      await issueSessionStore
+        .getState()
+        .updateStatus(link.issueKey, "completed", {
+          completionComment: comment,
+        });
+    } catch {
+      // Non-critical: merge succeeded, issue close failed
+      // User can close manually
+    }
+  }, [sessionId, machineId, worktree.branchName]);
+
   const handleCreatePR = useCallback(async () => {
     setMerging(true);
     const result = await createPullRequest(
@@ -116,6 +167,7 @@ export const WorktreeInfoSection = React.memo(function WorktreeInfoSection({
 
     if (result.success && result.prUrl) {
       setLocalState("merged");
+      closeLinkedIssue();
       Modal.alert(
         t("common.success"),
         t("worktreeInfo.merge.prSuccess", { url: result.prUrl }),
@@ -149,6 +201,7 @@ export const WorktreeInfoSection = React.memo(function WorktreeInfoSection({
 
     if (result.success) {
       setLocalState("merged");
+      closeLinkedIssue();
       Modal.alert(
         t("common.success"),
         t("worktreeInfo.merge.directSuccessDeleteBranch", {

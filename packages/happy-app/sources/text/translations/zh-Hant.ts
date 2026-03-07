@@ -371,9 +371,6 @@ export const zhHant: TranslationStructure = {
     compactionSummaryEmpty: "尚無背景摘要。在背景被壓縮後將出現在此處。",
     compactionSummaryDisconnected: "會話未連線。摘要僅在 CLI 連線時可用。",
     messageQueued: "已排隊",
-    interruptConfirmTitle: "中斷當前任務？",
-    interruptConfirmMessage: "將停止當前任務，排隊訊息將在下一輪處理。",
-    interruptAndSend: "中斷並傳送",
   },
 
   bookmark: {
@@ -1369,6 +1366,29 @@ export const zhHant: TranslationStructure = {
     newIssueBody: "工單描述（可選）",
     newIssueBodyPlaceholder: "描述問題...",
     pageOf: ({ page }: { page: number }) => `第 ${page} 頁`,
+    launchSession: "發起會話處理",
+    viewProcessingSession: "查看處理會話",
+    processing: "處理中",
+    launchFailed: ({ error }: { error: string }) => `發起會話失敗：${error}`,
+    autoClosedComment: ({ branchName }: { branchName: string }) =>
+      `此工單已由 Happy Coder 處理。分支：${branchName}`,
+    editIssue: "編輯 Issue",
+    editTitle: "編輯 Issue 標題",
+    editTitlePlaceholder: "Issue 標題...",
+    editBody: "編輯 Issue 正文",
+    editBodyPlaceholder: "描述問題...",
+    sortBy: "排序方式",
+    sortCreated: "建立時間",
+    sortUpdated: "更新時間",
+    sortComments: "留言數",
+    noOpenIssues: "沒有未關閉的工單",
+    noClosedIssues: "沒有已關閉的工單",
+    tryClosedHint: "試試查看已關閉的工單",
+    createFirstIssue: "建立工單",
+    createIssueTitle: "建立工單",
+    labelSelect: "標籤",
+    noLabelsAvailable: "沒有可用標籤",
+    createButton: "建立",
   },
 
   gitHosts: {
@@ -1388,6 +1408,13 @@ export const zhHant: TranslationStructure = {
       `確定從設定中移除「${host}」？`,
     duplicateTitle: "主機重複",
     duplicateMessage: ({ host }: { host: string }) => `「${host}」已設定過了。`,
+    autoIssueSectionTitle: "自動工單會話",
+    autoIssueDescription:
+      "當偵測到帶有指定標籤的工單時，自動啟動 Claude Code 會話處理。僅允許白名單使用者建立的工單觸發。",
+    autoIssueLabel: "觸發標籤",
+    autoIssueLabelPlaceholder: "例如 claude, auto-fix",
+    autoIssueAllowedAuthors: "允許的作者",
+    autoIssueAllowedAuthorsPlaceholder: "使用者名稱1, 使用者名稱2",
   },
 
   quickCommands: {
