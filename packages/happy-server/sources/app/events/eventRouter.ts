@@ -216,6 +216,19 @@ export type EphemeralEvent =
       machineId: string;
       online: boolean;
       timestamp: number;
+    }
+  | {
+      type: "webhook-trigger";
+      webhookEventId: string;
+      issueNumber: number;
+      issueTitle: string;
+      issueBody: string;
+      issueAuthor: string;
+      issueLabels: string[];
+      issueUrl: string;
+      repoUrl: string;
+      repoPath: string;
+      provider: string;
     };
 
 // === EVENT PAYLOAD TYPES ===

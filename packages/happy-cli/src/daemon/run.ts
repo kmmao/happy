@@ -45,6 +45,7 @@ import {
   formatTmuxSessionIdentifier,
 } from "@/utils/tmux";
 import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
+import { handleWebhookTrigger } from "@/webhook/handleWebhookTrigger";
 
 // Prepare initial metadata
 export const initialMachineMetadata: MachineMetadata = {
@@ -911,6 +912,15 @@ export async function startDaemon(): Promise<void> {
 
     // Connect to server
     apiMachine.connect();
+
+    // Set up webhook trigger handler
+    apiMachine.setWebhookHandler((data) => {
+      handleWebhookTrigger(data, {
+        spawnSession,
+        emitWebhookStatus: (statusData) =>
+          apiMachine.emitWebhookStatus(statusData),
+      });
+    });
 
     // Every 60 seconds:
     // 1. Prune stale sessions

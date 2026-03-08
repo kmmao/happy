@@ -52,6 +52,7 @@ model Account {
     AccessKey           AccessKey[]
     UserFeedItem        UserFeedItem[]
     UserKVStore         UserKVStore[]
+    WebhookRoute        WebhookRoute[]
 }
 
 model TerminalAuthRequest {
@@ -362,4 +363,50 @@ model UserKVStore {
 
     @@unique([accountId, key])
     @@index([accountId])
+}
+
+//
+// Webhooks
+//
+
+model WebhookRoute {
+    id            String   @id @default(cuid())
+    accountId     String
+    account       Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    provider      String // "github" | "gitea" | "gitlab"
+    repoUrl       String // Normalized, e.g. "https://github.com/owner/repo"
+    webhookSecret Bytes // Server-side encrypted (same as ServiceAccountToken.token)
+    labels        String[] // Trigger labels, e.g. ["auto-fix"]
+    authors       String[] // Allowed issue authors
+    machineId     String // Target machine to dispatch to
+    repoPath      String // Local repo path on the target machine
+    enabled       Boolean  @default(true)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    @@unique([accountId, repoUrl])
+    @@index([repoUrl])
+}
+
+model WebhookEvent {
+    id           String   @id @default(cuid())
+    accountId    String
+    provider     String // "github" | "gitea" | "gitlab"
+    deliveryId   String // Platform delivery ID for idempotency
+    repoUrl      String
+    issueNumber  Int
+    issueTitle   String
+    issueAuthor  String
+    issueLabels  String[]
+    issueUrl     String
+    status       String   @default("pending") // pending | dispatched | completed | failed | skipped
+    errorMessage String?
+    machineId    String?
+    sessionId    String?
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@unique([provider, deliveryId])
+    @@index([repoUrl, issueNumber])
+    @@index([status])
 }

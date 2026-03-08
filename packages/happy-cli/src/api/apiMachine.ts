@@ -31,6 +31,7 @@ interface ServerToDaemonEvents {
   "rpc-registered": (data: { method: string }) => void;
   "rpc-unregistered": (data: { method: string }) => void;
   "rpc-error": (data: { type: string; error: string }) => void;
+  ephemeral: (data: { type: string; [key: string]: any }) => void;
   auth: (data: { success: boolean; user: string }) => void;
   error: (data: { message: string }) => void;
 }
@@ -92,6 +93,12 @@ interface DaemonToServerEvents {
     data: { method: string; params: any },
     callback: (response: { ok: boolean; result?: any; error?: string }) => void,
   ) => void;
+  "webhook-status": (data: {
+    webhookEventId: string;
+    status: "dispatched" | "completed" | "failed";
+    sessionId?: string;
+    errorMessage?: string;
+  }) => void;
 }
 
 type MachineRpcHandlers = {
@@ -100,10 +107,25 @@ type MachineRpcHandlers = {
   requestShutdown: () => void;
 };
 
+export type WebhookTriggerData = {
+  type: "webhook-trigger";
+  webhookEventId: string;
+  issueNumber: number;
+  issueTitle: string;
+  issueBody: string;
+  issueAuthor: string;
+  issueLabels: string[];
+  issueUrl: string;
+  repoUrl: string;
+  repoPath: string;
+  provider: string;
+};
+
 export class ApiMachineClient {
   private socket!: Socket<ServerToDaemonEvents, DaemonToServerEvents>;
   private keepAliveInterval: NodeJS.Timeout | null = null;
   private rpcHandlerManager: RpcHandlerManager;
+  private webhookHandler: ((data: WebhookTriggerData) => void) | null = null;
 
   constructor(
     private token: string,
@@ -214,6 +236,26 @@ export class ApiMachineClient {
           "Daemon stop request acknowledged, starting shutdown sequence...",
       };
     });
+  }
+
+  /**
+   * Set handler for incoming webhook trigger events.
+   * Called when Server dispatches a webhook-trigger ephemeral event to this machine.
+   */
+  setWebhookHandler(handler: (data: WebhookTriggerData) => void) {
+    this.webhookHandler = handler;
+  }
+
+  /**
+   * Report webhook processing status back to server.
+   */
+  emitWebhookStatus(data: {
+    webhookEventId: string;
+    status: "dispatched" | "completed" | "failed";
+    sessionId?: string;
+    errorMessage?: string;
+  }) {
+    this.socket.emit("webhook-status", data);
   }
 
   /**
@@ -395,6 +437,16 @@ export class ApiMachineClient {
         logger.debug(
           `[API MACHINE] Received unknown update type: ${(data.body as any).t}`,
         );
+      }
+    });
+
+    // Handle ephemeral events (webhook triggers, etc.)
+    this.socket.on("ephemeral", (data) => {
+      if (data.type === "webhook-trigger" && this.webhookHandler) {
+        logger.debug(
+          `[API MACHINE] Received webhook-trigger for issue #${data.issueNumber}`,
+        );
+        this.webhookHandler(data as WebhookTriggerData);
       }
     });
 

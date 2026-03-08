@@ -1,6 +1,6 @@
 import os from "node:os";
 import { randomUUID } from "node:crypto";
-import { readFile, readdir, rm } from "node:fs/promises";
+import { readFile, readdir, rm, unlink } from "node:fs/promises";
 import { join, basename } from "node:path";
 
 import { ApiClient } from "@/api/api";
@@ -366,6 +366,30 @@ export async function runClaude(
   // Forward messages to the queue
   // Permission modes: Use the unified 7-mode type, mapping happens at SDK boundary in claudeRemote.ts
   let currentPermissionMode: PermissionMode | undefined = initialPermissionMode;
+
+  // Inject initial prompt from file if env var is set (webhook-triggered sessions)
+  const initialPromptFile = process.env.HAPPY_INITIAL_PROMPT_FILE;
+  if (initialPromptFile) {
+    try {
+      const promptContent = await readFile(initialPromptFile, "utf-8");
+      if (promptContent.trim()) {
+        messageQueue.push(promptContent, {
+          permissionMode: "bypassPermissions",
+        } as EnhancedMode);
+        logger.debug(
+          `[START] Injected initial prompt from ${initialPromptFile} (${promptContent.length} chars)`,
+        );
+      }
+      // Clean up the temp file
+      await unlink(initialPromptFile);
+      // Clear the env var to prevent re-reads
+      delete process.env.HAPPY_INITIAL_PROMPT_FILE;
+    } catch (error) {
+      logger.debug(
+        `[START] Failed to read initial prompt file ${initialPromptFile}: ${error}`,
+      );
+    }
+  }
   let currentModel = options.model; // Track current model state
   let currentFallbackModel: string | undefined = undefined; // Track current fallback model
   let currentCustomSystemPrompt: string | undefined = undefined; // Track current custom system prompt

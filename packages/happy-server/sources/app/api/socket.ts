@@ -18,6 +18,7 @@ import { rpcHandler } from "./socket/rpcHandler";
 import { pingHandler } from "./socket/pingHandler";
 import { sessionUpdateHandler } from "./socket/sessionUpdateHandler";
 import { machineUpdateHandler } from "./socket/machineUpdateHandler";
+import { webhookStatusHandler } from "./socket/webhookStatusHandler";
 import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
 import { accessKeyHandler } from "./socket/accessKeyHandler";
 import { sessionPreferencesHandler } from "./socket/sessionPreferencesHandler";
@@ -180,6 +181,7 @@ export function startSocket(app: Fastify) {
     machineUpdateHandler(userId, socket);
     artifactUpdateHandler(userId, socket);
     accessKeyHandler(userId, socket);
+    webhookStatusHandler(socket, userId);
 
     // Ready
     log({ module: "websocket" }, `User connected: ${userId}`);
