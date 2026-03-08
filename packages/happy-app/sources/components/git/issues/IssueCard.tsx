@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Pressable } from "react-native";
+import { View, Pressable, Linking } from "react-native";
 import { Octicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
@@ -8,6 +8,28 @@ import { t } from "@/text";
 import type { Issue, AggregatedIssue } from "@/sync/issueTypes";
 import { useIssueSessionStatus } from "@/hooks/useIssueSessionStatus";
 import { formatLastSeen } from "@/utils/sessionUtils";
+import type { IssueSessionStatus } from "@/sync/issueSessionTypes";
+
+const STATUS_COLORS: Record<IssueSessionStatus, string> = {
+    processing: "#007AFF",
+    completed: "#34C759",
+    failed: "#FF3B30",
+    cancelled: "#8E8E93",
+};
+
+const STATUS_ICONS: Record<IssueSessionStatus, React.ComponentProps<typeof Octicons>["name"]> = {
+    processing: "sync",
+    completed: "check-circle",
+    failed: "x-circle",
+    cancelled: "skip",
+};
+
+const STATUS_LABELS: Record<IssueSessionStatus, () => string> = {
+    processing: () => t("issues.statusProcessing"),
+    completed: () => t("issues.statusCompleted"),
+    failed: () => t("issues.statusFailed"),
+    cancelled: () => t("issues.statusCancelled"),
+};
 
 interface IssueCardProps {
     readonly issue: Issue | AggregatedIssue;
@@ -27,9 +49,10 @@ export const IssueCard = React.memo<IssueCardProps>(function IssueCard({
     const projectKey =
         "projectKey" in issue ? (issue as AggregatedIssue).projectKey : "";
     const issueSessionLink = useIssueSessionStatus(projectKey, issue.number);
-    const isProcessing = issueSessionLink?.status === "processing";
 
-    const bodyPreview = issue.body.trim().split("\n")[0] ?? "";
+    const statusColor = issueSessionLink
+        ? STATUS_COLORS[issueSessionLink.status]
+        : undefined;
 
     return (
         <Pressable
@@ -48,8 +71,8 @@ export const IssueCard = React.memo<IssueCardProps>(function IssueCard({
                 name={isOpen ? "issue-opened" : "issue-closed"}
                 size={16}
                 color={
-                    isProcessing
-                        ? theme.colors.button.primary.background
+                    issueSessionLink
+                        ? statusColor
                         : isOpen
                           ? theme.colors.success
                           : theme.colors.textSecondary
@@ -85,7 +108,7 @@ export const IssueCard = React.memo<IssueCardProps>(function IssueCard({
                     </Text>
                 </View>
 
-                {/* Meta: author · time · comments · processing badge — single line */}
+                {/* Meta: author · time · comments — single line */}
                 <View style={styles.meta}>
                     {issue.author !== "" && (
                         <Text style={[styles.metaText, { color: theme.colors.textSecondary }]}>
@@ -113,34 +136,65 @@ export const IssueCard = React.memo<IssueCardProps>(function IssueCard({
                             </Text>
                         </View>
                     )}
-                    {isProcessing && (
+                </View>
+
+                {/* Session status + PR link row */}
+                {issueSessionLink && statusColor && (
+                    <View style={styles.statusRow}>
                         <View
                             style={[
-                                styles.processingBadge,
-                                {
-                                    backgroundColor:
-                                        theme.colors.button.primary.background + "20",
-                                },
+                                styles.statusBadge,
+                                { backgroundColor: statusColor + "20" },
                             ]}
                         >
                             <Octicons
-                                name="sync"
+                                name={STATUS_ICONS[issueSessionLink.status]}
                                 size={10}
-                                color={theme.colors.button.primary.background}
+                                color={statusColor}
                             />
                             <Text
                                 style={{
                                     fontSize: 11,
                                     fontWeight: "600",
-                                    color: theme.colors.button.primary.background,
+                                    color: statusColor,
                                     ...Typography.default(),
                                 }}
                             >
-                                {t("issues.processing")}
+                                {STATUS_LABELS[issueSessionLink.status]()}
                             </Text>
                         </View>
-                    )}
-                </View>
+                        {issueSessionLink.prUrl ? (
+                            <Pressable
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    Linking.openURL(issueSessionLink.prUrl!);
+                                }}
+                                hitSlop={8}
+                                style={[
+                                    styles.prBadge,
+                                    { backgroundColor: theme.colors.textLink + "18" },
+                                ]}
+                            >
+                                <Octicons
+                                    name="git-pull-request"
+                                    size={10}
+                                    color={theme.colors.textLink}
+                                />
+                                <Text
+                                    style={{
+                                        fontSize: 11,
+                                        fontWeight: "500",
+                                        color: theme.colors.textLink,
+                                        ...Typography.mono(),
+                                    }}
+                                    numberOfLines={1}
+                                >
+                                    PR
+                                </Text>
+                            </Pressable>
+                        ) : null}
+                    </View>
+                )}
 
                 {/* Labels row — combine repo label + issue labels in one row */}
                 {(issue.labels.length > 0 || repoLabel) && (
@@ -237,7 +291,21 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center",
         gap: 3,
     },
-    processingBadge: {
+    statusRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 1,
+    },
+    statusBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 3,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 8,
+    },
+    prBadge: {
         flexDirection: "row",
         alignItems: "center",
         gap: 3,

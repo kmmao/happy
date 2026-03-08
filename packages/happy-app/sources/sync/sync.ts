@@ -2332,6 +2332,9 @@ class Sync {
               const link = issueSessionStore
                 .getState()
                 .findBySessionId(updateData.body.sid);
+              console.log(
+                `🔄 [IssueSession] turn-end: sid=${updateData.body.sid}, link=${link ? `${link.issueKey}(${link.status})` : "NONE"}`,
+              );
               if (link && link.status === "processing") {
                 void this.handleIssueSessionCompletion(link);
               }
@@ -3091,13 +3094,18 @@ class Sync {
       const session = storage.getState().sessions[link.sessionId];
       const branchName = session?.metadata?.worktree?.branchName;
 
+      console.log(
+        `🔄 [IssueSession] handleCompletion: issueKey=${link.issueKey}, branchName=${branchName ?? "NONE"}, repoInfo=${repoInfo?.provider ?? "NONE"}`,
+      );
+
       if (repoInfo && repoInfo.provider !== "unknown" && branchName) {
         if (repoInfo.provider === "github") {
           try {
             // Query ALL PRs for this branch (including merged/closed)
+            // Must specify --repo to target the correct fork (gh defaults to upstream)
             const prResult = await machineBash(
               link.machineId,
-              `gh pr list --head "${branchName}" --state all --json url,state --jq '.[0] | "\\(.url) \\(.state)"' 2>&1`,
+              `gh pr list --repo "${repoInfo.owner}/${repoInfo.repo}" --head "${branchName}" --state all --json url,state --jq '.[0] | "\\(.url) \\(.state)"' 2>&1`,
               link.repoPath,
             );
             if (prResult.success && prResult.exitCode === 0) {
@@ -3139,6 +3147,9 @@ class Sync {
       // - PR merged → completed (close issue)
       // - PR exists but not merged → stay processing (PR still needs review)
       // - No PR found → completed (Claude may have committed directly)
+      console.log(
+        `🔄 [IssueSession] PR check result: prUrl=${prUrl ?? "NONE"}, prMerged=${prMerged}`,
+      );
       if (prUrl && !prMerged) {
         // PR exists but not yet merged — just record URL, stay processing
         await issueSessionStore
