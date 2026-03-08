@@ -36,6 +36,7 @@ import {
   addIssueCommentViaMachine,
   updateIssueStateViaMachine,
 } from "./issueFetch";
+import { machineBash } from "./ops";
 import { promptTemplateStore } from "./promptTemplateStore";
 import { isTemplateKey } from "./promptTemplateTypes";
 import { ideationStore } from "./ideationStore";
@@ -2322,20 +2323,14 @@ class Sync {
             ]);
 
             // Auto-detect issue session completion: when a turn ends,
-            // mark the associated issue-session link as "completed"
-            // and auto-close the issue with a comment.
+            // mark the associated issue-session link as "completed",
+            // detect PR URL, and auto-close the issue with a comment.
+            // All done in a single sequential flow to avoid KV optimistic lock conflicts.
             if (isTaskComplete) {
               const link = issueSessionStore
                 .getState()
                 .findBySessionId(updateData.body.sid);
               if (link && link.status === "processing") {
-                void issueSessionStore
-                  .getState()
-                  .updateStatus(link.issueKey, "completed")
-                  .catch(() => {
-                    // Best-effort — don't block message processing
-                  });
-                // Auto-close issue + add comment (fire-and-forget)
                 void this.handleIssueSessionCompletion(link);
               }
             }
@@ -3087,39 +3082,94 @@ class Sync {
   private handleIssueSessionCompletion = async (link: IssueSessionLink) => {
     try {
       const repoInfo = issueStore.getState().repoInfoByProject[link.projectKey];
-      if (!repoInfo || repoInfo.provider === "unknown") return;
 
+      // Try to detect PR URL from worktree branch
+      let prUrl: string | undefined;
+      const session = storage.getState().sessions[link.sessionId];
+      const branchName = session?.metadata?.worktree?.branchName;
+
+      if (repoInfo && repoInfo.provider !== "unknown" && branchName) {
+        if (repoInfo.provider === "github") {
+          try {
+            const prResult = await machineBash(
+              link.machineId,
+              `gh pr list --head "${branchName}" --json url --jq '.[0].url' 2>&1`,
+              link.repoPath,
+            );
+            if (prResult.success && prResult.exitCode === 0) {
+              const url = prResult.stdout.trim();
+              if (url.startsWith("http")) {
+                prUrl = url;
+              }
+            }
+          } catch {
+            // Non-critical — proceed without PR URL
+          }
+        } else if (repoInfo.provider === "gitea") {
+          try {
+            const prResult = await machineBash(
+              link.machineId,
+              `curl -s "${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=open&head=${repoInfo.owner}:${branchName}" 2>&1`,
+              link.repoPath,
+            );
+            if (prResult.success && prResult.exitCode === 0) {
+              const prs: readonly { readonly html_url?: string }[] = JSON.parse(
+                prResult.stdout.trim(),
+              );
+              if (prs.length > 0 && prs[0].html_url) {
+                prUrl = prs[0].html_url;
+              }
+            }
+          } catch {
+            // Non-critical
+          }
+        }
+      }
+
+      // Mark link as completed FIRST (single updateStatus call — no race condition)
       const comment =
         "This issue has been processed by an automated Claude Code session.\n" +
-        "Please check the latest pull request for changes.";
+        (prUrl
+          ? `Pull request: ${prUrl}`
+          : "Please check the latest pull request for changes.");
 
-      // Add completion comment to the issue
-      await addIssueCommentViaMachine(
-        link.machineId,
-        repoInfo,
-        link.issueNumber,
-        comment,
-        link.repoPath,
-      );
-
-      // Close the issue
-      await updateIssueStateViaMachine(
-        link.machineId,
-        repoInfo,
-        link.issueNumber,
-        "closed",
-        link.repoPath,
-      );
-
-      // Update link with completion comment
       await issueSessionStore
         .getState()
         .updateStatus(link.issueKey, "completed", {
           completionComment: comment,
+          prUrl,
         });
+
+      // Then try to close the issue (best-effort, won't affect link status)
+      if (repoInfo && repoInfo.provider !== "unknown") {
+        try {
+          await addIssueCommentViaMachine(
+            link.machineId,
+            repoInfo,
+            link.issueNumber,
+            comment,
+            link.repoPath,
+          );
+          await updateIssueStateViaMachine(
+            link.machineId,
+            repoInfo,
+            link.issueNumber,
+            "closed",
+            link.repoPath,
+          );
+        } catch {
+          // Non-critical — issue close is best-effort
+        }
+      }
     } catch {
-      // Non-critical — issue close is best-effort.
-      // The issue-session link is already marked "completed".
+      // If even updateStatus failed, try a minimal fallback
+      try {
+        await issueSessionStore
+          .getState()
+          .updateStatus(link.issueKey, "completed");
+      } catch {
+        // Give up — will be caught by markFailedIssueSessionsForEndedSessions
+      }
     }
   };
 

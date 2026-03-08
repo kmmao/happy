@@ -40,6 +40,7 @@ interface IssueSessionActions {
       completionComment?: string;
       errorMessage?: string;
       sessionId?: string;
+      prUrl?: string;
     },
   ) => Promise<void>;
   findBySessionId: (sessionId: string) => IssueSessionLink | null;
@@ -223,6 +224,7 @@ export const issueSessionStore = create<IssueSessionStore>()((set, get) => ({
       updatedAt: Date.now(),
       completionComment: extra?.completionComment ?? link.completionComment,
       errorMessage: extra?.errorMessage ?? link.errorMessage,
+      prUrl: extra?.prUrl ?? link.prUrl,
     };
 
     const encrypted = await encryptLinkData(updatedData);

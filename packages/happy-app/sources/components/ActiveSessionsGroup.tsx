@@ -630,7 +630,8 @@ const CompactSessionRow = React.memo(
             {issueLink &&
               (() => {
                 const statusColor = ISSUE_STATUS_COLORS[issueLink.status].text;
-                const prUrl = session.metadata?.worktree?.prUrl;
+                const prUrl =
+                  issueLink.prUrl ?? session.metadata?.worktree?.prUrl;
                 return (
                   <View style={styles.issueRow}>
                     <Ionicons
