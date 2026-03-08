@@ -75,8 +75,13 @@ class AutoIssueService {
     // Subscribe to issueStore changes for immediate matching
     this.subscribeToIssueStore();
 
-    // Initial tick + periodic polling
-    void this.tick();
+    // Delay the first tick to allow gitStatus sync to complete first.
+    // Without this, the first tick fires before remoteUrl is available
+    // and silently fails to detect repoInfo for all projects.
+    setTimeout(() => {
+      if (!this.running) return;
+      void this.tick();
+    }, 10_000);
     this.timer = setInterval(() => void this.tick(), POLL_INTERVAL);
 
     // Pause/resume on app state changes
@@ -262,6 +267,12 @@ class AutoIssueService {
 
     for (const session of Object.values(sessions)) {
       if (!session.metadata?.machineId || !session.metadata?.path) continue;
+
+      // Skip worktree sessions — they are child sessions spawned by this
+      // service and must NOT be scanned for issues (their path differs from
+      // the parent repo, which would create a different projectKey and cause
+      // infinite session spawning).
+      if (session.metadata.worktree?.isWorktree) continue;
 
       const projectKey = `${session.metadata.machineId}:${session.metadata.path}`;
       if (seen.has(projectKey)) continue;

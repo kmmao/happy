@@ -41,6 +41,8 @@ import { sessionDelete, machineSpawnNewSession } from "@/sync/ops";
 import { HappyError } from "@/utils/errors";
 import { Modal } from "@/modal";
 import { isMachineOnline } from "@/utils/machineUtils";
+import { useIssueSessionBySessionId } from "@/sync/issueSessionStore";
+import type { IssueSessionStatus } from "@/sync/issueSessionTypes";
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -170,6 +172,20 @@ const stylesheet = StyleSheet.create((theme) => ({
     fontSize: 10,
     color: theme.colors.textSecondary,
     ...Typography.default(),
+  },
+  issueTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    gap: 3,
+    flexShrink: 1,
+  },
+  issueTagText: {
+    fontSize: 10,
+    ...Typography.default("semiBold"),
+    flexShrink: 1,
   },
   sessionTimestamp: {
     fontSize: 12,
@@ -486,6 +502,17 @@ export function SessionsList() {
 }
 
 // Sub-component that handles session message logic
+
+const ISSUE_STATUS_COLORS: Record<
+  IssueSessionStatus,
+  { bg: string; text: string }
+> = {
+  processing: { bg: "rgba(0, 122, 255, 0.12)", text: "#007AFF" },
+  completed: { bg: "rgba(52, 199, 89, 0.12)", text: "#34C759" },
+  failed: { bg: "rgba(255, 59, 48, 0.12)", text: "#FF3B30" },
+  cancelled: { bg: "rgba(142, 142, 147, 0.12)", text: "#8E8E93" },
+};
+
 const SessionItem = React.memo(
   ({
     session,
@@ -507,6 +534,7 @@ const SessionItem = React.memo(
     const navigateToSession = useNavigateToSession();
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
+    const issueLink = useIssueSessionBySessionId(session.id);
 
     const [deletingSession, performDelete] = useHappyAction(async () => {
       const result = await sessionDelete(session.id);
@@ -635,7 +663,9 @@ const SessionItem = React.memo(
             </View>
 
             {/* Tags line */}
-            {(session.metadata?.host || session.metadata?.version) && (
+            {(session.metadata?.host ||
+              session.metadata?.version ||
+              issueLink) && (
               <View style={styles.tagsRow}>
                 {session.metadata?.host && (
                   <View style={styles.tag}>
@@ -646,6 +676,32 @@ const SessionItem = React.memo(
                   <View style={styles.tag}>
                     <Text style={styles.tagText}>
                       {session.metadata.version}
+                    </Text>
+                  </View>
+                )}
+                {issueLink && (
+                  <View
+                    style={[
+                      styles.issueTag,
+                      {
+                        backgroundColor:
+                          ISSUE_STATUS_COLORS[issueLink.status].bg,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="pricetag-outline"
+                      size={10}
+                      color={ISSUE_STATUS_COLORS[issueLink.status].text}
+                    />
+                    <Text
+                      style={[
+                        styles.issueTagText,
+                        { color: ISSUE_STATUS_COLORS[issueLink.status].text },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      #{issueLink.issueNumber} {issueLink.issueTitle}
                     </Text>
                   </View>
                 )}

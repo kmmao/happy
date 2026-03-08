@@ -132,11 +132,17 @@ export const issueSessionStore = create<IssueSessionStore>()((set, get) => ({
         }
       }
 
-      // Merge: keep any link that has a newer kvVersion from real-time updates
+      // Merge: keep real-time updates that arrived AFTER the load started,
+      // but only if the link also exists in the loaded data (database is
+      // the authority — if a link was deleted from the DB, don't resurrect it
+      // from memory).
       set((prev) => {
         const merged = { ...loaded };
         for (const [key, existing] of Object.entries(prev.links)) {
-          if (existing.kvVersion > (merged[key]?.kvVersion ?? -1)) {
+          if (
+            key in merged &&
+            existing.kvVersion > (merged[key]?.kvVersion ?? -1)
+          ) {
             merged[key] = existing;
           }
         }
