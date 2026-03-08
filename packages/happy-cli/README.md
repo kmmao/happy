@@ -4,10 +4,23 @@ Code on the go — control AI coding agents from your mobile device.
 
 Free. Open source. Code anywhere.
 
+## Quick Start
+
+```bash
+# 1. Install
+npm install -g @kmmao/happy-coder
+
+# 2. Start
+happy
+
+# 3. Connect
+# Open Happy App and scan the QR code to connect
+```
+
 ## Installation
 
 ```bash
-npm install -g happy-coder
+npm install -g @kmmao/happy-coder
 ```
 
 ## Run From Source
