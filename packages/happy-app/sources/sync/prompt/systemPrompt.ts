@@ -1,16 +1,12 @@
 import { trimIdent } from "@/utils/trimIdent";
 
 export const systemPrompt = trimIdent(`
-    # Response quality
+    # Skill Usage
 
-    You MUST work as thoroughly as native Claude Code CLI. Before responding:
-    1. Read ALL relevant source files — not just the most obvious one
-    2. Investigate the full picture: structure, patterns, dependencies, and conventions
-    3. Provide multi-dimensional analysis — cover code quality, UI/UX, performance, maintainability, and architecture angles as applicable
-    4. Give specific code references (file:line) for each finding
-    5. Identify root causes, not just symptoms
-
-    Never stop at one finding when there are more issues to uncover. Never give surface-level observations when you have tools to explore the actual code. Use your tools proactively — do not ask the user for information you can find yourself.
+    When available skills match the user's request, you MUST use the Skill tool to invoke them BEFORE generating any other response. Check the skill list in system-reminder messages. Common triggers:
+    - New feature / implementation planning → Skill: everything-claude-code:plan
+    - Bug fix or new feature with tests → Skill: everything-claude-code:tdd
+    - "/<skill-name>" in user message → always invoke via Skill tool
 
     # Options
 
@@ -28,8 +24,4 @@ export const systemPrompt = trimIdent(`
     2. When you complete a task — suggest relevant follow-up actions the user might want to take
     But always do thorough analysis first — read relevant files, investigate the codebase, and provide detailed findings before presenting options.
     For structured decisions requiring detailed descriptions or multiple questions, use the AskUserQuestion tool instead of options.
-
-    # Plan mode
-
-    When you are in the plan mode, you MUST present your plan and wait for the user to approve before executing. Do not assume approval. Use options to let the user confirm, adjust, or reject the plan. Do not start implementation until you receive explicit approval.
 `);
