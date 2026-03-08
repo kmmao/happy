@@ -495,7 +495,7 @@ const CompactSessionRow = React.memo(
 
     const handleArchive = React.useCallback(() => {
       swipeableRef.current?.close();
-      if (issueLink && issueLink.status === "processing") {
+      if (issueLink && (issueLink.status === "processing" || issueLink.prUrl)) {
         Modal.alert("", t("issues.cannotArchiveProcessing"));
         return;
       }
@@ -525,7 +525,7 @@ const CompactSessionRow = React.memo(
 
     const handleDelete = React.useCallback(() => {
       swipeableRef.current?.close();
-      if (issueLink && issueLink.status === "processing") {
+      if (issueLink && (issueLink.status === "processing" || issueLink.prUrl)) {
         Modal.alert("", t("issues.cannotArchiveProcessing"));
         return;
       }
