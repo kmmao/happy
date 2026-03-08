@@ -38,6 +38,12 @@ export interface GitHostMapping {
   readonly autoIssueEnabled?: boolean;
   readonly autoIssueLabel?: string;
   readonly autoIssueAllowedAuthors?: readonly string[];
+  readonly webhookEnabled?: boolean;
+  readonly webhookSecret?: string;
+  readonly webhookMachineId?: string;
+  readonly webhookRepoPath?: string;
+  readonly webhookRepoUrl?: string;
+  readonly webhookRouteId?: string;
 }
 
 export type IssueFilterState = "open" | "closed" | "all";

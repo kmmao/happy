@@ -1521,6 +1521,24 @@ export const ru: TranslationStructure = {
     autoIssueLabelPlaceholder: "напр. claude, auto-fix",
     autoIssueAllowedAuthors: "Разрешённые авторы",
     autoIssueAllowedAuthorsPlaceholder: "имя1, имя2",
+    webhookSectionTitle: "Webhook",
+    webhookDescription:
+      "Получайте события Webhook от Git-хоста для автоматической обработки задач без опроса. Требуется настройка Webhook в репозитории.",
+    webhookRepoUrl: "URL репозитория",
+    webhookRepoUrlPlaceholder: "https://github.com/owner/repo",
+    webhookMachineId: "Целевая машина",
+    webhookMachineIdPlaceholder: "Выберите машину",
+    webhookRepoPath: "Локальный путь репозитория",
+    webhookRepoPathPlaceholder: "/path/to/repo",
+    webhookSecretLabel: "Webhook Secret",
+    webhookSecretCopied: "Secret скопирован в буфер обмена",
+    webhookUrlLabel: "Webhook URL",
+    webhookUrlCopied: "URL скопирован в буфер обмена",
+    webhookUrlHint:
+      "Настройте этот URL и Secret в настройках Webhook вашего репозитория.",
+    webhookSyncSuccess: "Маршрут Webhook синхронизирован",
+    webhookSyncError: "Не удалось синхронизировать маршрут Webhook",
+    webhookNoMachines: "Нет доступных машин",
   },
 
   quickCommands: {

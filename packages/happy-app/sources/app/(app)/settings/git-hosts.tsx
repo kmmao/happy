@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, Pressable, ScrollView, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSettingMutable } from "@/sync/storage";
+import { useAllMachines } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
@@ -10,6 +11,13 @@ import { layout } from "@/components/layout";
 import { Switch } from "@/components/Switch";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWindowDimensions } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import { TokenStorage } from "@/auth/tokenStorage";
+import {
+  generateWebhookSecret,
+  getWebhookUrl,
+  syncWebhookRoute,
+} from "@/sync/webhookRouteSync";
 
 type Provider = "github" | "gitea";
 
@@ -20,11 +28,18 @@ interface GitHost {
   readonly autoIssueEnabled?: boolean;
   readonly autoIssueLabel?: string;
   readonly autoIssueAllowedAuthors?: string[];
+  readonly webhookEnabled?: boolean;
+  readonly webhookSecret?: string;
+  readonly webhookMachineId?: string;
+  readonly webhookRepoPath?: string;
+  readonly webhookRepoUrl?: string;
+  readonly webhookRouteId?: string;
 }
 
 export default function GitHostsScreen() {
   const { theme } = useUnistyles();
   const [gitHosts, setGitHosts] = useSettingMutable("gitHosts");
+  const machines = useAllMachines();
   const [showAddForm, setShowAddForm] = React.useState(false);
   const [editIndex, setEditIndex] = React.useState<number | null>(null);
   const [formHost, setFormHost] = React.useState("");
@@ -33,6 +48,17 @@ export default function GitHostsScreen() {
   const [formAutoLabel, setFormAutoLabel] = React.useState("");
   const [formAutoAuthors, setFormAutoAuthors] = React.useState("");
   const [formAutoEnabled, setFormAutoEnabled] = React.useState(false);
+  // Webhook form fields
+  const [formWebhookEnabled, setFormWebhookEnabled] = React.useState(false);
+  const [formWebhookSecret, setFormWebhookSecret] = React.useState("");
+  const [formWebhookMachineId, setFormWebhookMachineId] = React.useState("");
+  const [formWebhookRepoPath, setFormWebhookRepoPath] = React.useState("");
+  const [formWebhookRepoUrl, setFormWebhookRepoUrl] = React.useState("");
+  const [formWebhookRouteId, setFormWebhookRouteId] = React.useState<
+    string | undefined
+  >(undefined);
+  const [webhookSyncing, setWebhookSyncing] = React.useState(false);
+
   const safeArea = useSafeAreaInsets();
   const screenWidth = useWindowDimensions().width;
 
@@ -43,6 +69,12 @@ export default function GitHostsScreen() {
     setFormAutoLabel("");
     setFormAutoAuthors("");
     setFormAutoEnabled(false);
+    setFormWebhookEnabled(false);
+    setFormWebhookSecret("");
+    setFormWebhookMachineId("");
+    setFormWebhookRepoPath("");
+    setFormWebhookRepoUrl("");
+    setFormWebhookRouteId(undefined);
     setEditIndex(null);
     setShowAddForm(true);
   };
@@ -55,6 +87,12 @@ export default function GitHostsScreen() {
     setFormAutoLabel(entry.autoIssueLabel ?? "");
     setFormAutoAuthors((entry.autoIssueAllowedAuthors ?? []).join(", "));
     setFormAutoEnabled(entry.autoIssueEnabled ?? Boolean(entry.autoIssueLabel));
+    setFormWebhookEnabled(entry.webhookEnabled ?? false);
+    setFormWebhookSecret(entry.webhookSecret ?? "");
+    setFormWebhookMachineId(entry.webhookMachineId ?? "");
+    setFormWebhookRepoPath(entry.webhookRepoPath ?? "");
+    setFormWebhookRepoUrl(entry.webhookRepoUrl ?? "");
+    setFormWebhookRouteId(entry.webhookRouteId);
     setEditIndex(index);
     setShowAddForm(true);
   };
@@ -74,7 +112,7 @@ export default function GitHostsScreen() {
     setGitHosts(gitHosts.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedHost = formHost.trim().toLowerCase();
     if (!trimmedHost) return;
 
@@ -97,20 +135,48 @@ export default function GitHostsScreen() {
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
-    const newEntry: GitHost = {
+
+    let newEntry: GitHost = {
       host: trimmedHost,
       provider: formProvider,
       ...(trimmedToken ? { apiToken: trimmedToken } : {}),
       autoIssueEnabled: formAutoEnabled,
       ...(trimmedLabel ? { autoIssueLabel: trimmedLabel } : {}),
       ...(authors.length > 0 ? { autoIssueAllowedAuthors: authors } : {}),
+      webhookEnabled: formWebhookEnabled,
+      ...(formWebhookSecret ? { webhookSecret: formWebhookSecret } : {}),
+      ...(formWebhookMachineId
+        ? { webhookMachineId: formWebhookMachineId }
+        : {}),
+      ...(formWebhookRepoPath.trim()
+        ? { webhookRepoPath: formWebhookRepoPath.trim() }
+        : {}),
+      ...(formWebhookRepoUrl.trim()
+        ? { webhookRepoUrl: formWebhookRepoUrl.trim() }
+        : {}),
+      ...(formWebhookRouteId ? { webhookRouteId: formWebhookRouteId } : {}),
     };
 
+    // Sync webhook route to server if webhook is enabled
+    if (formWebhookEnabled && formWebhookSecret && formWebhookMachineId) {
+      setWebhookSyncing(true);
+      try {
+        const credentials = await TokenStorage.getCredentials();
+        if (credentials) {
+          const synced = await syncWebhookRoute(credentials, newEntry);
+          newEntry = { ...synced } as GitHost;
+          HappyModal.toast(t("gitHosts.webhookSyncSuccess"));
+        }
+      } catch (error) {
+        HappyModal.toast(t("gitHosts.webhookSyncError"));
+      } finally {
+        setWebhookSyncing(false);
+      }
+    }
+
     if (editIndex !== null) {
-      // Update existing
       setGitHosts(gitHosts.map((h, i) => (i === editIndex ? newEntry : h)));
     } else {
-      // Add new
       setGitHosts([...gitHosts, newEntry]);
     }
 
@@ -121,6 +187,21 @@ export default function GitHostsScreen() {
   const handleCancel = () => {
     setShowAddForm(false);
     setEditIndex(null);
+  };
+
+  const handleGenerateSecret = () => {
+    setFormWebhookSecret(generateWebhookSecret());
+  };
+
+  const handleCopySecret = async () => {
+    await Clipboard.setStringAsync(formWebhookSecret);
+    HappyModal.toast(t("gitHosts.webhookSecretCopied"));
+  };
+
+  const handleCopyWebhookUrl = async () => {
+    const url = getWebhookUrl(formProvider);
+    await Clipboard.setStringAsync(url);
+    HappyModal.toast(t("gitHosts.webhookUrlCopied"));
   };
 
   return (
@@ -227,7 +308,8 @@ export default function GitHostsScreen() {
                   }}
                 >
                   {entry.provider === "github" ? "GitHub" : "Gitea"}
-                  {entry.apiToken ? " · Token ✓" : ""}
+                  {entry.apiToken ? " · Token" : ""}
+                  {entry.webhookEnabled ? " · Webhook" : ""}
                 </Text>
               </View>
               <Pressable onPress={() => handleDelete(index)} hitSlop={8}>
@@ -470,6 +552,297 @@ export default function GitHostsScreen() {
                 </>
               )}
 
+              {/* Webhook section */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginTop: 4,
+                  marginBottom: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "600",
+                    color: theme.colors.text,
+                    ...Typography.default("semiBold"),
+                  }}
+                >
+                  {t("gitHosts.webhookSectionTitle")}
+                </Text>
+                <Switch
+                  value={formWebhookEnabled}
+                  onValueChange={setFormWebhookEnabled}
+                />
+              </View>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: theme.colors.textSecondary,
+                  marginBottom: 12,
+                  lineHeight: 16,
+                  ...Typography.default(),
+                }}
+              >
+                {t("gitHosts.webhookDescription")}
+              </Text>
+
+              {formWebhookEnabled && (
+                <>
+                  {/* Repository URL */}
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: theme.colors.textSecondary,
+                      marginBottom: 6,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {t("gitHosts.webhookRepoUrl")}
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 15,
+                      color: theme.colors.text,
+                      marginBottom: 12,
+                      ...Typography.mono(),
+                    }}
+                    value={formWebhookRepoUrl}
+                    onChangeText={setFormWebhookRepoUrl}
+                    placeholder={t("gitHosts.webhookRepoUrlPlaceholder")}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+
+                  {/* Target Machine */}
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: theme.colors.textSecondary,
+                      marginBottom: 6,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {t("gitHosts.webhookMachineId")}
+                  </Text>
+                  {machines.length === 0 ? (
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: theme.colors.box.warning.text,
+                        marginBottom: 12,
+                        ...Typography.default(),
+                      }}
+                    >
+                      {t("gitHosts.webhookNoMachines")}
+                    </Text>
+                  ) : (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginBottom: 12,
+                      }}
+                    >
+                      {machines.map((machine) => (
+                        <Pressable
+                          key={machine.id}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 8,
+                            backgroundColor:
+                              formWebhookMachineId === machine.id
+                                ? theme.colors.button.primary.background
+                                : theme.colors.surface,
+                          }}
+                          onPress={() => setFormWebhookMachineId(machine.id)}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              color:
+                                formWebhookMachineId === machine.id
+                                  ? theme.colors.button.primary.tint
+                                  : theme.colors.text,
+                              ...Typography.default(
+                                formWebhookMachineId === machine.id
+                                  ? "semiBold"
+                                  : undefined,
+                              ),
+                            }}
+                          >
+                            {machine.metadata?.displayName ??
+                              machine.metadata?.host ??
+                              machine.id.slice(0, 8)}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Local repo path */}
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: theme.colors.textSecondary,
+                      marginBottom: 6,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {t("gitHosts.webhookRepoPath")}
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 15,
+                      color: theme.colors.text,
+                      marginBottom: 12,
+                      ...Typography.mono(),
+                    }}
+                    value={formWebhookRepoPath}
+                    onChangeText={setFormWebhookRepoPath}
+                    placeholder={t("gitHosts.webhookRepoPathPlaceholder")}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  {/* Webhook secret */}
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: theme.colors.textSecondary,
+                      marginBottom: 6,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {t("gitHosts.webhookSecretLabel")}
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: 8,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <TextInput
+                      style={{
+                        flex: 1,
+                        backgroundColor: theme.colors.surface,
+                        borderRadius: 8,
+                        padding: 12,
+                        fontSize: 13,
+                        color: theme.colors.text,
+                        ...Typography.mono(),
+                      }}
+                      value={formWebhookSecret}
+                      onChangeText={setFormWebhookSecret}
+                      placeholder="..."
+                      placeholderTextColor={theme.colors.textSecondary}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <Pressable
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        backgroundColor: theme.colors.surface,
+                        justifyContent: "center",
+                      }}
+                      onPress={handleGenerateSecret}
+                    >
+                      <Ionicons
+                        name="refresh-outline"
+                        size={18}
+                        color={theme.colors.textLink}
+                      />
+                    </Pressable>
+                    {formWebhookSecret.length > 0 && (
+                      <Pressable
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          backgroundColor: theme.colors.surface,
+                          justifyContent: "center",
+                        }}
+                        onPress={handleCopySecret}
+                      >
+                        <Ionicons
+                          name="copy-outline"
+                          size={18}
+                          color={theme.colors.textLink}
+                        />
+                      </Pressable>
+                    )}
+                  </View>
+
+                  {/* Webhook URL (read-only) */}
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: theme.colors.textSecondary,
+                      marginBottom: 6,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {t("gitHosts.webhookUrlLabel")}
+                  </Text>
+                  <Pressable
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: theme.colors.surface,
+                      borderRadius: 8,
+                      padding: 12,
+                      marginBottom: 4,
+                      gap: 8,
+                    }}
+                    onPress={handleCopyWebhookUrl}
+                  >
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: 13,
+                        color: theme.colors.text,
+                        ...Typography.mono(),
+                      }}
+                      numberOfLines={1}
+                    >
+                      {getWebhookUrl(formProvider)}
+                    </Text>
+                    <Ionicons
+                      name="copy-outline"
+                      size={16}
+                      color={theme.colors.textLink}
+                    />
+                  </Pressable>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: theme.colors.textSecondary,
+                      marginBottom: 16,
+                      lineHeight: 16,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {t("gitHosts.webhookUrlHint")}
+                  </Text>
+                </>
+              )}
+
               {/* Action buttons */}
               <View
                 style={{
@@ -502,10 +875,10 @@ export default function GitHostsScreen() {
                     paddingVertical: 8,
                     borderRadius: 8,
                     backgroundColor: theme.colors.button.primary.background,
-                    opacity: formHost.trim() ? 1 : 0.5,
+                    opacity: formHost.trim() && !webhookSyncing ? 1 : 0.5,
                   }}
                   onPress={handleSave}
-                  disabled={!formHost.trim()}
+                  disabled={!formHost.trim() || webhookSyncing}
                 >
                   <Text
                     style={{
@@ -515,7 +888,7 @@ export default function GitHostsScreen() {
                       ...Typography.default("semiBold"),
                     }}
                   >
-                    {t("common.save")}
+                    {webhookSyncing ? "..." : t("common.save")}
                   </Text>
                 </Pressable>
               </View>

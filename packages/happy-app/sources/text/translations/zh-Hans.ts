@@ -1423,6 +1423,23 @@ export const zhHans: TranslationStructure = {
     autoIssueLabelPlaceholder: "例如 claude, auto-fix",
     autoIssueAllowedAuthors: "允许的作者",
     autoIssueAllowedAuthorsPlaceholder: "用户名1, 用户名2",
+    webhookSectionTitle: "Webhook",
+    webhookDescription:
+      "接收来自 Git 平台的 Webhook 事件，自动处理 Issue，无需轮询。需要在仓库中配置 Webhook。",
+    webhookRepoUrl: "仓库 URL",
+    webhookRepoUrlPlaceholder: "https://github.com/owner/repo",
+    webhookMachineId: "目标机器",
+    webhookMachineIdPlaceholder: "选择一台机器",
+    webhookRepoPath: "本地仓库路径",
+    webhookRepoPathPlaceholder: "/path/to/repo",
+    webhookSecretLabel: "Webhook Secret",
+    webhookSecretCopied: "Secret 已复制到剪贴板",
+    webhookUrlLabel: "Webhook URL",
+    webhookUrlCopied: "URL 已复制到剪贴板",
+    webhookUrlHint: "在仓库的 Webhook 设置中配置此 URL 和 Secret。",
+    webhookSyncSuccess: "Webhook 路由已同步",
+    webhookSyncError: "Webhook 路由同步失败",
+    webhookNoMachines: "没有可用的机器",
   },
 
   quickCommands: {

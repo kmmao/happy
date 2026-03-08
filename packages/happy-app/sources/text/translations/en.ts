@@ -1490,6 +1490,24 @@ export const en: TranslationStructure = {
     autoIssueLabelPlaceholder: "e.g. claude, auto-fix",
     autoIssueAllowedAuthors: "Allowed Authors",
     autoIssueAllowedAuthorsPlaceholder: "username1, username2",
+    webhookSectionTitle: "Webhook",
+    webhookDescription:
+      "Receive webhook events from your Git host to automatically process issues without polling. Requires webhook configuration on your repository.",
+    webhookRepoUrl: "Repository URL",
+    webhookRepoUrlPlaceholder: "https://github.com/owner/repo",
+    webhookMachineId: "Target Machine",
+    webhookMachineIdPlaceholder: "Select a machine",
+    webhookRepoPath: "Local Repository Path",
+    webhookRepoPathPlaceholder: "/path/to/repo",
+    webhookSecretLabel: "Webhook Secret",
+    webhookSecretCopied: "Secret copied to clipboard",
+    webhookUrlLabel: "Webhook URL",
+    webhookUrlCopied: "URL copied to clipboard",
+    webhookUrlHint:
+      "Configure this URL and secret in your repository's webhook settings.",
+    webhookSyncSuccess: "Webhook route synced",
+    webhookSyncError: "Failed to sync webhook route",
+    webhookNoMachines: "No machines available",
   },
 
   quickCommands: {

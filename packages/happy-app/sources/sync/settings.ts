@@ -492,6 +492,12 @@ export const SettingsSchema = z.object({
         autoIssueEnabled: z.boolean().optional(),
         autoIssueLabel: z.string().optional(),
         autoIssueAllowedAuthors: z.array(z.string()).optional(),
+        webhookEnabled: z.boolean().optional(),
+        webhookSecret: z.string().optional(),
+        webhookMachineId: z.string().optional(),
+        webhookRepoPath: z.string().optional(),
+        webhookRepoUrl: z.string().optional(),
+        webhookRouteId: z.string().optional(),
       }),
     )
     .describe(
