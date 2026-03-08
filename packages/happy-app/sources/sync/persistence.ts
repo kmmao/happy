@@ -13,6 +13,7 @@ import {
 import { Purchases, purchasesDefaults, purchasesParse } from "./purchases";
 import { Profile, profileDefaults, profileParse } from "./profile";
 import type { PermissionModeKey } from "@/components/PermissionModeSelector";
+import { clearAllMessageCaches } from "./messageCache";
 
 const mmkv = new MMKV();
 const NEW_SESSION_DRAFT_KEY = "new-session-draft-v1";
@@ -446,6 +447,31 @@ export function retrieveTempText(id: string): string | null {
   return null;
 }
 
+// Session message lastSeq - tracks sync position per session
+const LAST_SEQ_PREFIX = "msg-last-seq-";
+
+export function loadLastSeqs(): Map<string, number> {
+  const keys = mmkv.getAllKeys().filter((k) => k.startsWith(LAST_SEQ_PREFIX));
+  const result = new Map<string, number>();
+  for (const key of keys) {
+    const sessionId = key.slice(LAST_SEQ_PREFIX.length);
+    const seq = mmkv.getNumber(key);
+    if (seq !== undefined && seq > 0) {
+      result.set(sessionId, seq);
+    }
+  }
+  return result;
+}
+
+export function saveLastSeq(sessionId: string, seq: number): void {
+  mmkv.set(`${LAST_SEQ_PREFIX}${sessionId}`, seq);
+}
+
+export function deleteLastSeq(sessionId: string): void {
+  mmkv.delete(`${LAST_SEQ_PREFIX}${sessionId}`);
+}
+
 export function clearPersistence() {
   mmkv.clearAll();
+  clearAllMessageCaches();
 }

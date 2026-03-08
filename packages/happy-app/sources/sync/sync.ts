@@ -51,7 +51,13 @@ import {
   SUPPORTED_SCHEMA_VERSION,
 } from "./settings";
 import { Profile, profileParse } from "./profile";
-import { loadPendingSettings, savePendingSettings } from "./persistence";
+import {
+  loadPendingSettings,
+  savePendingSettings,
+  loadLastSeqs,
+  saveLastSeq,
+  deleteLastSeq,
+} from "./persistence";
 import { initializeTracking, tracking } from "@/track";
 import { parseToken } from "@/utils/parseToken";
 import { RevenueCat, LogLevel, PaywallResult } from "./revenueCat";
@@ -94,6 +100,12 @@ import { FeedItem } from "./feedTypes";
 import { UserProfile } from "./friendTypes";
 import { resolveMessageModeMeta } from "./messageMeta";
 import { getSessionUsageSummary } from "./apiUsage";
+import {
+  initMessageCache,
+  loadMessageCache,
+  saveMessageCache,
+  deleteMessageCache,
+} from "./messageCache";
 
 type V3GetSessionMessagesResponse = {
   messages: ApiMessage[];
@@ -126,7 +138,7 @@ class Sync {
   private messagesSync = new Map<string, InvalidateSync>();
   private sendSync = new Map<string, InvalidateSync>();
   private sendAbortControllers = new Map<string, AbortController>();
-  private sessionLastSeq = new Map<string, number>();
+  private sessionLastSeq = loadLastSeqs();
   private pendingOutbox = new Map<string, OutboxMessage[]>();
   private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
   private sessionQueueProcessing = new Set<string>();
@@ -134,6 +146,7 @@ class Sync {
   private sessionDataKeys = new Map<string, Uint8Array>(); // Store session data encryption keys internally
   private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
   private artifactDataKeys = new Map<string, Uint8Array>(); // Store artifact data encryption keys internally
+  private cacheWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private settingsSync: InvalidateSync;
   private profileSync: InvalidateSync;
   private purchasesSync: InvalidateSync;
@@ -214,6 +227,8 @@ class Sync {
       } else {
         log.log(`📱 App state changed to: ${nextAppState}`);
         this.maybeStartBackgroundSendWatchdog();
+        // Flush pending cache writes before going to background
+        this.flushPendingCacheWrites();
       }
     });
   }
@@ -223,6 +238,14 @@ class Sync {
     this.encryption = encryption;
     this.anonID = encryption.anonID;
     this.serverID = parseToken(credentials.token);
+
+    // Cancel any pending cache writes from previous user before switching
+    this.cancelPendingCacheWrites();
+
+    // Initialize message cache - anonID is a 16-char hex derived from master secret,
+    // used as a device-level deterrent, not cryptographic-grade protection
+    initMessageCache(this.anonID + "-message-cache");
+
     await this.#init();
 
     // Await settings sync to have fresh settings
@@ -242,6 +265,14 @@ class Sync {
     this.encryption = encryption;
     this.anonID = encryption.anonID;
     this.serverID = parseToken(credentials.token);
+
+    // Cancel any pending cache writes from previous user before switching
+    this.cancelPendingCacheWrites();
+
+    // Initialize message cache - anonID is a 16-char hex derived from master secret,
+    // used as a device-level deterrent, not cryptographic-grade protection
+    initMessageCache(this.anonID + "-message-cache");
+
     await this.#init();
   }
 
@@ -299,6 +330,33 @@ class Sync {
   }
 
   onSessionVisible = (sessionId: string) => {
+    // Restore from local cache if no messages in memory yet
+    const existingMessages = storage.getState().sessionMessages[sessionId];
+    if (!existingMessages || existingMessages.messages.length === 0) {
+      const cached = loadMessageCache(sessionId);
+      if (cached) {
+        storage.getState().restoreMessagesFromCache(sessionId, cached);
+        if (cached.isTrimmed) {
+          // Cache was truncated — force full re-fetch to recover older messages.
+          // Cached messages still provide instant preview while fetching.
+          this.sessionLastSeq.delete(sessionId);
+          deleteLastSeq(sessionId);
+        } else if (!this.sessionLastSeq.has(sessionId)) {
+          // Cache is complete — use cached lastSeq for incremental fetch only
+          this.sessionLastSeq.set(sessionId, cached.lastSeq);
+        }
+        log.log(
+          `💬 Restored ${cached.messages.length} cached messages for ${sessionId}`,
+        );
+      } else if (this.sessionLastSeq.has(sessionId)) {
+        // lastSeq exists but no cache (e.g. first launch after feature rollout)
+        // Reset to 0 to force full re-fetch, otherwise history would be missing
+        this.sessionLastSeq.delete(sessionId);
+        deleteLastSeq(sessionId);
+        log.log(`💬 Reset lastSeq for ${sessionId} — no cache available`);
+      }
+    }
+
     this.getMessagesSync(sessionId).invalidate();
 
     // Also invalidate git status sync for this session
@@ -1980,6 +2038,7 @@ class Sync {
           }
         }
         this.sessionLastSeq.set(sessionId, maxSeq);
+        saveLastSeq(sessionId, maxSeq);
       }
     } catch (error) {
       this.maybeStartBackgroundSendWatchdog();
@@ -2017,6 +2076,7 @@ class Sync {
       let afterSeq = this.sessionLastSeq.get(sessionId) ?? 0;
       let hasMore = true;
       let totalNormalized = 0;
+      let isFirstBatch = true;
 
       while (hasMore) {
         const response = await apiSocket.request(
@@ -2083,7 +2143,15 @@ class Sync {
           this.enqueueMessages(sessionId, normalizedMessages);
         }
 
+        // Mark loaded after first batch so UI renders immediately
+        // instead of waiting for all pages to complete
+        if (isFirstBatch) {
+          storage.getState().applyMessagesLoaded(sessionId);
+          isFirstBatch = false;
+        }
+
         this.sessionLastSeq.set(sessionId, maxSeq);
+        saveLastSeq(sessionId, maxSeq);
         hasMore = !!data.hasMore;
         if (hasMore && maxSeq === afterSeq) {
           log.log(
@@ -2360,6 +2428,7 @@ class Sync {
             // Update seq tracker if this message advances it
             if (currentLastSeq === undefined || incomingSeq > currentLastSeq) {
               this.sessionLastSeq.set(updateData.body.sid, incomingSeq);
+              saveLastSeq(updateData.body.sid, incomingSeq);
             }
 
             // Check for mutable tool calls to refresh git status
@@ -2453,6 +2522,8 @@ class Sync {
       this.sendSync.delete(sessionId);
       this.pendingOutbox.delete(sessionId);
       this.sessionLastSeq.delete(sessionId);
+      deleteLastSeq(sessionId);
+      deleteMessageCache(sessionId);
       this.sessionMessageLocks.delete(sessionId);
       this.sessionMessageQueue.delete(sessionId);
       this.sessionQueueProcessing.delete(sessionId);
@@ -3013,6 +3084,44 @@ class Sync {
   // Apply store
   //
 
+  private scheduleCacheWrite(sessionId: string): void {
+    const existing = this.cacheWriteTimers.get(sessionId);
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    this.cacheWriteTimers.set(
+      sessionId,
+      setTimeout(() => {
+        this.cacheWriteTimers.delete(sessionId);
+        const session = storage.getState().sessionMessages[sessionId];
+        const lastSeq = this.sessionLastSeq.get(sessionId) ?? 0;
+        if (session?.isLoaded && session.messages.length > 0) {
+          saveMessageCache(sessionId, session.messages, lastSeq);
+        }
+      }, 2000),
+    );
+  }
+
+  private flushPendingCacheWrites(): void {
+    for (const [sessionId, timer] of this.cacheWriteTimers) {
+      clearTimeout(timer);
+      const session = storage.getState().sessionMessages[sessionId];
+      const lastSeq = this.sessionLastSeq.get(sessionId) ?? 0;
+      if (session?.isLoaded && session.messages.length > 0) {
+        saveMessageCache(sessionId, session.messages, lastSeq);
+      }
+    }
+    this.cacheWriteTimers.clear();
+  }
+
+  private cancelPendingCacheWrites(): void {
+    for (const timer of this.cacheWriteTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.cacheWriteTimers.clear();
+  }
+
   private applyMessages = (
     sessionId: string,
     messages: NormalizedMessage[],
@@ -3032,6 +3141,9 @@ class Sync {
     if (result.hasReadyEvent) {
       voiceHooks.onReady(sessionId);
     }
+
+    // Schedule debounced cache write
+    this.scheduleCacheWrite(sessionId);
   };
 
   private applySessions = (

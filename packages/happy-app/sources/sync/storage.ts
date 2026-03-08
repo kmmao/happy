@@ -162,6 +162,10 @@ interface StorageState {
     messages: NormalizedMessage[],
   ) => { changed: string[]; hasReadyEvent: boolean };
   applyMessagesLoaded: (sessionId: string) => void;
+  restoreMessagesFromCache: (
+    sessionId: string,
+    cached: { messages: readonly Message[]; lastSeq: number },
+  ) => void;
   applySessionUsageBaseline: (
     sessionId: string,
     baseline: {
@@ -938,6 +942,53 @@ export const storage = create<StorageState>()((set, get) => {
         }
 
         return result;
+      }),
+    restoreMessagesFromCache: (
+      sessionId: string,
+      cached: { messages: readonly Message[]; lastSeq: number },
+    ) =>
+      set((state) => {
+        // Don't overwrite if we already have messages (fresher than cache)
+        const existing = state.sessionMessages[sessionId];
+        if (existing && existing.messages.length > 0) {
+          return state;
+        }
+
+        // Build messagesMap from cached messages
+        const messagesMap: Record<string, Message> = {};
+        for (const msg of cached.messages) {
+          messagesMap[msg.id] = msg;
+        }
+
+        // Create fresh reducer with pre-populated dedup maps
+        // This ensures subsequent incremental messages are properly deduplicated
+        const reducerState = createReducer();
+        for (const msg of cached.messages) {
+          reducerState.messageIds.set(msg.id, msg.id);
+          if (msg.kind === "tool-call" && msg.tool) {
+            reducerState.toolIdToMessageId.set(
+              msg.tool.permission?.id ?? msg.id,
+              msg.id,
+            );
+          }
+          // Rebuild localIds map for user messages (prevents duplicate display)
+          if ("localId" in msg && msg.localId) {
+            reducerState.localIds.set(msg.localId, msg.id);
+          }
+        }
+
+        return {
+          ...state,
+          sessionMessages: {
+            ...state.sessionMessages,
+            [sessionId]: {
+              messages: [...cached.messages],
+              messagesMap,
+              reducerState,
+              isLoaded: true,
+            } satisfies SessionMessages,
+          },
+        };
       }),
     applySessionUsageBaseline: (
       sessionId: string,
