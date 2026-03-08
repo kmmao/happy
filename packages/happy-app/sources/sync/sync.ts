@@ -2324,10 +2324,10 @@ class Sync {
               },
             ]);
 
-            // Auto-detect issue session completion: when a turn ends,
-            // mark the associated issue-session link as "completed",
-            // detect PR URL, and auto-close the issue with a comment.
-            // All done in a single sequential flow to avoid KV optimistic lock conflicts.
+            // Auto-detect issue session completion on turn-end.
+            // Only check PR status — do NOT mark completed just because a turn ended.
+            // The session may still be working (multi-turn). Completion without PR
+            // is handled by markFailedIssueSessionsForEndedSessions when session truly ends.
             if (isTaskComplete) {
               const link = issueSessionStore
                 .getState()
@@ -2335,8 +2335,9 @@ class Sync {
               console.log(
                 `🔄 [IssueSession] turn-end: sid=${updateData.body.sid}, link=${link ? `${link.issueKey}(${link.status})` : "NONE"}`,
               );
-              if (link && link.status === "processing") {
-                void this.handleIssueSessionCompletion(link);
+              if (link && link.status === "processing" && !link.prUrl) {
+                // Only try to detect PR — don't mark completed here
+                void this.detectPRForIssueSession(link);
               }
             }
           } else {
@@ -3081,6 +3082,79 @@ class Sync {
   };
 
   /**
+   * Detect if a PR exists for an issue session's worktree branch.
+   * If found, record the prUrl on the link (stays processing).
+   * Does NOT mark completed or close the issue — that's handleIssueSessionCompletion's job.
+   */
+  private detectPRForIssueSession = async (
+    link: IssueSessionLink,
+  ): Promise<void> => {
+    try {
+      const repoInfo = issueStore.getState().repoInfoByProject[link.projectKey];
+      const session = storage.getState().sessions[link.sessionId];
+      const branchName = session?.metadata?.worktree?.branchName;
+
+      console.log(
+        `🔄 [IssueSession] detectPR: issueKey=${link.issueKey}, branchName=${branchName ?? "NONE"}, repoInfo=${repoInfo?.provider ?? "NONE"}`,
+      );
+
+      if (!repoInfo || repoInfo.provider === "unknown" || !branchName) return;
+
+      let prUrl: string | undefined;
+
+      if (repoInfo.provider === "github") {
+        try {
+          const prResult = await machineBash(
+            link.machineId,
+            `gh pr list --repo "${repoInfo.owner}/${repoInfo.repo}" --head "${branchName}" --state all --json url,state --jq '.[0] | "\\(.url) \\(.state)"' 2>&1`,
+            link.repoPath,
+          );
+          if (prResult.success && prResult.exitCode === 0) {
+            const output = prResult.stdout.trim();
+            const [url] = output.split(" ");
+            if (url?.startsWith("http")) {
+              prUrl = url;
+            }
+          }
+        } catch {
+          // Non-critical
+        }
+      } else if (repoInfo.provider === "gitea") {
+        try {
+          const prResult = await machineBash(
+            link.machineId,
+            `curl -s "${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=all&head=${repoInfo.owner}:${branchName}" 2>&1`,
+            link.repoPath,
+          );
+          if (prResult.success && prResult.exitCode === 0) {
+            const prs: readonly { readonly html_url?: string }[] = JSON.parse(
+              prResult.stdout.trim(),
+            );
+            if (prs.length > 0 && prs[0].html_url) {
+              prUrl = prs[0].html_url;
+            }
+          }
+        } catch {
+          // Non-critical
+        }
+      }
+
+      console.log(
+        `🔄 [IssueSession] detectPR result: prUrl=${prUrl ?? "NONE"}`,
+      );
+
+      if (prUrl) {
+        // Record PR URL, stay processing
+        await issueSessionStore
+          .getState()
+          .updateStatus(link.issueKey, "processing", { prUrl });
+      }
+    } catch {
+      // Non-critical — best effort PR detection
+    }
+  };
+
+  /**
    * After an issue session completes (turn-end), auto-close the linked issue
    * and add a completion comment. Best-effort — failures are silently ignored.
    */
@@ -3158,12 +3232,16 @@ class Sync {
         return;
       }
 
-      // Either PR merged or no PR — mark completed
+      if (!prUrl) {
+        // No PR found — don't mark completed here.
+        // Let markFailedIssueSessionsForEndedSessions handle it when session truly ends.
+        return;
+      }
+
+      // PR exists and is merged — mark completed and close issue
       const comment =
         "This issue has been processed by an automated Claude Code session.\n" +
-        (prUrl
-          ? `Pull request: ${prUrl}`
-          : "Please check the latest pull request for changes.");
+        `Pull request: ${prUrl}`;
 
       await issueSessionStore
         .getState()
@@ -3206,9 +3284,9 @@ class Sync {
   };
 
   /**
-   * Mark issue-session links as "failed" when their session ends
-   * without the worktree being merged (i.e., status is still "processing").
-   * If a PR exists (prUrl recorded), check its merge status first.
+   * Handle issue-session links when their session ends (no longer active).
+   * - Has prUrl → keep processing (PR may still need review/merge)
+   * - No prUrl → try one final PR detection, then mark completed if no PR found
    */
   private markFailedIssueSessionsForEndedSessions = async (
     endedSessionIds: string[],
@@ -3223,22 +3301,28 @@ class Sync {
       // Don't mark as failed — let it stay processing until PR is merged/closed.
       if (link.prUrl) continue;
 
-      // No PR was ever detected — try one final check before marking failed
-      await this.handleIssueSessionCompletion(link);
+      // No PR was ever detected — try one final check
+      await this.detectPRForIssueSession(link);
 
-      // If handleIssueSessionCompletion kept it as processing (found open PR),
-      // or marked completed (found merged PR), don't override.
+      // Re-read after detectPR may have updated it
       const updatedLink = issueSessionStore.getState().links[link.issueKey];
       if (
         updatedLink &&
         updatedLink.status === "processing" &&
-        !updatedLink.prUrl
+        updatedLink.prUrl
       ) {
-        // Still processing with no PR — mark as failed
+        // PR found on final check — keep processing
+        continue;
+      }
+
+      if (updatedLink && updatedLink.status === "processing") {
+        // Session ended, no PR ever found — mark as completed
+        // (Claude may have committed directly to the branch without PR)
         await issueSessionStore
           .getState()
-          .updateStatus(link.issueKey, "failed", {
-            errorMessage: "Session ended before worktree was merged",
+          .updateStatus(link.issueKey, "completed", {
+            completionComment:
+              "Session completed without creating a pull request.",
           });
       }
     }
