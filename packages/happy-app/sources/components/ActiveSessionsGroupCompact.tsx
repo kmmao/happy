@@ -175,25 +175,6 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     textAlign: "center",
     ...Typography.default("semiBold"),
   },
-  hoverActions: {
-    position: "absolute",
-    right: 0,
-    top: 0,
-    bottom: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingRight: 12,
-    paddingLeft: 24,
-    gap: 4,
-    backgroundColor: theme.colors.surface,
-  },
-  hoverActionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   tagsRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -447,7 +428,6 @@ const CompactSessionRow = React.memo(
     const sessionName = getSessionName(session);
     const navigateToSession = useNavigateToSession();
     const isTablet = useIsTablet();
-    const [hovered, setHovered] = React.useState(false);
     const swipeableRef = React.useRef<Swipeable | null>(null);
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
@@ -503,10 +483,7 @@ const CompactSessionRow = React.memo(
     }, [performDelete]);
 
     const itemContent = (
-      <View
-        onPointerEnter={() => setHovered(true)}
-        onPointerLeave={() => setHovered(false)}
-      >
+      <View>
         <Pressable
           style={[
             styles.sessionRow,
@@ -626,31 +603,6 @@ const CompactSessionRow = React.memo(
             )}
           </View>
         </Pressable>
-        {hovered && (
-          <View
-            style={[
-              styles.hoverActions,
-              selected && {
-                backgroundColor: styles.sessionRowSelected.backgroundColor,
-              },
-            ]}
-          >
-            <Pressable style={styles.hoverActionButton} onPress={handleArchive}>
-              <Ionicons
-                name="archive-outline"
-                size={18}
-                color={styles.swipeActionArchive.backgroundColor as string}
-              />
-            </Pressable>
-            <Pressable style={styles.hoverActionButton} onPress={handleDelete}>
-              <Ionicons
-                name="trash-outline"
-                size={18}
-                color={styles.swipeAction.backgroundColor as string}
-              />
-            </Pressable>
-          </View>
-        )}
       </View>
     );
 
