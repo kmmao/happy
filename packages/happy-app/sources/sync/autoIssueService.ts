@@ -417,13 +417,19 @@ class AutoIssueService {
         continue;
       }
 
-      const labelLower = mapping.autoIssueLabel.toLowerCase();
+      // Support comma-separated labels (e.g. "auto-fix,auto-issue")
+      const triggerLabels = mapping.autoIssueLabel
+        .split(",")
+        .map((l) => l.trim().toLowerCase())
+        .filter(Boolean);
       const allowedSet = new Set(
-        mapping.autoIssueAllowedAuthors.map((a) => a.toLowerCase()),
+        mapping.autoIssueAllowedAuthors
+          .flatMap((a) => a.split(",").map((s) => s.trim().toLowerCase()))
+          .filter(Boolean),
       );
 
       log.log(
-        `🔄 AutoIssueService match: ${projectKey} — scanning ${issues.length} issues (label="${labelLower}", authors=${[...allowedSet].join(",")})`,
+        `🔄 AutoIssueService match: ${projectKey} — scanning ${issues.length} issues (labels=[${triggerLabels.join(",")}], authors=${[...allowedSet].join(",")})`,
       );
 
       for (const issue of issues) {
@@ -436,12 +442,12 @@ class AutoIssueService {
           continue;
         }
 
-        const hasLabel = issue.labels.some(
-          (l) => l.name.toLowerCase() === labelLower,
+        const hasLabel = issue.labels.some((l) =>
+          triggerLabels.includes(l.name.toLowerCase()),
         );
         if (!hasLabel) {
           log.log(
-            `🔄 AutoIssueService skip: ${issueTag} — no "${labelLower}" label (has: ${issue.labels.map((l) => l.name).join(", ") || "none"})`,
+            `🔄 AutoIssueService skip: ${issueTag} — no matching label (need: [${triggerLabels.join(",")}], has: ${issue.labels.map((l) => l.name).join(", ") || "none"})`,
           );
           continue;
         }
