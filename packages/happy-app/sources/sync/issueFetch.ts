@@ -785,6 +785,76 @@ export async function updateIssueStateViaMachine(
 }
 
 /**
+ * Fetch comments for an issue via machineBash (no active session required).
+ * Used for enriching the issue prompt when launching an issue session.
+ * Returns empty array on any failure — non-critical, must not block launch.
+ */
+export interface IssueComment {
+  readonly author: string;
+  readonly body: string;
+  readonly createdAt: number;
+}
+
+export async function fetchIssueCommentsViaMachine(
+  machineId: string,
+  repoInfo: RepoInfo,
+  issueNumber: number,
+  cwd: string,
+  maxComments: number = 20,
+): Promise<readonly IssueComment[]> {
+  if (repoInfo.provider === "github") {
+    const command = `gh api "repos/${repoInfo.owner}/${repoInfo.repo}/issues/${issueNumber}/comments?per_page=${maxComments}" 2>&1`;
+    const result = await machineBash(machineId, command, cwd);
+    if (!result.success || result.exitCode !== 0) return [];
+    try {
+      const raw: readonly any[] = JSON.parse(result.stdout.trim());
+      return raw.map(parseGitHubComment);
+    } catch {
+      return [];
+    }
+  }
+
+  if (repoInfo.provider === "gitea") {
+    if (!repoInfo.apiBase) return [];
+    const url = `${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/issues/${issueNumber}/comments?limit=${maxComments}`;
+    const authHeader = repoInfo.apiToken
+      ? `-H "Authorization: token ${repoInfo.apiToken}"`
+      : "";
+    const command = `curl -s ${authHeader} -w "\\n%{http_code}" "${url}" 2>&1`;
+    const result = await machineBash(machineId, command, cwd);
+    if (!result.success || result.exitCode !== 0) return [];
+    const lines = result.stdout.trim().split("\n");
+    const httpStatus = lines.pop()?.trim() ?? "";
+    const body = lines.join("\n").trim();
+    if (!httpStatus.startsWith("2")) return [];
+    try {
+      const raw: readonly any[] = JSON.parse(body);
+      return raw.map(parseGiteaComment);
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function parseGitHubComment(raw: any): IssueComment {
+  return {
+    author: raw.user?.login ?? "",
+    body: raw.body ?? "",
+    createdAt: raw.created_at ? new Date(raw.created_at).getTime() : 0,
+  };
+}
+
+function parseGiteaComment(raw: any): IssueComment {
+  return {
+    author: raw.user?.login ?? "",
+    body: raw.body ?? "",
+    createdAt: raw.created_at ? new Date(raw.created_at).getTime() : 0,
+  };
+}
+
+/**
  * Add a comment to an issue via machineBash (no active session required).
  * Used for adding completion comments after worktree merge.
  */

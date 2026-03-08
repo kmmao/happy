@@ -29,7 +29,13 @@ import { getCurrentLanguage } from "@/text";
 import { kanbanStore } from "./kanbanStore";
 import { isKanbanKey } from "./kanbanTypes";
 import { issueSessionStore } from "./issueSessionStore";
+import type { IssueSessionLink } from "./issueSessionTypes";
 import { isIssueSessionKey } from "./issueSessionTypes";
+import { issueStore } from "./issueStore";
+import {
+  addIssueCommentViaMachine,
+  updateIssueStateViaMachine,
+} from "./issueFetch";
 import { promptTemplateStore } from "./promptTemplateStore";
 import { isTemplateKey } from "./promptTemplateTypes";
 import { ideationStore } from "./ideationStore";
@@ -2316,7 +2322,8 @@ class Sync {
             ]);
 
             // Auto-detect issue session completion: when a turn ends,
-            // mark the associated issue-session link as "completed".
+            // mark the associated issue-session link as "completed"
+            // and auto-close the issue with a comment.
             if (isTaskComplete) {
               const link = issueSessionStore
                 .getState()
@@ -2328,6 +2335,8 @@ class Sync {
                   .catch(() => {
                     // Best-effort — don't block message processing
                   });
+                // Auto-close issue + add comment (fire-and-forget)
+                void this.handleIssueSessionCompletion(link);
               }
             }
           } else {
@@ -3068,6 +3077,49 @@ class Sync {
       if (hasActiveSession) continue;
 
       kanbanStore.getState().moveTask(task.id, "done");
+    }
+  };
+
+  /**
+   * After an issue session completes (turn-end), auto-close the linked issue
+   * and add a completion comment. Best-effort — failures are silently ignored.
+   */
+  private handleIssueSessionCompletion = async (link: IssueSessionLink) => {
+    try {
+      const repoInfo = issueStore.getState().repoInfoByProject[link.projectKey];
+      if (!repoInfo || repoInfo.provider === "unknown") return;
+
+      const comment =
+        "This issue has been processed by an automated Claude Code session.\n" +
+        "Please check the latest pull request for changes.";
+
+      // Add completion comment to the issue
+      await addIssueCommentViaMachine(
+        link.machineId,
+        repoInfo,
+        link.issueNumber,
+        comment,
+        link.repoPath,
+      );
+
+      // Close the issue
+      await updateIssueStateViaMachine(
+        link.machineId,
+        repoInfo,
+        link.issueNumber,
+        "closed",
+        link.repoPath,
+      );
+
+      // Update link with completion comment
+      await issueSessionStore
+        .getState()
+        .updateStatus(link.issueKey, "completed", {
+          completionComment: comment,
+        });
+    } catch {
+      // Non-critical — issue close is best-effort.
+      // The issue-session link is already marked "completed".
     }
   };
 

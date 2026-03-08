@@ -16,6 +16,11 @@ import { storage } from "@/sync/storage";
 import { sync } from "@/sync/sync";
 import { issueSessionStore } from "@/sync/issueSessionStore";
 import { buildIssueKey } from "@/sync/issueSessionTypes";
+import { issueStore } from "@/sync/issueStore";
+import {
+  fetchIssueCommentsViaMachine,
+  type IssueComment,
+} from "@/sync/issueFetch";
 import { log } from "@/log";
 import type { AggregatedIssue } from "@/sync/issueTypes";
 
@@ -33,20 +38,147 @@ export interface LaunchIssueSessionResult {
 
 /**
  * Build the initial prompt sent to Claude for processing the issue.
+ * Includes rich metadata, comments, and clear task instructions.
  */
-function buildIssuePrompt(issue: AggregatedIssue): string {
+const MAX_COMMENT_BODY_LENGTH = 2000;
+const MAX_TOTAL_COMMENTS_LENGTH = 15000;
+
+function formatDate(timestamp: number): string {
+  if (timestamp === 0) return "unknown";
+  return new Date(timestamp).toISOString().split("T")[0];
+}
+
+function truncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + "…";
+}
+
+/**
+ * Extract image URLs from text containing HTML <img> tags or markdown ![](url) syntax.
+ */
+function extractImageUrls(text: string): readonly string[] {
+  const urls: string[] = [];
+  // HTML: <img ... src="url" ... />
+  const htmlImgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*\/?>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = htmlImgRegex.exec(text)) !== null) {
+    if (match[1]) urls.push(match[1]);
+  }
+  // Markdown: ![alt](url)
+  const mdImgRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+  while ((match = mdImgRegex.exec(text)) !== null) {
+    if (match[1]) urls.push(match[1]);
+  }
+  // Dedupe while preserving order
+  return [...new Set(urls)];
+}
+
+function buildCommentsSection(comments: readonly IssueComment[]): string {
+  if (comments.length === 0) return "";
+
+  const nonEmpty = comments.filter((c) => c.body.trim() !== "");
+  if (nonEmpty.length === 0) return "";
+
+  // Truncate individual comments and enforce total length budget.
+  // Keep the newest comments (end of array) when budget is exceeded.
+  const formatted: readonly string[] = nonEmpty.map(
+    (c) =>
+      `**@${c.author}** (${formatDate(c.createdAt)}):\n> ${truncate(c.body.trim(), MAX_COMMENT_BODY_LENGTH)}`,
+  );
+
+  let totalLength = 0;
+  let startIndex = 0;
+  for (let i = formatted.length - 1; i >= 0; i--) {
+    totalLength += formatted[i].length;
+    if (totalLength > MAX_TOTAL_COMMENTS_LENGTH) {
+      startIndex = i + 1;
+      break;
+    }
+  }
+
+  const kept = formatted.slice(startIndex);
+  const skipped = formatted.length - kept.length;
+  const header =
+    skipped > 0
+      ? `## Comments (showing ${kept.length} of ${nonEmpty.length}, ${skipped} older comments omitted)`
+      : `## Comments (${kept.length})`;
+
+  return [header, "", ...kept].join("\n\n");
+}
+
+interface WorktreeInfo {
+  readonly branchName: string;
+  readonly parentBranch: string;
+}
+
+function buildIssuePrompt(
+  issue: AggregatedIssue,
+  comments: readonly IssueComment[],
+  worktree: WorktreeInfo,
+): string {
   const bodySection =
     issue.body.trim() !== "" ? issue.body : "(No description provided)";
 
-  return [
-    `You are working on Issue #${issue.number}: ${issue.title}`,
-    `Repository: ${issue.repoLabel}`,
+  const labels =
+    issue.labels.length > 0
+      ? issue.labels.map((l) => l.name).join(", ")
+      : "none";
+
+  const sections: string[] = [
+    `# Issue #${issue.number}: ${issue.title}`,
     "",
-    "Issue content:",
+    "## Metadata",
+    `- Repository: ${issue.repoLabel}`,
+    `- Author: @${issue.author}`,
+    `- Labels: ${labels}`,
+    `- Created: ${formatDate(issue.createdAt)}`,
+    ...(issue.url ? [`- URL: ${issue.url}`] : []),
+    "",
+    "## Description",
     bodySection,
+  ];
+
+  const commentsSection = buildCommentsSection(comments);
+  if (commentsSection) {
+    sections.push("", commentsSection);
+  }
+
+  // Extract image URLs from description and comments for explicit listing
+  const allText = [bodySection, ...comments.map((c) => c.body)].join("\n");
+  const imageUrls = extractImageUrls(allText);
+  if (imageUrls.length > 0) {
+    sections.push(
+      "",
+      "## Referenced Images",
+      "The following images are referenced in this issue. Use WebFetch to view each one for visual context:",
+      ...imageUrls.map((url, i) => `${i + 1}. ${url}`),
+    );
+  }
+
+  sections.push(
     "",
-    "Please analyze this issue and implement the required changes. Commit your changes when done.",
-  ].join("\n");
+    "## Worktree",
+    `- Branch: ${worktree.branchName}`,
+    `- Parent branch: ${worktree.parentBranch}`,
+  );
+
+  sections.push(
+    "",
+    "## Your Task",
+    "You are an autonomous coding agent working on this issue in an isolated git worktree branch.",
+    "",
+    "1. Read CLAUDE.md and any project configuration files to understand repo conventions",
+    "2. Analyze this issue thoroughly — understand the root cause and full scope",
+    "3. If the issue or comments contain image URLs (e.g. screenshots, mockups), use WebFetch to view them for visual context",
+    "4. Implement the required changes following the project's coding standards",
+    "5. Run existing tests to make sure nothing is broken",
+    `6. Create a well-formatted commit referencing this issue (e.g. "fix: description - closes #${issue.number}")`,
+    `7. Push your branch to the remote: git push -u origin ${worktree.branchName}`,
+    `8. Create a pull request: gh pr create --base "${worktree.parentBranch}" --head "${worktree.branchName}" --fill`,
+    "9. After completing, provide a concise summary of what you changed and why",
+  );
+
+  return sections.join("\n");
 }
 
 export async function launchIssueSession(
@@ -145,8 +277,29 @@ export async function launchIssueSession(
     .updateSessionPermissionMode(newSessionId, "bypassPermissions");
   storage.getState().updateSessionModelMode(newSessionId, "opus");
 
-  // 8. Send initial prompt with issue content
-  const prompt = buildIssuePrompt(issue);
+  // 8. Fetch issue comments (non-critical — proceed without on failure)
+  let comments: readonly IssueComment[] = [];
+  const repoInfo = issueStore.getState().repoInfoByProject[issue.projectKey];
+  if (repoInfo && repoInfo.provider !== "unknown") {
+    try {
+      comments = await fetchIssueCommentsViaMachine(
+        machineId,
+        repoInfo,
+        issue.number,
+        repoPath,
+      );
+    } catch {
+      log.log(
+        `⚠️ launchIssueSession: failed to fetch comments for #${issue.number}`,
+      );
+    }
+  }
+
+  // 9. Send initial prompt with issue content + comments + task instructions
+  const prompt = buildIssuePrompt(issue, comments, {
+    branchName: worktreeResult.branchName,
+    parentBranch: worktreeResult.parentBranch,
+  });
   await sync.sendMessage(newSessionId, prompt);
 
   return { success: true, newSessionId };
