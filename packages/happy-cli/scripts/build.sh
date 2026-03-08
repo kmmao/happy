@@ -19,7 +19,13 @@ cd "$PROJECT_DIR"
 echo "[build] Type checking..."
 npx tsc --noEmit
 
-# 2. Build into a temp directory (dist_next)
+# 2. Inject build timestamp
+BUILD_DATE=$(date -u +"%Y-%m-%d")
+echo "[build] Injecting build timestamp: ${BUILD_DATE}"
+echo "// This value is replaced by scripts/build.sh during production builds
+export const BUILD_TIMESTAMP = '${BUILD_DATE}'" > src/buildTimestamp.ts
+
+# 3. Build into a temp directory (dist_next)
 echo "[build] Building to dist_next..."
 rm -rf dist_next
 
@@ -41,7 +47,14 @@ else
   if [ -d dist_prev ]; then
     mv dist_prev dist
   fi
+  # Restore dev timestamp
+  echo "// This value is replaced by scripts/build.sh during production builds
+export const BUILD_TIMESTAMP = 'dev'" > src/buildTimestamp.ts
   exit 1
 fi
 
 echo "[build] Done."
+
+# Restore dev timestamp so source stays clean
+echo "// This value is replaced by scripts/build.sh during production builds
+export const BUILD_TIMESTAMP = 'dev'" > src/buildTimestamp.ts

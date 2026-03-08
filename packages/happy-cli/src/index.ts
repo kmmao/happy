@@ -12,6 +12,7 @@ import { logger } from "./ui/logger";
 import { readCredentials, readSettings } from "./persistence";
 import { authAndSetupMachineIfNeeded } from "./ui/auth";
 import packageJson from "../package.json";
+import { BUILD_TIMESTAMP } from "./buildTimestamp";
 import { z } from "zod";
 import { startDaemon } from "./daemon/run";
 import {
@@ -793,7 +794,9 @@ ${chalk.bold.cyan("Claude Code Options (from `claude --help`):")}
 
     // Show version
     if (showVersion) {
-      console.log(`happy version: ${packageJson.version}`);
+      const buildSuffix =
+        BUILD_TIMESTAMP !== "dev" ? ` (built: ${BUILD_TIMESTAMP})` : "";
+      console.log(`happy version: ${packageJson.version}${buildSuffix}`);
       // Don't exit - continue to pass --version to Claude Code
     }
 
