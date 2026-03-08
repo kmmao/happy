@@ -2393,9 +2393,7 @@ class Sync {
             ]);
 
             // Auto-detect issue session completion on turn-end.
-            // Only check PR status — do NOT mark completed just because a turn ended.
-            // The session may still be working (multi-turn). Completion without PR
-            // is handled by markFailedIssueSessionsForEndedSessions when session truly ends.
+            // When a task completes, check PR status and update issue session link accordingly.
             if (isTaskComplete) {
               const link = issueSessionStore
                 .getState()
@@ -2403,9 +2401,9 @@ class Sync {
               console.log(
                 `🔄 [IssueSession] turn-end: sid=${updateData.body.sid}, link=${link ? `${link.issueKey}(${link.status})` : "NONE"}`,
               );
-              if (link && link.status === "processing" && !link.prUrl) {
-                // Only try to detect PR — don't mark completed here
-                void this.detectPRForIssueSession(link);
+              if (link && link.status === "processing") {
+                // Check PR status and mark completed if appropriate
+                void this.handleIssueSessionCompletion(link);
               }
             }
           } else {
@@ -3356,8 +3354,14 @@ class Sync {
       }
 
       if (!prUrl) {
-        // No PR found — don't mark completed here.
-        // Let markFailedIssueSessionsForEndedSessions handle it when session truly ends.
+        // No PR found — mark as completed (Claude may have committed directly
+        // or the task didn't require code changes).
+        await issueSessionStore
+          .getState()
+          .updateStatus(link.issueKey, "completed", {
+            completionComment:
+              "Session completed without creating a pull request.",
+          });
         return;
       }
 
