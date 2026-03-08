@@ -1,3 +1,4 @@
+<!-- Hello from automated issue session -->
 # Changelog
 
 ## Version 4 - 2026-03-05
