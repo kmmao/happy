@@ -1065,7 +1065,10 @@ function normalizeSessionEnvelope(
  * Extract a prompt suggestion from a raw record, if present.
  * Returns the suggestion text or null if the record is not a prompt-suggestion event.
  */
-export function extractPromptSuggestionFromRaw(raw: RawRecord): string | null {
+export function extractPromptSuggestionFromRaw(
+  raw: RawRecord | null | undefined,
+): string | null {
+  if (!raw) return null;
   // Session protocol envelope can arrive via two paths:
   // 1. raw.role === "session" → raw.content.data is the envelope
   // 2. raw.role === "agent" && raw.content.type === "session" → raw.content.data is the envelope
@@ -1093,7 +1096,10 @@ export function extractPromptSuggestionFromRaw(raw: RawRecord): string | null {
  * Returns true when the agent signals that max turns was reached
  * and the user can choose to continue.
  */
-export function extractNeedsContinueFromRaw(raw: RawRecord): boolean {
+export function extractNeedsContinueFromRaw(
+  raw: RawRecord | null | undefined,
+): boolean {
+  if (!raw) return false;
   let envelope: any = null;
   if (raw.role === "session" && raw.content?.data) {
     envelope = raw.content.data;
