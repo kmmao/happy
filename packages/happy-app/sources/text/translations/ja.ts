@@ -1020,7 +1020,7 @@ export const ja: TranslationStructure = {
 
   changelog: {
     // Used by the changelog screen
-    version: ({ version }: { version: number }) => `バージョン ${version}`,
+    version: ({ version }: { version: string }) => `バージョン ${version}`,
     noEntriesAvailable: "変更履歴はありません。",
   },
 

@@ -968,7 +968,7 @@ export const pt: TranslationStructure = {
 
   changelog: {
     // Used by the changelog screen
-    version: ({ version }: { version: number }) => `Versão ${version}`,
+    version: ({ version }: { version: string }) => `Versão ${version}`,
     noEntriesAvailable: "Nenhuma entrada de changelog disponível.",
   },
 

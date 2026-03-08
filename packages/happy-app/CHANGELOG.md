@@ -1,60 +1,99 @@
 # Changelog
 
-## Version 4 - 2026-03-05
+## 2.1.0 - 2026-03-09
 
-修复图片上传偶发失败的问题。
+GitHub/Gitea issue management, tablet sidebar, animated AI avatar, and major session loading performance improvements.
 
-### 修复
-- Fixed 多图上传时部分图片失败：改为串行上传，避免并发大文件传输超时
+### Issues Integration
+- Added GitHub and Gitea issues integration with Git Hosts settings
+- Added multi-repository issue aggregation and detail sheet
+- Added issue session automation with CRUD management and completion lifecycle
+- Added issue tags display in session lists with clickable links and URL preview
+- Fixed issue session completion race condition and PR merge status checking
+- Fixed comma-separated labels and authors in auto-issue config
+- Fixed block archive/delete when issue has open PR
 
-## Version 3 - 2026-03-01
-
-语音交互全面升级，新增 Worktree 支持、工具分组与简洁模式，大幅优化会话管理与 UI 体验。
-
-### 语音助手
-- 全新语音管线：Edge TTS 语音合成、Web VAD 语音活动检测、状态动画
-- 新增 WebSocket 实时语音转文字服务
-- Haiku 模型智能纠错 STT 结果，提升识别准确率
-- 修复移动端 Web 中文转写问题
-- 降低语音交互延迟，支持 TTS 打断
-- 移除 Claude Code 完成后多余的"Done"语音提示
-
-### Worktree
-- 新增 Worktree 检测与会话元数据支持
-- Worktree 会话类型移出实验性功能
-- 新增 9 语言 i18n 翻译
-- 修复合并冲突时自动中止、命令注入漏洞及生命周期管理
-
-### 工具与权限
-- 新增工具分组显示与简洁模式
-- 分组工具内自动批准权限，TodoWrite 排除在外
-- 未知工具不再显示审核按钮
-- 新增 dontAsk 权限模式与 opusplan 模型支持
-
-### 会话管理
-- 会话列表支持滑动归档与删除
-- 会话偏好（权限模式、模型模式）同步至服务端
-- 新增会话 Profile 追踪与持久化
-- 远程模式下注册 getCompactionSummary RPC
-- 新增实时会话排序开关
+### Tablet & Layout
+- Added collapsible sidebar with icon rail for tablet
+- Added foldable inner screen detection as tablet for sidebar layout
+- Fixed split-screen not switching from tablet to phone layout
+- Improved SidebarNavigator and SidebarView components
 
 ### UI/UX
-- 改进代码块交互与工具描述展示
-- Task 工具卡片显示 Agent 类型、实时副标题与 Copilot 图标
-- 新增 Modal.toast 自动消失通知
-- 工具栏窄屏自动换行
-- 用量面板宽度约束
+- Replaced AI avatar with animated status dot and improved AskUserQuestion UI
+- Added Claude Code-style turn metrics with animated tokens display
+- Added FAB action buttons with disabled state and pulse animation
+- Added expand tools setting for detailed tool view
+- Enhanced plan mode feedback with multiline input and image support
+- Enhanced kanban UI with pill selectors and board polish
+- Added project tab feature toggle in settings
+
+### Performance
+- Optimized session message loading with local cache and progressive rendering
+
+### Auth & Settings
+- Added secret key login option and navigate to login after logout
+- Removed Happy logo from settings page
 
 ### CLI
-- 修复 Shell 命令结果无法在 App 中显示
-- App 语言偏好传递给 Claude 系统提示
-- 升级 SDK 至 0.2.62
-- CLI 版本升级至 0.29.27
+- Upgraded CLI to v0.29.36
+- Fixed plan mode permission handling (require manual approval for ExitPlanMode)
+- Fixed interrupt fallback when no active query
 
-### 安全
-- 修补 22 个 Dependabot 安全漏洞
+## 2.0.3 - 2026-03-05
 
-## Version 2 - 2026-02-27
+Fixed intermittent image upload failures.
+
+- Fixed multi-image upload failures by serializing uploads to avoid concurrent large file transfer timeouts
+
+## 2.0.2 - 2026-03-01
+
+Major voice interaction upgrade, Worktree support, tool grouping with compact mode, and significant session management and UI improvements.
+
+### Voice Assistant
+- Added full voice pipeline: Edge TTS synthesis, Web VAD activity detection, status animations
+- Added WebSocket real-time speech-to-text service
+- Added Haiku model intelligent STT correction for improved recognition accuracy
+- Fixed mobile Web Chinese transcription issues
+- Reduced voice interaction latency with TTS interruption support
+- Removed unnecessary "Done" voice prompt after Claude Code completion
+
+### Worktree
+- Added Worktree detection and session metadata support
+- Moved Worktree session type out of experimental features
+- Added i18n translations for 9 languages
+- Fixed merge conflict auto-abort, command injection vulnerability, and lifecycle management
+
+### Tools & Permissions
+- Added tool grouping display with compact mode
+- Added auto-approve permissions within tool groups (TodoWrite excluded)
+- Removed review button for unknown tools
+- Added dontAsk permission mode and opusplan model support
+
+### Session Management
+- Added swipe-to-archive and swipe-to-delete in session list
+- Added session preferences (permission mode, model mode) sync to server
+- Added session Profile tracking and persistence
+- Registered getCompactionSummary RPC for remote mode
+- Added real-time session sorting toggle
+
+### UI/UX
+- Improved code block interaction and tool description display
+- Added Agent type, real-time subtitle, and Copilot icon to Task tool cards
+- Added Modal.toast auto-dismiss notifications
+- Added toolbar auto-wrap on narrow screens
+- Added usage panel width constraints
+
+### CLI
+- Fixed Shell command results not displaying in App
+- Added App language preference forwarding to Claude system prompt
+- Upgraded SDK to 0.2.62
+- Upgraded CLI to v0.29.27
+
+### Security
+- Patched 22 Dependabot security vulnerabilities
+
+## 2.0.1 - 2026-02-27
 
 Fixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.
 
@@ -62,18 +101,18 @@ Fixed session resume to reuse the same Happy session instead of creating a new o
 - Fixed session title reverting to project name after resume by preserving the summary field during metadata updates
 - Added session resume V2 support — resume now reconnects to the same session instead of creating a new one
 
-## Version 1 - 2026-02-27
+## 2.0.0 - 2026-02-27
 
-Happy Coder 2.0 — 基于上游 Happy Coder 深度定制的移动端 AI 开发助手，支持远程控制 Claude Code 与 Codex，全链路端到端加密。
+Happy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.
 
-- 支持通过手机远程控制 Claude Code 和 Codex，随时随地发起 AI 编程会话
-- 全链路端到端加密（AES-256-GCM / NaCl secretbox），确保会话内容完全私密
-- QR 码扫描与 URL 手动输入两种方式快速认证设备
-- Daemon 模式常驻运行，手机一键即可启动远程开发会话
-- 智能语音助手，支持 15+ 语言的自然对话交互
-- GitHub 与 Claude 账户连接，统一管理开发者身份
-- 多设备实时同步，在线/离线状态一目了然
-- 深色模式与外观自定义，自动跟随系统主题
-- 聊天中 Markdown 表格渲染，代码高亮显示
-- 精简设置页面，移除上游相关链接，开始维护自有更新日志
-- 支持 iOS、Android 和 Web 三端
+- Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere
+- Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content
+- Added QR code scanning and manual URL entry for quick device authentication
+- Added Daemon mode for persistent background running with one-tap remote session launch
+- Added intelligent voice assistant supporting 15+ languages for natural conversation
+- Added GitHub and Claude account connection for unified developer identity management
+- Added multi-device real-time sync with online/offline status indicators
+- Added dark mode and appearance customization with automatic system theme following
+- Added Markdown table rendering and code syntax highlighting in chat
+- Streamlined settings page, removed upstream links, started maintaining own changelog
+- Supported iOS, Android, and Web platforms

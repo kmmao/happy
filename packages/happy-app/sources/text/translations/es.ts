@@ -969,7 +969,7 @@ export const es: TranslationStructure = {
 
   changelog: {
     // Used by the changelog screen
-    version: ({ version }: { version: number }) => `Versión ${version}`,
+    version: ({ version }: { version: string }) => `Versión ${version}`,
     noEntriesAvailable: "No hay entradas de registro de cambios disponibles.",
   },
 

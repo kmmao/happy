@@ -970,7 +970,7 @@ export const ca: TranslationStructure = {
 
   changelog: {
     // Used by the changelog screen
-    version: ({ version }: { version: number }) => `Versió ${version}`,
+    version: ({ version }: { version: string }) => `Versió ${version}`,
     noEntriesAvailable: "No hi ha entrades de registre de canvis disponibles.",
   },
 

@@ -9,7 +9,7 @@
 
 ## Changelog
 When adding features/fixes, update `/CHANGELOG.md` then run `npx tsx sources/scripts/parseChangelog.ts`.
-Format: `## Version [N] - YYYY-MM-DD` with bullet points starting with verbs (Added, Fixed, Improved). Write user-friendly descriptions with a brief summary paragraph. Auto-parsed during `yarn ota`.
+Format: `## X.Y.Z - YYYY-MM-DD` (semver matching app.config.js version) with bullet points starting with verbs (Added, Fixed, Improved). Write user-friendly descriptions with a brief summary paragraph. Auto-parsed during `yarn ota`.
 
 ## i18n Rules
 - Use `t('section.key')` from `@/text` for ALL user-visible strings (dev pages excepted)
