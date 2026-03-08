@@ -7,13 +7,19 @@ import {
   StyleSheet,
   Platform,
   TextInput,
+  ScrollView,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { sessionAllow, sessionDeny } from "@/sync/ops";
 import { useUnistyles } from "react-native-unistyles";
 import { storage } from "@/sync/storage";
 import { t } from "@/text";
 import { Modal } from "@/modal";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { MAX_IMAGES } from "@/utils/imageUpload";
+import { hapticsLight } from "@/components/haptics";
 
 interface PermissionFooterProps {
   permission: {
@@ -544,6 +550,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
     return (
       <ExitPlanButtons
         permission={permission}
+        sessionId={sessionId}
         isPending={isPending}
         isApproved={isApproved}
         isDenied={isDenied}
@@ -769,6 +776,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
  */
 const ExitPlanButtons: React.FC<{
   permission: PermissionFooterProps["permission"];
+  sessionId: string;
   isPending: boolean;
   isApproved: boolean;
   isDenied: boolean;
@@ -782,6 +790,7 @@ const ExitPlanButtons: React.FC<{
   styles: any;
 }> = ({
   permission,
+  sessionId,
   isPending,
   isApproved,
   isDenied,
@@ -798,14 +807,38 @@ const ExitPlanButtons: React.FC<{
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
 
+  const {
+    pendingImagePaths,
+    pendingImageUris,
+    isPickingImage,
+    isProcessingImage,
+    pendingImagePathsRef,
+    doPickImage,
+    removeImageByPath,
+    clearImages,
+  } = useImageUpload(sessionId);
+
+  const hasImages = pendingImagePaths.length > 0;
+  const atMaxImages = pendingImagePaths.length >= MAX_IMAGES;
+
   const onRejectPress = () => {
     if (!isPending || loadingButton !== null || loadingAllEdits) return;
     setShowFeedbackInput(true);
   };
 
   const onSubmitFeedback = () => {
-    if (!feedbackText.trim()) return;
-    handleSubmitFeedback(feedbackText);
+    const text = feedbackText.trim();
+    if (!text && !hasImages) return;
+
+    // Append image references to feedback text (same format as main chat)
+    const imageRefs = pendingImagePathsRef.current
+      .map((p) => `[image: ${p}]`)
+      .join("\n");
+    const finalMessage = [text, imageRefs].filter(Boolean).join("\n");
+
+    handleSubmitFeedback(finalMessage);
+    clearImages();
+    setFeedbackText("");
   };
 
   return (
@@ -917,53 +950,210 @@ const ExitPlanButtons: React.FC<{
             </Text>
           </View>
         ) : showFeedbackInput && isPending ? (
-          // Inline feedback input
+          // Inline feedback input with image support
           <View style={{ paddingHorizontal: 12, paddingVertical: 4 }}>
+            {/* Image thumbnails */}
+            {hasImages && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingBottom: 8,
+                  gap: 8,
+                }}
+              >
+                {pendingImagePaths.map((path, index) => {
+                  const uri = pendingImageUris[index];
+                  return (
+                    <View
+                      key={path}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.surfacePressed,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: theme.colors.divider,
+                        overflow: "hidden",
+                        height: uri ? 48 : 32,
+                      }}
+                    >
+                      {uri ? (
+                        <Image
+                          source={{ uri }}
+                          style={{ width: 48, height: 48 }}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          <Ionicons
+                            name="image"
+                            size={14}
+                            color={theme.colors.success}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: theme.colors.textSecondary,
+                            }}
+                          >
+                            {t("session.imageLabel", { index: index + 1 })}
+                          </Text>
+                        </View>
+                      )}
+                      <Pressable
+                        onPress={() => removeImageByPath(path)}
+                        hitSlop={6}
+                        style={{
+                          paddingHorizontal: 6,
+                          paddingVertical: 4,
+                        }}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={16}
+                          color={theme.colors.textSecondary}
+                        />
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            {/* Multiline text input */}
             <TextInput
               style={{
                 fontSize: 14,
                 color: theme.colors.text,
                 borderWidth: 1,
                 borderColor: theme.colors.divider,
-                borderRadius: 6,
+                borderRadius: 8,
                 paddingHorizontal: 10,
                 paddingVertical: 8,
-                minHeight: 36,
+                minHeight: 80,
+                maxHeight: 160,
+                textAlignVertical: "top",
               }}
               placeholder={t("plan.rejectPlaceholder")}
               placeholderTextColor={theme.colors.textSecondary}
               value={feedbackText}
               onChangeText={setFeedbackText}
-              onSubmitEditing={onSubmitFeedback}
-              returnKeyType="send"
+              returnKeyType="default"
               autoFocus
-              multiline={false}
+              multiline
             />
-            {loadingButton === "deny" ? (
-              <ActivityIndicator
-                size={Platform.OS === "ios" ? "small" : (14 as any)}
-                color={theme.colors.permissionButton.deny.background}
-                style={{ marginTop: 6 }}
-              />
-            ) : (
-              <TouchableOpacity
-                onPress={onSubmitFeedback}
-                disabled={!feedbackText.trim()}
-                style={{ marginTop: 6 }}
+
+            {/* Action row: image pick + submit */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginTop: 8,
+              }}
+            >
+              {/* Image pick button */}
+              <Pressable
+                onPress={() => {
+                  hapticsLight();
+                  doPickImage();
+                }}
+                disabled={isPickingImage || isProcessingImage || atMaxImages}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                style={(p) => ({
+                  flexDirection: "row",
+                  alignItems: "center",
+                  borderRadius: 16,
+                  paddingHorizontal: 8,
+                  paddingVertical: 6,
+                  height: 32,
+                  opacity:
+                    isPickingImage || isProcessingImage || atMaxImages
+                      ? 0.4
+                      : p.pressed
+                        ? 0.6
+                        : 1,
+                  backgroundColor: hasImages
+                    ? `${theme.colors.success}14`
+                    : "transparent",
+                })}
               >
-                <Text
+                {isPickingImage || isProcessingImage ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.success}
+                  />
+                ) : (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Ionicons
+                      name={hasImages ? "image" : "image-outline"}
+                      size={18}
+                      color={
+                        hasImages
+                          ? theme.colors.success
+                          : theme.colors.textSecondary
+                      }
+                    />
+                    {hasImages && (
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: theme.colors.success,
+                        }}
+                      >
+                        {pendingImagePaths.length}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </Pressable>
+
+              {/* Submit button */}
+              {loadingButton === "deny" ? (
+                <ActivityIndicator
+                  size={Platform.OS === "ios" ? "small" : (14 as any)}
+                  color={theme.colors.permissionButton.deny.background}
+                />
+              ) : (
+                <TouchableOpacity
+                  onPress={onSubmitFeedback}
+                  disabled={!feedbackText.trim() && !hasImages}
                   style={{
-                    fontSize: 14,
-                    fontWeight: "500",
-                    color: feedbackText.trim()
-                      ? theme.colors.permissionButton.deny.background
-                      : theme.colors.textSecondary,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
                   }}
                 >
-                  {t("common.submit")}
-                </Text>
-              </TouchableOpacity>
-            )}
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "500",
+                      color:
+                        feedbackText.trim() || hasImages
+                          ? theme.colors.permissionButton.deny.background
+                          : theme.colors.textSecondary,
+                    }}
+                  >
+                    {t("common.submit")}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         ) : (
           // Reject button

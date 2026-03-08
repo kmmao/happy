@@ -24,6 +24,8 @@ export interface UseImageUploadResult {
   setPendingImagePaths: React.Dispatch<React.SetStateAction<string[]>>;
   /** Remove an image by its remote path, keeping pendingImageUris in sync. */
   removeImageByPath: (path: string) => void;
+  /** Clear all pending images (both paths and URIs) in sync. */
+  clearImages: () => void;
 }
 
 /**
@@ -155,6 +157,11 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
     });
   }, []);
 
+  const clearImages = React.useCallback(() => {
+    setPendingImagePaths([]);
+    setPendingImageUris([]);
+  }, []);
+
   return {
     pendingImagePaths,
     pendingImageUris,
@@ -165,5 +172,6 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
     handleImagePaste: Platform.OS === "web" ? handleImagePaste : undefined,
     setPendingImagePaths,
     removeImageByPath,
+    clearImages,
   };
 }
