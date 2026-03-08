@@ -541,6 +541,10 @@ export const en: TranslationStructure = {
     deleteSessionConfirm: "Delete Session Permanently?",
     deleteSessionWarning:
       "This action cannot be undone. All messages and data associated with this session will be permanently deleted.",
+    deleteSessionWorktreeWarning: ({ branchName }: { branchName: string }) =>
+      `This session has a worktree branch '${branchName}' with unmerged changes. Deleting will also remove the branch and its changes permanently.`,
+    deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
+      `This session has a worktree branch '${branchName}' with an open PR. The branch will be kept for the PR, but the session data will be permanently deleted.`,
     failedToDeleteSession: "Failed to delete session",
     sessionDeleted: "Session deleted successfully",
     deleteAllArchivedSessions: "Delete All Archived Sessions",

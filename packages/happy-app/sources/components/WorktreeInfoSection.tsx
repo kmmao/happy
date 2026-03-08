@@ -282,7 +282,7 @@ export const WorktreeInfoSection = React.memo(function WorktreeInfoSection({
             machineId,
             worktree.name,
             worktree.parentRepoPath,
-            true,
+            "safe",
           );
           setCleaning(false);
 

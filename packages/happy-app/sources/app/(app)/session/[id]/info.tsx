@@ -230,19 +230,30 @@ function SessionInfoContent({ session }: { session: Session }) {
   });
 
   const handleDeleteSession = useCallback(() => {
-    Modal.alert(
-      t("sessionInfo.deleteSession"),
-      t("sessionInfo.deleteSessionWarning"),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("sessionInfo.deleteSession"),
-          style: "destructive",
-          onPress: performDelete,
-        },
-      ],
-    );
-  }, [performDelete]);
+    const wt = session.metadata?.worktree;
+    let warningMessage = t("sessionInfo.deleteSessionWarning");
+
+    if (wt?.isWorktree && wt.branchName) {
+      if (wt.prUrl) {
+        warningMessage = t("sessionInfo.deleteSessionWorktreePrWarning", {
+          branchName: wt.branchName,
+        });
+      } else if (wt.state !== "merged") {
+        warningMessage = t("sessionInfo.deleteSessionWorktreeWarning", {
+          branchName: wt.branchName,
+        });
+      }
+    }
+
+    Modal.alert(t("sessionInfo.deleteSession"), warningMessage, [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("sessionInfo.deleteSession"),
+        style: "destructive",
+        onPress: performDelete,
+      },
+    ]);
+  }, [performDelete, session.metadata?.worktree]);
 
   // Use HappyAction for resume - reconnects to the same Happy session with --resume
   const [resumingSession, performResume] = useHappyAction(async () => {

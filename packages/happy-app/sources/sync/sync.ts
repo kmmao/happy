@@ -2417,11 +2417,22 @@ class Sync {
       if (wt?.isWorktree && wt.name && sessionToDelete?.metadata?.machineId) {
         const parentPath =
           wt.parentRepoPath ?? sessionToDelete.metadata.path ?? "";
+
+        // Determine branch cleanup strategy:
+        // - PR exists → skip (remote branch needed for PR)
+        // - Already merged → safe delete (-d, will succeed)
+        // - Otherwise → force delete (-D, avoid orphaned branches)
+        const branchCleanup: "skip" | "safe" | "force" = wt.prUrl
+          ? "skip"
+          : wt.state === "merged"
+            ? "safe"
+            : "force";
+
         void removeWorktree(
           sessionToDelete.metadata.machineId,
           wt.name,
           parentPath,
-          true,
+          branchCleanup,
         ).catch((err) => {
           log.log(`⚠️ Worktree cleanup failed for ${wt.name}: ${err}`);
         });

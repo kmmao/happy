@@ -318,12 +318,17 @@ export async function deleteBranch(
 
 /**
  * Remove a worktree and optionally delete its branch.
+ *
+ * branchCleanup modes:
+ * - "skip": don't touch the branch (e.g. PR depends on it)
+ * - "safe": use `git branch -d` (only deletes if fully merged)
+ * - "force": use `git branch -D` (deletes even if not merged)
  */
 export async function removeWorktree(
   machineId: string,
   worktreeName: string,
   repoPath: string,
-  deleteBranch: boolean,
+  branchCleanup: "skip" | "safe" | "force" = "safe",
 ): Promise<WorktreeOpResult> {
   // Prune stale worktrees first
   await machineBash(machineId, "git worktree prune", repoPath);
@@ -350,10 +355,11 @@ export async function removeWorktree(
   }
 
   // Optionally delete the branch
-  if (deleteBranch) {
+  if (branchCleanup !== "skip") {
+    const flag = branchCleanup === "force" ? "-D" : "-d";
     const branchResult = await machineBash(
       machineId,
-      `git branch -d "${worktreeName}" 2>&1`,
+      `git branch ${flag} "${worktreeName}" 2>&1`,
       repoPath,
     );
 

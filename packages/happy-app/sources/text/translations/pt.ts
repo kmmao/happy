@@ -540,6 +540,10 @@ export const pt: TranslationStructure = {
     deleteSessionConfirm: "Excluir sessão permanentemente?",
     deleteSessionWarning:
       "Esta ação não pode ser desfeita. Todas as mensagens e dados associados a esta sessão serão excluídos permanentemente.",
+    deleteSessionWorktreeWarning: ({ branchName }: { branchName: string }) =>
+      `Esta sessão possui um worktree branch '${branchName}' com alterações não mescladas. A exclusão também removerá o branch e suas alterações permanentemente.`,
+    deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
+      `Esta sessão possui um worktree branch '${branchName}' com um PR aberto. O branch será mantido para o PR, mas os dados da sessão serão excluídos permanentemente.`,
     failedToDeleteSession: "Falha ao excluir sessão",
     sessionDeleted: "Sessão excluída com sucesso",
     deleteAllArchivedSessions: "Excluir todas as sessões arquivadas",

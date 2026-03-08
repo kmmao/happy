@@ -509,6 +509,10 @@ export const zhHans: TranslationStructure = {
     deleteSessionConfirm: "永久删除会话？",
     deleteSessionWarning:
       "此操作无法撤销。与此会话相关的所有消息和数据将被永久删除。",
+    deleteSessionWorktreeWarning: ({ branchName }: { branchName: string }) =>
+      `此会话包含 worktree branch '${branchName}'，其中有未合并的更改。删除后将同时移除该 branch 及其所有更改，且无法恢复。`,
+    deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
+      `此会话包含 worktree branch '${branchName}'，且存在未关闭的 PR。该 branch 将为 PR 保留，但会话数据将被永久删除。`,
     failedToDeleteSession: "删除会话失败",
     sessionDeleted: "会话删除成功",
     deleteAllArchivedSessions: "删除所有已归档会话",

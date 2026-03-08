@@ -1023,12 +1023,20 @@ export function NewSessionWizard({
   const recentPaths = useMemo(() => {
     if (!selectedMachineId) return [];
 
+    // Filter out worktree/branch paths (e.g. .dev/worktree/*, .claude/worktrees/*)
+    const isWorktreePath = (p: string) =>
+      p.includes("/.dev/worktree/") || p.includes("/.claude/worktrees/");
+
     const paths: string[] = [];
     const pathSet = new Set<string>();
 
     // First, add paths from recentMachinePaths (these are the most recent)
     recentMachinePaths.forEach((entry) => {
-      if (entry.machineId === selectedMachineId && !pathSet.has(entry.path)) {
+      if (
+        entry.machineId === selectedMachineId &&
+        !pathSet.has(entry.path) &&
+        !isWorktreePath(entry.path)
+      ) {
         paths.push(entry.path);
         pathSet.add(entry.path);
       }
@@ -1048,7 +1056,7 @@ export function NewSessionWizard({
           session.metadata?.path
         ) {
           const path = session.metadata.path;
-          if (!pathSet.has(path)) {
+          if (!pathSet.has(path) && !isWorktreePath(path)) {
             pathSet.add(path);
             pathsWithTimestamps.push({
               path,

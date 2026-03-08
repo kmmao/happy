@@ -594,6 +594,10 @@ export const ja: TranslationStructure = {
     deleteSessionConfirm: "セッションを完全に削除しますか？",
     deleteSessionWarning:
       "この操作は取り消せません。このセッションに関連するすべてのメッセージとデータが完全に削除されます。",
+    deleteSessionWorktreeWarning: ({ branchName }: { branchName: string }) =>
+      `このセッションにはマージされていない変更を含む worktree branch '${branchName}' があります。削除すると、branch とその変更もすべて完全に削除されます。`,
+    deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
+      `このセッションにはオープン中の PR がある worktree branch '${branchName}' があります。branch は PR のために保持されますが、セッションデータは完全に削除されます。`,
     failedToDeleteSession: "セッションの削除に失敗しました",
     sessionDeleted: "セッションが正常に削除されました",
     deleteAllArchivedSessions: "アーカイブ済みセッションをすべて削除",

@@ -509,6 +509,10 @@ export const zhHant: TranslationStructure = {
     deleteSessionConfirm: "永久刪除工作階段？",
     deleteSessionWarning:
       "此操作無法復原。與此工作階段相關的所有訊息和資料將被永久刪除。",
+    deleteSessionWorktreeWarning: ({ branchName }: { branchName: string }) =>
+      `此工作階段包含 worktree branch '${branchName}'，其中有未合併的變更。刪除後將同時移除該 branch 及其所有變更，且無法復原。`,
+    deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
+      `此工作階段包含 worktree branch '${branchName}'，且存在未關閉的 PR。該 branch 將為 PR 保留，但工作階段資料將被永久刪除。`,
     failedToDeleteSession: "刪除工作階段失敗",
     sessionDeleted: "工作階段刪除成功",
     deleteAllArchivedSessions: "刪除所有已封存工作階段",

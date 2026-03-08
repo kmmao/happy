@@ -492,6 +492,10 @@ export const ru: TranslationStructure = {
     deleteSessionConfirm: "Удалить сессию навсегда?",
     deleteSessionWarning:
       "Это действие нельзя отменить. Все сообщения и данные, связанные с этой сессией, будут удалены навсегда.",
+    deleteSessionWorktreeWarning: ({ branchName }: { branchName: string }) =>
+      `Эта сессия содержит worktree branch '${branchName}' с незамерженными изменениями. При удалении branch и все его изменения также будут удалены безвозвратно.`,
+    deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
+      `Эта сессия содержит worktree branch '${branchName}' с открытым PR. Branch будет сохранён для PR, но данные сессии будут удалены навсегда.`,
     failedToDeleteSession: "Не удалось удалить сессию",
     sessionDeleted: "Сессия успешно удалена",
     deleteAllArchivedSessions: "Удалить все архивные сессии",

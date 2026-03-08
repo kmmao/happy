@@ -542,6 +542,10 @@ export const ca: TranslationStructure = {
     deleteSessionConfirm: "Eliminar la sessió permanentment?",
     deleteSessionWarning:
       "Aquesta acció no es pot desfer. Tots els missatges i dades associats amb aquesta sessió s'eliminaran permanentment.",
+    deleteSessionWorktreeWarning: ({ branchName }: { branchName: string }) =>
+      `Aquesta sessió té un worktree branch '${branchName}' amb canvis no fusionats. En eliminar-la, també s'eliminaran el branch i els seus canvis de manera permanent.`,
+    deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
+      `Aquesta sessió té un worktree branch '${branchName}' amb un PR obert. El branch es conservarà per al PR, però les dades de la sessió s'eliminaran permanentment.`,
     failedToDeleteSession: "Error en eliminar la sessió",
     sessionDeleted: "Sessió eliminada amb èxit",
     deleteAllArchivedSessions: "Elimina totes les sessions arxivades",

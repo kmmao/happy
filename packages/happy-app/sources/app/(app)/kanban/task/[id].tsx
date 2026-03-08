@@ -105,16 +105,28 @@ const KanbanTaskDetail = React.memo(() => {
   const pathSuggestions = React.useMemo(() => {
     if (!machineId) return [];
 
+    // Filter out worktree/branch paths (e.g. .dev/worktree/*, .claude/worktrees/*)
+    const isWorktreePath = (p: string) =>
+      p.includes("/.dev/worktree/") || p.includes("/.claude/worktrees/");
+
     const paths = new Set<string>();
 
     for (const entry of recentMachinePaths ?? []) {
-      if (entry.machineId === machineId && entry.path) {
+      if (
+        entry.machineId === machineId &&
+        entry.path &&
+        !isWorktreePath(entry.path)
+      ) {
         paths.add(entry.path);
       }
     }
 
     for (const s of allSessions) {
-      if (s.metadata?.machineId === machineId && s.metadata?.path) {
+      if (
+        s.metadata?.machineId === machineId &&
+        s.metadata?.path &&
+        !isWorktreePath(s.metadata.path)
+      ) {
         paths.add(s.metadata.path);
       }
     }

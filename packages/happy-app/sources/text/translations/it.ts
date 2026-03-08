@@ -604,6 +604,10 @@ export const it: TranslationStructure = {
     deleteSessionConfirm: "Eliminare definitivamente la sessione?",
     deleteSessionWarning:
       "Questa azione non può essere annullata. Tutti i messaggi e i dati associati a questa sessione verranno eliminati definitivamente.",
+    deleteSessionWorktreeWarning: ({ branchName }: { branchName: string }) =>
+      `Questa sessione ha un worktree branch '${branchName}' con modifiche non unite. L'eliminazione rimuoverà anche il branch e le sue modifiche in modo permanente.`,
+    deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
+      `Questa sessione ha un worktree branch '${branchName}' con un PR aperto. Il branch verrà mantenuto per il PR, ma i dati della sessione verranno eliminati definitivamente.`,
     failedToDeleteSession: "Impossibile eliminare la sessione",
     sessionDeleted: "Sessione eliminata con successo",
     deleteAllArchivedSessions: "Elimina tutte le sessioni archiviate",

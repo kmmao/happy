@@ -551,6 +551,10 @@ export const pl: TranslationStructure = {
     deleteSessionConfirm: "Usunąć sesję na stałe?",
     deleteSessionWarning:
       "Ta operacja jest nieodwracalna. Wszystkie wiadomości i dane powiązane z tą sesją zostaną trwale usunięte.",
+    deleteSessionWorktreeWarning: ({ branchName }: { branchName: string }) =>
+      `Ta sesja zawiera worktree branch '${branchName}' z niezłączonymi zmianami. Usunięcie spowoduje również trwałe usunięcie brancha i wszystkich jego zmian.`,
+    deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
+      `Ta sesja zawiera worktree branch '${branchName}' z otwartym PR. Branch zostanie zachowany dla PR, ale dane sesji zostaną trwale usunięte.`,
     failedToDeleteSession: "Nie udało się usunąć sesji",
     sessionDeleted: "Sesja została pomyślnie usunięta",
     deleteAllArchivedSessions: "Usuń wszystkie zarchiwizowane sesje",
