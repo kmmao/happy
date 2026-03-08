@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Happy Coder CLI - Remote Claude Code Controller
 
 /**
  * CLI entry point for happy command
