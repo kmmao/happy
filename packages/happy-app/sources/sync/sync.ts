@@ -290,6 +290,8 @@ class Sync {
         void issueSessionStore.getState().loadLinks();
         // Start auto-issue background service after sessions are loaded
         autoIssueService.start();
+        // Start PR status polling for processing issue sessions with open PRs
+        this.startPRStatusPolling();
       })
       .catch((error) => {
         console.error("Failed to load initial data:", error);
@@ -3083,41 +3085,48 @@ class Sync {
     try {
       const repoInfo = issueStore.getState().repoInfoByProject[link.projectKey];
 
-      // Try to detect PR URL from worktree branch
+      // Detect PR and its real status from the remote
       let prUrl: string | undefined;
+      let prMerged = false;
       const session = storage.getState().sessions[link.sessionId];
       const branchName = session?.metadata?.worktree?.branchName;
 
       if (repoInfo && repoInfo.provider !== "unknown" && branchName) {
         if (repoInfo.provider === "github") {
           try {
+            // Query ALL PRs for this branch (including merged/closed)
             const prResult = await machineBash(
               link.machineId,
-              `gh pr list --head "${branchName}" --json url --jq '.[0].url' 2>&1`,
+              `gh pr list --head "${branchName}" --state all --json url,state --jq '.[0] | "\\(.url) \\(.state)"' 2>&1`,
               link.repoPath,
             );
             if (prResult.success && prResult.exitCode === 0) {
-              const url = prResult.stdout.trim();
-              if (url.startsWith("http")) {
+              const output = prResult.stdout.trim();
+              const [url, state] = output.split(" ");
+              if (url?.startsWith("http")) {
                 prUrl = url;
+                prMerged = state === "MERGED";
               }
             }
           } catch {
-            // Non-critical — proceed without PR URL
+            // Non-critical — proceed without PR info
           }
         } else if (repoInfo.provider === "gitea") {
           try {
+            // Query all states for Gitea
             const prResult = await machineBash(
               link.machineId,
-              `curl -s "${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=open&head=${repoInfo.owner}:${branchName}" 2>&1`,
+              `curl -s "${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=all&head=${repoInfo.owner}:${branchName}" 2>&1`,
               link.repoPath,
             );
             if (prResult.success && prResult.exitCode === 0) {
-              const prs: readonly { readonly html_url?: string }[] = JSON.parse(
-                prResult.stdout.trim(),
-              );
+              const prs: readonly {
+                readonly html_url?: string;
+                readonly merged?: boolean;
+              }[] = JSON.parse(prResult.stdout.trim());
               if (prs.length > 0 && prs[0].html_url) {
                 prUrl = prs[0].html_url;
+                prMerged = prs[0].merged === true;
               }
             }
           } catch {
@@ -3126,7 +3135,19 @@ class Sync {
         }
       }
 
-      // Mark link as completed FIRST (single updateStatus call — no race condition)
+      // Decide status based on PR state:
+      // - PR merged → completed (close issue)
+      // - PR exists but not merged → stay processing (PR still needs review)
+      // - No PR found → completed (Claude may have committed directly)
+      if (prUrl && !prMerged) {
+        // PR exists but not yet merged — just record URL, stay processing
+        await issueSessionStore
+          .getState()
+          .updateStatus(link.issueKey, "processing", { prUrl });
+        return;
+      }
+
+      // Either PR merged or no PR — mark completed
       const comment =
         "This issue has been processed by an automated Claude Code session.\n" +
         (prUrl
@@ -3162,7 +3183,7 @@ class Sync {
         }
       }
     } catch {
-      // If even updateStatus failed, try a minimal fallback
+      // If updateStatus failed, try a minimal fallback
       try {
         await issueSessionStore
           .getState()
@@ -3176,6 +3197,7 @@ class Sync {
   /**
    * Mark issue-session links as "failed" when their session ends
    * without the worktree being merged (i.e., status is still "processing").
+   * If a PR exists (prUrl recorded), check its merge status first.
    */
   private markFailedIssueSessionsForEndedSessions = async (
     endedSessionIds: string[],
@@ -3185,10 +3207,65 @@ class Sync {
 
     for (const link of processingLinks) {
       if (!endedSet.has(link.sessionId)) continue;
-      // Session ended while still "processing" — mark as failed
-      await issueSessionStore.getState().updateStatus(link.issueKey, "failed", {
-        errorMessage: "Session ended before worktree was merged",
-      });
+
+      // If a PR URL was recorded, the session created a PR that may still need review.
+      // Don't mark as failed — let it stay processing until PR is merged/closed.
+      if (link.prUrl) continue;
+
+      // No PR was ever detected — try one final check before marking failed
+      await this.handleIssueSessionCompletion(link);
+
+      // If handleIssueSessionCompletion kept it as processing (found open PR),
+      // or marked completed (found merged PR), don't override.
+      const updatedLink = issueSessionStore.getState().links[link.issueKey];
+      if (
+        updatedLink &&
+        updatedLink.status === "processing" &&
+        !updatedLink.prUrl
+      ) {
+        // Still processing with no PR — mark as failed
+        await issueSessionStore
+          .getState()
+          .updateStatus(link.issueKey, "failed", {
+            errorMessage: "Session ended before worktree was merged",
+          });
+      }
+    }
+  };
+
+  /**
+   * Periodically check processing issue-session links that have an open PR.
+   * When the PR gets merged, mark the link as completed and close the issue.
+   */
+  private prStatusCheckTimer: ReturnType<typeof setInterval> | null = null;
+
+  startPRStatusPolling(): void {
+    if (this.prStatusCheckTimer) return;
+    this.prStatusCheckTimer = setInterval(
+      () => void this.checkProcessingPRs(),
+      60_000, // Check every 60s (same as autoIssueService)
+    );
+  }
+
+  stopPRStatusPolling(): void {
+    if (this.prStatusCheckTimer) {
+      clearInterval(this.prStatusCheckTimer);
+      this.prStatusCheckTimer = null;
+    }
+  }
+
+  private checkProcessingPRs = async (): Promise<void> => {
+    const processingLinks = issueSessionStore.getState().getProcessingLinks();
+    // Only check links that have a PR URL (PR was created but not yet merged)
+    const linksWithPR = processingLinks.filter((link) => link.prUrl);
+    if (linksWithPR.length === 0) return;
+
+    for (const link of linksWithPR) {
+      try {
+        await this.handleIssueSessionCompletion(link);
+      } catch {
+        // Non-critical
+      }
     }
   };
 }
