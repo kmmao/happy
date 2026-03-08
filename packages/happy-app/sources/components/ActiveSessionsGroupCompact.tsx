@@ -1,5 +1,11 @@
 import React from "react";
-import { View, Pressable, Platform, ActivityIndicator } from "react-native";
+import {
+  View,
+  Pressable,
+  Platform,
+  ActivityIndicator,
+  Linking,
+} from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { Text } from "@/components/StyledText";
 import { router, useRouter } from "expo-router";
@@ -213,19 +219,32 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     ...Typography.default(),
     maxWidth: 80,
   },
-  issueTag: {
+  issueRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-    gap: 3,
-    flexShrink: 1,
+    gap: 4,
+    marginBottom: 3,
   },
-  issueTagText: {
+  issueNumber: {
+    fontSize: 11,
+    ...Typography.default("semiBold"),
+  },
+  issueTitle: {
+    fontSize: 11,
+    ...Typography.default(),
+    flex: 1,
+  },
+  issueStatusDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  issueStatusText: {
     fontSize: 10,
     ...Typography.default("semiBold"),
-    flexShrink: 1,
+  },
+  issuePrIcon: {
+    marginLeft: 2,
   },
 }));
 
@@ -237,6 +256,13 @@ const ISSUE_STATUS_COLORS: Record<
   completed: { bg: "rgba(52, 199, 89, 0.12)", text: "#34C759" },
   failed: { bg: "rgba(255, 59, 48, 0.12)", text: "#FF3B30" },
   cancelled: { bg: "rgba(142, 142, 147, 0.12)", text: "#8E8E93" },
+};
+
+const ISSUE_STATUS_LABELS: Record<IssueSessionStatus, () => string> = {
+  processing: () => t("issues.statusProcessing"),
+  completed: () => t("issues.statusCompleted"),
+  failed: () => t("issues.statusFailed"),
+  cancelled: () => t("issues.statusCancelled"),
 };
 
 interface ActiveSessionsGroupProps {
@@ -469,6 +495,10 @@ const CompactSessionRow = React.memo(
 
     const handleArchive = React.useCallback(() => {
       swipeableRef.current?.close();
+      if (issueLink && issueLink.status === "processing") {
+        Modal.alert("", t("issues.cannotArchiveProcessing"));
+        return;
+      }
       Modal.alert(
         t("sessionInfo.archiveSession"),
         t("sessionInfo.archiveSessionConfirm"),
@@ -481,7 +511,7 @@ const CompactSessionRow = React.memo(
           },
         ],
       );
-    }, [performArchive]);
+    }, [performArchive, issueLink]);
 
     const [deletingSession, performDelete] = useHappyAction(async () => {
       const result = await sessionDelete(session.id);
@@ -495,6 +525,10 @@ const CompactSessionRow = React.memo(
 
     const handleDelete = React.useCallback(() => {
       swipeableRef.current?.close();
+      if (issueLink && issueLink.status === "processing") {
+        Modal.alert("", t("issues.cannotArchiveProcessing"));
+        return;
+      }
       Modal.alert(
         t("sessionInfo.deleteSession"),
         t("sessionInfo.deleteSessionWarning"),
@@ -507,7 +541,7 @@ const CompactSessionRow = React.memo(
           },
         ],
       );
-    }, [performDelete]);
+    }, [performDelete, issueLink]);
 
     const itemContent = (
       <View>
@@ -612,9 +646,7 @@ const CompactSessionRow = React.memo(
               ) : null}
             </View>
             {/* Tags line */}
-            {(session.metadata?.host ||
-              session.metadata?.version ||
-              issueLink) && (
+            {(session.metadata?.host || session.metadata?.version) && (
               <View style={styles.tagsRow}>
                 {session.metadata?.host && (
                   <View style={styles.tag}>
@@ -628,34 +660,57 @@ const CompactSessionRow = React.memo(
                     </Text>
                   </View>
                 )}
-                {issueLink && (
-                  <View
-                    style={[
-                      styles.issueTag,
-                      {
-                        backgroundColor:
-                          ISSUE_STATUS_COLORS[issueLink.status].bg,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name="pricetag-outline"
-                      size={10}
-                      color={ISSUE_STATUS_COLORS[issueLink.status].text}
-                    />
-                    <Text
-                      style={[
-                        styles.issueTagText,
-                        { color: ISSUE_STATUS_COLORS[issueLink.status].text },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      #{issueLink.issueNumber} {issueLink.issueTitle}
-                    </Text>
-                  </View>
-                )}
               </View>
             )}
+
+            {/* Issue info line */}
+            {issueLink &&
+              (() => {
+                const statusColor = ISSUE_STATUS_COLORS[issueLink.status].text;
+                const prUrl = session.metadata?.worktree?.prUrl;
+                return (
+                  <View style={styles.issueRow}>
+                    <Ionicons
+                      name="pricetag-outline"
+                      size={11}
+                      color={statusColor}
+                    />
+                    <Text style={[styles.issueNumber, { color: statusColor }]}>
+                      #{issueLink.issueNumber}
+                    </Text>
+                    <Text
+                      style={[styles.issueTitle, { color: statusColor }]}
+                      numberOfLines={1}
+                    >
+                      {issueLink.issueTitle}
+                    </Text>
+                    <View
+                      style={[
+                        styles.issueStatusDot,
+                        { backgroundColor: statusColor },
+                      ]}
+                    />
+                    <Text
+                      style={[styles.issueStatusText, { color: statusColor }]}
+                    >
+                      {ISSUE_STATUS_LABELS[issueLink.status]()}
+                    </Text>
+                    {prUrl ? (
+                      <Pressable
+                        style={styles.issuePrIcon}
+                        onPress={() => Linking.openURL(prUrl)}
+                        hitSlop={8}
+                      >
+                        <Ionicons
+                          name="git-pull-request-outline"
+                          size={12}
+                          color="#007AFF"
+                        />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                );
+              })()}
           </View>
         </Pressable>
       </View>

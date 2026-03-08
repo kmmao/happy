@@ -1439,6 +1439,12 @@ export const ja: TranslationStructure = {
     labelSelect: "ラベル",
     noLabelsAvailable: "利用可能なラベルがありません",
     createButton: "作成",
+    statusProcessing: "処理中",
+    statusCompleted: "完了",
+    statusFailed: "失敗",
+    statusCancelled: "キャンセル済み",
+    cannotArchiveProcessing:
+      "このセッションはイシューを処理中です。完了するまでお待ちください。",
   },
 
   gitHosts: {

@@ -1389,6 +1389,11 @@ export const zhHant: TranslationStructure = {
     labelSelect: "標籤",
     noLabelsAvailable: "沒有可用標籤",
     createButton: "建立",
+    statusProcessing: "處理中",
+    statusCompleted: "已完成",
+    statusFailed: "失敗",
+    statusCancelled: "已取消",
+    cannotArchiveProcessing: "該會話正在處理工單，請等待完成後再操作。",
   },
 
   gitHosts: {

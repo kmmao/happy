@@ -1458,6 +1458,12 @@ export const pt: TranslationStructure = {
     labelSelect: "Etiquetas",
     noLabelsAvailable: "Nenhuma etiqueta disponível",
     createButton: "Criar",
+    statusProcessing: "Processando",
+    statusCompleted: "Concluído",
+    statusFailed: "Falhou",
+    statusCancelled: "Cancelado",
+    cannotArchiveProcessing:
+      "Esta sessão está processando um issue. Aguarde a conclusão.",
   },
 
   gitHosts: {

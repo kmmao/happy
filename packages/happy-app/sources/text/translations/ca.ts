@@ -1460,6 +1460,12 @@ export const ca: TranslationStructure = {
     labelSelect: "Etiquetes",
     noLabelsAvailable: "No hi ha etiquetes disponibles",
     createButton: "Crear",
+    statusProcessing: "Processant",
+    statusCompleted: "Completat",
+    statusFailed: "Fallat",
+    statusCancelled: "Cancel·lat",
+    cannotArchiveProcessing:
+      "Aquesta sessió està processant un issue. Espereu que acabi.",
   },
 
   gitHosts: {

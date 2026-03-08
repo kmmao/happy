@@ -1482,6 +1482,12 @@ export const pl: TranslationStructure = {
     labelSelect: "Etykiety",
     noLabelsAvailable: "Brak dostępnych etykiet",
     createButton: "Utwórz",
+    statusProcessing: "Przetwarzanie",
+    statusCompleted: "Zakończono",
+    statusFailed: "Niepowodzenie",
+    statusCancelled: "Anulowano",
+    cannotArchiveProcessing:
+      "Ta sesja przetwarza zgłoszenie. Poczekaj na zakończenie.",
   },
 
   gitHosts: {

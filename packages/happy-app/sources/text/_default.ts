@@ -1441,6 +1441,12 @@ export const en = {
     labelSelect: "Labels",
     noLabelsAvailable: "No labels available",
     createButton: "Create",
+    statusProcessing: "Processing",
+    statusCompleted: "Completed",
+    statusFailed: "Failed",
+    statusCancelled: "Cancelled",
+    cannotArchiveProcessing:
+      "This session is processing an issue. Please wait until it completes.",
   },
 
   gitHosts: {

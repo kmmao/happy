@@ -1483,6 +1483,12 @@ export const ru: TranslationStructure = {
     labelSelect: "Метки",
     noLabelsAvailable: "Нет доступных меток",
     createButton: "Создать",
+    statusProcessing: "В обработке",
+    statusCompleted: "Завершено",
+    statusFailed: "Ошибка",
+    statusCancelled: "Отменено",
+    cannotArchiveProcessing:
+      "Этот сеанс обрабатывает задачу. Дождитесь завершения.",
   },
 
   gitHosts: {
