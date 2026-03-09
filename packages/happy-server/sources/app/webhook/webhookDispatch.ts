@@ -52,6 +52,8 @@ function labelsMatch(
   issueLabels: readonly string[],
   routeLabels: readonly string[],
 ): boolean {
+  // Empty route labels = match any issue (no label filter)
+  if (routeLabels.length === 0) return true;
   const triggerSet = new Set(routeLabels.map((l) => l.trim().toLowerCase()));
   return issueLabels.some((l) => triggerSet.has(l));
 }
@@ -63,6 +65,8 @@ function authorAllowed(
   author: string,
   allowedAuthors: readonly string[],
 ): boolean {
+  // Empty allowed list = allow any author (no author filter)
+  if (allowedAuthors.length === 0) return true;
   const allowedSet = new Set(allowedAuthors.map((a) => a.trim().toLowerCase()));
   return allowedSet.has(author.toLowerCase());
 }
@@ -156,7 +160,7 @@ async function processRoute(
 ): Promise<void> {
   // 1. Decrypt webhook secret and verify signature
   const secret = decryptString(
-    ["webhook-route", route.id],
+    ["webhook-route", `${route.accountId}:${issue.repoUrl.toLowerCase()}`],
     route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
   );
   const valid = verifyWebhookSignature(provider, secret, rawBody, headers);
