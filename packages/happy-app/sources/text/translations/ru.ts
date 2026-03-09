@@ -1551,7 +1551,8 @@ export const ru: TranslationStructure = {
     scanEmpty: "На этой машине не найдено git-репозиториев",
     scanError: "Сканирование не удалось — убедитесь, что машина онлайн",
     scanSearchPlaceholder: "Поиск репозиториев...",
-    webhookGuideTitle: "Настройка {{provider}} Webhook",
+    webhookGuideTitle: ({ provider }: { provider: string }) =>
+      `Настройка ${provider} Webhook`,
     guideStep1GitHub:
       "Перейдите в репозиторий → Settings → Webhooks → Add webhook",
     guideStep1Gitea:
@@ -1561,10 +1562,12 @@ export const ru: TranslationStructure = {
     guideStep4: 'Content type: выберите "application/json"',
     guideStep5: 'Events: выберите только "Issues", затем сохраните',
     webhookTestSuccess: "Сервер доступен",
-    webhookTestFail: "Сервер вернул HTTP {{status}}",
+    webhookTestFail: ({ status }: { status: string }) =>
+      `Сервер вернул HTTP ${status}`,
     webhookTestError: "Не удаётся подключиться к серверу — проверьте сеть",
     remoteWebhookSuccess: "Webhook создан в удалённом репозитории",
-    remoteWebhookFail: "Не удалось создать Webhook: {{error}}",
+    remoteWebhookFail: ({ error }: { error: string }) =>
+      `Не удалось создать Webhook: ${error}`,
     tokenRequiredForRemote:
       "Для автоматического создания Webhook на удалённом сервере требуется API-токен",
   },

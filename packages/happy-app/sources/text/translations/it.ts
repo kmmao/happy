@@ -1525,7 +1525,8 @@ export const it: TranslationStructure = {
     scanEmpty: "Nessun repo git trovato su questa macchina",
     scanError: "Scansione fallita — assicurati che la macchina sia online",
     scanSearchPlaceholder: "Cerca repos...",
-    webhookGuideTitle: "Configurazione Webhook di {{provider}}",
+    webhookGuideTitle: ({ provider }: { provider: string }) =>
+      `Configurazione Webhook di ${provider}`,
     guideStep1GitHub:
       "Vai al tuo repository → Settings → Webhooks → Add webhook",
     guideStep1Gitea:
@@ -1535,10 +1536,12 @@ export const it: TranslationStructure = {
     guideStep4: 'Content type: seleziona "application/json"',
     guideStep5: 'Events: seleziona solo "Issues", poi salva',
     webhookTestSuccess: "Il server è raggiungibile",
-    webhookTestFail: "Il server ha restituito HTTP {{status}}",
+    webhookTestFail: ({ status }: { status: string }) =>
+      `Il server ha restituito HTTP ${status}`,
     webhookTestError: "Impossibile raggiungere il server — controlla la rete",
     remoteWebhookSuccess: "Webhook creato nel repository remoto",
-    remoteWebhookFail: "Impossibile creare webhook remoto: {{error}}",
+    remoteWebhookFail: ({ error }: { error: string }) =>
+      `Impossibile creare webhook remoto: ${error}`,
     tokenRequiredForRemote:
       "Token API necessario per creare automaticamente i webhook sul remoto",
   },

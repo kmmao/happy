@@ -1530,7 +1530,8 @@ export const ca: TranslationStructure = {
     scanError:
       "Error d'escaneig — assegureu-vos que la màquina estigui en línia",
     scanSearchPlaceholder: "Cerca repositoris...",
-    webhookGuideTitle: "Configuració de Webhook de {{provider}}",
+    webhookGuideTitle: ({ provider }: { provider: string }) =>
+      `Configuració de Webhook de ${provider}`,
     guideStep1GitHub:
       "Vés al teu repositori → Settings → Webhooks → Add webhook",
     guideStep1Gitea:
@@ -1540,10 +1541,12 @@ export const ca: TranslationStructure = {
     guideStep4: 'Content type: selecciona "application/json"',
     guideStep5: 'Events: selecciona només "Issues" i desa',
     webhookTestSuccess: "El servidor és accessible",
-    webhookTestFail: "El servidor ha retornat HTTP {{status}}",
+    webhookTestFail: ({ status }: { status: string }) =>
+      `El servidor ha retornat HTTP ${status}`,
     webhookTestError: "No es pot connectar al servidor — comprova la xarxa",
     remoteWebhookSuccess: "Webhook creat al repositori remot",
-    remoteWebhookFail: "Error en crear webhook remot: {{error}}",
+    remoteWebhookFail: ({ error }: { error: string }) =>
+      `Error en crear webhook remot: ${error}`,
     tokenRequiredForRemote:
       "Cal un token d'API per crear webhooks automàticament al remot",
   },

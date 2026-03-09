@@ -1528,7 +1528,8 @@ export const pt: TranslationStructure = {
     scanError:
       "Falha na verificação — certifique-se de que a máquina está online",
     scanSearchPlaceholder: "Pesquisar repos...",
-    webhookGuideTitle: "Configuração de Webhook do {{provider}}",
+    webhookGuideTitle: ({ provider }: { provider: string }) =>
+      `Configuração de Webhook do ${provider}`,
     guideStep1GitHub:
       "Vá ao seu repositório → Settings → Webhooks → Add webhook",
     guideStep1Gitea:
@@ -1538,11 +1539,13 @@ export const pt: TranslationStructure = {
     guideStep4: 'Content type: selecione "application/json"',
     guideStep5: 'Events: selecione apenas "Issues" e salve',
     webhookTestSuccess: "Servidor acessível",
-    webhookTestFail: "Servidor retornou HTTP {{status}}",
+    webhookTestFail: ({ status }: { status: string }) =>
+      `Servidor retornou HTTP ${status}`,
     webhookTestError:
       "Não foi possível conectar ao servidor — verifique sua rede",
     remoteWebhookSuccess: "Webhook criado no repositório remoto",
-    remoteWebhookFail: "Falha ao criar webhook remoto: {{error}}",
+    remoteWebhookFail: ({ error }: { error: string }) =>
+      `Falha ao criar webhook remoto: ${error}`,
     tokenRequiredForRemote:
       "Token de API necessário para criar webhooks automaticamente no remoto",
   },

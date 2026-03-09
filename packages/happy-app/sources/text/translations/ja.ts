@@ -1508,7 +1508,8 @@ export const ja: TranslationStructure = {
     scanEmpty: "このマシンに git リポジトリが見つかりません",
     scanError: "スキャン失敗 — マシンがオンラインであることを確認してください",
     scanSearchPlaceholder: "リポジトリを検索...",
-    webhookGuideTitle: "{{provider}} Webhook セットアップ",
+    webhookGuideTitle: ({ provider }: { provider: string }) =>
+      `${provider} Webhook セットアップ`,
     guideStep1GitHub: "リポジトリ → Settings → Webhooks → Add webhook に移動",
     guideStep1Gitea:
       "リポジトリ → Settings → Webhooks → Add Webhook → Gitea に移動",
@@ -1517,11 +1518,13 @@ export const ja: TranslationStructure = {
     guideStep4: "Content type：「application/json」を選択",
     guideStep5: "Events：「Issues」のみを選択して保存",
     webhookTestSuccess: "サーバーに到達可能",
-    webhookTestFail: "サーバーが HTTP {{status}} を返しました",
+    webhookTestFail: ({ status }: { status: string }) =>
+      `サーバーが HTTP ${status} を返しました`,
     webhookTestError:
       "サーバーに到達できません — ネットワークを確認してください",
     remoteWebhookSuccess: "リモートリポジトリに Webhook を作成しました",
-    remoteWebhookFail: "リモート Webhook の作成に失敗: {{error}}",
+    remoteWebhookFail: ({ error }: { error: string }) =>
+      `リモート Webhook の作成に失敗: ${error}`,
     tokenRequiredForRemote:
       "リモートで Webhook を自動作成するには API トークンが必要です",
   },

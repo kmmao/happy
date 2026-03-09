@@ -1451,7 +1451,8 @@ export const zhHans: TranslationStructure = {
     scanEmpty: "在此机器上未找到 git 仓库",
     scanError: "扫描失败 - 请确保机器在线",
     scanSearchPlaceholder: "搜索仓库...",
-    webhookGuideTitle: "{{provider}} Webhook 设置",
+    webhookGuideTitle: ({ provider }: { provider: string }) =>
+      `${provider} Webhook 设置`,
     guideStep1GitHub: "前往你的仓库 → Settings → Webhooks → Add webhook",
     guideStep1Gitea: "前往你的仓库 → Settings → Webhooks → Add Webhook → Gitea",
     guideStep2: "粘贴下方显示的 Webhook URL",
@@ -1459,10 +1460,12 @@ export const zhHans: TranslationStructure = {
     guideStep4: 'Content type：选择 "application/json"',
     guideStep5: 'Events：仅选择 "Issues"，然后保存',
     webhookTestSuccess: "服务器可达",
-    webhookTestFail: "服务器返回 HTTP {{status}}",
+    webhookTestFail: ({ status }: { status: string }) =>
+      `服务器返回 HTTP ${status}`,
     webhookTestError: "无法连接服务器 - 请检查网络",
     remoteWebhookSuccess: "已在远程仓库创建 Webhook",
-    remoteWebhookFail: "创建远程 Webhook 失败：{{error}}",
+    remoteWebhookFail: ({ error }: { error: string }) =>
+      `创建远程 Webhook 失败：${error}`,
     tokenRequiredForRemote: "需要 API Token 才能在远程自动创建 Webhook",
   },
 

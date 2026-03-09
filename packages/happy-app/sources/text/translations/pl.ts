@@ -1552,7 +1552,8 @@ export const pl: TranslationStructure = {
     scanError:
       "Skanowanie nie powiodło się — upewnij się, że maszyna jest online",
     scanSearchPlaceholder: "Szukaj repozytoriów...",
-    webhookGuideTitle: "Konfiguracja Webhook {{provider}}",
+    webhookGuideTitle: ({ provider }: { provider: string }) =>
+      `Konfiguracja Webhook ${provider}`,
     guideStep1GitHub:
       "Przejdź do repozytorium → Settings → Webhooks → Add webhook",
     guideStep1Gitea:
@@ -1562,10 +1563,12 @@ export const pl: TranslationStructure = {
     guideStep4: 'Content type: wybierz "application/json"',
     guideStep5: 'Events: wybierz tylko "Issues", następnie zapisz',
     webhookTestSuccess: "Serwer jest osiągalny",
-    webhookTestFail: "Serwer zwrócił HTTP {{status}}",
+    webhookTestFail: ({ status }: { status: string }) =>
+      `Serwer zwrócił HTTP ${status}`,
     webhookTestError: "Nie można połączyć się z serwerem — sprawdź sieć",
     remoteWebhookSuccess: "Webhook utworzony w zdalnym repozytorium",
-    remoteWebhookFail: "Nie udało się utworzyć zdalnego Webhook: {{error}}",
+    remoteWebhookFail: ({ error }: { error: string }) =>
+      `Nie udało się utworzyć zdalnego Webhook: ${error}`,
     tokenRequiredForRemote:
       "Token API jest wymagany do automatycznego tworzenia webhooków na zdalnym serwerze",
   },

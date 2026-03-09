@@ -1452,7 +1452,8 @@ export const zhHant: TranslationStructure = {
     scanEmpty: "在此機器上未找到 git 倉庫",
     scanError: "掃描失敗 - 請確保機器在線",
     scanSearchPlaceholder: "搜尋倉庫...",
-    webhookGuideTitle: "{{provider}} Webhook 設定",
+    webhookGuideTitle: ({ provider }: { provider: string }) =>
+      `${provider} Webhook 設定`,
     guideStep1GitHub: "前往你的倉庫 → Settings → Webhooks → Add webhook",
     guideStep1Gitea: "前往你的倉庫 → Settings → Webhooks → Add Webhook → Gitea",
     guideStep2: "貼上下方顯示的 Webhook URL",
@@ -1460,10 +1461,12 @@ export const zhHant: TranslationStructure = {
     guideStep4: 'Content type：選擇 "application/json"',
     guideStep5: 'Events：僅選擇 "Issues"，然後儲存',
     webhookTestSuccess: "伺服器可達",
-    webhookTestFail: "伺服器回應 HTTP {{status}}",
+    webhookTestFail: ({ status }: { status: string }) =>
+      `伺服器回應 HTTP ${status}`,
     webhookTestError: "無法連線伺服器 - 請檢查網路",
     remoteWebhookSuccess: "已在遠端倉庫建立 Webhook",
-    remoteWebhookFail: "建立遠端 Webhook 失敗：{{error}}",
+    remoteWebhookFail: ({ error }: { error: string }) =>
+      `建立遠端 Webhook 失敗：${error}`,
     tokenRequiredForRemote: "需要 API Token 才能在遠端自動建立 Webhook",
   },
 

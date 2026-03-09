@@ -1520,7 +1520,8 @@ export const en: TranslationStructure = {
     scanEmpty: "No git repos found on this machine",
     scanError: "Scan failed — make sure the machine is online",
     scanSearchPlaceholder: "Search repos...",
-    webhookGuideTitle: "{{provider}} Webhook Setup",
+    webhookGuideTitle: ({ provider }: { provider: string }) =>
+      `${provider} Webhook Setup`,
     guideStep1GitHub: "Go to your repo → Settings → Webhooks → Add webhook",
     guideStep1Gitea:
       "Go to your repo → Settings → Webhooks → Add Webhook → Gitea",
@@ -1529,10 +1530,12 @@ export const en: TranslationStructure = {
     guideStep4: 'Content type: select "application/json"',
     guideStep5: 'Events: select "Issues" only, then save',
     webhookTestSuccess: "Server is reachable",
-    webhookTestFail: "Server returned HTTP {{status}}",
+    webhookTestFail: ({ status }: { status: string }) =>
+      `Server returned HTTP ${status}`,
     webhookTestError: "Cannot reach server — check your network",
     remoteWebhookSuccess: "Webhook created on remote repo",
-    remoteWebhookFail: "Failed to create remote webhook: {{error}}",
+    remoteWebhookFail: ({ error }: { error: string }) =>
+      `Failed to create remote webhook: ${error}`,
     tokenRequiredForRemote:
       "API Token required to auto-create webhooks on remote",
   },
