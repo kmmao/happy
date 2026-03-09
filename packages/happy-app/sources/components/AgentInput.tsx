@@ -1160,7 +1160,7 @@ export const AgentInput = React.memo(
                           })().map((level) => {
                             const isSelected =
                               props.effortLevel === level.key ||
-                              (!props.effortLevel && level.key === "high");
+                              (!props.effortLevel && level.key === "medium");
 
                             return (
                               <Pressable
@@ -1642,30 +1642,28 @@ export const AgentInput = React.memo(
                       ...Typography.default(),
                     }}
                   >
-                    {props.modelMode.name}
+                    {[
+                      props.modelMode.name,
+                      ...(!isCodex && !isGemini
+                        ? [
+                            (props.effortLevel ?? "medium") === "low"
+                              ? t("agentInput.effort.low")
+                              : (props.effortLevel ?? "medium") === "high"
+                                ? t("agentInput.effort.high")
+                                : (props.effortLevel ?? "medium") === "max"
+                                  ? t("agentInput.effort.max")
+                                  : t("agentInput.effort.medium"),
+                            (props.thinkingMode ?? "adaptive") === "enabled"
+                              ? t("agentInput.thinking.enabled")
+                              : (props.thinkingMode ?? "adaptive") ===
+                                  "disabled"
+                                ? t("agentInput.thinking.disabled")
+                                : t("agentInput.thinking.adaptive"),
+                          ]
+                        : []),
+                    ].join(" · ")}
                   </Text>
                 )}
-                {props.effortLevel &&
-                  props.effortLevel !== "high" &&
-                  !isCodex &&
-                  !isGemini && (
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        color:
-                          props.effortLevel === "max"
-                            ? theme.colors.radio.active
-                            : theme.colors.textSecondary,
-                        ...Typography.default(),
-                      }}
-                    >
-                      {props.effortLevel === "low"
-                        ? t("agentInput.effort.low")
-                        : props.effortLevel === "medium"
-                          ? t("agentInput.effort.medium")
-                          : t("agentInput.effort.max")}
-                    </Text>
-                  )}
               </View>
             </View>
           )}
