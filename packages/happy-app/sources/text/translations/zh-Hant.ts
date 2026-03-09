@@ -1464,6 +1464,7 @@ export const zhHant: TranslationStructure = {
     webhookTestError: "無法連線伺服器 - 請檢查網路",
     remoteWebhookSuccess: "已在遠端倉庫建立 Webhook",
     remoteWebhookFail: "建立遠端 Webhook 失敗：{{error}}",
+    tokenRequiredForRemote: "需要 API Token 才能在遠端自動建立 Webhook",
   },
 
   quickCommands: {

@@ -1543,6 +1543,8 @@ export const pt: TranslationStructure = {
       "Não foi possível conectar ao servidor — verifique sua rede",
     remoteWebhookSuccess: "Webhook criado no repositório remoto",
     remoteWebhookFail: "Falha ao criar webhook remoto: {{error}}",
+    tokenRequiredForRemote:
+      "Token de API necessário para criar webhooks automaticamente no remoto",
   },
 
   quickCommands: {

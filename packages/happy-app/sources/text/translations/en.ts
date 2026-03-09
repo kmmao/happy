@@ -1533,6 +1533,8 @@ export const en: TranslationStructure = {
     webhookTestError: "Cannot reach server — check your network",
     remoteWebhookSuccess: "Webhook created on remote repo",
     remoteWebhookFail: "Failed to create remote webhook: {{error}}",
+    tokenRequiredForRemote:
+      "API Token required to auto-create webhooks on remote",
   },
 
   quickCommands: {

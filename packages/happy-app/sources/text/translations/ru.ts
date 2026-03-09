@@ -1565,6 +1565,8 @@ export const ru: TranslationStructure = {
     webhookTestError: "Не удаётся подключиться к серверу — проверьте сеть",
     remoteWebhookSuccess: "Webhook создан в удалённом репозитории",
     remoteWebhookFail: "Не удалось создать Webhook: {{error}}",
+    tokenRequiredForRemote:
+      "Для автоматического создания Webhook на удалённом сервере требуется API-токен",
   },
 
   quickCommands: {

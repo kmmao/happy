@@ -1463,6 +1463,7 @@ export const zhHans: TranslationStructure = {
     webhookTestError: "无法连接服务器 - 请检查网络",
     remoteWebhookSuccess: "已在远程仓库创建 Webhook",
     remoteWebhookFail: "创建远程 Webhook 失败：{{error}}",
+    tokenRequiredForRemote: "需要 API Token 才能在远程自动创建 Webhook",
   },
 
   quickCommands: {

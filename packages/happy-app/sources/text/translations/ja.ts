@@ -1522,6 +1522,8 @@ export const ja: TranslationStructure = {
       "サーバーに到達できません — ネットワークを確認してください",
     remoteWebhookSuccess: "リモートリポジトリに Webhook を作成しました",
     remoteWebhookFail: "リモート Webhook の作成に失敗: {{error}}",
+    tokenRequiredForRemote:
+      "リモートで Webhook を自動作成するには API トークンが必要です",
   },
 
   quickCommands: {

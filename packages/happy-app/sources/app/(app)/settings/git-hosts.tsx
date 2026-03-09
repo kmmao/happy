@@ -98,7 +98,7 @@ async function ensureRemoteWebhook(
           body: JSON.stringify({
             config: {
               url: webhookUrl,
-              content_type: "application/json",
+              content_type: "json",
               secret,
             },
             events: ["issues"],
@@ -117,7 +117,7 @@ async function ensureRemoteWebhook(
         name: "web",
         config: {
           url: webhookUrl,
-          content_type: "application/json",
+          content_type: "json",
           secret,
         },
         events: ["issues"],
@@ -260,11 +260,13 @@ export default React.memo(function GitHostsScreen() {
 
       // Auto-create webhooks on remote Git host
       if (trimmedToken && hasEnabledRepos) {
-        const webhookUrl = getWebhookUrl(formProvider);
-        const results = await Promise.all(
-          formWebhookRepos
-            .filter((r) => r.enabled && r.secret && r.repoUrl)
-            .map((r) =>
+        try {
+          const webhookUrl = getWebhookUrl(formProvider);
+          const enabledRepos = formWebhookRepos.filter(
+            (r) => r.enabled && r.secret && r.repoUrl,
+          );
+          const results = await Promise.all(
+            enabledRepos.map((r) =>
               ensureRemoteWebhook(
                 formProvider,
                 trimmedHost,
@@ -274,17 +276,28 @@ export default React.memo(function GitHostsScreen() {
                 r.secret,
               ),
             ),
-        );
-        const failed = results.filter((r) => !r.created);
-        if (failed.length === 0 && results.length > 0) {
-          HappyModal.toast(t("gitHosts.remoteWebhookSuccess"));
-        } else if (failed.length > 0) {
-          HappyModal.toast(
+          );
+          const failed = results.filter((r) => !r.created);
+          if (failed.length === 0 && results.length > 0) {
+            HappyModal.toast(t("gitHosts.remoteWebhookSuccess"));
+          } else if (failed.length > 0) {
+            HappyModal.alert(
+              "Webhook",
+              t("gitHosts.remoteWebhookFail", {
+                error: failed[0].error ?? "Unknown",
+              }),
+            );
+          }
+        } catch (err) {
+          HappyModal.alert(
+            "Webhook",
             t("gitHosts.remoteWebhookFail", {
-              error: failed[0].error ?? "Unknown",
+              error: String(err),
             }),
           );
         }
+      } else if (hasEnabledRepos && !trimmedToken) {
+        HappyModal.toast(t("gitHosts.tokenRequiredForRemote"));
       }
 
       setWebhookSyncing(false);

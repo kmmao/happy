@@ -1566,6 +1566,8 @@ export const pl: TranslationStructure = {
     webhookTestError: "Nie można połączyć się z serwerem — sprawdź sieć",
     remoteWebhookSuccess: "Webhook utworzony w zdalnym repozytorium",
     remoteWebhookFail: "Nie udało się utworzyć zdalnego Webhook: {{error}}",
+    tokenRequiredForRemote:
+      "Token API jest wymagany do automatycznego tworzenia webhooków na zdalnym serwerze",
   },
 
   quickCommands: {

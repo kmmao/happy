@@ -46,6 +46,34 @@ export function connectRoutes(app: Fastify) {
     },
   );
 
+  // Fallback parser for form-urlencoded (GitHub defaults to this when content_type is misconfigured)
+  app.addContentTypeParser(
+    "application/x-www-form-urlencoded",
+    { parseAs: "string" },
+    function (req, body, done) {
+      try {
+        const bodyStr = body as string;
+        (req as any).rawBody = bodyStr;
+
+        // GitHub sends form-encoded body with a "payload" key containing JSON
+        const params = new URLSearchParams(bodyStr);
+        const payload = params.get("payload");
+        if (payload) {
+          done(null, JSON.parse(payload));
+          return;
+        }
+        done(null, {});
+      } catch (err: any) {
+        log(
+          { module: "content-parser", level: "error" },
+          `Form parse error on ${req.method} ${req.url}: ${err.message}`,
+        );
+        err.statusCode = 400;
+        done(err, undefined);
+      }
+    },
+  );
+
   // GitHub OAuth parameters
   app.get(
     "/v1/connect/github/params",

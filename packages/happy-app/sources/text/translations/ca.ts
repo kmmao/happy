@@ -1544,6 +1544,8 @@ export const ca: TranslationStructure = {
     webhookTestError: "No es pot connectar al servidor — comprova la xarxa",
     remoteWebhookSuccess: "Webhook creat al repositori remot",
     remoteWebhookFail: "Error en crear webhook remot: {{error}}",
+    tokenRequiredForRemote:
+      "Cal un token d'API per crear webhooks automàticament al remot",
   },
 
   quickCommands: {
