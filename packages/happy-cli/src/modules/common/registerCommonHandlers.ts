@@ -794,4 +794,149 @@ export function registerCommonHandlers(
       }
     },
   );
+
+  // ── createRemoteWebhook handler ────────────────────────────────────
+  // Creates or updates a webhook on a remote Git host (GitHub/Gitea/GitLab).
+  // Runs from the daemon, which has local network access to self-hosted instances.
+
+  interface CreateRemoteWebhookRequest {
+    provider: "github" | "gitea" | "gitlab";
+    apiToken: string;
+    repoUrl: string;
+    webhookUrl: string;
+    webhookSecret: string;
+    events: string[];
+  }
+
+  interface CreateRemoteWebhookResponse {
+    success: boolean;
+    created?: boolean;
+    webhookId?: number;
+    error?: string;
+  }
+
+  function parseRepoOwnerFromUrl(
+    repoUrl: string,
+  ): { origin: string; owner: string; repo: string } | null {
+    try {
+      const url = new URL(repoUrl);
+      const parts = url.pathname
+        .replace(/^\//, "")
+        .replace(/\.git$/, "")
+        .split("/");
+      if (parts.length >= 2) {
+        return { origin: url.origin, owner: parts[0], repo: parts[1] };
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+
+  rpcHandlerManager.registerHandler<
+    CreateRemoteWebhookRequest,
+    CreateRemoteWebhookResponse
+  >("createRemoteWebhook", async (data) => {
+    logger.debug("createRemoteWebhook request:", {
+      provider: data.provider,
+      repoUrl: data.repoUrl,
+    });
+
+    try {
+      const parsed = parseRepoOwnerFromUrl(data.repoUrl);
+      if (!parsed) {
+        return { success: false, error: "Invalid repo URL" };
+      }
+      const { origin, owner, repo } = parsed;
+
+      const isGitHubCom =
+        origin === "https://github.com" || origin === "http://github.com";
+      const baseUrl =
+        data.provider === "github" && isGitHubCom
+          ? "https://api.github.com"
+          : data.provider === "github"
+            ? `${origin}/api/v3`
+            : `${origin}/api/v1`;
+
+      const headers: Record<string, string> = {
+        Authorization: `token ${data.apiToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      };
+
+      const hooksEndpoint = `${baseUrl}/repos/${owner}/${repo}/hooks`;
+      logger.debug("createRemoteWebhook hooksEndpoint:", hooksEndpoint);
+
+      // Check if webhook already exists
+      const listRes = await fetch(hooksEndpoint, { headers });
+      if (listRes.ok) {
+        const hooks = (await listRes.json()) as {
+          id: number;
+          config: { url?: string };
+        }[];
+        const existing = hooks.find((h) => h.config.url === data.webhookUrl);
+        if (existing) {
+          const patchRes = await fetch(`${hooksEndpoint}/${existing.id}`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({
+              config: {
+                url: data.webhookUrl,
+                content_type: "json",
+                secret: data.webhookSecret,
+              },
+              events: data.events,
+              active: true,
+            }),
+          });
+          if (!patchRes.ok) {
+            const errText = await patchRes.text().catch(() => "");
+            return {
+              success: false,
+              error: `PATCH ${patchRes.status}: ${errText}`,
+            };
+          }
+          return { success: true, created: false, webhookId: existing.id };
+        }
+      }
+
+      // Create new webhook
+      const createRes = await fetch(hooksEndpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          name: "web",
+          config: {
+            url: data.webhookUrl,
+            content_type: "json",
+            secret: data.webhookSecret,
+          },
+          events: data.events,
+          active: true,
+        }),
+      });
+
+      if (createRes.ok || createRes.status === 201) {
+        const body = await createRes.json().catch(() => ({}));
+        return {
+          success: true,
+          created: true,
+          webhookId: (body as { id?: number }).id,
+        };
+      }
+
+      const errBody = await createRes.text().catch(() => "");
+      return {
+        success: false,
+        error: `HTTP ${createRes.status}: ${errBody}`,
+      };
+    } catch (error) {
+      logger.debug("createRemoteWebhook failed:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to create webhook",
+      };
+    }
+  });
 }

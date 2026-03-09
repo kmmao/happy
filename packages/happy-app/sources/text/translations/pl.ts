@@ -276,6 +276,12 @@ export const pl: TranslationStructure = {
     sttCorrectionDisabled: "Używanie surowego wyniku rozpoznawania mowy",
     showProjectTab: "Karta projektu",
     showProjectTabSubtitle: "Pokaż kartę projektu (kanban) na pasku kart",
+    webNotifications: "Powiadomienia przeglądarki",
+    webNotificationsEnabled:
+      "Powiadamiaj o ukończeniu zadań i prośbach o zatwierdzenie",
+    webNotificationsDisabled: "Brak powiadomień przeglądarki",
+    webNotificationsDenied:
+      "Zablokowane przez przeglądarkę — włącz w ustawieniach witryny",
   },
 
   errors: {
@@ -1505,6 +1511,9 @@ export const pl: TranslationStructure = {
       "Brak skonfigurowanych hostów. GitHub.com jest wykrywany automatycznie, inne hosty domyślnie używają Gitea.",
     addHost: "Dodaj host",
     editHost: "Edytuj host",
+    tabBasic: "Podstawowe",
+    tabAutoIssue: "Auto-zadania",
+    tabWebhooks: "Webhooks",
     hostLabel: "Host",
     providerLabel: "Dostawca",
     tokenLabel: "API Token",
@@ -1802,6 +1811,11 @@ export const pl: TranslationStructure = {
       totalFeatures: ({ count }: { count: number }) =>
         `${count} ${plural({ count, one: "funkcja", few: "funkcje", many: "funkcji" })}`,
     },
+  },
+
+  webNotification: {
+    taskComplete: "Zadanie ukończone",
+    permissionRequest: "Wymagane zatwierdzenie",
   },
 
   openclaw: {

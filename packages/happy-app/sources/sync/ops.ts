@@ -250,6 +250,35 @@ export async function machineListGitRepos(
   return result.repos ?? [];
 }
 
+export interface CreateRemoteWebhookParams {
+  readonly provider: string;
+  readonly apiToken: string;
+  readonly repoUrl: string;
+  readonly webhookUrl: string;
+  readonly webhookSecret: string;
+  readonly events: readonly string[];
+}
+
+export interface CreateRemoteWebhookResult {
+  readonly created: boolean;
+  readonly webhookId?: number;
+}
+
+export async function machineCreateRemoteWebhook(
+  machineId: string,
+  params: CreateRemoteWebhookParams,
+): Promise<CreateRemoteWebhookResult> {
+  const result = await apiSocket.machineRPC<
+    { success: boolean; created?: boolean; webhookId?: number; error?: string },
+    CreateRemoteWebhookParams
+  >(machineId, "createRemoteWebhook", params);
+
+  if (!result.success) {
+    throw new Error(result.error ?? "Failed to create remote webhook");
+  }
+  return { created: result.created ?? true, webhookId: result.webhookId };
+}
+
 /**
  * Execute a bash command on a specific machine
  */

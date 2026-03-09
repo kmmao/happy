@@ -1,12 +1,5 @@
-import React, { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  TextInput,
-  ActivityIndicator,
-} from "react-native";
+import React from "react";
+import { View, Text, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSettingMutable } from "@/sync/storage";
 import { useAllMachines } from "@/sync/storage";
@@ -15,138 +8,72 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Modal as HappyModal } from "@/modal/ModalManager";
 import { layout } from "@/components/layout";
-import { Switch } from "@/components/Switch";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWindowDimensions } from "react-native";
-import * as Clipboard from "expo-clipboard";
 import { TokenStorage } from "@/auth/tokenStorage";
 import {
   generateWebhookSecret,
   getWebhookUrl,
   syncWebhookRoutes,
 } from "@/sync/webhookRouteSync";
-import { machineListGitRepos } from "@/sync/ops";
-import type { GitRepoEntry } from "@/sync/ops";
+import { machineCreateRemoteWebhook } from "@/sync/ops";
 import type { WebhookRepoConfig } from "@/sync/issueTypes";
+import type { GitHost, GitHostTab, Provider } from "./git-hosts/types";
+import { GitHostBasicForm } from "./git-hosts/GitHostBasicForm";
+import { GitHostAutoIssueForm } from "./git-hosts/GitHostAutoIssueForm";
+import { GitHostWebhookForm } from "./git-hosts/GitHostWebhookForm";
 
-type Provider = "github" | "gitea";
+// ── Segment Control ────────────────────────────────
 
-/** Parse owner/repo from a repo URL like https://github.com/owner/repo */
-function parseRepoOwner(
-  repoUrl: string,
-): { owner: string; repo: string } | null {
-  try {
-    const url = new URL(repoUrl);
-    const parts = url.pathname
-      .replace(/^\//, "")
-      .replace(/\.git$/, "")
-      .split("/");
-    if (parts.length >= 2) {
-      return { owner: parts[0], repo: parts[1] };
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
+const TABS = [
+  { key: "basic", label: "gitHosts.tabBasic" },
+  { key: "autoIssue", label: "gitHosts.tabAutoIssue" },
+  { key: "webhooks", label: "gitHosts.tabWebhooks" },
+] as const;
 
-/** Create or update a webhook on the remote Git host */
-async function ensureRemoteWebhook(
-  provider: Provider,
-  host: string,
-  apiToken: string,
-  repoUrl: string,
-  webhookUrl: string,
-  secret: string,
-): Promise<{ created: boolean; error?: string }> {
-  const parsed = parseRepoOwner(repoUrl);
-  if (!parsed) return { created: false, error: "Invalid repo URL" };
-  const { owner, repo } = parsed;
+const GitHostSegment = React.memo<{
+  active: GitHostTab;
+  onSelect: (tab: GitHostTab) => void;
+}>(function GitHostSegment({ active, onSelect }) {
+  const { theme } = useUnistyles();
+  return (
+    <View style={[styles.track, { backgroundColor: theme.colors.surface }]}>
+      {TABS.map((tab) => {
+        const isActive = tab.key === active;
+        return (
+          <Pressable
+            key={tab.key}
+            onPress={() => onSelect(tab.key)}
+            accessibilityRole="tab"
+            accessibilityLabel={t(tab.label)}
+            accessibilityState={{ selected: isActive }}
+            style={[
+              styles.segment,
+              isActive && {
+                backgroundColor: theme.colors.text,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                {
+                  color: isActive
+                    ? theme.colors.surface
+                    : theme.colors.textSecondary,
+                },
+              ]}
+            >
+              {t(tab.label)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+});
 
-  // Normalize host: strip protocol and trailing slashes
-  const bareHost = host.replace(/^https?:\/\//, "").replace(/\/+$/, "");
-
-  const baseUrl =
-    provider === "github" && (bareHost === "github.com" || bareHost === "")
-      ? "https://api.github.com"
-      : provider === "github"
-        ? `https://${bareHost}/api/v3`
-        : `https://${bareHost}/api/v1`;
-
-  const headers: Record<string, string> = {
-    Authorization: `token ${apiToken}`,
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  };
-
-  const hooksEndpoint = `${baseUrl}/repos/${owner}/${repo}/hooks`;
-
-  try {
-    // Check if webhook already exists
-    const listRes = await fetch(hooksEndpoint, { headers });
-    if (listRes.ok) {
-      const hooks = (await listRes.json()) as {
-        id: number;
-        config: { url?: string };
-      }[];
-      const existing = hooks.find((h) => h.config.url === webhookUrl);
-      if (existing) {
-        // Update existing webhook with new secret
-        await fetch(`${hooksEndpoint}/${existing.id}`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify({
-            config: {
-              url: webhookUrl,
-              content_type: "json",
-              secret,
-            },
-            events: ["issues"],
-            active: true,
-          }),
-        });
-        return { created: true };
-      }
-    }
-
-    // Create new webhook
-    const createRes = await fetch(hooksEndpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        name: "web",
-        config: {
-          url: webhookUrl,
-          content_type: "json",
-          secret,
-        },
-        events: ["issues"],
-        active: true,
-      }),
-    });
-
-    if (createRes.ok || createRes.status === 201) {
-      return { created: true };
-    }
-    const errBody = await createRes.text();
-    return { created: false, error: `HTTP ${createRes.status}: ${errBody}` };
-  } catch (err) {
-    return {
-      created: false,
-      error: err instanceof Error ? err.message : "Network error",
-    };
-  }
-}
-
-interface GitHost {
-  readonly host: string;
-  readonly provider: Provider;
-  readonly apiToken?: string;
-  readonly autoIssueEnabled?: boolean;
-  readonly autoIssueLabel?: string;
-  readonly autoIssueAllowedAuthors?: string[];
-  readonly webhookRepos?: WebhookRepoConfig[];
-}
+// ── Main Screen ────────────────────────────────────
 
 export default React.memo(function GitHostsScreen() {
   const { theme } = useUnistyles();
@@ -154,6 +81,7 @@ export default React.memo(function GitHostsScreen() {
   const machines = useAllMachines();
   const [showAddForm, setShowAddForm] = React.useState(false);
   const [editIndex, setEditIndex] = React.useState<number | null>(null);
+  const [activeTab, setActiveTab] = React.useState<GitHostTab>("basic");
   const [formHost, setFormHost] = React.useState("");
   const [formProvider, setFormProvider] = React.useState<Provider>("github");
   const [formToken, setFormToken] = React.useState("");
@@ -177,6 +105,7 @@ export default React.memo(function GitHostsScreen() {
     setFormAutoEnabled(false);
     setFormWebhookRepos([]);
     setEditIndex(null);
+    setActiveTab("basic");
     setShowAddForm(true);
   };
 
@@ -190,6 +119,7 @@ export default React.memo(function GitHostsScreen() {
     setFormAutoEnabled(entry.autoIssueEnabled ?? Boolean(entry.autoIssueLabel));
     setFormWebhookRepos((entry.webhookRepos ?? []).map((r) => ({ ...r })));
     setEditIndex(index);
+    setActiveTab("basic");
     setShowAddForm(true);
   };
 
@@ -258,33 +188,37 @@ export default React.memo(function GitHostsScreen() {
         HappyModal.toast(t("gitHosts.webhookSyncError"));
       }
 
-      // Auto-create webhooks on remote Git host
+      // Auto-create webhooks on remote Git host via CLI Daemon RPC
       if (trimmedToken && hasEnabledRepos) {
         try {
           const webhookUrl = getWebhookUrl(formProvider);
           const enabledRepos = formWebhookRepos.filter(
-            (r) => r.enabled && r.secret && r.repoUrl,
+            (r) => r.enabled && r.secret && r.repoUrl && r.machineId,
           );
-          const results = await Promise.all(
+          const results = await Promise.allSettled(
             enabledRepos.map((r) =>
-              ensureRemoteWebhook(
-                formProvider,
-                trimmedHost,
-                trimmedToken,
-                r.repoUrl,
+              machineCreateRemoteWebhook(r.machineId, {
+                provider: formProvider,
+                apiToken: trimmedToken,
+                repoUrl: r.repoUrl,
                 webhookUrl,
-                r.secret,
-              ),
+                webhookSecret: r.secret,
+                events: ["issues"],
+              }),
             ),
           );
-          const failed = results.filter((r) => !r.created);
+          const failed = results.filter((r) => r.status === "rejected");
           if (failed.length === 0 && results.length > 0) {
             HappyModal.toast(t("gitHosts.remoteWebhookSuccess"));
           } else if (failed.length > 0) {
+            const reason =
+              failed[0].status === "rejected"
+                ? (failed[0].reason as Error).message
+                : "Unknown";
             HappyModal.alert(
               "Webhook",
               t("gitHosts.remoteWebhookFail", {
-                error: failed[0].error ?? "Unknown",
+                error: reason,
               }),
             );
           }
@@ -488,205 +422,47 @@ export default React.memo(function GitHostsScreen() {
                   : t("gitHosts.addHost")}
               </Text>
 
-              {/* Host input */}
-              <FieldLabel theme={theme}>{t("gitHosts.hostLabel")}</FieldLabel>
-              <TextInput
-                style={{
-                  backgroundColor: theme.colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  fontSize: 15,
-                  color: theme.colors.text,
-                  marginBottom: 12,
-                  ...Typography.mono(),
-                }}
-                value={formHost}
-                onChangeText={setFormHost}
-                placeholder="github.mycompany.com or http://10.0.0.1:3000"
-                placeholderTextColor={theme.colors.textSecondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-              />
+              {/* Segment Control */}
+              <GitHostSegment active={activeTab} onSelect={setActiveTab} />
 
-              {/* Provider selector */}
-              <FieldLabel theme={theme}>
-                {t("gitHosts.providerLabel")}
-              </FieldLabel>
-              <View
-                style={{
-                  flexDirection: "row",
-                  gap: 8,
-                  marginBottom: 16,
-                }}
-              >
-                <ProviderButton
-                  label="GitHub"
-                  icon="logo-github"
-                  selected={formProvider === "github"}
-                  onPress={() => setFormProvider("github")}
-                />
-                <ProviderButton
-                  label="Gitea"
-                  icon="server-outline"
-                  selected={formProvider === "gitea"}
-                  onPress={() => setFormProvider("gitea")}
-                />
+              {/* Tab content */}
+              <View style={{ marginTop: 16 }}>
+                {activeTab === "basic" && (
+                  <GitHostBasicForm
+                    theme={theme}
+                    formHost={formHost}
+                    formProvider={formProvider}
+                    formToken={formToken}
+                    onHostChange={setFormHost}
+                    onProviderChange={setFormProvider}
+                    onTokenChange={setFormToken}
+                  />
+                )}
+
+                {activeTab === "autoIssue" && (
+                  <GitHostAutoIssueForm
+                    theme={theme}
+                    formAutoEnabled={formAutoEnabled}
+                    formAutoLabel={formAutoLabel}
+                    formAutoAuthors={formAutoAuthors}
+                    onAutoEnabledChange={setFormAutoEnabled}
+                    onAutoLabelChange={setFormAutoLabel}
+                    onAutoAuthorsChange={setFormAutoAuthors}
+                  />
+                )}
+
+                {activeTab === "webhooks" && (
+                  <GitHostWebhookForm
+                    theme={theme}
+                    provider={formProvider}
+                    machines={machines}
+                    formWebhookRepos={formWebhookRepos}
+                    onAddRepo={handleAddWebhookRepo}
+                    onUpdateRepo={handleUpdateWebhookRepo}
+                    onRemoveRepo={handleRemoveWebhookRepo}
+                  />
+                )}
               </View>
-
-              {/* API Token input */}
-              <FieldLabel theme={theme}>{t("gitHosts.tokenLabel")}</FieldLabel>
-              <TextInput
-                style={{
-                  backgroundColor: theme.colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  fontSize: 15,
-                  color: theme.colors.text,
-                  marginBottom: 4,
-                  ...Typography.mono(),
-                }}
-                value={formToken}
-                onChangeText={setFormToken}
-                placeholder={t("gitHosts.tokenPlaceholder")}
-                placeholderTextColor={theme.colors.textSecondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                secureTextEntry
-              />
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: theme.colors.textSecondary,
-                  marginBottom: 16,
-                  lineHeight: 16,
-                  ...Typography.default(),
-                }}
-              >
-                {formProvider === "github"
-                  ? t("gitHosts.tokenHintGitHub")
-                  : t("gitHosts.tokenHint")}
-              </Text>
-
-              {/* Auto Issue section */}
-              <SectionToggle
-                theme={theme}
-                label={t("gitHosts.autoIssueSectionTitle")}
-                value={formAutoEnabled}
-                onValueChange={setFormAutoEnabled}
-              />
-              <HintText theme={theme}>
-                {t("gitHosts.autoIssueDescription")}
-              </HintText>
-
-              {formAutoEnabled && (
-                <>
-                  <FieldLabel theme={theme}>
-                    {t("gitHosts.autoIssueLabel")}
-                  </FieldLabel>
-                  <TextInput
-                    style={{
-                      backgroundColor: theme.colors.surface,
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 15,
-                      color: theme.colors.text,
-                      marginBottom: 12,
-                      ...Typography.mono(),
-                    }}
-                    value={formAutoLabel}
-                    onChangeText={setFormAutoLabel}
-                    placeholder={t("gitHosts.autoIssueLabelPlaceholder")}
-                    placeholderTextColor={theme.colors.textSecondary}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-
-                  <FieldLabel theme={theme}>
-                    {t("gitHosts.autoIssueAllowedAuthors")}
-                  </FieldLabel>
-                  <TextInput
-                    style={{
-                      backgroundColor: theme.colors.surface,
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 15,
-                      color: theme.colors.text,
-                      marginBottom: 16,
-                      ...Typography.mono(),
-                    }}
-                    value={formAutoAuthors}
-                    onChangeText={setFormAutoAuthors}
-                    placeholder={t(
-                      "gitHosts.autoIssueAllowedAuthorsPlaceholder",
-                    )}
-                    placeholderTextColor={theme.colors.textSecondary}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </>
-              )}
-
-              {/* Webhook Repos section */}
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: "600",
-                  color: theme.colors.text,
-                  marginTop: 4,
-                  marginBottom: 8,
-                  ...Typography.default("semiBold"),
-                }}
-              >
-                {t("gitHosts.webhookSectionTitle")}
-              </Text>
-              <HintText theme={theme}>
-                {t("gitHosts.webhookDescription")}
-              </HintText>
-
-              {formWebhookRepos.map((repo, idx) => (
-                <WebhookRepoItem
-                  key={idx}
-                  repo={repo}
-                  index={idx}
-                  provider={formProvider}
-                  machines={machines}
-                  theme={theme}
-                  onUpdate={handleUpdateWebhookRepo}
-                  onRemove={handleRemoveWebhookRepo}
-                />
-              ))}
-
-              {/* Add webhook repo button */}
-              <Pressable
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingVertical: 10,
-                  borderRadius: 8,
-                  backgroundColor: theme.colors.surface,
-                  marginBottom: 16,
-                }}
-                onPress={handleAddWebhookRepo}
-              >
-                <Ionicons
-                  name="add-circle-outline"
-                  size={18}
-                  color={theme.colors.textLink}
-                  style={{ marginRight: 6 }}
-                />
-                <Text
-                  style={{
-                    fontSize: 14,
-                    color: theme.colors.textLink,
-                    fontWeight: "600",
-                    ...Typography.default("semiBold"),
-                  }}
-                >
-                  {t("gitHosts.webhookAddRepo")}
-                </Text>
-              </Pressable>
 
               {/* Action buttons */}
               <View
@@ -694,6 +470,7 @@ export default React.memo(function GitHostsScreen() {
                   flexDirection: "row",
                   justifyContent: "flex-end",
                   gap: 8,
+                  marginTop: 16,
                 }}
               >
                 <Pressable
@@ -778,625 +555,26 @@ export default React.memo(function GitHostsScreen() {
   );
 });
 
-// ── Sub-components ──────────────────────────────────
-
-const FieldLabel = React.memo<{
-  theme: any;
-  children: string;
-}>(function FieldLabel({ theme, children }) {
-  return (
-    <Text
-      style={{
-        fontSize: 13,
-        color: theme.colors.textSecondary,
-        marginBottom: 6,
-        ...Typography.default(),
-      }}
-    >
-      {children}
-    </Text>
-  );
-});
-
-const HintText = React.memo<{
-  theme: any;
-  children: string;
-}>(function HintText({ theme, children }) {
-  return (
-    <Text
-      style={{
-        fontSize: 12,
-        color: theme.colors.textSecondary,
-        marginBottom: 12,
-        lineHeight: 16,
-        ...Typography.default(),
-      }}
-    >
-      {children}
-    </Text>
-  );
-});
-
-const SectionToggle = React.memo<{
-  theme: any;
-  label: string;
-  value: boolean;
-  onValueChange: (v: boolean) => void;
-}>(function SectionToggle({ theme, label, value, onValueChange }) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginTop: 4,
-        marginBottom: 8,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 14,
-          fontWeight: "600",
-          color: theme.colors.text,
-          ...Typography.default("semiBold"),
-        }}
-      >
-        {label}
-      </Text>
-      <Switch value={value} onValueChange={onValueChange} />
-    </View>
-  );
-});
-
-const ProviderButton = React.memo<{
-  label: string;
-  icon: React.ComponentProps<typeof Ionicons>["name"];
-  selected: boolean;
-  onPress: () => void;
-}>(function ProviderButton({ label, icon, selected, onPress }) {
-  const { theme } = useUnistyles();
-  return (
-    <Pressable
-      style={{
-        flex: 1,
-        paddingVertical: 10,
-        borderRadius: 8,
-        backgroundColor: selected
-          ? theme.colors.button.primary.background
-          : theme.colors.surface,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-      }}
-      onPress={onPress}
-    >
-      <Ionicons
-        name={icon}
-        size={18}
-        color={selected ? theme.colors.button.primary.tint : theme.colors.text}
-      />
-      <Text
-        style={{
-          fontSize: 14,
-          fontWeight: selected ? "600" : "400",
-          color: selected
-            ? theme.colors.button.primary.tint
-            : theme.colors.text,
-          ...Typography.default(selected ? "semiBold" : undefined),
-        }}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-});
-
-/**
- * Individual webhook repo configuration item.
- * Machine picker → Scan repos → Repo URL / Path → Secret → Webhook URL
- */
-const WebhookRepoItem = React.memo<{
-  repo: WebhookRepoConfig;
-  index: number;
-  provider: Provider;
-  machines: readonly { id: string; metadata?: any }[];
-  theme: any;
-  onUpdate: (index: number, updates: Partial<WebhookRepoConfig>) => void;
-  onRemove: (index: number) => void;
-}>(function WebhookRepoItem({
-  repo,
-  index,
-  provider,
-  machines,
-  theme,
-  onUpdate,
-  onRemove,
-}) {
-  const [scanning, setScanning] = useState(false);
-  const [scanResults, setScanResults] = useState<readonly GitRepoEntry[]>([]);
-  const [showScanResults, setShowScanResults] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [scanSearch, setScanSearch] = useState("");
-  const [testing, setTesting] = useState(false);
-
-  const handleCopySecret = async () => {
-    await Clipboard.setStringAsync(repo.secret);
-    HappyModal.toast(t("gitHosts.webhookSecretCopied"));
-  };
-
-  const handleCopyUrl = async () => {
-    const url = getWebhookUrl(provider);
-    await Clipboard.setStringAsync(url);
-    HappyModal.toast(t("gitHosts.webhookUrlCopied"));
-  };
-
-  const handleRegenSecret = () => {
-    onUpdate(index, { secret: generateWebhookSecret() });
-  };
-
-  const handleScanRepos = useCallback(async () => {
-    if (!repo.machineId || scanning) return;
-    setScanning(true);
-    setScanError(null);
-    setScanResults([]);
-    setScanSearch("");
-    setShowScanResults(true);
-    try {
-      const repos = await machineListGitRepos(repo.machineId);
-      setScanResults(repos);
-      if (repos.length === 0) {
-        setScanError(t("gitHosts.scanEmpty"));
-      }
-    } catch {
-      setScanError(t("gitHosts.scanError"));
-    } finally {
-      setScanning(false);
-    }
-  }, [repo.machineId, scanning]);
-
-  const handleSelectRepo = useCallback(
-    (entry: GitRepoEntry) => {
-      onUpdate(index, { repoUrl: entry.remoteUrl, repoPath: entry.repoPath });
-      setShowScanResults(false);
-    },
-    [index, onUpdate],
-  );
-
-  const handleShowGuide = useCallback(() => {
-    const webhookUrl = getWebhookUrl(provider);
-    const providerName = provider === "github" ? "GitHub" : "Gitea";
-    const steps =
-      provider === "github"
-        ? `1. ${t("gitHosts.guideStep1GitHub")}\n2. ${t("gitHosts.guideStep2")}\n3. ${t("gitHosts.guideStep3")}\n4. ${t("gitHosts.guideStep4")}\n5. ${t("gitHosts.guideStep5")}`
-        : `1. ${t("gitHosts.guideStep1Gitea")}\n2. ${t("gitHosts.guideStep2")}\n3. ${t("gitHosts.guideStep3")}\n4. ${t("gitHosts.guideStep4")}\n5. ${t("gitHosts.guideStep5")}`;
-    HappyModal.confirm(
-      t("gitHosts.webhookGuideTitle", { provider: providerName }),
-      `${steps}\n\nWebhook URL:\n${webhookUrl}`,
-      { cancelText: t("common.ok") },
-    );
-  }, [provider]);
-
-  const handleTestWebhook = useCallback(async () => {
-    if (testing) return;
-    setTesting(true);
-    try {
-      const webhookUrl = getWebhookUrl(provider);
-      const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "ping" }),
-      });
-      if (response.ok) {
-        HappyModal.toast(t("gitHosts.webhookTestSuccess"));
-      } else {
-        HappyModal.toast(
-          t("gitHosts.webhookTestFail", { status: String(response.status) }),
-        );
-      }
-    } catch {
-      HappyModal.toast(t("gitHosts.webhookTestError"));
-    } finally {
-      setTesting(false);
-    }
-  }, [provider, testing]);
-
-  return (
-    <View
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: 10,
-        padding: 12,
-        marginBottom: 10,
-      }}
-    >
-      {/* Header with enabled toggle, guide, test, remove */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 10,
-        }}
-      >
-        <Switch
-          value={repo.enabled}
-          onValueChange={(v) => onUpdate(index, { enabled: v })}
-        />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <Pressable onPress={handleShowGuide} hitSlop={8}>
-            <Ionicons
-              name="help-circle-outline"
-              size={20}
-              color={theme.colors.textLink}
-            />
-          </Pressable>
-          <Pressable
-            onPress={handleTestWebhook}
-            hitSlop={8}
-            disabled={testing}
-            style={{ opacity: testing ? 0.5 : 1 }}
-          >
-            {testing ? (
-              <ActivityIndicator size={16} color={theme.colors.textLink} />
-            ) : (
-              <Ionicons
-                name="flash-outline"
-                size={20}
-                color={theme.colors.textLink}
-              />
-            )}
-          </Pressable>
-          <Pressable onPress={() => onRemove(index)} hitSlop={8}>
-            <Text
-              style={{
-                fontSize: 13,
-                color: theme.colors.box.warning.text,
-                ...Typography.default(),
-              }}
-            >
-              {t("gitHosts.webhookRemoveRepo")}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Target Machine (moved before repo URL) */}
-      <FieldLabel theme={theme}>{t("gitHosts.webhookMachineId")}</FieldLabel>
-      {machines.length === 0 ? (
-        <Text
-          style={{
-            fontSize: 13,
-            color: theme.colors.box.warning.text,
-            marginBottom: 10,
-            ...Typography.default(),
-          }}
-        >
-          {t("gitHosts.webhookNoMachines")}
-        </Text>
-      ) : (
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: 6,
-            marginBottom: 10,
-          }}
-        >
-          {machines.map((machine) => (
-            <Pressable
-              key={machine.id}
-              style={{
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                borderRadius: 6,
-                backgroundColor:
-                  repo.machineId === machine.id
-                    ? theme.colors.button.primary.background
-                    : theme.colors.input.background,
-              }}
-              onPress={() =>
-                onUpdate(index, {
-                  machineId: machine.id,
-                })
-              }
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  color:
-                    repo.machineId === machine.id
-                      ? theme.colors.button.primary.tint
-                      : theme.colors.text,
-                  ...Typography.default(
-                    repo.machineId === machine.id ? "semiBold" : undefined,
-                  ),
-                }}
-              >
-                {machine.metadata?.displayName ??
-                  machine.metadata?.host ??
-                  machine.id.slice(0, 8)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-
-      {/* Scan repos button */}
-      {repo.machineId ? (
-        <Pressable
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            paddingVertical: 8,
-            borderRadius: 8,
-            backgroundColor: theme.colors.input.background,
-            marginBottom: 10,
-            opacity: scanning ? 0.6 : 1,
-          }}
-          onPress={handleScanRepos}
-          disabled={scanning}
-        >
-          {scanning ? (
-            <ActivityIndicator
-              size="small"
-              color={theme.colors.textLink}
-              style={{ marginRight: 6 }}
-            />
-          ) : (
-            <Ionicons
-              name="search-outline"
-              size={16}
-              color={theme.colors.textLink}
-              style={{ marginRight: 6 }}
-            />
-          )}
-          <Text
-            style={{
-              fontSize: 13,
-              color: theme.colors.textLink,
-              ...Typography.default("semiBold"),
-            }}
-          >
-            {scanning ? t("gitHosts.scanning") : t("gitHosts.scanRepos")}
-          </Text>
-        </Pressable>
-      ) : null}
-
-      {/* Scan results */}
-      {showScanResults && (
-        <View
-          style={{
-            backgroundColor: theme.colors.input.background,
-            borderRadius: 8,
-            marginBottom: 10,
-            overflow: "hidden",
-          }}
-        >
-          {scanError ? (
-            <Text
-              style={{
-                padding: 12,
-                fontSize: 13,
-                color: theme.colors.textSecondary,
-                textAlign: "center",
-                ...Typography.default(),
-              }}
-            >
-              {scanError}
-            </Text>
-          ) : (
-            <>
-              {scanResults.length > 0 && (
-                <TextInput
-                  style={{
-                    padding: 10,
-                    fontSize: 14,
-                    color: theme.colors.text,
-                    borderBottomWidth: 0.5,
-                    borderBottomColor: theme.colors.border,
-                    ...Typography.default(),
-                  }}
-                  value={scanSearch}
-                  onChangeText={setScanSearch}
-                  placeholder={t("gitHosts.scanSearchPlaceholder")}
-                  placeholderTextColor={theme.colors.textSecondary}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              )}
-              <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
-                {scanResults
-                  .filter((entry) => {
-                    if (!scanSearch) return true;
-                    const q = scanSearch.toLowerCase();
-                    return (
-                      entry.name.toLowerCase().includes(q) ||
-                      entry.repoPath.toLowerCase().includes(q) ||
-                      entry.remoteUrl.toLowerCase().includes(q)
-                    );
-                  })
-                  .map((entry) => (
-                    <Pressable
-                      key={entry.repoPath}
-                      style={{
-                        paddingHorizontal: 12,
-                        paddingVertical: 10,
-                        borderBottomWidth: 0.5,
-                        borderBottomColor: theme.colors.border,
-                      }}
-                      onPress={() => handleSelectRepo(entry)}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          color: theme.colors.text,
-                          ...Typography.default("semiBold"),
-                        }}
-                        numberOfLines={1}
-                      >
-                        {entry.name}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: theme.colors.textSecondary,
-                          marginTop: 2,
-                          ...Typography.mono(),
-                        }}
-                        numberOfLines={1}
-                      >
-                        {entry.repoPath}
-                      </Text>
-                    </Pressable>
-                  ))}
-              </ScrollView>
-            </>
-          )}
-        </View>
-      )}
-
-      {/* Repo URL */}
-      <FieldLabel theme={theme}>{t("gitHosts.webhookRepoUrl")}</FieldLabel>
-      <TextInput
-        style={{
-          backgroundColor: theme.colors.input.background,
-          borderRadius: 8,
-          padding: 10,
-          fontSize: 14,
-          color: theme.colors.text,
-          marginBottom: 10,
-          ...Typography.mono(),
-        }}
-        value={repo.repoUrl}
-        onChangeText={(v) => onUpdate(index, { repoUrl: v })}
-        placeholder={t("gitHosts.webhookRepoUrlPlaceholder")}
-        placeholderTextColor={theme.colors.textSecondary}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-      />
-
-      {/* Local repo path */}
-      <FieldLabel theme={theme}>{t("gitHosts.webhookRepoPath")}</FieldLabel>
-      <TextInput
-        style={{
-          backgroundColor: theme.colors.input.background,
-          borderRadius: 8,
-          padding: 10,
-          fontSize: 14,
-          color: theme.colors.text,
-          marginBottom: 10,
-          ...Typography.mono(),
-        }}
-        value={repo.repoPath}
-        onChangeText={(v) => onUpdate(index, { repoPath: v })}
-        placeholder={t("gitHosts.webhookRepoPathPlaceholder")}
-        placeholderTextColor={theme.colors.textSecondary}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-
-      {/* Secret */}
-      <FieldLabel theme={theme}>{t("gitHosts.webhookSecretLabel")}</FieldLabel>
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 6,
-          marginBottom: 10,
-        }}
-      >
-        <TextInput
-          style={{
-            flex: 1,
-            backgroundColor: theme.colors.input.background,
-            borderRadius: 8,
-            padding: 10,
-            fontSize: 12,
-            color: theme.colors.text,
-            ...Typography.mono(),
-          }}
-          value={repo.secret}
-          onChangeText={(v) => onUpdate(index, { secret: v })}
-          placeholder="..."
-          placeholderTextColor={theme.colors.textSecondary}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <Pressable
-          style={{
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderRadius: 6,
-            backgroundColor: theme.colors.input.background,
-            justifyContent: "center",
-          }}
-          onPress={handleRegenSecret}
-        >
-          <Ionicons
-            name="refresh-outline"
-            size={16}
-            color={theme.colors.textLink}
-          />
-        </Pressable>
-        {repo.secret.length > 0 && (
-          <Pressable
-            style={{
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 6,
-              backgroundColor: theme.colors.input.background,
-              justifyContent: "center",
-            }}
-            onPress={handleCopySecret}
-          >
-            <Ionicons
-              name="copy-outline"
-              size={16}
-              color={theme.colors.textLink}
-            />
-          </Pressable>
-        )}
-      </View>
-
-      {/* Webhook URL (read-only) */}
-      <FieldLabel theme={theme}>{t("gitHosts.webhookUrlLabel")}</FieldLabel>
-      <Pressable
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          backgroundColor: theme.colors.input.background,
-          borderRadius: 8,
-          padding: 10,
-          marginBottom: 4,
-          gap: 6,
-        }}
-        onPress={handleCopyUrl}
-      >
-        <Text
-          style={{
-            flex: 1,
-            fontSize: 12,
-            color: theme.colors.text,
-            ...Typography.mono(),
-          }}
-          numberOfLines={1}
-        >
-          {getWebhookUrl(provider)}
-        </Text>
-        <Ionicons name="copy-outline" size={14} color={theme.colors.textLink} />
-      </Pressable>
-      <HintText theme={theme}>{t("gitHosts.webhookUrlHint")}</HintText>
-    </View>
-  );
-});
-
 const styles = StyleSheet.create((theme) => ({
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 40,
     paddingHorizontal: 32,
+  },
+  track: {
+    flexDirection: "row",
+    borderRadius: 20,
+    padding: 3,
+  },
+  segment: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 7,
+    borderRadius: 18,
+  },
+  segmentText: {
+    fontSize: 13,
+    ...Typography.default("semiBold"),
   },
 }));

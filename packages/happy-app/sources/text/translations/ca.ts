@@ -267,6 +267,12 @@ export const ca: TranslationStructure = {
     showProjectTab: "Pestanya de projecte",
     showProjectTabSubtitle:
       "Mostra la pestanya de projecte (kanban) a la barra de pestanyes",
+    webNotifications: "Notificacions del navegador",
+    webNotificationsEnabled:
+      "Notificar quan es completin tasques o es necessitin aprovacions",
+    webNotificationsDisabled: "Sense notificacions del navegador",
+    webNotificationsDenied:
+      "Blocat pel navegador — activar a la configuració del lloc",
   },
 
   errors: {
@@ -1483,6 +1489,9 @@ export const ca: TranslationStructure = {
       "No hi ha hosts configurats. GitHub.com es detecta automàticament, altres hosts usen Gitea per defecte.",
     addHost: "Afegir host",
     editHost: "Editar host",
+    tabBasic: "Bàsic",
+    tabAutoIssue: "Issue Automàtic",
+    tabWebhooks: "Webhooks",
     hostLabel: "Host",
     providerLabel: "Proveïdor",
     tokenLabel: "API Token",
@@ -1781,6 +1790,11 @@ export const ca: TranslationStructure = {
       totalFeatures: ({ count }: { count: number }) =>
         `${count} ${plural({ count, singular: "funcionalitat", plural: "funcionalitats" })}`,
     },
+  },
+
+  webNotification: {
+    taskComplete: "Tasca completada",
+    permissionRequest: "Aprovació necessària",
   },
 
   openclaw: {

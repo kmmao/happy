@@ -249,6 +249,12 @@ export const ru: TranslationStructure = {
     showProjectTab: "Вкладка проекта",
     showProjectTabSubtitle:
       "Показывать вкладку проекта (канбан) в панели вкладок",
+    webNotifications: "Уведомления браузера",
+    webNotificationsEnabled:
+      "Уведомлять о завершении задач и запросах разрешений",
+    webNotificationsDisabled: "Уведомления браузера отключены",
+    webNotificationsDenied:
+      "Заблокировано браузером — включите в настройках сайта",
   },
 
   errors: {
@@ -1506,6 +1512,9 @@ export const ru: TranslationStructure = {
       "Нет настроенных хостов. GitHub.com определяется автоматически, остальные хосты используют Gitea.",
     addHost: "Добавить хост",
     editHost: "Редактировать хост",
+    tabBasic: "Основное",
+    tabAutoIssue: "Авто-задачи",
+    tabWebhooks: "Webhooks",
     hostLabel: "Хост",
     providerLabel: "Провайдер",
     tokenLabel: "API Token",
@@ -1798,6 +1807,11 @@ export const ru: TranslationStructure = {
       totalFeatures: ({ count }: { count: number }) =>
         `${count} ${plural({ count, one: "функция", few: "функции", many: "функций" })}`,
     },
+  },
+
+  webNotification: {
+    taskComplete: "Задача завершена",
+    permissionRequest: "Требуется одобрение",
   },
 
   openclaw: {

@@ -251,6 +251,10 @@ export const zhHant: TranslationStructure = {
     sttCorrectionDisabled: "使用原始語音辨識結果",
     showProjectTab: "專案標籤頁",
     showProjectTabSubtitle: "在標籤列中顯示專案（看板）標籤頁",
+    webNotifications: "瀏覽器通知",
+    webNotificationsEnabled: "任務完成或需要審批時通知",
+    webNotificationsDisabled: "未開啟瀏覽器通知",
+    webNotificationsDenied: "已被瀏覽器攔截 — 請在網站設定中開啟",
   },
 
   errors: {
@@ -1409,6 +1413,9 @@ export const zhHant: TranslationStructure = {
     empty: "尚未設定自訂主機。GitHub.com 會自動偵測，其他主機預設使用 Gitea。",
     addHost: "新增主機",
     editHost: "編輯主機",
+    tabBasic: "基本資訊",
+    tabAutoIssue: "自動工單",
+    tabWebhooks: "Webhooks",
     hostLabel: "主機位址",
     providerLabel: "供應商",
     tokenLabel: "API Token",
@@ -1690,6 +1697,11 @@ export const zhHant: TranslationStructure = {
       totalMilestones: ({ count }: { count: number }) => `${count} 個里程碑`,
       totalFeatures: ({ count }: { count: number }) => `${count} 個功能`,
     },
+  },
+
+  webNotification: {
+    taskComplete: "任務已完成",
+    permissionRequest: "需要審批",
   },
 
   openclaw: {

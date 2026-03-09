@@ -331,6 +331,12 @@ export const it: TranslationStructure = {
     showProjectTab: "Scheda progetto",
     showProjectTabSubtitle:
       "Mostra la scheda progetto (kanban) nella barra delle schede",
+    webNotifications: "Notifiche del browser",
+    webNotificationsEnabled:
+      "Notifica quando le attività sono completate o richiedono approvazione",
+    webNotificationsDisabled: "Nessuna notifica del browser",
+    webNotificationsDenied:
+      "Bloccato dal browser — attivare nelle impostazioni del sito",
   },
 
   errors: {
@@ -1479,6 +1485,9 @@ export const it: TranslationStructure = {
       "Nessun host configurato. GitHub.com viene rilevato automaticamente, gli altri host utilizzano Gitea per impostazione predefinita.",
     addHost: "Aggiungi host",
     editHost: "Modifica host",
+    tabBasic: "Base",
+    tabAutoIssue: "Issue Automatico",
+    tabWebhooks: "Webhooks",
     hostLabel: "Host",
     providerLabel: "Provider",
     tokenLabel: "API Token",
@@ -1776,6 +1785,11 @@ export const it: TranslationStructure = {
       totalFeatures: ({ count }: { count: number }) =>
         `${count} ${plural({ count, singular: "funzionalità", plural: "funzionalità" })}`,
     },
+  },
+
+  webNotification: {
+    taskComplete: "Attività completata",
+    permissionRequest: "Approvazione necessaria",
   },
 
   openclaw: {

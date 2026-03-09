@@ -127,6 +127,7 @@ class ApiSocket {
       "getDirectoryTree",
       "writeFile",
       "listGitRepos",
+      "createRemoteWebhook",
     ];
     return longRunningMethods.includes(method) ? LONG_TIMEOUT : 30_000;
   }

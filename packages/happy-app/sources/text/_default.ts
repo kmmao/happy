@@ -257,6 +257,10 @@ export const en = {
     sttCorrectionDisabled: "Using raw speech recognition output",
     showProjectTab: "Project Tab",
     showProjectTabSubtitle: "Show project (kanban) tab in the tab bar",
+    webNotifications: "Browser Notifications",
+    webNotificationsEnabled: "Notify when tasks complete or need approval",
+    webNotificationsDisabled: "No browser notifications",
+    webNotificationsDenied: "Blocked by browser — enable in site settings",
   },
 
   errors: {
@@ -1464,6 +1468,9 @@ export const en = {
       "No custom hosts configured. GitHub.com is detected automatically, other hosts default to Gitea.",
     addHost: "Add Host",
     editHost: "Edit Host",
+    tabBasic: "Basic",
+    tabAutoIssue: "Auto Issue",
+    tabWebhooks: "Webhooks",
     hostLabel: "Host",
     providerLabel: "Provider",
     tokenLabel: "API Token",
@@ -1756,6 +1763,11 @@ export const en = {
       totalMilestones: ({ count }: { count: number }) => `${count} milestones`,
       totalFeatures: ({ count }: { count: number }) => `${count} features`,
     },
+  },
+
+  webNotification: {
+    taskComplete: "Task Complete",
+    permissionRequest: "Approval Needed",
   },
 
   openclaw: {

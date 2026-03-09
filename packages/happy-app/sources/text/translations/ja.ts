@@ -321,6 +321,11 @@ export const ja: TranslationStructure = {
     sttCorrectionDisabled: "音声認識の結果をそのまま使用",
     showProjectTab: "プロジェクトタブ",
     showProjectTabSubtitle: "タブバーにプロジェクト（カンバン）タブを表示",
+    webNotifications: "ブラウザ通知",
+    webNotificationsEnabled: "タスク完了・承認要求時に通知",
+    webNotificationsDisabled: "ブラウザ通知オフ",
+    webNotificationsDenied:
+      "ブラウザにブロックされました — サイト設定で有効にしてください",
   },
 
   errors: {
@@ -1462,6 +1467,9 @@ export const ja: TranslationStructure = {
       "カスタムホストは設定されていません。GitHub.com は自動的に検出され、その他のホストはデフォルトで Gitea を使用します。",
     addHost: "ホストを追加",
     editHost: "ホストを編集",
+    tabBasic: "基本情報",
+    tabAutoIssue: "自動Issue",
+    tabWebhooks: "Webhooks",
     hostLabel: "ホスト",
     providerLabel: "プロバイダー",
     tokenLabel: "API Token",
@@ -1752,6 +1760,11 @@ export const ja: TranslationStructure = {
         `${count} 件のマイルストーン`,
       totalFeatures: ({ count }: { count: number }) => `${count} 件の機能`,
     },
+  },
+
+  webNotification: {
+    taskComplete: "タスク完了",
+    permissionRequest: "承認が必要",
   },
 
   openclaw: {

@@ -251,6 +251,10 @@ export const zhHans: TranslationStructure = {
     sttCorrectionDisabled: "使用原始语音识别结果",
     showProjectTab: "项目标签页",
     showProjectTabSubtitle: "在标签栏中显示项目（看板）标签页",
+    webNotifications: "浏览器通知",
+    webNotificationsEnabled: "任务完成或需要审批时通知",
+    webNotificationsDisabled: "未开启浏览器通知",
+    webNotificationsDenied: "已被浏览器拦截 — 请在站点设置中开启",
   },
 
   errors: {
@@ -1408,6 +1412,9 @@ export const zhHans: TranslationStructure = {
       "暂无自定义主机配置。GitHub.com 会自动识别，其他主机默认使用 Gitea。",
     addHost: "添加主机",
     editHost: "编辑主机",
+    tabBasic: "基本信息",
+    tabAutoIssue: "自动工单",
+    tabWebhooks: "Webhooks",
     hostLabel: "主机地址",
     providerLabel: "提供商",
     tokenLabel: "API Token",
@@ -1689,6 +1696,11 @@ export const zhHans: TranslationStructure = {
       totalMilestones: ({ count }: { count: number }) => `${count} 个里程碑`,
       totalFeatures: ({ count }: { count: number }) => `${count} 个功能`,
     },
+  },
+
+  webNotification: {
+    taskComplete: "任务已完成",
+    permissionRequest: "需要审批",
   },
 
   openclaw: {
