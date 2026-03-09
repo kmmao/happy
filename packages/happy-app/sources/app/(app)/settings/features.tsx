@@ -31,6 +31,8 @@ export default function FeaturesSettingsScreen() {
     useSettingMutable("showProjectTab");
   const [webNotifications, setWebNotifications] =
     useSettingMutable("webNotifications");
+  const [webNotificationsPersistent, setWebNotificationsPersistent] =
+    useSettingMutable("webNotificationsPersistent");
 
   // Track browser notification permission state to avoid calling browser API in render
   const [notifPermission, setNotifPermission] = React.useState<
@@ -184,8 +186,7 @@ export default function FeaturesSettingsScreen() {
                 onValueChange={async (value) => {
                   if (value) {
                     try {
-                      const permission =
-                        await requestNotificationPermission();
+                      const permission = await requestNotificationPermission();
                       setNotifPermission(permission);
                       if (permission === "granted") {
                         setWebNotifications(true);
@@ -201,6 +202,24 @@ export default function FeaturesSettingsScreen() {
             }
             showChevron={false}
           />
+          {webNotifications && (
+            <Item
+              title={t("settingsFeatures.webNotificationsPersistent")}
+              subtitle={
+                webNotificationsPersistent
+                  ? t("settingsFeatures.webNotificationsPersistentEnabled")
+                  : t("settingsFeatures.webNotificationsPersistentDisabled")
+              }
+              icon={<Ionicons name="pin-outline" size={29} color="#FF9500" />}
+              rightElement={
+                <Switch
+                  value={webNotificationsPersistent}
+                  onValueChange={setWebNotificationsPersistent}
+                />
+              }
+              showChevron={false}
+            />
+          )}
         </ItemGroup>
       )}
     </ItemList>

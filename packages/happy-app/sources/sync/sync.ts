@@ -2459,11 +2459,13 @@ class Sync {
                 Platform.OS === "web" &&
                 storage.getState().settings.webNotifications
               ) {
+                const settings = storage.getState().settings;
                 const sessionName = getSessionName(session);
                 notifyTaskComplete(
                   sessionName,
                   updateData.body.sid,
                   t("webNotification.taskComplete"),
+                  settings.webNotificationsPersistent,
                 );
               }
 
@@ -2702,6 +2704,7 @@ class Sync {
                   requestIds[0],
                   toolName,
                   t("webNotification.permissionRequest"),
+                  storage.getState().settings.webNotificationsPersistent,
                 );
               }
             }

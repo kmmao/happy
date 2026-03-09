@@ -591,6 +591,11 @@ export const SettingsSchema = z.object({
     .describe(
       "Enable browser notifications for task completion and permission requests (web only)",
     ),
+  webNotificationsPersistent: z
+    .boolean()
+    .describe(
+      "Keep browser notifications visible until manually dismissed (web only)",
+    ),
 });
 
 //
@@ -665,6 +670,7 @@ export const settingsDefaults: Settings = {
   dismissedCLIWarnings: { perMachine: {}, global: {} },
   // Browser notifications (web only, off by default)
   webNotifications: false,
+  webNotificationsPersistent: false,
 };
 Object.freeze(settingsDefaults);
 

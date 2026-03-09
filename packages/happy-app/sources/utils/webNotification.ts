@@ -36,7 +36,7 @@ export function getNotificationPermission():
  */
 export function sendWebNotification(
   title: string,
-  options?: { body?: string; tag?: string },
+  options?: { body?: string; tag?: string; persistent?: boolean },
 ): void {
   if (!isNotificationSupported()) {
     return;
@@ -52,6 +52,7 @@ export function sendWebNotification(
     body: options?.body,
     tag: options?.tag,
     icon: "/icon-notification.png",
+    requireInteraction: options?.persistent ?? false,
   });
 
   notification.onclick = () => {
@@ -59,8 +60,9 @@ export function sendWebNotification(
     notification.close();
   };
 
-  // Auto-close after 5 seconds
-  setTimeout(() => notification.close(), 5000);
+  if (!options?.persistent) {
+    setTimeout(() => notification.close(), 5000);
+  }
 }
 
 /**
@@ -70,10 +72,12 @@ export function notifyTaskComplete(
   sessionName: string,
   sessionId: string,
   title: string,
+  persistent?: boolean,
 ): void {
   sendWebNotification(title, {
     body: sessionName,
     tag: `task-complete-${sessionId}`,
+    persistent,
   });
 }
 
@@ -90,6 +94,7 @@ export function notifyPermissionRequest(
   requestId: string,
   toolName: string | undefined,
   title: string,
+  persistent?: boolean,
 ): void {
   if (notifiedRequestIds.has(requestId)) {
     return;
@@ -101,6 +106,7 @@ export function notifyPermissionRequest(
   sendWebNotification(title, {
     body,
     tag: `permission-${sessionId}`,
+    persistent,
   });
 }
 
