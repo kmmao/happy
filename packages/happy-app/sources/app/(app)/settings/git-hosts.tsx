@@ -979,7 +979,7 @@ const WebhookRepoItem = React.memo<{
             </Text>
           ) : (
             <>
-              {scanResults.length > 5 && (
+              {scanResults.length > 0 && (
                 <TextInput
                   style={{
                     padding: 10,
