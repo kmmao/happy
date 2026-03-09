@@ -443,7 +443,7 @@ const ChatListInternal = React.memo(
         keyExtractor={keyExtractor}
         maintainVisibleContentPosition={{
           minIndexForVisible: 0,
-          autoscrollToTopThreshold: 10,
+          autoscrollToTopThreshold: 300,
         }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}

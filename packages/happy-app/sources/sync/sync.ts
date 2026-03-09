@@ -337,16 +337,18 @@ class Sync {
       if (cached) {
         storage.getState().restoreMessagesFromCache(sessionId, cached);
         if (cached.isTrimmed) {
-          // Cache was truncated — force full re-fetch to recover older messages.
-          // Cached messages still provide instant preview while fetching.
-          this.sessionLastSeq.delete(sessionId);
-          deleteLastSeq(sessionId);
+          // Cache was truncated — older messages are missing.
+          // Use cached lastSeq for incremental fetch first (to get NEWEST messages fast),
+          // then backfill older messages in the background.
+          if (!this.sessionLastSeq.has(sessionId)) {
+            this.sessionLastSeq.set(sessionId, cached.lastSeq);
+          }
         } else if (!this.sessionLastSeq.has(sessionId)) {
           // Cache is complete — use cached lastSeq for incremental fetch only
           this.sessionLastSeq.set(sessionId, cached.lastSeq);
         }
         log.log(
-          `💬 Restored ${cached.messages.length} cached messages for ${sessionId}`,
+          `💬 Restored ${cached.messages.length} cached messages for ${sessionId} (trimmed: ${cached.isTrimmed})`,
         );
       } else if (this.sessionLastSeq.has(sessionId)) {
         // lastSeq exists but no cache (e.g. first launch after feature rollout)
@@ -2076,7 +2078,13 @@ class Sync {
       let afterSeq = this.sessionLastSeq.get(sessionId) ?? 0;
       let hasMore = true;
       let totalNormalized = 0;
-      let isFirstBatch = true;
+
+      // Collect all messages across batches before applying to the store.
+      // Applying per-batch would cause the UI to show old messages first
+      // and progressively load newer ones, which looks jarring.
+      const allNormalized: NormalizedMessage[] = [];
+      let latestPromptSuggestion: string | null = null;
+      let latestNeedsContinue = false;
 
       while (hasMore) {
         const response = await apiSocket.request(
@@ -2098,9 +2106,6 @@ class Sync {
         }
 
         const decryptedMessages = await encryption.decryptMessages(messages);
-        const normalizedMessages: NormalizedMessage[] = [];
-        let latestPromptSuggestion: string | null = null;
-        let latestNeedsContinue = false;
         for (let i = 0; i < decryptedMessages.length; i++) {
           const decrypted = decryptedMessages[i];
           if (!decrypted) {
@@ -2124,34 +2129,8 @@ class Sync {
             decrypted.content,
           );
           if (normalized) {
-            normalizedMessages.push(normalized);
+            allNormalized.push(normalized);
           }
-        }
-
-        // Surface the latest prompt suggestion for this session
-        if (latestPromptSuggestion !== null) {
-          storage
-            .getState()
-            .setPromptSuggestion(sessionId, latestPromptSuggestion);
-        }
-
-        // Surface needs-continue signal for this session (always sync to handle resets)
-        storage.getState().setNeedsContinue(sessionId, latestNeedsContinue);
-
-        if (normalizedMessages.length > 0) {
-          totalNormalized += normalizedMessages.length;
-          // Apply messages directly instead of going through the queue.
-          // We already hold the sessionMessageLock, so enqueueMessages would
-          // deadlock — the queue processor also needs this same lock.
-          // Direct application ensures each batch is visible to the UI immediately.
-          this.applyMessages(sessionId, normalizedMessages);
-        }
-
-        // Mark loaded after first batch so UI renders immediately
-        // instead of waiting for all pages to complete
-        if (isFirstBatch) {
-          storage.getState().applyMessagesLoaded(sessionId);
-          isFirstBatch = false;
         }
 
         this.sessionLastSeq.set(sessionId, maxSeq);
@@ -2165,6 +2144,23 @@ class Sync {
         }
         afterSeq = maxSeq;
       }
+
+      // Apply all collected messages at once so the UI renders them together.
+      // We call applyMessages directly (not enqueueMessages) because we
+      // already hold the sessionMessageLock — the queue processor needs
+      // the same lock and would deadlock.
+      totalNormalized = allNormalized.length;
+      if (totalNormalized > 0) {
+        this.applyMessages(sessionId, allNormalized);
+      }
+
+      // Surface prompt suggestion and needs-continue after all messages processed
+      if (latestPromptSuggestion !== null) {
+        storage
+          .getState()
+          .setPromptSuggestion(sessionId, latestPromptSuggestion);
+      }
+      storage.getState().setNeedsContinue(sessionId, latestNeedsContinue);
 
       storage.getState().applyMessagesLoaded(sessionId);
       log.log(
