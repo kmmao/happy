@@ -2078,11 +2078,11 @@ class Sync {
       let afterSeq = this.sessionLastSeq.get(sessionId) ?? 0;
       let hasMore = true;
       let totalNormalized = 0;
+      let isFirstBatch = true;
 
-      // Collect all messages across batches before applying to the store.
-      // Applying per-batch would cause the UI to show old messages first
-      // and progressively load newer ones, which looks jarring.
-      const allNormalized: NormalizedMessage[] = [];
+      // After the first batch is applied immediately (to exit loading state),
+      // remaining batches are collected here and applied all at once at the end.
+      const remainingNormalized: NormalizedMessage[] = [];
       let latestPromptSuggestion: string | null = null;
       let latestNeedsContinue = false;
 
@@ -2106,17 +2106,16 @@ class Sync {
         }
 
         const decryptedMessages = await encryption.decryptMessages(messages);
+        const batchNormalized: NormalizedMessage[] = [];
         for (let i = 0; i < decryptedMessages.length; i++) {
           const decrypted = decryptedMessages[i];
           if (!decrypted) {
             continue;
           }
-          // Extract prompt suggestion before normalizing (normalization returns null for these)
           const suggestion = extractPromptSuggestionFromRaw(decrypted.content);
           if (suggestion !== null) {
             latestPromptSuggestion = suggestion;
           }
-          // Extract needs-continue signal (reset on user messages — user already intervened)
           if (extractNeedsContinueFromRaw(decrypted.content)) {
             latestNeedsContinue = true;
           } else if (decrypted.content?.role === "user") {
@@ -2129,8 +2128,23 @@ class Sync {
             decrypted.content,
           );
           if (normalized) {
-            allNormalized.push(normalized);
+            batchNormalized.push(normalized);
           }
+        }
+
+        totalNormalized += batchNormalized.length;
+
+        // Apply first batch immediately so the UI exits the loading spinner.
+        // Subsequent batches are collected and applied all at once at the end
+        // to avoid the jarring "old messages appear first" progressive loading.
+        if (isFirstBatch) {
+          if (batchNormalized.length > 0) {
+            this.applyMessages(sessionId, batchNormalized);
+          }
+          storage.getState().applyMessagesLoaded(sessionId);
+          isFirstBatch = false;
+        } else {
+          remainingNormalized.push(...batchNormalized);
         }
 
         this.sessionLastSeq.set(sessionId, maxSeq);
@@ -2145,13 +2159,12 @@ class Sync {
         afterSeq = maxSeq;
       }
 
-      // Apply all collected messages at once so the UI renders them together.
+      // Apply remaining batches at once so the UI renders them together.
       // We call applyMessages directly (not enqueueMessages) because we
       // already hold the sessionMessageLock — the queue processor needs
       // the same lock and would deadlock.
-      totalNormalized = allNormalized.length;
-      if (totalNormalized > 0) {
-        this.applyMessages(sessionId, allNormalized);
+      if (remainingNormalized.length > 0) {
+        this.applyMessages(sessionId, remainingNormalized);
       }
 
       // Surface prompt suggestion and needs-continue after all messages processed
