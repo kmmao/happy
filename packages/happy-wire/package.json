@@ -1,6 +1,6 @@
 {
   "name": "@kmmao/happy-wire",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Shared message wire types and Zod schemas for Happy clients and services",
   "author": "kmmao",
   "license": "MIT",
@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^2.2.2",
-    "zod": "3.25.76"
+    "zod": "4"
   },
   "devDependencies": {
     "@types/node": ">=20",
