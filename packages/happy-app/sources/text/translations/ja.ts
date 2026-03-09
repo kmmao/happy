@@ -1468,6 +1468,8 @@ export const ja: TranslationStructure = {
     tokenPlaceholder: "任意 — プライベートリポジトリには必須",
     tokenHint:
       "Giteaの 設定 → アプリケーション → アクセストークン で生成してください。",
+    tokenHintGitHub:
+      "admin:repo_hook スコープの Personal Access Token。保存時に Webhook を自動作成します。",
     deleteTitle: "ホストを削除",
     deleteMessage: ({ host }: { host: string }) =>
       `"${host}" を設定済みホストから削除しますか？`,
@@ -1518,6 +1520,8 @@ export const ja: TranslationStructure = {
     webhookTestFail: "サーバーが HTTP {{status}} を返しました",
     webhookTestError:
       "サーバーに到達できません — ネットワークを確認してください",
+    remoteWebhookSuccess: "リモートリポジトリに Webhook を作成しました",
+    remoteWebhookFail: "リモート Webhook の作成に失敗: {{error}}",
   },
 
   quickCommands: {

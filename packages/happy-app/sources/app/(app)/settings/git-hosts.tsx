@@ -31,6 +31,110 @@ import type { WebhookRepoConfig } from "@/sync/issueTypes";
 
 type Provider = "github" | "gitea";
 
+/** Parse owner/repo from a repo URL like https://github.com/owner/repo */
+function parseRepoOwner(
+  repoUrl: string,
+): { owner: string; repo: string } | null {
+  try {
+    const url = new URL(repoUrl);
+    const parts = url.pathname
+      .replace(/^\//, "")
+      .replace(/\.git$/, "")
+      .split("/");
+    if (parts.length >= 2) {
+      return { owner: parts[0], repo: parts[1] };
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/** Create or update a webhook on the remote Git host */
+async function ensureRemoteWebhook(
+  provider: Provider,
+  host: string,
+  apiToken: string,
+  repoUrl: string,
+  webhookUrl: string,
+  secret: string,
+): Promise<{ created: boolean; error?: string }> {
+  const parsed = parseRepoOwner(repoUrl);
+  if (!parsed) return { created: false, error: "Invalid repo URL" };
+  const { owner, repo } = parsed;
+
+  const baseUrl =
+    provider === "github" && (host === "github.com" || host === "")
+      ? "https://api.github.com"
+      : provider === "github"
+        ? `https://${host}/api/v3`
+        : `https://${host}/api/v1`;
+
+  const headers: Record<string, string> = {
+    Authorization: `token ${apiToken}`,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+
+  const hooksEndpoint = `${baseUrl}/repos/${owner}/${repo}/hooks`;
+
+  try {
+    // Check if webhook already exists
+    const listRes = await fetch(hooksEndpoint, { headers });
+    if (listRes.ok) {
+      const hooks = (await listRes.json()) as {
+        id: number;
+        config: { url?: string };
+      }[];
+      const existing = hooks.find((h) => h.config.url === webhookUrl);
+      if (existing) {
+        // Update existing webhook with new secret
+        await fetch(`${hooksEndpoint}/${existing.id}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({
+            config: {
+              url: webhookUrl,
+              content_type: "application/json",
+              secret,
+            },
+            events: ["issues"],
+            active: true,
+          }),
+        });
+        return { created: true };
+      }
+    }
+
+    // Create new webhook
+    const createRes = await fetch(hooksEndpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        name: "web",
+        config: {
+          url: webhookUrl,
+          content_type: "application/json",
+          secret,
+        },
+        events: ["issues"],
+        active: true,
+      }),
+    });
+
+    if (createRes.ok || createRes.status === 201) {
+      return { created: true };
+    }
+    const errBody = await createRes.text();
+    return { created: false, error: `HTTP ${createRes.status}: ${errBody}` };
+  } catch (err) {
+    return {
+      created: false,
+      error: err instanceof Error ? err.message : "Network error",
+    };
+  }
+}
+
 interface GitHost {
   readonly host: string;
   readonly provider: Provider;
@@ -149,9 +253,38 @@ export default React.memo(function GitHostsScreen() {
         }
       } catch {
         HappyModal.toast(t("gitHosts.webhookSyncError"));
-      } finally {
-        setWebhookSyncing(false);
       }
+
+      // Auto-create webhooks on remote Git host
+      if (trimmedToken && hasEnabledRepos) {
+        const webhookUrl = getWebhookUrl(formProvider);
+        const results = await Promise.all(
+          formWebhookRepos
+            .filter((r) => r.enabled && r.secret && r.repoUrl)
+            .map((r) =>
+              ensureRemoteWebhook(
+                formProvider,
+                trimmedHost,
+                trimmedToken,
+                r.repoUrl,
+                webhookUrl,
+                r.secret,
+              ),
+            ),
+        );
+        const failed = results.filter((r) => !r.created);
+        if (failed.length === 0 && results.length > 0) {
+          HappyModal.toast(t("gitHosts.remoteWebhookSuccess"));
+        } else if (failed.length > 0) {
+          HappyModal.toast(
+            t("gitHosts.remoteWebhookFail", {
+              error: failed[0].error ?? "Unknown",
+            }),
+          );
+        }
+      }
+
+      setWebhookSyncing(false);
     }
 
     if (editIndex !== null) {
@@ -385,43 +518,39 @@ export default React.memo(function GitHostsScreen() {
                 />
               </View>
 
-              {/* API Token input (Gitea only) */}
-              {formProvider === "gitea" && (
-                <>
-                  <FieldLabel theme={theme}>
-                    {t("gitHosts.tokenLabel")}
-                  </FieldLabel>
-                  <TextInput
-                    style={{
-                      backgroundColor: theme.colors.surface,
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 15,
-                      color: theme.colors.text,
-                      marginBottom: 4,
-                      ...Typography.mono(),
-                    }}
-                    value={formToken}
-                    onChangeText={setFormToken}
-                    placeholder={t("gitHosts.tokenPlaceholder")}
-                    placeholderTextColor={theme.colors.textSecondary}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    secureTextEntry
-                  />
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: theme.colors.textSecondary,
-                      marginBottom: 16,
-                      lineHeight: 16,
-                      ...Typography.default(),
-                    }}
-                  >
-                    {t("gitHosts.tokenHint")}
-                  </Text>
-                </>
-              )}
+              {/* API Token input */}
+              <FieldLabel theme={theme}>{t("gitHosts.tokenLabel")}</FieldLabel>
+              <TextInput
+                style={{
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 15,
+                  color: theme.colors.text,
+                  marginBottom: 4,
+                  ...Typography.mono(),
+                }}
+                value={formToken}
+                onChangeText={setFormToken}
+                placeholder={t("gitHosts.tokenPlaceholder")}
+                placeholderTextColor={theme.colors.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: theme.colors.textSecondary,
+                  marginBottom: 16,
+                  lineHeight: 16,
+                  ...Typography.default(),
+                }}
+              >
+                {formProvider === "github"
+                  ? t("gitHosts.tokenHintGitHub")
+                  : t("gitHosts.tokenHint")}
+              </Text>
 
               {/* Auto Issue section */}
               <SectionToggle

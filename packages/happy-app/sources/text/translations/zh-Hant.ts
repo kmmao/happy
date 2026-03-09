@@ -1414,6 +1414,8 @@ export const zhHant: TranslationStructure = {
     tokenLabel: "API Token",
     tokenPlaceholder: "可選 — 私有倉庫必填",
     tokenHint: "在 Gitea 的 設定 → 應用程式 → 存取權杖 中產生。",
+    tokenHintGitHub:
+      "需要 admin:repo_hook 權限的 Personal Access Token。儲存時自動建立 Webhook。",
     deleteTitle: "刪除主機",
     deleteMessage: ({ host }: { host: string }) =>
       `確定從設定中移除「${host}」？`,
@@ -1460,6 +1462,8 @@ export const zhHant: TranslationStructure = {
     webhookTestSuccess: "伺服器可達",
     webhookTestFail: "伺服器回應 HTTP {{status}}",
     webhookTestError: "無法連線伺服器 - 請檢查網路",
+    remoteWebhookSuccess: "已在遠端倉庫建立 Webhook",
+    remoteWebhookFail: "建立遠端 Webhook 失敗：{{error}}",
   },
 
   quickCommands: {

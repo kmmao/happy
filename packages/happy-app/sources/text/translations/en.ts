@@ -1480,6 +1480,8 @@ export const en: TranslationStructure = {
     tokenPlaceholder: "Optional — required for private repos",
     tokenHint:
       "Generate at Settings → Applications → Access Tokens in your Gitea instance.",
+    tokenHintGitHub:
+      "Personal Access Token with admin:repo_hook scope. Enables auto-creating webhooks on save.",
     deleteTitle: "Delete Host",
     deleteMessage: ({ host }: { host: string }) =>
       `Remove "${host}" from configured hosts?`,
@@ -1529,6 +1531,8 @@ export const en: TranslationStructure = {
     webhookTestSuccess: "Server is reachable",
     webhookTestFail: "Server returned HTTP {{status}}",
     webhookTestError: "Cannot reach server — check your network",
+    remoteWebhookSuccess: "Webhook created on remote repo",
+    remoteWebhookFail: "Failed to create remote webhook: {{error}}",
   },
 
   quickCommands: {

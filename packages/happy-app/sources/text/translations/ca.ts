@@ -1489,6 +1489,8 @@ export const ca: TranslationStructure = {
     tokenPlaceholder: "Opcional — necessari per a repos privats",
     tokenHint:
       "Genera'l a Configuració → Aplicacions → Tokens d'accés del teu Gitea.",
+    tokenHintGitHub:
+      "Personal Access Token amb permisos admin:repo_hook. Crea webhooks automàticament en desar.",
     deleteTitle: "Eliminar host",
     deleteMessage: ({ host }: { host: string }) =>
       `Eliminar "${host}" dels hosts configurats?`,
@@ -1540,6 +1542,8 @@ export const ca: TranslationStructure = {
     webhookTestSuccess: "El servidor és accessible",
     webhookTestFail: "El servidor ha retornat HTTP {{status}}",
     webhookTestError: "No es pot connectar al servidor — comprova la xarxa",
+    remoteWebhookSuccess: "Webhook creat al repositori remot",
+    remoteWebhookFail: "Error en crear webhook remot: {{error}}",
   },
 
   quickCommands: {

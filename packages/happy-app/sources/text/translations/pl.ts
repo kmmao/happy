@@ -1511,6 +1511,8 @@ export const pl: TranslationStructure = {
     tokenPlaceholder: "Opcjonalnie — wymagane dla prywatnych repozytoriów",
     tokenHint:
       "Wygeneruj w Ustawienia → Aplikacje → Tokeny dostępu w Twojej instancji Gitea.",
+    tokenHintGitHub:
+      "Personal Access Token z uprawnieniami admin:repo_hook. Automatycznie tworzy Webhook przy zapisywaniu.",
     deleteTitle: "Usuń host",
     deleteMessage: ({ host }: { host: string }) =>
       `Usunąć "${host}" z listy hostów?`,
@@ -1562,6 +1564,8 @@ export const pl: TranslationStructure = {
     webhookTestSuccess: "Serwer jest osiągalny",
     webhookTestFail: "Serwer zwrócił HTTP {{status}}",
     webhookTestError: "Nie można połączyć się z serwerem — sprawdź sieć",
+    remoteWebhookSuccess: "Webhook utworzony w zdalnym repozytorium",
+    remoteWebhookFail: "Nie udało się utworzyć zdalnego Webhook: {{error}}",
   },
 
   quickCommands: {

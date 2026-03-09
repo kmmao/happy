@@ -1413,6 +1413,8 @@ export const zhHans: TranslationStructure = {
     tokenLabel: "API Token",
     tokenPlaceholder: "可选 — 私有仓库必填",
     tokenHint: "在 Gitea 的 设置 → 应用 → 访问令牌 中生成。",
+    tokenHintGitHub:
+      "需要 admin:repo_hook 权限的 Personal Access Token。保存时自动创建 Webhook。",
     deleteTitle: "删除主机",
     deleteMessage: ({ host }: { host: string }) =>
       `确定从配置中移除"${host}"？`,
@@ -1459,6 +1461,8 @@ export const zhHans: TranslationStructure = {
     webhookTestSuccess: "服务器可达",
     webhookTestFail: "服务器返回 HTTP {{status}}",
     webhookTestError: "无法连接服务器 - 请检查网络",
+    remoteWebhookSuccess: "已在远程仓库创建 Webhook",
+    remoteWebhookFail: "创建远程 Webhook 失败：{{error}}",
   },
 
   quickCommands: {
