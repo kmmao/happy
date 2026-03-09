@@ -16,7 +16,10 @@ import {
   getWebhookUrl,
   syncWebhookRoutes,
 } from "@/sync/webhookRouteSync";
-import { machineCreateRemoteWebhook } from "@/sync/ops";
+import {
+  machineCreateRemoteWebhook,
+  machineDeleteRemoteWebhook,
+} from "@/sync/ops";
 import type { WebhookRepoConfig } from "@/sync/issueTypes";
 import type { GitHost, GitHostTab, Provider } from "./git-hosts/types";
 import { GitHostBasicForm } from "./git-hosts/GitHostBasicForm";
@@ -232,6 +235,30 @@ export default React.memo(function GitHostsScreen() {
         }
       } else if (hasEnabledRepos && !trimmedToken) {
         HappyModal.toast(t("gitHosts.tokenRequiredForRemote"));
+      }
+
+      // Delete webhooks for removed repos from remote Git host
+      if (trimmedToken && editIndex !== null) {
+        const originalRepos = gitHosts[editIndex]?.webhookRepos ?? [];
+        const currentRepoUrls = new Set(
+          formWebhookRepos.map((r) => r.repoUrl).filter(Boolean),
+        );
+        const removedRepos = originalRepos.filter(
+          (r) => r.repoUrl && r.machineId && !currentRepoUrls.has(r.repoUrl),
+        );
+        if (removedRepos.length > 0) {
+          const webhookUrl = getWebhookUrl(formProvider);
+          await Promise.allSettled(
+            removedRepos.map((r) =>
+              machineDeleteRemoteWebhook(r.machineId, {
+                provider: formProvider,
+                apiToken: trimmedToken,
+                repoUrl: r.repoUrl,
+                webhookUrl,
+              }),
+            ),
+          );
+        }
       }
 
       setWebhookSyncing(false);

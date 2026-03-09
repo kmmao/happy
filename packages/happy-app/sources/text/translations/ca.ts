@@ -273,6 +273,10 @@ export const ca: TranslationStructure = {
     webNotificationsDisabled: "Sense notificacions del navegador",
     webNotificationsDenied:
       "Blocat pel navegador — activar a la configuració del lloc",
+    webNotificationsPersistent: "Fixar notificacions",
+    webNotificationsPersistentEnabled:
+      "Les notificacions es mantenen fins tancar-les",
+    webNotificationsPersistentDisabled: "Les notificacions es tanquen en 5 seg",
   },
 
   errors: {

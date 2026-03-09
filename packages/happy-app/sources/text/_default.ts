@@ -261,6 +261,9 @@ export const en = {
     webNotificationsEnabled: "Notify when tasks complete or need approval",
     webNotificationsDisabled: "No browser notifications",
     webNotificationsDenied: "Blocked by browser — enable in site settings",
+    webNotificationsPersistent: "Pin Notifications",
+    webNotificationsPersistentEnabled: "Notifications stay until dismissed",
+    webNotificationsPersistentDisabled: "Notifications auto-close after 5s",
   },
 
   errors: {

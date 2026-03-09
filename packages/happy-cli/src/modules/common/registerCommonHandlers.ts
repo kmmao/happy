@@ -944,4 +944,94 @@ export function registerCommonHandlers(
       };
     }
   });
+
+  // ── deleteRemoteWebhook handler ────────────────────────────────────
+  // Deletes a webhook on a remote Git host by matching the webhook URL.
+
+  interface DeleteRemoteWebhookRequest {
+    provider: "github" | "gitea" | "gitlab";
+    apiToken: string;
+    repoUrl: string;
+    webhookUrl: string;
+  }
+
+  interface DeleteRemoteWebhookResponse {
+    success: boolean;
+    deleted?: boolean;
+    error?: string;
+  }
+
+  rpcHandlerManager.registerHandler<
+    DeleteRemoteWebhookRequest,
+    DeleteRemoteWebhookResponse
+  >("deleteRemoteWebhook", async (data) => {
+    logger.debug("deleteRemoteWebhook request:", {
+      provider: data.provider,
+      repoUrl: data.repoUrl,
+    });
+
+    try {
+      const parsed = parseRepoOwnerFromUrl(data.repoUrl);
+      if (!parsed) {
+        return { success: false, error: "Invalid repo URL" };
+      }
+      const { origin, owner, repo } = parsed;
+
+      const isGitHubCom =
+        origin === "https://github.com" || origin === "http://github.com";
+      const baseUrl =
+        data.provider === "github" && isGitHubCom
+          ? "https://api.github.com"
+          : data.provider === "github"
+            ? `${origin}/api/v3`
+            : `${origin}/api/v1`;
+
+      const headers: Record<string, string> = {
+        Authorization: `token ${data.apiToken}`,
+        Accept: "application/json",
+      };
+
+      const hooksEndpoint = `${baseUrl}/repos/${owner}/${repo}/hooks`;
+
+      // List hooks and find by URL
+      const listRes = await fetch(hooksEndpoint, { headers });
+      if (!listRes.ok) {
+        return {
+          success: false,
+          error: `List hooks failed: HTTP ${listRes.status}`,
+        };
+      }
+
+      const hooks = (await listRes.json()) as {
+        id: number;
+        config: { url?: string };
+      }[];
+      const existing = hooks.find((h) => h.config.url === data.webhookUrl);
+      if (!existing) {
+        return { success: true, deleted: false };
+      }
+
+      const deleteRes = await fetch(`${hooksEndpoint}/${existing.id}`, {
+        method: "DELETE",
+        headers,
+      });
+
+      if (deleteRes.ok || deleteRes.status === 204) {
+        return { success: true, deleted: true };
+      }
+
+      const errBody = await deleteRes.text().catch(() => "");
+      return {
+        success: false,
+        error: `DELETE ${deleteRes.status}: ${errBody}`,
+      };
+    } catch (error) {
+      logger.debug("deleteRemoteWebhook failed:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to delete webhook",
+      };
+    }
+  });
 }

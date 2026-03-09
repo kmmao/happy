@@ -255,6 +255,9 @@ export const zhHant: TranslationStructure = {
     webNotificationsEnabled: "任務完成或需要審批時通知",
     webNotificationsDisabled: "未開啟瀏覽器通知",
     webNotificationsDenied: "已被瀏覽器攔截 — 請在網站設定中開啟",
+    webNotificationsPersistent: "釘選通知",
+    webNotificationsPersistentEnabled: "通知保持顯示直到手動關閉",
+    webNotificationsPersistentDisabled: "通知 5 秒後自動關閉",
   },
 
   errors: {

@@ -255,6 +255,9 @@ export const zhHans: TranslationStructure = {
     webNotificationsEnabled: "任务完成或需要审批时通知",
     webNotificationsDisabled: "未开启浏览器通知",
     webNotificationsDenied: "已被浏览器拦截 — 请在站点设置中开启",
+    webNotificationsPersistent: "固定通知",
+    webNotificationsPersistentEnabled: "通知保持显示直到手动关闭",
+    webNotificationsPersistentDisabled: "通知 5 秒后自动关闭",
   },
 
   errors: {

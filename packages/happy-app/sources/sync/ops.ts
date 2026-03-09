@@ -279,6 +279,28 @@ export async function machineCreateRemoteWebhook(
   return { created: result.created ?? true, webhookId: result.webhookId };
 }
 
+export interface DeleteRemoteWebhookParams {
+  readonly provider: string;
+  readonly apiToken: string;
+  readonly repoUrl: string;
+  readonly webhookUrl: string;
+}
+
+export async function machineDeleteRemoteWebhook(
+  machineId: string,
+  params: DeleteRemoteWebhookParams,
+): Promise<{ deleted: boolean }> {
+  const result = await apiSocket.machineRPC<
+    { success: boolean; deleted?: boolean; error?: string },
+    DeleteRemoteWebhookParams
+  >(machineId, "deleteRemoteWebhook", params);
+
+  if (!result.success) {
+    throw new Error(result.error ?? "Failed to delete remote webhook");
+  }
+  return { deleted: result.deleted ?? false };
+}
+
 /**
  * Execute a bash command on a specific machine
  */

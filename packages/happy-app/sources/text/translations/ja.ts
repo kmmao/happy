@@ -326,6 +326,9 @@ export const ja: TranslationStructure = {
     webNotificationsDisabled: "ブラウザ通知オフ",
     webNotificationsDenied:
       "ブラウザにブロックされました — サイト設定で有効にしてください",
+    webNotificationsPersistent: "通知を固定",
+    webNotificationsPersistentEnabled: "手動で閉じるまで通知を表示",
+    webNotificationsPersistentDisabled: "5秒後に自動で閉じる",
   },
 
   errors: {

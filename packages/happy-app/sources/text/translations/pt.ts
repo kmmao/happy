@@ -273,6 +273,10 @@ export const pt: TranslationStructure = {
     webNotificationsDisabled: "Sem notificações do navegador",
     webNotificationsDenied:
       "Bloqueado pelo navegador — ativar nas configurações do site",
+    webNotificationsPersistent: "Fixar notificações",
+    webNotificationsPersistentEnabled:
+      "Notificações permanecem até serem fechadas",
+    webNotificationsPersistentDisabled: "Notificações fecham após 5 seg",
   },
 
   errors: {

@@ -255,6 +255,9 @@ export const ru: TranslationStructure = {
     webNotificationsDisabled: "Уведомления браузера отключены",
     webNotificationsDenied:
       "Заблокировано браузером — включите в настройках сайта",
+    webNotificationsPersistent: "Закрепить уведомления",
+    webNotificationsPersistentEnabled: "Уведомления остаются до закрытия",
+    webNotificationsPersistentDisabled: "Уведомления закрываются через 5 сек",
   },
 
   errors: {
