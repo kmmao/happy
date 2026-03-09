@@ -40,38 +40,40 @@ const GitHostSegment = React.memo<{
 }>(function GitHostSegment({ active, onSelect }) {
   const { theme } = useUnistyles();
   return (
-    <View style={[styles.track, { backgroundColor: theme.colors.surface }]}>
-      {TABS.map((tab) => {
-        const isActive = tab.key === active;
-        return (
-          <Pressable
-            key={tab.key}
-            onPress={() => onSelect(tab.key)}
-            accessibilityRole="tab"
-            accessibilityLabel={t(tab.label)}
-            accessibilityState={{ selected: isActive }}
-            style={[
-              styles.segment,
-              isActive && {
-                backgroundColor: theme.colors.text,
-              },
-            ]}
-          >
-            <Text
+    <View style={{ paddingVertical: 4 }}>
+      <View style={[styles.track, { backgroundColor: theme.colors.surface }]}>
+        {TABS.map((tab) => {
+          const isActive = tab.key === active;
+          return (
+            <Pressable
+              key={tab.key}
+              onPress={() => onSelect(tab.key)}
+              accessibilityRole="tab"
+              accessibilityLabel={t(tab.label)}
+              accessibilityState={{ selected: isActive }}
               style={[
-                styles.segmentText,
-                {
-                  color: isActive
-                    ? theme.colors.surface
-                    : theme.colors.textSecondary,
+                styles.segment,
+                isActive && {
+                  backgroundColor: theme.colors.text,
                 },
               ]}
             >
-              {t(tab.label)}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <Text
+                style={[
+                  styles.segmentText,
+                  {
+                    color: isActive
+                      ? theme.colors.surface
+                      : theme.colors.textSecondary,
+                  },
+                ]}
+              >
+                {t(tab.label)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 });
