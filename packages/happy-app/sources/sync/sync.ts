@@ -2140,7 +2140,11 @@ class Sync {
 
         if (normalizedMessages.length > 0) {
           totalNormalized += normalizedMessages.length;
-          this.enqueueMessages(sessionId, normalizedMessages);
+          // Apply messages directly instead of going through the queue.
+          // We already hold the sessionMessageLock, so enqueueMessages would
+          // deadlock — the queue processor also needs this same lock.
+          // Direct application ensures each batch is visible to the UI immediately.
+          this.applyMessages(sessionId, normalizedMessages);
         }
 
         // Mark loaded after first batch so UI renders immediately

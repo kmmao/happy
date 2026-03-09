@@ -85,8 +85,8 @@ export const lightTheme = {
       },
     },
     fab: {
-      background: "#000000",
-      backgroundPressed: "#1a1a1a",
+      background: "rgba(0, 0, 0, 0.6)",
+      backgroundPressed: "rgba(0, 0, 0, 0.8)",
       icon: "#FFFFFF",
     },
     radio: {
@@ -296,8 +296,8 @@ export const darkTheme = {
       sectionTitle: Platform.select({ ios: "#8E8E93", default: "#CAC4D0" }),
     },
     fab: {
-      background: "#FFFFFF",
-      backgroundPressed: "#f0f0f0",
+      background: "rgba(255, 255, 255, 0.6)",
+      backgroundPressed: "rgba(255, 255, 255, 0.8)",
       icon: "#000000",
     },
     radio: {

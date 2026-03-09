@@ -379,6 +379,11 @@ export const SettingsSchema = z.object({
   compactSessionView: z
     .boolean()
     .describe("Whether to use compact view for active sessions"),
+  collapsibleInput: z
+    .boolean()
+    .describe(
+      "Whether to enable collapsible input box in sessions (auto-collapse when messages exist)",
+    ),
   hideInactiveSessions: z
     .boolean()
     .describe("Hide inactive sessions in the main list"),
@@ -621,6 +626,7 @@ export const settingsDefaults: Settings = {
   avatarStyle: "brutalist",
   showFlavorIcons: false,
   compactSessionView: false,
+  collapsibleInput: false,
   hideInactiveSessions: false,
   realtimeSessionSort: true,
   reviewPromptAnswered: false,

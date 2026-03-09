@@ -39,6 +39,8 @@ export default function AppearanceSettingsScreen() {
     useSettingMutable("showFlavorIcons");
   const [compactSessionView, setCompactSessionView] =
     useSettingMutable("compactSessionView");
+  const [collapsibleInput, setCollapsibleInput] =
+    useSettingMutable("collapsibleInput");
   const [realtimeSessionSort, setRealtimeSessionSort] = useSettingMutable(
     "realtimeSessionSort",
   );
@@ -187,6 +189,17 @@ export default function AppearanceSettingsScreen() {
             <Switch
               value={compactSessionView}
               onValueChange={setCompactSessionView}
+            />
+          }
+        />
+        <Item
+          title={t("settingsAppearance.collapsibleInput")}
+          subtitle={t("settingsAppearance.collapsibleInputDescription")}
+          icon={<Ionicons name="resize-outline" size={29} color="#5856D6" />}
+          rightElement={
+            <Switch
+              value={collapsibleInput}
+              onValueChange={setCollapsibleInput}
             />
           }
         />

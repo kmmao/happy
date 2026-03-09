@@ -3,9 +3,6 @@ import * as React from "react";
 import { Animated, Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-const IDLE_TIMEOUT = 3000;
-const IDLE_OPACITY = 0.15;
-
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
     position: "absolute",
@@ -64,8 +61,6 @@ interface ScrollToBottomButtonProps {
   onOptionsPress?: () => void;
   bookmarkCount?: number;
   onBookmarksPress?: () => void;
-  /** Bump this counter on every scroll event to wake buttons from idle fade */
-  scrollTick?: number;
   /** Callback to collapse the input area */
   onCollapseInput?: () => void;
   /** Whether there is a pending AI suggestion or needsContinue */
@@ -85,7 +80,6 @@ export const ScrollToBottomButton = React.memo(
     onOptionsPress,
     bookmarkCount = 0,
     onBookmarksPress,
-    scrollTick = 0,
     onCollapseInput,
     hasPendingAction,
     onPendingActionPress,
@@ -95,45 +89,6 @@ export const ScrollToBottomButton = React.memo(
     const scrollBtnOpacity = React.useRef(new Animated.Value(0)).current;
     const [shouldRenderScrollBtn, setShouldRenderScrollBtn] =
       React.useState(false);
-
-    // Idle fade-out for the entire button row
-    const idleOpacity = React.useRef(new Animated.Value(1)).current;
-    const idleTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
-      null,
-    );
-
-    const resetIdleTimer = React.useCallback(() => {
-      // Restore full opacity immediately
-      Animated.timing(idleOpacity, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }).start();
-
-      // Clear existing timer
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current);
-      }
-
-      // Start new idle timer
-      idleTimerRef.current = setTimeout(() => {
-        Animated.timing(idleOpacity, {
-          toValue: IDLE_OPACITY,
-          duration: 600,
-          useNativeDriver: true,
-        }).start();
-      }, IDLE_TIMEOUT);
-    }, [idleOpacity]);
-
-    // Reset idle timer whenever the component is rendered and user scrolls
-    React.useEffect(() => {
-      resetIdleTimer();
-      return () => {
-        if (idleTimerRef.current) {
-          clearTimeout(idleTimerRef.current);
-        }
-      };
-    }, [visible, scrollTick, resetIdleTimer]);
 
     React.useEffect(() => {
       if (visible) {
@@ -165,11 +120,6 @@ export const ScrollToBottomButton = React.memo(
 
     const noop = () => {};
 
-    const wrapWithIdleReset = (handler: () => void) => () => {
-      resetIdleTimer();
-      handler();
-    };
-
     // sparkles button: active if options available OR pending action
     const sparklesActive = showOptionsButton || showPendingAction;
     const sparklesHandler = showOptionsButton
@@ -182,15 +132,12 @@ export const ScrollToBottomButton = React.memo(
     const disabledIconColor = theme.colors.textSecondary;
 
     return (
-      <Animated.View
-        style={[styles.container, { opacity: idleOpacity }]}
-        pointerEvents="box-none"
-      >
+      <View style={styles.container} pointerEvents="box-none">
         <View style={styles.scrollBtnWrapper}>
           <View style={styles.scrollBtnRow}>
             <PulseButton
               icon={showPendingAction ? "sparkles-outline" : "sparkles"}
-              onPress={wrapWithIdleReset(sparklesHandler)}
+              onPress={sparklesHandler}
               size={18}
               styles={styles}
               iconColor={iconColor}
@@ -199,7 +146,7 @@ export const ScrollToBottomButton = React.memo(
             />
             <PulseButton
               icon="bookmark"
-              onPress={wrapWithIdleReset(onBookmarksPress ?? noop)}
+              onPress={onBookmarksPress ?? noop}
               size={18}
               styles={styles}
               iconColor={iconColor}
@@ -208,7 +155,7 @@ export const ScrollToBottomButton = React.memo(
             />
             <PulseButton
               icon="arrow-up"
-              onPress={wrapWithIdleReset(onPrevUserMessage ?? noop)}
+              onPress={onPrevUserMessage ?? noop}
               size={18}
               styles={styles}
               iconColor={iconColor}
@@ -219,7 +166,7 @@ export const ScrollToBottomButton = React.memo(
               <Animated.View style={{ opacity: scrollBtnOpacity }}>
                 <PulseButton
                   icon="chevron-down"
-                  onPress={wrapWithIdleReset(onPress)}
+                  onPress={onPress}
                   size={20}
                   styles={styles}
                   iconColor={iconColor}
@@ -239,7 +186,7 @@ export const ScrollToBottomButton = React.memo(
             )}
             <PulseButton
               icon="arrow-down"
-              onPress={wrapWithIdleReset(onNextUserMessage ?? noop)}
+              onPress={onNextUserMessage ?? noop}
               size={18}
               styles={styles}
               iconColor={iconColor}
@@ -249,7 +196,7 @@ export const ScrollToBottomButton = React.memo(
             {onCollapseInput && (
               <PulseButton
                 icon="contract-outline"
-                onPress={wrapWithIdleReset(onCollapseInput)}
+                onPress={onCollapseInput}
                 size={18}
                 styles={styles}
                 iconColor={iconColor}
@@ -258,7 +205,7 @@ export const ScrollToBottomButton = React.memo(
             )}
           </View>
         </View>
-      </Animated.View>
+      </View>
     );
   },
 );

@@ -398,14 +398,11 @@ function SessionViewInner({
   const promptSuggestion = usePromptSuggestion(sessionId);
   const needsContinue = useNeedsContinue(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
+  const collapsibleInputEnabled = useSetting("collapsibleInput");
 
   // Scroll-to-bottom state
   const chatListRef = React.useRef<ChatListHandle>(null);
   const [showScrollToBottom, setShowScrollToBottom] = React.useState(false);
-  const [scrollTick, setScrollTick] = React.useState(0);
-  const handleScrollActivity = React.useCallback(() => {
-    setScrollTick((prev) => prev + 1);
-  }, []);
 
   // Anchor for options detection — updated by both scroll and nav buttons
   const [scrollAnchor, setScrollAnchor] = React.useState(-1);
@@ -727,7 +724,6 @@ function SessionViewInner({
             ref={chatListRef}
             session={session}
             onScrollAwayFromBottom={setShowScrollToBottom}
-            onScrollActivity={handleScrollActivity}
             onVisibleUserMessageChange={handleVisibleUserMessage}
           />
         )}
@@ -737,8 +733,9 @@ function SessionViewInner({
           visible={showScrollToBottom && messages.length > 0}
           onPress={handleScrollDown}
           {...scrollNavProps}
-          scrollTick={scrollTick}
-          onCollapseInput={collapsibleInput.collapse}
+          onCollapseInput={
+            collapsibleInputEnabled ? collapsibleInput.collapse : undefined
+          }
           hasPendingAction={
             !showScrollToBottom && collapsibleInput.hasPendingAction
           }
