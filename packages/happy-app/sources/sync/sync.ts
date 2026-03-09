@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import { apiSocket } from "@/sync/apiSocket";
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { Encryption } from "@/sync/encryption/encryption";
+import { SessionEncryption } from "@/sync/encryption/sessionEncryption";
 import { decodeBase64, encodeBase64 } from "@/encryption/base64";
 import { storage, registerPreferencesSyncCallback } from "./storage";
 import {
@@ -2086,6 +2087,60 @@ class Sync {
       let latestPromptSuggestion: string | null = null;
       let latestNeedsContinue = false;
 
+      // When starting from seq 0 (no cache, no persisted lastSeq), fetch the
+      // NEWEST messages first using reverse pagination (before_seq). This way
+      // the user sees the latest content immediately instead of waiting for
+      // all historical messages to load.
+      if (afterSeq === 0) {
+        const newestResponse = await apiSocket.request(
+          `/v3/sessions/${sessionId}/messages?before_seq=${Number.MAX_SAFE_INTEGER}&limit=100`,
+        );
+        if (newestResponse.ok) {
+          const newestData =
+            (await newestResponse.json()) as V3GetSessionMessagesResponse;
+          const newestMessages = Array.isArray(newestData.messages)
+            ? newestData.messages
+            : [];
+          if (newestMessages.length > 0) {
+            const { normalized, promptSuggestion, needsContinue } =
+              await this.decryptAndNormalizeBatch(encryption, newestMessages);
+            if (promptSuggestion !== null) {
+              latestPromptSuggestion = promptSuggestion;
+            }
+            latestNeedsContinue = needsContinue;
+
+            totalNormalized += normalized.length;
+            if (normalized.length > 0) {
+              this.applyMessages(sessionId, normalized);
+            }
+            storage.getState().applyMessagesLoaded(sessionId);
+            isFirstBatch = false;
+
+            // Track the seq range covered by the newest batch.
+            // Forward pagination will fill in gaps (if any) below this range.
+            let minNewestSeq = Infinity;
+            let maxNewestSeq = 0;
+            for (const msg of newestMessages) {
+              if (msg.seq < minNewestSeq) minNewestSeq = msg.seq;
+              if (msg.seq > maxNewestSeq) maxNewestSeq = msg.seq;
+            }
+            this.sessionLastSeq.set(sessionId, maxNewestSeq);
+            saveLastSeq(sessionId, maxNewestSeq);
+
+            // If there are older messages, backfill with forward pagination
+            if (newestData.hasMore) {
+              log.log(
+                `💬 fetchMessages: newest batch loaded (seq ${minNewestSeq}-${maxNewestSeq}), backfilling older messages`,
+              );
+              // afterSeq stays at 0, forward pagination will fill in everything
+            } else {
+              // All messages fit in one batch, no more to fetch
+              hasMore = false;
+            }
+          }
+        }
+      }
+
       while (hasMore) {
         const response = await apiSocket.request(
           `/v3/sessions/${sessionId}/messages?after_seq=${afterSeq}&limit=100`,
@@ -2105,31 +2160,16 @@ class Sync {
           }
         }
 
-        const decryptedMessages = await encryption.decryptMessages(messages);
-        const batchNormalized: NormalizedMessage[] = [];
-        for (let i = 0; i < decryptedMessages.length; i++) {
-          const decrypted = decryptedMessages[i];
-          if (!decrypted) {
-            continue;
-          }
-          const suggestion = extractPromptSuggestionFromRaw(decrypted.content);
-          if (suggestion !== null) {
-            latestPromptSuggestion = suggestion;
-          }
-          if (extractNeedsContinueFromRaw(decrypted.content)) {
-            latestNeedsContinue = true;
-          } else if (decrypted.content?.role === "user") {
-            latestNeedsContinue = false;
-          }
-          const normalized = normalizeRawMessage(
-            decrypted.id,
-            decrypted.localId,
-            decrypted.createdAt,
-            decrypted.content,
-          );
-          if (normalized) {
-            batchNormalized.push(normalized);
-          }
+        const decryptResult = await this.decryptAndNormalizeBatch(
+          encryption,
+          messages,
+        );
+        const batchNormalized = decryptResult.normalized;
+        if (decryptResult.promptSuggestion !== null) {
+          latestPromptSuggestion = decryptResult.promptSuggestion;
+        }
+        if (decryptResult.needsContinue) {
+          latestNeedsContinue = true;
         }
 
         totalNormalized += batchNormalized.length;
@@ -3131,6 +3171,43 @@ class Sync {
       clearTimeout(timer);
     }
     this.cacheWriteTimers.clear();
+  }
+
+  /**
+   * Decrypt and normalize a batch of raw messages.
+   * Extracted to share between reverse-pagination (newest-first) and forward pagination paths.
+   */
+  private async decryptAndNormalizeBatch(
+    encryption: SessionEncryption,
+    rawMessages: ApiMessage[],
+  ): Promise<{
+    normalized: NormalizedMessage[];
+    promptSuggestion: string | null;
+    needsContinue: boolean;
+  }> {
+    const decryptedMessages = await encryption.decryptMessages(rawMessages);
+    const normalized: NormalizedMessage[] = [];
+    let promptSuggestion: string | null = null;
+    let needsContinue = false;
+    for (let i = 0; i < decryptedMessages.length; i++) {
+      const decrypted = decryptedMessages[i];
+      if (!decrypted) continue;
+      const suggestion = extractPromptSuggestionFromRaw(decrypted.content);
+      if (suggestion !== null) promptSuggestion = suggestion;
+      if (extractNeedsContinueFromRaw(decrypted.content)) {
+        needsContinue = true;
+      } else if (decrypted.content?.role === "user") {
+        needsContinue = false;
+      }
+      const msg = normalizeRawMessage(
+        decrypted.id,
+        decrypted.localId,
+        decrypted.createdAt,
+        decrypted.content,
+      );
+      if (msg) normalized.push(msg);
+    }
+    return { normalized, promptSuggestion, needsContinue };
   }
 
   private applyMessages = (
