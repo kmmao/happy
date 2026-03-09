@@ -2093,7 +2093,7 @@ class Sync {
       // all historical messages to load.
       if (afterSeq === 0) {
         const newestResponse = await apiSocket.request(
-          `/v3/sessions/${sessionId}/messages?before_seq=2147483647&limit=100`,
+          `/v3/sessions/${sessionId}/messages?before_seq=2147483647&limit=300`,
         );
         if (newestResponse.ok) {
           const newestData =
