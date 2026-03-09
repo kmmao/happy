@@ -901,19 +901,24 @@ export function registerCommonHandlers(
       }
 
       // Create new webhook
+      const createBody: Record<string, unknown> = {
+        name: "web",
+        config: {
+          url: data.webhookUrl,
+          content_type: "json",
+          secret: data.webhookSecret,
+        },
+        events: data.events,
+        active: true,
+      };
+      // Gitea requires a "type" field
+      if (data.provider === "gitea") {
+        createBody.type = "gitea";
+      }
       const createRes = await fetch(hooksEndpoint, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          name: "web",
-          config: {
-            url: data.webhookUrl,
-            content_type: "json",
-            secret: data.webhookSecret,
-          },
-          events: data.events,
-          active: true,
-        }),
+        body: JSON.stringify(createBody),
       });
 
       if (createRes.ok || createRes.status === 201) {
