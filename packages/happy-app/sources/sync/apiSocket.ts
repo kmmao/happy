@@ -126,6 +126,7 @@ class ApiSocket {
       "difftastic",
       "getDirectoryTree",
       "writeFile",
+      "listGitRepos",
     ];
     return longRunningMethods.includes(method) ? LONG_TIMEOUT : 30_000;
   }

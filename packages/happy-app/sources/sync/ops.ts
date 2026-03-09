@@ -227,6 +227,30 @@ export async function machineStopDaemon(
 }
 
 /**
+ * Scan a machine for git repositories and return their paths + remote URLs.
+ */
+export interface GitRepoEntry {
+  readonly repoPath: string;
+  readonly remoteUrl: string;
+  readonly name: string;
+}
+
+export async function machineListGitRepos(
+  machineId: string,
+  scanPaths?: readonly string[],
+): Promise<readonly GitRepoEntry[]> {
+  const result = await apiSocket.machineRPC<
+    { success: boolean; repos?: GitRepoEntry[]; error?: string },
+    { scanPaths?: readonly string[] }
+  >(machineId, "listGitRepos", { scanPaths });
+
+  if (!result.success) {
+    throw new Error(result.error ?? "Failed to scan git repos");
+  }
+  return result.repos ?? [];
+}
+
+/**
  * Execute a bash command on a specific machine
  */
 export async function machineBash(

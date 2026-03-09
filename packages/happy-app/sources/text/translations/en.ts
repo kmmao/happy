@@ -1510,6 +1510,10 @@ export const en: TranslationStructure = {
     webhookSyncSuccess: "Webhook routes synced",
     webhookSyncError: "Failed to sync webhook routes",
     webhookNoMachines: "No machines available",
+    scanRepos: "Scan Repos",
+    scanning: "Scanning...",
+    scanEmpty: "No git repos found on this machine",
+    scanError: "Scan failed — make sure the machine is online",
   },
 
   quickCommands: {

@@ -1541,6 +1541,10 @@ export const ru: TranslationStructure = {
     webhookSyncSuccess: "Webhook маршруты синхронизированы",
     webhookSyncError: "Ошибка синхронизации Webhook маршрутов",
     webhookNoMachines: "Нет доступных машин",
+    scanRepos: "Сканировать репозитории",
+    scanning: "Сканирование...",
+    scanEmpty: "На этой машине не найдено git-репозиториев",
+    scanError: "Сканирование не удалось — убедитесь, что машина онлайн",
   },
 
   quickCommands: {

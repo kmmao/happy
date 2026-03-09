@@ -1519,6 +1519,11 @@ export const ca: TranslationStructure = {
     webhookSyncSuccess: "Rutes webhook sincronitzades",
     webhookSyncError: "Error en sincronitzar rutes webhook",
     webhookNoMachines: "No hi ha màquines disponibles",
+    scanRepos: "Escanejar repos",
+    scanning: "Escanejant...",
+    scanEmpty: "No s'han trobat repos git en aquesta màquina",
+    scanError:
+      "Error d'escaneig — assegureu-vos que la màquina estigui en línia",
   },
 
   quickCommands: {

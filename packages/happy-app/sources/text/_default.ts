@@ -217,6 +217,9 @@ export const en = {
     compactSessionView: "Compact Session View",
     compactSessionViewDescription:
       "Show active sessions in a more compact layout",
+    collapsibleInput: "Collapsible Input",
+    collapsibleInputDescription:
+      "Auto-collapse the input box when a session has messages",
     realtimeSessionSort: "Real-Time Session Sorting",
     realtimeSessionSortDescription:
       "Sort sessions by recent activity (disable for stable order by creation time)",
@@ -1500,6 +1503,10 @@ export const en = {
     webhookSyncSuccess: "Webhook routes synced",
     webhookSyncError: "Failed to sync webhook routes",
     webhookNoMachines: "No machines available",
+    scanRepos: "Scan Repos",
+    scanning: "Scanning...",
+    scanEmpty: "No git repos found on this machine",
+    scanError: "Scan failed — make sure the machine is online",
   },
 
   quickCommands: {

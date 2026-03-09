@@ -1443,6 +1443,10 @@ export const zhHant: TranslationStructure = {
     webhookSyncSuccess: "Webhook 路由已同步",
     webhookSyncError: "同步 Webhook 路由失敗",
     webhookNoMachines: "沒有可用的機器",
+    scanRepos: "掃描倉庫",
+    scanning: "掃描中...",
+    scanEmpty: "在此機器上未找到 git 倉庫",
+    scanError: "掃描失敗 - 請確保機器在線",
   },
 
   quickCommands: {

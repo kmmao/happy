@@ -1442,6 +1442,10 @@ export const zhHans: TranslationStructure = {
     webhookSyncSuccess: "Webhook 路由已同步",
     webhookSyncError: "同步 Webhook 路由失败",
     webhookNoMachines: "没有可用的机器",
+    scanRepos: "扫描仓库",
+    scanning: "扫描中...",
+    scanEmpty: "在此机器上未找到 git 仓库",
+    scanError: "扫描失败 - 请确保机器在线",
   },
 
   quickCommands: {

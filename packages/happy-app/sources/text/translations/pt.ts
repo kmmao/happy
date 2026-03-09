@@ -1517,6 +1517,11 @@ export const pt: TranslationStructure = {
     webhookSyncSuccess: "Rotas webhook sincronizadas",
     webhookSyncError: "Falha ao sincronizar rotas webhook",
     webhookNoMachines: "Nenhuma máquina disponível",
+    scanRepos: "Escanear repos",
+    scanning: "Escaneando...",
+    scanEmpty: "Nenhum repo git encontrado nesta máquina",
+    scanError:
+      "Falha na verificação — certifique-se de que a máquina está online",
   },
 
   quickCommands: {

@@ -1498,6 +1498,10 @@ export const ja: TranslationStructure = {
     webhookSyncSuccess: "Webhook ルートが同期されました",
     webhookSyncError: "Webhook ルートの同期に失敗しました",
     webhookNoMachines: "利用可能なマシンがありません",
+    scanRepos: "リポジトリをスキャン",
+    scanning: "スキャン中...",
+    scanEmpty: "このマシンに git リポジトリが見つかりません",
+    scanError: "スキャン失敗 — マシンがオンラインであることを確認してください",
   },
 
   quickCommands: {

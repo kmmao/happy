@@ -3,8 +3,8 @@ import { exec, ExecOptions } from "child_process";
 import { promisify } from "util";
 import { readFile, writeFile, readdir, stat, mkdir } from "fs/promises";
 import { createHash } from "crypto";
-import { dirname, join, resolve } from "path";
-import { tmpdir } from "os";
+import { dirname, join, resolve, basename } from "path";
+import { tmpdir, homedir } from "os";
 import { run as runRipgrep } from "@/modules/ripgrep/index";
 import { run as runDifftastic } from "@/modules/difftastic/index";
 import { RpcHandlerManager } from "../../api/rpc/RpcHandlerManager";
@@ -639,6 +639,157 @@ export function registerCommonHandlers(
           success: false,
           error:
             error instanceof Error ? error.message : "Failed to run difftastic",
+        };
+      }
+    },
+  );
+
+  // ── listGitRepos handler ─────────────────────────────────────────────
+  // Scans the user's home directory for git repositories and returns
+  // their paths and remote URLs. NOT restricted to workingDirectory.
+
+  interface ListGitReposRequest {
+    scanPaths?: string[];
+  }
+
+  interface GitRepoEntry {
+    repoPath: string;
+    remoteUrl: string;
+    name: string;
+  }
+
+  interface ListGitReposResponse {
+    success: boolean;
+    repos?: GitRepoEntry[];
+    error?: string;
+  }
+
+  /** Convert SSH remote URL to HTTPS: git@github.com:owner/repo.git → https://github.com/owner/repo */
+  function normalizeRemoteUrl(url: string): string {
+    const sshMatch = url.match(/^git@([^:]+):(.+?)(?:\.git)?$/);
+    if (sshMatch) {
+      return `https://${sshMatch[1]}/${sshMatch[2]}`;
+    }
+    return url.replace(/\.git$/, "");
+  }
+
+  /** Derive a short display name from a repo path: last two segments. */
+  function repoDisplayName(repoPath: string): string {
+    const parent = basename(dirname(repoPath));
+    const self = basename(repoPath);
+    return parent && parent !== "." ? `${parent}/${self}` : self;
+  }
+
+  let gitReposCache: { repos: GitRepoEntry[]; expiry: number } | null = null;
+  const CACHE_TTL = 120_000; // 120 seconds
+
+  rpcHandlerManager.registerHandler<ListGitReposRequest, ListGitReposResponse>(
+    "listGitRepos",
+    async (data) => {
+      logger.debug("listGitRepos request, scanPaths:", data.scanPaths);
+
+      // Return cache if fresh
+      if (gitReposCache && Date.now() < gitReposCache.expiry) {
+        logger.debug(
+          "listGitRepos returning cached result:",
+          gitReposCache.repos.length,
+          "repos",
+        );
+        return { success: true, repos: gitReposCache.repos };
+      }
+
+      const home = homedir();
+      const scanPaths =
+        data.scanPaths && data.scanPaths.length > 0 ? data.scanPaths : [home];
+
+      // Directories to exclude from scanning
+      const excludes = [
+        "node_modules",
+        ".cache",
+        "Library",
+        ".Trash",
+        ".npm",
+        ".yarn",
+        ".pnpm-store",
+        ".local",
+        "go/pkg",
+        ".cargo",
+        ".rustup",
+      ];
+
+      const excludeArgs = excludes
+        .map((d) => `-not -path '*/${d}/*'`)
+        .join(" ");
+
+      try {
+        // Find all .git directories (max depth 5)
+        const findPaths = scanPaths
+          .map((p) => `'${p.replace(/'/g, "'\\''")}'`)
+          .join(" ");
+        const findCmd = `find ${findPaths} -maxdepth 5 -name .git -type d ${excludeArgs} 2>/dev/null`;
+
+        const { stdout: findStdout } = await execAsync(findCmd, {
+          timeout: 20_000,
+          maxBuffer: 1024 * 1024,
+        });
+
+        const gitDirs = findStdout.trim().split("\n").filter(Boolean);
+        logger.debug("Found", gitDirs.length, ".git directories");
+
+        // Deduplicate by resolving to toplevel
+        const seen = new Set<string>();
+        const repos: GitRepoEntry[] = [];
+
+        for (const gitDir of gitDirs) {
+          if (repos.length >= 100) break;
+
+          const parentDir = dirname(gitDir);
+
+          try {
+            // Get canonical repo root (handles worktrees)
+            const { stdout: toplevel } = await execAsync(
+              "git rev-parse --show-toplevel",
+              { cwd: parentDir, timeout: 3000 },
+            );
+            const repoPath = toplevel.trim();
+
+            if (seen.has(repoPath)) continue;
+            seen.add(repoPath);
+
+            // Get remote URL
+            const { stdout: remoteRaw } = await execAsync(
+              "git remote get-url origin",
+              { cwd: repoPath, timeout: 3000 },
+            ).catch(() => ({ stdout: "" }));
+
+            const rawUrl = remoteRaw.trim();
+            if (!rawUrl) continue;
+
+            repos.push({
+              repoPath,
+              remoteUrl: normalizeRemoteUrl(rawUrl),
+              name: repoDisplayName(repoPath),
+            });
+          } catch {
+            // Skip repos that fail (permission, corrupt, etc.)
+            logger.debug("Skipping git dir:", gitDir);
+          }
+        }
+
+        // Sort alphabetically by path
+        repos.sort((a, b) => a.repoPath.localeCompare(b.repoPath));
+
+        // Cache result
+        gitReposCache = { repos, expiry: Date.now() + CACHE_TTL };
+
+        logger.debug("listGitRepos returning", repos.length, "repos");
+        return { success: true, repos };
+      } catch (error) {
+        logger.debug("listGitRepos failed:", error);
+        return {
+          success: false,
+          error:
+            error instanceof Error ? error.message : "Failed to scan git repos",
         };
       }
     },
