@@ -63,12 +63,15 @@ async function ensureRemoteWebhook(
   if (!parsed) return { created: false, error: "Invalid repo URL" };
   const { owner, repo } = parsed;
 
+  // Normalize host: strip protocol and trailing slashes
+  const bareHost = host.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+
   const baseUrl =
-    provider === "github" && (host === "github.com" || host === "")
+    provider === "github" && (bareHost === "github.com" || bareHost === "")
       ? "https://api.github.com"
       : provider === "github"
-        ? `https://${host}/api/v3`
-        : `https://${host}/api/v1`;
+        ? `https://${bareHost}/api/v3`
+        : `https://${bareHost}/api/v1`;
 
   const headers: Record<string, string> = {
     Authorization: `token ${apiToken}`,
