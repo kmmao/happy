@@ -213,6 +213,8 @@ export const zhHant: TranslationStructure = {
     showFlavorIconsDescription: "在工作階段頭像上顯示 AI 提供者圖示",
     compactSessionView: "緊湊工作階段檢視",
     compactSessionViewDescription: "以更緊湊的版面配置顯示活躍工作階段",
+    collapsibleInput: "輸入框縮放",
+    collapsibleInputDescription: "有訊息時自動收起輸入框",
     realtimeSessionSort: "即時工作階段排序",
     realtimeSessionSortDescription:
       "依最近活動排序工作階段（關閉後依建立時間穩定排序）",
@@ -1447,6 +1449,7 @@ export const zhHant: TranslationStructure = {
     scanning: "掃描中...",
     scanEmpty: "在此機器上未找到 git 倉庫",
     scanError: "掃描失敗 - 請確保機器在線",
+    scanSearchPlaceholder: "搜尋倉庫...",
   },
 
   quickCommands: {

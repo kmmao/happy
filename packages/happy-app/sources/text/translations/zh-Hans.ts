@@ -213,6 +213,8 @@ export const zhHans: TranslationStructure = {
     showFlavorIconsDescription: "在会话头像上显示 AI 提供商图标",
     compactSessionView: "紧凑会话视图",
     compactSessionViewDescription: "以更紧凑的布局显示活跃会话",
+    collapsibleInput: "输入框缩放",
+    collapsibleInputDescription: "有消息时自动收起输入框",
     realtimeSessionSort: "实时会话排序",
     realtimeSessionSortDescription:
       "按最近活动排序会话（关闭后按创建时间稳定排序）",
@@ -1446,6 +1448,7 @@ export const zhHans: TranslationStructure = {
     scanning: "扫描中...",
     scanEmpty: "在此机器上未找到 git 仓库",
     scanError: "扫描失败 - 请确保机器在线",
+    scanSearchPlaceholder: "搜索仓库...",
   },
 
   quickCommands: {

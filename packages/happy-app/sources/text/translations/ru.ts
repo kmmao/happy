@@ -205,6 +205,9 @@ export const ru: TranslationStructure = {
     compactSessionView: "Компактный вид сессий",
     compactSessionViewDescription:
       "Отображать активные сессии в более компактном виде",
+    collapsibleInput: "Сворачиваемый ввод",
+    collapsibleInputDescription:
+      "Автоматически сворачивать поле ввода при наличии сообщений",
     realtimeSessionSort: "Сортировка сессий в реальном времени",
     realtimeSessionSortDescription:
       "Сортировать сессии по недавней активности (отключите для стабильного порядка по времени создания)",
@@ -1545,6 +1548,7 @@ export const ru: TranslationStructure = {
     scanning: "Сканирование...",
     scanEmpty: "На этой машине не найдено git-репозиториев",
     scanError: "Сканирование не удалось — убедитесь, что машина онлайн",
+    scanSearchPlaceholder: "Поиск репозиториев...",
   },
 
   quickCommands: {

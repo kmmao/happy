@@ -1507,6 +1507,7 @@ export const en = {
     scanning: "Scanning...",
     scanEmpty: "No git repos found on this machine",
     scanError: "Scan failed — make sure the machine is online",
+    scanSearchPlaceholder: "Search repos...",
   },
 
   quickCommands: {

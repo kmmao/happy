@@ -225,6 +225,9 @@ export const es: TranslationStructure = {
     compactSessionView: "Vista compacta de sesiones",
     compactSessionViewDescription:
       "Mostrar sesiones activas en un diseño más compacto",
+    collapsibleInput: "Entrada plegable",
+    collapsibleInputDescription:
+      "Colapsar automáticamente el cuadro de entrada cuando una sesión tiene mensajes",
     realtimeSessionSort: "Ordenación de sesiones en tiempo real",
     realtimeSessionSortDescription:
       "Ordenar sesiones por actividad reciente (desactivar para orden estable por fecha de creación)",
@@ -1522,6 +1525,7 @@ export const es: TranslationStructure = {
     scanning: "Escaneando...",
     scanEmpty: "No se encontraron repos git en esta máquina",
     scanError: "Error de escaneo — asegúrate de que la máquina esté en línea",
+    scanSearchPlaceholder: "Buscar repos...",
   },
 
   quickCommands: {

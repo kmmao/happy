@@ -235,6 +235,9 @@ export const pl: TranslationStructure = {
     compactSessionView: "Kompaktowy widok sesji",
     compactSessionViewDescription:
       "Pokazuj aktywne sesje w bardziej zwartym układzie",
+    collapsibleInput: "Zwijane pole wprowadzania",
+    collapsibleInputDescription:
+      "Automatycznie zwijaj pole wprowadzania, gdy sesja ma wiadomości",
     realtimeSessionSort: "Sortowanie sesji w czasie rzeczywistym",
     realtimeSessionSortDescription:
       "Sortuj sesje według ostatniej aktywności (wyłącz, aby zachować stabilną kolejność wg daty utworzenia)",
@@ -1546,6 +1549,7 @@ export const pl: TranslationStructure = {
     scanEmpty: "Nie znaleziono repozytoriów git na tej maszynie",
     scanError:
       "Skanowanie nie powiodło się — upewnij się, że maszyna jest online",
+    scanSearchPlaceholder: "Szukaj repozytoriów...",
   },
 
   quickCommands: {

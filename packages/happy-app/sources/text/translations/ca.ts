@@ -225,6 +225,9 @@ export const ca: TranslationStructure = {
     compactSessionView: "Vista compacta de sessions",
     compactSessionViewDescription:
       "Mostra les sessions actives en un disseny més compacte",
+    collapsibleInput: "Entrada plegable",
+    collapsibleInputDescription:
+      "Plegar automàticament el quadre d'entrada quan una sessió té missatges",
     realtimeSessionSort: "Ordenació de sessions en temps real",
     realtimeSessionSortDescription:
       "Ordena les sessions per activitat recent (desactiveu per ordre estable per data de creació)",
@@ -1524,6 +1527,7 @@ export const ca: TranslationStructure = {
     scanEmpty: "No s'han trobat repos git en aquesta màquina",
     scanError:
       "Error d'escaneig — assegureu-vos que la màquina estigui en línia",
+    scanSearchPlaceholder: "Cerca repositoris...",
   },
 
   quickCommands: {

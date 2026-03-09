@@ -225,6 +225,9 @@ export const pt: TranslationStructure = {
     compactSessionView: "Visualização compacta de sessões",
     compactSessionViewDescription:
       "Mostrar sessões ativas em um layout mais compacto",
+    collapsibleInput: "Entrada recolhível",
+    collapsibleInputDescription:
+      "Recolher automaticamente a caixa de entrada quando uma sessão tem mensagens",
     realtimeSessionSort: "Ordenação de sessões em tempo real",
     realtimeSessionSortDescription:
       "Ordenar sessões por atividade recente (desative para ordem estável por data de criação)",
@@ -1522,6 +1525,7 @@ export const pt: TranslationStructure = {
     scanEmpty: "Nenhum repo git encontrado nesta máquina",
     scanError:
       "Falha na verificação — certifique-se de que a máquina está online",
+    scanSearchPlaceholder: "Pesquisar repos...",
   },
 
   quickCommands: {

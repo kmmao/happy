@@ -772,6 +772,7 @@ const WebhookRepoItem = React.memo<{
   const [scanResults, setScanResults] = useState<readonly GitRepoEntry[]>([]);
   const [showScanResults, setShowScanResults] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [scanSearch, setScanSearch] = useState("");
 
   const handleCopySecret = async () => {
     await Clipboard.setStringAsync(repo.secret);
@@ -793,6 +794,7 @@ const WebhookRepoItem = React.memo<{
     setScanning(true);
     setScanError(null);
     setScanResults([]);
+    setScanSearch("");
     setShowScanResults(true);
     try {
       const repos = await machineListGitRepos(repo.machineId);
@@ -960,7 +962,6 @@ const WebhookRepoItem = React.memo<{
             backgroundColor: theme.colors.input.background,
             borderRadius: 8,
             marginBottom: 10,
-            maxHeight: 200,
             overflow: "hidden",
           }}
         >
@@ -977,42 +978,72 @@ const WebhookRepoItem = React.memo<{
               {scanError}
             </Text>
           ) : (
-            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
-              {scanResults.map((entry) => (
-                <Pressable
-                  key={entry.repoPath}
+            <>
+              {scanResults.length > 5 && (
+                <TextInput
                   style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
+                    padding: 10,
+                    fontSize: 14,
+                    color: theme.colors.text,
                     borderBottomWidth: 0.5,
                     borderBottomColor: theme.colors.border,
+                    ...Typography.default(),
                   }}
-                  onPress={() => handleSelectRepo(entry)}
-                >
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      color: theme.colors.text,
-                      ...Typography.default("semiBold"),
-                    }}
-                    numberOfLines={1}
-                  >
-                    {entry.name}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: theme.colors.textSecondary,
-                      marginTop: 2,
-                      ...Typography.mono(),
-                    }}
-                    numberOfLines={1}
-                  >
-                    {entry.repoPath}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+                  value={scanSearch}
+                  onChangeText={setScanSearch}
+                  placeholder={t("gitHosts.scanSearchPlaceholder")}
+                  placeholderTextColor={theme.colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              )}
+              <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+                {scanResults
+                  .filter((entry) => {
+                    if (!scanSearch) return true;
+                    const q = scanSearch.toLowerCase();
+                    return (
+                      entry.name.toLowerCase().includes(q) ||
+                      entry.repoPath.toLowerCase().includes(q) ||
+                      entry.remoteUrl.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((entry) => (
+                    <Pressable
+                      key={entry.repoPath}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderBottomWidth: 0.5,
+                        borderBottomColor: theme.colors.border,
+                      }}
+                      onPress={() => handleSelectRepo(entry)}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          color: theme.colors.text,
+                          ...Typography.default("semiBold"),
+                        }}
+                        numberOfLines={1}
+                      >
+                        {entry.name}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: theme.colors.textSecondary,
+                          marginTop: 2,
+                          ...Typography.mono(),
+                        }}
+                        numberOfLines={1}
+                      >
+                        {entry.repoPath}
+                      </Text>
+                    </Pressable>
+                  ))}
+              </ScrollView>
+            </>
           )}
         </View>
       )}

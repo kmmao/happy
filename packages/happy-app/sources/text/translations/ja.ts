@@ -282,6 +282,9 @@ export const ja: TranslationStructure = {
     compactSessionView: "コンパクトセッション表示",
     compactSessionViewDescription:
       "アクティブなセッションをコンパクトなレイアウトで表示",
+    collapsibleInput: "入力ボックスの折りたたみ",
+    collapsibleInputDescription:
+      "メッセージがあるセッションで入力ボックスを自動的に折りたたむ",
     realtimeSessionSort: "リアルタイムセッション並び替え",
     realtimeSessionSortDescription:
       "最近のアクティビティでセッションを並び替え（オフにすると作成日時順で安定表示）",
@@ -1502,6 +1505,7 @@ export const ja: TranslationStructure = {
     scanning: "スキャン中...",
     scanEmpty: "このマシンに git リポジトリが見つかりません",
     scanError: "スキャン失敗 — マシンがオンラインであることを確認してください",
+    scanSearchPlaceholder: "リポジトリを検索...",
   },
 
   quickCommands: {
