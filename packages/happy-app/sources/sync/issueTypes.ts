@@ -31,6 +31,15 @@ export interface IssueLabel {
   readonly color: string;
 }
 
+export interface WebhookRepoConfig {
+  readonly repoUrl: string;
+  readonly machineId: string;
+  readonly repoPath: string;
+  readonly secret: string;
+  readonly routeId?: string;
+  readonly enabled: boolean;
+}
+
 export interface GitHostMapping {
   readonly host: string;
   readonly provider: "github" | "gitea";
@@ -38,12 +47,7 @@ export interface GitHostMapping {
   readonly autoIssueEnabled?: boolean;
   readonly autoIssueLabel?: string;
   readonly autoIssueAllowedAuthors?: readonly string[];
-  readonly webhookEnabled?: boolean;
-  readonly webhookSecret?: string;
-  readonly webhookMachineId?: string;
-  readonly webhookRepoPath?: string;
-  readonly webhookRepoUrl?: string;
-  readonly webhookRouteId?: string;
+  readonly webhookRepos?: readonly WebhookRepoConfig[];
 }
 
 export type IssueFilterState = "open" | "closed" | "all";

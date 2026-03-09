@@ -1424,9 +1424,11 @@ export const zhHant: TranslationStructure = {
     autoIssueLabelPlaceholder: "例如 claude, auto-fix",
     autoIssueAllowedAuthors: "允許的作者",
     autoIssueAllowedAuthorsPlaceholder: "使用者名稱1, 使用者名稱2",
-    webhookSectionTitle: "Webhook",
+    webhookSectionTitle: "Webhook 倉庫",
     webhookDescription:
-      "接收來自 Git 平台的 Webhook 事件，自動處理 Issue，無需輪詢。需要在倉庫中配置 Webhook。",
+      "接收來自 Git 平台的 Webhook 事件，自動處理 Issue，無需輪詢。在下方新增要監控的倉庫。",
+    webhookAddRepo: "新增 Webhook 倉庫",
+    webhookRemoveRepo: "移除",
     webhookRepoUrl: "倉庫 URL",
     webhookRepoUrlPlaceholder: "https://github.com/owner/repo",
     webhookMachineId: "目標機器",
@@ -1439,7 +1441,7 @@ export const zhHant: TranslationStructure = {
     webhookUrlCopied: "URL 已複製到剪貼簿",
     webhookUrlHint: "在倉庫的 Webhook 設定中配置此 URL 和 Secret。",
     webhookSyncSuccess: "Webhook 路由已同步",
-    webhookSyncError: "Webhook 路由同步失敗",
+    webhookSyncError: "同步 Webhook 路由失敗",
     webhookNoMachines: "沒有可用的機器",
   },
 

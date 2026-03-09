@@ -1497,9 +1497,11 @@ export const pt: TranslationStructure = {
     autoIssueLabelPlaceholder: "ex. claude, auto-fix",
     autoIssueAllowedAuthors: "Autores permitidos",
     autoIssueAllowedAuthorsPlaceholder: "utilizador1, utilizador2",
-    webhookSectionTitle: "Webhook",
+    webhookSectionTitle: "Webhook Repos",
     webhookDescription:
-      "Receba eventos Webhook do seu host Git para processar issues automaticamente sem polling. Requer configuração de Webhook no seu repositório.",
+      "Receba eventos Webhook do seu host Git para processar issues automaticamente sem polling. Adicione repos para monitorar abaixo.",
+    webhookAddRepo: "Adicionar Webhook Repo",
+    webhookRemoveRepo: "Remover",
     webhookRepoUrl: "URL do repositório",
     webhookRepoUrlPlaceholder: "https://github.com/owner/repo",
     webhookMachineId: "Máquina de destino",
@@ -1512,8 +1514,8 @@ export const pt: TranslationStructure = {
     webhookUrlCopied: "URL copiado para a área de transferência",
     webhookUrlHint:
       "Configure este URL e Secret nas definições de Webhook do seu repositório.",
-    webhookSyncSuccess: "Rota de Webhook sincronizada",
-    webhookSyncError: "Falha ao sincronizar rota de Webhook",
+    webhookSyncSuccess: "Rotas webhook sincronizadas",
+    webhookSyncError: "Falha ao sincronizar rotas webhook",
     webhookNoMachines: "Nenhuma máquina disponível",
   },
 

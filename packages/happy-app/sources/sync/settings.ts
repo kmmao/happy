@@ -492,12 +492,65 @@ export const SettingsSchema = z.object({
         autoIssueEnabled: z.boolean().optional(),
         autoIssueLabel: z.string().optional(),
         autoIssueAllowedAuthors: z.array(z.string()).optional(),
+        webhookRepos: z
+          .array(
+            z.object({
+              repoUrl: z.string(),
+              machineId: z.string(),
+              repoPath: z.string(),
+              secret: z.string(),
+              routeId: z.string().optional(),
+              enabled: z.boolean(),
+            }),
+          )
+          .optional(),
+        // Legacy single-webhook fields (auto-migrated to webhookRepos)
         webhookEnabled: z.boolean().optional(),
         webhookSecret: z.string().optional(),
         webhookMachineId: z.string().optional(),
         webhookRepoPath: z.string().optional(),
         webhookRepoUrl: z.string().optional(),
         webhookRouteId: z.string().optional(),
+      }),
+    )
+    .transform((hosts) =>
+      hosts.map((h) => {
+        // Migrate legacy single-value webhook fields → webhookRepos array
+        if (h.webhookRepoUrl && !h.webhookRepos?.length) {
+          const {
+            webhookEnabled,
+            webhookSecret,
+            webhookMachineId,
+            webhookRepoPath,
+            webhookRepoUrl,
+            webhookRouteId,
+            ...rest
+          } = h;
+          return {
+            ...rest,
+            webhookRepos: [
+              {
+                repoUrl: webhookRepoUrl,
+                machineId: webhookMachineId ?? "",
+                repoPath: webhookRepoPath ?? "",
+                secret: webhookSecret ?? "",
+                routeId: webhookRouteId,
+                enabled: webhookEnabled ?? false,
+              },
+            ],
+          };
+        }
+        // Strip legacy fields if already migrated
+        const {
+          webhookEnabled: _a,
+          webhookSecret: _b,
+          webhookMachineId: _c,
+          webhookRepoPath: _d,
+          webhookRepoUrl: _e,
+          webhookRouteId: _f,
+          ...rest
+        } = h;
+        return rest;
       }),
     )
     .describe(
@@ -628,6 +681,37 @@ export function settingsParse(settings: unknown): Settings {
       '[Settings Migration] Converting language code from "zh" to "zh-Hans"',
     );
     parsed.data.preferredLanguage = "zh-Hans";
+  }
+
+  // Migration: Convert legacy single-webhook fields to webhookRepos array
+  if (parsed.data.gitHosts) {
+    parsed.data.gitHosts = parsed.data.gitHosts.map((host: any) => {
+      if (host.webhookRepoUrl && !host.webhookRepos) {
+        const {
+          webhookEnabled,
+          webhookSecret,
+          webhookMachineId,
+          webhookRepoPath,
+          webhookRepoUrl,
+          webhookRouteId,
+          ...rest
+        } = host;
+        return {
+          ...rest,
+          webhookRepos: [
+            {
+              repoUrl: webhookRepoUrl,
+              machineId: webhookMachineId ?? "",
+              repoPath: webhookRepoPath ?? "",
+              secret: webhookSecret ?? "",
+              routeId: webhookRouteId,
+              enabled: webhookEnabled ?? false,
+            },
+          ],
+        };
+      }
+      return host;
+    });
   }
 
   // Merge defaults, parsed settings, and preserve unknown fields

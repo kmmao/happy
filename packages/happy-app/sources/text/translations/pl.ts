@@ -1521,9 +1521,11 @@ export const pl: TranslationStructure = {
     autoIssueLabelPlaceholder: "np. claude, auto-fix",
     autoIssueAllowedAuthors: "Dozwoleni autorzy",
     autoIssueAllowedAuthorsPlaceholder: "nazwa1, nazwa2",
-    webhookSectionTitle: "Webhook",
+    webhookSectionTitle: "Webhook Repozytoria",
     webhookDescription:
-      "Odbieraj zdarzenia Webhook z hosta Git, aby automatycznie przetwarzać zgłoszenia bez odpytywania. Wymaga konfiguracji Webhook w repozytorium.",
+      "Odbieraj zdarzenia Webhook z hosta Git, aby automatycznie przetwarzać zgłoszenia bez odpytywania. Dodaj repozytoria do monitorowania poniżej.",
+    webhookAddRepo: "Dodaj Webhook Repo",
+    webhookRemoveRepo: "Usuń",
     webhookRepoUrl: "URL repozytorium",
     webhookRepoUrlPlaceholder: "https://github.com/owner/repo",
     webhookMachineId: "Maszyna docelowa",
@@ -1536,8 +1538,8 @@ export const pl: TranslationStructure = {
     webhookUrlCopied: "URL skopiowany do schowka",
     webhookUrlHint:
       "Skonfiguruj ten URL i Secret w ustawieniach Webhook repozytorium.",
-    webhookSyncSuccess: "Trasa Webhook zsynchronizowana",
-    webhookSyncError: "Nie udało się zsynchronizować trasy Webhook",
+    webhookSyncSuccess: "Trasy webhook zsynchronizowane",
+    webhookSyncError: "Błąd synchronizacji tras webhook",
     webhookNoMachines: "Brak dostępnych maszyn",
   },
 

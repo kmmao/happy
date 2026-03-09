@@ -1478,9 +1478,11 @@ export const ja: TranslationStructure = {
     autoIssueLabelPlaceholder: "例: claude, auto-fix",
     autoIssueAllowedAuthors: "許可された作成者",
     autoIssueAllowedAuthorsPlaceholder: "ユーザー名1, ユーザー名2",
-    webhookSectionTitle: "Webhook",
+    webhookSectionTitle: "Webhook リポジトリ",
     webhookDescription:
-      "Git ホストから Webhook イベントを受信し、ポーリングなしで自動的に Issue を処理します。リポジトリで Webhook の設定が必要です。",
+      "Git ホストから Webhook イベントを受信し、ポーリングなしで自動的に Issue を処理します。以下に監視するリポジトリを追加してください。",
+    webhookAddRepo: "Webhook リポジトリを追加",
+    webhookRemoveRepo: "削除",
     webhookRepoUrl: "リポジトリ URL",
     webhookRepoUrlPlaceholder: "https://github.com/owner/repo",
     webhookMachineId: "対象マシン",
@@ -1493,7 +1495,7 @@ export const ja: TranslationStructure = {
     webhookUrlCopied: "URL をクリップボードにコピーしました",
     webhookUrlHint:
       "リポジトリの Webhook 設定にこの URL と Secret を設定してください。",
-    webhookSyncSuccess: "Webhook ルートを同期しました",
+    webhookSyncSuccess: "Webhook ルートが同期されました",
     webhookSyncError: "Webhook ルートの同期に失敗しました",
     webhookNoMachines: "利用可能なマシンがありません",
   },
