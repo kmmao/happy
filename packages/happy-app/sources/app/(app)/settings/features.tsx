@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Item } from "@/components/Item";
@@ -6,6 +7,10 @@ import { ItemList } from "@/components/ItemList";
 import { useSettingMutable, useLocalSettingMutable } from "@/sync/storage";
 import { Switch } from "@/components/Switch";
 import { t } from "@/text";
+import {
+  requestNotificationPermission,
+  getNotificationPermission,
+} from "@/utils/webNotification";
 
 export default function FeaturesSettingsScreen() {
   const [experiments, setExperiments] = useSettingMutable("experiments");
@@ -24,6 +29,13 @@ export default function FeaturesSettingsScreen() {
   const [sttCorrection, setSttCorrection] = useSettingMutable("sttCorrection");
   const [showProjectTab, setShowProjectTab] =
     useSettingMutable("showProjectTab");
+  const [webNotifications, setWebNotifications] =
+    useSettingMutable("webNotifications");
+
+  // Track browser notification permission state to avoid calling browser API in render
+  const [notifPermission, setNotifPermission] = React.useState<
+    NotificationPermission | "unsupported"
+  >(() => getNotificationPermission());
 
   return (
     <ItemList style={{ paddingTop: 0 }}>
@@ -146,6 +158,45 @@ export default function FeaturesSettingsScreen() {
               <Switch
                 value={commandPaletteEnabled}
                 onValueChange={setCommandPaletteEnabled}
+              />
+            }
+            showChevron={false}
+          />
+          <Item
+            title={t("settingsFeatures.webNotifications")}
+            subtitle={
+              webNotifications
+                ? t("settingsFeatures.webNotificationsEnabled")
+                : notifPermission === "denied"
+                  ? t("settingsFeatures.webNotificationsDenied")
+                  : t("settingsFeatures.webNotificationsDisabled")
+            }
+            icon={
+              <Ionicons
+                name="notifications-outline"
+                size={29}
+                color="#FF9500"
+              />
+            }
+            rightElement={
+              <Switch
+                value={webNotifications}
+                onValueChange={async (value) => {
+                  if (value) {
+                    try {
+                      const permission =
+                        await requestNotificationPermission();
+                      setNotifPermission(permission);
+                      if (permission === "granted") {
+                        setWebNotifications(true);
+                      }
+                    } catch {
+                      setNotifPermission("denied");
+                    }
+                  } else {
+                    setWebNotifications(false);
+                  }
+                }}
               />
             }
             showChevron={false}

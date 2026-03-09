@@ -143,6 +143,7 @@ describe("settings", () => {
         gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
+        webNotifications: false,
       };
       const delta: Partial<Settings> = {
         viewInline: true,
@@ -191,6 +192,7 @@ describe("settings", () => {
         gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
+        webNotifications: false,
       });
     });
 
@@ -239,6 +241,7 @@ describe("settings", () => {
         gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
+        webNotifications: false,
       };
       const delta: Partial<Settings> = {};
       expect(applySettings(currentSettings, delta)).toEqual(currentSettings);
@@ -289,6 +292,7 @@ describe("settings", () => {
         gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
+        webNotifications: false,
       };
       const delta: Partial<Settings> = {
         viewInline: false,
@@ -344,6 +348,7 @@ describe("settings", () => {
         gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
+        webNotifications: false,
       };
       expect(applySettings(currentSettings, {})).toEqual(currentSettings);
     });
@@ -408,6 +413,7 @@ describe("settings", () => {
         gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
+        webNotifications: false,
       };
       const delta: any = {
         viewInline: false,
@@ -483,6 +489,7 @@ describe("settings", () => {
         gitHosts: [],
         showProjectTab: false,
         dismissedCLIWarnings: { perMachine: {}, global: {} },
+        webNotifications: false,
 
         useEnhancedSessionWizard: false,
       });

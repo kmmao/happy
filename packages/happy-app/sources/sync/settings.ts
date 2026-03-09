@@ -586,6 +586,11 @@ export const SettingsSchema = z.object({
     .describe(
       "Tracks which CLI installation warnings user has dismissed (per-machine or globally)",
     ),
+  webNotifications: z
+    .boolean()
+    .describe(
+      "Enable browser notifications for task completion and permission requests (web only)",
+    ),
 });
 
 //
@@ -658,6 +663,8 @@ export const settingsDefaults: Settings = {
   showProjectTab: false,
   // Dismissed CLI warnings (empty by default)
   dismissedCLIWarnings: { perMachine: {}, global: {} },
+  // Browser notifications (web only, off by default)
+  webNotifications: false,
 };
 Object.freeze(settingsDefaults);
 

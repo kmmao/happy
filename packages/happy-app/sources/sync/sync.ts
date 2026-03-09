@@ -26,7 +26,7 @@ import {
   extractNeedsContinueFromRaw,
   RawRecord,
 } from "./typesRaw";
-import { getCurrentLanguage } from "@/text";
+import { getCurrentLanguage, t } from "@/text";
 import { kanbanStore } from "./kanbanStore";
 import { isKanbanKey } from "./kanbanTypes";
 import { issueSessionStore } from "./issueSessionStore";
@@ -107,6 +107,12 @@ import {
   saveMessageCache,
   deleteMessageCache,
 } from "./messageCache";
+import { getSessionName } from "@/utils/sessionUtils";
+import {
+  notifyTaskComplete,
+  notifyPermissionRequest,
+  clearNotifiedRequests,
+} from "@/utils/webNotification";
 
 type V3GetSessionMessagesResponse = {
   messages: ApiMessage[];
@@ -2448,6 +2454,19 @@ class Sync {
             // Auto-detect issue session completion on turn-end.
             // When a task completes, check PR status and update issue session link accordingly.
             if (isTaskComplete) {
+              // Web browser notification for task completion
+              if (
+                Platform.OS === "web" &&
+                storage.getState().settings.webNotifications
+              ) {
+                const sessionName = getSessionName(session);
+                notifyTaskComplete(
+                  sessionName,
+                  updateData.body.sid,
+                  t("webNotification.taskComplete"),
+                );
+              }
+
               const link = issueSessionStore
                 .getState()
                 .findBySessionId(updateData.body.sid);
@@ -2667,6 +2686,31 @@ class Sync {
               toolName,
               firstRequest?.arguments,
             );
+
+            // Web browser notification for permission request
+            if (
+              Platform.OS === "web" &&
+              storage.getState().settings.webNotifications
+            ) {
+              const permSession =
+                storage.getState().sessions[updateData.body.id];
+              if (permSession) {
+                const sessionName = getSessionName(permSession);
+                notifyPermissionRequest(
+                  sessionName,
+                  updateData.body.id,
+                  requestIds[0],
+                  toolName,
+                  t("webNotification.permissionRequest"),
+                );
+              }
+            }
+          } else if (Platform.OS === "web") {
+            // Permissions resolved — clear notified request IDs to free memory
+            const prevRequests = session.agentState?.requests;
+            if (prevRequests && Object.keys(prevRequests).length > 0) {
+              clearNotifiedRequests(Object.keys(prevRequests));
+            }
           }
 
           // Re-fetch messages when control returns to mobile (local -> remote mode switch)
