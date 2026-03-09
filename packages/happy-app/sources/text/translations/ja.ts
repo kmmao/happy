@@ -1506,6 +1506,18 @@ export const ja: TranslationStructure = {
     scanEmpty: "このマシンに git リポジトリが見つかりません",
     scanError: "スキャン失敗 — マシンがオンラインであることを確認してください",
     scanSearchPlaceholder: "リポジトリを検索...",
+    webhookGuideTitle: "{{provider}} Webhook セットアップ",
+    guideStep1GitHub: "リポジトリ → Settings → Webhooks → Add webhook に移動",
+    guideStep1Gitea:
+      "リポジトリ → Settings → Webhooks → Add Webhook → Gitea に移動",
+    guideStep2: "下に表示されている Webhook URL を貼り付け",
+    guideStep3: "下に表示されている Webhook Secret を貼り付け",
+    guideStep4: "Content type：「application/json」を選択",
+    guideStep5: "Events：「Issues」のみを選択して保存",
+    webhookTestSuccess: "サーバーに到達可能",
+    webhookTestFail: "サーバーが HTTP {{status}} を返しました",
+    webhookTestError:
+      "サーバーに到達できません — ネットワークを確認してください",
   },
 
   quickCommands: {

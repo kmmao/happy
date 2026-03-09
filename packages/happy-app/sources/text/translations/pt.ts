@@ -1526,6 +1526,19 @@ export const pt: TranslationStructure = {
     scanError:
       "Falha na verificação — certifique-se de que a máquina está online",
     scanSearchPlaceholder: "Pesquisar repos...",
+    webhookGuideTitle: "Configuração de Webhook do {{provider}}",
+    guideStep1GitHub:
+      "Vá ao seu repositório → Settings → Webhooks → Add webhook",
+    guideStep1Gitea:
+      "Vá ao seu repositório → Settings → Webhooks → Add Webhook → Gitea",
+    guideStep2: "Cole a Webhook URL exibida abaixo",
+    guideStep3: "Cole o Webhook Secret exibido abaixo",
+    guideStep4: 'Content type: selecione "application/json"',
+    guideStep5: 'Events: selecione apenas "Issues" e salve',
+    webhookTestSuccess: "Servidor acessível",
+    webhookTestFail: "Servidor retornou HTTP {{status}}",
+    webhookTestError:
+      "Não foi possível conectar ao servidor — verifique sua rede",
   },
 
   quickCommands: {

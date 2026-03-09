@@ -773,6 +773,7 @@ const WebhookRepoItem = React.memo<{
   const [showScanResults, setShowScanResults] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanSearch, setScanSearch] = useState("");
+  const [testing, setTesting] = useState(false);
 
   const handleCopySecret = async () => {
     await Clipboard.setStringAsync(repo.secret);
@@ -817,6 +818,44 @@ const WebhookRepoItem = React.memo<{
     [index, onUpdate],
   );
 
+  const handleShowGuide = useCallback(() => {
+    const webhookUrl = getWebhookUrl(provider);
+    const providerName = provider === "github" ? "GitHub" : "Gitea";
+    const steps =
+      provider === "github"
+        ? `1. ${t("gitHosts.guideStep1GitHub")}\n2. ${t("gitHosts.guideStep2")}\n3. ${t("gitHosts.guideStep3")}\n4. ${t("gitHosts.guideStep4")}\n5. ${t("gitHosts.guideStep5")}`
+        : `1. ${t("gitHosts.guideStep1Gitea")}\n2. ${t("gitHosts.guideStep2")}\n3. ${t("gitHosts.guideStep3")}\n4. ${t("gitHosts.guideStep4")}\n5. ${t("gitHosts.guideStep5")}`;
+    HappyModal.confirm(
+      t("gitHosts.webhookGuideTitle", { provider: providerName }),
+      `${steps}\n\nWebhook URL:\n${webhookUrl}`,
+      { cancelText: t("common.ok") },
+    );
+  }, [provider]);
+
+  const handleTestWebhook = useCallback(async () => {
+    if (testing) return;
+    setTesting(true);
+    try {
+      const webhookUrl = getWebhookUrl(provider);
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ping" }),
+      });
+      if (response.ok) {
+        HappyModal.toast(t("gitHosts.webhookTestSuccess"));
+      } else {
+        HappyModal.toast(
+          t("gitHosts.webhookTestFail", { status: String(response.status) }),
+        );
+      }
+    } catch {
+      HappyModal.toast(t("gitHosts.webhookTestError"));
+    } finally {
+      setTesting(false);
+    }
+  }, [provider, testing]);
+
   return (
     <View
       style={{
@@ -826,7 +865,7 @@ const WebhookRepoItem = React.memo<{
         marginBottom: 10,
       }}
     >
-      {/* Header with enabled toggle and remove */}
+      {/* Header with enabled toggle, guide, test, remove */}
       <View
         style={{
           flexDirection: "row",
@@ -839,17 +878,42 @@ const WebhookRepoItem = React.memo<{
           value={repo.enabled}
           onValueChange={(v) => onUpdate(index, { enabled: v })}
         />
-        <Pressable onPress={() => onRemove(index)} hitSlop={8}>
-          <Text
-            style={{
-              fontSize: 13,
-              color: theme.colors.box.warning.text,
-              ...Typography.default(),
-            }}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <Pressable onPress={handleShowGuide} hitSlop={8}>
+            <Ionicons
+              name="help-circle-outline"
+              size={20}
+              color={theme.colors.textLink}
+            />
+          </Pressable>
+          <Pressable
+            onPress={handleTestWebhook}
+            hitSlop={8}
+            disabled={testing}
+            style={{ opacity: testing ? 0.5 : 1 }}
           >
-            {t("gitHosts.webhookRemoveRepo")}
-          </Text>
-        </Pressable>
+            {testing ? (
+              <ActivityIndicator size={16} color={theme.colors.textLink} />
+            ) : (
+              <Ionicons
+                name="flash-outline"
+                size={20}
+                color={theme.colors.textLink}
+              />
+            )}
+          </Pressable>
+          <Pressable onPress={() => onRemove(index)} hitSlop={8}>
+            <Text
+              style={{
+                fontSize: 13,
+                color: theme.colors.box.warning.text,
+                ...Typography.default(),
+              }}
+            >
+              {t("gitHosts.webhookRemoveRepo")}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Target Machine (moved before repo URL) */}

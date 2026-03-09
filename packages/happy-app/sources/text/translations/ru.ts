@@ -1549,6 +1549,18 @@ export const ru: TranslationStructure = {
     scanEmpty: "На этой машине не найдено git-репозиториев",
     scanError: "Сканирование не удалось — убедитесь, что машина онлайн",
     scanSearchPlaceholder: "Поиск репозиториев...",
+    webhookGuideTitle: "Настройка {{provider}} Webhook",
+    guideStep1GitHub:
+      "Перейдите в репозиторий → Settings → Webhooks → Add webhook",
+    guideStep1Gitea:
+      "Перейдите в репозиторий → Settings → Webhooks → Add Webhook → Gitea",
+    guideStep2: "Вставьте Webhook URL, показанный ниже",
+    guideStep3: "Вставьте Webhook Secret, показанный ниже",
+    guideStep4: 'Content type: выберите "application/json"',
+    guideStep5: 'Events: выберите только "Issues", затем сохраните',
+    webhookTestSuccess: "Сервер доступен",
+    webhookTestFail: "Сервер вернул HTTP {{status}}",
+    webhookTestError: "Не удаётся подключиться к серверу — проверьте сеть",
   },
 
   quickCommands: {

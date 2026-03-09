@@ -1450,6 +1450,16 @@ export const zhHant: TranslationStructure = {
     scanEmpty: "在此機器上未找到 git 倉庫",
     scanError: "掃描失敗 - 請確保機器在線",
     scanSearchPlaceholder: "搜尋倉庫...",
+    webhookGuideTitle: "{{provider}} Webhook 設定",
+    guideStep1GitHub: "前往你的倉庫 → Settings → Webhooks → Add webhook",
+    guideStep1Gitea: "前往你的倉庫 → Settings → Webhooks → Add Webhook → Gitea",
+    guideStep2: "貼上下方顯示的 Webhook URL",
+    guideStep3: "貼上下方顯示的 Webhook Secret",
+    guideStep4: 'Content type：選擇 "application/json"',
+    guideStep5: 'Events：僅選擇 "Issues"，然後儲存',
+    webhookTestSuccess: "伺服器可達",
+    webhookTestFail: "伺服器回應 HTTP {{status}}",
+    webhookTestError: "無法連線伺服器 - 請檢查網路",
   },
 
   quickCommands: {

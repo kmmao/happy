@@ -1526,6 +1526,17 @@ export const es: TranslationStructure = {
     scanEmpty: "No se encontraron repos git en esta máquina",
     scanError: "Error de escaneo — asegúrate de que la máquina esté en línea",
     scanSearchPlaceholder: "Buscar repos...",
+    webhookGuideTitle: "Configuración de Webhook de {{provider}}",
+    guideStep1GitHub: "Ve a tu repositorio → Settings → Webhooks → Add webhook",
+    guideStep1Gitea:
+      "Ve a tu repositorio → Settings → Webhooks → Add Webhook → Gitea",
+    guideStep2: "Pega la Webhook URL que se muestra abajo",
+    guideStep3: "Pega el Webhook Secret que se muestra abajo",
+    guideStep4: 'Content type: selecciona "application/json"',
+    guideStep5: 'Events: selecciona solo "Issues" y guarda',
+    webhookTestSuccess: "El servidor es accesible",
+    webhookTestFail: "El servidor devolvió HTTP {{status}}",
+    webhookTestError: "No se puede conectar al servidor — verifica tu red",
   },
 
   quickCommands: {

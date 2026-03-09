@@ -1528,6 +1528,18 @@ export const ca: TranslationStructure = {
     scanError:
       "Error d'escaneig — assegureu-vos que la màquina estigui en línia",
     scanSearchPlaceholder: "Cerca repositoris...",
+    webhookGuideTitle: "Configuració de Webhook de {{provider}}",
+    guideStep1GitHub:
+      "Vés al teu repositori → Settings → Webhooks → Add webhook",
+    guideStep1Gitea:
+      "Vés al teu repositori → Settings → Webhooks → Add Webhook → Gitea",
+    guideStep2: "Enganxa la Webhook URL que es mostra a sota",
+    guideStep3: "Enganxa el Webhook Secret que es mostra a sota",
+    guideStep4: 'Content type: selecciona "application/json"',
+    guideStep5: 'Events: selecciona només "Issues" i desa',
+    webhookTestSuccess: "El servidor és accessible",
+    webhookTestFail: "El servidor ha retornat HTTP {{status}}",
+    webhookTestError: "No es pot connectar al servidor — comprova la xarxa",
   },
 
   quickCommands: {

@@ -1518,6 +1518,17 @@ export const en: TranslationStructure = {
     scanEmpty: "No git repos found on this machine",
     scanError: "Scan failed — make sure the machine is online",
     scanSearchPlaceholder: "Search repos...",
+    webhookGuideTitle: "{{provider}} Webhook Setup",
+    guideStep1GitHub: "Go to your repo → Settings → Webhooks → Add webhook",
+    guideStep1Gitea:
+      "Go to your repo → Settings → Webhooks → Add Webhook → Gitea",
+    guideStep2: "Paste the Webhook URL shown below",
+    guideStep3: "Paste the Webhook Secret shown below",
+    guideStep4: 'Content type: select "application/json"',
+    guideStep5: 'Events: select "Issues" only, then save',
+    webhookTestSuccess: "Server is reachable",
+    webhookTestFail: "Server returned HTTP {{status}}",
+    webhookTestError: "Cannot reach server — check your network",
   },
 
   quickCommands: {
