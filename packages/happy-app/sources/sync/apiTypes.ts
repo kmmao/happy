@@ -194,10 +194,22 @@ export const ApiEphemeralMachineActivityUpdateSchema = z.object({
   activeAt: z.number(),
 });
 
+export const ApiEphemeralWebhookIssueLinkSchema = z.object({
+  type: z.literal("webhook-issue-linked"),
+  issueNumber: z.number(),
+  issueTitle: z.string(),
+  issueUrl: z.string(),
+  repoUrl: z.string(),
+  repoPath: z.string(),
+  machineId: z.string(),
+  sessionId: z.string(),
+});
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
   ApiEphemeralMachineActivityUpdateSchema,
+  ApiEphemeralWebhookIssueLinkSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

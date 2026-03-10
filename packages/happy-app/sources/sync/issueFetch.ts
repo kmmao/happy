@@ -543,8 +543,27 @@ export async function createIssue(
     }
     try {
       const raw = JSON.parse(responseBody);
-      return parseGiteaIssue(raw);
-    } catch {
+      const created = parseGiteaIssue(raw);
+
+      // Gitea create-issue API accepts label IDs, not names.
+      // Resolve names→IDs and set labels via a separate API call.
+      if (labels && labels.length > 0) {
+        await replaceGiteaIssueLabels(
+          sessionId,
+          repoInfo,
+          created.number,
+          labels,
+        );
+      }
+
+      return created;
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        e.message.startsWith("Failed to update labels")
+      ) {
+        throw e;
+      }
       throw new Error("Failed to parse create issue response");
     }
   }
