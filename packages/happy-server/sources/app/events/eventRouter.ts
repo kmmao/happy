@@ -229,6 +229,16 @@ export type EphemeralEvent =
       repoUrl: string;
       repoPath: string;
       provider: string;
+    }
+  | {
+      type: "webhook-issue-linked";
+      issueNumber: number;
+      issueTitle: string;
+      issueUrl: string;
+      repoUrl: string;
+      repoPath: string;
+      machineId: string;
+      sessionId: string;
     };
 
 // === EVENT PAYLOAD TYPES ===

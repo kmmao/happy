@@ -31,7 +31,7 @@ import { kanbanStore } from "./kanbanStore";
 import { isKanbanKey } from "./kanbanTypes";
 import { issueSessionStore } from "./issueSessionStore";
 import type { IssueSessionLink } from "./issueSessionTypes";
-import { isIssueSessionKey } from "./issueSessionTypes";
+import { isIssueSessionKey, buildIssueKey } from "./issueSessionTypes";
 import { issueStore } from "./issueStore";
 import {
   addIssueCommentViaMachine,
@@ -133,6 +133,24 @@ type OutboxMessage = {
   localId: string;
   content: string;
 };
+
+/**
+ * Extract "owner/repo" from a normalized repo URL.
+ * Handles HTTPS URLs like "https://github.com/owner/repo" or
+ * "https://gitea.example.com/owner/repo".
+ */
+function extractRepoLabel(repoUrl: string): string {
+  try {
+    const url = new URL(repoUrl);
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0]}/${parts[1]}`;
+    }
+  } catch {
+    // Not a valid URL — fall through
+  }
+  return repoUrl;
+}
 
 class Sync {
   private static readonly BACKGROUND_SEND_TIMEOUT_MS = 30_000;
@@ -3176,6 +3194,67 @@ class Sync {
     }
 
     // daemon-status ephemeral updates are deprecated, machine status is handled via machine-activity
+
+    // Handle webhook-issue-linked: create IssueSessionLink so the session list
+    // shows issue info for webhook-triggered sessions (same as app-initiated ones).
+    if (updateData.type === "webhook-issue-linked") {
+      void this.handleWebhookIssueLinked(updateData);
+    }
+  };
+
+  /**
+   * Create an IssueSessionLink when a webhook-triggered session completes.
+   * Extracts owner/repo from repoUrl for the repoLabel field.
+   */
+  private handleWebhookIssueLinked = async (data: {
+    readonly issueNumber: number;
+    readonly issueTitle: string;
+    readonly issueUrl: string;
+    readonly repoUrl: string;
+    readonly repoPath: string;
+    readonly machineId: string;
+    readonly sessionId: string;
+  }): Promise<void> => {
+    try {
+      if (!issueSessionStore.getState().isLoaded) {
+        await issueSessionStore.getState().loadLinks();
+      }
+
+      const projectKey = `${data.machineId}:${data.repoPath}`;
+      const issueKey = buildIssueKey(projectKey, data.issueNumber);
+
+      // Don't overwrite if autoIssueService already created the link
+      const existing = issueSessionStore.getState().findByIssueKey(issueKey);
+      if (existing) {
+        return;
+      }
+
+      // Extract "owner/repo" from repoUrl for repoLabel
+      const repoLabel = extractRepoLabel(data.repoUrl);
+
+      await issueSessionStore.getState().createLink({
+        issueNumber: data.issueNumber,
+        issueTitle: data.issueTitle,
+        projectKey,
+        repoLabel,
+        sessionId: data.sessionId,
+        machineId: data.machineId,
+        repoPath: data.repoPath,
+      });
+    } catch (error) {
+      // KV optimistic lock conflict means another device/service created
+      // the link concurrently (e.g. autoIssueService). Only log if the
+      // link truly doesn't exist after the conflict.
+      const projectKey = `${data.machineId}:${data.repoPath}`;
+      const alreadyExists = issueSessionStore
+        .getState()
+        .findByIssueKey(buildIssueKey(projectKey, data.issueNumber));
+      if (!alreadyExists) {
+        log.log(
+          `⚠️ handleWebhookIssueLinked: failed to create link for #${data.issueNumber}: ${error}`,
+        );
+      }
+    }
   };
 
   //
