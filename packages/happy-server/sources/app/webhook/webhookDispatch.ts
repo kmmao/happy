@@ -17,6 +17,7 @@ import {
 } from "./webhookParsers";
 import type { ParsedWebhookIssue } from "./webhookParsers";
 import { eventRouter } from "@/app/events/eventRouter";
+import { fetchIssueLabelsFromProvider } from "./webhookFetchLabels";
 
 /**
  * Extract the repository URL from a webhook body.
@@ -125,8 +126,15 @@ export async function dispatchWebhook(
   // 5. Process each matching route
   for (const route of routes) {
     try {
-      await processRoute(route, provider, rawBody, headers, deliveryId, issue);
-      anyDispatched = true;
+      const dispatched = await processRoute(
+        route,
+        provider,
+        rawBody,
+        headers,
+        deliveryId,
+        issue,
+      );
+      if (dispatched) anyDispatched = true;
     } catch (error) {
       log(
         { module: "webhook", level: "error" },
@@ -146,6 +154,7 @@ async function processRoute(
     id: string;
     accountId: string;
     webhookSecret: Uint8Array<ArrayBuffer>;
+    apiToken: Uint8Array<ArrayBuffer> | null;
     labels: string[];
     authors: string[];
     machineId: string;
@@ -157,7 +166,7 @@ async function processRoute(
   headers: Record<string, string | undefined>,
   deliveryId: string,
   issue: ParsedWebhookIssue,
-): Promise<void> {
+): Promise<boolean> {
   // 1. Decrypt webhook secret and verify signature
   const secret = decryptString(
     ["webhook-route", `${route.accountId}:${issue.repoUrl.toLowerCase()}`],
@@ -169,16 +178,43 @@ async function processRoute(
       { module: "webhook", level: "warn" },
       `Signature verification failed for route ${route.id}`,
     );
-    return;
+    return false;
   }
 
-  // 2. Match labels
-  if (!labelsMatch(issue.issueLabels, route.labels)) {
+  // 2. Match labels — if payload labels are empty and we have an API token,
+  //    fetch real labels from the provider API (Gitea bug workaround).
+  let effectiveLabels = issue.issueLabels;
+  if (
+    effectiveLabels.length === 0 &&
+    route.labels.length > 0 &&
+    route.apiToken
+  ) {
     log(
       { module: "webhook" },
-      `Issue #${issue.issueNumber} labels don't match route ${route.id}`,
+      `Issue #${issue.issueNumber} has no labels in payload, fetching from API...`,
     );
-    return;
+    const fetched = await fetchIssueLabelsFromProvider({
+      provider,
+      repoUrl: issue.repoUrl,
+      issueNumber: issue.issueNumber,
+      encryptedApiToken: route.apiToken as unknown as Uint8Array<ArrayBuffer>,
+      accountId: route.accountId,
+    });
+    if (fetched) {
+      effectiveLabels = fetched;
+      log(
+        { module: "webhook" },
+        `Fetched labels from API for issue #${issue.issueNumber}: [${fetched.join(",")}]`,
+      );
+    }
+  }
+
+  if (!labelsMatch(effectiveLabels, route.labels)) {
+    log(
+      { module: "webhook" },
+      `Issue #${issue.issueNumber} labels don't match route ${route.id} — issue has [${effectiveLabels.join(",")}], route expects [${route.labels.join(",")}]`,
+    );
+    return false;
   }
 
   // 3. Match author
@@ -187,7 +223,7 @@ async function processRoute(
       { module: "webhook" },
       `Issue #${issue.issueNumber} author "${issue.issueAuthor}" not allowed for route ${route.id}`,
     );
-    return;
+    return false;
   }
 
   // 4. Dedup — check if we already processed this issue
@@ -204,7 +240,7 @@ async function processRoute(
       { module: "webhook" },
       `Issue #${issue.issueNumber} already processed (event ${existing.id}, status=${existing.status})`,
     );
-    return;
+    return false;
   }
 
   // 5. Create webhook event record
@@ -217,7 +253,7 @@ async function processRoute(
       issueNumber: issue.issueNumber,
       issueTitle: issue.issueTitle,
       issueAuthor: issue.issueAuthor,
-      issueLabels: issue.issueLabels,
+      issueLabels: effectiveLabels,
       issueUrl: issue.issueUrl,
       status: "pending",
       machineId: route.machineId,
@@ -234,7 +270,7 @@ async function processRoute(
       issueTitle: issue.issueTitle,
       issueBody: issue.issueBody,
       issueAuthor: issue.issueAuthor,
-      issueLabels: issue.issueLabels,
+      issueLabels: effectiveLabels,
       issueUrl: issue.issueUrl,
       repoUrl: issue.repoUrl,
       repoPath: route.repoPath,
@@ -256,4 +292,6 @@ async function processRoute(
     { module: "webhook" },
     `Dispatched webhook for issue #${issue.issueNumber} to machine ${route.machineId}`,
   );
+
+  return true;
 }

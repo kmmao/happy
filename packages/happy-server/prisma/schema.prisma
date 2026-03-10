@@ -376,6 +376,7 @@ model WebhookRoute {
     provider      String // "github" | "gitea" | "gitlab"
     repoUrl       String // Normalized, e.g. "https://github.com/owner/repo"
     webhookSecret Bytes // Server-side encrypted (same as ServiceAccountToken.token)
+    apiToken      Bytes? // Server-side encrypted API token for label verification
     labels        String[] // Trigger labels, e.g. ["auto-fix"]
     authors       String[] // Allowed issue authors
     machineId     String // Target machine to dispatch to

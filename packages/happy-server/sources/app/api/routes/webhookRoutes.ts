@@ -107,6 +107,7 @@ export function webhookRoutes(app: Fastify) {
           provider: z.enum(["github", "gitea", "gitlab"]),
           repoUrl: z.string().url(),
           webhookSecret: z.string().min(1),
+          apiToken: z.string().optional(),
           labels: z.array(z.string()),
           authors: z.array(z.string()),
           machineId: z.string().min(1),
@@ -127,6 +128,7 @@ export function webhookRoutes(app: Fastify) {
         provider: string;
         repoUrl: string;
         webhookSecret: string;
+        apiToken?: string;
         labels: string[];
         authors: string[];
         machineId: string;
@@ -144,6 +146,13 @@ export function webhookRoutes(app: Fastify) {
         body.webhookSecret,
       );
 
+      const encryptedApiToken = body.apiToken
+        ? encryptString(
+            ["webhook-route-token", `${userId}:${normalizedUrl}`],
+            body.apiToken,
+          )
+        : undefined;
+
       const route = await db.webhookRoute.upsert({
         where: {
           accountId_repoUrl: {
@@ -156,6 +165,9 @@ export function webhookRoutes(app: Fastify) {
           provider: body.provider,
           repoUrl: normalizedUrl,
           webhookSecret: Buffer.from(encryptedSecret),
+          apiToken: encryptedApiToken
+            ? Buffer.from(encryptedApiToken)
+            : undefined,
           labels: body.labels.map((l) => l.trim().toLowerCase()),
           authors: body.authors.map((a) => a.trim().toLowerCase()),
           machineId: body.machineId,
@@ -165,6 +177,9 @@ export function webhookRoutes(app: Fastify) {
         update: {
           provider: body.provider,
           webhookSecret: Buffer.from(encryptedSecret),
+          apiToken: encryptedApiToken
+            ? Buffer.from(encryptedApiToken)
+            : undefined,
           labels: body.labels.map((l) => l.trim().toLowerCase()),
           authors: body.authors.map((a) => a.trim().toLowerCase()),
           machineId: body.machineId,
