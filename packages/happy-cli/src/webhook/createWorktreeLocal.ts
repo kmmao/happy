@@ -3,7 +3,7 @@
  * Ported from happy-app's createWorktree.ts for CLI-side webhook handling.
  */
 
-import { exec, execFile } from "child_process";
+import { execFile } from "child_process";
 import { logger } from "@/ui/logger";
 
 const adjectives = [
@@ -79,21 +79,6 @@ function generateWorktreeName(): string {
   return `${adj}-${noun}-${hash}`;
 }
 
-function execAsync(
-  command: string,
-  cwd: string,
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  return new Promise((resolve) => {
-    exec(command, { cwd, timeout: 30_000 }, (error, stdout, stderr) => {
-      resolve({
-        stdout: stdout ?? "",
-        stderr: stderr ?? "",
-        exitCode: error?.code ?? (error ? 1 : 0),
-      });
-    });
-  });
-}
-
 function execFileAsync(
   file: string,
   args: readonly string[],
@@ -153,11 +138,19 @@ export async function removeWorktreeForced(
 
 export async function createWorktreeLocal(
   basePath: string,
+  issueNumber?: number,
 ): Promise<CreateWorktreeResult> {
-  const name = generateWorktreeName();
+  const randomPart = generateWorktreeName();
+  const name = issueNumber != null
+    ? `issue-${issueNumber}-${randomPart}`
+    : randomPart;
 
   // Check if it's a git repository
-  const gitCheck = await execAsync("git rev-parse --git-dir", basePath);
+  const gitCheck = await execFileAsync(
+    "git",
+    ["rev-parse", "--git-dir"],
+    basePath,
+  );
   if (gitCheck.exitCode !== 0) {
     return {
       success: false,
@@ -169,8 +162,9 @@ export async function createWorktreeLocal(
   }
 
   // Get current branch name (parent branch for the worktree)
-  const branchResult = await execAsync(
-    "git rev-parse --abbrev-ref HEAD",
+  const branchResult = await execFileAsync(
+    "git",
+    ["rev-parse", "--abbrev-ref", "HEAD"],
     basePath,
   );
   let parentBranch: string;
@@ -178,8 +172,9 @@ export async function createWorktreeLocal(
     parentBranch = branchResult.stdout.trim();
   } else {
     // Fallback: detect remote default branch
-    const defaultResult = await execAsync(
-      "git symbolic-ref refs/remotes/origin/HEAD --short",
+    const defaultResult = await execFileAsync(
+      "git",
+      ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"],
       basePath,
     );
     parentBranch =
@@ -190,8 +185,9 @@ export async function createWorktreeLocal(
 
   // Create the worktree with new branch
   const worktreeRelPath = `.dev/worktree/${name}`;
-  let result = await execAsync(
-    `git worktree add -b ${name} ${worktreeRelPath}`,
+  let result = await execFileAsync(
+    "git",
+    ["worktree", "add", "-b", name, worktreeRelPath],
     basePath,
   );
 
@@ -200,8 +196,9 @@ export async function createWorktreeLocal(
     for (let i = 2; i <= 4; i++) {
       const newName = `${name}-${i}`;
       const newRelPath = `.dev/worktree/${newName}`;
-      result = await execAsync(
-        `git worktree add -b ${newName} ${newRelPath}`,
+      result = await execFileAsync(
+        "git",
+        ["worktree", "add", "-b", newName, newRelPath],
         basePath,
       );
 

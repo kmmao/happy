@@ -64,7 +64,11 @@ function labelsMatch(
 ): boolean {
   // Empty route labels = match any issue (no label filter)
   if (routeLabels.length === 0) return true;
-  const triggerSet = new Set(routeLabels.map((l) => l.trim().toLowerCase()));
+  const triggerSet = new Set(
+    routeLabels.flatMap((l) =>
+      l.split(",").map((s) => s.trim().toLowerCase()),
+    ).filter(Boolean),
+  );
   return issueLabels.some((l) => triggerSet.has(l));
 }
 

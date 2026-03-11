@@ -58,7 +58,7 @@ export async function handleWebhookTrigger(
     );
 
     // 1. Create worktree locally
-    const worktreeResult = await createWorktreeLocal(repoPath);
+    const worktreeResult = await createWorktreeLocal(repoPath, issueNumber);
     if (!worktreeResult.success) {
       const errorMessage = worktreeResult.error ?? "Failed to create worktree";
       logger.debug(`[WEBHOOK] Worktree creation failed: ${errorMessage}`);

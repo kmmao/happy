@@ -38,7 +38,9 @@ async function upsertWebhookRoute(
       repoUrl: repo.repoUrl,
       webhookSecret: repo.secret,
       apiToken: host.apiToken || undefined,
-      labels: host.autoIssueLabel ? [host.autoIssueLabel] : [],
+      labels: host.autoIssueLabel
+        ? host.autoIssueLabel.split(",").map((l) => l.trim().toLowerCase()).filter(Boolean)
+        : [],
       authors: host.autoIssueAllowedAuthors ?? [],
       machineId: repo.machineId,
       repoPath: repo.repoPath,

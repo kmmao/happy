@@ -144,7 +144,7 @@ export function buildIssuePrompt(
     "5. Run existing tests to make sure nothing is broken",
     `6. Create a well-formatted commit referencing this issue (e.g. "fix: description - closes #${issue.issueNumber}")`,
     `7. Push your branch to the remote: git push -u origin ${worktree.branchName}`,
-    `8. Create a pull request: gh pr create --base "${worktree.parentBranch}" --head "${worktree.branchName}" --fill`,
+    `8. Create a pull request: gh pr create --base "${worktree.parentBranch}" --head "${worktree.branchName}" --title "<type>: <short description>" --body "Fixes #${issue.issueNumber}"`,
     "9. After completing, provide a concise summary of what you changed and why",
   );
 
