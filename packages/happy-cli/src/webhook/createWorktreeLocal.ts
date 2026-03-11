@@ -3,25 +3,80 @@
  * Ported from happy-app's createWorktree.ts for CLI-side webhook handling.
  */
 
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
 import { logger } from "@/ui/logger";
 
 const adjectives = [
-  "clever", "happy", "swift", "bright", "calm",
-  "bold", "quiet", "brave", "wise", "eager",
-  "gentle", "quick", "sharp", "smooth", "fresh",
+  "clever",
+  "happy",
+  "swift",
+  "bright",
+  "calm",
+  "bold",
+  "quiet",
+  "brave",
+  "wise",
+  "eager",
+  "gentle",
+  "quick",
+  "sharp",
+  "smooth",
+  "fresh",
+  "nimble",
+  "serene",
+  "vivid",
+  "lively",
+  "noble",
+  "daring",
+  "fierce",
+  "agile",
+  "witty",
+  "keen",
+  "mellow",
+  "steady",
+  "lucid",
+  "plucky",
+  "crisp",
 ];
 
 const nouns = [
-  "ocean", "forest", "cloud", "star", "river",
-  "mountain", "valley", "bridge", "beacon", "harbor",
-  "garden", "meadow", "canyon", "island", "desert",
+  "ocean",
+  "forest",
+  "cloud",
+  "star",
+  "river",
+  "mountain",
+  "valley",
+  "bridge",
+  "beacon",
+  "harbor",
+  "garden",
+  "meadow",
+  "canyon",
+  "island",
+  "desert",
+  "aurora",
+  "glacier",
+  "summit",
+  "prairie",
+  "lagoon",
+  "falcon",
+  "phoenix",
+  "condor",
+  "osprey",
+  "sparrow",
+  "crystal",
+  "quartz",
+  "marble",
+  "cobalt",
+  "bronze",
 ];
 
 function generateWorktreeName(): string {
   const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
   const noun = nouns[Math.floor(Math.random() * nouns.length)];
-  return `${adj}-${noun}`;
+  const hash = Math.random().toString(16).slice(2, 6);
+  return `${adj}-${noun}-${hash}`;
 }
 
 function execAsync(
@@ -39,12 +94,61 @@ function execAsync(
   });
 }
 
+function execFileAsync(
+  file: string,
+  args: readonly string[],
+  cwd: string,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return new Promise((resolve) => {
+    execFile(
+      file,
+      [...args],
+      { cwd, timeout: 30_000 },
+      (error, stdout, stderr) => {
+        resolve({
+          stdout: stdout ?? "",
+          stderr: stderr ?? "",
+          exitCode: error
+            ? typeof error.code === "number"
+              ? error.code
+              : 1
+            : 0,
+        });
+      },
+    );
+  });
+}
+
 export interface CreateWorktreeResult {
   readonly success: boolean;
   readonly worktreePath: string;
   readonly branchName: string;
   readonly parentBranch: string;
   readonly error?: string;
+}
+
+/**
+ * Force-remove a worktree and its branch. Best-effort, never throws.
+ */
+export async function removeWorktreeForced(
+  basePath: string,
+  branchName: string,
+): Promise<void> {
+  const worktreeRelPath = `.dev/worktree/${branchName}`;
+  try {
+    await execFileAsync(
+      "git",
+      ["worktree", "remove", worktreeRelPath, "--force"],
+      basePath,
+    );
+  } catch {
+    /* best-effort */
+  }
+  try {
+    await execFileAsync("git", ["branch", "-D", branchName], basePath);
+  } catch {
+    /* best-effort */
+  }
 }
 
 export async function createWorktreeLocal(
@@ -69,8 +173,20 @@ export async function createWorktreeLocal(
     "git rev-parse --abbrev-ref HEAD",
     basePath,
   );
-  const parentBranch =
-    branchResult.exitCode === 0 ? branchResult.stdout.trim() : "main";
+  let parentBranch: string;
+  if (branchResult.exitCode === 0 && branchResult.stdout.trim()) {
+    parentBranch = branchResult.stdout.trim();
+  } else {
+    // Fallback: detect remote default branch
+    const defaultResult = await execAsync(
+      "git symbolic-ref refs/remotes/origin/HEAD --short",
+      basePath,
+    );
+    parentBranch =
+      defaultResult.exitCode === 0
+        ? defaultResult.stdout.trim().replace("origin/", "")
+        : "main";
+  }
 
   // Create the worktree with new branch
   const worktreeRelPath = `.dev/worktree/${name}`;

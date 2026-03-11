@@ -6,6 +6,7 @@
  */
 
 import { create } from "zustand";
+import { AsyncLock } from "@/utils/lock";
 import { useShallow } from "zustand/react/shallow";
 import { sync } from "./sync";
 import { kvList, kvMutate, type KvMutation, type KvItem } from "./apiKv";
@@ -102,57 +103,59 @@ const initialState: IssueSessionState = {
   isLoaded: false,
 };
 
+const loadLinksLock = new AsyncLock();
+
 export const issueSessionStore = create<IssueSessionStore>()((set, get) => ({
   ...initialState,
 
   loadLinks: async () => {
-    if (get().isLoading) {
-      return;
-    }
+    await loadLinksLock.inLock(async () => {
+      if (get().isLoaded) return;
 
-    set({ isLoading: true });
+      set({ isLoading: true });
 
-    try {
-      const credentials = sync.getCredentials();
-      if (!credentials) {
-        set({ isLoading: false });
-        return;
-      }
-
-      const response = await kvList(credentials, {
-        prefix: "issueSession/",
-        limit: 500,
-      });
-
-      const decrypted = await Promise.all(response.items.map(decryptKvItem));
-
-      const loaded: Record<string, IssueSessionLink> = {};
-      for (const link of decrypted) {
-        if (link) {
-          loaded[link.issueKey] = link;
+      try {
+        const credentials = sync.getCredentials();
+        if (!credentials) {
+          set({ isLoading: false, isLoaded: true });
+          return;
         }
-      }
 
-      // Merge: keep real-time updates that arrived AFTER the load started,
-      // but only if the link also exists in the loaded data (database is
-      // the authority — if a link was deleted from the DB, don't resurrect it
-      // from memory).
-      set((prev) => {
-        const merged = { ...loaded };
-        for (const [key, existing] of Object.entries(prev.links)) {
-          if (
-            key in merged &&
-            existing.kvVersion > (merged[key]?.kvVersion ?? -1)
-          ) {
-            merged[key] = existing;
+        const response = await kvList(credentials, {
+          prefix: "issueSession/",
+          limit: 500,
+        });
+
+        const decrypted = await Promise.all(response.items.map(decryptKvItem));
+
+        const loaded: Record<string, IssueSessionLink> = {};
+        for (const link of decrypted) {
+          if (link) {
+            loaded[link.issueKey] = link;
           }
         }
-        return { links: merged, isLoading: false, isLoaded: true };
-      });
-    } catch (error) {
-      set({ isLoading: false });
-      throw error;
-    }
+
+        // Merge: keep real-time updates that arrived AFTER the load started,
+        // but only if the link also exists in the loaded data (database is
+        // the authority — if a link was deleted from the DB, don't resurrect it
+        // from memory).
+        set((prev) => {
+          const merged = { ...loaded };
+          for (const [key, existing] of Object.entries(prev.links)) {
+            if (
+              key in merged &&
+              existing.kvVersion > (merged[key]?.kvVersion ?? -1)
+            ) {
+              merged[key] = existing;
+            }
+          }
+          return { links: merged, isLoading: false, isLoaded: true };
+        });
+      } catch (error) {
+        set({ isLoading: false });
+        throw error;
+      }
+    });
   },
 
   createLink: async (data) => {

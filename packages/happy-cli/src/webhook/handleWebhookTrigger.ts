@@ -8,7 +8,10 @@
 import { writeFile, mkdir, unlink } from "fs/promises";
 import { join } from "path";
 import { logger } from "@/ui/logger";
-import { createWorktreeLocal } from "./createWorktreeLocal";
+import {
+  createWorktreeLocal,
+  removeWorktreeForced,
+} from "./createWorktreeLocal";
 import { fetchIssueComments } from "./fetchIssueComments";
 import { buildIssuePrompt } from "./buildIssuePrompt";
 import type { WebhookTriggerData } from "@/api/apiMachine";
@@ -47,6 +50,8 @@ export async function handleWebhookTrigger(
   }
   processingEvents.add(webhookEventId);
 
+  let createdWorktreeBranch: string | undefined;
+
   try {
     logger.debug(
       `[WEBHOOK] Processing webhook event ${webhookEventId} for issue #${issueNumber}`,
@@ -55,8 +60,7 @@ export async function handleWebhookTrigger(
     // 1. Create worktree locally
     const worktreeResult = await createWorktreeLocal(repoPath);
     if (!worktreeResult.success) {
-      const errorMessage =
-        worktreeResult.error ?? "Failed to create worktree";
+      const errorMessage = worktreeResult.error ?? "Failed to create worktree";
       logger.debug(`[WEBHOOK] Worktree creation failed: ${errorMessage}`);
       deps.emitWebhookStatus({
         webhookEventId,
@@ -69,9 +73,14 @@ export async function handleWebhookTrigger(
     logger.debug(
       `[WEBHOOK] Worktree created: ${worktreeResult.worktreePath} (branch: ${worktreeResult.branchName})`,
     );
+    createdWorktreeBranch = worktreeResult.branchName;
 
     // 2. Fetch issue comments (non-critical)
-    let comments: readonly { author: string; body: string; createdAt: number }[] = [];
+    let comments: readonly {
+      author: string;
+      body: string;
+      createdAt: number;
+    }[] = [];
     try {
       comments = await fetchIssueComments(
         provider,
@@ -134,9 +143,14 @@ export async function handleWebhookTrigger(
         status: "failed",
         errorMessage,
       });
-      // Clean up prompt file on failure
+      // Clean up prompt file and worktree on failure
       try {
         await unlink(promptFilePath);
+      } catch {
+        // best-effort
+      }
+      try {
+        await removeWorktreeForced(repoPath, worktreeResult.branchName);
       } catch {
         // best-effort
       }
@@ -153,8 +167,7 @@ export async function handleWebhookTrigger(
       sessionId: spawnResult.sessionId,
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     logger.debug(
       `[WEBHOOK] Failed to handle webhook event ${webhookEventId}: ${errorMessage}`,
     );
@@ -163,6 +176,14 @@ export async function handleWebhookTrigger(
       status: "failed",
       errorMessage,
     });
+    // Clean up worktree if it was created before the error
+    if (createdWorktreeBranch) {
+      try {
+        await removeWorktreeForced(repoPath, createdWorktreeBranch);
+      } catch {
+        // best-effort
+      }
+    }
   } finally {
     processingEvents.delete(webhookEventId);
   }

@@ -79,22 +79,22 @@ export function parseGiteaIssueWebhook(
   // Older Gitea versions don't include body.label either.
   // Strategy: merge body.label (if present) into issue.labels.
   // If labels are still empty, dispatch will fetch from API.
-  const issueLabels: string[] = (issue.labels ?? []).map(
+  const baseLabels: readonly string[] = (issue.labels ?? []).map(
     (l: any) => l.name?.toLowerCase() ?? "",
   );
-  if (action === "label_updated" && body.label?.name) {
-    const triggerLabel = body.label.name.toLowerCase();
-    if (!issueLabels.includes(triggerLabel)) {
-      issueLabels.push(triggerLabel);
-    }
-  }
+  const issueLabels: readonly string[] =
+    action === "label_updated" && body.label?.name
+      ? baseLabels.includes(body.label.name.toLowerCase())
+        ? baseLabels
+        : [...baseLabels, body.label.name.toLowerCase()]
+      : baseLabels;
 
   return {
     issueNumber: issue.number,
     issueTitle: issue.title ?? "",
     issueBody: issue.body ?? "",
     issueAuthor: issue.user?.login ?? "",
-    issueLabels,
+    issueLabels: [...issueLabels],
     issueUrl: issue.html_url ?? "",
     repoUrl: body.repository?.html_url ?? "",
     action: normalizedAction,
@@ -117,14 +117,15 @@ export function parseGitLabIssueWebhook(
   const attrs = body?.object_attributes;
   if (!attrs) return null;
 
-  // GitLab uses "open" / "update" actions
+  // GitLab uses "open" / "update" actions.
+  // Only map "update" to "labeled" when labels actually changed
+  // (otherwise title edits, assignee changes etc. would false-trigger).
   const action = attrs.action;
-  // Map GitLab actions to our normalized set
   const normalizedAction =
     action === "open"
       ? "opened"
-      : action === "update"
-        ? "labeled" // label changes come as "update"
+      : action === "update" && body.changes?.labels
+        ? "labeled"
         : null;
   if (!normalizedAction || !TRIGGER_ACTIONS.has(normalizedAction)) return null;
 
@@ -199,12 +200,16 @@ function extractLinkedIssueNumbers(
   }
 
   // Parse branch name for issue number patterns
-  // e.g. issue-123, fix/123, 123-feature-name
+  // e.g. issue-123, fix/123, feature/123-add-login, 123-feature-name
   const branchPatterns = [
     /issue[/-](\d+)/i,
     /fix[/-](\d+)/i,
     /feat[/-](\d+)/i,
+    /feature[/-](\d+)/i,
     /bug[/-](\d+)/i,
+    /hotfix[/-](\d+)/i,
+    /chore[/-](\d+)/i,
+    /^(\d+)[/-]/,
   ];
   for (const pattern of branchPatterns) {
     const branchMatch = headBranch.match(pattern);

@@ -4,7 +4,7 @@
  * Returns empty array on any failure — non-critical, must not block launch.
  */
 
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { logger } from "@/ui/logger";
 
 export interface IssueComment {
@@ -13,23 +13,28 @@ export interface IssueComment {
   readonly createdAt: number;
 }
 
-function execAsync(
-  command: string,
+/** Only allow safe characters in owner/repo to prevent injection */
+const SAFE_NAME = /^[a-zA-Z0-9._-]+$/;
+
+function execFileAsync(
+  file: string,
+  args: readonly string[],
   cwd: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolve) => {
-    exec(command, { cwd, timeout: 30_000 }, (error, stdout, stderr) => {
+    execFile(file, [...args], { cwd, timeout: 30_000 }, (error, stdout, stderr) => {
       resolve({
         stdout: stdout ?? "",
         stderr: stderr ?? "",
-        exitCode: error?.code ?? (error ? 1 : 0),
+        exitCode: error ? (typeof error.code === "number" ? error.code : 1) : 0,
       });
     });
   });
 }
 
 /**
- * Parse owner/repo from a repo URL like "https://github.com/owner/repo"
+ * Parse owner/repo from a repo URL like "https://github.com/owner/repo".
+ * Validates owner/repo names to prevent command injection.
  */
 function parseRepoFromUrl(
   repoUrl: string,
@@ -38,7 +43,12 @@ function parseRepoFromUrl(
     const url = new URL(repoUrl);
     const parts = url.pathname.replace(/^\//, "").replace(/\.git$/, "").split("/");
     if (parts.length >= 2) {
-      return { owner: parts[0], repo: parts[1] };
+      const owner = parts[0];
+      const repo = parts[1];
+      if (!SAFE_NAME.test(owner) || !SAFE_NAME.test(repo)) {
+        return null;
+      }
+      return { owner, repo };
     }
   } catch {
     // not a valid URL
@@ -76,8 +86,14 @@ export async function fetchIssueComments(
   }
 
   if (provider === "github") {
-    const command = `gh api "repos/${parsed.owner}/${parsed.repo}/issues/${issueNumber}/comments?per_page=${maxComments}" 2>&1`;
-    const result = await execAsync(command, cwd);
+    const result = await execFileAsync(
+      "gh",
+      [
+        "api",
+        `repos/${parsed.owner}/${parsed.repo}/issues/${issueNumber}/comments?per_page=${maxComments}`,
+      ],
+      cwd,
+    );
     if (result.exitCode !== 0) return [];
     try {
       const raw: readonly any[] = JSON.parse(result.stdout.trim());
@@ -88,13 +104,15 @@ export async function fetchIssueComments(
   }
 
   if (provider === "gitea") {
-    // Extract API base from repoUrl (e.g., "https://gitea.example.com")
     try {
       const url = new URL(repoUrl);
       const apiBase = `${url.protocol}//${url.host}/api/v1`;
       const apiUrl = `${apiBase}/repos/${parsed.owner}/${parsed.repo}/issues/${issueNumber}/comments?limit=${maxComments}`;
-      const command = `curl -s -w "\\n%{http_code}" "${apiUrl}" 2>&1`;
-      const result = await execAsync(command, cwd);
+      const result = await execFileAsync(
+        "curl",
+        ["-s", "-w", "\n%{http_code}", apiUrl],
+        cwd,
+      );
       if (result.exitCode !== 0) return [];
       const lines = result.stdout.trim().split("\n");
       const httpStatus = lines.pop()?.trim() ?? "";

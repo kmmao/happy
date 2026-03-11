@@ -3275,6 +3275,20 @@ class Sync {
     readonly machineId: string;
     readonly repoPath: string;
   }): Promise<void> => {
+    await this.tryHandlePRMerged(data, 0);
+  };
+
+  private tryHandlePRMerged = async (
+    data: {
+      readonly prNumber: number;
+      readonly prUrl: string;
+      readonly issueNumber: number;
+      readonly sessionId: string;
+      readonly machineId: string;
+      readonly repoPath: string;
+    },
+    attempt: number,
+  ): Promise<void> => {
     try {
       if (!issueSessionStore.getState().isLoaded) {
         await issueSessionStore.getState().loadLinks();
@@ -3285,6 +3299,12 @@ class Sync {
 
       const existing = issueSessionStore.getState().findByIssueKey(issueKey);
       if (!existing) {
+        // Retry once after delay — issue-linked event may arrive shortly
+        if (attempt < 1) {
+          setTimeout(() => {
+            void this.tryHandlePRMerged(data, attempt + 1);
+          }, 3000);
+        }
         return;
       }
 

@@ -9,6 +9,8 @@
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { decryptString } from "@/modules/encrypt";
+import { inTx } from "@/storage/inTx";
+import { Prisma } from "@prisma/client";
 import { verifyWebhookSignature } from "./webhookVerify";
 import {
   parseWebhookIssue,
@@ -194,6 +196,7 @@ async function processRoute(
   route: {
     id: string;
     accountId: string;
+    repoUrl: string;
     webhookSecret: Uint8Array<ArrayBuffer>;
     apiToken: Uint8Array<ArrayBuffer> | null;
     labels: string[];
@@ -208,9 +211,9 @@ async function processRoute(
   deliveryId: string,
   issue: ParsedWebhookIssue,
 ): Promise<boolean> {
-  // 1. Decrypt webhook secret and verify signature
+  // 1. Decrypt webhook secret and verify signature (use route.repoUrl — already normalized in DB)
   const secret = decryptString(
-    ["webhook-route", `${route.accountId}:${issue.repoUrl.toLowerCase()}`],
+    ["webhook-route", `${route.accountId}:${route.repoUrl}`],
     route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
   );
   const valid = verifyWebhookSignature(provider, secret, rawBody, headers);
@@ -267,41 +270,44 @@ async function processRoute(
     return false;
   }
 
-  // 4. Dedup — check if we already processed this issue
-  const existing = await db.webhookEvent.findFirst({
-    where: {
-      repoUrl: issue.repoUrl.toLowerCase(),
-      issueNumber: issue.issueNumber,
-      accountId: route.accountId,
-      status: { notIn: ["skipped", "failed"] },
-    },
+  // 4. Dedup + create in a single transaction to prevent race conditions
+  const event = await inTx(async (tx) => {
+    const existing = await tx.webhookEvent.findFirst({
+      where: {
+        repoUrl: issue.repoUrl.toLowerCase(),
+        issueNumber: issue.issueNumber,
+        accountId: route.accountId,
+        status: { notIn: ["skipped", "failed"] },
+      },
+    });
+    if (existing) return null;
+
+    return await tx.webhookEvent.create({
+      data: {
+        accountId: route.accountId,
+        provider,
+        deliveryId,
+        repoUrl: issue.repoUrl.toLowerCase(),
+        issueNumber: issue.issueNumber,
+        issueTitle: issue.issueTitle,
+        issueAuthor: issue.issueAuthor,
+        issueLabels: effectiveLabels,
+        issueUrl: issue.issueUrl,
+        status: "pending",
+        machineId: route.machineId,
+      },
+    });
   });
-  if (existing) {
+
+  if (!event) {
     log(
       { module: "webhook" },
-      `Issue #${issue.issueNumber} already processed (event ${existing.id}, status=${existing.status})`,
+      `Issue #${issue.issueNumber} already processed for route ${route.id}`,
     );
     return false;
   }
 
-  // 5. Create webhook event record
-  const event = await db.webhookEvent.create({
-    data: {
-      accountId: route.accountId,
-      provider,
-      deliveryId,
-      repoUrl: issue.repoUrl.toLowerCase(),
-      issueNumber: issue.issueNumber,
-      issueTitle: issue.issueTitle,
-      issueAuthor: issue.issueAuthor,
-      issueLabels: effectiveLabels,
-      issueUrl: issue.issueUrl,
-      status: "pending",
-      machineId: route.machineId,
-    },
-  });
-
-  // 6. Emit ephemeral event to target machine
+  // 5. Emit ephemeral event to target machine
   eventRouter.emitEphemeral({
     userId: route.accountId,
     payload: {
@@ -323,7 +329,7 @@ async function processRoute(
     },
   });
 
-  // 7. Update status to dispatched
+  // 6. Update status to dispatched
   await db.webhookEvent.update({
     where: { id: event.id },
     data: { status: "dispatched" },
@@ -371,19 +377,36 @@ async function processRoutePRMerge(
     return false;
   }
 
-  // 2. Dedup — check if this delivery was already processed
-  const existingDelivery = await db.webhookEvent.findFirst({
-    where: {
-      deliveryId,
-      accountId: route.accountId,
-    },
-  });
-  if (existingDelivery) {
-    log(
-      { module: "webhook" },
-      `PR merge delivery ${deliveryId} already processed for route ${route.id}`,
-    );
-    return false;
+  // 2. Dedup — create a WebhookEvent record for this delivery.
+  //    The @@unique([provider, deliveryId]) constraint prevents duplicate processing.
+  try {
+    await db.webhookEvent.create({
+      data: {
+        accountId: route.accountId,
+        provider,
+        deliveryId,
+        repoUrl: prMerge.repoUrl.toLowerCase(),
+        issueNumber: prMerge.prNumber,
+        issueTitle: `PR #${prMerge.prNumber} merged`,
+        issueAuthor: prMerge.mergedBy,
+        issueLabels: [],
+        issueUrl: prMerge.prUrl,
+        status: "completed",
+        machineId: route.machineId,
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      log(
+        { module: "webhook" },
+        `PR merge delivery ${deliveryId} already processed for route ${route.id}`,
+      );
+      return false;
+    }
+    throw error;
   }
 
   // 3. Find associated webhook events by linked issue numbers
@@ -407,7 +430,7 @@ async function processRoutePRMerge(
 
   let anyArchived = false;
 
-  // 3. Archive each associated session
+  // 4. Archive each associated session
   for (const webhookEvent of webhookEvents) {
     if (!webhookEvent.sessionId) continue;
 

@@ -7,6 +7,7 @@ import type { IssueComment } from "./fetchIssueComments";
 
 const MAX_COMMENT_BODY_LENGTH = 2000;
 const MAX_TOTAL_COMMENTS_LENGTH = 15000;
+const MAX_ISSUE_BODY_LENGTH = 30000;
 
 function formatDate(timestamp: number): string {
   if (timestamp === 0) return "unknown";
@@ -86,9 +87,10 @@ export function buildIssuePrompt(
   comments: readonly IssueComment[],
   worktree: WorktreeInfo,
 ): string {
+  const rawBody = issue.issueBody.trim();
   const bodySection =
-    issue.issueBody.trim() !== ""
-      ? issue.issueBody
+    rawBody !== ""
+      ? truncate(rawBody, MAX_ISSUE_BODY_LENGTH)
       : "(No description provided)";
 
   const labels =

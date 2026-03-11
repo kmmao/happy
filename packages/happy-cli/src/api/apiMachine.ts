@@ -126,6 +126,12 @@ export class ApiMachineClient {
   private keepAliveInterval: NodeJS.Timeout | null = null;
   private rpcHandlerManager: RpcHandlerManager;
   private webhookHandler: ((data: WebhookTriggerData) => void) | null = null;
+  private pendingWebhookStatuses: Array<{
+    webhookEventId: string;
+    status: "dispatched" | "completed" | "failed";
+    sessionId?: string;
+    errorMessage?: string;
+  }> = [];
 
   constructor(
     private token: string,
@@ -248,6 +254,7 @@ export class ApiMachineClient {
 
   /**
    * Report webhook processing status back to server.
+   * Queues the status if the socket is disconnected and flushes on reconnect.
    */
   emitWebhookStatus(data: {
     webhookEventId: string;
@@ -255,7 +262,22 @@ export class ApiMachineClient {
     sessionId?: string;
     errorMessage?: string;
   }) {
+    if (!this.socket.connected) {
+      logger.debug(
+        `[WEBHOOK] Socket disconnected, queuing status for ${data.webhookEventId}`,
+      );
+      this.pendingWebhookStatuses.push(data);
+      return;
+    }
     this.socket.emit("webhook-status", data);
+  }
+
+  private flushPendingWebhookStatuses() {
+    const pending = [...this.pendingWebhookStatuses];
+    this.pendingWebhookStatuses = [];
+    for (const item of pending) {
+      this.socket.emit("webhook-status", item);
+    }
   }
 
   /**
@@ -381,6 +403,9 @@ export class ApiMachineClient {
 
       // Register all handlers
       this.rpcHandlerManager.onSocketConnect(this.socket);
+
+      // Flush any webhook statuses queued during disconnect
+      this.flushPendingWebhookStatuses();
 
       // Start keep-alive
       this.startKeepAlive();
