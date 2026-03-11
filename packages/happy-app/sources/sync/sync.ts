@@ -3200,6 +3200,11 @@ class Sync {
     if (updateData.type === "webhook-issue-linked") {
       void this.handleWebhookIssueLinked(updateData);
     }
+
+    // Handle webhook-pr-merged: archive session and mark IssueSessionLink as completed.
+    if (updateData.type === "webhook-pr-merged") {
+      void this.handleWebhookPRMerged(updateData);
+    }
   };
 
   /**
@@ -3255,6 +3260,46 @@ class Sync {
           `⚠️ handleWebhookIssueLinked: failed to create link for #${data.issueNumber}: ${error}`,
         );
       }
+    }
+  };
+
+  /**
+   * Update IssueSessionLink to "completed" when a PR is merged.
+   * Session archiving is already handled server-side via the activity ephemeral.
+   */
+  private handleWebhookPRMerged = async (data: {
+    readonly prNumber: number;
+    readonly prUrl: string;
+    readonly issueNumber: number;
+    readonly sessionId: string;
+    readonly machineId: string;
+    readonly repoPath: string;
+  }): Promise<void> => {
+    try {
+      if (!issueSessionStore.getState().isLoaded) {
+        await issueSessionStore.getState().loadLinks();
+      }
+
+      const projectKey = `${data.machineId}:${data.repoPath}`;
+      const issueKey = buildIssueKey(projectKey, data.issueNumber);
+
+      const existing = issueSessionStore.getState().findByIssueKey(issueKey);
+      if (!existing) {
+        return;
+      }
+
+      // Only update if currently processing — don't overwrite terminal states
+      if (existing.status !== "processing") {
+        return;
+      }
+
+      await issueSessionStore.getState().updateStatus(issueKey, "completed", {
+        prUrl: data.prUrl,
+      });
+    } catch (error) {
+      log.log(
+        `⚠️ handleWebhookPRMerged: failed to update link for #${data.issueNumber}: ${error}`,
+      );
     }
   };
 

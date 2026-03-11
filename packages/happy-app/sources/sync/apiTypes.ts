@@ -205,11 +205,22 @@ export const ApiEphemeralWebhookIssueLinkSchema = z.object({
   sessionId: z.string(),
 });
 
+export const ApiEphemeralWebhookPRMergedSchema = z.object({
+  type: z.literal("webhook-pr-merged"),
+  prNumber: z.number(),
+  prUrl: z.string(),
+  issueNumber: z.number(),
+  sessionId: z.string(),
+  machineId: z.string(),
+  repoPath: z.string(),
+});
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
   ApiEphemeralMachineActivityUpdateSchema,
   ApiEphemeralWebhookIssueLinkSchema,
+  ApiEphemeralWebhookPRMergedSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

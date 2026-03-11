@@ -12,11 +12,18 @@ import { decryptString } from "@/modules/encrypt";
 import { verifyWebhookSignature } from "./webhookVerify";
 import {
   parseWebhookIssue,
+  parseWebhookPRMerge,
   getEventTypeHeader,
   getDeliveryId,
 } from "./webhookParsers";
-import type { ParsedWebhookIssue } from "./webhookParsers";
-import { eventRouter } from "@/app/events/eventRouter";
+import type {
+  ParsedWebhookIssue,
+  ParsedWebhookPRMerge,
+} from "./webhookParsers";
+import {
+  buildSessionActivityEphemeral,
+  eventRouter,
+} from "@/app/events/eventRouter";
 import { fetchIssueLabelsFromProvider } from "./webhookFetchLabels";
 
 /**
@@ -115,10 +122,44 @@ export async function dispatchWebhook(
     return { dispatched: false, reason: "no_delivery_id" };
   }
 
-  // 4. Parse the issue data
+  // 4. Parse the issue data — or try PR merge
   const issue = parseWebhookIssue(provider, body, eventType);
   if (!issue) {
-    return { dispatched: false, reason: "not_issue_event" };
+    // Not an issue event — check if it's a PR merge
+    const prMerge = parseWebhookPRMerge(provider, body, eventType);
+    if (!prMerge) {
+      return { dispatched: false, reason: "not_supported_event" };
+    }
+
+    if (prMerge.linkedIssueNumbers.length === 0) {
+      return { dispatched: false, reason: "pr_no_linked_issues" };
+    }
+
+    // Handle PR merge: archive associated sessions
+    let anyDispatched = false;
+    for (const route of routes) {
+      try {
+        const dispatched = await processRoutePRMerge(
+          route,
+          provider,
+          rawBody,
+          headers,
+          deliveryId,
+          prMerge,
+        );
+        if (dispatched) anyDispatched = true;
+      } catch (error) {
+        log(
+          { module: "webhook", level: "error" },
+          `Failed to process PR merge for route ${route.id}: ${error}`,
+        );
+      }
+    }
+
+    return {
+      dispatched: anyDispatched,
+      reason: anyDispatched ? undefined : "all_routes_failed",
+    };
   }
 
   let anyDispatched = false;
@@ -294,4 +335,138 @@ async function processRoute(
   );
 
   return true;
+}
+
+/**
+ * Process a PR merge event for a single route.
+ * Finds the associated webhook session via linked issue numbers and archives it.
+ */
+async function processRoutePRMerge(
+  route: {
+    id: string;
+    accountId: string;
+    repoUrl: string;
+    webhookSecret: Uint8Array<ArrayBuffer>;
+    machineId: string;
+    repoPath: string;
+    provider: string;
+  },
+  provider: string,
+  rawBody: string,
+  headers: Record<string, string | undefined>,
+  deliveryId: string,
+  prMerge: ParsedWebhookPRMerge,
+): Promise<boolean> {
+  // 1. Verify signature (use route.repoUrl which is already normalized in DB)
+  const secret = decryptString(
+    ["webhook-route", `${route.accountId}:${route.repoUrl}`],
+    route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
+  );
+  const valid = verifyWebhookSignature(provider, secret, rawBody, headers);
+  if (!valid) {
+    log(
+      { module: "webhook", level: "warn" },
+      `PR merge signature verification failed for route ${route.id}`,
+    );
+    return false;
+  }
+
+  // 2. Dedup — check if this delivery was already processed
+  const existingDelivery = await db.webhookEvent.findFirst({
+    where: {
+      deliveryId,
+      accountId: route.accountId,
+    },
+  });
+  if (existingDelivery) {
+    log(
+      { module: "webhook" },
+      `PR merge delivery ${deliveryId} already processed for route ${route.id}`,
+    );
+    return false;
+  }
+
+  // 3. Find associated webhook events by linked issue numbers
+  const webhookEvents = await db.webhookEvent.findMany({
+    where: {
+      repoUrl: prMerge.repoUrl.toLowerCase(),
+      issueNumber: { in: [...prMerge.linkedIssueNumbers] },
+      accountId: route.accountId,
+      status: { in: ["completed", "dispatched"] },
+      sessionId: { not: null },
+    },
+  });
+
+  if (webhookEvents.length === 0) {
+    log(
+      { module: "webhook" },
+      `PR #${prMerge.prNumber} merge: no matching webhook sessions found for issues [${prMerge.linkedIssueNumbers.join(",")}]`,
+    );
+    return false;
+  }
+
+  let anyArchived = false;
+
+  // 3. Archive each associated session
+  for (const webhookEvent of webhookEvents) {
+    if (!webhookEvent.sessionId) continue;
+
+    try {
+      const now = Date.now();
+
+      // Archive the session
+      const updated = await db.session.updateMany({
+        where: {
+          id: webhookEvent.sessionId,
+          accountId: route.accountId,
+          active: true,
+        },
+        data: {
+          active: false,
+          lastActiveAt: new Date(now),
+        },
+      });
+
+      // Notify App: session is no longer active
+      eventRouter.emitEphemeral({
+        userId: route.accountId,
+        payload: buildSessionActivityEphemeral(
+          webhookEvent.sessionId,
+          false,
+          now,
+          false,
+        ),
+        recipientFilter: { type: "user-scoped-only" },
+      });
+
+      // Notify App: PR was merged, update IssueSessionLink status
+      eventRouter.emitEphemeral({
+        userId: route.accountId,
+        payload: {
+          type: "webhook-pr-merged",
+          prNumber: prMerge.prNumber,
+          prUrl: prMerge.prUrl,
+          issueNumber: webhookEvent.issueNumber,
+          sessionId: webhookEvent.sessionId,
+          machineId: route.machineId,
+          repoPath: route.repoPath,
+        },
+        recipientFilter: { type: "user-scoped-only" },
+      });
+
+      log(
+        { module: "webhook" },
+        `PR #${prMerge.prNumber} merged: archived session ${webhookEvent.sessionId} for issue #${webhookEvent.issueNumber}${updated.count === 0 ? " (already inactive)" : ""}`,
+      );
+
+      anyArchived = true;
+    } catch (error) {
+      log(
+        { module: "webhook", level: "error" },
+        `Failed to archive session ${webhookEvent.sessionId} for PR #${prMerge.prNumber}: ${error}`,
+      );
+    }
+  }
+
+  return anyArchived;
 }

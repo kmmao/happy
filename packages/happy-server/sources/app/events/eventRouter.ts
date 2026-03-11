@@ -239,6 +239,15 @@ export type EphemeralEvent =
       repoPath: string;
       machineId: string;
       sessionId: string;
+    }
+  | {
+      type: "webhook-pr-merged";
+      prNumber: number;
+      prUrl: string;
+      issueNumber: number;
+      sessionId: string;
+      machineId: string;
+      repoPath: string;
     };
 
 // === EVENT PAYLOAD TYPES ===

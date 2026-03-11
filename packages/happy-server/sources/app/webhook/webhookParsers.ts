@@ -164,6 +164,163 @@ export function parseWebhookIssue(
   }
 }
 
+// ── PR Merge Parsing ───────────────────────────────────
+
+/**
+ * Parsed PR merge data from a webhook payload.
+ * Used to auto-archive sessions when their associated PR is merged.
+ */
+export interface ParsedWebhookPRMerge {
+  readonly prNumber: number;
+  readonly prTitle: string;
+  readonly prUrl: string;
+  readonly mergedBy: string;
+  readonly headBranch: string;
+  readonly repoUrl: string;
+  readonly linkedIssueNumbers: readonly number[];
+}
+
+/**
+ * Extract issue numbers referenced in PR body or branch name.
+ * Matches: Fixes #N, Closes #N, Resolves #N (case-insensitive).
+ * Also extracts from branch names like issue-123, fix/456.
+ */
+function extractLinkedIssueNumbers(
+  prBody: string,
+  headBranch: string,
+): readonly number[] {
+  const numbers = new Set<number>();
+
+  // Parse PR body for "Fixes #N", "Closes #N", "Resolves #N"
+  const bodyPattern = /(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s+#(\d+)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = bodyPattern.exec(prBody)) !== null) {
+    numbers.add(Number(match[1]));
+  }
+
+  // Parse branch name for issue number patterns
+  // e.g. issue-123, fix/123, 123-feature-name
+  const branchPatterns = [
+    /issue[/-](\d+)/i,
+    /fix[/-](\d+)/i,
+    /feat[/-](\d+)/i,
+    /bug[/-](\d+)/i,
+  ];
+  for (const pattern of branchPatterns) {
+    const branchMatch = headBranch.match(pattern);
+    if (branchMatch) {
+      numbers.add(Number(branchMatch[1]));
+    }
+  }
+
+  return [...numbers];
+}
+
+/**
+ * Parse a GitHub pull_request merge webhook payload.
+ * Event: x-github-event = "pull_request", action = "closed", merged = true
+ */
+function parseGitHubPRMerge(
+  body: any,
+  eventType: string,
+): ParsedWebhookPRMerge | null {
+  if (eventType !== "pull_request") return null;
+  if (body?.action !== "closed") return null;
+
+  const pr = body?.pull_request;
+  if (!pr?.merged) return null;
+
+  const prBody = pr.body ?? "";
+  const headBranch = pr.head?.ref ?? "";
+
+  return {
+    prNumber: pr.number,
+    prTitle: pr.title ?? "",
+    prUrl: pr.html_url ?? "",
+    mergedBy: pr.merged_by?.login ?? body.sender?.login ?? "",
+    headBranch,
+    repoUrl: body.repository?.html_url ?? "",
+    linkedIssueNumbers: extractLinkedIssueNumbers(prBody, headBranch),
+  };
+}
+
+/**
+ * Parse a Gitea pull_request merge webhook payload.
+ * Event: x-gitea-event = "pull_request", action = "closed", merged = true
+ */
+function parseGiteaPRMerge(
+  body: any,
+  eventType: string,
+): ParsedWebhookPRMerge | null {
+  if (eventType !== "pull_request") return null;
+  if (body?.action !== "closed") return null;
+
+  const pr = body?.pull_request;
+  if (!pr?.merged) return null;
+
+  const prBody = pr.body ?? "";
+  const headBranch = pr.head?.ref ?? "";
+
+  return {
+    prNumber: pr.number,
+    prTitle: pr.title ?? "",
+    prUrl: pr.html_url ?? "",
+    mergedBy: pr.merged_by?.login ?? body.sender?.login ?? "",
+    headBranch,
+    repoUrl: body.repository?.html_url ?? "",
+    linkedIssueNumbers: extractLinkedIssueNumbers(prBody, headBranch),
+  };
+}
+
+/**
+ * Parse a GitLab merge request merge webhook payload.
+ * Event: x-gitlab-event = "Merge Request Hook", state = "merged"
+ */
+function parseGitLabPRMerge(
+  body: any,
+  eventType: string,
+): ParsedWebhookPRMerge | null {
+  if (eventType !== "Merge Request Hook") return null;
+
+  const attrs = body?.object_attributes;
+  if (!attrs) return null;
+
+  if (attrs.state !== "merged" || attrs.action !== "merge") return null;
+
+  const prBody = attrs.description ?? "";
+  const headBranch = attrs.source_branch ?? "";
+
+  return {
+    prNumber: attrs.iid,
+    prTitle: attrs.title ?? "",
+    prUrl: attrs.url ?? "",
+    mergedBy: body.user?.username ?? "",
+    headBranch,
+    repoUrl: body.project?.web_url ?? "",
+    linkedIssueNumbers: extractLinkedIssueNumbers(prBody, headBranch),
+  };
+}
+
+/**
+ * Parse a webhook payload for a PR merge event across all providers.
+ */
+export function parseWebhookPRMerge(
+  provider: string,
+  body: any,
+  eventType: string,
+): ParsedWebhookPRMerge | null {
+  switch (provider) {
+    case "github":
+      return parseGitHubPRMerge(body, eventType);
+    case "gitea":
+      return parseGiteaPRMerge(body, eventType);
+    case "gitlab":
+      return parseGitLabPRMerge(body, eventType);
+    default:
+      return null;
+  }
+}
+
 /**
  * Extract the event type header for a given provider.
  */
