@@ -308,11 +308,6 @@ describe("parseWebhookPRMerge", () => {
       expect(result?.linkedIssueNumbers).toEqual([123]);
     });
 
-    it("should extract from 'issue-N-random-words' worktree branch", () => {
-      const result = parseGitHubPR("", "issue-29-calm-crystal-64f5");
-      expect(result?.linkedIssueNumbers).toEqual([29]);
-    });
-
     it("should extract from 'issue/N' branch", () => {
       const result = parseGitHubPR("", "issue/456");
       expect(result?.linkedIssueNumbers).toEqual([456]);
@@ -361,6 +356,11 @@ describe("parseWebhookPRMerge", () => {
     it("should extract from 'N/description' branch (leading number with slash)", () => {
       const result = parseGitHubPR("", "88/cleanup");
       expect(result?.linkedIssueNumbers).toEqual([88]);
+    });
+
+    it("should extract from worktree branch 'issue-N-word-word-hash'", () => {
+      const result = parseGitHubPR("", "issue-31-agile-marble-5cf5");
+      expect(result?.linkedIssueNumbers).toEqual([31]);
     });
 
     it("should not extract from random branch with numbers", () => {
