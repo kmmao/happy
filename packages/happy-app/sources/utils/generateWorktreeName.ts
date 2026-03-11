@@ -18,8 +18,9 @@ function randomChoice<T>(array: T[]): T {
     return array[Math.floor(Math.random() * array.length)];
 }
 
-export function generateWorktreeName(): string {
+export function generateWorktreeName(issueNumber?: number): string {
     const adjective = randomChoice(adjectives);
     const noun = randomChoice(nouns);
-    return `${adjective}-${noun}`;
+    const base = `${adjective}-${noun}`;
+    return issueNumber != null ? `issue-${issueNumber}-${base}` : base;
 }

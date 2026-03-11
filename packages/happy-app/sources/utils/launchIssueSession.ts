@@ -232,7 +232,7 @@ export async function launchIssueSession(
   };
 
   // 3. Create worktree
-  const worktreeResult = await createWorktree(machineId, repoPath);
+  const worktreeResult = await createWorktree(machineId, repoPath, issue.number);
   if (!worktreeResult.success) {
     const error = worktreeResult.error ?? "Failed to create worktree";
     await markFailed(error);

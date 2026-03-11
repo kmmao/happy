@@ -7,7 +7,8 @@ import { generateWorktreeName } from './generateWorktreeName';
 
 export async function createWorktree(
     machineId: string,
-    basePath: string
+    basePath: string,
+    issueNumber?: number,
 ): Promise<{
     success: boolean;
     worktreePath: string;
@@ -15,7 +16,7 @@ export async function createWorktree(
     parentBranch: string;
     error?: string;
 }> {
-    const name = generateWorktreeName();
+    const name = generateWorktreeName(issueNumber);
 
     // Check if it's a git repository
     const gitCheck = await machineBash(
