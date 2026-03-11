@@ -3,6 +3,8 @@
  * Ported from happy-app's launchIssueSession.ts — pure functions, no App dependencies.
  */
 
+// Last webhook flow verified: 2026-03-12
+
 import type { IssueComment } from "./fetchIssueComments";
 
 const MAX_COMMENT_BODY_LENGTH = 2000;
