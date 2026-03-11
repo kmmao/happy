@@ -189,7 +189,7 @@ class ActivityCache {
                 await Promise.all(sessionUpdates.map(update =>
                     db.session.update({
                         where: { id: update.id },
-                        data: { lastActiveAt: new Date(update.timestamp), active: true }
+                        data: { lastActiveAt: new Date(update.timestamp) }
                     })
                 ));
                 
