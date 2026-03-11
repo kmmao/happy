@@ -30,7 +30,7 @@ class Configuration {
   constructor() {
     // Server configuration - priority: parameter > environment > default
     this.serverUrl =
-      process.env.HAPPY_SERVER_URL || "https://api.cluster-fluster.com";
+      process.env.HAPPY_SERVER_URL || "https://happyserve.xycloud.info";
     this.webappUrl =
       process.env.HAPPY_WEBAPP_URL || "https://happy.xycloud.info";
 

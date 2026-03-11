@@ -7,7 +7,7 @@ This is a completely separate client from `happy-cli`. It has its own authentica
 
 ## Context
 - **Existing system**: Monorepo with `happy-cli` (agent runtime + control), `happy-server` (Fastify + PostgreSQL + Redis), `happy-app` (React Native mobile)
-- **Server API**: REST endpoints at `https://api.cluster-fluster.com` + Socket.IO at `/v1/updates`
+- **Server API**: REST endpoints at `https://happyserve.xycloud.info` + Socket.IO at `/v1/updates`
 - **Authentication**: Uses account auth flow (`/v1/auth/account/request` + `/v1/auth/account/response`) — generates ephemeral keypair, displays QR code (`happy:///account?[base64url-publicKey]`), user scans with existing Happy mobile app to approve, receives encrypted account secret
 - **Credential storage**: `~/.happy/agent.key` (separate from happy-cli's `~/.happy/access.key`)
 - **Encryption**: AES-256-GCM (dataKey) for all new sessions. The master content keypair is derived deterministically from the account secret via `deriveKey(secret, 'Happy EnCoder', ['content'])` → seed → `crypto_box_seed_keypair(seed)`. Per-session random keys are encrypted with the master public key and stored on the server.
@@ -77,7 +77,7 @@ This is a completely separate client from `happy-cli`. It has its own authentica
 - [x] Run tests — must pass before task 3
 
 ### Task 3: Configuration and credential storage
-- [x] Create `src/config.ts` — reads `HAPPY_SERVER_URL` (default: `https://api.cluster-fluster.com`), `HAPPY_HOME_DIR` (default: `~/.happy`), derives credential file path as `${happyHomeDir}/agent.key`
+- [x] Create `src/config.ts` — reads `HAPPY_SERVER_URL` (default: `https://happyserve.xycloud.info`), `HAPPY_HOME_DIR` (default: `~/.happy`), derives credential file path as `${happyHomeDir}/agent.key`
 - [x] Create `src/credentials.ts`:
   - `Credentials` type: `{ token: string, secret: Uint8Array, contentKeyPair: { publicKey: Uint8Array, secretKey: Uint8Array } }`
   - `readCredentials(config)` — parses `~/.happy/agent.key` JSON `{ token, secret }`, decodes secret from base64, derives contentKeyPair via `deriveContentKeyPair(secret)`. Returns `Credentials` or `null` if file missing.
