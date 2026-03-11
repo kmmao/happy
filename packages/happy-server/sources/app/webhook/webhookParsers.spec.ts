@@ -625,6 +625,103 @@ describe("parseWebhookIssue", () => {
   });
 });
 
+// ── Full Flow: Issue Webhook → PR Merge → Session Archive ──
+
+describe("webhook → worktree → PR merge flow", () => {
+  it("step 1: webhook triggers issue parsing with correct data", () => {
+    const body = {
+      action: "labeled",
+      issue: {
+        number: 33,
+        title: "test: verify session archive stays after PR merge",
+        body: "Test to verify the full flow.",
+        state: "open",
+        user: { login: "kmmao" },
+        labels: [{ name: "auto-fix" }],
+        html_url: "https://github.com/kmmao/happy/issues/33",
+      },
+      repository: { html_url: "https://github.com/kmmao/happy" },
+    };
+
+    const result = parseWebhookIssue("github", body, "issues");
+
+    expect(result).not.toBeNull();
+    expect(result!.issueNumber).toBe(33);
+    expect(result!.issueLabels).toEqual(["auto-fix"]);
+    expect(result!.action).toBe("labeled");
+  });
+
+  it("step 2: PR with 'Fixes #N' links to the correct issue", () => {
+    const body = {
+      action: "closed",
+      pull_request: {
+        number: 34,
+        title: "test: verify session archive stays after PR merge",
+        html_url: "https://github.com/kmmao/happy/pull/34",
+        merged: true,
+        merged_by: { login: "kmmao" },
+        head: { ref: "issue-33-eager-crystal-df87" },
+        body: "Fixes #33\n\n## Summary\n- Added tests for webhook→PR merge flow",
+      },
+      repository: { html_url: "https://github.com/kmmao/happy" },
+    };
+
+    const result = parseWebhookPRMerge("github", body, "pull_request");
+
+    expect(result).not.toBeNull();
+    expect(result!.prNumber).toBe(34);
+    expect(result!.headBranch).toBe("issue-33-eager-crystal-df87");
+    // Both PR body and branch name should link to issue #33
+    expect(result!.linkedIssueNumbers).toEqual([33]);
+  });
+
+  it("step 2b: branch name 'issue-N-*' alone is enough to link", () => {
+    const body = {
+      action: "closed",
+      pull_request: {
+        number: 35,
+        title: "some PR",
+        html_url: "https://github.com/o/r/pull/35",
+        merged: true,
+        head: { ref: "issue-33-eager-crystal-df87" },
+        body: "No closing keywords here",
+      },
+      repository: { html_url: "https://github.com/o/r" },
+    };
+
+    const result = parseWebhookPRMerge("github", body, "pull_request");
+
+    expect(result!.linkedIssueNumbers).toEqual([33]);
+  });
+
+  it("step 3: after PR merge, linked issues are found for session archival", () => {
+    // This test verifies the parser extracts all the data needed
+    // for processRoutePRMerge to find and archive sessions.
+    const prBody = {
+      action: "closed",
+      pull_request: {
+        number: 50,
+        title: "feat: implement feature",
+        html_url: "https://github.com/kmmao/happy/pull/50",
+        merged: true,
+        merged_by: { login: "kmmao" },
+        head: { ref: "issue-42-cool-branch" },
+        body: "Fixes #42\nAlso closes #43",
+      },
+      repository: { html_url: "https://github.com/kmmao/happy" },
+    };
+
+    const result = parseWebhookPRMerge("github", prBody, "pull_request");
+
+    expect(result).not.toBeNull();
+    expect(result!.linkedIssueNumbers).toEqual(
+      expect.arrayContaining([42, 43]),
+    );
+    expect(result!.linkedIssueNumbers).toHaveLength(2);
+    expect(result!.repoUrl).toBe("https://github.com/kmmao/happy");
+  });
+});
+
 // ── Header Helpers ────────────────────────────────────────
 
 describe("getEventTypeHeader", () => {
