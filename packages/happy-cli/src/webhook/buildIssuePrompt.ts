@@ -143,9 +143,10 @@ export function buildIssuePrompt(
     "4. Implement the required changes following the project's coding standards",
     "5. Run existing tests to make sure nothing is broken",
     `6. Create a well-formatted commit referencing this issue (e.g. "fix: description - closes #${issue.issueNumber}")`,
-    `7. Push your branch to the remote: git push -u origin ${worktree.branchName}`,
-    `8. Create a pull request: gh pr create --base "${worktree.parentBranch}" --head "${worktree.branchName}" --title "<type>: <short description>" --body "Fixes #${issue.issueNumber}"`,
-    "9. After completing, provide a concise summary of what you changed and why",
+    `7. Sync with the latest base branch to avoid merge conflicts: git fetch origin ${worktree.parentBranch} && git rebase origin/${worktree.parentBranch} (resolve any conflicts if they arise)`,
+    `8. Push your branch to the remote: git push -u origin ${worktree.branchName}`,
+    `9. Create a pull request: gh pr create --base "${worktree.parentBranch}" --head "${worktree.branchName}" --title "<type>: <short description>" --body "Fixes #${issue.issueNumber}"`,
+    "10. After completing, provide a concise summary of what you changed and why",
   );
 
   return sections.join("\n");
