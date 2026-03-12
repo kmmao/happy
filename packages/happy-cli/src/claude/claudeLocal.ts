@@ -40,7 +40,13 @@ export async function claudeLocal(opts: {
   mcpServers?: Record<string, any>;
   path: string;
   onSessionFound: (id: string) => void;
-  onThinkingChange?: (thinking: boolean) => void;
+  /** fd3 fetch event callback — used by ThinkingTracker for unified state */
+  onFetchEvent?: (event: {
+    type: "fetch-start" | "fetch-end";
+    id: number;
+  }) => void;
+  /** Called when the spawned process exits */
+  onProcessExit?: () => void;
   claudeEnvVars?: Record<string, string>;
   claudeArgs?: string[];
   allowedTools?: string[];
@@ -190,18 +196,8 @@ export async function claudeLocal(opts: {
     }
   }
 
-  // Thinking state
-  let thinking = false;
-  let stopThinkingTimeout: NodeJS.Timeout | null = null;
-  const updateThinking = (newThinking: boolean) => {
-    if (thinking !== newThinking) {
-      thinking = newThinking;
-      logger.debug(`[ClaudeLocal] Thinking state changed to: ${thinking}`);
-      if (opts.onThinkingChange) {
-        opts.onThinkingChange(thinking);
-      }
-    }
-  };
+  // fd3 fetch events are forwarded to the caller via onFetchEvent.
+  // Thinking state is managed by ThinkingTracker in claudeLocalLauncher.ts.
 
   // Spawn the process
   try {
@@ -340,18 +336,12 @@ export async function claudeLocal(opts: {
           },
         );
 
-        // Listen to the custom fd (fd 3) for thinking state tracking
+        // Listen to the custom fd (fd 3) for fetch event forwarding
         if (child.stdio[3]) {
           const rl = createInterface({
             input: child.stdio[3] as any,
             crlfDelay: Infinity,
           });
-
-          // Track active fetches for thinking state
-          const activeFetches = new Map<
-            number,
-            { hostname: string; path: string; startTime: number }
-          >();
 
           rl.on("line", (line) => {
             try {
@@ -359,38 +349,17 @@ export async function claudeLocal(opts: {
 
               switch (message.type) {
                 case "fetch-start":
-                  activeFetches.set(message.id, {
-                    hostname: message.hostname,
-                    path: message.path,
-                    startTime: message.timestamp,
+                  opts.onFetchEvent?.({
+                    type: "fetch-start",
+                    id: message.id,
                   });
-
-                  // Clear any pending stop timeout
-                  if (stopThinkingTimeout) {
-                    clearTimeout(stopThinkingTimeout);
-                    stopThinkingTimeout = null;
-                  }
-
-                  // Start thinking
-                  updateThinking(true);
                   break;
 
                 case "fetch-end":
-                  activeFetches.delete(message.id);
-
-                  // Stop thinking when no active fetches
-                  if (
-                    activeFetches.size === 0 &&
-                    thinking &&
-                    !stopThinkingTimeout
-                  ) {
-                    stopThinkingTimeout = setTimeout(() => {
-                      if (activeFetches.size === 0) {
-                        updateThinking(false);
-                      }
-                      stopThinkingTimeout = null;
-                    }, 500); // Small delay to avoid flickering
-                  }
+                  opts.onFetchEvent?.({
+                    type: "fetch-end",
+                    id: message.id,
+                  });
                   break;
 
                 default:
@@ -405,15 +374,7 @@ export async function claudeLocal(opts: {
           });
 
           rl.on("error", (err) => {
-            console.error("Error reading from fd 3:", err);
-          });
-
-          // Cleanup on child exit
-          child.on("exit", () => {
-            if (stopThinkingTimeout) {
-              clearTimeout(stopThinkingTimeout);
-            }
-            updateThinking(false);
+            logger.debug("[ClaudeLocal] Error reading from fd 3:", err);
           });
         }
         child.on("error", (error) => {
@@ -447,11 +408,7 @@ export async function claudeLocal(opts: {
     });
   } finally {
     process.stdin.resume();
-    if (stopThinkingTimeout) {
-      clearTimeout(stopThinkingTimeout);
-      stopThinkingTimeout = null;
-    }
-    updateThinking(false);
+    opts.onProcessExit?.();
   }
 
   // Return the effective session ID (what was actually used)

@@ -238,7 +238,6 @@ export async function runClaude(
         onSessionFound: (id) => {
           offlineSessionId = id;
         },
-        onThinkingChange: () => {},
         abort: new AbortController().signal,
         claudeEnvVars: options.claudeEnvVars,
         claudeArgs: options.claudeArgs,

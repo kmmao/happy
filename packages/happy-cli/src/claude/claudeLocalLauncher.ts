@@ -3,6 +3,7 @@ import { claudeLocal, ExitCodeError } from "./claudeLocal";
 import { Session } from "./session";
 import { Future } from "@/utils/future";
 import { createSessionScanner } from "./utils/sessionScanner";
+import { createThinkingTracker } from "./utils/thinkingTracker";
 
 export type LauncherResult =
   | { type: "switch" }
@@ -14,6 +15,11 @@ export async function claudeLocalLauncher(
   // Track the latest compaction summary for on-demand retrieval via RPC
   let latestCompactionSummary: string | null = null;
 
+  // Unified thinking state tracker — fuses fd3 fetch events with JSONL messages
+  const thinkingTracker = createThinkingTracker({
+    onChange: session.onThinkingChange,
+  });
+
   // Create scanner
   const scanner = await createSessionScanner({
     sessionId: session.sessionId,
@@ -24,6 +30,10 @@ export async function claudeLocalLauncher(
       if (message.type === "summary") {
         latestCompactionSummary = message.summary;
         return;
+      }
+      // Assistant messages signal Claude is working (possibly executing tools next)
+      if (message.type === "assistant") {
+        thinkingTracker.onAssistantMessage();
       }
       session.client.sendClaudeSessionMessage(message);
     },
@@ -121,7 +131,14 @@ export async function claudeLocalLauncher(
           path: session.path,
           sessionId: session.sessionId,
           onSessionFound: handleSessionStart,
-          onThinkingChange: session.onThinkingChange,
+          onFetchEvent: (event) => {
+            if (event.type === "fetch-start") {
+              thinkingTracker.onFetchStart(event.id);
+            } else {
+              thinkingTracker.onFetchEnd(event.id);
+            }
+          },
+          onProcessExit: () => thinkingTracker.onProcessExit(),
           abort: processAbortController.signal,
           claudeEnvVars: session.claudeEnvVars,
           claudeArgs: session.claudeArgs,
@@ -175,6 +192,7 @@ export async function claudeLocalLauncher(
     session.removeSessionFoundCallback(scannerSessionCallback);
 
     // Cleanup
+    thinkingTracker.cleanup();
     await scanner.cleanup();
   }
 
