@@ -107,9 +107,10 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
     };
   }
 
-  // ── Environment: strip CLAUDECODE to avoid nested session detection ──
+  // ── Environment tweaks ──
   const env = { ...process.env };
-  delete env.CLAUDECODE;
+  delete env.CLAUDECODE; // avoid nested session detection
+  env.ENABLE_TOOL_SEARCH = "1"; // enable on-demand tool discovery (saves ~85% tool-definition tokens)
   result.env = env;
 
   return result;
