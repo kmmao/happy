@@ -2115,6 +2115,8 @@ class Sync {
       // NEWEST messages first using reverse pagination (before_seq). This way
       // the user sees the latest content immediately instead of waiting for
       // all historical messages to load.
+      let needsBackfill = false;
+      let backfillMaxSeq = 0;
       if (afterSeq === 0) {
         const newestResponse = await apiSocket.request(
           `/v3/sessions/${sessionId}/messages?before_seq=2147483647&limit=300`,
@@ -2148,17 +2150,21 @@ class Sync {
               if (msg.seq < minNewestSeq) minNewestSeq = msg.seq;
               if (msg.seq > maxNewestSeq) maxNewestSeq = msg.seq;
             }
-            this.sessionLastSeq.set(sessionId, maxNewestSeq);
-            saveLastSeq(sessionId, maxNewestSeq);
 
-            // If there are older messages, backfill with forward pagination
+            // If there are older messages, backfill with forward pagination.
+            // Do NOT save maxNewestSeq as lastSeq yet — if backfill is interrupted,
+            // the next attempt must still start from seq 0 to avoid missing messages.
             if (newestData.hasMore) {
               log.log(
                 `💬 fetchMessages: newest batch loaded (seq ${minNewestSeq}-${maxNewestSeq}), backfilling older messages`,
               );
+              needsBackfill = true;
+              backfillMaxSeq = maxNewestSeq;
               // afterSeq stays at 0, forward pagination will fill in everything
             } else {
               // All messages fit in one batch, no more to fetch
+              this.sessionLastSeq.set(sessionId, maxNewestSeq);
+              saveLastSeq(sessionId, maxNewestSeq);
               hasMore = false;
             }
           }
@@ -2211,16 +2217,25 @@ class Sync {
           remainingNormalized.push(...batchNormalized);
         }
 
+        // During backfill (needsBackfill=true), only update the in-memory cursor.
+        // Persisting intermediate seq values would cause interrupted backfills to
+        // skip earlier messages on next attempt. The final lastSeq is saved after
+        // the loop completes successfully.
         this.sessionLastSeq.set(sessionId, maxSeq);
-        saveLastSeq(sessionId, maxSeq);
+        if (!needsBackfill) {
+          saveLastSeq(sessionId, maxSeq);
+        }
         hasMore = !!data.hasMore;
         if (hasMore && maxSeq === afterSeq) {
+          // API returned hasMore=true but no new messages (empty page).
+          // Skip past current seq to avoid infinite loop.
           log.log(
-            `💬 fetchMessages: pagination stalled for ${sessionId}, stopping to avoid infinite loop`,
+            `💬 fetchMessages: pagination stalled at seq ${afterSeq} for ${sessionId}, advancing by 1`,
           );
-          break;
+          afterSeq = maxSeq + 1;
+        } else {
+          afterSeq = maxSeq;
         }
-        afterSeq = maxSeq;
       }
 
       // Apply remaining batches at once so the UI renders them together.
@@ -2229,6 +2244,14 @@ class Sync {
       // the same lock and would deadlock.
       if (remainingNormalized.length > 0) {
         this.applyMessages(sessionId, remainingNormalized);
+      }
+
+      // If we did a reverse-pagination + backfill, now that backfill is
+      // complete we can safely persist the highest seq from the newest batch.
+      // This ensures interrupted backfills restart from seq 0 next time.
+      if (needsBackfill && backfillMaxSeq > 0) {
+        this.sessionLastSeq.set(sessionId, backfillMaxSeq);
+        saveLastSeq(sessionId, backfillMaxSeq);
       }
 
       // Surface prompt suggestion and needs-continue after all messages processed
