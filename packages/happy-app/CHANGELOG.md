@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.1 - 2026-03-13
+
+Bug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.
+
+- Fixed message loss during pagination and backfill when switching between sessions
+- Improved usage trend chart with gap filling for missing dates and better layout
+- Fixed CLI thinking state accuracy in local mode to correctly reflect model status
+- Fixed server rejecting heartbeats for archived sessions to prevent ghost connections
+- Updated README to remove upstream branding and add fork disclaimers
+
 ## 2.1.0 - 2026-03-09
 
 GitHub/Gitea issue management, tablet sidebar, animated AI avatar, and major session loading performance improvements.
