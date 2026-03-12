@@ -1,5 +1,5 @@
 import React from "react";
-import { View, ScrollView, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import { Text } from "@/components/StyledText";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { UsageDataPoint } from "@/sync/apiUsage";
@@ -7,6 +7,7 @@ import { UsageDataPoint } from "@/sync/apiUsage";
 interface UsageChartProps {
   data: UsageDataPoint[];
   metric: "tokens" | "cost";
+  groupBy: "hour" | "day";
   height?: number;
   onBarPress?: (dataPoint: UsageDataPoint, index: number) => void;
 }
@@ -58,6 +59,7 @@ const styles = StyleSheet.create((theme) => ({
 export const UsageChart: React.FC<UsageChartProps> = ({
   data,
   metric,
+  groupBy,
   height = 200,
   onBarPress,
 }) => {
@@ -82,17 +84,13 @@ export const UsageChart: React.FC<UsageChartProps> = ({
 
   const maxValue = Math.max(...data.map(getValueForDataPoint), 1);
 
-  // Format date label
+  // Format date label based on groupBy
   const formatLabel = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-
-    if (isToday) {
+    if (groupBy === "hour") {
       return date.toLocaleTimeString("en-US", { hour: "numeric" });
-    } else {
-      return `${date.getMonth() + 1}/${date.getDate()}`;
     }
+    return `${date.getMonth() + 1}/${date.getDate()}`;
   };
 
   // Format value for display
@@ -109,12 +107,17 @@ export const UsageChart: React.FC<UsageChartProps> = ({
   };
 
   // Limit bars to show (for better visibility)
-  const maxBarsToShow = 30;
+  const maxBarsToShow = 31;
   const displayData =
     data.length > maxBarsToShow ? data.slice(-maxBarsToShow) : data;
 
-  // Only use horizontal scroll when there are many bars
-  const needsScroll = displayData.length > 10;
+  // Determine label frequency to avoid crowding
+  // Show every label for ≤10 bars, every other for ≤20, every 3rd for more
+  const labelInterval =
+    displayData.length <= 10 ? 1 : displayData.length <= 20 ? 2 : 3;
+
+  // Tighter spacing when there are many bars
+  const barMargin = displayData.length > 15 ? 1 : 2;
 
   const chartContent = (
     <View style={[styles.chartContainer, { height }]}>
@@ -124,14 +127,13 @@ export const UsageChart: React.FC<UsageChartProps> = ({
         const maxBarHeight = height - 20;
         const barHeight = (value / maxValue) * maxBarHeight;
         const showValue = value > 0 && barHeight > 20;
+        const showLabel =
+          index % labelInterval === 0 || index === displayData.length - 1;
 
         return (
           <Pressable
             key={`${point.timestamp}-${index}`}
-            style={[
-              styles.barWrapper,
-              needsScroll ? { minWidth: 40 } : undefined,
-            ]}
+            style={[styles.barWrapper, { marginHorizontal: barMargin }]}
             onPress={() => onBarPress?.(point, index)}
           >
             {showValue && (
@@ -146,26 +148,16 @@ export const UsageChart: React.FC<UsageChartProps> = ({
                 },
               ]}
             />
-            <Text style={styles.barLabel}>{formatLabel(point.timestamp)}</Text>
+            {showLabel && (
+              <Text style={styles.barLabel}>
+                {formatLabel(point.timestamp)}
+              </Text>
+            )}
           </Pressable>
         );
       })}
     </View>
   );
 
-  return (
-    <View style={styles.container}>
-      {needsScroll ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          bounces={false}
-        >
-          {chartContent}
-        </ScrollView>
-      ) : (
-        chartContent
-      )}
-    </View>
-  );
+  return <View style={styles.container}>{chartContent}</View>;
 };

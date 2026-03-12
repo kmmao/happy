@@ -130,6 +130,14 @@ const styles = StyleSheet.create((theme) => ({
   metricTextActive: {
     color: "#FFFFFF",
   },
+  breakdownRow: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: Platform.select({ ios: 0, default: 4 }),
+  },
+  breakdownColumn: {
+    flex: 1,
+  },
 }));
 
 /**
@@ -385,54 +393,74 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
                 </Pressable>
               </View>
 
-              <UsageChart data={usageData} metric={chartMetric} height={180} />
+              <UsageChart
+                data={usageData}
+                metric={chartMetric}
+                groupBy={period === "today" ? "hour" : "day"}
+                height={180}
+              />
             </View>
           </View>
         </View>
       )}
 
-      {/* Usage by model */}
-      {tokenModels.length > 0 && (
-        <ItemGroup title={t("usage.byModel")}>
-          <View style={{ padding: 16 }}>
-            {(chartMetric === "tokens" ? tokenModels : costModels).map(
-              ([model, value]) => (
-                <UsageBar
-                  key={model}
-                  label={formatModelName(model)}
-                  value={value}
-                  maxValue={
-                    chartMetric === "tokens" ? maxModelTokens : maxModelCost
-                  }
-                  color="#007AFF"
-                  formatValue={
-                    chartMetric === "cost"
-                      ? (v) => formatCost(v)
-                      : (v) => formatTokens(v)
-                  }
-                />
-              ),
-            )}
-          </View>
-        </ItemGroup>
-      )}
+      {/* Usage by model & token type - side by side */}
+      {(tokenModels.length > 0 || tokenTypes.length > 0) && (
+        <View style={styles.statsWrapper}>
+          <View style={styles.statsConstraint}>
+            <View style={styles.breakdownRow}>
+              {tokenModels.length > 0 && (
+                <ItemGroup
+                  title={t("usage.byModel")}
+                  style={styles.breakdownColumn}
+                >
+                  <View style={{ padding: 16 }}>
+                    {(chartMetric === "tokens" ? tokenModels : costModels).map(
+                      ([model, value]) => (
+                        <UsageBar
+                          key={model}
+                          label={formatModelName(model)}
+                          value={value}
+                          maxValue={
+                            chartMetric === "tokens"
+                              ? maxModelTokens
+                              : maxModelCost
+                          }
+                          color="#007AFF"
+                          formatValue={
+                            chartMetric === "cost"
+                              ? (v) => formatCost(v)
+                              : (v) => formatTokens(v)
+                          }
+                        />
+                      ),
+                    )}
+                  </View>
+                </ItemGroup>
+              )}
 
-      {/* Usage by token type */}
-      {tokenTypes.length > 0 && (
-        <ItemGroup title={t("usage.byTokenType")}>
-          <View style={{ padding: 16 }}>
-            {tokenTypes.map(([type, tokens]) => (
-              <UsageBar
-                key={type}
-                label={formatTokenType(type)}
-                value={tokens}
-                maxValue={maxTypeTokens}
-                color="#007AFF"
-                formatValue={(v) => formatTokens(v)}
-              />
-            ))}
+              {tokenTypes.length > 0 && (
+                <ItemGroup
+                  title={t("usage.byTokenType")}
+                  style={styles.breakdownColumn}
+                >
+                  <View style={{ padding: 16 }}>
+                    {tokenTypes.map(([type, tokens]) => (
+                      <UsageBar
+                        key={type}
+                        label={formatTokenType(type)}
+                        value={tokens}
+                        maxValue={maxTypeTokens}
+                        color="#007AFF"
+                        formatValue={(v) => formatTokens(v)}
+                      />
+                    ))}
+                  </View>
+                </ItemGroup>
+              )}
+            </View>
           </View>
-        </ItemGroup>
+        </View>
       )}
     </ScrollView>
   );

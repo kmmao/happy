@@ -52,6 +52,96 @@ export async function queryUsage(
 }
 
 /**
+ * Fill in missing time slots with zero-value data points so
+ * charts always show the full range (e.g. 7 bars for 7 days).
+ */
+function fillTimeGaps(
+  data: UsageDataPoint[],
+  startTime: number,
+  endTime: number,
+  groupBy: "hour" | "day",
+): UsageDataPoint[] {
+  const stepSeconds = groupBy === "hour" ? 3600 : 86400;
+
+  // Round startTime down to the boundary
+  const startDate = new Date(startTime * 1000);
+  if (groupBy === "hour") {
+    startDate.setMinutes(0, 0, 0);
+  } else {
+    startDate.setHours(0, 0, 0, 0);
+  }
+  const alignedStart = Math.floor(startDate.getTime() / 1000);
+
+  // Re-align existing data points to local timezone boundaries.
+  // Server timestamps may use a different timezone, so we snap each
+  // point to the client's local day/hour start for correct matching.
+  const alignToLocal = (ts: number): number => {
+    const d = new Date(ts * 1000);
+    if (groupBy === "hour") {
+      d.setMinutes(0, 0, 0);
+    } else {
+      d.setHours(0, 0, 0, 0);
+    }
+    return Math.floor(d.getTime() / 1000);
+  };
+
+  const existingMap = new Map<number, UsageDataPoint>();
+  for (const point of data) {
+    const aligned = alignToLocal(point.timestamp);
+    const prev = existingMap.get(aligned);
+    if (prev) {
+      // Merge if multiple server buckets map to the same local slot
+      const merged: UsageDataPoint = {
+        timestamp: aligned,
+        tokens: { ...prev.tokens },
+        cost: { ...prev.cost },
+        reportCount: prev.reportCount + point.reportCount,
+      };
+      for (const [k, v] of Object.entries(point.tokens)) {
+        if (typeof v === "number") {
+          merged.tokens[k] = (merged.tokens[k] || 0) + v;
+        }
+      }
+      for (const [k, v] of Object.entries(point.cost)) {
+        if (typeof v === "number") {
+          merged.cost[k] = (merged.cost[k] || 0) + v;
+        }
+      }
+      existingMap.set(aligned, merged);
+    } else {
+      existingMap.set(aligned, { ...point, timestamp: aligned });
+    }
+  }
+
+  // Generate all time slots
+  const result: UsageDataPoint[] = [];
+  let current = alignedStart;
+  while (current <= endTime) {
+    const existing = existingMap.get(current);
+    if (existing) {
+      result.push(existing);
+    } else {
+      result.push({
+        timestamp: current,
+        tokens: { total: 0 },
+        cost: { total: 0 },
+        reportCount: 0,
+      });
+    }
+    // Advance by step, handling DST correctly for day grouping
+    if (groupBy === "day") {
+      const d = new Date(current * 1000);
+      d.setDate(d.getDate() + 1);
+      current = Math.floor(d.getTime() / 1000);
+    } else {
+      current += stepSeconds;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Helper function to get usage for a specific time period
  */
 export async function getUsageForPeriod(
@@ -83,12 +173,17 @@ export async function getUsageForPeriod(
       break;
   }
 
-  return queryUsage(credentials, {
+  const response = await queryUsage(credentials, {
     sessionId,
     startTime,
     endTime: now,
     groupBy,
   });
+
+  return {
+    ...response,
+    usage: fillTimeGaps(response.usage || [], startTime, now, groupBy),
+  };
 }
 
 export interface SessionUsageSummary {
