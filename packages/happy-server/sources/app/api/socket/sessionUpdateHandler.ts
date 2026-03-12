@@ -275,6 +275,9 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 data: { lastActiveAt: new Date(t), active: false }
             });
 
+            // Evict from cache so heartbeats are immediately rejected
+            activityCache.invalidateSession(sid);
+
             // Emit session activity update
             const sessionActivity = buildSessionActivityEphemeral(sid, false, t, false);
             eventRouter.emitEphemeral({

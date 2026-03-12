@@ -11,6 +11,7 @@ import { log } from "@/utils/log";
 import { decryptString } from "@/modules/encrypt";
 import { inTx } from "@/storage/inTx";
 import { Prisma } from "@prisma/client";
+import { activityCache } from "@/app/presence/sessionCache";
 import { verifyWebhookSignature } from "./webhookVerify";
 import {
   parseWebhookIssue,
@@ -453,6 +454,9 @@ async function processRoutePRMerge(
           lastActiveAt: new Date(now),
         },
       });
+
+      // Evict from cache so heartbeats are immediately rejected
+      activityCache.invalidateSession(webhookEvent.sessionId);
 
       // Notify App: session is no longer active
       eventRouter.emitEphemeral({

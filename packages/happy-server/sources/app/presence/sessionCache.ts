@@ -7,6 +7,7 @@ interface SessionCacheEntry {
     lastUpdateSent: number;
     pendingUpdate: number | null;
     userId: string;
+    active: boolean;
 }
 
 interface MachineCacheEntry {
@@ -52,6 +53,10 @@ class ActivityCache {
         
         // Check cache first
         if (cached && cached.validUntil > now && cached.userId === userId) {
+            if (!cached.active) {
+                sessionCacheCounter.inc({ operation: 'session_validation', result: 'hit_inactive' });
+                return false;
+            }
             sessionCacheCounter.inc({ operation: 'session_validation', result: 'hit' });
             return true;
         }
@@ -61,18 +66,20 @@ class ActivityCache {
         // Cache miss - check database
         try {
             const session = await db.session.findUnique({
-                where: { id: sessionId, accountId: userId }
+                where: { id: sessionId, accountId: userId },
+                select: { active: true, lastActiveAt: true }
             });
-            
+
             if (session) {
-                // Cache the result
+                // Cache the result (including active status)
                 this.sessionCache.set(sessionId, {
                     validUntil: now + this.CACHE_TTL,
                     lastUpdateSent: session.lastActiveAt.getTime(),
                     pendingUpdate: null,
-                    userId
+                    userId,
+                    active: session.active
                 });
-                return true;
+                return session.active;
             }
             
             return false;
@@ -128,16 +135,25 @@ class ActivityCache {
         if (!cached) {
             return false; // Should validate first
         }
-        
+
         // Only queue if time difference is significant
         const timeDiff = Math.abs(timestamp - cached.lastUpdateSent);
         if (timeDiff > this.UPDATE_THRESHOLD) {
             cached.pendingUpdate = timestamp;
             return true;
         }
-        
+
         databaseUpdatesSkippedCounter.inc({ type: 'session' });
         return false; // No update needed
+    }
+
+    /**
+     * Immediately invalidate a session from cache.
+     * Call this when a session is archived/deactivated to prevent
+     * stale cache entries from allowing heartbeats through.
+     */
+    invalidateSession(sessionId: string): void {
+        this.sessionCache.delete(sessionId);
     }
 
     queueMachineUpdate(machineId: string, timestamp: number): boolean {
