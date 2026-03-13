@@ -961,7 +961,7 @@ export async function runAcp(opts: {
       const nextThinking = msg.status === "running";
       if (thinking !== nextThinking) {
         thinking = nextThinking;
-        session.keepAlive(thinking, "remote");
+        session.keepAlive(thinking, "remote", true);
       }
       if (msg.status === "idle") {
         clearPendingTurn();

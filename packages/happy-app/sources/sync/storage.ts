@@ -617,8 +617,18 @@ export const storage = create<StorageState>()((set, get) => {
             savedProfilesAll[session.id]?.profileName ??
             null;
 
+          // Preserve ephemeral thinking state: fetchSessions always sends
+          // thinking:false because the server doesn't persist it. Without this,
+          // every socket reconnection resets active sessions to "online".
+          const preservedThinking =
+            state.sessions[session.id]?.thinking ?? session.thinking;
+          const preservedThinkingAt =
+            state.sessions[session.id]?.thinkingAt ?? session.thinkingAt;
+
           mergedSessions[session.id] = {
             ...session,
+            thinking: preservedThinking,
+            thinkingAt: preservedThinkingAt,
             metadata: resolvedMetadata,
             presence,
             draft: existingDraft || savedDraft || session.draft || null,

@@ -873,17 +873,24 @@ export class ApiSessionClient extends EventEmitter {
   /**
    * Send a ping message to keep the connection alive
    */
-  keepAlive(thinking: boolean, mode: "local" | "remote") {
+  keepAlive(thinking: boolean, mode: "local" | "remote", reliable?: boolean) {
     if (process.env.DEBUG) {
       // too verbose for production
       logger.debug(`[API] Sending keep alive message: ${thinking}`);
     }
-    this.socket.volatile.emit("session-alive", {
+    const payload = {
       sid: this.sessionId,
       time: Date.now(),
       thinking,
       mode,
-    });
+    };
+    // Use reliable (non-volatile) emit for thinking state changes so the
+    // update is queued and delivered even during brief disconnections.
+    if (reliable) {
+      this.socket.emit("session-alive", payload);
+    } else {
+      this.socket.volatile.emit("session-alive", payload);
+    }
   }
 
   /**

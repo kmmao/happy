@@ -2425,11 +2425,15 @@ class Sync {
                 type?: string;
                 ev?: { t?: string };
               };
+              // Claude session protocol: envelope has ev directly (no data wrapper)
+              ev?: { t?: string };
             };
           } | null;
           const contentType = rawContent?.content?.type;
           const dataType = rawContent?.content?.data?.type;
           const sessionEventType = rawContent?.content?.data?.ev?.t;
+          // Claude session protocol: role="session", envelope.ev.t at content.ev.t
+          const envelopeEventType = rawContent?.content?.ev?.t;
 
           // Debug logging to trace lifecycle events
           if (
@@ -2437,22 +2441,28 @@ class Sync {
             dataType === "turn_aborted" ||
             dataType === "task_started" ||
             sessionEventType === "turn-start" ||
-            sessionEventType === "turn-end"
+            sessionEventType === "turn-end" ||
+            envelopeEventType === "turn-start" ||
+            envelopeEventType === "turn-end"
           ) {
             console.log(
-              `🔄 [Sync] Lifecycle event detected: contentType=${contentType}, dataType=${dataType}, sessionEventType=${sessionEventType}`,
+              `🔄 [Sync] Lifecycle event detected: contentType=${contentType}, dataType=${dataType}, sessionEventType=${sessionEventType}, role=${rawContent?.role}, envelopeEventType=${envelopeEventType}`,
             );
           }
+
+          const isSessionProtocolEvent = rawContent?.role === "session";
 
           const isTaskComplete =
             ((contentType === "acp" || contentType === "codex") &&
               (dataType === "task_complete" || dataType === "turn_aborted")) ||
-            (contentType === "session" && sessionEventType === "turn-end");
+            (contentType === "session" && sessionEventType === "turn-end") ||
+            (isSessionProtocolEvent && envelopeEventType === "turn-end");
 
           const isTaskStarted =
             ((contentType === "acp" || contentType === "codex") &&
               dataType === "task_started") ||
-            (contentType === "session" && sessionEventType === "turn-start");
+            (contentType === "session" && sessionEventType === "turn-start") ||
+            (isSessionProtocolEvent && envelopeEventType === "turn-start");
 
           if (isTaskComplete || isTaskStarted) {
             console.log(

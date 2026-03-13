@@ -88,12 +88,12 @@ export class Session {
 
   onThinkingChange = (thinking: boolean) => {
     this.thinking = thinking;
-    this.client.keepAlive(thinking, this.mode);
+    this.client.keepAlive(thinking, this.mode, true);
   };
 
   onModeChange = (mode: "local" | "remote") => {
     this.mode = mode;
-    this.client.keepAlive(this.thinking, mode);
+    this.client.keepAlive(this.thinking, mode, true);
     this._onModeChange(mode);
   };
 
