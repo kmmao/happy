@@ -26,6 +26,10 @@ export type IssueSessionStatus =
 export interface IssueSessionLinkData {
   readonly issueNumber: number;
   readonly issueTitle: string;
+  readonly issueBody?: string;
+  readonly issueAuthor?: string;
+  readonly issueLabels?: readonly string[];
+  readonly issueUrl?: string;
   readonly projectKey: string;
   readonly repoLabel: string;
   readonly sessionId: string;

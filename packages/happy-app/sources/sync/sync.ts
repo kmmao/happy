@@ -73,7 +73,6 @@ import { getServerUrl } from "./serverConfig";
 import { config } from "@/config";
 import { log } from "@/log";
 import { gitStatusSync } from "./gitStatusSync";
-import { autoIssueService } from "./autoIssueService";
 import { projectManager } from "./projectManager";
 import { removeWorktree } from "./gitWorktreeOps";
 import { AsyncLock } from "@/utils/lock";
@@ -248,7 +247,6 @@ class Sync {
         this.friendsSync.invalidate();
         this.friendRequestsSync.invalidate();
         this.feedSync.invalidate();
-        autoIssueService.triggerNow();
       } else {
         log.log(`📱 App state changed to: ${nextAppState}`);
         this.maybeStartBackgroundSendWatchdog();
@@ -344,8 +342,6 @@ class Sync {
         storage.getState().applyReady();
         // Load issue-session links so UI can show processing status
         void issueSessionStore.getState().loadLinks();
-        // Start auto-issue background service after sessions are loaded
-        autoIssueService.start();
         // Start PR status polling for processing issue sessions with open PRs
         this.startPRStatusPolling();
       })
@@ -3238,6 +3234,9 @@ class Sync {
   private handleWebhookIssueLinked = async (data: {
     readonly issueNumber: number;
     readonly issueTitle: string;
+    readonly issueBody: string;
+    readonly issueAuthor: string;
+    readonly issueLabels: string[];
     readonly issueUrl: string;
     readonly repoUrl: string;
     readonly repoPath: string;
@@ -3258,10 +3257,7 @@ class Sync {
       const { gitHosts } = storage.getState().settings;
       issueStore.getState().detectRepoInfo(projectKey, data.repoUrl, gitHosts);
 
-      // If autoIssueService already created the link, update it with
-      // the real sessionId from the webhook (instead of "pending").
-      // This fixes the race condition where autoIssueService creates
-      // a link before the webhook-issue-linked event arrives.
+      // If link already exists (e.g. from another device), skip creation.
       const existing = issueSessionStore.getState().findByIssueKey(issueKey);
       if (existing) {
         if (
@@ -3283,6 +3279,10 @@ class Sync {
       await issueSessionStore.getState().createLink({
         issueNumber: data.issueNumber,
         issueTitle: data.issueTitle,
+        issueBody: data.issueBody,
+        issueAuthor: data.issueAuthor,
+        issueLabels: data.issueLabels,
+        issueUrl: data.issueUrl,
         projectKey,
         repoLabel,
         sessionId: data.sessionId,
@@ -3290,9 +3290,8 @@ class Sync {
         repoPath: data.repoPath,
       });
     } catch (error) {
-      // KV optimistic lock conflict means another device/service created
-      // the link concurrently (e.g. autoIssueService). Only log if the
-      // link truly doesn't exist after the conflict.
+      // KV optimistic lock conflict means another device created
+      // the link concurrently. Only log if the link truly doesn't exist.
       const projectKey = `${data.machineId}:${data.repoPath}`;
       const alreadyExists = issueSessionStore
         .getState()
@@ -3795,7 +3794,7 @@ class Sync {
     if (this.prStatusCheckTimer) return;
     this.prStatusCheckTimer = setInterval(
       () => void this.checkProcessingPRs(),
-      60_000, // Check every 60s (same as autoIssueService)
+      60_000, // Check every 60s
     );
   }
 

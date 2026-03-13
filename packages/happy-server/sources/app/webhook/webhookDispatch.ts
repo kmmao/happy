@@ -295,6 +295,7 @@ async function processRoute(
         repoUrl: issue.repoUrl.toLowerCase(),
         issueNumber: issue.issueNumber,
         issueTitle: issue.issueTitle,
+        issueBody: issue.issueBody,
         issueAuthor: issue.issueAuthor,
         issueLabels: effectiveLabels,
         issueUrl: issue.issueUrl,

@@ -5,7 +5,7 @@
  * permission/model setup → initial prompt.
  *
  * The link is created FIRST ("processing") so that even if later steps fail,
- * the issue is marked and won't be re-triggered by auto-issue service.
+ * the issue is marked and won't be re-triggered.
  *
  * Independent of UI components — can be called from automation.
  */

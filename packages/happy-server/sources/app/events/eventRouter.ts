@@ -234,6 +234,9 @@ export type EphemeralEvent =
       type: "webhook-issue-linked";
       issueNumber: number;
       issueTitle: string;
+      issueBody: string;
+      issueAuthor: string;
+      issueLabels: string[];
       issueUrl: string;
       repoUrl: string;
       repoPath: string;

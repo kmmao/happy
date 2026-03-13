@@ -1,8 +1,8 @@
 /**
  * Hook to get issue-session link info for a given session.
  *
- * Combines issueSessionStore (link metadata) with optional issue body
- * from issueStore (if already loaded — no extra fetch).
+ * Prefers issue metadata stored directly in the link (from webhook events).
+ * Falls back to issueStore if link metadata is unavailable.
  */
 
 import { useIssueSessionBySessionId } from "@/sync/issueSessionStore";
@@ -17,9 +17,11 @@ interface SessionIssueInfo {
 export function useSessionIssueInfo(sessionId: string): SessionIssueInfo {
     const issueLink = useIssueSessionBySessionId(sessionId);
 
-    // Try to get issue body from issueStore if already loaded (no fetch triggered)
     const issueBody = (() => {
         if (!issueLink) return null;
+        // Prefer body stored directly in the link (from webhook-issue-linked)
+        if (issueLink.issueBody?.trim()) return issueLink.issueBody.trim();
+        // Fallback: try issueStore if already loaded
         const issues =
             issueStore.getState().issuesByProject[issueLink.projectKey];
         if (!issues) return null;

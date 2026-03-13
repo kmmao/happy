@@ -398,6 +398,7 @@ model WebhookEvent {
     issueNumber  Int
     issueTitle   String
     issueAuthor  String
+    issueBody    String   @default("")
     issueLabels  String[]
     issueUrl     String
     status       String   @default("pending") // pending | dispatched | completed | failed | skipped
