@@ -31,11 +31,8 @@ export function loadAppConfig(): AppConfig {
       if (typeof exponentManifest === "string") {
         try {
           exponentManifest = JSON.parse(exponentManifest);
-        } catch (e) {
-          console.warn(
-            "[loadAppConfig] Failed to parse ExponentConstants.manifest:",
-            e,
-          );
+        } catch {
+          // Failed to parse ExponentConstants.manifest
         }
       }
 
@@ -43,14 +40,10 @@ export function loadAppConfig(): AppConfig {
       const appConfig = exponentManifest?.extra?.app;
       if (appConfig && typeof appConfig === "object") {
         Object.assign(config, appConfig);
-        console.log(
-          "[loadAppConfig] Loaded from ExponentConstants:",
-          Object.keys(config),
-        );
       }
     }
-  } catch (e) {
-    console.warn("[loadAppConfig] Error accessing ExponentConstants:", e);
+  } catch {
+    // ExponentConstants not available
   }
 
   try {
@@ -59,20 +52,11 @@ export function loadAppConfig(): AppConfig {
       const appConfig = Constants.expoConfig.extra.app;
       if (typeof appConfig === "object") {
         Object.assign(config, appConfig);
-        console.log(
-          "[loadAppConfig] Loaded from Constants.expoConfig:",
-          Object.keys(config),
-        );
       }
     }
-  } catch (e) {
-    console.warn("[loadAppConfig] Error accessing Constants.expoConfig:", e);
+  } catch {
+    // Constants.expoConfig not available
   }
-
-  console.log(
-    "[loadAppConfig] Final merged config:",
-    JSON.stringify(config, null, 2),
-  );
 
   // Override with EXPO_PUBLIC_* env vars if present at runtime and different
   // Why: Native config is baked at prebuild time, but EXPO_PUBLIC_* vars
@@ -82,45 +66,30 @@ export function loadAppConfig(): AppConfig {
     process.env.EXPO_PUBLIC_REVENUE_CAT_APPLE &&
     config.revenueCatAppleKey !== process.env.EXPO_PUBLIC_REVENUE_CAT_APPLE
   ) {
-    console.log(
-      "[loadAppConfig] Override revenueCatAppleKey from EXPO_PUBLIC_REVENUE_CAT_APPLE",
-    );
     config.revenueCatAppleKey = process.env.EXPO_PUBLIC_REVENUE_CAT_APPLE;
   }
   if (
     process.env.EXPO_PUBLIC_REVENUE_CAT_GOOGLE &&
     config.revenueCatGoogleKey !== process.env.EXPO_PUBLIC_REVENUE_CAT_GOOGLE
   ) {
-    console.log(
-      "[loadAppConfig] Override revenueCatGoogleKey from EXPO_PUBLIC_REVENUE_CAT_GOOGLE",
-    );
     config.revenueCatGoogleKey = process.env.EXPO_PUBLIC_REVENUE_CAT_GOOGLE;
   }
   if (
     process.env.EXPO_PUBLIC_REVENUE_CAT_STRIPE &&
     config.revenueCatStripeKey !== process.env.EXPO_PUBLIC_REVENUE_CAT_STRIPE
   ) {
-    console.log(
-      "[loadAppConfig] Override revenueCatStripeKey from EXPO_PUBLIC_REVENUE_CAT_STRIPE",
-    );
     config.revenueCatStripeKey = process.env.EXPO_PUBLIC_REVENUE_CAT_STRIPE;
   }
   if (
     process.env.EXPO_PUBLIC_POSTHOG_KEY &&
     config.postHogKey !== process.env.EXPO_PUBLIC_POSTHOG_KEY
   ) {
-    console.log(
-      "[loadAppConfig] Override postHogKey from EXPO_PUBLIC_POSTHOG_KEY",
-    );
     config.postHogKey = process.env.EXPO_PUBLIC_POSTHOG_KEY;
   }
   if (
     process.env.EXPO_PUBLIC_SERVER_URL &&
     config.serverUrl !== process.env.EXPO_PUBLIC_SERVER_URL
   ) {
-    console.log(
-      "[loadAppConfig] Override serverUrl from EXPO_PUBLIC_SERVER_URL",
-    );
     config.serverUrl = process.env.EXPO_PUBLIC_SERVER_URL;
   }
 

@@ -1,4 +1,5 @@
 import { MMKV } from "react-native-mmkv";
+import { Platform } from "react-native";
 import type { Message } from "./typesMessage";
 import { log } from "@/log";
 
@@ -24,6 +25,10 @@ interface CacheIndexEntry {
 let messageCacheMMKV: MMKV | null = null;
 
 export function initMessageCache(encryptionKey: string): void {
+  if (Platform.OS === "web") {
+    messageCacheMMKV = null;
+    return;
+  }
   try {
     messageCacheMMKV = new MMKV({
       id: "message-cache",

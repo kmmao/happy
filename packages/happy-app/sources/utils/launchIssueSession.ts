@@ -224,6 +224,10 @@ export async function launchIssueSession(
     await issueSessionStore.getState().createLink({
       issueNumber: issue.number,
       issueTitle: issue.title,
+      issueBody: issue.body,
+      issueAuthor: issue.author,
+      issueLabels: issue.labels.map((l) => l.name),
+      issueUrl: issue.url,
       projectKey: issue.projectKey,
       repoLabel: issue.repoLabel,
       sessionId: "pending",

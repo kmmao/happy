@@ -5,6 +5,24 @@ import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { z } from "zod";
 import { type Fastify } from "../types";
 
+// Simple per-session 404 cache to prevent repeated DB lookups from buggy clients.
+// Caches (userId:sessionId) → timestamp of last 404 response.
+// If a client repeatedly hits a non-existent session within the window, skip the DB query.
+const notFoundCache = new Map<string, number>();
+const NOT_FOUND_WINDOW_MS = 30_000; // 30 seconds
+
+// Cleanup stale entries every 60 seconds. Use unref() so the timer
+// does not prevent the process from exiting gracefully.
+const notFoundCacheCleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [key, ts] of notFoundCache) {
+        if (now - ts > NOT_FOUND_WINDOW_MS) {
+            notFoundCache.delete(key);
+        }
+    }
+}, 60_000);
+notFoundCacheCleanupTimer.unref();
+
 const getMessagesQuerySchema = z.object({
   after_seq: z.coerce.number().int().min(0).default(0),
   before_seq: z.coerce.number().int().min(0).max(2147483647).optional(),
@@ -58,6 +76,7 @@ export function v3SessionRoutes(app: Fastify) {
     "/v3/sessions/:sessionId/messages",
     {
       preHandler: app.authenticate,
+      logLevel: "warn" as const,
       schema: {
         params: z.object({
           sessionId: z.string(),
@@ -70,6 +89,14 @@ export function v3SessionRoutes(app: Fastify) {
       const { sessionId } = request.params;
       const { after_seq, before_seq, limit } = request.query;
 
+      // Check 404 cache before hitting DB — prevents repeated DB lookups
+      // for sessions that were already confirmed not to exist.
+      const cacheKey = `${userId}:${sessionId}`;
+      const cachedAt = notFoundCache.get(cacheKey);
+      if (cachedAt && Date.now() - cachedAt < NOT_FOUND_WINDOW_MS) {
+        return reply.code(404).send({ error: "Session not found" });
+      }
+
       const session = await db.session.findFirst({
         where: {
           id: sessionId,
@@ -79,6 +106,7 @@ export function v3SessionRoutes(app: Fastify) {
       });
 
       if (!session) {
+        notFoundCache.set(cacheKey, Date.now());
         return reply.code(404).send({ error: "Session not found" });
       }
 
@@ -145,6 +173,7 @@ export function v3SessionRoutes(app: Fastify) {
     "/v3/sessions/:sessionId/messages",
     {
       preHandler: app.authenticate,
+      logLevel: "warn" as const,
       schema: {
         params: z.object({
           sessionId: z.string(),
@@ -157,6 +186,12 @@ export function v3SessionRoutes(app: Fastify) {
       const { sessionId } = request.params;
       const { messages } = request.body;
 
+      const cacheKey = `${userId}:${sessionId}`;
+      const cachedAt = notFoundCache.get(cacheKey);
+      if (cachedAt && Date.now() - cachedAt < NOT_FOUND_WINDOW_MS) {
+        return reply.code(404).send({ error: "Session not found" });
+      }
+
       const session = await db.session.findFirst({
         where: {
           id: sessionId,
@@ -166,6 +201,7 @@ export function v3SessionRoutes(app: Fastify) {
       });
 
       if (!session) {
+        notFoundCache.set(cacheKey, Date.now());
         return reply.code(404).send({ error: "Session not found" });
       }
 

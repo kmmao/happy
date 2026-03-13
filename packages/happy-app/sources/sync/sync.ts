@@ -76,6 +76,7 @@ import { gitStatusSync } from "./gitStatusSync";
 import { projectManager } from "./projectManager";
 import { removeWorktree } from "./gitWorktreeOps";
 import { AsyncLock } from "@/utils/lock";
+import { NonRetryableError } from "@/utils/time";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import { realtimeStore } from "@/realtime/realtimeStore";
 import { Message } from "./typesMessage";
@@ -167,6 +168,7 @@ class Sync {
   private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
   private sessionQueueProcessing = new Set<string>();
   private sessionMessageLocks = new Map<string, AsyncLock>();
+  private deleted404Sessions = new Set<string>(); // Guard against re-creating sync for 404'd sessions
   private sessionDataKeys = new Map<string, Uint8Array>(); // Store session data encryption keys internally
   private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
   private artifactDataKeys = new Map<string, Uint8Array>(); // Store artifact data encryption keys internally
@@ -344,6 +346,8 @@ class Sync {
         void issueSessionStore.getState().loadLinks();
         // Start PR status polling for processing issue sessions with open PRs
         this.startPRStatusPolling();
+        // One-time recovery: backfill prUrl for recently-completed links that missed PR detection
+        void this.recoverMissingPRUrls();
       })
       .catch((error) => {
         console.error("Failed to load initial data:", error);
@@ -380,7 +384,7 @@ class Sync {
       }
     }
 
-    this.getMessagesSync(sessionId).invalidate();
+    this.getMessagesSync(sessionId)?.invalidate();
 
     // Also invalidate git status sync for this session
     gitStatusSync.getSync(sessionId).invalidate();
@@ -392,7 +396,10 @@ class Sync {
     }
   };
 
-  private getMessagesSync(sessionId: string): InvalidateSync {
+  private getMessagesSync(sessionId: string): InvalidateSync | null {
+    if (this.deleted404Sessions.has(sessionId)) {
+      return null;
+    }
     let sync = this.messagesSync.get(sessionId);
     if (!sync) {
       sync = new InvalidateSync(() => this.fetchMessages(sessionId));
@@ -401,7 +408,10 @@ class Sync {
     return sync;
   }
 
-  private getSendSync(sessionId: string): InvalidateSync {
+  private getSendSync(sessionId: string): InvalidateSync | null {
+    if (this.deleted404Sessions.has(sessionId)) {
+      return null;
+    }
     let sync = this.sendSync.get(sessionId);
     if (!sync) {
       sync = new InvalidateSync(() => this.flushOutbox(sessionId));
@@ -432,6 +442,37 @@ class Sync {
       this.sessionMessageLocks.set(sessionId, lock);
     }
     return lock;
+  }
+
+  /**
+   * Clean up all local state for a session that no longer exists on the server (404).
+   * Removes messagesSync from the map to prevent future invalidate() calls,
+   * but does NOT call stop() on messagesSync since we are inside its own execution.
+   * Does NOT delete the lock — we are still inside lock.inLock().
+   * Adds sessionId to deleted404Sessions to prevent lazy re-creation.
+   */
+  private cleanupSessionLocally(sessionId: string) {
+    this.deleted404Sessions.add(sessionId);
+    storage.getState().deleteSession(sessionId);
+    this.encryption.removeSessionEncryption(sessionId);
+    projectManager.removeSession(sessionId);
+    gitStatusSync.clearForSession(sessionId);
+    // Remove from map so future invalidate() calls are no-ops,
+    // but don't call stop() on messagesSync — we are inside this sync's callback.
+    this.messagesSync.delete(sessionId);
+    // sendSync is a separate object — safe to stop() from here.
+    const sndSync = this.sendSync.get(sessionId);
+    if (sndSync) {
+      sndSync.stop();
+      this.sendSync.delete(sessionId);
+    }
+    this.pendingOutbox.delete(sessionId);
+    this.sessionLastSeq.delete(sessionId);
+    deleteLastSeq(sessionId);
+    deleteMessageCache(sessionId);
+    // Do NOT delete sessionMessageLocks — we are still inside lock.inLock().
+    this.sessionMessageQueue.delete(sessionId);
+    this.sessionQueueProcessing.delete(sessionId);
   }
 
   private scheduleQueuedMessagesProcessing(sessionId: string) {
@@ -719,7 +760,7 @@ class Sync {
       content: encryptedRawRecord,
     });
 
-    this.getSendSync(sessionId).invalidate();
+    this.getSendSync(sessionId)?.invalidate();
     this.maybeStartBackgroundSendWatchdog();
   }
 
@@ -1486,7 +1527,7 @@ class Sync {
   private fetchMachines = async () => {
     if (!this.credentials) return;
 
-    console.log("📊 Sync: Fetching machines...");
+    log.log("📊 Sync: Fetching machines...");
     const API_ENDPOINT = getServerUrl();
     const response = await fetch(`${API_ENDPOINT}/v1/machines`, {
       headers: {
@@ -1501,7 +1542,7 @@ class Sync {
     }
 
     const data = await response.json();
-    console.log(
+    log.log(
       `📊 Sync: Fetched ${Array.isArray(data) ? data.length : 0} machines from server`,
     );
     const machines = data as Array<{
@@ -1790,11 +1831,7 @@ class Sync {
           }
 
           // Log and retry
-          console.log("settings version-mismatch, retrying", {
-            serverVersion: data.currentVersion,
-            retry: retryCount + 1,
-            pendingKeys: Object.keys(this.pendingSettings),
-          });
+          log.log(`settings version-mismatch, retrying: serverVersion=${data.currentVersion}, retry=${retryCount + 1}, pendingKeys=${Object.keys(this.pendingSettings).join(",")}`);
           retryCount++;
           continue;
         } else {
@@ -1835,15 +1872,6 @@ class Sync {
       parsedSettings = { ...settingsDefaults };
     }
 
-    // Log
-    console.log(
-      "settings",
-      JSON.stringify({
-        settings: parsedSettings,
-        version: data.settingsVersion,
-      }),
-    );
-
     // Apply settings to storage
     storage.getState().applySettings(parsedSettings, data.settingsVersion);
 
@@ -1874,19 +1902,6 @@ class Sync {
 
     const data = await response.json();
     const parsedProfile = profileParse(data);
-
-    // Log profile data for debugging
-    console.log(
-      "profile",
-      JSON.stringify({
-        id: parsedProfile.id,
-        timestamp: parsedProfile.timestamp,
-        firstName: parsedProfile.firstName,
-        lastName: parsedProfile.lastName,
-        hasAvatar: !!parsedProfile.avatar,
-        hasGitHub: !!parsedProfile.github,
-      }),
-    );
 
     // Apply profile to storage
     storage.getState().applyProfile(parsedProfile);
@@ -1937,12 +1952,11 @@ class Sync {
       });
 
       if (!response.ok) {
-        console.log(`[fetchNativeUpdate] Request failed: ${response.status}`);
+        log.log(`[fetchNativeUpdate] Request failed: ${response.status}`);
         return;
       }
 
       const data = await response.json();
-      console.log("[fetchNativeUpdate] Data:", data);
 
       // Apply update status to storage
       if (data.update_required && data.update_url) {
@@ -1956,7 +1970,7 @@ class Sync {
         });
       }
     } catch (error) {
-      console.log("[fetchNativeUpdate] Error:", error);
+      log.log(`[fetchNativeUpdate] Error: ${error}`);
       storage.getState().applyNativeUpdateStatus(null);
     }
   };
@@ -1977,9 +1991,6 @@ class Sync {
         }
 
         if (!apiKey) {
-          console.log(
-            `RevenueCat: No API key found for platform ${Platform.OS}`,
-          );
           return;
         }
 
@@ -1996,7 +2007,7 @@ class Sync {
         });
 
         this.revenueCatInitialized = true;
-        console.log("RevenueCat initialized successfully");
+        log.log("RevenueCat initialized successfully");
       }
 
       // Sync purchases
@@ -2117,6 +2128,13 @@ class Sync {
         const newestResponse = await apiSocket.request(
           `/v3/sessions/${sessionId}/messages?before_seq=2147483647&limit=300`,
         );
+        if (!newestResponse.ok && newestResponse.status === 404) {
+          log.log(
+            `💬 fetchMessages: session ${sessionId} not found (404), cleaning up`,
+          );
+          this.cleanupSessionLocally(sessionId);
+          throw new NonRetryableError(`Session ${sessionId} not found`);
+        }
         if (newestResponse.ok) {
           const newestData =
             (await newestResponse.json()) as V3GetSessionMessagesResponse;
@@ -2172,6 +2190,13 @@ class Sync {
           `/v3/sessions/${sessionId}/messages?after_seq=${afterSeq}&limit=100`,
         );
         if (!response.ok) {
+          if (response.status === 404) {
+            log.log(
+              `💬 fetchMessages: session ${sessionId} not found (404), cleaning up`,
+            );
+            this.cleanupSessionLocally(sessionId);
+            throw new NonRetryableError(`Session ${sessionId} not found`);
+          }
           throw new Error(
             `Failed to fetch messages for ${sessionId}: ${response.status}`,
           );
@@ -2310,7 +2335,7 @@ class Sync {
     log.log("finalStatus: " + JSON.stringify(finalStatus));
 
     if (finalStatus !== "granted") {
-      console.log("Failed to get push token for push notification!");
+      log.log("Failed to get push token for push notification!");
       return;
     }
 
@@ -2350,7 +2375,7 @@ class Sync {
       if (sessionsData) {
         for (const item of sessionsData) {
           if (typeof item !== "string") {
-            this.getMessagesSync(item.id).invalidate();
+            this.getMessagesSync(item.id)?.invalidate();
             // Also invalidate git status on reconnection
             gitStatusSync.invalidate(item.id);
           }
@@ -2363,18 +2388,12 @@ class Sync {
   };
 
   private handleUpdate = async (update: unknown) => {
-    console.log(
-      "🔄 Sync: handleUpdate called with:",
-      JSON.stringify(update).substring(0, 300),
-    );
     const validatedUpdate = ApiUpdateContainerSchema.safeParse(update);
     if (!validatedUpdate.success) {
-      console.log("❌ Sync: Invalid update received:", validatedUpdate.error);
-      console.error("❌ Sync: Invalid update data:", update);
+      log.log(`❌ Sync: Invalid update received: ${validatedUpdate.error}`);
       return;
     }
     const updateData = validatedUpdate.data;
-    console.log(`🔄 Sync: Validated update type: ${updateData.body.t}`);
 
     if (updateData.body.t === "new-message") {
       // Get encryption
@@ -2445,7 +2464,7 @@ class Sync {
             envelopeEventType === "turn-start" ||
             envelopeEventType === "turn-end"
           ) {
-            console.log(
+            log.log(
               `🔄 [Sync] Lifecycle event detected: contentType=${contentType}, dataType=${dataType}, sessionEventType=${sessionEventType}, role=${rawContent?.role}, envelopeEventType=${envelopeEventType}`,
             );
           }
@@ -2465,7 +2484,7 @@ class Sync {
             (isSessionProtocolEvent && envelopeEventType === "turn-start");
 
           if (isTaskComplete || isTaskStarted) {
-            console.log(
+            log.log(
               `🔄 [Sync] Updating thinking state: isTaskComplete=${isTaskComplete}, isTaskStarted=${isTaskStarted}`,
             );
           }
@@ -2519,7 +2538,7 @@ class Sync {
               const link = issueSessionStore
                 .getState()
                 .findBySessionId(updateData.body.sid);
-              console.log(
+              log.log(
                 `🔄 [IssueSession] turn-end: sid=${updateData.body.sid}, link=${link ? `${link.issueKey}(${link.status})` : "NONE"}`,
               );
               if (link && link.status === "processing") {
@@ -2571,7 +2590,7 @@ class Sync {
 
           // If seq is non-consecutive, also fetch missing messages from server
           if (!isConsecutive) {
-            this.getMessagesSync(updateData.body.sid).invalidate();
+            this.getMessagesSync(updateData.body.sid)?.invalidate();
           }
         }
       }
@@ -2629,16 +2648,29 @@ class Sync {
       // Remove session from storage
       storage.getState().deleteSession(sessionId);
 
+      // Remove from 404 guard if present
+      this.deleted404Sessions.delete(sessionId);
+
       // Remove encryption keys from memory
       this.encryption.removeSessionEncryption(sessionId);
 
       // Remove from project manager
       projectManager.removeSession(sessionId);
 
-      // Clear any cached git status
+      // Stop and clean up syncs
+      const msgSync = this.messagesSync.get(sessionId);
+      if (msgSync) {
+        msgSync.stop();
+        this.messagesSync.delete(sessionId);
+      }
+      const sndSync = this.sendSync.get(sessionId);
+      if (sndSync) {
+        sndSync.stop();
+        this.sendSync.delete(sessionId);
+      }
+
+      // Clear any cached git status and remaining state
       gitStatusSync.clearForSession(sessionId);
-      this.messagesSync.delete(sessionId);
-      this.sendSync.delete(sessionId);
       this.pendingOutbox.delete(sessionId);
       this.sessionLastSeq.delete(sessionId);
       deleteLastSeq(sessionId);
@@ -3164,11 +3196,8 @@ class Sync {
   private handleEphemeralUpdate = (update: unknown) => {
     const validatedUpdate = ApiEphemeralUpdateSchema.safeParse(update);
     if (!validatedUpdate.success) {
-      console.log("Invalid ephemeral update received:", validatedUpdate.error);
-      console.error("Invalid ephemeral update received:", update);
+      log.log(`Invalid ephemeral update received: ${validatedUpdate.error}`);
       return;
-    } else {
-      // console.log('Ephemeral update received:', update);
     }
     const updateData = validatedUpdate.data;
 
@@ -3270,14 +3299,22 @@ class Sync {
       // If link already exists (e.g. from another device), skip creation.
       const existing = issueSessionStore.getState().findByIssueKey(issueKey);
       if (existing) {
-        if (
-          (existing.sessionId === "pending" || existing.status === "failed") &&
-          data.sessionId !== "pending"
-        ) {
+        const needsUpdate =
+          ((existing.sessionId === "pending" || existing.status === "failed") &&
+            data.sessionId !== "pending") ||
+          (!existing.issueUrl && data.issueUrl);
+
+        if (needsUpdate) {
+          const newStatus =
+            (existing.sessionId === "pending" || existing.status === "failed") &&
+            data.sessionId !== "pending"
+              ? "processing"
+              : existing.status;
           await issueSessionStore
             .getState()
-            .updateStatus(issueKey, "processing", {
-              sessionId: data.sessionId,
+            .updateStatus(issueKey, newStatus, {
+              sessionId: data.sessionId !== "pending" ? data.sessionId : undefined,
+              issueUrl: !existing.issueUrl ? data.issueUrl : undefined,
             });
         }
         return;
@@ -3536,6 +3573,102 @@ class Sync {
   };
 
   /**
+   * Ensure repoInfo is populated for a given issue session link.
+   * Falls back to deriving repoUrl from the link's issueUrl if the
+   * in-memory repoInfoByProject cache is empty (e.g. after app restart).
+   */
+  private ensureRepoInfo = (link: IssueSessionLink) => {
+    const existing = issueStore.getState().repoInfoByProject[link.projectKey];
+    if (existing && existing.provider !== "unknown") return existing;
+
+    const { gitHosts } = storage.getState().settings;
+
+    // Strategy 1: Derive repoUrl from issueUrl
+    if (link.issueUrl) {
+      const repoUrl = link.issueUrl
+        .replace(/\?.*$/, "")
+        .replace(/\/+$/, "")
+        .replace(/\/issues\/\d+$/, "");
+      if (repoUrl !== link.issueUrl && repoUrl.startsWith("http")) {
+        issueStore.getState().detectRepoInfo(link.projectKey, repoUrl, gitHosts);
+        const result = issueStore.getState().repoInfoByProject[link.projectKey];
+        if (result) return result;
+      }
+    }
+
+    // Strategy 2: Match machineId + repoPath against gitHosts webhookRepos config
+    if (gitHosts) {
+      for (const host of gitHosts) {
+        for (const repo of host.webhookRepos ?? []) {
+          if (repo.machineId === link.machineId && repo.repoPath === link.repoPath && repo.repoUrl) {
+            issueStore.getState().detectRepoInfo(link.projectKey, repo.repoUrl, gitHosts);
+            const result = issueStore.getState().repoInfoByProject[link.projectKey];
+            if (result) return result;
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
+  /**
+   * Query Gitea API for PRs matching a branch name.
+   * Tries owner:branch format first, then falls back to branch-only.
+   */
+  private queryGiteaPRs = async (
+    machineId: string,
+    repoInfo: { readonly apiBase?: string; readonly apiToken?: string; readonly owner: string; readonly repo: string },
+    branchName: string,
+  ): Promise<readonly { readonly html_url?: string; readonly merged?: boolean; readonly head?: { readonly ref?: string } }[]> => {
+    // Validate inputs to prevent shell injection
+    const SAFE_SLUG = /^[a-zA-Z0-9._\-/]+$/;
+    if (!SAFE_SLUG.test(branchName) || !SAFE_SLUG.test(repoInfo.owner) || !SAFE_SLUG.test(repoInfo.repo)) {
+      return [];
+    }
+    if (!repoInfo.apiBase) return [];
+
+    const authHeader = repoInfo.apiToken
+      ? ` -H "Authorization: token ${repoInfo.apiToken}"`
+      : "";
+    const baseUrl = `${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=all`;
+    // Use "/" as cwd to bypass path security (curl doesn't need a specific working directory)
+    const safeCwd = "/";
+
+    // Try owner:branch format first
+    const result1 = await machineBash(
+      machineId,
+      `curl -s${authHeader} "${baseUrl}&head=${repoInfo.owner}:${branchName}" 2>&1`,
+      safeCwd,
+    );
+    if (result1.success && result1.exitCode === 0) {
+      try {
+        const prs = JSON.parse(result1.stdout.trim());
+        if (Array.isArray(prs) && prs.length > 0) return prs;
+      } catch {
+        // Malformed response, try fallback
+      }
+    }
+
+    // Fallback: branch-only (some Gitea versions don't need owner prefix)
+    const result2 = await machineBash(
+      machineId,
+      `curl -s${authHeader} "${baseUrl}&head=${branchName}" 2>&1`,
+      safeCwd,
+    );
+    if (result2.success && result2.exitCode === 0) {
+      try {
+        const prs = JSON.parse(result2.stdout.trim());
+        if (Array.isArray(prs) && prs.length > 0) return prs;
+      } catch {
+        // Malformed response
+      }
+    }
+
+    return [];
+  };
+
+  /**
    * Detect if a PR exists for an issue session's worktree branch.
    * If found, record the prUrl on the link (stays processing).
    * Does NOT mark completed or close the issue — that's handleIssueSessionCompletion's job.
@@ -3544,11 +3677,11 @@ class Sync {
     link: IssueSessionLink,
   ): Promise<void> => {
     try {
-      const repoInfo = issueStore.getState().repoInfoByProject[link.projectKey];
+      const repoInfo = this.ensureRepoInfo(link);
       const session = storage.getState().sessions[link.sessionId];
       const branchName = session?.metadata?.worktree?.branchName;
 
-      console.log(
+      log.log(
         `🔄 [IssueSession] detectPR: issueKey=${link.issueKey}, branchName=${branchName ?? "NONE"}, repoInfo=${repoInfo?.provider ?? "NONE"}`,
       );
 
@@ -3575,28 +3708,20 @@ class Sync {
         }
       } else if (repoInfo.provider === "gitea") {
         try {
-          const authHeader = repoInfo.apiToken
-            ? ` -H "Authorization: token ${repoInfo.apiToken}"`
-            : "";
-          const prResult = await machineBash(
+          const prs = await this.queryGiteaPRs(
             link.machineId,
-            `curl -s${authHeader} "${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=all&head=${repoInfo.owner}:${branchName}" 2>&1`,
-            link.repoPath,
+            repoInfo,
+            branchName,
           );
-          if (prResult.success && prResult.exitCode === 0) {
-            const prs: readonly { readonly html_url?: string }[] = JSON.parse(
-              prResult.stdout.trim(),
-            );
-            if (prs.length > 0 && prs[0].html_url) {
-              prUrl = prs[0].html_url;
-            }
+          if (prs.length > 0 && prs[0].html_url) {
+            prUrl = prs[0].html_url;
           }
         } catch {
           // Non-critical
         }
       }
 
-      console.log(
+      log.log(
         `🔄 [IssueSession] detectPR result: prUrl=${prUrl ?? "NONE"}`,
       );
 
@@ -3617,7 +3742,7 @@ class Sync {
    */
   private handleIssueSessionCompletion = async (link: IssueSessionLink) => {
     try {
-      const repoInfo = issueStore.getState().repoInfoByProject[link.projectKey];
+      const repoInfo = this.ensureRepoInfo(link);
 
       // Detect PR and its real status from the remote
       let prUrl: string | undefined;
@@ -3625,7 +3750,7 @@ class Sync {
       const session = storage.getState().sessions[link.sessionId];
       const branchName = session?.metadata?.worktree?.branchName;
 
-      console.log(
+      log.log(
         `🔄 [IssueSession] handleCompletion: issueKey=${link.issueKey}, branchName=${branchName ?? "NONE"}, repoInfo=${repoInfo?.provider ?? "NONE"}`,
       );
 
@@ -3652,24 +3777,14 @@ class Sync {
           }
         } else if (repoInfo.provider === "gitea") {
           try {
-            // Query all states for Gitea (with auth for private repos)
-            const authHeader = repoInfo.apiToken
-              ? ` -H "Authorization: token ${repoInfo.apiToken}"`
-              : "";
-            const prResult = await machineBash(
+            const prs = await this.queryGiteaPRs(
               link.machineId,
-              `curl -s${authHeader} "${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=all&head=${repoInfo.owner}:${branchName}" 2>&1`,
-              link.repoPath,
+              repoInfo,
+              branchName,
             );
-            if (prResult.success && prResult.exitCode === 0) {
-              const prs: readonly {
-                readonly html_url?: string;
-                readonly merged?: boolean;
-              }[] = JSON.parse(prResult.stdout.trim());
-              if (prs.length > 0 && prs[0].html_url) {
-                prUrl = prs[0].html_url;
-                prMerged = prs[0].merged === true;
-              }
+            if (prs.length > 0 && prs[0].html_url) {
+              prUrl = prs[0].html_url;
+              prMerged = prs[0].merged === true;
             }
           } catch {
             // Non-critical
@@ -3681,7 +3796,7 @@ class Sync {
       // - PR merged → completed (close issue)
       // - PR exists but not merged → stay processing (PR still needs review)
       // - No PR found → completed (Claude may have committed directly)
-      console.log(
+      log.log(
         `🔄 [IssueSession] PR check result: prUrl=${prUrl ?? "NONE"}, prMerged=${prMerged}`,
       );
       if (prUrl && !prMerged) {
@@ -3826,6 +3941,78 @@ class Sync {
         await this.handleIssueSessionCompletion(link);
       } catch {
         // Non-critical
+      }
+    }
+  };
+
+  /**
+   * One-time recovery: find recently-completed links without prUrl and
+   * attempt to detect the PR from the remote. Updates prUrl in-place
+   * without changing the completed status.
+   */
+  private recoverMissingPRUrls = async (): Promise<void> => {
+    // Wait for links to load
+    await issueSessionStore.getState().loadLinks();
+
+    const allLinks = Object.values(issueSessionStore.getState().links);
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - SEVEN_DAYS;
+
+    const candidates = allLinks.filter(
+      (link) =>
+        link.status === "completed" &&
+        !link.prUrl &&
+        link.updatedAt > cutoff,
+    );
+
+    if (candidates.length === 0) return;
+
+    for (const link of candidates) {
+      try {
+        const repoInfo = this.ensureRepoInfo(link);
+        const session = storage.getState().sessions[link.sessionId];
+        const branchName = session?.metadata?.worktree?.branchName;
+
+        if (!repoInfo || repoInfo.provider === "unknown" || !branchName) continue;
+
+        let prUrl: string | undefined;
+
+        if (repoInfo.provider === "github") {
+          try {
+            const prResult = await machineBash(
+              link.machineId,
+              `gh pr list --repo "${repoInfo.owner}/${repoInfo.repo}" --head "${branchName}" --state all --json url --jq '.[0].url' 2>&1`,
+              link.repoPath,
+            );
+            if (prResult.success && prResult.exitCode === 0) {
+              const url = prResult.stdout.trim();
+              if (url.startsWith("http")) prUrl = url;
+            }
+          } catch {
+            // Non-critical
+          }
+        } else if (repoInfo.provider === "gitea") {
+          try {
+            const prs = await this.queryGiteaPRs(
+              link.machineId,
+              repoInfo,
+              branchName,
+            );
+            if (prs.length > 0 && prs[0].html_url) {
+              prUrl = prs[0].html_url;
+            }
+          } catch {
+            // Non-critical
+          }
+        }
+
+        if (prUrl) {
+          await issueSessionStore
+            .getState()
+            .updateStatus(link.issueKey, "completed", { prUrl });
+        }
+      } catch {
+        // Non-critical — best effort recovery
       }
     }
   };

@@ -42,6 +42,7 @@ interface IssueSessionActions {
       errorMessage?: string;
       sessionId?: string;
       prUrl?: string;
+      issueUrl?: string;
     },
   ) => Promise<void>;
   findBySessionId: (sessionId: string) => IssueSessionLink | null;
@@ -220,7 +221,7 @@ export const issueSessionStore = create<IssueSessionStore>()((set, get) => ({
       issueBody: link.issueBody,
       issueAuthor: link.issueAuthor,
       issueLabels: link.issueLabels,
-      issueUrl: link.issueUrl,
+      issueUrl: extra?.issueUrl ?? link.issueUrl,
       projectKey: link.projectKey,
       repoLabel: link.repoLabel,
       sessionId: extra?.sessionId ?? link.sessionId,

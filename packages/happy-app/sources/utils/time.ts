@@ -2,6 +2,14 @@ export async function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+export class NonRetryableError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'NonRetryableError';
+        Object.setPrototypeOf(this, NonRetryableError.prototype);
+    }
+}
+
 export function exponentialBackoffDelay(currentFailureCount: number, minDelay: number, maxDelay: number, maxFailureCount: number) {
     let maxDelayRet = minDelay + ((maxDelay - minDelay) / maxFailureCount) * Math.max(currentFailureCount, maxFailureCount);
     return Math.round(Math.random() * maxDelayRet);
@@ -25,6 +33,9 @@ export function createBackoff(
             try {
                 return await callback();
             } catch (e) {
+                if (e instanceof NonRetryableError) {
+                    throw e;
+                }
                 if (currentFailureCount < maxFailureCount) {
                     currentFailureCount++;
                 }

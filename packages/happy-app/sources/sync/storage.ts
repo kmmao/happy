@@ -1566,16 +1566,10 @@ export const storage = create<StorageState>()((set, get) => {
     // Artifact methods
     applyArtifacts: (artifacts: DecryptedArtifact[]) =>
       set((state) => {
-        console.log(
-          `🗂️ Storage.applyArtifacts: Applying ${artifacts.length} artifacts`,
-        );
         const mergedArtifacts = { ...state.artifacts };
         artifacts.forEach((artifact) => {
           mergedArtifacts[artifact.id] = artifact;
         });
-        console.log(
-          `🗂️ Storage.applyArtifacts: Total artifacts after merge: ${Object.keys(mergedArtifacts).length}`,
-        );
 
         return {
           ...state,

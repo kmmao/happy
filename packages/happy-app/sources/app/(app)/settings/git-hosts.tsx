@@ -21,10 +21,10 @@ import {
   machineDeleteRemoteWebhook,
 } from "@/sync/ops";
 import type { WebhookRepoConfig } from "@/sync/issueTypes";
-import type { GitHost, GitHostTab, Provider } from "./git-hosts/types";
-import { GitHostBasicForm } from "./git-hosts/GitHostBasicForm";
-import { GitHostAutoIssueForm } from "./git-hosts/GitHostAutoIssueForm";
-import { GitHostWebhookForm } from "./git-hosts/GitHostWebhookForm";
+import type { GitHost, GitHostTab, Provider } from "@/components/settings/git-hosts/types";
+import { GitHostBasicForm } from "@/components/settings/git-hosts/GitHostBasicForm";
+import { GitHostAutoIssueForm } from "@/components/settings/git-hosts/GitHostAutoIssueForm";
+import { GitHostWebhookForm } from "@/components/settings/git-hosts/GitHostWebhookForm";
 
 // ── Segment Control ────────────────────────────────
 

@@ -1,4 +1,5 @@
 import { backoff } from "@/utils/time";
+import { NonRetryableError } from "@/utils/time";
 
 export class InvalidateSync {
     private _invalidated = false;
@@ -62,12 +63,22 @@ export class InvalidateSync {
 
 
     private _doSync = async () => {
-        await backoff(async () => {
-            if (this._stopped) {
+        try {
+            await backoff(async () => {
+                if (this._stopped) {
+                    return;
+                }
+                await this._command();
+            });
+        } catch (e) {
+            if (e instanceof NonRetryableError) {
+                this._invalidated = false;
+                this._invalidatedDouble = false;
+                this._notifyPendings();
                 return;
             }
-            await this._command();
-        });
+            throw e;
+        }
         if (this._stopped) {
             this._notifyPendings();
             return;
@@ -144,20 +155,29 @@ export class ValueSync<T> {
         while (this._hasValue && !this._stopped) {
             const value = this._latestValue!;
             this._hasValue = false;
-            
-            await backoff(async () => {
-                if (this._stopped) {
+
+            try {
+                await backoff(async () => {
+                    if (this._stopped) {
+                        return;
+                    }
+                    await this._command(value);
+                });
+            } catch (e) {
+                if (e instanceof NonRetryableError) {
+                    this._processing = false;
+                    this._notifyPendings();
                     return;
                 }
-                await this._command(value);
-            });
-            
+                throw e;
+            }
+
             if (this._stopped) {
                 this._notifyPendings();
                 return;
             }
         }
-        
+
         this._processing = false;
         this._notifyPendings();
     }

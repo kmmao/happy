@@ -100,13 +100,11 @@ let found = false;
 if (settings.settings.preferredLanguage && settings.settings.preferredLanguage in translations) {
     currentLanguage = settings.settings.preferredLanguage as SupportedLanguage;
     found = true;
-    console.log(`[i18n] Using preferred language: ${currentLanguage}`);
 }
 
 // Read from device
 if (!found) {
     let locales = Localization.getLocales();
-    console.log(`[i18n] Device locales:`, locales.map(l => l.languageCode));
     for (let l of locales) {
         if (l.languageCode) {
             // Expo added special handling for Chinese variants using script code https://github.com/expo/expo/pull/34984
@@ -120,30 +118,23 @@ if (!found) {
                     chineseVariant = 'zh-Hant';
                 }
 
-                console.log(`[i18n] Chinese script code: ${l.languageScriptCode} -> ${chineseVariant}`);
-
                 if (chineseVariant && chineseVariant in translations) {
                     currentLanguage = chineseVariant as SupportedLanguage;
-                    console.log(`[i18n] Using Chinese variant: ${currentLanguage}`);
                     break;
                 }
 
                 currentLanguage = 'zh-Hans';
-                console.log(`[i18n] Falling back to simplified Chinese: zh-Hans`);
                 break;
             }
 
             // Direct match for non-Chinese languages
             if (l.languageCode in translations) {
                 currentLanguage = l.languageCode as SupportedLanguage;
-                console.log(`[i18n] Using device locale: ${currentLanguage}`);
                 break;
             }
         }
     }
 }
-
-console.log(`[i18n] Final language: ${currentLanguage}`);
 
 /**
  * Main translation function with strict typing

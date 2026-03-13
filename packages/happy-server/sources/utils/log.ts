@@ -47,7 +47,7 @@ transports.push({
         colorize: true,
         translateTime: 'HH:MM:ss.l',
         ignore: 'pid,hostname',
-        messageFormat: '{levelLabel} {msg} | [{time}]',
+        messageFormat: '{msg} | [{time}]',
         errorLikeObjectKeys: ['err', 'error'],
     },
 });
@@ -58,7 +58,7 @@ if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && consolidatedL
         options: {
             destination: consolidatedLogFile,
             mkdir: true,
-            messageFormat: '{levelLabel} {msg} | [server time: {time}]',
+            messageFormat: '{msg} | [server time: {time}]',
         },
     });
 }

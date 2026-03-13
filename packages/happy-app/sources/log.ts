@@ -1,6 +1,7 @@
 /**
- * Simple logging mechanism that writes to console and maintains internal array
- * Keeps last 5k records in memory with change notifications for UI updates
+ * Simple logging mechanism that maintains internal array for dev/logs page.
+ * Does NOT write to console to keep browser/device console clean.
+ * Keeps last 5k records in memory with change notifications for UI updates.
  */
 class Logger {
     private logs: string[] = [];
@@ -8,20 +9,17 @@ class Logger {
     private listeners: Array<() => void> = [];
 
     /**
-     * Log a message - writes to both console and internal array
+     * Log a message - stores in internal array only (no console output)
      */
     log(message: string): void {
         // Add to internal array
         this.logs.push(message);
-        
+
         // Maintain 5k limit with circular buffer
         if (this.logs.length > this.maxLogs) {
             this.logs.shift();
         }
-        
-        // Write to console
-        console.log(message);
-        
+
         // Notify listeners for real-time updates
         this.listeners.forEach(listener => listener());
     }
