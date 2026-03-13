@@ -119,7 +119,7 @@ export function useCollapsibleInput(
     if (!collapsibleEnabled || isSttListening || hasPendingImages) return;
     setCollapsed(true);
     persistExpanded(false);
-  }, [isSttListening, hasPendingImages, persistExpanded]);
+  }, [collapsibleEnabled, isSttListening, hasPendingImages, persistExpanded]);
 
   return {
     collapsed,
