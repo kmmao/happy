@@ -429,6 +429,11 @@ export const ja: TranslationStructure = {
         `ワークツリーの作成に失敗しました: ${error}`,
       success: "ワークツリーが正常に作成されました",
     },
+    gitRepos: {
+      title: "Git リポジトリ",
+      showingCount: ({ showing, total }: { showing: number; total: number }) =>
+        `${total} 件中 ${showing} 件を表示`,
+    },
   },
 
   sessionHistory: {

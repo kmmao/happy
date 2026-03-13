@@ -379,6 +379,11 @@ export const ca: TranslationStructure = {
         `Error en crear el worktree: ${error}`,
       success: "Worktree creat amb èxit",
     },
+    gitRepos: {
+      title: "Repositoris Git",
+      showingCount: ({ showing, total }: { showing: number; total: number }) =>
+        `Mostrant ${showing} de ${total} repositoris`,
+    },
   },
 
   sessionHistory: {

@@ -1,5 +1,12 @@
 import React, { useState, useMemo, useRef } from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+} from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import { ItemGroup } from "@/components/ItemGroup";
@@ -14,6 +21,7 @@ import {
   MultiTextInput,
   MultiTextInputHandle,
 } from "@/components/MultiTextInput";
+import { useGitRepoScanner } from "@/hooks/useGitRepoScanner";
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -76,6 +84,19 @@ export default function PathPickerScreen() {
   const recentMachinePaths = useSetting("recentMachinePaths");
 
   const [customPath, setCustomPath] = useState(params.selectedPath || "");
+
+  const {
+    scanning,
+    scanError,
+    scanResults,
+    showResults,
+    searchQuery,
+    setSearchQuery,
+    filteredResults,
+    handleScan,
+  } = useGitRepoScanner(params.machineId);
+
+  const MAX_VISIBLE_REPOS = 20;
 
   // Get the selected machine
   const machine = useMemo(() => {
@@ -238,6 +259,133 @@ export default function PathPickerScreen() {
                   />
                 </View>
               </View>
+            </ItemGroup>
+
+            <ItemGroup title={t("newSession.gitRepos.title")}>
+              <Item
+                title={
+                  scanning ? t("gitHosts.scanning") : t("gitHosts.scanRepos")
+                }
+                leftElement={
+                  scanning ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.colors.textLink}
+                    />
+                  ) : (
+                    <Ionicons
+                      name="git-branch-outline"
+                      size={18}
+                      color={theme.colors.textLink}
+                    />
+                  )
+                }
+                onPress={handleScan}
+                disabled={scanning}
+                titleStyle={{ color: theme.colors.textLink }}
+                showChevron={false}
+                showDivider={showResults && filteredResults.length > 0}
+              />
+              {showResults && scanError && (
+                <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: theme.colors.textSecondary,
+                      textAlign: "center",
+                      ...Typography.default(),
+                    }}
+                  >
+                    {scanError}
+                  </Text>
+                </View>
+              )}
+              {showResults && scanResults.length > 0 && (
+                <>
+                  <View
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      borderBottomWidth: 0.5,
+                      borderBottomColor: theme.colors.divider,
+                    }}
+                  >
+                    <TextInput
+                      style={{
+                        fontSize: 14,
+                        color: theme.colors.text,
+                        padding: 0,
+                        ...Typography.default(),
+                      }}
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      placeholder={t("gitHosts.scanSearchPlaceholder")}
+                      placeholderTextColor={theme.colors.textSecondary}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                  {filteredResults
+                    .slice(0, MAX_VISIBLE_REPOS)
+                    .map((entry, index) => {
+                      const isSelected = customPath.trim() === entry.repoPath;
+                      const isLast =
+                        index ===
+                        Math.min(filteredResults.length, MAX_VISIBLE_REPOS) - 1;
+
+                      return (
+                        <Item
+                          key={entry.repoPath}
+                          title={entry.name}
+                          subtitle={entry.repoPath}
+                          leftElement={
+                            <Ionicons
+                              name="folder-outline"
+                              size={18}
+                              color={theme.colors.textSecondary}
+                            />
+                          }
+                          onPress={() => {
+                            setCustomPath(entry.repoPath);
+                            setTimeout(() => inputRef.current?.focus(), 50);
+                          }}
+                          selected={isSelected}
+                          showChevron={false}
+                          pressableStyle={
+                            isSelected
+                              ? {
+                                  backgroundColor: theme.colors.surfaceSelected,
+                                }
+                              : undefined
+                          }
+                          showDivider={!isLast}
+                        />
+                      );
+                    })}
+                  {filteredResults.length > MAX_VISIBLE_REPOS && (
+                    <View
+                      style={{
+                        paddingHorizontal: 16,
+                        paddingVertical: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: theme.colors.textSecondary,
+                          textAlign: "center",
+                          ...Typography.default(),
+                        }}
+                      >
+                        {t("newSession.gitRepos.showingCount", {
+                          showing: MAX_VISIBLE_REPOS,
+                          total: filteredResults.length,
+                        })}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
             </ItemGroup>
 
             {recentPaths.length > 0 && (

@@ -364,6 +364,11 @@ export const en = {
         `Failed to create worktree: ${error}`,
       success: "Worktree created successfully",
     },
+    gitRepos: {
+      title: "Git Repositories",
+      showingCount: ({ showing, total }: { showing: number; total: number }) =>
+        `Showing ${showing} of ${total} repos`,
+    },
   },
 
   sessionHistory: {

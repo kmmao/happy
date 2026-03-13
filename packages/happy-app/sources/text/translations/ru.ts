@@ -358,6 +358,11 @@ export const ru: TranslationStructure = {
         `Не удалось создать worktree: ${error}`,
       success: "Worktree успешно создан",
     },
+    gitRepos: {
+      title: "Git репозитории",
+      showingCount: ({ showing, total }: { showing: number; total: number }) =>
+        `Показано ${showing} из ${total} репозиториев`,
+    },
   },
 
   sessionHistory: {

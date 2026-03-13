@@ -352,6 +352,11 @@ export const zhHant: TranslationStructure = {
       failed: ({ error }: { error: string }) => `建立 worktree 失敗：${error}`,
       success: "Worktree 建立成功",
     },
+    gitRepos: {
+      title: "Git 倉庫",
+      showingCount: ({ showing, total }: { showing: number; total: number }) =>
+        `顯示 ${showing} / ${total} 個倉庫`,
+    },
   },
 
   sessionHistory: {

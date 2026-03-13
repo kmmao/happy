@@ -444,6 +444,11 @@ export const it: TranslationStructure = {
         `Impossibile creare la worktree: ${error}`,
       success: "Worktree creata con successo",
     },
+    gitRepos: {
+      title: "Repository Git",
+      showingCount: ({ showing, total }: { showing: number; total: number }) =>
+        `Mostrati ${showing} di ${total} repository`,
+    },
   },
 
   sessionHistory: {

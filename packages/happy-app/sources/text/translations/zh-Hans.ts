@@ -352,6 +352,11 @@ export const zhHans: TranslationStructure = {
       failed: ({ error }: { error: string }) => `创建 worktree 失败：${error}`,
       success: "Worktree 创建成功",
     },
+    gitRepos: {
+      title: "Git 仓库",
+      showingCount: ({ showing, total }: { showing: number; total: number }) =>
+        `显示 ${showing} / ${total} 个仓库`,
+    },
   },
 
   sessionHistory: {
