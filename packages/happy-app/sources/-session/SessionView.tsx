@@ -1,6 +1,7 @@
 import { AgentContentView } from "@/components/AgentContentView";
 import { AgentInput } from "@/components/AgentInput";
 import { InputFAB, InputFABStatusInfo } from "@/components/InputFAB";
+import { IssueSummaryHeader } from "@/components/IssueSummaryHeader";
 import { useCollapsibleInput } from "@/hooks/useCollapsibleInput";
 import {
   getAvailableModels,
@@ -21,6 +22,7 @@ import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
 import { useLatestOptions } from "@/hooks/useLatestOptions";
 import { BookmarkProvider, useBookmarks } from "@/hooks/useBookmarks";
+import { useSessionIssueInfo } from "@/hooks/useSessionIssueInfo";
 import { Modal } from "@/modal";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import {
@@ -324,6 +326,7 @@ function SessionViewInner({
   const [message, setMessage] = React.useState("");
   const realtimeStatus = useRealtimeStatus();
   const { messages, isLoaded } = useSessionMessages(sessionId);
+  const { issueLink, issueBody } = useSessionIssueInfo(sessionId);
   const acknowledgedCliVersions = useLocalSetting("acknowledgedCliVersions");
 
   // Check if CLI version is outdated and not already acknowledged
@@ -963,6 +966,14 @@ function SessionViewInner({
             (isRunningOnMac() || Platform.OS === "web" ? 16 : 0),
         }}
       >
+        {/* Issue summary header for issue-linked sessions */}
+        {issueLink && (
+          <IssueSummaryHeader
+            issueLink={issueLink}
+            issueBody={issueBody}
+            prUrl={session.metadata?.worktree?.prUrl}
+          />
+        )}
         <AgentContentView
           content={content}
           input={input}
