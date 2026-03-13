@@ -14,6 +14,7 @@ import type { GitHostMapping, WebhookRepoConfig } from "./issueTypes";
 interface WebhookRouteResponse {
   readonly id: string;
   readonly repoUrl: string;
+  readonly remoteWebhookId: string | null;
 }
 
 /**
@@ -45,6 +46,7 @@ async function upsertWebhookRoute(
       machineId: repo.machineId,
       repoPath: repo.repoPath,
       enabled: repo.enabled,
+      callbackUrl: getWebhookUrl(provider),
     }),
   });
 

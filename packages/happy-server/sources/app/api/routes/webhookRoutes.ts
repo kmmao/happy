@@ -4,6 +4,10 @@ import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { encryptString, decryptString } from "@/modules/encrypt";
 import { dispatchWebhook } from "@/app/webhook/webhookDispatch";
+import {
+    ensureRemoteWebhook,
+    deleteRemoteWebhook,
+} from "@/app/webhook/webhookProviderApi";
 
 export function webhookRoutes(app: Fastify) {
   // ── Receive webhook from GitHub/Gitea/GitLab ────────────
@@ -113,11 +117,13 @@ export function webhookRoutes(app: Fastify) {
           machineId: z.string().min(1),
           repoPath: z.string().min(1),
           enabled: z.boolean().default(true),
+          callbackUrl: z.string().url().optional(),
         }),
         response: {
           200: z.object({
             id: z.string(),
             repoUrl: z.string(),
+            remoteWebhookId: z.string().nullable(),
           }),
         },
       },
@@ -134,6 +140,7 @@ export function webhookRoutes(app: Fastify) {
         machineId: string;
         repoPath: string;
         enabled: boolean;
+        callbackUrl?: string;
       };
 
       const normalizedUrl = body.repoUrl
@@ -188,7 +195,26 @@ export function webhookRoutes(app: Fastify) {
         },
       });
 
-      reply.send({ id: route.id, repoUrl: route.repoUrl });
+      // Auto-create/update webhook on the Git platform (best-effort)
+      let remoteWebhookId = route.remoteWebhookId;
+      if (body.callbackUrl && body.apiToken && body.enabled) {
+        remoteWebhookId = await ensureRemoteWebhook(
+          body.provider,
+          normalizedUrl,
+          body.apiToken,
+          body.webhookSecret,
+          body.callbackUrl,
+          route.remoteWebhookId,
+        );
+        if (remoteWebhookId !== route.remoteWebhookId) {
+          await db.webhookRoute.update({
+            where: { id: route.id },
+            data: { remoteWebhookId },
+          });
+        }
+      }
+
+      reply.send({ id: route.id, repoUrl: route.repoUrl, remoteWebhookId: remoteWebhookId ?? null });
     },
   );
 
@@ -217,6 +243,20 @@ export function webhookRoutes(app: Fastify) {
       });
       if (!route) {
         return reply.code(404).send({ error: "Route not found" });
+      }
+
+      // Delete remote webhook from Git platform (best-effort)
+      if (route.remoteWebhookId && route.apiToken) {
+        const apiToken = decryptString(
+          ["webhook-route-token", `${route.accountId}:${route.repoUrl}`],
+          route.apiToken as unknown as Uint8Array<ArrayBuffer>,
+        );
+        await deleteRemoteWebhook(
+          route.provider,
+          route.repoUrl,
+          apiToken,
+          route.remoteWebhookId,
+        );
       }
 
       await db.webhookRoute.delete({ where: { id } });

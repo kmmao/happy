@@ -381,9 +381,10 @@ model WebhookRoute {
     authors       String[] // Allowed issue authors
     machineId     String // Target machine to dispatch to
     repoPath      String // Local repo path on the target machine
-    enabled       Boolean  @default(true)
-    createdAt     DateTime @default(now())
-    updatedAt     DateTime @updatedAt
+    enabled          Boolean  @default(true)
+    remoteWebhookId  String?  // ID of the webhook created on the Git platform
+    createdAt        DateTime @default(now())
+    updatedAt        DateTime @updatedAt
 
     @@unique([accountId, repoUrl])
     @@index([repoUrl])
