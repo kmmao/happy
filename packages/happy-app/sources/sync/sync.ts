@@ -3252,6 +3252,12 @@ class Sync {
       const projectKey = `${data.machineId}:${data.repoPath}`;
       const issueKey = buildIssueKey(projectKey, data.issueNumber);
 
+      // Ensure repoInfo is populated so that PR detection works later.
+      // Without this, handleIssueSessionCompletion skips PR detection
+      // because issueStore.repoInfoByProject[projectKey] is undefined.
+      const { gitHosts } = storage.getState().settings;
+      issueStore.getState().detectRepoInfo(projectKey, data.repoUrl, gitHosts);
+
       // If autoIssueService already created the link, update it with
       // the real sessionId from the webhook (instead of "pending").
       // This fixes the race condition where autoIssueService creates

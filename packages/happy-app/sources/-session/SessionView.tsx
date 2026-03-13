@@ -971,7 +971,7 @@ function SessionViewInner({
           <IssueSummaryHeader
             issueLink={issueLink}
             issueBody={issueBody}
-            prUrl={session.metadata?.worktree?.prUrl}
+            prUrl={issueLink.prUrl ?? session.metadata?.worktree?.prUrl}
           />
         )}
         <AgentContentView
