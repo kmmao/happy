@@ -1,6 +1,19 @@
 {
   "entries": [
     {
+      "version": "2.1.1",
+      "date": "2026-03-13",
+      "summary": "Bug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.",
+      "changes": [
+        "Fixed message loss during pagination and backfill when switching between sessions",
+        "Improved usage trend chart with gap filling for missing dates and better layout",
+        "Fixed CLI thinking state accuracy in local mode to correctly reflect model status",
+        "Fixed server rejecting heartbeats for archived sessions to prevent ghost connections",
+        "Updated README to remove upstream branding and add fork disclaimers"
+      ],
+      "rawMarkdown": "## 2.1.1 - 2026-03-13\n\n\nBug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.\n\n- Fixed message loss during pagination and backfill when switching between sessions\n- Improved usage trend chart with gap filling for missing dates and better layout\n- Fixed CLI thinking state accuracy in local mode to correctly reflect model status\n- Fixed server rejecting heartbeats for archived sessions to prevent ghost connections\n- Updated README to remove upstream branding and add fork disclaimers"
+    },
+    {
       "version": "2.1.0",
       "date": "2026-03-09",
       "summary": "GitHub/Gitea issue management, tablet sidebar, animated AI avatar, and major session loading performance improvements.",
@@ -109,5 +122,5 @@
       "rawMarkdown": "## 2.0.0 - 2026-02-27\n\n\nHappy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.\n\n- Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere\n- Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content\n- Added QR code scanning and manual URL entry for quick device authentication\n- Added Daemon mode for persistent background running with one-tap remote session launch\n- Added intelligent voice assistant supporting 15+ languages for natural conversation\n- Added GitHub and Claude account connection for unified developer identity management\n- Added multi-device real-time sync with online/offline status indicators\n- Added dark mode and appearance customization with automatic system theme following\n- Added Markdown table rendering and code syntax highlighting in chat\n- Streamlined settings page, removed upstream links, started maintaining own changelog\n- Supported iOS, Android, and Web platforms"
     }
   ],
-  "latestVersion": "2.1.0"
+  "latestVersion": "2.1.1"
 }
