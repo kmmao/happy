@@ -3252,9 +3252,22 @@ class Sync {
       const projectKey = `${data.machineId}:${data.repoPath}`;
       const issueKey = buildIssueKey(projectKey, data.issueNumber);
 
-      // Don't overwrite if autoIssueService already created the link
+      // If autoIssueService already created the link, update it with
+      // the real sessionId from the webhook (instead of "pending").
+      // This fixes the race condition where autoIssueService creates
+      // a link before the webhook-issue-linked event arrives.
       const existing = issueSessionStore.getState().findByIssueKey(issueKey);
       if (existing) {
+        if (
+          (existing.sessionId === "pending" || existing.status === "failed") &&
+          data.sessionId !== "pending"
+        ) {
+          await issueSessionStore
+            .getState()
+            .updateStatus(issueKey, "processing", {
+              sessionId: data.sessionId,
+            });
+        }
         return;
       }
 
@@ -3547,9 +3560,12 @@ class Sync {
         }
       } else if (repoInfo.provider === "gitea") {
         try {
+          const authHeader = repoInfo.apiToken
+            ? ` -H "Authorization: token ${repoInfo.apiToken}"`
+            : "";
           const prResult = await machineBash(
             link.machineId,
-            `curl -s "${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=all&head=${repoInfo.owner}:${branchName}" 2>&1`,
+            `curl -s${authHeader} "${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=all&head=${repoInfo.owner}:${branchName}" 2>&1`,
             link.repoPath,
           );
           if (prResult.success && prResult.exitCode === 0) {
@@ -3621,10 +3637,13 @@ class Sync {
           }
         } else if (repoInfo.provider === "gitea") {
           try {
-            // Query all states for Gitea
+            // Query all states for Gitea (with auth for private repos)
+            const authHeader = repoInfo.apiToken
+              ? ` -H "Authorization: token ${repoInfo.apiToken}"`
+              : "";
             const prResult = await machineBash(
               link.machineId,
-              `curl -s "${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=all&head=${repoInfo.owner}:${branchName}" 2>&1`,
+              `curl -s${authHeader} "${repoInfo.apiBase}/repos/${repoInfo.owner}/${repoInfo.repo}/pulls?state=all&head=${repoInfo.owner}:${branchName}" 2>&1`,
               link.repoPath,
             );
             if (prResult.success && prResult.exitCode === 0) {
