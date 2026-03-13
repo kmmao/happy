@@ -217,6 +217,10 @@ export const issueSessionStore = create<IssueSessionStore>()((set, get) => ({
     const updatedData: IssueSessionLinkData = {
       issueNumber: link.issueNumber,
       issueTitle: link.issueTitle,
+      issueBody: link.issueBody,
+      issueAuthor: link.issueAuthor,
+      issueLabels: link.issueLabels,
+      issueUrl: link.issueUrl,
       projectKey: link.projectKey,
       repoLabel: link.repoLabel,
       sessionId: extra?.sessionId ?? link.sessionId,
