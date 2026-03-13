@@ -1885,6 +1885,11 @@ export const it: TranslationStructure = {
     noBaselineHint:
       "Prima cattura uno screenshot, poi impostalo come riferimento",
     comparisonFailed: "Confronto fallito",
+    unavailableTitle: "agent-browser non trovato",
+    unavailableHint:
+      "Installa agent-browser sulla macchina CLI per utilizzare la funzione anteprima. Esegui: npm install -g @anthropic-ai/agent-browser",
+    emptyHint:
+      "Seleziona un server di sviluppo o inserisci un URL per catturare uno screenshot dell'interfaccia.",
   },
 } as const;
 

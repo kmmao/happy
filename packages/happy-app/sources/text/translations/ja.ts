@@ -1857,5 +1857,10 @@ export const ja: TranslationStructure = {
     noBaselineHint:
       "先にスクリーンショットを撮り、ベースラインに設定してください",
     comparisonFailed: "比較に失敗しました",
+    unavailableTitle: "agent-browser が見つかりません",
+    unavailableHint:
+      "プレビュー機能を使用するには、CLIマシンに agent-browser をインストールしてください。実行：npm install -g @anthropic-ai/agent-browser",
+    emptyHint:
+      "開発サーバーを選択するか、URLを入力してフロントエンドのスクリーンショットを撮影します。",
   },
 } as const;

@@ -1788,5 +1788,9 @@ export const zhHans: TranslationStructure = {
     noBaseline: "未设置基准",
     noBaselineHint: "先截图，然后设为基准",
     comparisonFailed: "对比失败",
+    unavailableTitle: "未找到 agent-browser",
+    unavailableHint:
+      "请在 CLI 机器上安装 agent-browser 以使用预览功能。运行：npm install -g @anthropic-ai/agent-browser",
+    emptyHint: "选择开发服务器或输入 URL 来截取前端页面截图。",
   },
 } as const;

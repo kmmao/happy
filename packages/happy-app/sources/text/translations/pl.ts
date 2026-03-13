@@ -1906,6 +1906,11 @@ export const pl: TranslationStructure = {
     noBaseline: "Brak zrzutu bazowego",
     noBaselineHint: "Najpierw zrób zrzut ekranu, a potem ustaw go jako bazowy",
     comparisonFailed: "Porównanie nie powiodło się",
+    unavailableTitle: "Nie znaleziono agent-browser",
+    unavailableHint:
+      "Zainstaluj agent-browser na maszynie CLI, aby korzystać z podglądu. Uruchom: npm install -g @anthropic-ai/agent-browser",
+    emptyHint:
+      "Wybierz serwer deweloperski lub wprowadź URL, aby wykonać zrzut ekranu interfejsu.",
   },
 } as const;
 

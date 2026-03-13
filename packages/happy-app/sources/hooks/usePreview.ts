@@ -39,6 +39,7 @@ export interface DiffResult {
 export type PreviewState =
   | { readonly status: "idle" }
   | { readonly status: "detecting-ports" }
+  | { readonly status: "unavailable"; readonly reason: string }
   | {
       readonly status: "ports-detected";
       readonly ports: readonly DetectedPort[];
@@ -187,6 +188,20 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
   const detectPorts = React.useCallback(async () => {
     if (!sessionId) return;
     setState({ status: "detecting-ports" });
+
+    // Check if agent-browser is available
+    const browserCheck = await sessionBash(sessionId, {
+      command: "which agent-browser 2>/dev/null",
+      timeout: 5000,
+    });
+
+    if (!browserCheck.success || browserCheck.exitCode !== 0) {
+      setState({
+        status: "unavailable",
+        reason: "agent-browser",
+      });
+      return;
+    }
 
     const result = await sessionBash(sessionId, {
       command: "lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null",

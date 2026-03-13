@@ -1892,6 +1892,11 @@ export const ca: TranslationStructure = {
     noBaselineHint:
       "Primer captura una pantalla, després estableix-la com a referència",
     comparisonFailed: "Error en la comparació",
+    unavailableTitle: "agent-browser no trobat",
+    unavailableHint:
+      "Instal·la agent-browser a la màquina CLI per utilitzar la funció de vista prèvia. Executa: npm install -g @anthropic-ai/agent-browser",
+    emptyHint:
+      "Selecciona un servidor de desenvolupament o introdueix una URL per capturar una vista prèvia.",
   },
 } as const;
 

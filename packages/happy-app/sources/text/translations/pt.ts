@@ -1889,6 +1889,11 @@ export const pt: TranslationStructure = {
     noBaseline: "Nenhuma referência definida",
     noBaselineHint: "Primeiro capture uma tela, depois defina como referência",
     comparisonFailed: "Falha na comparação",
+    unavailableTitle: "agent-browser não encontrado",
+    unavailableHint:
+      "Instale o agent-browser na máquina CLI para usar o recurso de visualização. Execute: npm install -g @anthropic-ai/agent-browser",
+    emptyHint:
+      "Selecione um servidor de desenvolvimento ou insira uma URL para capturar uma prévia da interface.",
   },
 } as const;
 

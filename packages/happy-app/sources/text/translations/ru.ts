@@ -1904,6 +1904,11 @@ export const ru: TranslationStructure = {
     noBaseline: "Базовый снимок не задан",
     noBaselineHint: "Сначала сделайте снимок, затем установите его как базовый",
     comparisonFailed: "Сравнение не удалось",
+    unavailableTitle: "agent-browser не найден",
+    unavailableHint:
+      "Установите agent-browser на машине CLI для использования предпросмотра. Выполните: npm install -g @anthropic-ai/agent-browser",
+    emptyHint:
+      "Выберите сервер разработки или введите URL для создания скриншота фронтенда.",
   },
 } as const;
 

@@ -1790,5 +1790,9 @@ export const zhHant: TranslationStructure = {
     noBaseline: "未設定基準",
     noBaselineHint: "先截圖，然後設為基準",
     comparisonFailed: "比較失敗",
+    unavailableTitle: "找不到 agent-browser",
+    unavailableHint:
+      "請在 CLI 機器上安裝 agent-browser 以使用預覽功能。執行：npm install -g @anthropic-ai/agent-browser",
+    emptyHint: "選擇開發伺服器或輸入 URL 來擷取前端頁面截圖。",
   },
 } as const;

@@ -1868,6 +1868,11 @@ export const en: TranslationStructure = {
     noBaseline: "No baseline set",
     noBaselineHint: "Capture a screenshot first, then set it as baseline",
     comparisonFailed: "Comparison failed",
+    unavailableTitle: "agent-browser not found",
+    unavailableHint:
+      "Install agent-browser on the CLI machine to use the preview feature. Run: npm install -g @anthropic-ai/agent-browser",
+    emptyHint:
+      "Select a dev server or enter a URL to capture a screenshot of your frontend.",
   },
 } as const;
 
