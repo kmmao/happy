@@ -39,8 +39,8 @@ export async function gitFetch(
     return {
       success: false,
       error:
-        result.stdout.trim() ||
-        result.stderr.trim() ||
+        (result.stdout ?? "").trim() ||
+        (result.stderr ?? "").trim() ||
         result.error ||
         "Fetch failed",
     };
@@ -49,7 +49,7 @@ export async function gitFetch(
   await gitStatusSync.invalidateAndAwait(sessionId);
   return {
     success: true,
-    output: result.stdout.trim() || undefined,
+    output: (result.stdout ?? "").trim() || undefined,
   };
 }
 
@@ -72,8 +72,8 @@ export async function gitPull(
     return {
       success: false,
       error:
-        result.stdout.trim() ||
-        result.stderr.trim() ||
+        (result.stdout ?? "").trim() ||
+        (result.stderr ?? "").trim() ||
         result.error ||
         "Pull failed",
     };
@@ -82,7 +82,7 @@ export async function gitPull(
   await gitStatusSync.invalidateAndAwait(sessionId);
   return {
     success: true,
-    output: result.stdout.trim() || undefined,
+    output: (result.stdout ?? "").trim() || undefined,
   };
 }
 
@@ -105,8 +105,8 @@ export async function gitPush(
     return {
       success: false,
       error:
-        result.stdout.trim() ||
-        result.stderr.trim() ||
+        (result.stdout ?? "").trim() ||
+        (result.stderr ?? "").trim() ||
         result.error ||
         "Push failed",
     };
@@ -115,6 +115,6 @@ export async function gitPush(
   await gitStatusSync.invalidateAndAwait(sessionId);
   return {
     success: true,
-    output: result.stdout.trim() || undefined,
+    output: (result.stdout ?? "").trim() || undefined,
   };
 }

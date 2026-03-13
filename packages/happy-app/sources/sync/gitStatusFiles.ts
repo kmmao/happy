@@ -87,8 +87,8 @@ export async function getGitStatusFiles(
     });
 
     // Parse the results using v2 parser
-    const statusOutput = statusResult.stdout;
-    const diffOutput = diffStatResult.success ? diffStatResult.stdout : "";
+    const statusOutput = statusResult.stdout ?? "";
+    const diffOutput = diffStatResult.success ? (diffStatResult.stdout ?? "") : "";
 
     const mainResult = parseGitStatusFilesV2(statusOutput, diffOutput);
 
@@ -136,7 +136,7 @@ async function fetchSubmodulePaths(
     return [];
   }
 
-  return result.stdout
+  return (result.stdout ?? "")
     .trim()
     .split("\n")
     .filter(Boolean)
@@ -186,8 +186,8 @@ async function fetchSubmoduleFiles(
     });
 
     const parsed = parseGitStatusFilesV2(
-      statusResult.stdout,
-      diffStatResult.success ? diffStatResult.stdout : "",
+      statusResult.stdout ?? "",
+      diffStatResult.success ? (diffStatResult.stdout ?? "") : "",
     );
 
     return {
@@ -223,11 +223,11 @@ async function fetchChildGitRepoFiles(
     timeout: 10000,
   });
 
-  if (!findResult.success || !findResult.stdout.trim()) {
+  if (!findResult.success || !(findResult.stdout ?? "").trim()) {
     return null;
   }
 
-  const childPaths = findResult.stdout
+  const childPaths = (findResult.stdout ?? "")
     .trim()
     .split("\n")
     .filter(Boolean)

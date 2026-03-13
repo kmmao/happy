@@ -243,12 +243,12 @@ export class GitStatusSync {
       // Parse the git status output with diff statistics
       const remoteUrl =
         remoteUrlResult.success && remoteUrlResult.exitCode === 0
-          ? remoteUrlResult.stdout.trim() || null
+          ? (remoteUrlResult.stdout ?? "").trim() || null
           : null;
       const gitStatus = this.parseGitStatusV2(
-        statusResult.stdout,
-        diffStatResult.success ? diffStatResult.stdout : "",
-        stagedDiffStatResult.success ? stagedDiffStatResult.stdout : "",
+        statusResult.stdout ?? "",
+        diffStatResult.success ? (diffStatResult.stdout ?? "") : "",
+        stagedDiffStatResult.success ? (stagedDiffStatResult.stdout ?? "") : "",
         remoteUrl,
       );
 
@@ -400,7 +400,7 @@ export class GitStatusSync {
       return paths;
     }
 
-    const paths = result.stdout
+    const paths = (result.stdout ?? "")
       .trim()
       .split("\n")
       .filter(Boolean)
@@ -441,7 +441,7 @@ export class GitStatusSync {
     }
 
     // Parse output: each line is " <sha> <path> (<describe>)" or "+<sha> <path> (<describe>)"
-    const paths = result.stdout
+    const paths = (result.stdout ?? "")
       .trim()
       .split("\n")
       .filter(Boolean)
@@ -515,12 +515,12 @@ export class GitStatusSync {
 
       const subRemoteUrl =
         remoteUrlResult.success && remoteUrlResult.exitCode === 0
-          ? remoteUrlResult.stdout.trim() || null
+          ? (remoteUrlResult.stdout ?? "").trim() || null
           : null;
       const gitStatus = this.parseGitStatusV2(
-        statusResult.stdout,
-        diffResult.success ? diffResult.stdout : "",
-        stagedDiffResult.success ? stagedDiffResult.stdout : "",
+        statusResult.stdout ?? "",
+        diffResult.success ? (diffResult.stdout ?? "") : "",
+        stagedDiffResult.success ? (stagedDiffResult.stdout ?? "") : "",
         subRemoteUrl,
       );
 

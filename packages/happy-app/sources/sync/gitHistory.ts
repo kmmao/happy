@@ -105,11 +105,11 @@ export async function fetchGitHistory(
     timeout: 15000,
   });
 
-  if (!result.success || !result.stdout.trim()) {
+  if (!result.success || !(result.stdout ?? "").trim()) {
     return { commits: [], hasMore: false };
   }
 
-  const parsed = parseGitLog(result.stdout);
+  const parsed = parseGitLog(result.stdout ?? "");
   const hasMore = parsed.length > PAGE_SIZE;
 
   return {
@@ -132,7 +132,7 @@ export async function fetchCommitFiles(
     timeout: 10000,
   });
 
-  if (!result.success || !result.stdout.trim()) return [];
+  if (!result.success || !(result.stdout ?? "").trim()) return [];
 
-  return parseCommitFiles(result.stdout);
+  return parseCommitFiles(result.stdout ?? "");
 }

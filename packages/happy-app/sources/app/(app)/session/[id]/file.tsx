@@ -271,9 +271,9 @@ export default function FileScreen() {
             if (
               !isCancelled &&
               diffResponse.success &&
-              diffResponse.stdout.trim()
+              (diffResponse.stdout ?? "").trim()
             ) {
-              setDiffContent(diffResponse.stdout);
+              setDiffContent(diffResponse.stdout ?? "");
             }
           } catch (diffError) {
             console.log("Could not fetch git diff:", diffError);
@@ -293,7 +293,7 @@ export default function FileScreen() {
 
             if (!isCancelled) {
               if (showResponse.success) {
-                const content = showResponse.stdout;
+                const content = showResponse.stdout ?? "";
                 const hasNullBytes = content.includes("\0");
                 const isBinary = hasNullBytes;
 

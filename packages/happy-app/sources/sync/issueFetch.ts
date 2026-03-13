@@ -71,14 +71,14 @@ async function fetchGitHubIssues(
 
   if (!result.success || result.exitCode !== 0) {
     const errorMsg =
-      result.stdout.trim() ||
-      result.stderr.trim() ||
+      result.stdout?.trim() ||
+      result.stderr?.trim() ||
       result.error ||
       "Failed to fetch issues";
     throw new Error(errorMsg);
   }
 
-  const stdout = result.stdout.trim();
+  const stdout = (result.stdout ?? "").trim();
   if (!stdout || stdout === "[]") return { issues: [], hasMore: false };
 
   try {
@@ -167,11 +167,11 @@ async function fetchGiteaIssues(
 
   if (!result.success || result.exitCode !== 0) {
     throw new Error(
-      `Gitea API request failed: ${sanitizeErrorOutput(result.stdout.trim() || result.error || "Unknown error")}\nURL: ${url}`,
+      `Gitea API request failed: ${sanitizeErrorOutput((result.stdout ?? "").trim() || result.error || "Unknown error")}\nURL: ${url}`,
     );
   }
 
-  const stdout = result.stdout.trim();
+  const stdout = (result.stdout ?? "").trim();
 
   // Extract HTTP status code from last line
   const lines = stdout.split("\n");
@@ -285,7 +285,7 @@ export async function updateIssueState(
     });
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
-        result.stdout.trim() || result.error || "Failed to update issue state",
+        result.stdout?.trim() || result.error || "Failed to update issue state",
       );
     }
     return;
@@ -307,13 +307,13 @@ export async function updateIssueState(
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
         sanitizeErrorOutput(
-          result.stdout.trim() ||
+          (result.stdout ?? "").trim() ||
             result.error ||
             "Failed to update issue state",
         ),
       );
     }
-    const lines = result.stdout.trim().split("\n");
+    const lines = (result.stdout ?? "").trim().split("\n");
     const httpStatus = lines.pop()?.trim() ?? "";
     if (httpStatus && !httpStatus.startsWith("2")) {
       throw new Error(`Gitea API returned HTTP ${httpStatus}`);
@@ -345,7 +345,7 @@ export async function addIssueComment(
     });
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
-        result.stdout.trim() || result.error || "Failed to add comment",
+        result.stdout?.trim() || result.error || "Failed to add comment",
       );
     }
     return;
@@ -368,11 +368,11 @@ export async function addIssueComment(
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
         sanitizeErrorOutput(
-          result.stdout.trim() || result.error || "Failed to add comment",
+          (result.stdout ?? "").trim() || result.error || "Failed to add comment",
         ),
       );
     }
-    const lines = result.stdout.trim().split("\n");
+    const lines = (result.stdout ?? "").trim().split("\n");
     const httpStatus = lines.pop()?.trim() ?? "";
     if (httpStatus && !httpStatus.startsWith("2")) {
       throw new Error(`Gitea API returned HTTP ${httpStatus}`);
@@ -404,7 +404,7 @@ export async function fetchLabels(
       return [];
     }
     try {
-      const raw = JSON.parse(result.stdout.trim());
+      const raw = JSON.parse((result.stdout ?? "").trim());
       if (!Array.isArray(raw)) return [];
       return raw.map((l: any) => ({
         name: String(l.name ?? ""),
@@ -455,11 +455,11 @@ export async function fetchLabels(
 
     const repoLabels =
       repoResult.success && repoResult.exitCode === 0
-        ? parseGiteaLabels(repoResult.stdout)
+        ? parseGiteaLabels(repoResult.stdout ?? "")
         : [];
     const orgLabels =
       orgResult.success && orgResult.exitCode === 0
-        ? parseGiteaLabels(orgResult.stdout)
+        ? parseGiteaLabels(orgResult.stdout ?? "")
         : [];
 
     // Merge, repo labels take priority (dedupe by name)
@@ -503,11 +503,11 @@ export async function createIssue(
     });
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
-        result.stdout.trim() || result.error || "Failed to create issue",
+        result.stdout?.trim() || result.error || "Failed to create issue",
       );
     }
     try {
-      const raw = JSON.parse(result.stdout.trim());
+      const raw = JSON.parse((result.stdout ?? "").trim());
       return parseGitHubIssue(raw);
     } catch {
       throw new Error("Failed to parse create issue response");
@@ -531,11 +531,11 @@ export async function createIssue(
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
         sanitizeErrorOutput(
-          result.stdout.trim() || result.error || "Failed to create issue",
+          (result.stdout ?? "").trim() || result.error || "Failed to create issue",
         ),
       );
     }
-    const lines = result.stdout.trim().split("\n");
+    const lines = (result.stdout ?? "").trim().split("\n");
     const httpStatus = lines.pop()?.trim() ?? "";
     const responseBody = lines.join("\n").trim();
     if (httpStatus && !httpStatus.startsWith("2")) {
@@ -625,11 +625,11 @@ async function replaceGiteaIssueLabels(
 
   const repoMap =
     repoLabelsResult.success && repoLabelsResult.exitCode === 0
-      ? parseLabelIds(repoLabelsResult.stdout)
+      ? parseLabelIds(repoLabelsResult.stdout ?? "")
       : new Map<string, number>();
   const orgMap =
     orgLabelsResult.success && orgLabelsResult.exitCode === 0
-      ? parseLabelIds(orgLabelsResult.stdout)
+      ? parseLabelIds(orgLabelsResult.stdout ?? "")
       : new Map<string, number>();
 
   // Resolve label names to IDs (repo labels take priority)
@@ -648,7 +648,7 @@ async function replaceGiteaIssueLabels(
     timeout: ISSUE_FETCH_TIMEOUT,
   });
   if (!result.success || result.exitCode !== 0) return;
-  const lines = result.stdout.trim().split("\n");
+  const lines = (result.stdout ?? "").trim().split("\n");
   const httpStatus = lines.pop()?.trim() ?? "";
   if (httpStatus && !httpStatus.startsWith("2")) {
     throw new Error(
@@ -685,7 +685,7 @@ export async function editIssue(
     });
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
-        result.stdout.trim() || result.error || "Failed to edit issue",
+        result.stdout?.trim() || result.error || "Failed to edit issue",
       );
     }
     return;
@@ -708,11 +708,11 @@ export async function editIssue(
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
         sanitizeErrorOutput(
-          result.stdout.trim() || result.error || "Failed to edit issue",
+          (result.stdout ?? "").trim() || result.error || "Failed to edit issue",
         ),
       );
     }
-    const lines = result.stdout.trim().split("\n");
+    const lines = (result.stdout ?? "").trim().split("\n");
     const httpStatus = lines.pop()?.trim() ?? "";
     if (httpStatus && !httpStatus.startsWith("2")) {
       throw new Error(`Gitea API returned HTTP ${httpStatus}`);

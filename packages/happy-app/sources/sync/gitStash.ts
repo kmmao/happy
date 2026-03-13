@@ -97,9 +97,9 @@ export async function fetchGitStashList(
     timeout: 10000,
   });
 
-  if (!result.success || !result.stdout.trim()) return [];
+  if (!result.success || !(result.stdout ?? "").trim()) return [];
 
-  return parseStashList(result.stdout);
+  return parseStashList(result.stdout ?? "");
 }
 
 export async function fetchStashFiles(
@@ -116,7 +116,7 @@ export async function fetchStashFiles(
     timeout: 10000,
   });
 
-  if (!result.success || !result.stdout.trim()) return [];
+  if (!result.success || !(result.stdout ?? "").trim()) return [];
 
-  return parseStashFiles(result.stdout);
+  return parseStashFiles(result.stdout ?? "");
 }

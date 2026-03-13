@@ -134,11 +134,11 @@ export async function getWorktreeCommits(
     timeout: 15000,
   });
 
-  if (!result.success || !result.stdout.trim()) {
+  if (!result.success || !(result.stdout ?? "").trim()) {
     return { success: result.success, commits: [] };
   }
 
-  const commits = result.stdout
+  const commits = (result.stdout ?? "")
     .trim()
     .split("\n")
     .filter(Boolean)
@@ -193,7 +193,7 @@ export async function createPullRequest(
     return {
       success: false,
       error:
-        pushResult.stdout.trim() || pushResult.stderr?.trim() || "Push failed",
+        pushResult.stdout?.trim() || pushResult.stderr?.trim() || "Push failed",
     };
   }
 
@@ -209,14 +209,14 @@ export async function createPullRequest(
     return {
       success: false,
       error:
-        prResult.stdout.trim() ||
+        prResult.stdout?.trim() ||
         prResult.stderr?.trim() ||
         "PR creation failed",
     };
   }
 
   // Extract PR URL from output
-  const prUrl = prResult.stdout.trim().split("\n").pop() || "";
+  const prUrl = (prResult.stdout ?? "").trim().split("\n").pop() || "";
 
   return { success: true, prUrl };
 }

@@ -52,8 +52,8 @@ export async function gitStageFiles(
     return {
       success: false,
       error:
-        result.stdout.trim() ||
-        result.stderr.trim() ||
+        (result.stdout ?? "").trim() ||
+        (result.stderr ?? "").trim() ||
         result.error ||
         "Stage failed",
     };
@@ -87,8 +87,8 @@ export async function gitUnstageFiles(
     return {
       success: false,
       error:
-        result.stdout.trim() ||
-        result.stderr.trim() ||
+        (result.stdout ?? "").trim() ||
+        (result.stderr ?? "").trim() ||
         result.error ||
         "Unstage failed",
     };
@@ -129,8 +129,8 @@ export async function gitDiscardFiles(
       return {
         success: false,
         error:
-          result.stdout.trim() ||
-          result.stderr.trim() ||
+          (result.stdout ?? "").trim() ||
+          (result.stderr ?? "").trim() ||
           result.error ||
           "Discard failed",
       };
@@ -150,8 +150,8 @@ export async function gitDiscardFiles(
       return {
         success: false,
         error:
-          result.stdout.trim() ||
-          result.stderr.trim() ||
+          (result.stdout ?? "").trim() ||
+          (result.stderr ?? "").trim() ||
           result.error ||
           "Failed to remove untracked files",
       };
@@ -189,8 +189,8 @@ export async function gitIgnoreFiles(
     return {
       success: false,
       error:
-        result.stdout.trim() ||
-        result.stderr.trim() ||
+        (result.stdout ?? "").trim() ||
+        (result.stderr ?? "").trim() ||
         result.error ||
         "Failed to update .gitignore",
     };
@@ -224,8 +224,8 @@ export async function gitCommit(
     return {
       success: false,
       error:
-        result.stdout.trim() ||
-        result.stderr.trim() ||
+        (result.stdout ?? "").trim() ||
+        (result.stderr ?? "").trim() ||
         result.error ||
         "Commit failed",
     };
@@ -257,8 +257,8 @@ export async function gitStageAll(
     return {
       success: false,
       error:
-        result.stdout.trim() ||
-        result.stderr.trim() ||
+        (result.stdout ?? "").trim() ||
+        (result.stderr ?? "").trim() ||
         result.error ||
         "Stage all failed",
     };
@@ -290,8 +290,8 @@ export async function gitUnstageAll(
     return {
       success: false,
       error:
-        result.stdout.trim() ||
-        result.stderr.trim() ||
+        (result.stdout ?? "").trim() ||
+        (result.stderr ?? "").trim() ||
         result.error ||
         "Unstage all failed",
     };

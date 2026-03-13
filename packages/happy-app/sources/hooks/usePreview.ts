@@ -213,7 +213,7 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
       return;
     }
 
-    const ports = parseLsofOutput(result.stdout);
+    const ports = parseLsofOutput(result.stdout ?? "");
     setState({ status: "ports-detected", ports });
   }, [sessionId]);
 

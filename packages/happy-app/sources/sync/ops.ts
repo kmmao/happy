@@ -34,11 +34,11 @@ interface SessionBashRequest {
   timeout?: number;
 }
 
-interface SessionBashResponse {
+export interface SessionBashResponse {
   success: boolean;
-  stdout: string;
-  stderr: string;
-  exitCode: number;
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number;
   error?: string;
 }
 
@@ -697,7 +697,6 @@ export async function sessionDelete(
 // Export types for external use
 export type {
   SessionBashRequest,
-  SessionBashResponse,
   SessionReadFileResponse,
   SessionWriteFileResponse,
   SessionListDirectoryResponse,

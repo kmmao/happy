@@ -165,7 +165,7 @@ async function isWorkingTreeClean(
     cwd,
     timeout: 10000,
   });
-  return result.success && result.stdout.trim() === "";
+  return result.success && (result.stdout ?? "").trim() === "";
 }
 
 function stripRemotePrefix(branchName: string): string {
@@ -202,7 +202,7 @@ export async function checkoutBranch(
   if (!result.success) {
     return {
       success: false,
-      error: result.stderr.trim() || result.error || "Checkout failed",
+      error: result.stderr?.trim() || result.error || "Checkout failed",
     };
   }
 
@@ -237,7 +237,7 @@ export async function createBranch(
   });
 
   if (!result.success) {
-    const stderr = result.stderr.trim();
+    const stderr = result.stderr?.trim() ?? "";
     if (stderr.includes("already exists")) {
       return { success: false, error: "branch_already_exists" };
     }
@@ -266,8 +266,8 @@ export async function fetchGitBranches(
     timeout: 10000,
   });
 
-  if (result.success && result.stdout.trim()) {
-    return parseBranchFormat(result.stdout);
+  if (result.success && (result.stdout ?? "").trim()) {
+    return parseBranchFormat(result.stdout ?? "");
   }
 
   // Fallback to verbose mode
@@ -277,9 +277,9 @@ export async function fetchGitBranches(
     timeout: 10000,
   });
 
-  if (!fallback.success || !fallback.stdout.trim()) {
+  if (!fallback.success || !(fallback.stdout ?? "").trim()) {
     return { local: [], remote: [], current: null };
   }
 
-  return parseBranchVerbose(fallback.stdout);
+  return parseBranchVerbose(fallback.stdout ?? "");
 }
