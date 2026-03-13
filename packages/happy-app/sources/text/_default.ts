@@ -389,11 +389,6 @@ export const en = {
     couldNotAttachFile: "Could not attach this file",
     imageLoadFailed: "Failed to load image",
     bookmarkOption: "Bookmark",
-    compactionSummaryTitle: "Context Summary",
-    compactionSummaryEmpty:
-      "No compaction summary yet. A summary will appear here after the context is compressed.",
-    compactionSummaryDisconnected:
-      "Session is not connected. The summary is only available when the CLI is online.",
     messageQueued: "Queued",
   },
 
@@ -1837,6 +1832,35 @@ export const en = {
     thinking: "Thinking",
     usingTools: "Using tools",
     errorOccurred: "An error occurred",
+  },
+
+  preview: {
+    title: "Preview",
+    detectingPorts: "Detecting dev servers...",
+    noPorts: "No dev servers detected",
+    noPortsHint: "Start a dev server first, then tap Detect",
+    detect: "Detect",
+    refresh: "Refresh",
+    capture: "Capture",
+    capturing: "Capturing screenshot...",
+    urlPlaceholder: "http://localhost:3000",
+    customUrl: "Custom URL",
+    screenshotFailed: "Screenshot capture failed",
+    devServers: "Dev Servers",
+    screenshotAt: ({ url }: { url: string }) => `Screenshot of ${url}`,
+    portItem: ({ port, process }: { port: number; process: string }) =>
+      `Port ${port} — ${process}`,
+    setBaseline: "Set as Baseline",
+    clearBaseline: "Clear Baseline",
+    baselineSet: "Baseline saved",
+    compare: "Compare",
+    comparing: "Comparing with baseline...",
+    before: "Before",
+    after: "After",
+    diff: "Diff",
+    noBaseline: "No baseline set",
+    noBaselineHint: "Capture a screenshot first, then set it as baseline",
+    comparisonFailed: "Comparison failed",
   },
 } as const;
 

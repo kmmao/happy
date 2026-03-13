@@ -403,11 +403,6 @@ export const pt: TranslationStructure = {
     couldNotAttachFile: "Não foi possível anexar este arquivo",
     imageLoadFailed: "Falha ao carregar imagem",
     bookmarkOption: "Favorito",
-    compactionSummaryTitle: "Resumo de Contexto",
-    compactionSummaryEmpty:
-      "Ainda não há resumo de compactação. Aparecerá aqui após o contexto ser compactado.",
-    compactionSummaryDisconnected:
-      "A sessão não está conectada. O resumo só está disponível quando o CLI está online.",
     messageQueued: "Na fila",
   },
 
@@ -1865,6 +1860,35 @@ export const pt: TranslationStructure = {
     thinking: "Pensando",
     usingTools: "Usando ferramentas",
     errorOccurred: "Ocorreu um erro",
+  },
+  preview: {
+    title: "Pré-visualização",
+    detectingPorts: "Detectando servidores de desenvolvimento...",
+    noPorts: "Nenhum servidor de desenvolvimento detectado",
+    noPortsHint:
+      "Inicie um servidor de desenvolvimento primeiro, depois toque em Detectar",
+    detect: "Detectar",
+    refresh: "Atualizar",
+    capture: "Capturar",
+    capturing: "Capturando tela...",
+    urlPlaceholder: "http://localhost:3000",
+    customUrl: "URL personalizado",
+    screenshotFailed: "Falha ao capturar tela",
+    devServers: "Servidores de desenvolvimento",
+    screenshotAt: ({ url }: { url: string }) => `Captura de ${url}`,
+    portItem: ({ port, process }: { port: number; process: string }) =>
+      `Porta ${port} — ${process}`,
+    setBaseline: "Definir como referência",
+    clearBaseline: "Limpar referência",
+    baselineSet: "Referência salva",
+    compare: "Comparar",
+    comparing: "Comparando com a referência...",
+    before: "Antes",
+    after: "Depois",
+    diff: "Diferenças",
+    noBaseline: "Nenhuma referência definida",
+    noBaselineHint: "Primeiro capture uma tela, depois defina como referência",
+    comparisonFailed: "Falha na comparação",
   },
 } as const;
 

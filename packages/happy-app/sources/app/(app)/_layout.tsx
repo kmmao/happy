@@ -84,6 +84,14 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="session/[id]/preview"
+        options={{
+          headerShown: true,
+          headerTitle: t("preview.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="session/[id]/git"
         options={{
           headerShown: true,

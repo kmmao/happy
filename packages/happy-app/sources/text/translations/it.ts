@@ -469,11 +469,6 @@ export const it: TranslationStructure = {
     couldNotAttachFile: "Impossibile allegare questo file",
     imageLoadFailed: "Impossibile caricare l'immagine",
     bookmarkOption: "Segnalibro",
-    compactionSummaryTitle: "Riepilogo del contesto",
-    compactionSummaryEmpty:
-      "Nessun riepilogo di compattazione. Apparirà qui dopo la compattazione del contesto.",
-    compactionSummaryDisconnected:
-      "La sessione non è connessa. Il riepilogo è disponibile solo quando il CLI è online.",
     messageQueued: "In coda",
   },
 
@@ -1861,6 +1856,35 @@ export const it: TranslationStructure = {
     thinking: "Sto pensando",
     usingTools: "Uso degli strumenti",
     errorOccurred: "Si è verificato un errore",
+  },
+  preview: {
+    title: "Anteprima",
+    detectingPorts: "Rilevamento server di sviluppo...",
+    noPorts: "Nessun server di sviluppo rilevato",
+    noPortsHint: "Avvia prima un server di sviluppo, poi tocca Rileva",
+    detect: "Rileva",
+    refresh: "Aggiorna",
+    capture: "Cattura",
+    capturing: "Cattura screenshot in corso...",
+    urlPlaceholder: "http://localhost:3000",
+    customUrl: "URL personalizzato",
+    screenshotFailed: "Cattura screenshot fallita",
+    devServers: "Server di sviluppo",
+    screenshotAt: ({ url }: { url: string }) => `Screenshot di ${url}`,
+    portItem: ({ port, process }: { port: number; process: string }) =>
+      `Porta ${port} — ${process}`,
+    setBaseline: "Imposta come riferimento",
+    clearBaseline: "Cancella riferimento",
+    baselineSet: "Riferimento salvato",
+    compare: "Confronta",
+    comparing: "Confronto con il riferimento...",
+    before: "Prima",
+    after: "Dopo",
+    diff: "Differenze",
+    noBaseline: "Nessun riferimento impostato",
+    noBaselineHint:
+      "Prima cattura uno screenshot, poi impostalo come riferimento",
+    comparisonFailed: "Confronto fallito",
   },
 } as const;
 

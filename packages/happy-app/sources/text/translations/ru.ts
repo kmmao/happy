@@ -570,11 +570,6 @@ export const ru: TranslationStructure = {
     couldNotAttachFile: "Не удалось прикрепить этот файл",
     imageLoadFailed: "Не удалось загрузить изображение",
     bookmarkOption: "Закладка",
-    compactionSummaryTitle: "Резюме сжатия",
-    compactionSummaryEmpty:
-      "Резюме сжатия отсутствует. Оно появится здесь после сжатия контекста.",
-    compactionSummaryDisconnected:
-      "Сессия не подключена. Резюме доступно только когда CLI онлайн.",
     messageQueued: "В очереди",
   },
 
@@ -1880,6 +1875,35 @@ export const ru: TranslationStructure = {
     thinking: "Думаю",
     usingTools: "Использую инструменты",
     errorOccurred: "Произошла ошибка",
+  },
+  preview: {
+    title: "Предпросмотр",
+    detectingPorts: "Обнаружение серверов разработки...",
+    noPorts: "Серверы разработки не обнаружены",
+    noPortsHint:
+      "Сначала запустите сервер разработки, затем нажмите Обнаружить",
+    detect: "Обнаружить",
+    refresh: "Обновить",
+    capture: "Снимок",
+    capturing: "Создание снимка экрана...",
+    urlPlaceholder: "http://localhost:3000",
+    customUrl: "Свой URL",
+    screenshotFailed: "Не удалось сделать снимок экрана",
+    devServers: "Серверы разработки",
+    screenshotAt: ({ url }: { url: string }) => `Снимок ${url}`,
+    portItem: ({ port, process }: { port: number; process: string }) =>
+      `Порт ${port} — ${process}`,
+    setBaseline: "Установить как базовый",
+    clearBaseline: "Очистить базовый",
+    baselineSet: "Базовый снимок сохранён",
+    compare: "Сравнить",
+    comparing: "Сравнение с базовым снимком...",
+    before: "До",
+    after: "После",
+    diff: "Различия",
+    noBaseline: "Базовый снимок не задан",
+    noBaselineHint: "Сначала сделайте снимок, затем установите его как базовый",
+    comparisonFailed: "Сравнение не удалось",
   },
 } as const;
 

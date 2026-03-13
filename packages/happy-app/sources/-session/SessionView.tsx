@@ -30,11 +30,7 @@ import {
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
 import { gitStatusSync } from "@/sync/gitStatusSync";
-import {
-  sessionAbort,
-  sessionInterrupt,
-  sessionGetCompactionSummary,
-} from "@/sync/ops";
+import { sessionAbort, sessionInterrupt } from "@/sync/ops";
 import {
   storage,
   useIsDataReady,
@@ -152,33 +148,6 @@ export const SessionView = React.memo((props: { id: string }) => {
     };
   }, [session, isDataReady, sessionId, router, showAgentActivity]);
 
-  const handleSummaryPress = React.useCallback(async () => {
-    // Check if CLI is connected before attempting RPC
-    if (session?.presence !== "online") {
-      Modal.alert(
-        t("session.compactionSummaryTitle"),
-        t("session.compactionSummaryDisconnected"),
-      );
-      return;
-    }
-
-    try {
-      const { summary } = await sessionGetCompactionSummary(sessionId);
-      if (!summary) {
-        Modal.alert(
-          t("session.compactionSummaryTitle"),
-          t("session.compactionSummaryEmpty"),
-        );
-        return;
-      }
-      Modal.alert(t("session.compactionSummaryTitle"), summary);
-    } catch (e) {
-      const message =
-        e instanceof Error ? e.message : t("errors.operationFailed");
-      Modal.alert(t("common.error"), message);
-    }
-  }, [sessionId, session?.presence]);
-
   return (
     <>
       {/* Status bar shadow for landscape mode */}
@@ -218,7 +187,7 @@ export const SessionView = React.memo((props: { id: string }) => {
           <ChatHeaderView
             {...headerProps}
             onBackPress={() => router.back()}
-            onSummaryPress={handleSummaryPress}
+            onPreviewPress={() => router.push(`/session/${sessionId}/preview`)}
           />
           {/* Voice status bar below header - not on tablet (shown in sidebar) */}
           {!isTablet && realtimeStatus !== "disconnected" && (

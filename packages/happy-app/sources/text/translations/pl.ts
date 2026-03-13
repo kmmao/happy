@@ -414,11 +414,6 @@ export const pl: TranslationStructure = {
     couldNotAttachFile: "Nie można załączyć tego pliku",
     imageLoadFailed: "Nie udało się załadować obrazu",
     bookmarkOption: "Zakładka",
-    compactionSummaryTitle: "Podsumowanie kontekstu",
-    compactionSummaryEmpty:
-      "Brak podsumowania kompresji. Pojawi się tutaj po skompresowaniu kontekstu.",
-    compactionSummaryDisconnected:
-      "Sesja nie jest połączona. Podsumowanie jest dostępne tylko gdy CLI jest online.",
     messageQueued: "W kolejce",
   },
 
@@ -1883,6 +1878,34 @@ export const pl: TranslationStructure = {
     thinking: "Myślę",
     usingTools: "Używam narzędzi",
     errorOccurred: "Wystąpił błąd",
+  },
+  preview: {
+    title: "Podgląd",
+    detectingPorts: "Wykrywanie serwerów deweloperskich...",
+    noPorts: "Nie wykryto serwerów deweloperskich",
+    noPortsHint: "Najpierw uruchom serwer deweloperski, a potem dotknij Wykryj",
+    detect: "Wykryj",
+    refresh: "Odśwież",
+    capture: "Zrzut",
+    capturing: "Przechwytywanie zrzutu ekranu...",
+    urlPlaceholder: "http://localhost:3000",
+    customUrl: "Własny URL",
+    screenshotFailed: "Nie udało się przechwycić zrzutu ekranu",
+    devServers: "Serwery deweloperskie",
+    screenshotAt: ({ url }: { url: string }) => `Zrzut ekranu ${url}`,
+    portItem: ({ port, process }: { port: number; process: string }) =>
+      `Port ${port} — ${process}`,
+    setBaseline: "Ustaw jako bazowy",
+    clearBaseline: "Wyczyść bazowy",
+    baselineSet: "Zrzut bazowy zapisany",
+    compare: "Porównaj",
+    comparing: "Porównywanie z bazowym zrzutem...",
+    before: "Przed",
+    after: "Po",
+    diff: "Różnice",
+    noBaseline: "Brak zrzutu bazowego",
+    noBaselineHint: "Najpierw zrób zrzut ekranu, a potem ustaw go jako bazowy",
+    comparisonFailed: "Porównanie nie powiodło się",
   },
 } as const;
 

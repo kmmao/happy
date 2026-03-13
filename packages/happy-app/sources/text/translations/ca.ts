@@ -404,11 +404,6 @@ export const ca: TranslationStructure = {
     couldNotAttachFile: "No s'ha pogut adjuntar aquest fitxer",
     imageLoadFailed: "No s'ha pogut carregar la imatge",
     bookmarkOption: "Marcador",
-    compactionSummaryTitle: "Resum del context",
-    compactionSummaryEmpty:
-      "Encara no hi ha cap resum de compressió. Apareixerà aquí després de comprimir el context.",
-    compactionSummaryDisconnected:
-      "La sessió no està connectada. El resum només està disponible quan el CLI està en línia.",
     messageQueued: "En cua",
   },
 
@@ -1867,6 +1862,36 @@ export const ca: TranslationStructure = {
     thinking: "Pensant",
     usingTools: "Utilitzant eines",
     errorOccurred: "S'ha produ\u00eft un error",
+  },
+  preview: {
+    title: "Previsualització",
+    detectingPorts: "Detectant servidors de desenvolupament...",
+    noPorts: "No s'han detectat servidors de desenvolupament",
+    noPortsHint:
+      "Inicia un servidor de desenvolupament primer, després toca Detectar",
+    detect: "Detectar",
+    refresh: "Actualitzar",
+    capture: "Capturar",
+    capturing: "Capturant pantalla...",
+    urlPlaceholder: "http://localhost:3000",
+    customUrl: "URL personalitzada",
+    screenshotFailed: "Error en capturar la pantalla",
+    devServers: "Servidors de desenvolupament",
+    screenshotAt: ({ url }: { url: string }) => `Captura de ${url}`,
+    portItem: ({ port, process }: { port: number; process: string }) =>
+      `Port ${port} — ${process}`,
+    setBaseline: "Establir com a referència",
+    clearBaseline: "Esborrar referència",
+    baselineSet: "Referència desada",
+    compare: "Comparar",
+    comparing: "Comparant amb la referència...",
+    before: "Abans",
+    after: "Després",
+    diff: "Diferències",
+    noBaseline: "Cap referència establerta",
+    noBaselineHint:
+      "Primer captura una pantalla, després estableix-la com a referència",
+    comparisonFailed: "Error en la comparació",
   },
 } as const;
 

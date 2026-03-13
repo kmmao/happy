@@ -454,11 +454,6 @@ export const ja: TranslationStructure = {
     couldNotAttachFile: "このファイルを添付できませんでした",
     imageLoadFailed: "画像の読み込みに失敗しました",
     bookmarkOption: "ブックマーク",
-    compactionSummaryTitle: "コンテキストサマリー",
-    compactionSummaryEmpty:
-      "圧縮サマリーはまだありません。コンテキストが圧縮されるとここに表示されます。",
-    compactionSummaryDisconnected:
-      "セッションが接続されていません。サマリーはCLIがオンラインの時のみ利用可能です。",
     messageQueued: "キュー中",
   },
 
@@ -1833,5 +1828,34 @@ export const ja: TranslationStructure = {
     thinking: "思考中",
     usingTools: "ツールを使用中",
     errorOccurred: "エラーが発生しました",
+  },
+  preview: {
+    title: "プレビュー",
+    detectingPorts: "開発サーバーを検出中...",
+    noPorts: "開発サーバーが見つかりません",
+    noPortsHint: "先に開発サーバーを起動してから検出をタップしてください",
+    detect: "検出",
+    refresh: "更新",
+    capture: "キャプチャ",
+    capturing: "スクリーンショットを撮影中...",
+    urlPlaceholder: "http://localhost:3000",
+    customUrl: "カスタム URL",
+    screenshotFailed: "スクリーンショットの撮影に失敗しました",
+    devServers: "開発サーバー",
+    screenshotAt: ({ url }: { url: string }) => `${url} のスクリーンショット`,
+    portItem: ({ port, process }: { port: number; process: string }) =>
+      `ポート ${port} — ${process}`,
+    setBaseline: "ベースラインに設定",
+    clearBaseline: "ベースラインをクリア",
+    baselineSet: "ベースラインを保存しました",
+    compare: "比較",
+    comparing: "ベースラインと比較中...",
+    before: "変更前",
+    after: "変更後",
+    diff: "差分",
+    noBaseline: "ベースラインが未設定",
+    noBaselineHint:
+      "先にスクリーンショットを撮り、ベースラインに設定してください",
+    comparisonFailed: "比較に失敗しました",
   },
 } as const;
