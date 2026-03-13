@@ -26,7 +26,9 @@ import type { JsRuntime } from "./runClaude";
  * Map App-level virtual model mode keys to real Anthropic model IDs.
  * Returns undefined for "use default" modes so the system default takes effect.
  */
-function resolveModelKey(modelKey: string | undefined): string | undefined {
+export function resolveModelKey(
+  modelKey: string | undefined,
+): string | undefined {
   if (!modelKey) return undefined;
   if (modelKey === "default") return undefined;
 
@@ -103,6 +105,8 @@ export async function claudeRemote(opts: {
   onQueryReady?: (
     query: import("@anthropic-ai/claude-agent-sdk").Query,
   ) => void;
+  /** Called when the messages PushableAsyncIterable is ready, exposing mid-turn push capability */
+  onMessagesReady?: (push: (msg: SDKUserMessage) => void) => void;
   /** Called with initialization info (supported models) after system init */
   onInitialized?: (info: {
     models?: Array<{
@@ -288,6 +292,9 @@ export async function claudeRemote(opts: {
       session_id: "",
     });
   }
+
+  // Expose mid-turn push capability to caller
+  opts.onMessagesReady?.((msg) => messages.push(msg));
 
   // Start the loop.
   // Forward all messages for sync immediately as they arrive from stdout,

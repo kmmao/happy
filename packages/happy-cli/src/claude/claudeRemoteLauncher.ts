@@ -3,7 +3,7 @@ import { Session } from "./session";
 import { MessageBuffer } from "@/ui/ink/messageBuffer";
 import { RemoteModeDisplay } from "@/ui/ink/RemoteModeDisplay";
 import React from "react";
-import { claudeRemote } from "./claudeRemote";
+import { claudeRemote, resolveModelKey } from "./claudeRemote";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
 import { SDKAssistantMessage, SDKMessage, SDKUserMessage } from "./sdk";
@@ -25,6 +25,8 @@ import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
 import { getProjectPath } from "./utils/path";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { parseSpecialCommand } from "@/parsers/specialCommands";
+import { executeShellCommand } from "@/utils/shellCommand";
 
 interface PermissionsField {
   date: number;
@@ -585,6 +587,124 @@ export async function claudeRemoteLauncher(
           locale: m.locale,
         });
       let currentColdHash: string | null = null;
+      let midTurnPushFn: ((msg: SDKUserMessage) => void) | null = null;
+      let turnDrainController: AbortController | null = null;
+
+      // Drain mid-turn messages from the queue and push them directly to the SDK.
+      // This runs concurrently during a turn, allowing user messages sent from
+      // the App to be injected into the CLI subprocess stdin immediately rather
+      // than waiting for the turn to complete.
+      async function drainMidTurnMessages(
+        signal: AbortSignal,
+        currentHash: string,
+        pushFn: (msg: SDKUserMessage) => void,
+      ) {
+        logger.debug("[remote]: mid-turn drain started");
+        while (!signal.aborted) {
+          const hasNew = await session.queue.waitForNewMessage(signal);
+          if (!hasNew || signal.aborted) break;
+
+          const item = session.queue.tryTakeForMidTurn(
+            currentHash,
+            coldModeHash,
+          );
+
+          if (!item) {
+            // Message exists but can't be mid-turn pushed.
+            // If it's an isolate (/compact, /clear), interrupt the current turn
+            // so nextMessage() can handle it properly.
+            if (session.queue.peekIsolate()) {
+              logger.debug(
+                "[remote]: mid-turn drain — isolate detected, interrupting",
+              );
+              await doInterrupt();
+            }
+            // For other non-mid-turn cases (cold hash change, continue),
+            // just stop draining and let nextMessage() handle after turn ends.
+            break;
+          }
+
+          // Handle shell commands directly without sending to Claude
+          const specialCmd = parseSpecialCommand(item.message);
+          if (specialCmd.type === "shell" && specialCmd.shellCommand) {
+            logger.debug("[remote]: mid-turn drain — executing shell command");
+            const output = await executeShellCommand(
+              specialCmd.shellCommand,
+              session.path,
+            );
+            session.client.sendDirectResult(output);
+            continue;
+          }
+
+          // Hot-swap model if changed
+          if (mode && item.mode.model !== mode.model && currentQuery) {
+            const resolvedModel = resolveModelKey(item.mode.model);
+            if (resolvedModel) {
+              logger.debug(
+                `[remote]: mid-turn hot-swap model: ${mode.model} → ${resolvedModel}`,
+              );
+              try {
+                await currentQuery.setModel(resolvedModel);
+              } catch (e) {
+                logger.debug("[remote]: mid-turn setModel failed", e);
+              }
+            }
+          }
+
+          // Hot-swap permissionMode if changed (non-plan, non-bypass)
+          if (
+            mode &&
+            item.mode.permissionMode !== mode.permissionMode &&
+            currentQuery
+          ) {
+            logger.debug(
+              `[remote]: mid-turn hot-swap permissionMode: ${mode.permissionMode} → ${item.mode.permissionMode}`,
+            );
+            try {
+              await currentQuery.setPermissionMode(
+                item.mode.permissionMode as any,
+              );
+            } catch (e) {
+              logger.debug("[remote]: mid-turn setPermissionMode failed", e);
+            }
+            permissionHandler.handleModeChange(item.mode.permissionMode);
+          }
+
+          // Update tracked mode state
+          modeHash = item.modeHash;
+          mode = item.mode;
+
+          // Push the message to the SDK for mid-turn injection
+          logger.debug(
+            `[remote]: mid-turn push — ${item.message.length} chars`,
+          );
+          pushFn({
+            type: "user",
+            message: { role: "user", content: item.message },
+            parent_tool_use_id: null,
+            session_id: "",
+          });
+        }
+        logger.debug("[remote]: mid-turn drain stopped");
+      }
+
+      function startMidTurnDrain() {
+        if (!midTurnPushFn || !currentColdHash) return;
+        // Stop any previous drain
+        turnDrainController?.abort();
+        turnDrainController = new AbortController();
+        drainMidTurnMessages(
+          turnDrainController.signal,
+          currentColdHash,
+          midTurnPushFn,
+        );
+      }
+
+      function stopMidTurnDrain() {
+        turnDrainController?.abort();
+        turnDrainController = null;
+      }
+
       try {
         const remoteResult = await claudeRemote({
           sessionId: session.sessionId,
@@ -599,10 +719,14 @@ export async function claudeRemoteLauncher(
           },
           onTurnComplete: () => {},
           nextMessage: async () => {
+            // Stop any running mid-turn drain from the previous turn
+            stopMidTurnDrain();
+
             if (pending) {
               let p = pending;
               pending = null;
               permissionHandler.handleModeChange(p.mode.permissionMode);
+              startMidTurnDrain();
               return p;
             }
 
@@ -645,6 +769,7 @@ export async function claudeRemoteLauncher(
                   modeHash = msg.hash;
                   mode = msg.mode;
                   permissionHandler.handleModeChange(mode.permissionMode);
+                  startMidTurnDrain();
                   return {
                     message: msg.message,
                     mode: msg.mode,
@@ -663,6 +788,7 @@ export async function claudeRemoteLauncher(
               mode = msg.mode;
               currentColdHash = coldModeHash(mode);
               permissionHandler.handleModeChange(mode.permissionMode);
+              startMidTurnDrain();
               return {
                 message: msg.message,
                 mode: msg.mode,
@@ -692,6 +818,9 @@ export async function claudeRemoteLauncher(
           onQueryReady: (query) => {
             currentQuery = query;
           },
+          onMessagesReady: (pushFn) => {
+            midTurnPushFn = pushFn;
+          },
           onInitialized: (info) => {
             logger.debug(
               `[remote]: SDK initialized — ${info.models?.length ?? 0} models`,
@@ -720,6 +849,9 @@ export async function claudeRemoteLauncher(
             session.client.sendSessionProtocolMessage(envelope);
           },
           onReady: async () => {
+            // Stop mid-turn drain before flushing — prevents race with nextMessage()
+            stopMidTurnDrain();
+
             // Flush queued messages before closing the turn to prevent
             // turn-end from arriving at the App before delayed tool call messages
             await messageQueue.flush();
@@ -764,6 +896,10 @@ export async function claudeRemoteLauncher(
         }
       } finally {
         logger.debug("[remote]: launch finally");
+
+        // Stop mid-turn drain and clear push function to prevent stale pushes
+        stopMidTurnDrain();
+        midTurnPushFn = null;
 
         // Clear query reference immediately to prevent stale interrupt/stopTask calls
         currentQuery = null;
