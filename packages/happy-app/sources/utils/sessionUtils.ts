@@ -31,13 +31,26 @@ export function useSessionStatus(session: Session): SessionStatus {
       ? true
       : false;
 
+  // Derive a stable index from session ID + a counter that increments
+  // each time thinking changes, so the word updates per thinking cycle
+  // but stays consistent across all component instances showing this session.
+  const thinkingGeneration = React.useRef(0);
+  const prevThinking = React.useRef(session.thinking);
+  if (session.thinking !== prevThinking.current) {
+    prevThinking.current = session.thinking;
+    thinkingGeneration.current += 1;
+  }
+  const generation = thinkingGeneration.current;
+
   const vibingMessage = React.useMemo(() => {
-    return (
-      vibingMessages[
-        Math.floor(Math.random() * vibingMessages.length)
-      ].toLowerCase() + "…"
-    );
-  }, [isOnline, hasPermissions, session.thinking]);
+    let hash = 0;
+    const seed = `${session.id}:${generation}`;
+    for (let i = 0; i < seed.length; i++) {
+      hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+    }
+    const index = Math.abs(hash) % vibingMessages.length;
+    return vibingMessages[index].toLowerCase() + "…";
+  }, [session.id, generation]);
 
   if (!isOnline) {
     return {
