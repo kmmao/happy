@@ -945,6 +945,14 @@ function SessionViewInner({
             issueLink={issueLink}
             issueBody={issueBody}
             prUrl={issueLink.prUrl ?? session.metadata?.worktree?.prUrl}
+            worktree={
+              session.metadata?.worktree
+                ? {
+                    branchName: session.metadata.worktree.branchName,
+                    parentBranch: session.metadata.worktree.parentBranch,
+                  }
+                : null
+            }
           />
         )}
         <AgentContentView

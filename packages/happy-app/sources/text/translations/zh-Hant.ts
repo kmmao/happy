@@ -1403,6 +1403,8 @@ export const zhHant: TranslationStructure = {
     statusCompleted: "已完成",
     statusFailed: "失敗",
     statusCancelled: "已取消",
+    worktreeSection: "工作樹",
+    createdAtLabel: "建立時間",
     cannotArchiveProcessing: "該會話正在處理工單，請等待完成後再操作。",
   },
 

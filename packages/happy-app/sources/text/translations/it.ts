@@ -1472,6 +1472,8 @@ export const it: TranslationStructure = {
     statusCompleted: "Completato",
     statusFailed: "Fallito",
     statusCancelled: "Annullato",
+    worktreeSection: "Albero di lavoro",
+    createdAtLabel: "Creato",
     cannotArchiveProcessing:
       "Questa sessione sta elaborando un issue. Attendi il completamento.",
   },

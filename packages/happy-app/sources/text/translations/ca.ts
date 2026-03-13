@@ -1476,6 +1476,8 @@ export const ca: TranslationStructure = {
     statusCompleted: "Completat",
     statusFailed: "Fallat",
     statusCancelled: "Cancel·lat",
+    worktreeSection: "Arbre de treball",
+    createdAtLabel: "Creat",
     cannotArchiveProcessing:
       "Aquesta sessió està processant un issue. Espereu que acabi.",
   },

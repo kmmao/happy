@@ -1498,6 +1498,8 @@ export const ru: TranslationStructure = {
     statusCompleted: "Завершено",
     statusFailed: "Ошибка",
     statusCancelled: "Отменено",
+    worktreeSection: "Рабочее дерево",
+    createdAtLabel: "Создано",
     cannotArchiveProcessing:
       "Этот сеанс обрабатывает задачу. Дождитесь завершения.",
   },
