@@ -9,6 +9,7 @@ Bug fixes for message loading, usage charts, session management, and CLI thinkin
 - Fixed CLI thinking state accuracy in local mode to correctly reflect model status
 - Fixed server rejecting heartbeats for archived sessions to prevent ghost connections
 - Updated README to remove upstream branding and add fork disclaimers
+- Fixed collapsible input collapse button not responding due to stale closure
 
 ## 2.1.0 - 2026-03-09
 

@@ -9,9 +9,10 @@
         "Improved usage trend chart with gap filling for missing dates and better layout",
         "Fixed CLI thinking state accuracy in local mode to correctly reflect model status",
         "Fixed server rejecting heartbeats for archived sessions to prevent ghost connections",
-        "Updated README to remove upstream branding and add fork disclaimers"
+        "Updated README to remove upstream branding and add fork disclaimers",
+        "Fixed collapsible input collapse button not responding due to stale closure"
       ],
-      "rawMarkdown": "## 2.1.1 - 2026-03-13\n\n\nBug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.\n\n- Fixed message loss during pagination and backfill when switching between sessions\n- Improved usage trend chart with gap filling for missing dates and better layout\n- Fixed CLI thinking state accuracy in local mode to correctly reflect model status\n- Fixed server rejecting heartbeats for archived sessions to prevent ghost connections\n- Updated README to remove upstream branding and add fork disclaimers"
+      "rawMarkdown": "## 2.1.1 - 2026-03-13\n\n\nBug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.\n\n- Fixed message loss during pagination and backfill when switching between sessions\n- Improved usage trend chart with gap filling for missing dates and better layout\n- Fixed CLI thinking state accuracy in local mode to correctly reflect model status\n- Fixed server rejecting heartbeats for archived sessions to prevent ghost connections\n- Updated README to remove upstream branding and add fork disclaimers\n- Fixed collapsible input collapse button not responding due to stale closure"
     },
     {
       "version": "2.1.0",
