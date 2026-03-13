@@ -47,7 +47,7 @@ export function isValidImageBase64(base64: string): boolean {
 async function getUploadDir(sessionId: string): Promise<string | null> {
   try {
     const result = await apiSocket.sessionRPC<
-      { success: boolean; path?: string },
+      { success: boolean; path?: string; error?: string },
       Record<string, never>
     >(sessionId, "getUploadDir", {});
     if (!result.success || !result.path) {
