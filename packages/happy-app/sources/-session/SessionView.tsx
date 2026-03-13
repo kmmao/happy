@@ -946,7 +946,7 @@ function SessionViewInner({
             issueBody={issueBody}
             prUrl={issueLink.prUrl ?? session.metadata?.worktree?.prUrl}
             worktree={
-              session.metadata?.worktree
+              session.metadata?.worktree?.isWorktree
                 ? {
                     branchName: session.metadata.worktree.branchName,
                     parentBranch: session.metadata.worktree.parentBranch,
