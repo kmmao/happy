@@ -617,13 +617,18 @@ export const storage = create<StorageState>()((set, get) => {
             savedProfilesAll[session.id]?.profileName ??
             null;
 
-          // Preserve ephemeral thinking state: fetchSessions always sends
-          // thinking:false because the server doesn't persist it. Without this,
-          // every socket reconnection resets active sessions to "online".
-          const preservedThinking =
-            state.sessions[session.id]?.thinking ?? session.thinking;
-          const preservedThinkingAt =
-            state.sessions[session.id]?.thinkingAt ?? session.thinkingAt;
+          // Preserve ephemeral thinking state ONLY when the incoming data
+          // comes from fetchSessions (which always sends thinking:false,
+          // thinkingAt:0 because the server doesn't persist it).
+          // For all other callers (activity updates, lifecycle events),
+          // use the incoming value so thinking state can actually change.
+          const isFetchSessionsData = session.thinkingAt === 0;
+          const preservedThinking = isFetchSessionsData
+            ? (state.sessions[session.id]?.thinking ?? session.thinking)
+            : session.thinking;
+          const preservedThinkingAt = isFetchSessionsData
+            ? (state.sessions[session.id]?.thinkingAt ?? session.thinkingAt)
+            : session.thinkingAt;
 
           mergedSessions[session.id] = {
             ...session,

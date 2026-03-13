@@ -740,7 +740,7 @@ const CompactSessionRow = React.memo(
                 ) : null}
 
                 {/* Task status indicator */}
-                {session.todos &&
+                {Array.isArray(session.todos) &&
                   session.todos.length > 0 &&
                   (() => {
                     const totalTasks = session.todos.length;
