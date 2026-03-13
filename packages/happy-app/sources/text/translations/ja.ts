@@ -1453,6 +1453,8 @@ export const ja: TranslationStructure = {
     statusCompleted: "完了",
     statusFailed: "失敗",
     statusCancelled: "キャンセル済み",
+    worktreeSection: "ワークツリー",
+    createdAtLabel: "作成日時",
     cannotArchiveProcessing:
       "このセッションはイシューを処理中です。完了するまでお待ちください。",
   },

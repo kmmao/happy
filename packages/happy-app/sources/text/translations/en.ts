@@ -1464,6 +1464,8 @@ export const en: TranslationStructure = {
     statusCompleted: "Completed",
     statusFailed: "Failed",
     statusCancelled: "Cancelled",
+    worktreeSection: "Worktree",
+    createdAtLabel: "Created",
     cannotArchiveProcessing:
       "This session is processing an issue. Please wait until it completes.",
   },

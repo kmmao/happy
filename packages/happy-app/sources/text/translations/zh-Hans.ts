@@ -1401,6 +1401,8 @@ export const zhHans: TranslationStructure = {
     statusCompleted: "已完成",
     statusFailed: "失败",
     statusCancelled: "已取消",
+    worktreeSection: "工作树",
+    createdAtLabel: "创建时间",
     cannotArchiveProcessing: "该会话正在处理工单，请等待完成后再操作。",
   },
 

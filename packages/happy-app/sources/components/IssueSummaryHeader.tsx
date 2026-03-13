@@ -3,7 +3,7 @@
  *
  * Shows issue number, title, processing status, and optional PR link.
  * Supports collapse/expand (default: collapsed).
- * When expanded, shows structured metadata (author, labels, URL, body).
+ * When expanded, shows structured sections: Metadata, Description, Worktree.
  */
 
 import * as React from "react";
@@ -16,18 +16,48 @@ import {
     ISSUE_STATUS_COLORS,
     ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
+import { t } from "@/text";
 import type { IssueSessionLink } from "@/sync/issueSessionTypes";
 
 const MAX_BODY_HEIGHT = 240;
+
+interface WorktreeDisplayInfo {
+    readonly branchName: string;
+    readonly parentBranch: string;
+}
 
 interface IssueSummaryHeaderProps {
     readonly issueLink: IssueSessionLink;
     readonly issueBody?: string | null;
     readonly prUrl?: string | null;
+    readonly worktree?: WorktreeDisplayInfo | null;
+}
+
+function formatCreatedAt(timestamp: number): string {
+    const date = new Date(timestamp);
+    const now = Date.now();
+    const diffMs = now - timestamp;
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    if (diffHours < 24) {
+        const hours = Math.floor(diffHours);
+        if (hours < 1) {
+            const mins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+            return `${mins}m ago`;
+        }
+        return `${hours}h ago`;
+    }
+
+    return date.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 }
 
 export const IssueSummaryHeader = React.memo<IssueSummaryHeaderProps>(
-    function IssueSummaryHeader({ issueLink, issueBody, prUrl }) {
+    function IssueSummaryHeader({ issueLink, issueBody, prUrl, worktree }) {
         const { theme } = useUnistyles();
         const [expanded, setExpanded] = React.useState(false);
 
@@ -36,11 +66,6 @@ export const IssueSummaryHeader = React.memo<IssueSummaryHeaderProps>(
         const statusLabel = ISSUE_STATUS_LABELS[issueLink.status]();
 
         const effectivePrUrl = prUrl ?? issueLink.prUrl;
-
-        const hasMetadata =
-            issueLink.issueAuthor ||
-            (issueLink.issueLabels && issueLink.issueLabels.length > 0) ||
-            issueLink.issueUrl;
 
         return (
             <View
@@ -118,47 +143,56 @@ export const IssueSummaryHeader = React.memo<IssueSummaryHeaderProps>(
                     />
                 </Pressable>
 
-                {/* Expanded content: structured metadata + body */}
+                {/* Expanded content: structured sections */}
                 {expanded && (
                     <View style={styles.expandedContent}>
                         {/* Metadata section */}
-                        {hasMetadata && (
-                            <View style={styles.metadataSection}>
-                                {issueLink.issueAuthor ? (
+                        <View style={styles.metadataSection}>
+                            <MetadataRow
+                                icon="code-slash-outline"
+                                label={issueLink.repoLabel}
+                                color={theme.colors.textSecondary}
+                                numberOfLines={1}
+                            />
+                            {issueLink.issueAuthor ? (
+                                <MetadataRow
+                                    icon="person-outline"
+                                    label={`@${issueLink.issueAuthor}`}
+                                    color={theme.colors.textSecondary}
+                                />
+                            ) : null}
+                            {issueLink.issueLabels &&
+                            issueLink.issueLabels.length > 0 ? (
+                                <MetadataRow
+                                    icon="pricetag-outline"
+                                    label={issueLink.issueLabels.join(", ")}
+                                    color={theme.colors.textSecondary}
+                                />
+                            ) : null}
+                            {issueLink.createdAt ? (
+                                <MetadataRow
+                                    icon="time-outline"
+                                    label={`${t("issues.createdAtLabel")}: ${formatCreatedAt(issueLink.createdAt)}`}
+                                    color={theme.colors.textSecondary}
+                                />
+                            ) : null}
+                            {issueLink.issueUrl ? (
+                                <Pressable
+                                    onPress={() =>
+                                        Linking.openURL(
+                                            issueLink.issueUrl!,
+                                        )
+                                    }
+                                >
                                     <MetadataRow
-                                        icon="person-outline"
-                                        label={`@${issueLink.issueAuthor}`}
-                                        color={theme.colors.textSecondary}
+                                        icon="link-outline"
+                                        label={issueLink.issueUrl}
+                                        color={theme.colors.textLink}
+                                        numberOfLines={1}
                                     />
-                                ) : null}
-                                {issueLink.issueLabels &&
-                                issueLink.issueLabels.length > 0 ? (
-                                    <MetadataRow
-                                        icon="pricetag-outline"
-                                        label={issueLink.issueLabels.join(
-                                            ", ",
-                                        )}
-                                        color={theme.colors.textSecondary}
-                                    />
-                                ) : null}
-                                {issueLink.issueUrl ? (
-                                    <Pressable
-                                        onPress={() =>
-                                            Linking.openURL(
-                                                issueLink.issueUrl!,
-                                            )
-                                        }
-                                    >
-                                        <MetadataRow
-                                            icon="link-outline"
-                                            label={issueLink.issueUrl}
-                                            color={theme.colors.textLink}
-                                            numberOfLines={1}
-                                        />
-                                    </Pressable>
-                                ) : null}
-                            </View>
-                        )}
+                                </Pressable>
+                            ) : null}
+                        </View>
 
                         {/* Issue body */}
                         {issueBody ? (
@@ -182,24 +216,53 @@ export const IssueSummaryHeader = React.memo<IssueSummaryHeaderProps>(
                             </ScrollView>
                         ) : null}
 
-                        {/* Repo label + PR link row */}
-                        <View style={styles.metaRow}>
-                            <Ionicons
-                                name="git-branch-outline"
-                                size={12}
-                                color={theme.colors.textSecondary}
-                            />
-                            <Text
-                                style={[
-                                    styles.repoLabel,
-                                    { color: theme.colors.textSecondary },
-                                ]}
-                                numberOfLines={1}
-                            >
-                                {issueLink.repoLabel}
-                            </Text>
+                        {/* Worktree section */}
+                        {worktree && (
+                            <View style={styles.worktreeSection}>
+                                <Text
+                                    style={[
+                                        styles.sectionLabel,
+                                        {
+                                            color: theme.colors.textSecondary,
+                                        },
+                                    ]}
+                                >
+                                    {t("issues.worktreeSection")}
+                                </Text>
+                                <MetadataRow
+                                    icon="git-branch-outline"
+                                    label={worktree.branchName}
+                                    color={theme.colors.textSecondary}
+                                    mono
+                                />
+                                <MetadataRow
+                                    icon="arrow-undo-outline"
+                                    label={worktree.parentBranch}
+                                    color={theme.colors.textSecondary}
+                                    mono
+                                />
+                            </View>
+                        )}
 
-                            {effectivePrUrl ? (
+                        {/* Repo + PR link footer row */}
+                        {effectivePrUrl ? (
+                            <View style={styles.metaRow}>
+                                <Ionicons
+                                    name="git-branch-outline"
+                                    size={12}
+                                    color={theme.colors.textSecondary}
+                                />
+                                <Text
+                                    style={[
+                                        styles.repoLabel,
+                                        {
+                                            color: theme.colors.textSecondary,
+                                        },
+                                    ]}
+                                    numberOfLines={1}
+                                >
+                                    {issueLink.repoLabel}
+                                </Text>
                                 <Pressable
                                     style={styles.prLink}
                                     onPress={() =>
@@ -221,8 +284,8 @@ export const IssueSummaryHeader = React.memo<IssueSummaryHeaderProps>(
                                         PR
                                     </Text>
                                 </Pressable>
-                            ) : null}
-                        </View>
+                            </View>
+                        ) : null}
                     </View>
                 )}
             </View>
@@ -238,12 +301,16 @@ const MetadataRow = React.memo<{
     readonly label: string;
     readonly color: string;
     readonly numberOfLines?: number;
-}>(function MetadataRow({ icon, label, color, numberOfLines }) {
+    readonly mono?: boolean;
+}>(function MetadataRow({ icon, label, color, numberOfLines, mono }) {
     return (
         <View style={styles.metadataRow}>
             <Ionicons name={icon} size={12} color={color} />
             <Text
-                style={[styles.metadataText, { color }]}
+                style={[
+                    mono ? styles.metadataTextMono : styles.metadataText,
+                    { color },
+                ]}
                 numberOfLines={numberOfLines}
             >
                 {label}
@@ -309,6 +376,19 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 12,
         flex: 1,
         ...Typography.default(),
+    },
+    metadataTextMono: {
+        fontSize: 12,
+        flex: 1,
+        ...Typography.mono(),
+    },
+    sectionLabel: {
+        fontSize: 11,
+        marginTop: 2,
+        ...Typography.default("semiBold"),
+    },
+    worktreeSection: {
+        gap: 4,
     },
     bodyScroll: {
         maxHeight: MAX_BODY_HEIGHT,
