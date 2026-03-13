@@ -1522,7 +1522,7 @@ export const pl: TranslationStructure = {
     tokenLabel: "API Token",
     tokenPlaceholder: "Opcjonalnie — wymagane dla prywatnych repozytoriów",
     tokenHint:
-      "Wygeneruj w Ustawienia → Aplikacje → Tokeny dostępu w Twojej instancji Gitea.",
+      "Wygeneruj w Ustawienia → Aplikacje → Tokeny dostępu w Twojej instancji Gitea. Wymagane uprawnienia: issue, repository, admin:repo_hook.",
     tokenHintGitHub:
       "Personal Access Token z uprawnieniami admin:repo_hook. Automatycznie tworzy Webhook przy zapisywaniu.",
     deleteTitle: "Usuń host",

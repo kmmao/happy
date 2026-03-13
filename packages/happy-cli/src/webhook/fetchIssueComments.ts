@@ -22,13 +22,22 @@ function execFileAsync(
   cwd: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolve) => {
-    execFile(file, [...args], { cwd, timeout: 30_000 }, (error, stdout, stderr) => {
-      resolve({
-        stdout: stdout ?? "",
-        stderr: stderr ?? "",
-        exitCode: error ? (typeof error.code === "number" ? error.code : 1) : 0,
-      });
-    });
+    execFile(
+      file,
+      [...args],
+      { cwd, timeout: 30_000 },
+      (error, stdout, stderr) => {
+        resolve({
+          stdout: stdout ?? "",
+          stderr: stderr ?? "",
+          exitCode: error
+            ? typeof error.code === "number"
+              ? error.code
+              : 1
+            : 0,
+        });
+      },
+    );
   });
 }
 
@@ -41,7 +50,10 @@ function parseRepoFromUrl(
 ): { owner: string; repo: string } | null {
   try {
     const url = new URL(repoUrl);
-    const parts = url.pathname.replace(/^\//, "").replace(/\.git$/, "").split("/");
+    const parts = url.pathname
+      .replace(/^\//, "")
+      .replace(/\.git$/, "")
+      .split("/");
     if (parts.length >= 2) {
       const owner = parts[0];
       const repo = parts[1];
@@ -78,6 +90,7 @@ export async function fetchIssueComments(
   issueNumber: number,
   cwd: string,
   maxComments: number = 20,
+  apiToken?: string,
 ): Promise<readonly IssueComment[]> {
   const parsed = parseRepoFromUrl(repoUrl);
   if (!parsed) {
@@ -108,11 +121,12 @@ export async function fetchIssueComments(
       const url = new URL(repoUrl);
       const apiBase = `${url.protocol}//${url.host}/api/v1`;
       const apiUrl = `${apiBase}/repos/${parsed.owner}/${parsed.repo}/issues/${issueNumber}/comments?limit=${maxComments}`;
-      const result = await execFileAsync(
-        "curl",
-        ["-s", "-w", "\n%{http_code}", apiUrl],
-        cwd,
-      );
+      const curlArgs = ["-s", "-w", "\n%{http_code}"];
+      if (apiToken) {
+        curlArgs.push("-H", `Authorization: token ${apiToken}`);
+      }
+      curlArgs.push(apiUrl);
+      const result = await execFileAsync("curl", curlArgs, cwd);
       if (result.exitCode !== 0) return [];
       const lines = result.stdout.trim().split("\n");
       const httpStatus = lines.pop()?.trim() ?? "";

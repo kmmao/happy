@@ -1423,7 +1423,8 @@ export const zhHant: TranslationStructure = {
     providerLabel: "供應商",
     tokenLabel: "API Token",
     tokenPlaceholder: "可選 — 私有倉庫必填",
-    tokenHint: "在 Gitea 的 設定 → 應用程式 → 存取權杖 中產生。",
+    tokenHint:
+      "在 Gitea 的 設定 → 應用程式 → 存取權杖 中產生。所需權限：issue、repository、admin:repo_hook。",
     tokenHintGitHub:
       "需要 admin:repo_hook 權限的 Personal Access Token。儲存時自動建立 Webhook。",
     deleteTitle: "刪除主機",

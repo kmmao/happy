@@ -119,6 +119,7 @@ export type WebhookTriggerData = {
   repoUrl: string;
   repoPath: string;
   provider: string;
+  apiToken?: string;
 };
 
 export class ApiMachineClient {

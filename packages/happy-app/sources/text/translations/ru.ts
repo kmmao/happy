@@ -1523,7 +1523,7 @@ export const ru: TranslationStructure = {
     tokenLabel: "API Token",
     tokenPlaceholder: "Необязательно — требуется для приватных репозиториев",
     tokenHint:
-      "Создайте в Настройки → Приложения → Токены доступа вашего Gitea.",
+      "Создайте в Настройки → Приложения → Токены доступа вашего Gitea. Необходимые разрешения: issue, repository, admin:repo_hook.",
     tokenHintGitHub:
       "Personal Access Token с правами admin:repo_hook. Автоматически создаёт Webhook при сохранении.",
     deleteTitle: "Удалить хост",

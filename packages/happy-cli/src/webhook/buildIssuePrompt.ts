@@ -77,11 +77,40 @@ export interface WebhookIssueData {
   readonly issueLabels: string[];
   readonly issueUrl: string;
   readonly repoUrl: string;
+  readonly provider?: string;
 }
 
 export interface WorktreeInfo {
   readonly branchName: string;
   readonly parentBranch: string;
+}
+
+function buildPrCreateStep(
+  issue: WebhookIssueData,
+  worktree: WorktreeInfo,
+): string {
+  if (issue.provider === "gitea") {
+    try {
+      const url = new URL(issue.repoUrl);
+      const parts = url.pathname
+        .replace(/^\//, "")
+        .replace(/\.git$/, "")
+        .split("/");
+      const owner = parts[0];
+      const repo = parts[1];
+      const apiBase = `${url.protocol}//${url.host}/api/v1`;
+      return [
+        `9. Create a pull request using the Gitea API:`,
+        `   curl -s -X POST "${apiBase}/repos/${owner}/${repo}/pulls" \\`,
+        `     -H "Authorization: token $GITEA_TOKEN" \\`,
+        `     -H "Content-Type: application/json" \\`,
+        `     -d '{"title":"<type>: <short description>","body":"Fixes #${issue.issueNumber}","base":"${worktree.parentBranch}","head":"${worktree.branchName}"}'`,
+      ].join("\n");
+    } catch {
+      // Fallback if URL parsing fails
+    }
+  }
+  return `9. Create a pull request: gh pr create --base "${worktree.parentBranch}" --head "${worktree.branchName}" --title "<type>: <short description>" --body "Fixes #${issue.issueNumber}"`;
 }
 
 export function buildIssuePrompt(
@@ -147,7 +176,7 @@ export function buildIssuePrompt(
     `6. Create a well-formatted commit referencing this issue (e.g. "fix: description - closes #${issue.issueNumber}")`,
     `7. Sync with the latest base branch to avoid merge conflicts: git fetch origin ${worktree.parentBranch} && git rebase origin/${worktree.parentBranch} (resolve any conflicts if they arise)`,
     `8. Push your branch to the remote: git push -u origin ${worktree.branchName}`,
-    `9. Create a pull request: gh pr create --base "${worktree.parentBranch}" --head "${worktree.branchName}" --title "<type>: <short description>" --body "Fixes #${issue.issueNumber}"`,
+    buildPrCreateStep(issue, worktree),
     "10. After completing, provide a concise summary of what you changed and why",
   );
 

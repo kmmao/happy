@@ -1422,7 +1422,8 @@ export const zhHans: TranslationStructure = {
     providerLabel: "提供商",
     tokenLabel: "API Token",
     tokenPlaceholder: "可选 — 私有仓库必填",
-    tokenHint: "在 Gitea 的 设置 → 应用 → 访问令牌 中生成。",
+    tokenHint:
+      "在 Gitea 的 设置 → 应用 → 访问令牌 中生成。所需权限：issue、repository、admin:repo_hook。",
     tokenHintGitHub:
       "需要 admin:repo_hook 权限的 Personal Access Token。保存时自动创建 Webhook。",
     deleteTitle: "删除主机",

@@ -1479,7 +1479,7 @@ export const en = {
     tokenLabel: "API Token",
     tokenPlaceholder: "Optional — required for private repos",
     tokenHint:
-      "Generate at Settings → Applications → Access Tokens in your Gitea instance.",
+      "Generate at Settings → Applications → Access Tokens in your Gitea instance. Required scopes: issue, repository, admin:repo_hook.",
     tokenHintGitHub:
       "Personal Access Token with admin:repo_hook scope. Enables auto-creating webhooks on save.",
     deleteTitle: "Delete Host",

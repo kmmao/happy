@@ -66,9 +66,9 @@ function labelsMatch(
   // Empty route labels = match any issue (no label filter)
   if (routeLabels.length === 0) return true;
   const triggerSet = new Set(
-    routeLabels.flatMap((l) =>
-      l.split(",").map((s) => s.trim().toLowerCase()),
-    ).filter(Boolean),
+    routeLabels
+      .flatMap((l) => l.split(",").map((s) => s.trim().toLowerCase()))
+      .filter(Boolean),
   );
   return issueLabels.some((l) => triggerSet.has(l));
 }
@@ -312,7 +312,20 @@ async function processRoute(
     return false;
   }
 
-  // 5. Emit ephemeral event to target machine
+  // 5. Decrypt API token for CLI-side use (comment fetching, PR creation)
+  let decryptedApiToken: string | undefined;
+  if (route.apiToken) {
+    try {
+      decryptedApiToken = decryptString(
+        ["webhook-route-token", `${route.accountId}:${route.repoUrl}`],
+        route.apiToken as unknown as Uint8Array<ArrayBuffer>,
+      );
+    } catch {
+      // Non-critical: CLI will proceed without token
+    }
+  }
+
+  // 6. Emit ephemeral event to target machine
   eventRouter.emitEphemeral({
     userId: route.accountId,
     payload: {
@@ -327,6 +340,7 @@ async function processRoute(
       repoUrl: issue.repoUrl,
       repoPath: route.repoPath,
       provider,
+      apiToken: decryptedApiToken,
     },
     recipientFilter: {
       type: "machine-scoped-only",
@@ -334,7 +348,7 @@ async function processRoute(
     },
   });
 
-  // 6. Update status to dispatched
+  // 7. Update status to dispatched
   await db.webhookEvent.update({
     where: { id: event.id },
     data: { status: "dispatched" },

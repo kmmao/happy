@@ -1501,7 +1501,7 @@ export const es: TranslationStructure = {
     tokenLabel: "API Token",
     tokenPlaceholder: "Opcional — necesario para repos privados",
     tokenHint:
-      "Genéralo en Configuración → Aplicaciones → Tokens de acceso de tu Gitea.",
+      "Genéralo en Configuración → Aplicaciones → Tokens de acceso de tu Gitea. Permisos requeridos: issue, repository, admin:repo_hook.",
     tokenHintGitHub:
       "Personal Access Token con permisos admin:repo_hook. Crea webhooks automáticamente al guardar.",
     deleteTitle: "Eliminar host",

@@ -87,6 +87,8 @@ export async function handleWebhookTrigger(
         repoUrl,
         issueNumber,
         repoPath,
+        20,
+        data.apiToken,
       );
       logger.debug(
         `[WEBHOOK] Fetched ${comments.length} comments for issue #${issueNumber}`,
@@ -107,6 +109,7 @@ export async function handleWebhookTrigger(
         issueLabels: data.issueLabels,
         issueUrl: data.issueUrl,
         repoUrl: data.repoUrl,
+        provider: data.provider,
       },
       comments,
       {
@@ -123,13 +126,18 @@ export async function handleWebhookTrigger(
     logger.debug(`[WEBHOOK] Wrote initial prompt to ${promptFilePath}`);
 
     // 5. Spawn session in the worktree directory
+    const environmentVariables: Record<string, string> = {
+      HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
+    };
+    if (provider === "gitea" && data.apiToken) {
+      environmentVariables.GITEA_TOKEN = data.apiToken;
+    }
+
     const spawnResult = await deps.spawnSession({
       directory: worktreeResult.worktreePath,
       approvedNewDirectoryCreation: true,
       agent: "claude",
-      environmentVariables: {
-        HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
-      },
+      environmentVariables,
     });
 
     if (spawnResult.type !== "success") {

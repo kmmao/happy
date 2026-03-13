@@ -1478,7 +1478,7 @@ export const ja: TranslationStructure = {
     tokenLabel: "API Token",
     tokenPlaceholder: "任意 — プライベートリポジトリには必須",
     tokenHint:
-      "Giteaの 設定 → アプリケーション → アクセストークン で生成してください。",
+      "Giteaの 設定 → アプリケーション → アクセストークン で生成してください。必要なスコープ：issue、repository、admin:repo_hook。",
     tokenHintGitHub:
       "admin:repo_hook スコープの Personal Access Token。保存時に Webhook を自動作成します。",
     deleteTitle: "ホストを削除",
