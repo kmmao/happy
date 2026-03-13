@@ -48,7 +48,7 @@ export async function listWorktrees(
   }
 
   const entries: WorktreeInfo[] = [];
-  const blocks = result.stdout.split("\n\n").filter(Boolean);
+  const blocks = (result.stdout ?? "").split("\n\n").filter(Boolean);
 
   for (const block of blocks) {
     const lines = block.split("\n");
@@ -238,7 +238,7 @@ export async function directMerge(
     repoPath,
   );
 
-  if (statusResult.success && statusResult.stdout.trim()) {
+  if (statusResult.success && (statusResult.stdout ?? "").trim()) {
     return {
       success: false,
       error:
@@ -254,7 +254,7 @@ export async function directMerge(
   );
 
   if (!checkoutResult.success || checkoutResult.exitCode !== 0) {
-    const output = checkoutResult.stdout.trim() || checkoutResult.stderr.trim();
+    const output = (checkoutResult.stdout ?? "").trim() || (checkoutResult.stderr ?? "").trim();
     return {
       success: false,
       error: `Failed to checkout '${parentBranch}': ${output}`,
@@ -269,7 +269,7 @@ export async function directMerge(
   );
 
   if (!result.success || result.exitCode !== 0) {
-    const output = result.stdout.trim() || result.stderr.trim();
+    const output = (result.stdout ?? "").trim() || (result.stderr ?? "").trim();
 
     // Always abort a failed merge to leave repo in clean state
     await machineBash(machineId, "git merge --abort 2>&1", repoPath);
@@ -307,8 +307,8 @@ export async function deleteBranch(
     return {
       success: false,
       error:
-        result.stdout.trim() ||
-        result.stderr.trim() ||
+        (result.stdout ?? "").trim() ||
+        (result.stderr ?? "").trim() ||
         "Failed to delete branch",
     };
   }
@@ -343,13 +343,13 @@ export async function removeWorktree(
 
   if (
     !removeResult.success &&
-    !removeResult.stderr.includes("is not a working tree")
+    !(removeResult.stderr ?? "").includes("is not a working tree")
   ) {
     return {
       success: false,
       error:
-        removeResult.stdout.trim() ||
-        removeResult.stderr.trim() ||
+        (removeResult.stdout ?? "").trim() ||
+        (removeResult.stderr ?? "").trim() ||
         "Failed to remove worktree",
     };
   }
@@ -365,7 +365,7 @@ export async function removeWorktree(
 
     if (
       !branchResult.success &&
-      branchResult.stderr.includes("not fully merged")
+      (branchResult.stderr ?? "").includes("not fully merged")
     ) {
       return {
         success: true,

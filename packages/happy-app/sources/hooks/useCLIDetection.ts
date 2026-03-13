@@ -70,7 +70,7 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
 
                 if (result.success && result.exitCode === 0) {
                     // Parse output: "claude:true\ncodex:false\ngemini:false"
-                    const lines = result.stdout.trim().split('\n');
+                    const lines = (result.stdout ?? "").trim().split('\n');
                     const cliStatus: { claude?: boolean; codex?: boolean; gemini?: boolean } = {};
 
                     lines.forEach(line => {

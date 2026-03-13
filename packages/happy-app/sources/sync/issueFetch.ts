@@ -765,8 +765,8 @@ export async function updateIssueStateViaMachine(
     const result = await machineBash(machineId, command, cwd);
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
-        result.stdout.trim() ||
-          result.stderr.trim() ||
+        result.stdout?.trim() ||
+          result.stderr?.trim() ||
           "Failed to update issue state",
       );
     }
@@ -786,13 +786,13 @@ export async function updateIssueStateViaMachine(
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
         sanitizeErrorOutput(
-          result.stdout.trim() ||
-            result.stderr.trim() ||
+          result.stdout?.trim() ||
+            result.stderr?.trim() ||
             "Failed to update issue state",
         ),
       );
     }
-    const lines = result.stdout.trim().split("\n");
+    const lines = (result.stdout ?? "").trim().split("\n");
     const httpStatus = lines.pop()?.trim() ?? "";
     if (httpStatus && !httpStatus.startsWith("2")) {
       throw new Error(`Gitea API returned HTTP ${httpStatus}`);
@@ -826,7 +826,7 @@ export async function fetchIssueCommentsViaMachine(
     const result = await machineBash(machineId, command, cwd);
     if (!result.success || result.exitCode !== 0) return [];
     try {
-      const raw: readonly any[] = JSON.parse(result.stdout.trim());
+      const raw: readonly any[] = JSON.parse((result.stdout ?? "").trim());
       return raw.map(parseGitHubComment);
     } catch {
       return [];
@@ -842,7 +842,7 @@ export async function fetchIssueCommentsViaMachine(
     const command = `curl -s ${authHeader} -w "\\n%{http_code}" "${url}" 2>&1`;
     const result = await machineBash(machineId, command, cwd);
     if (!result.success || result.exitCode !== 0) return [];
-    const lines = result.stdout.trim().split("\n");
+    const lines = (result.stdout ?? "").trim().split("\n");
     const httpStatus = lines.pop()?.trim() ?? "";
     const body = lines.join("\n").trim();
     if (!httpStatus.startsWith("2")) return [];
@@ -889,7 +889,7 @@ export async function addIssueCommentViaMachine(
     const result = await machineBash(machineId, command, cwd);
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
-        result.stdout.trim() || result.stderr.trim() || "Failed to add comment",
+        (result.stdout ?? "").trim() || (result.stderr ?? "").trim() || "Failed to add comment",
       );
     }
     return;
@@ -909,13 +909,13 @@ export async function addIssueCommentViaMachine(
     if (!result.success || result.exitCode !== 0) {
       throw new Error(
         sanitizeErrorOutput(
-          result.stdout.trim() ||
-            result.stderr.trim() ||
+          (result.stdout ?? "").trim() ||
+            (result.stderr ?? "").trim() ||
             "Failed to add comment",
         ),
       );
     }
-    const lines = result.stdout.trim().split("\n");
+    const lines = (result.stdout ?? "").trim().split("\n");
     const httpStatus = lines.pop()?.trim() ?? "";
     if (httpStatus && !httpStatus.startsWith("2")) {
       throw new Error(`Gitea API returned HTTP ${httpStatus}`);

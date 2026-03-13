@@ -304,24 +304,22 @@ export async function machineDeleteRemoteWebhook(
 /**
  * Execute a bash command on a specific machine
  */
+export interface MachineBashResult {
+  readonly success: boolean;
+  readonly stdout?: string;
+  readonly stderr?: string;
+  readonly exitCode?: number;
+  readonly error?: string;
+}
+
 export async function machineBash(
   machineId: string,
   command: string,
   cwd: string,
-): Promise<{
-  success: boolean;
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-}> {
+): Promise<MachineBashResult> {
   try {
     const result = await apiSocket.machineRPC<
-      {
-        success: boolean;
-        stdout: string;
-        stderr: string;
-        exitCode: number;
-      },
+      MachineBashResult,
       {
         command: string;
         cwd: string;
@@ -334,6 +332,7 @@ export async function machineBash(
       stdout: "",
       stderr: error instanceof Error ? error.message : "Unknown error",
       exitCode: -1,
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }

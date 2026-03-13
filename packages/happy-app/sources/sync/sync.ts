@@ -3643,7 +3643,7 @@ class Sync {
     );
     if (result1.success && result1.exitCode === 0) {
       try {
-        const prs = JSON.parse(result1.stdout.trim());
+        const prs = JSON.parse((result1.stdout ?? "").trim());
         if (Array.isArray(prs) && prs.length > 0) return prs;
       } catch {
         // Malformed response, try fallback
@@ -3658,7 +3658,7 @@ class Sync {
     );
     if (result2.success && result2.exitCode === 0) {
       try {
-        const prs = JSON.parse(result2.stdout.trim());
+        const prs = JSON.parse((result2.stdout ?? "").trim());
         if (Array.isArray(prs) && prs.length > 0) return prs;
       } catch {
         // Malformed response
@@ -3697,7 +3697,7 @@ class Sync {
             link.repoPath,
           );
           if (prResult.success && prResult.exitCode === 0) {
-            const output = prResult.stdout.trim();
+            const output = (prResult.stdout ?? "").trim();
             const [url] = output.split(" ");
             if (url?.startsWith("http")) {
               prUrl = url;
@@ -3765,7 +3765,7 @@ class Sync {
               link.repoPath,
             );
             if (prResult.success && prResult.exitCode === 0) {
-              const output = prResult.stdout.trim();
+              const output = (prResult.stdout ?? "").trim();
               const [url, state] = output.split(" ");
               if (url?.startsWith("http")) {
                 prUrl = url;
@@ -3985,7 +3985,7 @@ class Sync {
               link.repoPath,
             );
             if (prResult.success && prResult.exitCode === 0) {
-              const url = prResult.stdout.trim();
+              const url = (prResult.stdout ?? "").trim();
               if (url.startsWith("http")) prUrl = url;
             }
           } catch {

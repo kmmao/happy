@@ -83,7 +83,7 @@ export function useEnvironmentVariables(
 
                 if (result.success && result.exitCode === 0) {
                     // Parse output: "VAR1=value1\nVAR2=value2\nVAR3="
-                    const lines = result.stdout.trim().split('\n');
+                    const lines = (result.stdout ?? "").trim().split('\n');
                     lines.forEach(line => {
                         const equalsIndex = line.indexOf('=');
                         if (equalsIndex !== -1) {

@@ -41,7 +41,7 @@ export async function createWorktree(
         'git rev-parse --abbrev-ref HEAD',
         basePath
     );
-    const parentBranch = branchResult.success ? branchResult.stdout.trim() : 'main';
+    const parentBranch = branchResult.success ? (branchResult.stdout ?? "").trim() : 'main';
 
     // Create the worktree with new branch
     const worktreePath = `.dev/worktree/${name}`;
@@ -52,7 +52,7 @@ export async function createWorktree(
     );
 
     // If worktree exists, try with a different name
-    if (!result.success && result.stderr.includes('already exists')) {
+    if (!result.success && (result.stderr ?? "").includes('already exists')) {
         // Try up to 3 times with numbered suffixes
         for (let i = 2; i <= 4; i++) {
             const newName = `${name}-${i}`;
