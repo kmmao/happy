@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.2.0 - 2026-03-14
+
+Added full Pull Request management for mobile AI DevOps workflow — browse PRs, review diffs, check CI status, and merge from your phone.
+
+### PR List & Navigation
+- Added PR tab in Git section with badge showing open PR count
+- Added PR card with state icons, branch info, diff stats, labels, and draft badge
+- Added filter bar with Open/Closed/All states and sort options
+- Added infinite scroll pagination and 60-second auto-polling
+- Added multi-repository PR aggregation
+
+### PR Detail & Diff Review
+- Added PR detail sheet with full metadata, branch info, and description
+- Added unified diff patch viewer for reviewing file changes
+- Added collapsible changed files section with per-file diff rendering
+- Added CI Checks detail view showing individual check run status
+- Added Reviews section with author, state badge, and review body
+- Added Comments section with full comment history
+
+### PR Actions
+- Added merge with method selection (merge commit, squash, rebase)
+- Added approve and close PR actions
+- Added comment posting with text input
+- Added open in browser action
+
+### Platform Support
+- Supported GitHub via `gh api` CLI
+- Supported Gitea via REST API with token auth
+- Added i18n translations for all 10 languages
+
 ## 2.1.2 - 2026-03-14
 
 Added copy-to-input button for AI suggestion options, allowing users to edit suggestions before sending.

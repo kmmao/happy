@@ -1,6 +1,32 @@
 {
   "entries": [
     {
+      "version": "2.2.0",
+      "date": "2026-03-14",
+      "summary": "Added full Pull Request management for mobile AI DevOps workflow — browse PRs, review diffs, check CI status, and merge from your phone.",
+      "changes": [
+        "Added PR tab in Git section with badge showing open PR count",
+        "Added PR card with state icons, branch info, diff stats, labels, and draft badge",
+        "Added filter bar with Open/Closed/All states and sort options",
+        "Added infinite scroll pagination and 60-second auto-polling",
+        "Added multi-repository PR aggregation",
+        "Added PR detail sheet with full metadata, branch info, and description",
+        "Added unified diff patch viewer for reviewing file changes",
+        "Added collapsible changed files section with per-file diff rendering",
+        "Added CI Checks detail view showing individual check run status",
+        "Added Reviews section with author, state badge, and review body",
+        "Added Comments section with full comment history",
+        "Added merge with method selection (merge commit, squash, rebase)",
+        "Added approve and close PR actions",
+        "Added comment posting with text input",
+        "Added open in browser action",
+        "Supported GitHub via `gh api` CLI",
+        "Supported Gitea via REST API with token auth",
+        "Added i18n translations for all 10 languages"
+      ],
+      "rawMarkdown": "## 2.2.0 - 2026-03-14\n\n\nAdded full Pull Request management for mobile AI DevOps workflow — browse PRs, review diffs, check CI status, and merge from your phone.\n\n### PR List & Navigation\n- Added PR tab in Git section with badge showing open PR count\n- Added PR card with state icons, branch info, diff stats, labels, and draft badge\n- Added filter bar with Open/Closed/All states and sort options\n- Added infinite scroll pagination and 60-second auto-polling\n- Added multi-repository PR aggregation\n\n### PR Detail & Diff Review\n- Added PR detail sheet with full metadata, branch info, and description\n- Added unified diff patch viewer for reviewing file changes\n- Added collapsible changed files section with per-file diff rendering\n- Added CI Checks detail view showing individual check run status\n- Added Reviews section with author, state badge, and review body\n- Added Comments section with full comment history\n\n### PR Actions\n- Added merge with method selection (merge commit, squash, rebase)\n- Added approve and close PR actions\n- Added comment posting with text input\n- Added open in browser action\n\n### Platform Support\n- Supported GitHub via `gh api` CLI\n- Supported Gitea via REST API with token auth\n- Added i18n translations for all 10 languages"
+    },
+    {
       "version": "2.1.2",
       "date": "2026-03-14",
       "summary": "Added copy-to-input button for AI suggestion options, allowing users to edit suggestions before sending.",
@@ -133,5 +159,5 @@
       "rawMarkdown": "## 2.0.0 - 2026-02-27\n\n\nHappy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.\n\n- Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere\n- Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content\n- Added QR code scanning and manual URL entry for quick device authentication\n- Added Daemon mode for persistent background running with one-tap remote session launch\n- Added intelligent voice assistant supporting 15+ languages for natural conversation\n- Added GitHub and Claude account connection for unified developer identity management\n- Added multi-device real-time sync with online/offline status indicators\n- Added dark mode and appearance customization with automatic system theme following\n- Added Markdown table rendering and code syntax highlighting in chat\n- Streamlined settings page, removed upstream links, started maintaining own changelog\n- Supported iOS, Android, and Web platforms"
     }
   ],
-  "latestVersion": "2.1.2"
+  "latestVersion": "2.2.0"
 }

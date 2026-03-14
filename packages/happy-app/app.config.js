@@ -19,7 +19,7 @@ export default {
   expo: {
     name,
     slug: "happy",
-    version: "2.1.2",
+    version: "2.2.0",
     runtimeVersion: "20",
     orientation: "default",
     icon: "./sources/assets/images/icon.png",
