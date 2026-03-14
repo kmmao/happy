@@ -19,6 +19,13 @@ interface Props {
         updates: Partial<WebhookRepoConfig>,
     ) => void;
     readonly onRemoveRepo: (index: number) => void;
+    readonly host: string;
+    readonly apiToken?: string;
+    readonly autoIssueLabel?: string;
+    readonly autoIssueAllowedAuthors?: readonly string[];
+    readonly onSaveComplete: (index: number, updatedRepo: WebhookRepoConfig) => void;
+    readonly onDeleteComplete: (index: number) => void;
+    readonly isNewHost: boolean;
 }
 
 export const GitHostWebhookForm = React.memo(function GitHostWebhookForm({
@@ -29,6 +36,13 @@ export const GitHostWebhookForm = React.memo(function GitHostWebhookForm({
     onAddRepo,
     onUpdateRepo,
     onRemoveRepo,
+    host,
+    apiToken,
+    autoIssueLabel,
+    autoIssueAllowedAuthors,
+    onSaveComplete,
+    onDeleteComplete,
+    isNewHost,
 }: Props) {
     return (
         <View>
@@ -58,7 +72,7 @@ export const GitHostWebhookForm = React.memo(function GitHostWebhookForm({
 
             {formWebhookRepos.map((repo, idx) => (
                 <WebhookRepoItem
-                    key={idx}
+                    key={repo.secret || idx}
                     repo={repo}
                     index={idx}
                     provider={provider}
@@ -66,6 +80,13 @@ export const GitHostWebhookForm = React.memo(function GitHostWebhookForm({
                     theme={theme}
                     onUpdate={onUpdateRepo}
                     onRemove={onRemoveRepo}
+                    host={host}
+                    apiToken={apiToken}
+                    autoIssueLabel={autoIssueLabel}
+                    autoIssueAllowedAuthors={autoIssueAllowedAuthors}
+                    onSaveComplete={onSaveComplete}
+                    onDeleteComplete={onDeleteComplete}
+                    isNewHost={isNewHost}
                 />
             ))}
 

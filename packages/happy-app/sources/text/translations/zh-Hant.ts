@@ -1492,6 +1492,11 @@ export const zhHant: TranslationStructure = {
     remoteWebhookFail: ({ error }: { error: string }) =>
       `建立遠端 Webhook 失敗：${error}`,
     tokenRequiredForRemote: "需要 API Token 才能在遠端自動建立 Webhook",
+    webhookRepoSaved: "Webhook 已儲存",
+    webhookFieldsRequired: "請填寫倉庫地址、機器和密鑰",
+    webhookSaveHostFirst: "請先儲存 Git Host 基本資訊",
+    webhookRepoDeleted: "Webhook 已刪除",
+    webhookDeleteConfirm: "刪除此 Webhook 倉庫並清理伺服器路由？",
   },
 
   quickCommands: {

@@ -1549,6 +1549,11 @@ export const ja: TranslationStructure = {
       `リモート Webhook の作成に失敗: ${error}`,
     tokenRequiredForRemote:
       "リモートで Webhook を自動作成するには API トークンが必要です",
+    webhookRepoSaved: "Webhook を保存しました",
+    webhookFieldsRequired: "リポジトリURL、マシン、シークレットを入力してください",
+    webhookSaveHostFirst: "先に Git Host の基本情報を保存してください",
+    webhookRepoDeleted: "Webhook を削除しました",
+    webhookDeleteConfirm: "この Webhook リポジトリを削除しサーバールートもクリアしますか？",
   },
 
   quickCommands: {

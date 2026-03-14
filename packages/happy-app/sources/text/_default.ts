@@ -1549,6 +1549,11 @@ export const en = {
       `Failed to create remote webhook: ${error}`,
     tokenRequiredForRemote:
       "API Token required to auto-create webhooks on remote",
+    webhookRepoSaved: "Webhook saved",
+    webhookFieldsRequired: "Please fill in repo URL, machine, and secret",
+    webhookSaveHostFirst: "Please save the Git Host first",
+    webhookRepoDeleted: "Webhook deleted",
+    webhookDeleteConfirm: "Remove this webhook repo and delete server route?",
   },
 
   quickCommands: {

@@ -20,7 +20,7 @@ interface WebhookRouteResponse {
 /**
  * Upsert a single webhook route on the Server.
  */
-async function upsertWebhookRoute(
+export async function upsertWebhookRoute(
   credentials: AuthCredentials,
   provider: string,
   repo: WebhookRepoConfig,
@@ -63,7 +63,7 @@ async function upsertWebhookRoute(
 /**
  * Delete a webhook route from the Server.
  */
-async function deleteWebhookRoute(
+export async function deleteWebhookRoute(
   credentials: AuthCredentials,
   routeId: string,
 ): Promise<void> {

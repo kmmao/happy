@@ -1594,6 +1594,11 @@ export const pl: TranslationStructure = {
       `Nie udało się utworzyć zdalnego Webhook: ${error}`,
     tokenRequiredForRemote:
       "Token API jest wymagany do automatycznego tworzenia webhooków na zdalnym serwerze",
+    webhookRepoSaved: "Webhook zapisany",
+    webhookFieldsRequired: "Wypełnij URL repozytorium, maszynę i sekret",
+    webhookSaveHostFirst: "Najpierw zapisz Git Host",
+    webhookRepoDeleted: "Webhook usunięty",
+    webhookDeleteConfirm: "Usunąć ten Webhook i trasę serwera?",
   },
 
   quickCommands: {

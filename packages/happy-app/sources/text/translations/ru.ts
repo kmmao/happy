@@ -1593,6 +1593,11 @@ export const ru: TranslationStructure = {
       `Не удалось создать Webhook: ${error}`,
     tokenRequiredForRemote:
       "Для автоматического создания Webhook на удалённом сервере требуется API-токен",
+    webhookRepoSaved: "Webhook сохранён",
+    webhookFieldsRequired: "Заполните URL репозитория, машину и секрет",
+    webhookSaveHostFirst: "Сначала сохраните Git Host",
+    webhookRepoDeleted: "Webhook удалён",
+    webhookDeleteConfirm: "Удалить этот Webhook и маршрут на сервере?",
   },
 
   quickCommands: {

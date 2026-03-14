@@ -1491,6 +1491,11 @@ export const zhHans: TranslationStructure = {
     remoteWebhookFail: ({ error }: { error: string }) =>
       `创建远程 Webhook 失败：${error}`,
     tokenRequiredForRemote: "需要 API Token 才能在远程自动创建 Webhook",
+    webhookRepoSaved: "Webhook 已保存",
+    webhookFieldsRequired: "请填写仓库地址、机器和密钥",
+    webhookSaveHostFirst: "请先保存 Git Host 基本信息",
+    webhookRepoDeleted: "Webhook 已删除",
+    webhookDeleteConfirm: "删除此 Webhook 仓库并清理服务器路由？",
   },
 
   quickCommands: {

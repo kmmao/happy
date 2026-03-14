@@ -1573,6 +1573,11 @@ export const ca: TranslationStructure = {
       `Error en crear webhook remot: ${error}`,
     tokenRequiredForRemote:
       "Cal un token d'API per crear webhooks automàticament al remot",
+    webhookRepoSaved: "Webhook desat",
+    webhookFieldsRequired: "Omple l'URL del repositori, la màquina i el secret",
+    webhookSaveHostFirst: "Primer desa el Git Host",
+    webhookRepoDeleted: "Webhook eliminat",
+    webhookDeleteConfirm: "Eliminar aquest Webhook i la ruta del servidor?",
   },
 
   quickCommands: {

@@ -1572,6 +1572,11 @@ export const pt: TranslationStructure = {
       `Falha ao criar webhook remoto: ${error}`,
     tokenRequiredForRemote:
       "Token de API necessário para criar webhooks automaticamente no remoto",
+    webhookRepoSaved: "Webhook salvo",
+    webhookFieldsRequired: "Preencha a URL do repositório, máquina e segredo",
+    webhookSaveHostFirst: "Primeiro salve o Git Host",
+    webhookRepoDeleted: "Webhook eliminado",
+    webhookDeleteConfirm: "Eliminar este Webhook e a rota do servidor?",
   },
 
   quickCommands: {

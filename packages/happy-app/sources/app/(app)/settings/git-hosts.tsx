@@ -10,16 +10,9 @@ import { Modal as HappyModal } from "@/modal/ModalManager";
 import { layout } from "@/components/layout";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWindowDimensions } from "react-native";
-import { TokenStorage } from "@/auth/tokenStorage";
 import {
   generateWebhookSecret,
-  getWebhookUrl,
-  syncWebhookRoutes,
 } from "@/sync/webhookRouteSync";
-import {
-  machineCreateRemoteWebhook,
-  machineDeleteRemoteWebhook,
-} from "@/sync/ops";
 import type { WebhookRepoConfig } from "@/sync/issueTypes";
 import type { GitHost, GitHostTab, Provider } from "@/components/settings/git-hosts/types";
 import { GitHostBasicForm } from "@/components/settings/git-hosts/GitHostBasicForm";
@@ -96,7 +89,6 @@ export default React.memo(function GitHostsScreen() {
   const [formWebhookRepos, setFormWebhookRepos] = React.useState<
     WebhookRepoConfig[]
   >([]);
-  const [webhookSyncing, setWebhookSyncing] = React.useState(false);
 
   const safeArea = useSafeAreaInsets();
   const screenWidth = useWindowDimensions().width;
@@ -166,7 +158,7 @@ export default React.memo(function GitHostsScreen() {
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
-    let newEntry: GitHost = {
+    const newEntry: GitHost = {
       host: trimmedHost,
       provider: formProvider,
       ...(trimmedToken ? { apiToken: trimmedToken } : {}),
@@ -175,96 +167,6 @@ export default React.memo(function GitHostsScreen() {
       ...(authors.length > 0 ? { autoIssueAllowedAuthors: authors } : {}),
       webhookRepos: formWebhookRepos,
     };
-
-    // Sync webhook routes to server
-    const hasEnabledRepos = formWebhookRepos.some(
-      (r) => r.enabled && r.secret && r.machineId && r.repoUrl,
-    );
-    if (hasEnabledRepos || formWebhookRepos.some((r) => r.routeId)) {
-      setWebhookSyncing(true);
-      try {
-        const credentials = await TokenStorage.getCredentials();
-        if (credentials) {
-          const synced = await syncWebhookRoutes(credentials, newEntry);
-          newEntry = { ...synced } as GitHost;
-          HappyModal.toast(t("gitHosts.webhookSyncSuccess"));
-        }
-      } catch {
-        HappyModal.toast(t("gitHosts.webhookSyncError"));
-      }
-
-      // Auto-create webhooks on remote Git host via CLI Daemon RPC
-      if (trimmedToken && hasEnabledRepos) {
-        try {
-          const webhookUrl = getWebhookUrl(formProvider);
-          const enabledRepos = formWebhookRepos.filter(
-            (r) => r.enabled && r.secret && r.repoUrl && r.machineId,
-          );
-          const results = await Promise.allSettled(
-            enabledRepos.map((r) =>
-              machineCreateRemoteWebhook(r.machineId, {
-                provider: formProvider,
-                apiToken: trimmedToken,
-                repoUrl: r.repoUrl,
-                webhookUrl,
-                webhookSecret: r.secret,
-                events: ["issues", "pull_request"],
-              }),
-            ),
-          );
-          const failed = results.filter((r) => r.status === "rejected");
-          if (failed.length === 0 && results.length > 0) {
-            HappyModal.toast(t("gitHosts.remoteWebhookSuccess"));
-          } else if (failed.length > 0) {
-            const reason =
-              failed[0].status === "rejected"
-                ? (failed[0].reason as Error).message
-                : "Unknown";
-            HappyModal.alert(
-              "Webhook",
-              t("gitHosts.remoteWebhookFail", {
-                error: reason,
-              }),
-            );
-          }
-        } catch (err) {
-          HappyModal.alert(
-            "Webhook",
-            t("gitHosts.remoteWebhookFail", {
-              error: String(err),
-            }),
-          );
-        }
-      } else if (hasEnabledRepos && !trimmedToken) {
-        HappyModal.toast(t("gitHosts.tokenRequiredForRemote"));
-      }
-
-      // Delete webhooks for removed repos from remote Git host
-      if (trimmedToken && editIndex !== null) {
-        const originalRepos = gitHosts[editIndex]?.webhookRepos ?? [];
-        const currentRepoUrls = new Set(
-          formWebhookRepos.map((r) => r.repoUrl).filter(Boolean),
-        );
-        const removedRepos = originalRepos.filter(
-          (r) => r.repoUrl && r.machineId && !currentRepoUrls.has(r.repoUrl),
-        );
-        if (removedRepos.length > 0) {
-          const webhookUrl = getWebhookUrl(formProvider);
-          await Promise.allSettled(
-            removedRepos.map((r) =>
-              machineDeleteRemoteWebhook(r.machineId, {
-                provider: formProvider,
-                apiToken: trimmedToken,
-                repoUrl: r.repoUrl,
-                webhookUrl,
-              }),
-            ),
-          );
-        }
-      }
-
-      setWebhookSyncing(false);
-    }
 
     if (editIndex !== null) {
       setGitHosts(gitHosts.map((h, i) => (i === editIndex ? newEntry : h)));
@@ -280,6 +182,54 @@ export default React.memo(function GitHostsScreen() {
     setShowAddForm(false);
     setEditIndex(null);
   };
+
+  const editIndexRef = React.useRef(editIndex);
+  editIndexRef.current = editIndex;
+
+  const gitHostsRef = React.useRef(gitHosts);
+  gitHostsRef.current = gitHosts;
+
+  const handleWebhookRepoSaveComplete = React.useCallback(
+    (index: number, updatedRepo: WebhookRepoConfig) => {
+      setFormWebhookRepos((prev) =>
+        prev.map((r, i) => (i === index ? updatedRepo : r)),
+      );
+
+      const idx = editIndexRef.current;
+      const currentHosts = gitHostsRef.current;
+      if (idx !== null && currentHosts[idx]) {
+        const host = currentHosts[idx];
+        const newRepos = (host.webhookRepos ?? []).map((r, j) =>
+          j === index ? updatedRepo : r,
+        );
+        setGitHosts(
+          currentHosts.map((h, i) =>
+            i === idx ? { ...h, webhookRepos: newRepos } : h,
+          ),
+        );
+      }
+    },
+    [setGitHosts],
+  );
+
+  const handleWebhookRepoDeleteComplete = React.useCallback(
+    (index: number) => {
+      setFormWebhookRepos((prev) => prev.filter((_, i) => i !== index));
+
+      const idx = editIndexRef.current;
+      const currentHosts = gitHostsRef.current;
+      if (idx !== null && currentHosts[idx]) {
+        const host = currentHosts[idx];
+        const newRepos = (host.webhookRepos ?? []).filter((_, j) => j !== index);
+        setGitHosts(
+          currentHosts.map((h, i) =>
+            i === idx ? { ...h, webhookRepos: newRepos } : h,
+          ),
+        );
+      }
+    },
+    [setGitHosts],
+  );
 
   const handleAddWebhookRepo = () => {
     setFormWebhookRepos([
@@ -489,6 +439,18 @@ export default React.memo(function GitHostsScreen() {
                     onAddRepo={handleAddWebhookRepo}
                     onUpdateRepo={handleUpdateWebhookRepo}
                     onRemoveRepo={handleRemoveWebhookRepo}
+                    host={formHost.trim().toLowerCase()}
+                    apiToken={formToken.trim() || undefined}
+                    autoIssueLabel={formAutoLabel.trim() || undefined}
+                    autoIssueAllowedAuthors={
+                      formAutoAuthors
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean)
+                    }
+                    onSaveComplete={handleWebhookRepoSaveComplete}
+                    onDeleteComplete={handleWebhookRepoDeleteComplete}
+                    isNewHost={editIndex === null}
                   />
                 )}
               </View>
@@ -526,10 +488,10 @@ export default React.memo(function GitHostsScreen() {
                     paddingVertical: 8,
                     borderRadius: 8,
                     backgroundColor: theme.colors.button.primary.background,
-                    opacity: formHost.trim() && !webhookSyncing ? 1 : 0.5,
+                    opacity: formHost.trim() ? 1 : 0.5,
                   }}
                   onPress={handleSave}
-                  disabled={!formHost.trim() || webhookSyncing}
+                  disabled={!formHost.trim()}
                 >
                   <Text
                     style={{
@@ -539,7 +501,7 @@ export default React.memo(function GitHostsScreen() {
                       ...Typography.default("semiBold"),
                     }}
                   >
-                    {webhookSyncing ? "..." : t("common.save")}
+                    {t("common.save")}
                   </Text>
                 </Pressable>
               </View>
