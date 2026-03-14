@@ -867,6 +867,15 @@ export function registerCommonHandlers(
       const hooksEndpoint = `${baseUrl}/repos/${owner}/${repo}/hooks`;
       logger.debug("createRemoteWebhook hooksEndpoint:", hooksEndpoint);
 
+      // Gitea requires specific event names - use our curated list to ensure
+      // all issue and PR sub-events are enabled, regardless of what App sends.
+      const giteaEvents = [
+        "issues", "issue_assign", "issue_label", "issue_milestone", "issue_comment",
+        "pull_request", "pull_request_assign", "pull_request_label",
+        "pull_request_milestone", "pull_request_comment", "pull_request_review", "pull_request_sync",
+      ];
+      const events = data.provider === "gitea" ? giteaEvents : data.events;
+
       // Check if webhook already exists
       const listRes = await fetch(hooksEndpoint, { headers });
       if (listRes.ok) {
@@ -885,7 +894,7 @@ export function registerCommonHandlers(
                 content_type: "json",
                 secret: data.webhookSecret,
               },
-              events: data.events,
+              events,
               active: true,
             }),
           });
@@ -908,7 +917,7 @@ export function registerCommonHandlers(
           content_type: "json",
           secret: data.webhookSecret,
         },
-        events: data.events,
+        events,
         active: true,
       };
       // Gitea requires a "type" field

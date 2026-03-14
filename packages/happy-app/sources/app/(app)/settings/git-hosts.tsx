@@ -208,7 +208,7 @@ export default React.memo(function GitHostsScreen() {
                 repoUrl: r.repoUrl,
                 webhookUrl,
                 webhookSecret: r.secret,
-                events: ["issues"],
+                events: ["issues", "pull_request"],
               }),
             ),
           );

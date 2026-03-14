@@ -24,7 +24,25 @@ interface RepoCoordinates {
 // ── Events each provider needs ───────────────────────────
 
 const GITHUB_EVENTS = ["issues", "pull_request"] as const;
-const GITEA_EVENTS = ["issues", "issue_label", "pull_request"] as const;
+
+// Gitea requires explicit granular events — unlike GitHub, top-level names
+// like "pull_request" do NOT auto-enable sub-events on all Gitea versions.
+const GITEA_EVENTS = [
+    // Issue events
+    "issues",
+    "issue_assign",
+    "issue_label",
+    "issue_milestone",
+    "issue_comment",
+    // PR events
+    "pull_request",
+    "pull_request_assign",
+    "pull_request_label",
+    "pull_request_milestone",
+    "pull_request_comment",
+    "pull_request_review",
+    "pull_request_sync",
+] as const;
 
 // ── Repo URL → API coordinates ───────────────────────────
 
@@ -168,73 +186,156 @@ async function deleteGitHubWebhook(
 
 // ── Gitea ─────────────────────────────────────────────────
 
+/**
+ * List all webhooks on a Gitea repo and delete any that match our callbackUrl.
+ * Prevents duplicate webhooks from accumulating.
+ */
+async function cleanupGiteaWebhooks(
+    coords: RepoCoordinates,
+    apiToken: string,
+    callbackUrl: string,
+): Promise<void> {
+    const listUrl = `${coords.apiBase}/repos/${coords.owner}/${coords.repo}/hooks`;
+    const response = await fetch(listUrl, {
+        headers: { Authorization: `token ${apiToken}` },
+    });
+
+    if (!response.ok) {
+        log(
+            { module: "webhook", level: "warn" },
+            `Gitea list webhooks failed: ${response.status}`,
+        );
+        return;
+    }
+
+    const hooks = await response.json() as ReadonlyArray<{
+        id: number;
+        config: { url?: string };
+    }>;
+
+    const staleHooks = hooks.filter((h) => h.config.url === callbackUrl);
+    if (staleHooks.length > 0) {
+        log(
+            { module: "webhook" },
+            `Gitea cleanup: removing ${staleHooks.length} existing webhook(s) with url=${callbackUrl}`,
+        );
+    }
+
+    for (const hook of staleHooks) {
+        await deleteGiteaWebhook(coords, apiToken, String(hook.id));
+    }
+}
+
 async function createGiteaWebhook(
     coords: RepoCoordinates,
     apiToken: string,
     callbackUrl: string,
     webhookSecret: string,
 ): Promise<ProviderWebhookResult> {
-    const response = await fetch(
-        `${coords.apiBase}/repos/${coords.owner}/${coords.repo}/hooks`,
-        {
-            method: "POST",
-            headers: {
-                Authorization: `token ${apiToken}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                type: "gitea",
-                config: {
-                    url: callbackUrl,
-                    content_type: "json",
-                    secret: webhookSecret,
-                },
-                events: [...GITEA_EVENTS],
-                active: true,
-            }),
-        },
+    // Remove any existing webhooks with the same callback URL first
+    await cleanupGiteaWebhooks(coords, apiToken, callbackUrl);
+
+    const hooksUrl = `${coords.apiBase}/repos/${coords.owner}/${coords.repo}/hooks`;
+    const authHeaders = { Authorization: `token ${apiToken}` };
+
+    log(
+        { module: "webhook" },
+        `Gitea create webhook: POST ${hooksUrl} events=[${GITEA_EVENTS.join(",")}]`,
     );
 
-    if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        throw new Error(`Gitea create webhook failed: ${response.status} ${text}`);
+    const createResponse = await fetch(hooksUrl, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({
+            type: "gitea",
+            config: {
+                url: callbackUrl,
+                content_type: "json",
+                secret: webhookSecret,
+            },
+            events: [...GITEA_EVENTS],
+            active: true,
+        }),
+    });
+
+    const createText = await createResponse.text().catch(() => "");
+    if (!createResponse.ok) {
+        throw new Error(`Gitea create webhook failed: ${createResponse.status} ${createText}`);
     }
 
-    const data = await response.json() as { id: number | string };
-    return { remoteWebhookId: String(data.id) };
+    const created = JSON.parse(createText) as { id: number | string };
+    const hookId = String(created.id);
+
+    // Verify: GET the webhook back and check if PR events were actually saved.
+    // Some Gitea versions echo back events in POST response without persisting them.
+    const getResponse = await fetch(`${hooksUrl}/${hookId}`, {
+        headers: authHeaders,
+    });
+
+    if (getResponse.ok) {
+        const stored = await getResponse.json() as { events?: string[] };
+        const storedEvents = stored.events ?? [];
+        const hasPR = storedEvents.includes("pull_request");
+
+        log(
+            { module: "webhook" },
+            `Gitea webhook ${hookId} stored events: [${storedEvents.join(",")}] hasPR=${hasPR}`,
+        );
+
+        if (!hasPR) {
+            // PR events were not persisted — try PATCH as fallback
+            log(
+                { module: "webhook", level: "warn" },
+                `Gitea webhook ${hookId} missing PR events after create, trying PATCH...`,
+            );
+
+            const patchResponse = await fetch(`${hooksUrl}/${hookId}`, {
+                method: "PATCH",
+                headers: { ...authHeaders, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    events: [...GITEA_EVENTS],
+                    active: true,
+                }),
+            });
+
+            if (patchResponse.ok) {
+                // Verify again after PATCH
+                const verifyResponse = await fetch(`${hooksUrl}/${hookId}`, {
+                    headers: authHeaders,
+                });
+                if (verifyResponse.ok) {
+                    const patched = await verifyResponse.json() as { events?: string[] };
+                    log(
+                        { module: "webhook" },
+                        `Gitea webhook ${hookId} events after PATCH: [${(patched.events ?? []).join(",")}]`,
+                    );
+                }
+            } else {
+                const patchText = await patchResponse.text().catch(() => "");
+                log(
+                    { module: "webhook", level: "warn" },
+                    `Gitea PATCH events failed: ${patchResponse.status} ${patchText}`,
+                );
+            }
+        }
+    }
+
+    return { remoteWebhookId: hookId };
 }
 
+/**
+ * Gitea's PATCH endpoint does not reliably update events on all versions.
+ * Strategy: cleanup all matching webhooks and create a fresh one.
+ */
 async function updateGiteaWebhook(
     coords: RepoCoordinates,
     apiToken: string,
-    remoteWebhookId: string,
+    _remoteWebhookId: string,
     callbackUrl: string,
     webhookSecret: string,
-): Promise<void> {
-    const response = await fetch(
-        `${coords.apiBase}/repos/${coords.owner}/${coords.repo}/hooks/${remoteWebhookId}`,
-        {
-            method: "PATCH",
-            headers: {
-                Authorization: `token ${apiToken}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                config: {
-                    url: callbackUrl,
-                    content_type: "json",
-                    secret: webhookSecret,
-                },
-                events: [...GITEA_EVENTS],
-                active: true,
-            }),
-        },
-    );
-
-    if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        throw new Error(`Gitea update webhook failed: ${response.status} ${text}`);
-    }
+): Promise<ProviderWebhookResult> {
+    // createGiteaWebhook already runs cleanupGiteaWebhooks internally
+    return createGiteaWebhook(coords, apiToken, callbackUrl, webhookSecret);
 }
 
 async function deleteGiteaWebhook(
@@ -396,20 +497,33 @@ export async function ensureRemoteWebhook(
         : provider === "gitlab" ? createGitLabWebhook
         : null;
 
-    const updateFn = provider === "github" ? updateGitHubWebhook
-        : provider === "gitea" ? updateGiteaWebhook
-        : provider === "gitlab" ? updateGitLabWebhook
-        : null;
-
-    if (!createFn || !updateFn) return null;
+    if (!createFn) return null;
 
     try {
-        if (existingRemoteId) {
-            await updateFn(coords, apiToken, existingRemoteId, callbackUrl, webhookSecret);
+        // Gitea: always delete + create (PATCH doesn't reliably update events).
+        // GitHub/GitLab: use PATCH when webhook already exists.
+        if (existingRemoteId && provider === "gitea") {
+            const result = await updateGiteaWebhook(
+                coords, apiToken, existingRemoteId, callbackUrl, webhookSecret,
+            );
             log(
                 { module: "webhook" },
-                `Updated remote webhook ${existingRemoteId} on ${provider} for ${repoUrl}`,
+                `Recreated remote webhook ${existingRemoteId} → ${result.remoteWebhookId} on gitea for ${repoUrl}`,
             );
+            return result.remoteWebhookId;
+        }
+
+        if (existingRemoteId) {
+            const updateFn = provider === "github" ? updateGitHubWebhook
+                : provider === "gitlab" ? updateGitLabWebhook
+                : null;
+            if (updateFn) {
+                await updateFn(coords, apiToken, existingRemoteId, callbackUrl, webhookSecret);
+                log(
+                    { module: "webhook" },
+                    `Updated remote webhook ${existingRemoteId} on ${provider} for ${repoUrl}`,
+                );
+            }
             return existingRemoteId;
         }
 
