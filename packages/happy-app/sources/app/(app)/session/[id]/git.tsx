@@ -8,6 +8,7 @@ import { GitHistoryTab } from "@/components/git/GitHistoryTab";
 import { GitBranchesTab } from "@/components/git/GitBranchesTab";
 import { GitStashTab } from "@/components/git/GitStashTab";
 import { GitIssuesTab } from "@/components/git/issues/GitIssuesTab";
+import { GitPRsTab } from "@/components/git/prs/GitPRsTab";
 import { GitRepoSelector } from "@/components/git/GitRepoSelector";
 import { GitBranchHeader } from "@/components/git/GitBranchHeader";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/sync/storage";
 import { storage } from "@/sync/storage";
 import { issueStore } from "@/sync/issueStore";
+import { prStore } from "@/sync/prStore";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { Text } from "@/components/StyledText";
@@ -81,6 +83,15 @@ export default React.memo(function GitScreen() {
     ),
   );
 
+  const prCount = prStore((s) =>
+    allIssueKeys.reduce(
+      (sum, k) =>
+        sum +
+        (s.prsByProject[k] ?? []).filter((pr) => pr.state === "open").length,
+      0,
+    ),
+  );
+
   // Resolve git status for selected repo (root or submodule)
   const activeGitStatus = React.useMemo(() => {
     if (!selectedRepoPath) return gitStatus;
@@ -133,6 +144,7 @@ export default React.memo(function GitScreen() {
         onTabChange={handleTabChange}
         stashCount={gitStatus?.stashCount}
         issueCount={issueCount}
+        prCount={prCount}
       />
 
       {/* Changes / Browse sub-toggle — only visible on the Changes tab */}
@@ -252,6 +264,20 @@ export default React.memo(function GitScreen() {
         }}
       >
         <GitIssuesTab
+          sessionId={sessionId}
+          gitStatus={gitStatus}
+          submodules={submodules}
+          onPullDown={hasSubmodules ? handlePullDown : undefined}
+          onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+        />
+      </View>
+      <View
+        style={{
+          flex: 1,
+          display: activeTab === "prs" ? "flex" : "none",
+        }}
+      >
+        <GitPRsTab
           sessionId={sessionId}
           gitStatus={gitStatus}
           submodules={submodules}

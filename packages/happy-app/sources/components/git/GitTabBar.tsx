@@ -5,13 +5,14 @@ import { Typography } from "@/constants/Typography";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { t } from "@/text";
 
-export type GitTabId = "changes" | "history" | "branches" | "stash" | "issues";
+export type GitTabId = "changes" | "history" | "branches" | "stash" | "issues" | "prs";
 
 interface GitTabBarProps {
   activeTab: GitTabId;
   onTabChange: (tab: GitTabId) => void;
   stashCount?: number;
   issueCount?: number;
+  prCount?: number;
 }
 
 const TABS: readonly {
@@ -21,13 +22,15 @@ const TABS: readonly {
     | "tabHistory"
     | "tabBranches"
     | "tabStash"
-    | "tabIssues";
+    | "tabIssues"
+    | "tabPRs";
 }[] = [
   { id: "changes", labelKey: "tabChanges" },
   { id: "history", labelKey: "tabHistory" },
   { id: "branches", labelKey: "tabBranches" },
   { id: "stash", labelKey: "tabStash" },
   { id: "issues", labelKey: "tabIssues" },
+  { id: "prs", labelKey: "tabPRs" },
 ] as const;
 
 export const GitTabBar = React.memo<GitTabBarProps>(function GitTabBar({
@@ -35,6 +38,7 @@ export const GitTabBar = React.memo<GitTabBarProps>(function GitTabBar({
   onTabChange,
   stashCount,
   issueCount,
+  prCount,
 }) {
   const { theme } = useUnistyles();
 
@@ -85,6 +89,11 @@ export const GitTabBar = React.memo<GitTabBarProps>(function GitTabBar({
                 issueCount !== undefined &&
                 issueCount > 0 && (
                   <CountBadge count={issueCount} theme={theme} />
+                )}
+              {tab.id === "prs" &&
+                prCount !== undefined &&
+                prCount > 0 && (
+                  <CountBadge count={prCount} theme={theme} />
                 )}
             </View>
           </Pressable>
