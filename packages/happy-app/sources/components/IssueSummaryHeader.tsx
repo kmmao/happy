@@ -133,7 +133,11 @@ export const IssueSummaryHeader = React.memo<IssueSummaryHeaderProps>(
 
         {/* Expanded content: structured sections */}
         {expanded && (
-          <View style={styles.expandedContent}>
+          <ScrollView
+            style={styles.expandedContent}
+            contentContainerStyle={styles.expandedContentInner}
+            nestedScrollEnabled
+          >
             {/* == Metadata Section == */}
             <SectionHeader
               label={t("issues.sectionMetadata")}
@@ -283,7 +287,7 @@ export const IssueSummaryHeader = React.memo<IssueSummaryHeaderProps>(
                 </Text>
               </Pressable>
             ) : null}
-          </View>
+          </ScrollView>
         )}
       </View>
     );
@@ -385,6 +389,9 @@ const styles = StyleSheet.create((theme) => ({
     ...Typography.default("semiBold"),
   },
   expandedContent: {
+    maxHeight: 400,
+  },
+  expandedContentInner: {
     gap: 6,
     paddingLeft: 4,
     paddingBottom: 4,
