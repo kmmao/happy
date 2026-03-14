@@ -5,7 +5,7 @@
  * shared from issueTypes to avoid duplication.
  */
 
-export type { RepoInfo, RepoProvider, IssueLabel } from "./issueTypes";
+export type { RepoInfo, RepoProvider } from "./issueTypes";
 
 // ── PR state ────────────────────────────────────────────────────────
 
