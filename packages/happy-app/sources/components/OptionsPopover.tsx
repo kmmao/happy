@@ -5,6 +5,7 @@ import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
 import { layout } from "./layout";
 import { t } from "@/text";
+import { useAppendToInput } from "@/hooks/useInputContext";
 
 export interface OptionItem {
   text: string;
@@ -34,6 +35,7 @@ export const OptionsPopover = React.memo(
     onRemoveOption,
   }: OptionsPopoverProps) => {
     const { theme } = useUnistyles();
+    const appendToInput = useAppendToInput();
     const opacity = React.useRef(new Animated.Value(0)).current;
     const [shouldRender, setShouldRender] = React.useState(false);
 
@@ -125,6 +127,23 @@ export const OptionsPopover = React.memo(
                         </View>
                       )}
                     </View>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.removeButton,
+                      pressed && styles.removeButtonPressed,
+                    ]}
+                    onPress={() => {
+                      onClose();
+                      appendToInput(option.text);
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  >
+                    <Ionicons
+                      name="copy-outline"
+                      size={16}
+                      color={theme.colors.textSecondary}
+                    />
                   </Pressable>
                   {onRemoveOption && (
                     <Pressable

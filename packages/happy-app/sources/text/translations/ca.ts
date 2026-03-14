@@ -409,6 +409,7 @@ export const ca: TranslationStructure = {
     couldNotAttachFile: "No s'ha pogut adjuntar aquest fitxer",
     imageLoadFailed: "No s'ha pogut carregar la imatge",
     bookmarkOption: "Marcador",
+    appendToInput: "Edita al camp d'entrada",
     messageQueued: "En cua",
   },
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.2 - 2026-03-14
+
+Added copy-to-input button for AI suggestion options, allowing users to edit suggestions before sending.
+
+- Added copy-to-input icon on AI suggestion options to append text to input field for editing
+- Added copy-to-input icon in options popover and bookmarks popover
+
 ## 2.1.1 - 2026-03-13
 
 Bug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.

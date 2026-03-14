@@ -474,6 +474,7 @@ export const it: TranslationStructure = {
     couldNotAttachFile: "Impossibile allegare questo file",
     imageLoadFailed: "Impossibile caricare l'immagine",
     bookmarkOption: "Segnalibro",
+    appendToInput: "Modifica nel campo di input",
     messageQueued: "In coda",
   },
 

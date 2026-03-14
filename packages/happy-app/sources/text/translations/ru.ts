@@ -575,6 +575,7 @@ export const ru: TranslationStructure = {
     couldNotAttachFile: "Не удалось прикрепить этот файл",
     imageLoadFailed: "Не удалось загрузить изображение",
     bookmarkOption: "Закладка",
+    appendToInput: "Редактировать в поле ввода",
     messageQueued: "В очереди",
   },
 

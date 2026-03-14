@@ -412,6 +412,7 @@ export const es: TranslationStructure = {
     couldNotAttachFile: "No se pudo adjuntar este archivo",
     imageLoadFailed: "Error al cargar la imagen",
     bookmarkOption: "Marcador",
+    appendToInput: "Editar en el campo de entrada",
     messageQueued: "En cola",
   },
 

@@ -1,6 +1,16 @@
 {
   "entries": [
     {
+      "version": "2.1.2",
+      "date": "2026-03-14",
+      "summary": "Added copy-to-input button for AI suggestion options, allowing users to edit suggestions before sending.",
+      "changes": [
+        "Added copy-to-input icon on AI suggestion options to append text to input field for editing",
+        "Added copy-to-input icon in options popover and bookmarks popover"
+      ],
+      "rawMarkdown": "## 2.1.2 - 2026-03-14\n\n\nAdded copy-to-input button for AI suggestion options, allowing users to edit suggestions before sending.\n\n- Added copy-to-input icon on AI suggestion options to append text to input field for editing\n- Added copy-to-input icon in options popover and bookmarks popover"
+    },
+    {
       "version": "2.1.1",
       "date": "2026-03-13",
       "summary": "Bug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.",
@@ -123,5 +133,5 @@
       "rawMarkdown": "## 2.0.0 - 2026-02-27\n\n\nHappy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.\n\n- Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere\n- Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content\n- Added QR code scanning and manual URL entry for quick device authentication\n- Added Daemon mode for persistent background running with one-tap remote session launch\n- Added intelligent voice assistant supporting 15+ languages for natural conversation\n- Added GitHub and Claude account connection for unified developer identity management\n- Added multi-device real-time sync with online/offline status indicators\n- Added dark mode and appearance customization with automatic system theme following\n- Added Markdown table rendering and code syntax highlighting in chat\n- Streamlined settings page, removed upstream links, started maintaining own changelog\n- Supported iOS, Android, and Web platforms"
     }
   ],
-  "latestVersion": "2.1.1"
+  "latestVersion": "2.1.2"
 }

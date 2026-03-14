@@ -419,6 +419,7 @@ export const pl: TranslationStructure = {
     couldNotAttachFile: "Nie można załączyć tego pliku",
     imageLoadFailed: "Nie udało się załadować obrazu",
     bookmarkOption: "Zakładka",
+    appendToInput: "Edytuj w polu wpisywania",
     messageQueued: "W kolejce",
   },
 

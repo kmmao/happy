@@ -15,6 +15,7 @@ import * as Clipboard from "expo-clipboard";
 import { MermaidRenderer } from "./MermaidRenderer";
 import { t } from "@/text";
 import { useBookmarks } from "@/hooks/useBookmarks";
+import { useAppendToInput } from "@/hooks/useInputContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
 
@@ -321,6 +322,7 @@ function RenderOptionsBlock(props: {
   onOptionPress?: (option: Option) => void;
 }) {
   const { toggleBookmark, isBookmarked } = useBookmarks();
+  const appendToInput = useAppendToInput();
   const { theme } = useUnistyles();
 
   return (
@@ -353,8 +355,23 @@ function RenderOptionsBlock(props: {
                   style.bookmarkButton,
                   pressed && style.bookmarkButtonPressed,
                 ]}
+                onPress={() => appendToInput(item)}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                accessibilityLabel={t("session.appendToInput")}
+              >
+                <Ionicons
+                  name="copy-outline"
+                  size={16}
+                  color={theme.colors.textSecondary}
+                />
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  style.bookmarkButton,
+                  pressed && style.bookmarkButtonPressed,
+                ]}
                 onPress={() => toggleBookmark(item, "ai")}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                 accessibilityLabel={t("session.bookmarkOption")}
               >
                 <Ionicons

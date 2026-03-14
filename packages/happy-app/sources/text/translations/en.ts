@@ -409,6 +409,7 @@ export const en: TranslationStructure = {
     couldNotAttachFile: "Could not attach this file",
     imageLoadFailed: "Failed to load image",
     bookmarkOption: "Bookmark",
+    appendToInput: "Edit in input",
     messageQueued: "Queued",
   },
 

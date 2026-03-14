@@ -459,6 +459,7 @@ export const ja: TranslationStructure = {
     couldNotAttachFile: "このファイルを添付できませんでした",
     imageLoadFailed: "画像の読み込みに失敗しました",
     bookmarkOption: "ブックマーク",
+    appendToInput: "入力欄で編集",
     messageQueued: "キュー中",
   },
 

@@ -22,6 +22,7 @@ import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
 import { useLatestOptions } from "@/hooks/useLatestOptions";
 import { BookmarkProvider, useBookmarks } from "@/hooks/useBookmarks";
+import { InputContext } from "@/hooks/useInputContext";
 import { useSessionIssueInfo } from "@/hooks/useSessionIssueInfo";
 import { Modal } from "@/modal";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
@@ -417,6 +418,19 @@ function SessionViewInner({
     setShowCommandList(false);
     setMessage(`/${command} `);
   }, []);
+
+  // Append option text to input for editing before sending
+  const appendToInput = React.useCallback((text: string) => {
+    setMessage((prev) => {
+      const trimmed = prev.trimEnd();
+      return trimmed ? `${trimmed}\n${text}` : text;
+    });
+  }, []);
+
+  const inputContextValue = React.useMemo(
+    () => ({ appendToInput }),
+    [appendToInput],
+  );
 
   // Use draft hook for auto-saving message drafts
   const { clearDraft } = useDraft(sessionId, message, setMessage);
@@ -882,7 +896,7 @@ function SessionViewInner({
   );
 
   return (
-    <>
+    <InputContext.Provider value={inputContextValue}>
       {/* CLI Version Warning Overlay - Subtle centered pill */}
       {shouldShowCliWarning && !(isLandscape && deviceType === "phone") && (
         <Pressable
@@ -1025,6 +1039,6 @@ function SessionViewInner({
           />
         </Pressable>
       )}
-    </>
+    </InputContext.Provider>
   );
 }

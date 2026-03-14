@@ -381,6 +381,7 @@ export const zhHans: TranslationStructure = {
     couldNotAttachFile: "无法附加此文件",
     imageLoadFailed: "图片加载失败",
     bookmarkOption: "收藏",
+    appendToInput: "编辑后发送",
     messageQueued: "已排队",
   },
 

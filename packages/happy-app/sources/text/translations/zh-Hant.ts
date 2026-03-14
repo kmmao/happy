@@ -381,6 +381,7 @@ export const zhHant: TranslationStructure = {
     couldNotAttachFile: "無法附加此檔案",
     imageLoadFailed: "圖片載入失敗",
     bookmarkOption: "收藏",
+    appendToInput: "編輯後發送",
     messageQueued: "已排隊",
   },
 
