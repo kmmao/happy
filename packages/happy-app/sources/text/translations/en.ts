@@ -1517,9 +1517,11 @@ export const en: TranslationStructure = {
     mergeCommit: "Merge Commit",
     squashMerge: "Squash and Merge",
     rebaseMerge: "Rebase and Merge",
+    recommended: "Recommended",
     chooseMergeMethod: "Choose Merge Method",
     approve: "Approve",
     approved: "Approved!",
+    cannotApproveOwn: "Cannot approve your own pull request",
     closePR: "Close PR",
     addComment: "Add Comment",
     commentPlaceholder: "Enter your comment...",
@@ -1531,6 +1533,8 @@ export const en: TranslationStructure = {
     noReviews: "No reviews yet",
     noComments: "No comments yet",
     loadFailed: "Failed to load data",
+    mergeHint: "Merge code into base branch now",
+    approveHint: "Review only, does not merge",
   },
 
   gitHosts: {

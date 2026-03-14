@@ -5,9 +5,6 @@ import {
     ScrollView,
     Linking,
     ActivityIndicator,
-    ActionSheetIOS,
-    Alert,
-    Platform,
 } from "react-native";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
@@ -18,7 +15,7 @@ import { t } from "@/text";
 import { Modal } from "@/modal";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { prStore } from "@/sync/prStore";
-import { fetchPRFiles, fetchPRReviews, fetchPRComments, fetchPRChecks } from "@/sync/prFetch";
+import { fetchPRFiles, fetchPRReviews, fetchPRComments, fetchPRChecks, fetchPullRequestDetail } from "@/sync/prFetch";
 import type { AggregatedPR, PRFileDiff, PRReview, PRComment, CheckRun, MergeMethod, CheckStatus, ReviewState } from "@/sync/prTypes";
 import { PRFileItem } from "./PRFileItem";
 
@@ -52,6 +49,7 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
         const { theme } = useUnistyles();
         const insets = useSafeAreaInsets();
         const [prState, setPRState] = React.useState(pr.state);
+        const [prDetail, setPRDetail] = React.useState(pr);
         const [files, setFiles] = React.useState<readonly PRFileDiff[]>([]);
         const [filesLoading, setFilesLoading] = React.useState(false);
         const [filesLoaded, setFilesLoaded] = React.useState(false);
@@ -122,6 +120,34 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
             const repoInfo = prStore.getState().repoInfoByProject[pr.projectKey];
             return repoInfo && repoInfo.provider !== "unknown" ? repoInfo : null;
         }, [pr.projectKey]);
+
+        // Auto-fetch PR detail on mount for accurate stats, then auto-load CI checks
+        React.useEffect(() => {
+            const repoInfo = getRepoInfo();
+            if (!repoInfo) return;
+            // Show CI section with loading spinner immediately
+            setShowChecks(true);
+            setChecksLoading(true);
+            fetchPullRequestDetail(sessionId, repoInfo, pr.number, repoPath)
+                .then((detail) => {
+                    setPRDetail({ ...detail, repoLabel: pr.repoLabel, projectKey: pr.projectKey });
+                    // Auto-load CI checks
+                    return fetchPRChecks(sessionId, repoInfo, pr.number, repoPath)
+                        .then((result) => {
+                            setChecks(result);
+                            setChecksLoaded(true);
+                        })
+                        .catch(() => {
+                            setChecksLoaded(true);
+                        });
+                })
+                .catch(() => {
+                    // silently fail, keep using list data
+                })
+                .finally(() => {
+                    setChecksLoading(false);
+                });
+        }, [sessionId, pr.number, pr.projectKey, pr.repoLabel, repoPath, getRepoInfo]);
 
         // Load CI checks
         const handleToggleChecks = React.useCallback(async () => {
@@ -199,53 +225,12 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
         }, [commentsLoading, showComments, commentsLoaded, sessionId, pr.number, repoPath, getRepoInfo]);
 
         // Merge PR
+        const [showMergeMethods, setShowMergeMethods] = React.useState(false);
+        const pendingMergeMethod = React.useRef<MergeMethod | null>(null);
         const [mergeLoading, doMerge] = useHappyAction(
             React.useCallback(async () => {
-                const methods: { label: string; method: MergeMethod }[] = [
-                    { label: t("prs.mergeCommit"), method: "merge" },
-                    { label: t("prs.squashMerge"), method: "squash" },
-                    { label: t("prs.rebaseMerge"), method: "rebase" },
-                ];
-
-                const pickMethod = (): Promise<MergeMethod | null> =>
-                    new Promise((resolve) => {
-                        const cancelLabel = t("common.cancel");
-                        if (Platform.OS === "ios") {
-                            ActionSheetIOS.showActionSheetWithOptions(
-                                {
-                                    title: t("prs.chooseMergeMethod"),
-                                    options: [
-                                        ...methods.map((m) => m.label),
-                                        cancelLabel,
-                                    ],
-                                    cancelButtonIndex: methods.length,
-                                },
-                                (index) => {
-                                    if (index < methods.length) {
-                                        resolve(methods[index]!.method);
-                                    } else {
-                                        resolve(null);
-                                    }
-                                },
-                            );
-                        } else {
-                            Alert.alert(t("prs.chooseMergeMethod"), undefined, [
-                                ...methods.map((m) => ({
-                                    text: m.label,
-                                    onPress: () => resolve(m.method),
-                                })),
-                                {
-                                    text: cancelLabel,
-                                    style: "cancel" as const,
-                                    onPress: () => resolve(null),
-                                },
-                            ]);
-                        }
-                    });
-
-                const method = await pickMethod();
+                const method = pendingMergeMethod.current;
                 if (!method) return;
-
                 await prStore
                     .getState()
                     .mergePR(
@@ -257,23 +242,36 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                         repoPath,
                     );
                 setPRState("merged");
+                setShowMergeMethods(false);
             }, [pr.projectKey, pr.number, sessionId, repoPath]),
         );
+        const handleMerge = React.useCallback((method: MergeMethod) => {
+            pendingMergeMethod.current = method;
+            doMerge();
+        }, [doMerge]);
 
         // Approve PR
         const [approveLoading, doApprove] = useHappyAction(
             React.useCallback(async () => {
-                await prStore
-                    .getState()
-                    .submitReview(
-                        pr.projectKey,
-                        pr.number,
-                        "APPROVE",
-                        sessionId,
-                        undefined,
-                        repoPath,
-                    );
-                Modal.toast(t("prs.approved"));
+                try {
+                    await prStore
+                        .getState()
+                        .submitReview(
+                            pr.projectKey,
+                            pr.number,
+                            "APPROVE",
+                            sessionId,
+                            undefined,
+                            repoPath,
+                        );
+                    Modal.toast(t("prs.approved"));
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    if (msg.includes("approve your own")) {
+                        throw new Error(t("prs.cannotApproveOwn"));
+                    }
+                    throw err;
+                }
             }, [pr.projectKey, pr.number, sessionId, repoPath]),
         );
 
@@ -415,7 +413,7 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                             {formattedDate !== "" && ` · ${formattedDate}`}
                         </Text>
                         <View style={{ flexDirection: "row", gap: 6 }}>
-                            {pr.additions > 0 && (
+                            {prDetail.additions > 0 && (
                                 <Text
                                     style={{
                                         fontSize: 12,
@@ -424,10 +422,10 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                                         ...Typography.mono(),
                                     }}
                                 >
-                                    +{pr.additions}
+                                    +{prDetail.additions}
                                 </Text>
                             )}
-                            {pr.deletions > 0 && (
+                            {prDetail.deletions > 0 && (
                                 <Text
                                     style={{
                                         fontSize: 12,
@@ -436,10 +434,10 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                                         ...Typography.mono(),
                                     }}
                                 >
-                                    -{pr.deletions}
+                                    -{prDetail.deletions}
                                 </Text>
                             )}
-                            {pr.changedFiles > 0 && (
+                            {prDetail.changedFiles > 0 && (
                                 <Text
                                     style={{
                                         fontSize: 12,
@@ -447,57 +445,57 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                                         ...Typography.mono(),
                                     }}
                                 >
-                                    {pr.changedFiles} {t("prs.files")}
+                                    {prDetail.changedFiles} {t("prs.files")}
                                 </Text>
                             )}
                         </View>
                     </View>
 
                     {/* CI + Review status badges */}
-                    {(pr.checksStatus || pr.reviewDecision) && (
+                    {(prDetail.checksStatus || prDetail.reviewDecision) && (
                         <View style={styles.badgeRow}>
-                            {pr.checksStatus && (
+                            {prDetail.checksStatus && (
                                 <View
                                     style={[
                                         styles.statusBadge,
                                         {
                                             backgroundColor:
-                                                checkStatusColor(pr.checksStatus, theme.colors) + "20",
+                                                checkStatusColor(prDetail.checksStatus, theme.colors) + "20",
                                         },
                                     ]}
                                 >
                                     <Octicons
                                         name={
-                                            pr.checksStatus === "success"
+                                            prDetail.checksStatus === "success"
                                                 ? "check"
-                                                : pr.checksStatus ===
+                                                : prDetail.checksStatus ===
                                                         "failure" ||
-                                                    pr.checksStatus === "error"
+                                                    prDetail.checksStatus === "error"
                                                   ? "x"
                                                   : "clock"
                                         }
                                         size={12}
-                                        color={checkStatusColor(pr.checksStatus, theme.colors)}
+                                        color={checkStatusColor(prDetail.checksStatus, theme.colors)}
                                     />
                                     <Text
                                         style={{
                                             fontSize: 12,
                                             fontWeight: "600",
-                                            color: checkStatusColor(pr.checksStatus, theme.colors),
+                                            color: checkStatusColor(prDetail.checksStatus, theme.colors),
                                             ...Typography.default(),
                                         }}
                                     >
-                                        CI: {t(`prs.ci_${pr.checksStatus}`)}
+                                        CI: {t(`prs.ci_${prDetail.checksStatus}`)}
                                     </Text>
                                 </View>
                             )}
-                            {pr.reviewDecision && (
+                            {prDetail.reviewDecision && (
                                 <View
                                     style={[
                                         styles.statusBadge,
                                         {
                                             backgroundColor:
-                                                reviewStateColor(pr.reviewDecision, theme.colors) + "20",
+                                                reviewStateColor(prDetail.reviewDecision, theme.colors) + "20",
                                         },
                                     ]}
                                 >
@@ -505,12 +503,12 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                                         style={{
                                             fontSize: 12,
                                             fontWeight: "600",
-                                            color: reviewStateColor(pr.reviewDecision, theme.colors),
+                                            color: reviewStateColor(prDetail.reviewDecision, theme.colors),
                                             ...Typography.default(),
                                         }}
                                     >
                                         {t(
-                                            `prs.review_${pr.reviewDecision}`,
+                                            `prs.review_${prDetail.reviewDecision}`,
                                         )}
                                     </Text>
                                 </View>
@@ -525,7 +523,7 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                             { backgroundColor: theme.colors.surfaceHigh },
                         ]}
                     >
-                        {pr.body !== "" ? (
+                        {prDetail.body !== "" ? (
                             <ScrollView
                                 style={styles.bodyScroll}
                                 contentContainerStyle={styles.bodyContent}
@@ -538,7 +536,7 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                                         ...Typography.default(),
                                     }}
                                 >
-                                    {pr.body}
+                                    {prDetail.body}
                                 </Text>
                             </ScrollView>
                         ) : (
@@ -584,7 +582,7 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                                 ...Typography.default(),
                             }}
                         >
-                            {t("prs.viewChanges")} ({pr.changedFiles})
+                            {t("prs.viewChanges")} ({prDetail.changedFiles})
                         </Text>
                         {filesLoading && (
                             <ActivityIndicator
@@ -857,34 +855,103 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                     <View style={styles.actions}>
                         {/* Merge — only for open PRs */}
                         {isOpen && (
-                            <Pressable
-                                onPress={doMerge}
-                                disabled={mergeLoading}
-                                style={styles.actionItem}
-                            >
-                                {mergeLoading ? (
-                                    <ActivityIndicator
-                                        size={18}
-                                        color="#8957e5"
-                                    />
-                                ) : (
-                                    <Octicons
-                                        name="git-merge"
-                                        size={18}
-                                        color="#8957e5"
-                                    />
+                            <View>
+                                <View style={styles.mergeRow}>
+                                    <Pressable
+                                        onPress={() => handleMerge("squash")}
+                                        disabled={mergeLoading}
+                                        style={[styles.actionItem, { flex: 1 }]}
+                                    >
+                                        {mergeLoading ? (
+                                            <ActivityIndicator
+                                                size={18}
+                                                color="#8957e5"
+                                            />
+                                        ) : (
+                                            <Octicons
+                                                name="git-merge"
+                                                size={18}
+                                                color="#8957e5"
+                                            />
+                                        )}
+                                        <Text
+                                            style={{
+                                                fontSize: 15,
+                                                fontWeight: "600",
+                                                color: "#8957e5",
+                                                ...Typography.default("semiBold"),
+                                            }}
+                                        >
+                                            {t("prs.squashMerge")}
+                                        </Text>
+                                        <View style={[styles.recommendedBadge, { backgroundColor: "#8957e5" + "20" }]}>
+                                            <Text
+                                                style={{
+                                                    fontSize: 10,
+                                                    color: "#8957e5",
+                                                    fontWeight: "600",
+                                                    ...Typography.default("semiBold"),
+                                                }}
+                                            >
+                                                {t("prs.recommended")}
+                                            </Text>
+                                        </View>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => setShowMergeMethods((v) => !v)}
+                                        style={styles.mergeExpandButton}
+                                    >
+                                        <Ionicons
+                                            name={showMergeMethods ? "chevron-up" : "chevron-down"}
+                                            size={16}
+                                            color="#8957e5"
+                                        />
+                                    </Pressable>
+                                </View>
+                                {showMergeMethods && (
+                                    <View style={styles.mergeMethodsRow}>
+                                        {(
+                                            [
+                                                { label: t("prs.squashMerge"), method: "squash" as MergeMethod, recommended: true },
+                                                { label: t("prs.mergeCommit"), method: "merge" as MergeMethod, recommended: false },
+                                                { label: t("prs.rebaseMerge"), method: "rebase" as MergeMethod, recommended: false },
+                                            ] as const
+                                        ).map((m) => (
+                                            <Pressable
+                                                key={m.method}
+                                                onPress={() => handleMerge(m.method)}
+                                                disabled={mergeLoading}
+                                                style={[
+                                                    styles.mergeMethodButton,
+                                                    {
+                                                        backgroundColor: m.recommended
+                                                            ? "#8957e5" + "25"
+                                                            : "#8957e5" + "10",
+                                                        borderWidth: m.recommended ? 1 : 0,
+                                                        borderColor: "#8957e5" + "40",
+                                                    },
+                                                ]}
+                                            >
+                                                {mergeLoading ? (
+                                                    <ActivityIndicator size={12} color="#8957e5" />
+                                                ) : (
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: "#8957e5",
+                                                            textAlign: "center",
+                                                            fontWeight: m.recommended ? "700" : "500",
+                                                            ...Typography.default(m.recommended ? "semiBold" : undefined),
+                                                        }}
+                                                    >
+                                                        {m.label}
+                                                    </Text>
+                                                )}
+                                            </Pressable>
+                                        ))}
+                                    </View>
                                 )}
-                                <Text
-                                    style={{
-                                        fontSize: 15,
-                                        fontWeight: "600",
-                                        color: "#8957e5",
-                                        ...Typography.default("semiBold"),
-                                    }}
-                                >
-                                    {t("prs.merge")}
-                                </Text>
-                            </Pressable>
+                            </View>
                         )}
 
                         {/* Approve — only for open PRs */}
@@ -914,6 +981,15 @@ export const PRDetailSheet = React.memo<PRDetailSheetProps>(
                                     }}
                                 >
                                     {t("prs.approve")}
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 11,
+                                        color: theme.colors.textSecondary,
+                                        ...Typography.default(),
+                                    }}
+                                >
+                                    {t("prs.approveHint")}
                                 </Text>
                             </Pressable>
                         )}
@@ -1172,5 +1248,34 @@ const styles = StyleSheet.create((theme) => ({
     cancelItem: {
         alignItems: "center",
         paddingVertical: 14,
+    },
+    mergeRow: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    mergeExpandButton: {
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    recommendedBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    mergeMethodsRow: {
+        flexDirection: "row",
+        paddingHorizontal: 16,
+        paddingBottom: 8,
+        gap: 8,
+    },
+    mergeMethodButton: {
+        flex: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 4,
+        borderRadius: 8,
+        alignItems: "center",
+        justifyContent: "center",
     },
 }));
