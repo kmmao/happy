@@ -7,15 +7,125 @@ import { Item } from "@/components/Item";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { Project } from "@/sync/projectManager";
+import { useSetting } from "@/sync/storage";
+import { useRouter } from "expo-router";
 import { t } from "@/text";
+import type { GitHost } from "@/components/settings/git-hosts/types";
 
 interface ProjectGitTabProps {
     project: Project;
 }
 
+/**
+ * Extract hostname from a git remote URL.
+ * Handles SSH (git@host:...), HTTPS (https://host/...), HTTP+port (http://host:port/...)
+ */
+function extractHostFromRemoteUrl(
+    remoteUrl: string | null | undefined,
+): string | null {
+    if (!remoteUrl) return null;
+
+    // SSH format: git@github.com:owner/repo.git
+    const sshMatch = remoteUrl.match(/^[\w-]+@([^:]+):/);
+    if (sshMatch) return sshMatch[1];
+
+    // HTTPS/HTTP format
+    try {
+        const url = new URL(remoteUrl);
+        // For non-standard ports, return scheme + host + port (matches GitHost.host format)
+        if (
+            url.port &&
+            url.port !== "443" &&
+            url.port !== "80"
+        ) {
+            return `${url.protocol}//${url.host}`;
+        }
+        return url.hostname;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Extract owner/repo from a git remote URL for display.
+ */
+function extractRepoName(
+    remoteUrl: string | null | undefined,
+): string | null {
+    if (!remoteUrl) return null;
+
+    // SSH: git@github.com:owner/repo.git
+    const sshMatch = remoteUrl.match(/:([^/]+\/[^/]+?)(?:\.git)?$/);
+    if (sshMatch) return sshMatch[1];
+
+    // HTTPS: https://github.com/owner/repo.git
+    try {
+        const url = new URL(remoteUrl);
+        const path = url.pathname.replace(/^\//, "").replace(/\.git$/, "");
+        return path || null;
+    } catch {
+        return null;
+    }
+}
+
+function findMatchingGitHost(
+    remoteUrl: string | null | undefined,
+    gitHosts: readonly GitHost[],
+): GitHost | null {
+    const host = extractHostFromRemoteUrl(remoteUrl);
+    if (!host) return null;
+
+    return (
+        gitHosts.find(
+            (gh) =>
+                gh.host.toLowerCase() === host.toLowerCase() ||
+                host.toLowerCase().includes(gh.host.toLowerCase()),
+        ) ?? null
+    );
+}
+
+function formatTimeAgo(timestamp: number): string {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
+
+const LineChangeDetail = React.memo(
+    ({ added, removed }: { added: number; removed: number }) => {
+        const { theme } = useUnistyles();
+        if (added === 0 && removed === 0) {
+            return (
+                <Text style={{ color: theme.colors.textSecondary, ...Typography.default(), fontSize: 15 }}>
+                    0
+                </Text>
+            );
+        }
+        return (
+            <Text style={{ ...Typography.default(), fontSize: 15 }}>
+                {added > 0 && (
+                    <Text style={{ color: "#34C759" }}>+{added}</Text>
+                )}
+                {added > 0 && removed > 0 && (
+                    <Text style={{ color: theme.colors.textSecondary }}> / </Text>
+                )}
+                {removed > 0 && (
+                    <Text style={{ color: "#FF3B30" }}>-{removed}</Text>
+                )}
+            </Text>
+        );
+    },
+);
+
 export const ProjectGitTab = React.memo(({ project }: ProjectGitTabProps) => {
     const { theme } = useUnistyles();
+    const router = useRouter();
     const gitStatus = project.gitStatus;
+    const gitHosts = useSetting("gitHosts");
 
     if (!gitStatus) {
         return (
@@ -32,41 +142,283 @@ export const ProjectGitTab = React.memo(({ project }: ProjectGitTabProps) => {
         );
     }
 
+    const matchedHost = findMatchingGitHost(gitStatus.remoteUrl, gitHosts);
+    const repoName = extractRepoName(gitStatus.remoteUrl);
+
     return (
         <ItemList>
-            <ItemGroup title={t("projects.gitInfo")}>
+            {/* Branch & Remote */}
+            <ItemGroup title={t("projects.branchAndRemote")}>
                 <Item
                     title={t("projects.branch")}
                     detail={gitStatus.branch ?? "-"}
                     icon={
                         <Ionicons
                             name="git-branch-outline"
-                            size={24}
+                            size={20}
                             color={theme.colors.text}
                         />
                     }
                     showChevron={false}
                 />
+                {gitStatus.upstreamBranch && (
+                    <Item
+                        title={t("projects.upstreamBranch")}
+                        detail={gitStatus.upstreamBranch}
+                        icon={
+                            <Ionicons
+                                name="cloud-outline"
+                                size={20}
+                                color={theme.colors.text}
+                            />
+                        }
+                        showChevron={false}
+                    />
+                )}
                 {gitStatus.aheadCount !== undefined && (
                     <Item
                         title={t("projects.ahead")}
-                        detail={String(gitStatus.aheadCount)}
+                        rightElement={
+                            <Text
+                                style={{
+                                    ...Typography.default("semiBold"),
+                                    fontSize: 15,
+                                    color:
+                                        gitStatus.aheadCount > 0
+                                            ? "#34C759"
+                                            : theme.colors.textSecondary,
+                                }}
+                            >
+                                {gitStatus.aheadCount}
+                            </Text>
+                        }
                         showChevron={false}
                     />
                 )}
                 {gitStatus.behindCount !== undefined && (
                     <Item
                         title={t("projects.behind")}
-                        detail={String(gitStatus.behindCount)}
+                        rightElement={
+                            <Text
+                                style={{
+                                    ...Typography.default("semiBold"),
+                                    fontSize: 15,
+                                    color:
+                                        gitStatus.behindCount > 0
+                                            ? "#FF9500"
+                                            : theme.colors.textSecondary,
+                                }}
+                            >
+                                {gitStatus.behindCount}
+                            </Text>
+                        }
                         showChevron={false}
                     />
                 )}
+                {repoName && (
+                    <Item
+                        title={t("projects.remoteUrl")}
+                        detail={repoName}
+                        subtitle={gitStatus.remoteUrl ?? undefined}
+                        icon={
+                            <Ionicons
+                                name="link-outline"
+                                size={20}
+                                color={theme.colors.text}
+                            />
+                        }
+                        showChevron={false}
+                    />
+                )}
+            </ItemGroup>
+
+            {/* File Changes */}
+            <ItemGroup title={t("projects.fileChanges")}>
                 <Item
                     title={t("projects.dirty")}
-                    detail={gitStatus.isDirty ? t("common.yes") : t("common.no")}
+                    detail={
+                        gitStatus.isDirty
+                            ? t("common.yes")
+                            : t("common.no")
+                    }
+                    icon={
+                        <Ionicons
+                            name={
+                                gitStatus.isDirty
+                                    ? "alert-circle-outline"
+                                    : "checkmark-circle-outline"
+                            }
+                            size={20}
+                            color={
+                                gitStatus.isDirty
+                                    ? "#FF9500"
+                                    : "#34C759"
+                            }
+                        />
+                    }
+                    showChevron={false}
+                />
+                <Item
+                    title={t("projects.modifiedCount")}
+                    detail={String(gitStatus.modifiedCount)}
+                    icon={
+                        <Ionicons
+                            name="document-text-outline"
+                            size={20}
+                            color={theme.colors.text}
+                        />
+                    }
+                    showChevron={false}
+                />
+                <Item
+                    title={t("projects.untrackedCount")}
+                    detail={String(gitStatus.untrackedCount)}
+                    icon={
+                        <Ionicons
+                            name="help-circle-outline"
+                            size={20}
+                            color={theme.colors.text}
+                        />
+                    }
+                    showChevron={false}
+                />
+                <Item
+                    title={t("projects.stagedCount")}
+                    detail={String(gitStatus.stagedCount)}
+                    icon={
+                        <Ionicons
+                            name="checkmark-circle-outline"
+                            size={20}
+                            color={theme.colors.text}
+                        />
+                    }
                     showChevron={false}
                 />
             </ItemGroup>
+
+            {/* Line Changes */}
+            <ItemGroup title={t("projects.lineChanges")}>
+                <Item
+                    title={t("projects.stagedLines")}
+                    rightElement={
+                        <LineChangeDetail
+                            added={gitStatus.stagedLinesAdded}
+                            removed={gitStatus.stagedLinesRemoved}
+                        />
+                    }
+                    icon={
+                        <Ionicons
+                            name="checkmark-done-outline"
+                            size={20}
+                            color={theme.colors.text}
+                        />
+                    }
+                    showChevron={false}
+                />
+                <Item
+                    title={t("projects.unstagedLines")}
+                    rightElement={
+                        <LineChangeDetail
+                            added={gitStatus.unstagedLinesAdded}
+                            removed={gitStatus.unstagedLinesRemoved}
+                        />
+                    }
+                    icon={
+                        <Ionicons
+                            name="create-outline"
+                            size={20}
+                            color={theme.colors.text}
+                        />
+                    }
+                    showChevron={false}
+                />
+            </ItemGroup>
+
+            {/* Stash (only show if data available) */}
+            {gitStatus.stashCount !== undefined && (
+                <ItemGroup title={t("projects.stash")}>
+                    <Item
+                        title={t("projects.stashCount")}
+                        detail={String(gitStatus.stashCount)}
+                        icon={
+                            <Ionicons
+                                name="layers-outline"
+                                size={20}
+                                color={theme.colors.text}
+                            />
+                        }
+                        showChevron={false}
+                    />
+                </ItemGroup>
+            )}
+
+            {/* Git Host */}
+            <ItemGroup title={t("projects.gitHost")}>
+                {matchedHost ? (
+                    <Item
+                        title={matchedHost.host}
+                        subtitle={
+                            matchedHost.provider === "github"
+                                ? "GitHub"
+                                : "Gitea"
+                        }
+                        icon={
+                            <Ionicons
+                                name={
+                                    matchedHost.provider === "github"
+                                        ? "logo-github"
+                                        : "server-outline"
+                                }
+                                size={20}
+                                color={theme.colors.text}
+                            />
+                        }
+                        onPress={() =>
+                            router.push("/settings/git-hosts")
+                        }
+                    />
+                ) : gitStatus.remoteUrl ? (
+                    <Item
+                        title={t("projects.addGitHost")}
+                        icon={
+                            <Ionicons
+                                name="add-circle-outline"
+                                size={20}
+                                color={theme.colors.header.tint}
+                            />
+                        }
+                        titleStyle={{
+                            color: theme.colors.header.tint,
+                        }}
+                        onPress={() =>
+                            router.push("/settings/git-hosts")
+                        }
+                    />
+                ) : (
+                    <Item
+                        title={t("projects.noRemoteUrl")}
+                        icon={
+                            <Ionicons
+                                name="unlink-outline"
+                                size={20}
+                                color={theme.colors.textSecondary}
+                            />
+                        }
+                        titleStyle={{
+                            color: theme.colors.textSecondary,
+                        }}
+                        showChevron={false}
+                    />
+                )}
+            </ItemGroup>
+
+            {/* Last updated */}
+            <View style={styles.lastUpdatedContainer}>
+                <Text style={styles.lastUpdatedText}>
+                    {t("projects.lastUpdated")}:{" "}
+                    {formatTimeAgo(gitStatus.lastUpdatedAt)}
+                </Text>
+            </View>
         </ItemList>
     );
 });
@@ -84,5 +436,15 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         marginTop: 12,
         textAlign: "center",
+    },
+    lastUpdatedContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        alignItems: "center",
+    },
+    lastUpdatedText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
     },
 }));
