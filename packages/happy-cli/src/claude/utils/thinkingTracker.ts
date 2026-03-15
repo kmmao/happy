@@ -37,7 +37,7 @@ export function createThinkingTracker(opts: {
   onChange: (thinking: boolean) => void;
   idleTimeoutMs?: number;
 }): ThinkingTracker {
-  const idleTimeoutMs = opts.idleTimeoutMs ?? 2000;
+  const idleTimeoutMs = opts.idleTimeoutMs ?? 5000;
 
   let thinking = false;
   let activeFetches = new Set<number>();

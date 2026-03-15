@@ -189,14 +189,14 @@ describe("ThinkingTracker", () => {
     expect(onChange).toHaveBeenCalledTimes(1); // only the initial true
   });
 
-  it("should use default 2000ms idle timeout", () => {
+  it("should use default 5000ms idle timeout", () => {
     const onChange = vi.fn();
     const tracker = createThinkingTracker({ onChange });
 
     tracker.onFetchStart(1);
     tracker.onFetchEnd(1);
 
-    vi.advanceTimersByTime(1999);
+    vi.advanceTimersByTime(4999);
     expect(onChange).toHaveBeenCalledTimes(1);
 
     vi.advanceTimersByTime(1);
