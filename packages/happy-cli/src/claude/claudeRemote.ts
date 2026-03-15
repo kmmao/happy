@@ -514,9 +514,12 @@ export async function claudeRemote(opts: {
             currentPermissionMode === "bypassPermissions"
           ) {
             // Should never reach here: plan/bypass transitions are caught by coldModeHash.
+            // Freeze only permissionMode to avoid SDK state desync;
+            // other fields (model, thinking, etc.) still update normally.
             logger.debug(
-              `[claudeRemote] BUG: plan/bypass transition reached setPermissionMode — skipping (${currentPermissionMode} → ${newPermissionMode})`,
+              `[claudeRemote] BUG: plan/bypass transition reached setPermissionMode — preserving SDK state (${currentPermissionMode} → ${newPermissionMode})`,
             );
+            mode = { ...next.mode, permissionMode: mode.permissionMode };
           } else {
             logger.debug(
               `[claudeRemote] Hot-swapping permissionMode: ${currentPermissionMode} → ${newPermissionMode}`,
@@ -524,10 +527,11 @@ export async function claudeRemote(opts: {
             await (response as AdaptedQuery)._officialQuery.setPermissionMode(
               newPermissionMode,
             );
+            mode = next.mode;
           }
+        } else {
+          mode = next.mode;
         }
-
-        mode = next.mode;
         messages.push({
           type: "user",
           message: { role: "user", content: next.message },

@@ -4,6 +4,7 @@ import { MessageBuffer } from "@/ui/ink/messageBuffer";
 import { RemoteModeDisplay } from "@/ui/ink/RemoteModeDisplay";
 import React from "react";
 import { claudeRemote, resolveModelKey } from "./claudeRemote";
+import { mapToClaudeMode } from "./utils/permissionMode";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
 import { SDKAssistantMessage, SDKMessage, SDKUserMessage } from "./sdk";
@@ -572,10 +573,11 @@ export async function claudeRemoteLauncher(
       //   - plan ↔ non-plan: different tool sets (ExitPlanMode etc.)
       //   - bypassPermissions ↔ other: AskUserQuestion disallowedTools changes
       //   - thinking, effort, maxBudgetUsd: SDK has no runtime set methods
-      const coldModeHash = (m: EnhancedMode) =>
-        hashObject({
-          isPlan: m.permissionMode === "plan",
-          isBypass: m.permissionMode === "bypassPermissions",
+      const coldModeHash = (m: EnhancedMode) => {
+        const mapped = mapToClaudeMode(m.permissionMode);
+        return hashObject({
+          isPlan: mapped === "plan",
+          isBypass: mapped === "bypassPermissions",
           fallbackModel: m.fallbackModel,
           customSystemPrompt: m.customSystemPrompt,
           appendSystemPrompt: m.appendSystemPrompt,
@@ -586,6 +588,7 @@ export async function claudeRemoteLauncher(
           effort: m.effort,
           locale: m.locale,
         });
+      };
       let currentColdHash: string | null = null;
       let midTurnPushFn: ((msg: SDKUserMessage) => void) | null = null;
       let turnDrainController: AbortController | null = null;
@@ -651,23 +654,27 @@ export async function claudeRemoteLauncher(
             }
           }
 
-          // Hot-swap permissionMode if changed (non-plan, non-bypass)
-          if (
-            mode &&
-            item.mode.permissionMode !== mode.permissionMode &&
-            currentQuery
-          ) {
-            logger.debug(
-              `[remote]: mid-turn hot-swap permissionMode: ${mode.permissionMode} → ${item.mode.permissionMode}`,
-            );
-            try {
-              await currentQuery.setPermissionMode(
-                item.mode.permissionMode as any,
+          // Hot-swap permissionMode if changed (non-plan, non-bypass only)
+          // Use mapToClaudeMode to convert Codex modes (yolo/safe-yolo/read-only)
+          // to SDK-compatible modes before comparison and SDK call.
+          if (mode && currentQuery) {
+            const newMapped = mapToClaudeMode(item.mode.permissionMode);
+            const currentMapped = mapToClaudeMode(mode.permissionMode);
+            if (
+              newMapped !== currentMapped &&
+              newMapped !== "plan" && currentMapped !== "plan" &&
+              newMapped !== "bypassPermissions" && currentMapped !== "bypassPermissions"
+            ) {
+              logger.debug(
+                `[remote]: mid-turn hot-swap permissionMode: ${currentMapped} → ${newMapped}`,
               );
-            } catch (e) {
-              logger.debug("[remote]: mid-turn setPermissionMode failed", e);
+              try {
+                await currentQuery.setPermissionMode(newMapped);
+              } catch (e) {
+                logger.debug("[remote]: mid-turn setPermissionMode failed", e);
+              }
+              permissionHandler.handleModeChange(item.mode.permissionMode);
             }
-            permissionHandler.handleModeChange(item.mode.permissionMode);
           }
 
           // Update tracked mode state
