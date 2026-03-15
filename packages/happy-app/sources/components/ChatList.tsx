@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useSession, useSessionMessages } from "@/sync/storage";
+import { useSession, useSessionMessages, useSetting } from "@/sync/storage";
 import {
   FlatList,
   NativeScrollEvent,
@@ -14,41 +14,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MessageView } from "./MessageView";
 import { Metadata, Session } from "@/sync/storageTypes";
 import { ChatFooter } from "./ChatFooter";
-import { Message, ToolCallMessage } from "@/sync/typesMessage";
-import { ToolGroupView } from "./ToolGroupView";
+import { Message } from "@/sync/typesMessage";
 import { knownTools } from "./tools/knownTools";
 
-// Tools that should NOT be grouped (they have special UI or require interaction)
-const UNGROUPABLE_TOOLS = new Set([
-  "Task",
-  "Agent",
-  "AskUserQuestion",
-  "TodoWrite",
-  "Edit",
-  "MultiEdit",
-  "Write",
-  "NotebookEdit",
-]);
-
-function isToolGroupable(toolName: string): boolean {
-  if (UNGROUPABLE_TOOLS.has(toolName)) return false;
-  const knownTool = knownTools[toolName as keyof typeof knownTools] as any;
-  if (knownTool?.hidden) return false;
-  return true;
-}
-const MIN_GROUP_SIZE = 3;
-
-type ToolGroup = {
-  kind: "tool-group";
-  id: string;
-  messages: ToolCallMessage[];
-  model?: string;
-  turnTokens?: number;
-  cacheRead?: number;
-  totalInput?: number;
-};
-
-type DisplayItem = Message | ToolGroup;
+type DisplayItem = Message;
 
 export interface ChatListHandle {
   scrollToBottom: () => void;
@@ -165,92 +134,33 @@ const ChatListInternal = React.memo(
       return set;
     }, [props.messages]);
 
-    // Group consecutive tool-call messages (3+) into collapsible groups.
-    // The list is inverted (index 0 = newest), so we iterate normally
-    // and group consecutive groupable tool-calls.
+    // Filter tool-call messages based on viewInline setting.
+    // When viewInline is off, hide main agent tool calls (except special ones).
+    const viewInline = useSetting("viewInline");
     const displayItems: DisplayItem[] = React.useMemo(() => {
-      const result: DisplayItem[] = [];
-      let currentGroup: ToolCallMessage[] = [];
-      let groupStartIdx = -1;
-
-      const flushGroup = () => {
-        if (currentGroup.length >= MIN_GROUP_SIZE) {
-          let model: string | undefined;
-          let turnTokens: number | undefined;
-          let cacheRead: number | undefined;
-          let totalInput: number | undefined;
-
-          // Search backward in the original messages (toward newer / index 0)
-          // for the same-turn ready event (includes model + per-turn tokens).
-          for (let i = groupStartIdx - 1; i >= 0; i--) {
-            const m = props.messages[i];
-            if (m.kind === "user-text") break;
-            if (m.kind === "agent-event" && m.event.type === "ready") {
-              model = m.event.model;
-              if (m.event.usage) {
-                const cr = m.event.usage.cache_read_input_tokens ?? 0;
-                const cc = m.event.usage.cache_creation_input_tokens ?? 0;
-                turnTokens =
-                  m.event.usage.input_tokens +
-                  m.event.usage.output_tokens +
-                  cc +
-                  cr;
-                cacheRead = cr;
-                totalInput = m.event.usage.input_tokens + cc + cr;
-              }
-              break;
-            }
-          }
-
-          // Fallback: if no ready event found (running turn), search forward
-          // (toward older messages) for a previous turn's ready event.
-          // Only take the model name — tokens belong to a different turn.
-          if (!model) {
-            const afterGroup = groupStartIdx + currentGroup.length;
-            for (let i = afterGroup; i < props.messages.length; i++) {
-              const m = props.messages[i];
-              if (m.kind === "agent-event" && m.event.type === "ready") {
-                model = m.event.model;
-                break;
-              }
-            }
-          }
-
-          result.push({
-            kind: "tool-group",
-            id: `group-${currentGroup[0].id}`,
-            messages: [...currentGroup],
-            model,
-            turnTokens,
-            cacheRead,
-            totalInput,
-          });
-        } else {
-          for (const msg of currentGroup) {
-            result.push(msg);
-          }
-        }
-        currentGroup = [];
-        groupStartIdx = -1;
-      };
-
-      for (let idx = 0; idx < props.messages.length; idx++) {
-        const msg = props.messages[idx];
-        const isGroupable =
-          msg.kind === "tool-call" && isToolGroupable(msg.tool.name);
-
-        if (isGroupable) {
-          if (currentGroup.length === 0) groupStartIdx = idx;
-          currentGroup.push(msg as ToolCallMessage);
-        } else {
-          flushGroup();
-          result.push(msg);
-        }
+      if (viewInline) {
+        return props.messages;
       }
-      flushGroup();
-
-      return result;
-    }, [props.messages]);
+      // When viewInline is off, filter out tool-call messages
+      // Keep special tools that have important UI (Task, Agent, AskUserQuestion, TodoWrite, Edit, etc.)
+      const ALWAYS_VISIBLE_TOOLS = new Set([
+        "Task",
+        "Agent",
+        "AskUserQuestion",
+        "TodoWrite",
+        "Edit",
+        "MultiEdit",
+        "Write",
+        "NotebookEdit",
+      ]);
+      return props.messages.filter((msg) => {
+        if (msg.kind !== "tool-call") return true;
+        if (ALWAYS_VISIBLE_TOOLS.has(msg.tool.name)) return true;
+        const knownTool = knownTools[msg.tool.name as keyof typeof knownTools] as any;
+        if (knownTool?.hidden) return false;
+        return false;
+      });
+    }, [props.messages, viewInline]);
 
     // Collect user-text message indices in displayItems (not props.messages)
     // since the FlatList now uses displayItems as data.
@@ -263,23 +173,27 @@ const ChatListInternal = React.memo(
     );
 
     // Map displayItems index → original messages index.
-    // ToolGroups collapse N tool-call messages into 1 displayItem,
-    // so the indices diverge. useLatestOptions needs messages indices.
+    // When viewInline is off, some messages are filtered out, so indices diverge.
     const displayToMsgIndex = React.useMemo(() => {
+      if (viewInline) {
+        // 1:1 mapping when all messages are shown
+        const map = new Map<number, number>();
+        for (let i = 0; i < displayItems.length; i++) {
+          map.set(i, i);
+        }
+        return map;
+      }
       const map = new Map<number, number>();
       let msgIdx = 0;
-      for (let di = 0; di < displayItems.length; di++) {
-        const item = displayItems[di];
-        if (item.kind === "tool-group") {
-          map.set(di, msgIdx);
-          msgIdx += item.messages.length;
-        } else {
-          map.set(di, msgIdx);
-          msgIdx++;
+      let diIdx = 0;
+      for (let mi = 0; mi < props.messages.length; mi++) {
+        if (diIdx < displayItems.length && displayItems[diIdx] === props.messages[mi]) {
+          map.set(diIdx, mi);
+          diIdx++;
         }
       }
       return map;
-    }, [displayItems]);
+    }, [displayItems, props.messages, viewInline]);
 
     React.useImperativeHandle(ref, () => ({
       scrollToBottom: () => {
@@ -399,19 +313,6 @@ const ChatListInternal = React.memo(
     const keyExtractor = useCallback((item: DisplayItem) => item.id, []);
     const renderItem = useCallback(
       ({ item }: { item: DisplayItem }) => {
-        if (item.kind === "tool-group") {
-          return (
-            <ToolGroupView
-              messages={item.messages}
-              metadata={props.metadata}
-              sessionId={props.sessionId}
-              model={item.model}
-              turnTokens={item.turnTokens}
-              cacheRead={item.cacheRead}
-              totalInput={item.totalInput}
-            />
-          );
-        }
         const hasThinking =
           item.kind === "agent-event" &&
           item.event.type === "ready" &&

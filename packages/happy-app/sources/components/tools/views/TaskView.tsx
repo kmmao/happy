@@ -221,7 +221,8 @@ export const TaskView = React.memo<ToolViewProps>(
       },
     });
 
-    const [collapsed, setCollapsed] = React.useState(true);
+    const expandTools = useSetting("expandTools");
+    const [collapsed, setCollapsed] = React.useState(!expandTools);
     const [showAllTools, setShowAllTools] = React.useState(false);
 
     if (filtered.length === 0) {
