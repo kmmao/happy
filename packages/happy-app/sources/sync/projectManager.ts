@@ -473,6 +473,11 @@ class ProjectManager {
    */
   mergeServerProjects(serverProjects: ServerProject[]): void {
     for (const sp of serverProjects) {
+      // Skip worktree-path projects — these should belong to the parent project
+      if (sp.path.includes(".dev/worktree/")) {
+        continue;
+      }
+
       const keyString = this.getProjectKeyString({
         machineId: sp.machineId,
         path: sp.path,

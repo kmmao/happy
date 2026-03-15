@@ -34,8 +34,10 @@ export function projectRoutes(app: Fastify) {
             const userId = request.userId;
             const archived = request.query?.archived;
 
-            const where: { accountId: string; archived?: boolean } = {
+            const where: { accountId: string; archived?: boolean; path?: { not: { contains: string } } } = {
                 accountId: userId,
+                // Exclude worktree-path projects — they belong to their parent project
+                path: { not: { contains: ".dev/worktree/" } },
             };
             if (archived !== undefined) {
                 where.archived = archived;
