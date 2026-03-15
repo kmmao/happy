@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { Project } from "@/sync/projectManager";
 import { storage } from "@/sync/storage";
+import { useShallow } from "zustand/react/shallow";
 import { Session } from "@/sync/storageTypes";
 import { useSessionStatus, getSessionName } from "@/utils/sessionUtils";
 import { useRouter } from "expo-router";
@@ -42,18 +43,20 @@ const SessionRow = React.memo(({ session }: { session: Session }) => {
 
 export const ProjectSessionsTab = React.memo(
     ({ project }: ProjectSessionsTabProps) => {
-        const allSessions = storage((s) => s.sessions);
-
-        const sessions = React.useMemo(() => {
-            return project.sessionIds
-                .map((id) => allSessions[id])
-                .filter(Boolean)
-                .sort((a, b) => {
-                    // Active first, then by activeAt descending
-                    if (a.active !== b.active) return a.active ? -1 : 1;
-                    return b.activeAt - a.activeAt;
-                });
-        }, [project.sessionIds, allSessions]);
+        const sessions = storage(
+            useShallow((s) => {
+                return project.sessionIds
+                    .map((id) => s.sessions[id])
+                    .filter(Boolean)
+                    .sort((a, b) => {
+                        // Active first, then by activeAt descending
+                        if (a.active !== b.active) return a.active ? -1 : 1;
+                        const timeDiff = b.activeAt - a.activeAt;
+                        if (timeDiff !== 0) return timeDiff;
+                        return a.id < b.id ? -1 : 1;
+                    });
+            }),
+        );
 
         if (sessions.length === 0) {
             return (
