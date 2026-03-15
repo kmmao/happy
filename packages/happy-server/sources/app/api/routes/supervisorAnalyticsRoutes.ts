@@ -153,7 +153,11 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
 
             const project = await db.project.findFirst({
                 where: { id, accountId: userId },
-                select: { id: true },
+                select: {
+                    id: true,
+                    supervisorNextRunAt: true,
+                    supervisorScheduleEnabled: true,
+                },
             });
 
             if (!project) {
@@ -218,6 +222,11 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
                 },
             });
 
+            const nextRunAt =
+                project.supervisorScheduleEnabled && project.supervisorNextRunAt
+                    ? project.supervisorNextRunAt.getTime()
+                    : null;
+
             return reply.send({
                 grade,
                 score,
@@ -225,6 +234,7 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
                 trendDirection,
                 lastScanAt,
                 totalRuns30d,
+                nextRunAt,
             });
         },
     );

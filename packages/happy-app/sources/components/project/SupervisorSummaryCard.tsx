@@ -52,6 +52,18 @@ function formatRelativeTime(timestamp: number): string {
     return `${diffMonths}mo`;
 }
 
+function formatFutureTime(timestamp: number): string {
+    const now = Date.now();
+    const diffMs = timestamp - now;
+    if (diffMs <= 0) return "<1m";
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) return `${diffMins}m`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d`;
+}
+
 export const SupervisorSummaryCard = React.memo(
     ({ summary, scoreDelta }: SupervisorSummaryCardProps) => {
         const { theme } = useUnistyles();
@@ -171,6 +183,18 @@ export const SupervisorSummaryCard = React.memo(
                         {t("supervisor.runs30d")}: {summary.totalRuns30d}
                     </Text>
                 </View>
+                {summary.nextRunAt && (
+                    <View style={styles.nextRunRow}>
+                        <Ionicons
+                            name="time-outline"
+                            size={12}
+                            color={theme.colors.textSecondary}
+                        />
+                        <Text style={styles.metaText}>
+                            {t("supervisor.nextRun")}: {formatFutureTime(summary.nextRunAt)}
+                        </Text>
+                    </View>
+                )}
             </View>
         );
     },
@@ -263,6 +287,11 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+    },
+    nextRunRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
     },
     metaText: {
         ...Typography.default(),

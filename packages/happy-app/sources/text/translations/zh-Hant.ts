@@ -1942,6 +1942,7 @@ export const zhHant: TranslationStructure = {
     lastScan: "上次掃描",
     openIssues: "未解決問題",
     runs30d: "執行次數（30天）",
+    nextRun: "下次掃描",
     runDetail: "執行詳情",
     runTrigger: "觸發方式",
     runDuration: "耗時",

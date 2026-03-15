@@ -2045,6 +2045,7 @@ export const ca: TranslationStructure = {
     lastScan: "Últim escaneig",
     openIssues: "Problemes oberts",
     runs30d: "Execucions (30d)",
+    nextRun: "Proper escaneig",
     runDetail: "Detall d'execució",
     runTrigger: "Trigger",
     runDuration: "Durada",

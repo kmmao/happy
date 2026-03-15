@@ -2009,6 +2009,7 @@ export const ja: TranslationStructure = {
     lastScan: "最終スキャン",
     openIssues: "未解決の問題",
     runs30d: "実行回数（30日）",
+    nextRun: "次回スキャン",
     runDetail: "実行詳細",
     runTrigger: "トリガー",
     runDuration: "所要時間",

@@ -2057,6 +2057,7 @@ export const ru: TranslationStructure = {
     lastScan: "Последнее сканирование",
     openIssues: "Открытые проблемы",
     runs30d: "Запуски (30д)",
+    nextRun: "Следующее сканирование",
     runDetail: "Детали запуска",
     runTrigger: "Триггер",
     runDuration: "Длительность",

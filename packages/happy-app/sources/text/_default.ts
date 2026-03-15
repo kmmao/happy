@@ -2038,6 +2038,7 @@ export const en = {
     lastScan: "Last Scan",
     openIssues: "Open Issues",
     runs30d: "Runs (30d)",
+    nextRun: "Next Scan",
 
     // Run detail / comparison (Phase 6b)
     runDetail: "Run Detail",

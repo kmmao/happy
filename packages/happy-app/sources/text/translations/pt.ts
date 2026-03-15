@@ -2042,6 +2042,7 @@ export const pt: TranslationStructure = {
     lastScan: "Último escaneamento",
     openIssues: "Problemas abertos",
     runs30d: "Execuções (30d)",
+    nextRun: "Próxima verificação",
     runDetail: "Detalhe da execução",
     runTrigger: "Trigger",
     runDuration: "Duração",

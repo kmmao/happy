@@ -464,6 +464,7 @@ export interface SupervisorSummary {
     trendDirection: "improving" | "stable" | "declining";
     lastScanAt: number | null;
     totalRuns30d: number;
+    nextRunAt: number | null;
 }
 
 /**

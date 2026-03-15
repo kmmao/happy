@@ -2021,6 +2021,7 @@ export const en: TranslationStructure = {
     lastScan: "Last Scan",
     openIssues: "Open Issues",
     runs30d: "Runs (30d)",
+    nextRun: "Next Scan",
     runDetail: "Run Detail",
     runTrigger: "Trigger",
     runDuration: "Duration",

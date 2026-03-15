@@ -1939,6 +1939,7 @@ export const zhHans: TranslationStructure = {
     lastScan: "上次扫描",
     openIssues: "未解决问题",
     runs30d: "运行次数（30天）",
+    nextRun: "下次扫描",
     runDetail: "运行详情",
     runTrigger: "触发方式",
     runDuration: "耗时",
