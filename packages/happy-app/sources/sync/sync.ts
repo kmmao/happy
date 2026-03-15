@@ -3229,30 +3229,46 @@ class Sync {
     for (const [sessionId, update] of updates) {
       const session = storage.getState().sessions[sessionId];
       if (session) {
-        // Ephemeral activity updates (keepAlive heartbeats) can SET thinking=true
-        // but should NOT reset thinking=false — that's the job of lifecycle
-        // events (task_complete / turn-end) which arrive via the message stream.
+        // Thinking state resolution strategy:
         //
-        // The thinkingTracker on the CLI side has a short idle timeout that
-        // causes thinking to flicker false between API calls, even though
-        // Claude is still actively working within the same turn. By ignoring
-        // thinking=false from ephemeral updates, we keep the UI stable
-        // throughout the entire turn.
+        // Problem: The CLI's thinkingTracker has a short idle timeout that
+        // causes thinking to briefly flicker false between API calls, even
+        // though Claude is still working within the same turn. This makes
+        // the UI show "online" when it should show "thinking".
         //
-        // Exception: when session becomes inactive (active=false), always
-        // clear thinking — the CLI has disconnected.
-        const resolvedThinking = !update.active
-          ? false
-          : update.thinking
-            ? true
-            : session.thinking; // Keep existing thinking state; only lifecycle can clear it
+        // Solution: Use a hold period. When ephemeral says thinking=false
+        // but we recently received thinking=true, keep showing thinking.
+        // This gives the CLI time to start the next API call. The hold
+        // period acts as a fallback for missed lifecycle events.
+        //
+        // Lifecycle events (task_complete/turn-end) bypass this entirely
+        // and immediately set thinking=false via applySessions.
+        const THINKING_HOLD_MS = 8000;
+
+        let resolvedThinking: boolean;
+
+        if (!update.active) {
+          // Session disconnected → always clear thinking
+          resolvedThinking = false;
+        } else if (update.thinking) {
+          // Ephemeral says thinking=true → apply and refresh hold window
+          resolvedThinking = true;
+        } else {
+          // Ephemeral says thinking=false → only apply if we haven't
+          // received thinking=true recently (hold period)
+          const holdActive = session.thinking
+            && session.thinkingAt > 0
+            && (update.activeAt - session.thinkingAt) < THINKING_HOLD_MS;
+          resolvedThinking = holdActive ? true : false;
+        }
 
         sessions.push({
           ...session,
           active: update.active,
           activeAt: update.activeAt,
           thinking: resolvedThinking,
-          thinkingAt: resolvedThinking !== session.thinking
+          // Refresh thinkingAt when thinking=true so hold window slides forward
+          thinkingAt: resolvedThinking && update.thinking
             ? update.activeAt
             : session.thinkingAt,
         });
