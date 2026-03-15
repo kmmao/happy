@@ -103,6 +103,18 @@ export const ProjectSessionsTab = React.memo(
                     {sessions.map((session) => (
                         <SessionRow key={session.id} session={session} />
                     ))}
+                    <Item
+                        title={t("newSession.title")}
+                        icon={
+                            <Ionicons
+                                name="add-circle-outline"
+                                size={20}
+                                color={theme.colors.header.tint}
+                            />
+                        }
+                        onPress={handleNewSession}
+                        titleStyle={{ color: theme.colors.header.tint }}
+                    />
                 </ItemGroup>
             </ItemList>
         );
