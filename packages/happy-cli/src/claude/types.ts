@@ -52,6 +52,17 @@ export const RawJSONLinesSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("system"),
     uuid: z.string() // Used in getMessageKey()
+  }).passthrough(),
+
+  // Result message - signals turn completion
+  // Emitted by Claude Code SDK when a query finishes (success or error)
+  z.object({
+    type: z.literal("result"),
+    uuid: z.string(),
+    subtype: z.string(),
+    is_error: z.boolean().optional(),
+    total_cost_usd: z.number().optional(),
+    num_turns: z.number().optional(),
   }).passthrough()
 ]);
 

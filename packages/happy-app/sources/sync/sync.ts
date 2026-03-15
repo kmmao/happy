@@ -3229,48 +3229,15 @@ class Sync {
     for (const [sessionId, update] of updates) {
       const session = storage.getState().sessions[sessionId];
       if (session) {
-        // Thinking state resolution strategy:
-        //
-        // Problem: The CLI's thinkingTracker has a short idle timeout that
-        // causes thinking to briefly flicker false between API calls, even
-        // though Claude is still working within the same turn. This makes
-        // the UI show "online" when it should show "thinking".
-        //
-        // Solution: Use a hold period. When ephemeral says thinking=false
-        // but we recently received thinking=true, keep showing thinking.
-        // This gives the CLI time to start the next API call. The hold
-        // period acts as a fallback for missed lifecycle events.
-        //
-        // Lifecycle events (task_complete/turn-end) bypass this entirely
-        // and immediately set thinking=false via applySessions.
-        const THINKING_HOLD_MS = 8000;
-
-        let resolvedThinking: boolean;
-
-        if (!update.active) {
-          // Session disconnected → always clear thinking
-          resolvedThinking = false;
-        } else if (update.thinking) {
-          // Ephemeral says thinking=true → apply and refresh hold window
-          resolvedThinking = true;
-        } else {
-          // Ephemeral says thinking=false → only apply if we haven't
-          // received thinking=true recently (hold period)
-          const holdActive = session.thinking
-            && session.thinkingAt > 0
-            && (update.activeAt - session.thinkingAt) < THINKING_HOLD_MS;
-          resolvedThinking = holdActive ? true : false;
-        }
-
+        // Ephemeral activity updates carry the CLI's real-time thinking state.
+        // Lifecycle events (turn-end via result messages) provide authoritative
+        // turn boundaries and are applied separately via applySessions in handleUpdate.
         sessions.push({
           ...session,
           active: update.active,
           activeAt: update.activeAt,
-          thinking: resolvedThinking,
-          // Refresh thinkingAt when thinking=true so hold window slides forward
-          thinkingAt: resolvedThinking && update.thinking
-            ? update.activeAt
-            : session.thinkingAt,
+          thinking: update.active ? update.thinking : false,
+          thinkingAt: update.thinking ? update.activeAt : session.thinkingAt,
         });
       }
     }

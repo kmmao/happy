@@ -4,6 +4,7 @@ import { Session } from "./session";
 import { Future } from "@/utils/future";
 import { createSessionScanner } from "./utils/sessionScanner";
 import { createThinkingTracker } from "./utils/thinkingTracker";
+import type { SessionTurnEndStatus } from "@kmmao/happy-wire";
 
 export type LauncherResult =
   | { type: "switch" }
@@ -29,6 +30,20 @@ export async function claudeLocalLauncher(
       // But capture the summary text for RPC retrieval
       if (message.type === "summary") {
         latestCompactionSummary = message.summary;
+        return;
+      }
+      // Result message signals turn completion — emit turn-end immediately
+      // Without this, turn-end is only emitted when the next user message
+      // arrives or the process exits, leaving thinking state stale.
+      if (message.type === "result") {
+        thinkingTracker.onProcessExit(); // Clear all tracking, thinking=false
+        const status: SessionTurnEndStatus =
+          message.subtype === "success" ? "completed" : "failed";
+        session.client.closeClaudeSessionTurn(status, {
+          totalCostUsd: message.total_cost_usd ?? 0,
+          numTurns: message.num_turns ?? 0,
+          modelUsage: (message as any).modelUsage ?? {},
+        });
         return;
       }
       // Assistant messages signal Claude is working (possibly executing tools next)
