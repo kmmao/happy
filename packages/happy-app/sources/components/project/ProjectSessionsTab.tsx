@@ -100,9 +100,6 @@ export const ProjectSessionsTab = React.memo(
         return (
             <ItemList>
                 <ItemGroup title={t("projects.sessions")}>
-                    {sessions.map((session) => (
-                        <SessionRow key={session.id} session={session} />
-                    ))}
                     <Item
                         title={t("newSession.title")}
                         icon={
@@ -115,6 +112,9 @@ export const ProjectSessionsTab = React.memo(
                         onPress={handleNewSession}
                         titleStyle={{ color: theme.colors.header.tint }}
                     />
+                    {sessions.map((session) => (
+                        <SessionRow key={session.id} session={session} />
+                    ))}
                 </ItemGroup>
             </ItemList>
         );
