@@ -49,9 +49,12 @@ export const ProjectSessionsTab = React.memo(
                     .map((id) => s.sessions[id])
                     .filter(Boolean)
                     .sort((a, b) => {
-                        // Active first, then by activeAt descending
+                        // Active first
                         if (a.active !== b.active) return a.active ? -1 : 1;
-                        const timeDiff = b.activeAt - a.activeAt;
+                        // Active sessions: stable sort by createdAt (activeAt changes too frequently)
+                        // Inactive sessions: sort by activeAt (most recently active first)
+                        const sortKey = a.active ? "createdAt" : "activeAt";
+                        const timeDiff = b[sortKey] - a[sortKey];
                         if (timeDiff !== 0) return timeDiff;
                         return a.id < b.id ? -1 : 1;
                     });
