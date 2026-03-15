@@ -3229,21 +3229,32 @@ class Sync {
     for (const [sessionId, update] of updates) {
       const session = storage.getState().sessions[sessionId];
       if (session) {
-        // Don't let a stale ephemeral update overwrite a more recent
-        // lifecycle-event-driven thinking state (task_started / task_complete).
-        // Lifecycle events set thinkingAt to Date.now(), which is always
-        // newer than the ephemeral update's activeAt when there's a race.
-        const lifecycleIsNewer =
-          session.thinkingAt > 0 && update.activeAt < session.thinkingAt;
+        // Ephemeral activity updates (keepAlive heartbeats) can SET thinking=true
+        // but should NOT reset thinking=false — that's the job of lifecycle
+        // events (task_complete / turn-end) which arrive via the message stream.
+        //
+        // The thinkingTracker on the CLI side has a short idle timeout that
+        // causes thinking to flicker false between API calls, even though
+        // Claude is still actively working within the same turn. By ignoring
+        // thinking=false from ephemeral updates, we keep the UI stable
+        // throughout the entire turn.
+        //
+        // Exception: when session becomes inactive (active=false), always
+        // clear thinking — the CLI has disconnected.
+        const resolvedThinking = !update.active
+          ? false
+          : update.thinking
+            ? true
+            : session.thinking; // Keep existing thinking state; only lifecycle can clear it
 
         sessions.push({
           ...session,
           active: update.active,
           activeAt: update.activeAt,
-          thinking: lifecycleIsNewer
-            ? session.thinking
-            : (update.thinking ?? false),
-          thinkingAt: lifecycleIsNewer ? session.thinkingAt : update.activeAt,
+          thinking: resolvedThinking,
+          thinkingAt: resolvedThinking !== session.thinking
+            ? update.activeAt
+            : session.thinkingAt,
         });
       }
     }
