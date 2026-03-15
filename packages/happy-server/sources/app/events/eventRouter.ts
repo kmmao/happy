@@ -948,6 +948,9 @@ export function buildSupervisorStatusEphemeral(
   status: string,
   artifactId?: string,
   errorMessage?: string,
+  currentDimension?: string,
+  dimensionIndex?: number,
+  totalDimensions?: number,
 ): EphemeralPayload {
   return {
     type: "supervisor-status",
@@ -956,5 +959,8 @@ export function buildSupervisorStatusEphemeral(
     status,
     artifactId,
     errorMessage,
+    currentDimension,
+    dimensionIndex,
+    totalDimensions,
   };
 }

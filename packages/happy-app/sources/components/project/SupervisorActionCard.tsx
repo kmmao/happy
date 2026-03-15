@@ -22,6 +22,7 @@ import {
     CATEGORY_KEY_MAP,
     getConfidenceColor,
 } from "./supervisorConstants";
+import { Modal } from "@/modal";
 
 interface SupervisorActionCardProps {
     action: SupervisorAction;
@@ -105,6 +106,13 @@ export const SupervisorActionCard = React.memo(
             action.fixStatus === "pending" ||
             action.fixStatus === "running";
 
+        const showDetail = React.useCallback(() => {
+            const message = action.suggestedFix
+                ? `${action.description}\n\n${t("supervisor.suggestedFix")}:\n${action.suggestedFix}`
+                : action.description;
+            Modal.alert(action.title, message);
+        }, [action.title, action.description, action.suggestedFix]);
+
         return (
             <View
                 style={[
@@ -153,25 +161,27 @@ export const SupervisorActionCard = React.memo(
                     )}
                 </View>
 
-                {/* Title */}
-                <Text style={styles.title}>{action.title}</Text>
+                {/* Title + Description (tap for full detail) */}
+                <Pressable onPress={showDetail}>
+                    <Text style={styles.title}>{action.title}</Text>
 
-                {/* Description */}
-                <Text style={styles.description} numberOfLines={3}>
-                    {action.description}
-                </Text>
+                    {/* Description */}
+                    <Text style={styles.description} numberOfLines={3}>
+                        {action.description}
+                    </Text>
 
-                {/* Suggested fix */}
-                {action.suggestedFix && (
-                    <View style={styles.fixBox}>
-                        <Text style={styles.fixLabel}>
-                            {t("supervisor.suggestedFix")}
-                        </Text>
-                        <Text style={styles.fixText} numberOfLines={3}>
-                            {action.suggestedFix}
-                        </Text>
-                    </View>
-                )}
+                    {/* Suggested fix */}
+                    {action.suggestedFix && (
+                        <View style={styles.fixBox}>
+                            <Text style={styles.fixLabel}>
+                                {t("supervisor.suggestedFix")}
+                            </Text>
+                            <Text style={styles.fixText} numberOfLines={3}>
+                                {action.suggestedFix}
+                            </Text>
+                        </View>
+                    )}
+                </Pressable>
 
                 {/* Fix progress */}
                 {isApproved && action.fixStatus && (

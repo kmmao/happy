@@ -6,7 +6,7 @@ import { db } from "@/storage/db";
  */
 const MAX_DAILY_SUPERVISOR_RUNS = Math.max(
     1,
-    parseInt(process.env.MAX_DAILY_SUPERVISOR_RUNS ?? "5", 10) || 5,
+    parseInt(process.env.MAX_DAILY_SUPERVISOR_RUNS ?? "20", 10) || 20,
 );
 
 /**

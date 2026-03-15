@@ -10,6 +10,7 @@
 import {
   buildDimensionsSection,
   defaultEnabledDimensions,
+  dimensionTemplates,
   getEnabledCategories,
 } from "./dimensionTemplates";
 
@@ -78,6 +79,15 @@ ${options.customRules.trim()}
 
   const reportUrl = `${options.serverUrl}/v1/projects/${options.projectId}/supervisor/runs/${options.runId}/status`;
 
+  // Build dimension key list for progress reporting
+  const dimKeys = (dims as readonly string[]).filter(
+    (k) => dimensionTemplates[k] !== undefined,
+  );
+  const totalDimensions = dimKeys.length;
+  const dimKeyList = dimKeys
+    .map((k, i) => `${i + 1}. "${k}" → ${dimensionTemplates[k]!.title}`)
+    .join("\n");
+
   return `You are a **Project Health Supervisor** running an automated analysis.
 
 ## Context
@@ -92,7 +102,7 @@ ${autoModeSection}${incrementalSection}${customRulesSection}## Rules (CRITICAL)
 4. You MAY read files, run diagnostic commands (yarn audit, yarn outdated, grep, etc.).
 
 ## Analysis Dimensions
-Analyze the project across these dimensions:
+Analyze the project across these dimensions **in order**:
 
 ${buildDimensionsSection(dims)}
 
@@ -127,6 +137,23 @@ Rate how confident you are in the \`suggestedFix\` (0-100):
 - **low**: Cosmetic issues, minor naming preferences
 
 Focus on actionable findings. Do not report more than 10 findings per run.
+
+## MANDATORY: Report Progress Per Dimension (CRITICAL)
+
+After completing **each** dimension analysis, you MUST immediately report progress via curl.
+The enabled dimensions for this run are (analyze them in this exact order):
+${dimKeyList}
+
+After finishing each dimension, run:
+\`\`\`
+curl -s -X POST "${reportUrl}" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"status":"running","currentDimension":"<DIMENSION_KEY>","dimensionIndex":<INDEX>,"totalDimensions":${totalDimensions}}'
+\`\`\`
+
+Replace \`<DIMENSION_KEY>\` with the dimension key (e.g. "security") and \`<INDEX>\` with its 1-based index from the list above.
+Do this for EVERY dimension, one by one, before moving to the next dimension.
 
 ## MANDATORY: Report Results (CRITICAL — do this AFTER your analysis)
 

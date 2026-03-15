@@ -184,7 +184,14 @@ class Sync {
   private feedSync: InvalidateSync;
   private projectsSync: InvalidateSync;
   private activityAccumulator: ActivityUpdateAccumulator;
-  private supervisorStatusListeners = new Set<(event: { projectId: string; status: string; runId: string }) => void>();
+  private supervisorStatusListeners = new Set<(event: {
+    projectId: string;
+    status: string;
+    runId: string;
+    currentDimension?: string;
+    dimensionIndex?: number;
+    totalDimensions?: number;
+  }) => void>();
   private preferencesMigrationDone = false;
   private projectMigrationDone = isProjectMigrationDone();
   private pendingSettings: Partial<Settings> = loadPendingSettings();
@@ -1069,8 +1076,8 @@ class Sync {
       decryptedSessions.push(processedSession);
     }
 
-    // Apply to storage
-    this.applySessions(decryptedSessions);
+    // Apply to storage — replace mode: remove sessions no longer on the server
+    this.applySessions(decryptedSessions, true);
     log.log(
       `📥 fetchSessions completed - processed ${decryptedSessions.length} sessions`,
     );
@@ -1355,7 +1362,7 @@ class Sync {
       log.log(
         `📦 fetchArtifactsList: Successfully decrypted ${decryptedArtifacts.length} artifacts`,
       );
-      storage.getState().applyArtifacts(decryptedArtifacts);
+      storage.getState().applyArtifacts(decryptedArtifacts, true);
       log.log("📦 fetchArtifactsList: Artifacts applied to storage");
     } catch (error) {
       log.log(`📦 fetchArtifactsList: Error fetching artifacts: ${error}`);
@@ -1736,7 +1743,7 @@ class Sync {
     try {
       log.log("👥 Fetching friends list...");
       const friendsList = await getFriendsList(this.credentials);
-      storage.getState().applyFriends(friendsList);
+      storage.getState().applyFriends(friendsList, true);
       log.log(
         `👥 fetchFriends completed - processed ${friendsList.length} friends`,
       );
@@ -3321,7 +3328,14 @@ class Sync {
 
     // Handle supervisor-status: notify listeners for real-time Health Tab updates.
     if (updateData.type === "supervisor-status") {
-      const event = { projectId: updateData.projectId, status: updateData.status, runId: updateData.runId };
+      const event = {
+        projectId: updateData.projectId,
+        status: updateData.status,
+        runId: updateData.runId,
+        currentDimension: updateData.currentDimension,
+        dimensionIndex: updateData.dimensionIndex,
+        totalDimensions: updateData.totalDimensions,
+      };
       for (const listener of this.supervisorStatusListeners) {
         listener(event);
       }
@@ -3581,9 +3595,10 @@ class Sync {
     sessions: (Omit<Session, "presence"> & {
       presence?: "online" | number;
     })[],
+    replace?: boolean,
   ) => {
     const active = storage.getState().getActiveSessions();
-    storage.getState().applySessions(sessions);
+    storage.getState().applySessions(sessions, replace);
     const newActive = storage.getState().getActiveSessions();
     this.applySessionDiff(active, newActive);
   };
@@ -4055,7 +4070,14 @@ class Sync {
 
   // --- Supervisor status event subscription ---
 
-  onSupervisorStatus(listener: (event: { projectId: string; status: string; runId: string }) => void): () => void {
+  onSupervisorStatus(listener: (event: {
+    projectId: string;
+    status: string;
+    runId: string;
+    currentDimension?: string;
+    dimensionIndex?: number;
+    totalDimensions?: number;
+  }) => void): () => void {
     this.supervisorStatusListeners.add(listener);
     return () => { this.supervisorStatusListeners.delete(listener); };
   }

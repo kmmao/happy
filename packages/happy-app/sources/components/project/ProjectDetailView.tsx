@@ -6,6 +6,7 @@ import { Project } from "@/sync/projectManager";
 import { ProjectSessionsTab } from "./ProjectSessionsTab";
 import { ProjectGitTab } from "./ProjectGitTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
+import { layout } from "@/components/layout";
 import { t } from "@/text";
 
 type TabKey = "sessions" | "git" | "health";
@@ -104,6 +105,9 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surface,
         borderRadius: 8,
         padding: 2,
+        maxWidth: layout.maxWidth - 32,
+        alignSelf: "center",
+        width: "100%",
     },
     segmentButton: {
         flex: 1,

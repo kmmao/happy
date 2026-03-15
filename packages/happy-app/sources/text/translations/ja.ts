@@ -2017,6 +2017,7 @@ export const ja: TranslationStructure = {
     persistentIssues: "継続中",
     noPreviousRun: "初回スキャン — 比較対象の履歴がありません",
     dimensionsSection: "分析の次元",
+    analyzingDimension: ({ dimension, index, total }) => `${dimension} (${index}/${total})`,
     dimSecurity: "セキュリティ",
     dimDependencies: "依存関係",
     dimArchitecture: "アーキテクチャ",
@@ -2059,6 +2060,11 @@ export const ja: TranslationStructure = {
     skipAllConfirm: ({ count }: { count: number }) => `保留中の ${count} 件すべてをスキップしますか？`,
     approveAllSuccess: ({ count }: { count: number }) => `${count} 件を承認しました`,
     skipAllSuccess: ({ count }: { count: number }) => `${count} 件をスキップしました`,
+    clearAll: "すべてクリア",
+    clearAllConfirm: "このプロジェクトのすべてのSupervisor提案が永久に削除されます。続行しますか？",
+    clearAllSuccess: ({ count }: { count: number }) => `${count}件の提案をクリアしました`,
+
+    // Phase 7: Action history
     actionHistory: "アクション履歴",
     tabPending: "保留中",
     tabApproved: "承認済み",

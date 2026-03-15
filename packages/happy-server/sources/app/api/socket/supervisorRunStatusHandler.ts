@@ -12,8 +12,11 @@ import {
     eventRouter,
     buildSupervisorStatusEphemeral,
     buildSupervisorTriggerEphemeral,
+    buildSessionActivityEphemeral,
 } from "@/app/events/eventRouter";
+import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
+import { aggregateSessionUsage } from "@/modules/supervisorUsage";
 
 const supervisorActionSchema = z.object({
     severity: z.enum(["critical", "high", "medium", "low"]),
@@ -35,6 +38,9 @@ const supervisorRunStatusSchema = z.object({
     actions: z.array(supervisorActionSchema).max(20).optional(),
     tokenCount: z.number().int().min(0).optional(),
     costUsd: z.number().min(0).optional(),
+    currentDimension: z.string().max(50).optional(),
+    dimensionIndex: z.number().int().min(1).optional(),
+    totalDimensions: z.number().int().min(1).optional(),
 });
 
 export function supervisorRunStatusHandler(
@@ -184,6 +190,66 @@ export function supervisorRunStatusHandler(
                 `supervisor-run-status: run ${data.runId} → ${data.status}${data.actions ? ` (${data.actions.length} actions)` : ""}`,
             );
 
+            // Aggregate session usage (cost/tokens) on completion
+            if (data.status === "completed") {
+                const sessionId = data.sessionId;
+                let resolvedSessionId = sessionId;
+                if (!resolvedSessionId) {
+                    const existingRun = await db.supervisorRun.findUnique({
+                        where: { id: data.runId },
+                        select: { sessionId: true },
+                    });
+                    resolvedSessionId = existingRun?.sessionId ?? undefined;
+                }
+                const usage = await aggregateSessionUsage(resolvedSessionId);
+                if (usage) {
+                    await db.supervisorRun.update({
+                        where: { id: data.runId },
+                        data: {
+                            tokenCount: usage.totalTokens,
+                            costUsd: usage.totalCostUsd,
+                        },
+                    });
+                }
+
+                // Delayed re-aggregation: turn-end cost report may arrive after
+                // the completion event. Re-aggregate after 10s to capture actual cost.
+                if (resolvedSessionId) {
+                    const capturedRunId = data.runId;
+                    setTimeout(async () => {
+                        try {
+                            const delayed = await aggregateSessionUsage(resolvedSessionId);
+                            if (delayed && delayed.totalCostUsd > 0) {
+                                await db.supervisorRun.update({
+                                    where: { id: capturedRunId },
+                                    data: {
+                                        tokenCount: delayed.totalTokens,
+                                        costUsd: delayed.totalCostUsd,
+                                    },
+                                });
+                            }
+                        } catch {
+                            // best-effort
+                        }
+                    }, 10_000);
+                }
+
+                // Archive the supervisor session so it doesn't stay active
+                if (resolvedSessionId) {
+                    const now = Date.now();
+                    await db.session.updateMany({
+                        where: { id: resolvedSessionId, active: true },
+                        data: { lastActiveAt: new Date(now), active: false },
+                    });
+                    activityCache.invalidateSession(resolvedSessionId);
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: buildSessionActivityEphemeral(resolvedSessionId, false, now, false),
+                        recipientFilter: { type: "user-scoped-only" },
+                    });
+                }
+            }
+
             // Notify App clients about status change
             eventRouter.emitEphemeral({
                 userId,
@@ -193,6 +259,9 @@ export function supervisorRunStatusHandler(
                     data.status,
                     undefined,
                     data.errorMessage,
+                    data.currentDimension,
+                    data.dimensionIndex,
+                    data.totalDimensions,
                 ),
                 recipientFilter: { type: "user-scoped-only" },
             });

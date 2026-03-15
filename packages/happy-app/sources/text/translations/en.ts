@@ -2029,6 +2029,7 @@ export const en: TranslationStructure = {
     persistentIssues: "Persistent",
     noPreviousRun: "First scan — no previous run to compare",
     dimensionsSection: "Analysis Dimensions",
+    analyzingDimension: ({ dimension, index, total }) => `${dimension} (${index}/${total})`,
     dimSecurity: "Security",
     dimDependencies: "Dependencies",
     dimArchitecture: "Architecture",
@@ -2073,6 +2074,9 @@ export const en: TranslationStructure = {
     skipAllConfirm: ({ count }: { count: number }) => `Skip all ${count} pending actions?`,
     approveAllSuccess: ({ count }: { count: number }) => `${count} actions approved`,
     skipAllSuccess: ({ count }: { count: number }) => `${count} actions skipped`,
+    clearAll: "Clear All",
+    clearAllConfirm: "This will permanently delete all supervisor actions for this project. Are you sure?",
+    clearAllSuccess: ({ count }: { count: number }) => `${count} actions cleared`,
 
     // Phase 7: Action history
     actionHistory: "Action History",

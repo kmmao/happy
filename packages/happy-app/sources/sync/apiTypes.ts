@@ -268,6 +268,9 @@ export const ApiEphemeralSupervisorStatusSchema = z.object({
   status: z.string(),
   artifactId: z.string().optional(),
   errorMessage: z.string().optional(),
+  currentDimension: z.string().optional(),
+  dimensionIndex: z.number().optional(),
+  totalDimensions: z.number().optional(),
 });
 
 export const ApiEphemeralUpdateSchema = z.union([

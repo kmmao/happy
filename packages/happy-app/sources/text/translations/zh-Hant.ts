@@ -1950,6 +1950,7 @@ export const zhHant: TranslationStructure = {
     persistentIssues: "持續存在",
     noPreviousRun: "首次掃描 — 無歷史資料可對比",
     dimensionsSection: "分析維度",
+    analyzingDimension: ({ dimension, index, total }) => `${dimension} (${index}/${total})`,
     dimSecurity: "安全",
     dimDependencies: "依賴",
     dimArchitecture: "架構",
@@ -1992,6 +1993,11 @@ export const zhHant: TranslationStructure = {
     skipAllConfirm: ({ count }: { count: number }) => `確認跳過全部 ${count} 個待處理操作？`,
     approveAllSuccess: ({ count }: { count: number }) => `已批准 ${count} 個操作`,
     skipAllSuccess: ({ count }: { count: number }) => `已跳過 ${count} 個操作`,
+    clearAll: "清除全部",
+    clearAllConfirm: "這將永久刪除該專案的所有 Supervisor 建議。確定要繼續嗎？",
+    clearAllSuccess: ({ count }: { count: number }) => `已清除 ${count} 個建議`,
+
+    // Phase 7: Action history
     actionHistory: "操作歷史",
     tabPending: "待處理",
     tabApproved: "已批准",

@@ -179,10 +179,7 @@ export const SupervisorSummaryCard = React.memo(
 const styles = StyleSheet.create((theme) => ({
     card: {
         backgroundColor: theme.colors.surface,
-        borderRadius: 12,
         padding: 16,
-        marginHorizontal: 16,
-        marginTop: 12,
         gap: 14,
     },
     topRow: {

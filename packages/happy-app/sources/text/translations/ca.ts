@@ -2053,6 +2053,7 @@ export const ca: TranslationStructure = {
     persistentIssues: "Persistents",
     noPreviousRun: "Primer escaneig — sense execució prèvia per comparar",
     dimensionsSection: "Dimensions d'anàlisi",
+    analyzingDimension: ({ dimension, index, total }) => `${dimension} (${index}/${total})`,
     dimSecurity: "Seguretat",
     dimDependencies: "Dependències",
     dimArchitecture: "Arquitectura",
@@ -2095,6 +2096,11 @@ export const ca: TranslationStructure = {
     skipAllConfirm: ({ count }: { count: number }) => `Ometre totes les ${count} accions pendents?`,
     approveAllSuccess: ({ count }: { count: number }) => `${count} accions aprovades`,
     skipAllSuccess: ({ count }: { count: number }) => `${count} accions omeses`,
+    clearAll: "Esborrar-ho tot",
+    clearAllConfirm: "Això eliminarà permanentment totes les accions del Supervisor per a aquest projecte. N'esteu segur?",
+    clearAllSuccess: ({ count }: { count: number }) => `${count} accions eliminades`,
+
+    // Phase 7: Action history
     actionHistory: "Historial d'accions",
     tabPending: "Pendents",
     tabApproved: "Aprovades",

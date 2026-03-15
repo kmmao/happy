@@ -362,8 +362,16 @@ const ComparisonActionCard = React.memo(
 
         const confidenceColor = getConfidenceColor(action.confidence);
 
+        const showDetail = React.useCallback(() => {
+            const message = action.suggestedFix
+                ? `${action.description}\n\n${t("supervisor.suggestedFix")}:\n${action.suggestedFix}`
+                : action.description;
+            Modal.alert(action.title, message);
+        }, [action.title, action.description, action.suggestedFix]);
+
         return (
-            <View
+            <Pressable
+                onPress={showDetail}
                 style={[
                     styles.actionCard,
                     !isLast && styles.actionCardBorder,
@@ -423,7 +431,7 @@ const ComparisonActionCard = React.memo(
                         </Text>
                     </View>
                 )}
-            </View>
+            </Pressable>
         );
     },
 );

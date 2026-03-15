@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, ScrollView, Switch, Pressable, TextInput } from "react-native";
+import { View, Text, ScrollView, Switch, Pressable, TextInput, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
@@ -8,6 +8,7 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { updateSupervisorConfig } from "@/sync/apiSupervisor";
+import { projectManager } from "@/sync/projectManager";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal } from "@/modal";
 
@@ -60,9 +61,9 @@ export default function SupervisorSettingsScreen() {
     const { theme } = useUnistyles();
 
     const [config, setConfig] = React.useState<SupervisorConfig>(defaultConfig);
-    const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(
-        null,
-    );
+    const [initialConfig, setInitialConfig] =
+        React.useState<SupervisorConfig>(defaultConfig);
+    const [saving, setSaving] = React.useState(false);
 
     React.useLayoutEffect(() => {
         navigation.setOptions({
@@ -77,97 +78,96 @@ export default function SupervisorSettingsScreen() {
                 const parsed = JSON.parse(
                     project.supervisorConfig,
                 ) as Partial<SupervisorConfig>;
-                setConfig((prev) => ({
-                    ...prev,
+                const merged: SupervisorConfig = {
+                    ...defaultConfig,
                     ...parsed,
-                    customRules: parsed.customRules ?? prev.customRules,
-                    schedule: { ...prev.schedule, ...parsed.schedule },
-                    analysis: { ...prev.analysis, ...parsed.analysis },
+                    customRules: parsed.customRules ?? defaultConfig.customRules,
+                    schedule: { ...defaultConfig.schedule, ...parsed.schedule },
+                    analysis: { ...defaultConfig.analysis, ...parsed.analysis },
                     pushTrigger: {
-                        ...prev.pushTrigger,
+                        ...defaultConfig.pushTrigger,
                         ...parsed.pushTrigger,
                     },
                     constraints: {
-                        ...prev.constraints,
+                        ...defaultConfig.constraints,
                         ...parsed.constraints,
                     },
                     notifications: {
-                        ...prev.notifications,
+                        ...defaultConfig.notifications,
                         ...parsed.notifications,
                     },
-                }));
+                };
+                setConfig(merged);
+                setInitialConfig(merged);
             } catch {
                 // Invalid JSON — use defaults
             }
         }
     }, [project?.supervisorConfig]);
 
-    // Debounced save to server
-    const saveConfig = React.useCallback(
-        (newConfig: SupervisorConfig) => {
-            if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
-            }
-            saveTimeoutRef.current = setTimeout(async () => {
-                if (!project?.serverId) return;
-                try {
-                    const credentials =
-                        await TokenStorage.getCredentials();
-                    if (!credentials) return;
-                    await updateSupervisorConfig(
-                        credentials,
-                        project.serverId,
-                        JSON.stringify(newConfig),
-                        {
-                            supervisorMode: newConfig.mode,
-                            supervisorScheduleEnabled:
-                                newConfig.schedule.enabled,
-                            supervisorScheduleIntervalHours:
-                                newConfig.schedule.intervalHours,
-                            supervisorEnabledDimensions: Object.entries(
-                                newConfig.analysis,
-                            )
-                                .filter(([, v]) => v)
-                                .map(([k]) => k)
-                                .join(","),
-                            supervisorPushTriggerEnabled:
-                                newConfig.pushTrigger.enabled,
-                            supervisorNotifyPrefs:
-                                Object.entries(newConfig.notifications)
-                                    .filter(([, v]) => v)
-                                    .map(([k]) => k)
-                                    .join(",") || null,
-                            supervisorCustomRules:
-                                newConfig.customRules.trim() || null,
-                        },
-                    );
-                    Modal.toast(t("supervisor.settingsSaved"));
-                } catch {
-                    Modal.toast(t("supervisor.settingsSaveError"));
-                }
-            }, 1000);
-        },
-        [project?.serverId],
+    const isDirty = React.useMemo(
+        () => JSON.stringify(config) !== JSON.stringify(initialConfig),
+        [config, initialConfig],
     );
 
-    // Clean up timeout on unmount
-    React.useEffect(() => {
-        return () => {
-            if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
+    const handleSave = React.useCallback(async () => {
+        if (!project?.serverId || !isDirty) return;
+        setSaving(true);
+        try {
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return;
+            const configJson = JSON.stringify(config);
+            await updateSupervisorConfig(
+                credentials,
+                project.serverId,
+                configJson,
+                {
+                    supervisorMode: config.mode,
+                    supervisorScheduleEnabled: config.schedule.enabled,
+                    supervisorScheduleIntervalHours:
+                        config.schedule.intervalHours,
+                    supervisorEnabledDimensions: Object.entries(config.analysis)
+                        .filter(([, v]) => v)
+                        .map(([k]) => k)
+                        .join(","),
+                    supervisorPushTriggerEnabled: config.pushTrigger.enabled,
+                    supervisorNotifyPrefs:
+                        Object.entries(config.notifications)
+                            .filter(([, v]) => v)
+                            .map(([k]) => k)
+                            .join(",") || null,
+                    supervisorCustomRules:
+                        config.customRules.trim() || null,
+                },
+            );
+            // Update local projectManager cache so re-entering this page shows fresh data
+            const localProject = projectManager.getProject(id);
+            if (localProject) {
+                localProject.supervisorConfig = configJson;
+                localProject.supervisorMode = config.mode;
+                localProject.supervisorScheduleEnabled = config.schedule.enabled;
+                localProject.supervisorScheduleIntervalHours = config.schedule.intervalHours;
+                localProject.supervisorEnabledDimensions = Object.entries(config.analysis)
+                    .filter(([, v]) => v)
+                    .map(([k]) => k)
+                    .join(",");
+                localProject.supervisorPushTriggerEnabled = config.pushTrigger.enabled;
+                localProject.supervisorCustomRules = config.customRules.trim() || null;
             }
-        };
-    }, []);
+            setInitialConfig(config);
+            Modal.toast(t("supervisor.settingsSaved"));
+        } catch {
+            Modal.toast(t("supervisor.settingsSaveError"));
+        } finally {
+            setSaving(false);
+        }
+    }, [project?.serverId, isDirty, config]);
 
     const updateConfig = React.useCallback(
         (updater: (prev: SupervisorConfig) => SupervisorConfig) => {
-            setConfig((prev) => {
-                const next = updater(prev);
-                saveConfig(next);
-                return next;
-            });
+            setConfig(updater);
         },
-        [saveConfig],
+        [],
     );
 
     const setMode = React.useCallback(
@@ -466,6 +466,26 @@ export default function SupervisorSettingsScreen() {
                     </Text>
                 </View>
             </ItemGroup>
+
+            {/* Save Button */}
+            <View style={styles.saveButtonContainer}>
+                <Pressable
+                    style={[
+                        styles.saveButton,
+                        (!isDirty || saving) && styles.saveButtonDisabled,
+                    ]}
+                    onPress={handleSave}
+                    disabled={!isDirty || saving}
+                >
+                    {saving ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                        <Text style={styles.saveButtonText}>
+                            {t("common.save")}
+                        </Text>
+                    )}
+                </Pressable>
+            </View>
         </ScrollView>
     );
 }
@@ -682,5 +702,26 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 11,
         color: theme.colors.textSecondary,
         textAlign: "right",
+    },
+    saveButtonContainer: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 16,
+    },
+    saveButton: {
+        backgroundColor: theme.colors.header.tint,
+        borderRadius: 12,
+        paddingVertical: 14,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    saveButtonDisabled: {
+        opacity: 0.4,
+    },
+    saveButtonText: {
+        ...Typography.default(),
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#fff",
     },
 }));

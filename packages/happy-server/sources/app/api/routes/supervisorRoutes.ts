@@ -2,6 +2,7 @@ import {
     eventRouter,
     buildSupervisorTriggerEphemeral,
     buildSupervisorStatusEphemeral,
+    buildSessionActivityEphemeral,
 } from "@/app/events/eventRouter";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
@@ -9,6 +10,8 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
 import { computeHealthScore, countSeverities } from "@/modules/supervisorScoring";
+import { aggregateSessionUsage } from "@/modules/supervisorUsage";
+import { activityCache } from "@/app/presence/sessionCache";
 
 /**
  * Supervisor routes for project health scanning.
@@ -287,6 +290,9 @@ export function supervisorRoutes(app: Fastify) {
                     actionsCount: z.number().int().min(0).optional(),
                     issuesCreated: z.number().int().min(0).optional(),
                     errorMessage: z.string().max(500).optional(),
+                    currentDimension: z.string().max(50).optional(),
+                    dimensionIndex: z.number().int().min(1).optional(),
+                    totalDimensions: z.number().int().min(1).optional(),
                     actions: z.array(z.object({
                         severity: z.enum(["critical", "high", "medium", "low"]),
                         category: z.string().max(50),
@@ -308,6 +314,9 @@ export function supervisorRoutes(app: Fastify) {
                 actionsCount,
                 issuesCreated,
                 errorMessage,
+                currentDimension,
+                dimensionIndex,
+                totalDimensions,
                 actions: reportedActions,
             } = request.body;
 
@@ -418,10 +427,64 @@ export function supervisorRoutes(app: Fastify) {
                 });
                 const counts = countSeverities(allActions);
                 const healthScore = computeHealthScore(counts);
+
+                // Aggregate session usage (cost/tokens) from UsageReport
+                const runForSession = await db.supervisorRun.findUnique({
+                    where: { id: runId },
+                    select: { sessionId: true },
+                });
+                const resolvedSessionId = sessionId ?? runForSession?.sessionId;
+                const usage = await aggregateSessionUsage(resolvedSessionId);
+
                 await db.supervisorRun.update({
                     where: { id: runId },
-                    data: { healthScore },
+                    data: {
+                        healthScore,
+                        ...(usage
+                            ? {
+                                  tokenCount: usage.totalTokens,
+                                  costUsd: usage.totalCostUsd,
+                              }
+                            : {}),
+                    },
                 });
+
+                // Delayed re-aggregation: the turn-end cost report arrives AFTER
+                // Claude's curl POST (which triggers this handler). Schedule a
+                // second aggregation to capture the actual cost data.
+                if (resolvedSessionId) {
+                    setTimeout(async () => {
+                        try {
+                            const delayed = await aggregateSessionUsage(resolvedSessionId);
+                            if (delayed && delayed.totalCostUsd > 0) {
+                                await db.supervisorRun.update({
+                                    where: { id: runId },
+                                    data: {
+                                        tokenCount: delayed.totalTokens,
+                                        costUsd: delayed.totalCostUsd,
+                                    },
+                                });
+                            }
+                        } catch {
+                            // best-effort
+                        }
+                    }, 10_000);
+                }
+
+                // Archive the supervisor session so it doesn't stay active
+                if (resolvedSessionId) {
+                    const now = Date.now();
+                    await db.session.updateMany({
+                        where: { id: resolvedSessionId, active: true },
+                        data: { lastActiveAt: new Date(now), active: false },
+                    });
+                    activityCache.invalidateSession(resolvedSessionId);
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: buildSessionActivityEphemeral(resolvedSessionId, false, now, false),
+                        recipientFilter: { type: "user-scoped-only" },
+                    });
+                }
             }
 
             // Fetch the updated run for response
@@ -438,6 +501,9 @@ export function supervisorRoutes(app: Fastify) {
                     status,
                     artifactId,
                     errorMessage,
+                    currentDimension,
+                    dimensionIndex,
+                    totalDimensions,
                 ),
                 recipientFilter: { type: "user-scoped-only" },
             });

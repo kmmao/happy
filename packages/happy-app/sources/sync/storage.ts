@@ -153,6 +153,7 @@ interface StorageState {
   getToolReview: (messageId: string) => "accepted" | "rejected" | undefined;
   applySessions: (
     sessions: (Omit<Session, "presence"> & { presence?: "online" | number })[],
+    replace?: boolean,
   ) => void;
   applyMachines: (machines: Machine[], replace?: boolean) => void;
   applyLoaded: () => void;
@@ -225,7 +226,7 @@ interface StorageState {
   ) => void;
   updateSessionPreferencesVersion: (sessionId: string, version: number) => void;
   // Artifact methods
-  applyArtifacts: (artifacts: DecryptedArtifact[]) => void;
+  applyArtifacts: (artifacts: DecryptedArtifact[], replace?: boolean) => void;
   addArtifact: (artifact: DecryptedArtifact) => void;
   updateArtifact: (artifact: DecryptedArtifact) => void;
   deleteArtifact: (artifactId: string) => void;
@@ -253,7 +254,7 @@ interface StorageState {
     sessionId: string,
   ) => import("./projectManager").SubmoduleInfo[] | undefined;
   // Friend management methods
-  applyFriends: (friends: UserProfile[]) => void;
+  applyFriends: (friends: UserProfile[], replace?: boolean) => void;
   applyRelationshipUpdate: (event: RelationshipUpdatedEvent) => void;
   getFriend: (userId: string) => UserProfile | undefined;
   getAcceptedFriends: () => UserProfile[];
@@ -487,6 +488,7 @@ export const storage = create<StorageState>()((set, get) => {
       sessions: (Omit<Session, "presence"> & {
         presence?: "online" | number;
       })[],
+      replace?: boolean,
     ) =>
       set((state) => {
         // Load drafts, permission modes and needsAttention if sessions are empty (initial load)
@@ -502,8 +504,11 @@ export const storage = create<StorageState>()((set, get) => {
         const savedProfilesAll = isInitialLoad ? sessionProfiles : {};
         const savedNeedsAttention = isInitialLoad ? sessionNeedsAttention : {};
 
-        // Merge new sessions with existing ones
-        const mergedSessions: Record<string, Session> = { ...state.sessions };
+        // When replace=true (full server refresh), start empty so sessions
+        // no longer on the server are removed. Otherwise merge with existing.
+        const mergedSessions: Record<string, Session> = replace
+          ? {}
+          : { ...state.sessions };
 
         // Update sessions with calculated presence using centralized resolver
         sessions.forEach((session) => {
@@ -1564,9 +1569,9 @@ export const storage = create<StorageState>()((set, get) => {
         };
       }),
     // Artifact methods
-    applyArtifacts: (artifacts: DecryptedArtifact[]) =>
+    applyArtifacts: (artifacts: DecryptedArtifact[], replace?: boolean) =>
       set((state) => {
-        const mergedArtifacts = { ...state.artifacts };
+        const mergedArtifacts = replace ? {} : { ...state.artifacts };
         artifacts.forEach((artifact) => {
           mergedArtifacts[artifact.id] = artifact;
         });
@@ -1684,9 +1689,9 @@ export const storage = create<StorageState>()((set, get) => {
         };
       }),
     // Friend management methods
-    applyFriends: (friends: UserProfile[]) =>
+    applyFriends: (friends: UserProfile[], replace?: boolean) =>
       set((state) => {
-        const mergedFriends = { ...state.friends };
+        const mergedFriends = replace ? {} : { ...state.friends };
         friends.forEach((friend) => {
           mergedFriends[friend.id] = friend;
         });

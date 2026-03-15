@@ -1947,6 +1947,7 @@ export const zhHans: TranslationStructure = {
     persistentIssues: "持续存在",
     noPreviousRun: "首次扫描 — 无历史数据可对比",
     dimensionsSection: "分析维度",
+    analyzingDimension: ({ dimension, index, total }) => `${dimension} (${index}/${total})`,
     dimSecurity: "安全",
     dimDependencies: "依赖",
     dimArchitecture: "架构",
@@ -1989,6 +1990,11 @@ export const zhHans: TranslationStructure = {
     skipAllConfirm: ({ count }: { count: number }) => `确认跳过全部 ${count} 个待处理操作？`,
     approveAllSuccess: ({ count }: { count: number }) => `已批准 ${count} 个操作`,
     skipAllSuccess: ({ count }: { count: number }) => `已跳过 ${count} 个操作`,
+    clearAll: "清除全部",
+    clearAllConfirm: "这将永久删除该项目的所有 Supervisor 建议。确定要继续吗？",
+    clearAllSuccess: ({ count }: { count: number }) => `已清除 ${count} 个建议`,
+
+    // Phase 7: Action history
     actionHistory: "操作历史",
     tabPending: "待处理",
     tabApproved: "已批准",

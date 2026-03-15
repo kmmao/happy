@@ -35,6 +35,7 @@ import {
     type SupervisorSummary,
     fetchSupervisorSummary,
     batchUpdateActionApproval,
+    clearAllActions,
 } from "@/sync/apiSupervisor";
 import { ItemGroup } from "@/components/ItemGroup";
 import { useRouter } from "expo-router";
@@ -79,6 +80,23 @@ function estimateProgress(status: string, elapsedSeconds: number): number {
     return Math.round(8 + 87 * (1 - Math.exp(-elapsedSeconds / 70)));
 }
 
+// Map dimension key to i18n key
+const dimensionLabelMap: Record<string, TranslationKey> = {
+    security: "supervisor.dimSecurity",
+    dependencies: "supervisor.dimDependencies",
+    architecture: "supervisor.dimArchitecture",
+    techDebt: "supervisor.dimTechDebt",
+    codeQuality: "supervisor.dimCodeQuality",
+    testCoverage: "supervisor.dimTestCoverage",
+    documentation: "supervisor.dimDocumentation",
+    performance: "supervisor.dimPerformance",
+};
+
+function dimensionLabel(key: string): string {
+    const tk = dimensionLabelMap[key];
+    return tk ? t(tk) : key;
+}
+
 function useElapsedSeconds(startTimestamp: number | null): number {
     const [elapsed, setElapsed] = React.useState(0);
     React.useEffect(() => {
@@ -119,6 +137,11 @@ export const ProjectHealthTab = React.memo(
             React.useState<SupervisorSummary | null>(null);
         const [loaded, setLoaded] = React.useState(false);
         const [refreshing, setRefreshing] = React.useState(false);
+        const [dimensionProgress, setDimensionProgress] = React.useState<{
+            currentDimension: string;
+            dimensionIndex: number;
+            totalDimensions: number;
+        } | null>(null);
 
         const serverId = project.serverId;
 
@@ -172,12 +195,20 @@ export const ProjectHealthTab = React.memo(
             if (!serverId) return;
             const unsubscribe = sync.onSupervisorStatus((event) => {
                 if (event.projectId !== serverId) return;
-                // Terminal states: full refresh
+                // Terminal states: full refresh + clear progress
                 if (event.status === "completed" || event.status === "failed" || event.status === "cancelled") {
+                    setDimensionProgress(null);
                     loadData();
                 }
-                // Running state: optimistic UI update + fetch full data for sessionId
+                // Running state: update dimension progress if available
                 if (event.status === "running") {
+                    if (event.currentDimension && event.dimensionIndex && event.totalDimensions) {
+                        setDimensionProgress({
+                            currentDimension: event.currentDimension,
+                            dimensionIndex: event.dimensionIndex,
+                            totalDimensions: event.totalDimensions,
+                        });
+                    }
                     setRuns((prev) => {
                         const exists = prev.some((r) => r.id === event.runId);
                         if (exists) {
@@ -320,6 +351,27 @@ export const ProjectHealthTab = React.memo(
             }, [serverId, pendingActions, loadData]),
         );
 
+        const [clearAllLoading, doClearAll] = useHappyAction(
+            React.useCallback(async () => {
+                if (!serverId) return;
+                const confirmed = await Modal.confirm(
+                    t("supervisor.clearAll"),
+                    t("supervisor.clearAllConfirm"),
+                    { confirmText: t("common.delete"), destructive: true },
+                );
+                if (!confirmed) return;
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                const result = await clearAllActions(credentials, serverId);
+                Modal.toast(
+                    t("supervisor.clearAllSuccess", {
+                        count: result.deletedCount,
+                    }),
+                );
+                await loadData();
+            }, [serverId, loadData]),
+        );
+
         // Compute health score delta from trend data
         const scoreDelta = React.useMemo(() => {
             if (!trendData || trendData.points.length < 2) return null;
@@ -394,7 +446,13 @@ export const ProjectHealthTab = React.memo(
                                         <Text style={styles.statusChipText}>
                                             {activeRun.status === "pending"
                                                 ? t("supervisor.statusWaitingCli")
-                                                : t("supervisor.statusAnalyzing")}
+                                                : dimensionProgress
+                                                  ? t("supervisor.analyzingDimension", {
+                                                        dimension: dimensionLabel(dimensionProgress.currentDimension),
+                                                        index: dimensionProgress.dimensionIndex,
+                                                        total: dimensionProgress.totalDimensions,
+                                                    })
+                                                  : t("supervisor.statusAnalyzing")}
                                         </Text>
                                     </View>
                                     <View style={styles.progressContainer}>
@@ -403,14 +461,16 @@ export const ProjectHealthTab = React.memo(
                                                 style={[
                                                     styles.progressBarFill,
                                                     {
-                                                        width: `${estimateProgress(activeRun.status, elapsedSeconds)}%`,
+                                                        width: `${dimensionProgress ? Math.round((dimensionProgress.dimensionIndex / dimensionProgress.totalDimensions) * 95) : estimateProgress(activeRun.status, elapsedSeconds)}%`,
                                                         backgroundColor: theme.colors.header.tint,
                                                     },
                                                 ]}
                                             />
                                         </View>
                                         <Text style={styles.progressText}>
-                                            {estimateProgress(activeRun.status, elapsedSeconds)}%
+                                            {dimensionProgress
+                                                ? `${dimensionProgress.dimensionIndex}/${dimensionProgress.totalDimensions}`
+                                                : `${estimateProgress(activeRun.status, elapsedSeconds)}%`}
                                         </Text>
                                     </View>
                                     <Text style={styles.elapsedText}>
@@ -485,7 +545,11 @@ export const ProjectHealthTab = React.memo(
                 </ItemGroup>
 
                 {/* Health Summary */}
-                <SupervisorSummaryCard summary={summary} scoreDelta={scoreDelta} />
+                {summary && (
+                    <ItemGroup>
+                        <SupervisorSummaryCard summary={summary} scoreDelta={scoreDelta} />
+                    </ItemGroup>
+                )}
 
                 {/* Pending Actions */}
                 {pendingActions.length > 0 && serverId && (
@@ -555,6 +619,26 @@ export const ProjectHealthTab = React.memo(
                                 size={16}
                                 color={theme.colors.header.tint}
                             />
+                        </Pressable>
+                        <Pressable
+                            style={styles.clearAllLink}
+                            onPress={doClearAll}
+                            disabled={clearAllLoading}
+                        >
+                            {clearAllLoading ? (
+                                <ActivityIndicator size="small" color="#FF3B30" />
+                            ) : (
+                                <>
+                                    <Ionicons
+                                        name="trash-outline"
+                                        size={16}
+                                        color="#FF3B30"
+                                    />
+                                    <Text style={styles.clearAllLinkText}>
+                                        {t("supervisor.clearAll")}
+                                    </Text>
+                                </>
+                            )}
                         </Pressable>
                     </ItemGroup>
                 )}
@@ -901,5 +985,20 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
         fontSize: 14,
         color: theme.colors.header.tint,
+    },
+    clearAllLink: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderTopWidth: 0.5,
+        borderTopColor: theme.colors.divider,
+    },
+    clearAllLinkText: {
+        ...Typography.default("semiBold"),
+        fontSize: 14,
+        color: "#FF3B30",
     },
 }));

@@ -2065,6 +2065,7 @@ export const ru: TranslationStructure = {
     persistentIssues: "Нерешённые",
     noPreviousRun: "Первое сканирование — нет данных для сравнения",
     dimensionsSection: "Измерения анализа",
+    analyzingDimension: ({ dimension, index, total }) => `${dimension} (${index}/${total})`,
     dimSecurity: "Безопасность",
     dimDependencies: "Зависимости",
     dimArchitecture: "Архитектура",
@@ -2107,6 +2108,11 @@ export const ru: TranslationStructure = {
     skipAllConfirm: ({ count }: { count: number }) => `Пропустить все ${count} ожидающих действий?`,
     approveAllSuccess: ({ count }: { count: number }) => `${count} действий одобрено`,
     skipAllSuccess: ({ count }: { count: number }) => `${count} действий пропущено`,
+    clearAll: "Очистить всё",
+    clearAllConfirm: "Это навсегда удалит все рекомендации Supervisor для этого проекта. Вы уверены?",
+    clearAllSuccess: ({ count }: { count: number }) => `${count} действий удалено`,
+
+    // Phase 7: Action history
     actionHistory: "История действий",
     tabPending: "Ожидающие",
     tabApproved: "Одобренные",

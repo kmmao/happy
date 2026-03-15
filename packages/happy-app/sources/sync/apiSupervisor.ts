@@ -76,9 +76,15 @@ export async function triggerSupervisorRun(
             throw new SupervisorAlreadyRunningError(data.error, data.runId);
         }
 
+        if (response.status === 429) {
+            const data = (await response.json()) as { error: string };
+            throw new NonRetryableError(data.error);
+        }
+
         if (!response.ok) {
+            const text = await response.text().catch(() => "");
             throw new NonRetryableError(
-                `Failed to trigger supervisor run: ${response.status}`,
+                text || `Failed to trigger supervisor run: ${response.status}`,
             );
         }
 
@@ -514,6 +520,29 @@ export async function batchUpdateActionApproval(
             throw new Error(`Failed to batch update actions: ${response.status}`);
         }
         return (await response.json()) as { updatedCount: number };
+    });
+}
+
+/**
+ * Clear all actions for a project
+ */
+export async function clearAllActions(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<{ deletedCount: number }> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/actions`,
+            {
+                method: "DELETE",
+                headers: authHeaders(credentials),
+            },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to clear actions: ${response.status}`);
+        }
+        return (await response.json()) as { deletedCount: number };
     });
 }
 
