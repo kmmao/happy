@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, FlatList } from "react-native";
+import { View, Text, FlatList, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
@@ -43,6 +43,8 @@ const SessionRow = React.memo(({ session }: { session: Session }) => {
 
 export const ProjectSessionsTab = React.memo(
     ({ project }: ProjectSessionsTabProps) => {
+        const router = useRouter();
+        const { theme } = useUnistyles();
         const sessions = storage(
             useShallow((s) => {
                 return project.sessionIds
@@ -61,12 +63,36 @@ export const ProjectSessionsTab = React.memo(
             }),
         );
 
+        const handleNewSession = React.useCallback(() => {
+            router.push({
+                pathname: "/new",
+                params: {
+                    machineId: project.key.machineId,
+                    path: project.key.path,
+                },
+            });
+        }, [router, project.key.machineId, project.key.path]);
+
         if (sessions.length === 0) {
             return (
                 <View style={styles.emptyContainer}>
+                    <Ionicons
+                        name="chatbubble-outline"
+                        size={48}
+                        color={theme.colors.textSecondary}
+                    />
                     <Text style={styles.emptyText}>
                         {t("projects.noSessions")}
                     </Text>
+                    <Pressable
+                        style={styles.newSessionButton}
+                        onPress={handleNewSession}
+                    >
+                        <Ionicons name="add" size={18} color="#FFFFFF" />
+                        <Text style={styles.newSessionButtonText}>
+                            {t("newSession.title")}
+                        </Text>
+                    </Pressable>
                 </View>
             );
         }
@@ -89,12 +115,28 @@ const styles = StyleSheet.create((theme) => ({
         justifyContent: "center",
         alignItems: "center",
         padding: 32,
+        gap: 12,
     },
     emptyText: {
         ...Typography.default(),
         fontSize: 14,
         color: theme.colors.textSecondary,
         textAlign: "center",
+    },
+    newSessionButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        backgroundColor: theme.colors.header.tint,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+        marginTop: 4,
+    },
+    newSessionButtonText: {
+        ...Typography.default("semiBold"),
+        fontSize: 14,
+        color: "#FFFFFF",
     },
     statusDot: {
         width: 8,
