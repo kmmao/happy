@@ -142,6 +142,7 @@ export type SupervisorTriggerData = {
     category: string;
     severity: string;
   };
+  researchParams?: string;
 };
 
 export type SupervisorRunStatusData = {

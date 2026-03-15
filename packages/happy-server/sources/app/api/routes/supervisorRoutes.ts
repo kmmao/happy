@@ -29,6 +29,11 @@ export function supervisorRoutes(app: Fastify) {
                     .object({
                         machineId: z.string().optional(),
                         repoPath: z.string().optional(),
+                        trigger: z.enum(["manual", "research"]).optional(),
+                        researchParams: z.object({
+                            knownCompetitors: z.string().max(1000).optional(),
+                            focusAreas: z.string().max(1000).optional(),
+                        }).optional(),
                     })
                     .optional(),
             },
@@ -76,8 +81,11 @@ export function supervisorRoutes(app: Fastify) {
                         data: {
                             projectId: id,
                             accountId: userId,
-                            trigger: "manual",
+                            trigger: request.body?.trigger ?? "manual",
                             status: "pending",
+                            researchParams: request.body?.researchParams
+                                ? JSON.stringify(request.body.researchParams)
+                                : null,
                         },
                     });
                 });
@@ -98,18 +106,23 @@ export function supervisorRoutes(app: Fastify) {
             const machineId = request.body?.machineId || project.machineId;
             const repoPath = request.body?.repoPath || project.path;
 
+            const triggerType = request.body?.trigger ?? "manual";
+            const researchParams = request.body?.researchParams;
+
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildSupervisorTriggerEphemeral(
                     id,
                     run.id,
-                    "manual",
+                    triggerType,
                     machineId,
                     repoPath,
-                    project.supervisorMode ?? undefined,
-                    parseDimensions(project.supervisorEnabledDimensions),
+                    triggerType === "research" ? undefined : (project.supervisorMode ?? undefined),
+                    triggerType === "research" ? undefined : parseDimensions(project.supervisorEnabledDimensions),
                     undefined, // changedFiles
-                    project.supervisorCustomRules ?? undefined,
+                    triggerType === "research" ? undefined : (project.supervisorCustomRules ?? undefined),
+                    undefined, // fixAction
+                    researchParams ? JSON.stringify(researchParams) : undefined,
                 ),
                 recipientFilter: {
                     type: "machine-scoped-only",
@@ -139,6 +152,7 @@ export function supervisorRoutes(app: Fastify) {
                             .max(100)
                             .default(20),
                         offset: z.coerce.number().int().min(0).default(0),
+                        trigger: z.string().optional(),
                     })
                     .optional(),
             },
@@ -148,6 +162,7 @@ export function supervisorRoutes(app: Fastify) {
             const { id } = request.params;
             const limit = request.query?.limit ?? 20;
             const offset = request.query?.offset ?? 0;
+            const triggerFilter = request.query?.trigger;
 
             const project = await db.project.findFirst({
                 where: { id, accountId: userId },
@@ -158,16 +173,20 @@ export function supervisorRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Project not found" });
             }
 
+            const where = {
+                projectId: id,
+                accountId: userId,
+                ...(triggerFilter ? { trigger: triggerFilter } : {}),
+            };
+
             const [runs, total] = await Promise.all([
                 db.supervisorRun.findMany({
-                    where: { projectId: id, accountId: userId },
+                    where,
                     orderBy: { createdAt: "desc" },
                     take: limit,
                     skip: offset,
                 }),
-                db.supervisorRun.count({
-                    where: { projectId: id, accountId: userId },
-                }),
+                db.supervisorRun.count({ where }),
             ]);
 
             return reply.send({
@@ -293,6 +312,8 @@ export function supervisorRoutes(app: Fastify) {
                     currentDimension: z.string().max(50).optional(),
                     dimensionIndex: z.number().int().min(1).optional(),
                     totalDimensions: z.number().int().min(1).optional(),
+                    reportTitle: z.string().max(200).optional(),
+                    reportContent: z.string().max(50000).optional(),
                     actions: z.array(z.object({
                         severity: z.enum(["critical", "high", "medium", "low"]),
                         category: z.string().max(50),
@@ -317,6 +338,8 @@ export function supervisorRoutes(app: Fastify) {
                 currentDimension,
                 dimensionIndex,
                 totalDimensions,
+                reportTitle,
+                reportContent,
                 actions: reportedActions,
             } = request.body;
 
@@ -329,6 +352,8 @@ export function supervisorRoutes(app: Fastify) {
             if (actionsCount !== undefined) data.actionsCount = actionsCount;
             if (issuesCreated !== undefined) data.issuesCreated = issuesCreated;
             if (errorMessage !== undefined) data.errorMessage = errorMessage;
+            if (reportTitle !== undefined) data.reportTitle = reportTitle;
+            if (reportContent !== undefined) data.reportContent = reportContent;
             if (status === "completed" || status === "failed") {
                 data.completedAt = new Date();
             }
@@ -647,6 +672,9 @@ function serializeSupervisorRun(run: {
     trigger: string;
     status: string;
     artifactId: string | null;
+    reportTitle: string | null;
+    reportContent: string | null;
+    researchParams: string | null;
     actionsCount: number;
     issuesCreated: number;
     sessionId: string | null;
@@ -664,6 +692,9 @@ function serializeSupervisorRun(run: {
         trigger: run.trigger,
         status: run.status,
         artifactId: run.artifactId,
+        reportTitle: run.reportTitle,
+        reportContent: run.reportContent,
+        researchParams: run.researchParams,
         actionsCount: run.actionsCount,
         issuesCreated: run.issuesCreated,
         sessionId: run.sessionId,

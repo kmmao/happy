@@ -6,10 +6,11 @@ import { Project } from "@/sync/projectManager";
 import { ProjectSessionsTab } from "./ProjectSessionsTab";
 import { ProjectGitTab } from "./ProjectGitTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
+import { ProjectResearchTab } from "./ProjectResearchTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 
-type TabKey = "sessions" | "git" | "health";
+type TabKey = "sessions" | "git" | "health" | "research";
 
 interface ProjectDetailViewProps {
     project: Project;
@@ -28,6 +29,7 @@ export const ProjectDetailView = React.memo(
                 { key: "sessions", label: t("projects.tabSessions") },
                 { key: "git", label: t("projects.tabGit") },
                 { key: "health", label: t("projects.tabHealth") },
+                { key: "research", label: t("projects.tabResearch") },
             ],
             [],
         );
@@ -85,6 +87,15 @@ export const ProjectDetailView = React.memo(
                         }
                     >
                         <ProjectHealthTab project={project} />
+                    </View>
+                    <View
+                        style={
+                            activeTab === "research"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectResearchTab project={project} />
                     </View>
                 </View>
             </View>

@@ -926,6 +926,7 @@ export function buildSupervisorTriggerEphemeral(
   changedFiles?: string[],
   customRules?: string,
   fixAction?: { title: string; description: string; suggestedFix: string | null; category: string; severity: string },
+  researchParams?: string,
 ): EphemeralPayload {
   return {
     type: "supervisor-trigger",
@@ -939,6 +940,7 @@ export function buildSupervisorTriggerEphemeral(
     changedFiles,
     customRules,
     fixAction,
+    researchParams,
   };
 }
 

@@ -14,6 +14,7 @@ import { join } from "path";
 import { logger } from "@/ui/logger";
 import { buildSupervisorPrompt } from "./buildSupervisorPrompt";
 import { buildFixPrompt } from "./buildFixPrompt";
+import { buildResearchPrompt } from "./buildResearchPrompt";
 import type {
   SupervisorTriggerData,
   SupervisorRunStatusData,
@@ -51,6 +52,7 @@ export async function handleSupervisorTrigger(
     changedFiles,
     customRules,
     fixAction,
+    researchParams,
   } = data;
 
   // Guard against duplicate processing
@@ -69,6 +71,14 @@ export async function handleSupervisorTrigger(
         projectId,
         repoPath,
         fixAction,
+        deps,
+      );
+    } else if (trigger === "research") {
+      await handleResearchTrigger(
+        runId,
+        projectId,
+        repoPath,
+        researchParams,
         deps,
       );
     } else {
@@ -179,6 +189,77 @@ async function handleAnalysisTrigger(
 
   logger.debug(
     `[SUPERVISOR] Session ${spawnResult.sessionId} spawned for run ${runId}`,
+  );
+  deps.emitSupervisorRunStatus({
+    runId,
+    projectId,
+    status: "running",
+    sessionId: spawnResult.sessionId,
+  });
+}
+
+async function handleResearchTrigger(
+  runId: string,
+  projectId: string,
+  repoPath: string,
+  researchParams: string | undefined,
+  deps: SupervisorHandlerDeps,
+): Promise<void> {
+  logger.debug(
+    `[SUPERVISOR] Processing research ${runId} for project ${projectId} at ${repoPath}`,
+  );
+
+  // 1. Report running status
+  deps.emitSupervisorRunStatus({
+    runId,
+    projectId,
+    status: "running",
+  });
+
+  // 2. Build the research prompt
+  const prompt = buildResearchPrompt({
+    projectId,
+    runId,
+    repoPath,
+    researchParams,
+    serverUrl: deps.serverUrl,
+  });
+
+  // 3. Write prompt to temp file in the project
+  const promptFilePath = await writePromptFile(repoPath, `research-${runId}`, prompt);
+
+  // 4. Spawn session in the project directory (read-only research)
+  const spawnResult = await deps.spawnSession({
+    directory: repoPath,
+    approvedNewDirectoryCreation: false,
+    agent: "claude",
+    environmentVariables: {
+      HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
+      HAPPY_SUPERVISOR_RUN_ID: runId,
+      HAPPY_SUPERVISOR_PROJECT_ID: projectId,
+      HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
+      HAPPY_SUPERVISOR_AUTH_TOKEN: deps.authToken,
+    },
+  });
+
+  if (spawnResult.type !== "success") {
+    const errorMessage =
+      spawnResult.type === "error"
+        ? spawnResult.errorMessage
+        : "Failed to spawn research session";
+    logger.debug(`[SUPERVISOR] Research session spawn failed: ${errorMessage}`);
+    deps.emitSupervisorRunStatus({
+      runId,
+      projectId,
+      status: "failed",
+      errorMessage,
+    });
+    await cleanupPromptFile(promptFilePath);
+    return;
+  }
+
+  logger.debug(
+    `[SUPERVISOR] Research session ${spawnResult.sessionId} spawned for run ${runId}`,
   );
   deps.emitSupervisorRunStatus({
     runId,

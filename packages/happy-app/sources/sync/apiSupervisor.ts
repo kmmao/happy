@@ -9,9 +9,12 @@ import { getServerUrl } from "./serverConfig";
 export interface SupervisorRun {
     id: string;
     projectId: string;
-    trigger: string; // "manual" | "scheduled" | "event"
+    trigger: string; // "manual" | "scheduled" | "event" | "research"
     status: string; // "pending" | "running" | "completed" | "failed" | "cancelled"
     artifactId: string | null;
+    reportTitle: string | null;
+    reportContent: string | null;
+    researchParams: string | null;
     actionsCount: number;
     issuesCreated: number;
     sessionId: string | null;
@@ -54,6 +57,11 @@ export async function triggerSupervisorRun(
     params?: {
         machineId?: string;
         repoPath?: string;
+        trigger?: "manual" | "research";
+        researchParams?: {
+            knownCompetitors?: string;
+            focusAreas?: string;
+        };
     },
 ): Promise<SupervisorRun> {
     const API_ENDPOINT = getServerUrl();
@@ -99,13 +107,14 @@ export async function triggerSupervisorRun(
 export async function fetchSupervisorRuns(
     credentials: AuthCredentials,
     projectId: string,
-    params?: { limit?: number; offset?: number },
+    params?: { limit?: number; offset?: number; trigger?: string },
 ): Promise<{ runs: SupervisorRun[]; total: number }> {
     const API_ENDPOINT = getServerUrl();
     const query = new URLSearchParams();
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
     if (params?.offset !== undefined)
         query.set("offset", String(params.offset));
+    if (params?.trigger) query.set("trigger", params.trigger);
     const qs = query.toString() ? `?${query.toString()}` : "";
 
     return await backoff(async () => {

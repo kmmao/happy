@@ -430,11 +430,16 @@ model SupervisorRun {
     project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
     accountId       String
 
-    trigger         String    // "scheduled" | "manual" | "event"
+    trigger         String    // "scheduled" | "manual" | "event" | "research"
     status          String    @default("pending")  // pending | running | completed | failed | cancelled
 
     // Report stored as Artifact (encrypted), reference by artifactId
     artifactId      String?
+
+    // Competitor research fields (trigger = "research")
+    reportTitle     String?
+    reportContent   String?
+    researchParams  String?   // JSON: { knownCompetitors?: string, focusAreas?: string }
 
     actionsCount    Int       @default(0)
     issuesCreated   Int       @default(0)
