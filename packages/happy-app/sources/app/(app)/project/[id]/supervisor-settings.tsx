@@ -351,21 +351,25 @@ export default function SupervisorSettingsScreen() {
                     label={t("supervisor.dimSecurity")}
                     value={config.analysis.security}
                     onToggle={() => toggleDimension("security")}
+                    subtitle={t("supervisor.dimSecurityNote")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimDependencies")}
                     value={config.analysis.dependencies}
                     onToggle={() => toggleDimension("dependencies")}
+                    subtitle={t("supervisor.dimDependenciesNote")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimArchitecture")}
                     value={config.analysis.architecture}
                     onToggle={() => toggleDimension("architecture")}
+                    subtitle={t("supervisor.dimArchitectureNote")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimTechDebt")}
                     value={config.analysis.techDebt}
                     onToggle={() => toggleDimension("techDebt")}
+                    subtitle={t("supervisor.dimTechDebtNote")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimCodeQuality")}
@@ -383,11 +387,13 @@ export default function SupervisorSettingsScreen() {
                     label={t("supervisor.dimDocumentation")}
                     value={config.analysis.documentation}
                     onToggle={() => toggleDimension("documentation")}
+                    subtitle={t("supervisor.dimDocumentationNote")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimPerformance")}
                     value={config.analysis.performance}
                     onToggle={() => toggleDimension("performance")}
+                    subtitle={t("supervisor.dimPerformanceNote")}
                     isLast
                 />
             </ItemGroup>
