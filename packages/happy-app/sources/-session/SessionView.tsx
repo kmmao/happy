@@ -692,6 +692,8 @@ function SessionViewInner({
       alwaysShowContext: alwaysShowContextSize,
       modelCode: effectiveModelCode,
       totalDurationMs: usageSource?.totalDurationMs,
+      isThinking: session.thinking === true,
+      turnStartedAt: session.thinking && session.thinkingAt > 0 ? session.thinkingAt : undefined,
     }),
     [
       sessionStatus.statusText,
@@ -704,6 +706,8 @@ function SessionViewInner({
       usageSource,
       alwaysShowContextSize,
       effectiveModelCode,
+      session.thinking,
+      session.thinkingAt,
     ],
   );
 
@@ -892,6 +896,8 @@ function SessionViewInner({
           sync.sendMessage(sessionId, "", undefined, { continue: true });
         }}
         totalDurationMs={usageSource?.totalDurationMs}
+        isThinking={session.thinking === true}
+        turnStartedAt={session.thinking && session.thinkingAt > 0 ? session.thinkingAt : undefined}
       />
     </>
   );

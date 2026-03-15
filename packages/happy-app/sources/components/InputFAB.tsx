@@ -5,7 +5,9 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { StatusDot } from "@/components/StatusDot";
 import { Typography } from "@/constants/Typography";
+import { useElapsedTime } from "@/hooks/useElapsedTime";
 import {
+  formatDurationMs,
   formatTokenCountShort,
   getContextWindowSize,
 } from "@/utils/formatUsage";
@@ -88,6 +90,8 @@ export interface InputFABStatusInfo {
   alwaysShowContext?: boolean;
   modelCode?: string | null;
   totalDurationMs?: number;
+  isThinking?: boolean;
+  turnStartedAt?: number;
 }
 
 interface InputFABProps {
@@ -256,19 +260,19 @@ const CompactStatus = React.memo(function CompactStatus({
 }) {
   const styles = stylesheet;
 
-  // API duration label — computed directly from totalDurationMs, no ticking needed
+  // Real-time elapsed time — ticks every second while AI is thinking
+  const currentTurnElapsedSec = useElapsedTime(
+    info.isThinking ? info.turnStartedAt : undefined,
+  );
+
+  // Combine accumulated duration with current turn elapsed
   const elapsedLabel = React.useMemo(() => {
-    const ms = info.totalDurationMs;
-    if (!ms || ms <= 0) return null;
-    const totalSeconds = Math.floor(ms / 1000);
-    if (totalSeconds < 60) return `${totalSeconds}s`;
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    if (mins < 60) return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  }, [info.totalDurationMs]);
+    const accumulatedMs = info.totalDurationMs ?? 0;
+    const currentTurnMs = info.isThinking ? currentTurnElapsedSec * 1000 : 0;
+    const totalMs = accumulatedMs + currentTurnMs;
+    if (totalMs <= 0) return null;
+    return formatDurationMs(totalMs);
+  }, [info.totalDurationMs, info.isThinking, currentTurnElapsedSec]);
 
   // Context bar computation
   const contextSize = info.contextSize ?? 0;

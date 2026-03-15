@@ -1,22 +1,12 @@
 import * as React from "react";
 import { Text, TextStyle } from "react-native";
-import { formatTokenCountShort } from "@/utils/formatUsage";
+import { useElapsedTime } from "@/hooks/useElapsedTime";
+import { formatDurationMs, formatTokenCountShort } from "@/utils/formatUsage";
 
 const ANIMATION_DURATION = 800;
 
 function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
-}
-
-function formatDurationMs(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  if (totalSeconds < 60) return `${totalSeconds}s`;
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  if (mins < 60) return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    return 1 - Math.pow(1 - t, 3);
 }
 
 /**
@@ -29,9 +19,16 @@ export const AnimatedTokensCost = React.memo(
     totalTokens: number;
     totalCostUsd?: number;
     totalDurationMs?: number;
+    isThinking?: boolean;
+    turnStartedAt?: number;
     style?: TextStyle;
   }) => {
-    const { totalTokens, totalCostUsd, totalDurationMs } = props;
+    const { totalTokens, totalCostUsd, totalDurationMs, isThinking, turnStartedAt } = props;
+
+    // Real-time elapsed time — ticks every second while AI is thinking
+    const currentTurnElapsedSec = useElapsedTime(
+      isThinking ? turnStartedAt : undefined,
+    );
 
     // Track previous target values
     const prevTokensRef = React.useRef(0);
@@ -101,9 +98,11 @@ export const AnimatedTokensCost = React.memo(
         ? ` · $${displayCost < 0.01 ? displayCost.toFixed(4) : displayCost.toFixed(2)}`
         : "";
 
+    const currentTurnMs = isThinking ? currentTurnElapsedSec * 1000 : 0;
+    const effectiveDurationMs = (totalDurationMs ?? 0) + currentTurnMs;
     const durationStr =
-      totalDurationMs && totalDurationMs > 0
-        ? ` · ${formatDurationMs(totalDurationMs)}`
+      effectiveDurationMs > 0
+        ? ` · ${formatDurationMs(effectiveDurationMs)}`
         : "";
 
     return (

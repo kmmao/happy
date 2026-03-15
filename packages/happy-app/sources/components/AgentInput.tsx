@@ -142,6 +142,8 @@ interface AgentInputProps {
   needsContinue?: boolean;
   onContinuePress?: () => void;
   totalDurationMs?: number;
+  isThinking?: boolean;
+  turnStartedAt?: number;
 }
 
 const FAVORITE_CHIP_GRADIENTS: [string, string][] = [
@@ -1488,6 +1490,8 @@ export const AgentInput = React.memo(
                               }
                               totalCostUsd={props.usageData.totalCostUsd}
                               totalDurationMs={props.totalDurationMs}
+                              isThinking={props.isThinking}
+                              turnStartedAt={props.turnStartedAt}
                             />
                           )}
                       </Text>
