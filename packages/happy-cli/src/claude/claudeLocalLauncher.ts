@@ -34,6 +34,34 @@ export async function claudeLocalLauncher(
       // Assistant messages signal Claude is working (possibly executing tools next)
       if (message.type === "assistant") {
         thinkingTracker.onAssistantMessage();
+        // Track tool_use blocks — keeps thinking=true during tool execution
+        const blocks = Array.isArray(message.message?.content)
+          ? message.message.content
+          : [];
+        for (const block of blocks) {
+          if (
+            block.type === "tool_use" &&
+            typeof block.id === "string" &&
+            block.id.length > 0
+          ) {
+            thinkingTracker.onToolUseStart(block.id);
+          }
+        }
+      }
+      // Track tool_result blocks — mark tool execution complete
+      if (message.type === "user") {
+        const blocks = Array.isArray(message.message?.content)
+          ? message.message.content
+          : [];
+        for (const block of blocks) {
+          if (
+            block.type === "tool_result" &&
+            typeof block.tool_use_id === "string" &&
+            block.tool_use_id.length > 0
+          ) {
+            thinkingTracker.onToolUseEnd(block.tool_use_id);
+          }
+        }
       }
       session.client.sendClaudeSessionMessage(message);
     },

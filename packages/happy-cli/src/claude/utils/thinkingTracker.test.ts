@@ -204,6 +204,150 @@ describe("ThinkingTracker", () => {
     expect(onChange).toHaveBeenLastCalledWith(false);
   });
 
+  // ── Tool execution tracking ──
+
+  it("should keep thinking=true while tools are active", () => {
+    const onChange = vi.fn();
+    const tracker = createThinkingTracker({ onChange, idleTimeoutMs: 2000 });
+
+    // fetch starts → thinking=true
+    tracker.onFetchStart(10);
+    // fetch ends, but tool_use was detected
+    tracker.onFetchEnd(10);
+    tracker.onToolUseStart("tool_abc");
+
+    // Even after idle timeout, thinking should stay true because tool is active
+    vi.advanceTimersByTime(10000);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenLastCalledWith(true);
+
+    // Tool finishes → idle timer starts
+    tracker.onToolUseEnd("tool_abc");
+    vi.advanceTimersByTime(2000);
+    expect(onChange).toHaveBeenLastCalledWith(false);
+
+    tracker.cleanup();
+  });
+
+  it("should not go false when fetch ends but tools still active", () => {
+    const onChange = vi.fn();
+    const tracker = createThinkingTracker({ onChange, idleTimeoutMs: 2000 });
+
+    tracker.onFetchStart(1);
+    tracker.onToolUseStart("tool_1");
+    tracker.onToolUseStart("tool_2");
+    tracker.onFetchEnd(1);
+
+    // Two tools active — should not start idle timer
+    vi.advanceTimersByTime(30000);
+    expect(onChange).toHaveBeenCalledTimes(1); // only the initial true
+
+    // End one tool
+    tracker.onToolUseEnd("tool_1");
+    vi.advanceTimersByTime(30000);
+    expect(onChange).toHaveBeenCalledTimes(1); // still true, tool_2 active
+
+    // End second tool → idle timer starts
+    tracker.onToolUseEnd("tool_2");
+    vi.advanceTimersByTime(2000);
+    expect(onChange).toHaveBeenLastCalledWith(false);
+
+    tracker.cleanup();
+  });
+
+  it("should cancel tool idle timer when new fetch starts", () => {
+    const onChange = vi.fn();
+    const tracker = createThinkingTracker({ onChange, idleTimeoutMs: 2000 });
+
+    tracker.onFetchStart(1);
+    tracker.onToolUseStart("tool_1");
+    tracker.onFetchEnd(1);
+    tracker.onToolUseEnd("tool_1");
+
+    // Idle timer started
+    vi.advanceTimersByTime(1000);
+
+    // New fetch starts (next API call with tool result)
+    tracker.onFetchStart(2);
+
+    // Original idle timer should be cancelled
+    vi.advanceTimersByTime(5000);
+    expect(onChange).toHaveBeenCalledTimes(1); // still true
+
+    tracker.cleanup();
+  });
+
+  it("should clear active tools on process exit", () => {
+    const onChange = vi.fn();
+    const tracker = createThinkingTracker({ onChange, idleTimeoutMs: 2000 });
+
+    tracker.onFetchStart(1);
+    tracker.onToolUseStart("tool_1");
+    tracker.onFetchEnd(1);
+
+    // Process exits while tool still active
+    tracker.onProcessExit();
+    expect(onChange).toHaveBeenLastCalledWith(false);
+
+    // Should be able to reuse
+    onChange.mockClear();
+    tracker.onFetchStart(2);
+    expect(onChange).toHaveBeenCalledWith(true);
+
+    tracker.cleanup();
+  });
+
+  it("should simulate a full Claude work cycle with tool execution correctly", () => {
+    const onChange = vi.fn();
+    const tracker = createThinkingTracker({ onChange, idleTimeoutMs: 2000 });
+
+    // T=0: fetch-start (Claude calls API)
+    tracker.onFetchStart(10);
+    expect(onChange).toHaveBeenLastCalledWith(true);
+
+    // T=1000: fetch-end (API returns, Claude decides to call tools)
+    vi.advanceTimersByTime(1000);
+    tracker.onFetchEnd(10);
+
+    // T=1200: assistant message from JSONL with tool_use blocks
+    vi.advanceTimersByTime(200);
+    tracker.onAssistantMessage();
+    tracker.onToolUseStart("edit_1");
+    tracker.onToolUseStart("bash_1");
+
+    // T=15000: tools still executing (e.g. long-running bash command)
+    // Without tool tracking, thinking would have gone false at T=3200
+    vi.advanceTimersByTime(13800);
+    expect(onChange).toHaveBeenCalledTimes(1); // STILL true!
+
+    // T=15500: first tool finishes
+    vi.advanceTimersByTime(500);
+    tracker.onToolUseEnd("edit_1");
+    // Still one tool active
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    // T=30000: second tool finishes
+    vi.advanceTimersByTime(14500);
+    tracker.onToolUseEnd("bash_1");
+
+    // T=30000: idle timer starts
+    // T=31000: new fetch starts (next API call)
+    vi.advanceTimersByTime(1000);
+    tracker.onFetchStart(11);
+    // Still true, idle timer cancelled
+
+    // T=32000: second fetch ends (final response, no tools)
+    vi.advanceTimersByTime(1000);
+    tracker.onFetchEnd(11);
+
+    // T=34000: idle timer expires → thinking=false
+    vi.advanceTimersByTime(2000);
+    expect(onChange).toHaveBeenLastCalledWith(false);
+
+    tracker.cleanup();
+  });
+
+  // Original full cycle test (without tool tracking)
   it("should simulate a full Claude work cycle correctly", () => {
     const onChange = vi.fn();
     const tracker = createThinkingTracker({ onChange, idleTimeoutMs: 2000 });

@@ -1,13 +1,16 @@
 /**
  * ThinkingTracker — Unified thinking state machine for claudeLocal mode.
  *
- * Fuses two signal sources:
+ * Fuses three signal sources:
  *  1. fd3 fetch events (fast, but only covers HTTP requests)
  *  2. JSONL assistant messages (slightly delayed, but covers tool execution gaps)
+ *  3. JSONL tool lifecycle (tool_use in assistant → tool_result in user)
  *
  * Rules:
  *  - fetch-start        → thinking=true immediately, cancel idle timer
- *  - fetch-end          → if no active fetches, start idle timer
+ *  - fetch-end          → if no active fetches AND no active tools, start idle timer
+ *  - tool-use-start     → mark tool active, cancel idle timer, keep thinking=true
+ *  - tool-use-end       → mark tool done; if no active fetches/tools, start idle timer
  *  - assistant message   → if thinking, reset (extend) idle timer
  *  - idle timer expires  → thinking=false
  *  - process exit        → thinking=false immediately
@@ -20,6 +23,10 @@ export interface ThinkingTracker {
   onFetchEnd(id: number): void;
   /** JSONL: new assistant message arrived */
   onAssistantMessage(): void;
+  /** JSONL: tool_use block detected in assistant message */
+  onToolUseStart(callId: string): void;
+  /** JSONL: tool_result block detected in user message */
+  onToolUseEnd(callId: string): void;
   /** Claude Code process exited */
   onProcessExit(): void;
   /** Cleanup all timers */
@@ -34,6 +41,7 @@ export function createThinkingTracker(opts: {
 
   let thinking = false;
   let activeFetches = new Set<number>();
+  let activeToolCalls = new Set<string>();
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   function setThinking(value: boolean): void {
@@ -50,11 +58,15 @@ export function createThinkingTracker(opts: {
     }
   }
 
+  function hasActiveWork(): boolean {
+    return activeFetches.size > 0 || activeToolCalls.size > 0;
+  }
+
   function startIdleTimer(): void {
     clearIdleTimer();
     idleTimer = setTimeout(() => {
       idleTimer = null;
-      if (activeFetches.size === 0) {
+      if (!hasActiveWork()) {
         setThinking(false);
       }
     }, idleTimeoutMs);
@@ -69,7 +81,21 @@ export function createThinkingTracker(opts: {
 
     onFetchEnd(id: number): void {
       activeFetches.delete(id);
-      if (activeFetches.size === 0 && thinking) {
+      if (!hasActiveWork() && thinking) {
+        startIdleTimer();
+      }
+    },
+
+    onToolUseStart(callId: string): void {
+      activeToolCalls.add(callId);
+      clearIdleTimer();
+      // Keep thinking=true (should already be true from fetch)
+      setThinking(true);
+    },
+
+    onToolUseEnd(callId: string): void {
+      activeToolCalls.delete(callId);
+      if (!hasActiveWork() && thinking) {
         startIdleTimer();
       }
     },
@@ -86,12 +112,14 @@ export function createThinkingTracker(opts: {
     onProcessExit(): void {
       clearIdleTimer();
       activeFetches.clear();
+      activeToolCalls.clear();
       setThinking(false);
     },
 
     cleanup(): void {
       clearIdleTimer();
       activeFetches.clear();
+      activeToolCalls.clear();
     },
   };
 }
