@@ -9,6 +9,8 @@ import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab } from "./ProjectResearchTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
+import { storage } from "@/sync/storage";
+import { gitStatusSync } from "@/sync/gitStatusSync";
 
 type TabKey = "sessions" | "git" | "health" | "research";
 
@@ -23,6 +25,17 @@ export const ProjectDetailView = React.memo(
         const [activeTab, setActiveTab] = React.useState<TabKey>(
             initialTab ?? "sessions",
         );
+
+        // Proactively trigger git status refresh on mount if project has active sessions
+        React.useEffect(() => {
+            const sessions = storage.getState().sessions;
+            const activeSessionId = project.sessionIds.find(
+                (id) => sessions[id]?.active,
+            );
+            if (activeSessionId) {
+                gitStatusSync.getSync(activeSessionId).invalidate();
+            }
+        }, [project.sessionIds]);
 
         const tabs: { key: TabKey; label: string }[] = React.useMemo(
             () => [
