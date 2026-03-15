@@ -1976,6 +1976,9 @@ export const en = {
     status_completed: "Completed",
     status_failed: "Failed",
     status_cancelled: "Cancelled",
+    statusWaitingCli: "Waiting for CLI...",
+    statusAnalyzing: "AI analyzing code...",
+    elapsed: ({ time }: { time: string }) => `Elapsed: ${time}`,
 
     // Triggers
     triggerManual: "Manual Scan",

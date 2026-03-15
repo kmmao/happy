@@ -59,6 +59,40 @@ function statusLabel(status: string): string {
     return key ? t(key) : status;
 }
 
+function formatElapsed(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`;
+}
+
+// Asymptotic progress estimate: fast at first, slows down, never hits 100%.
+// pending phase: 0-8%  (tau=15s, cap=8%)
+// running phase: 8-95% (tau=70s, cap=95%)
+// Formula: cap * (1 - e^(-elapsed/tau))
+function estimateProgress(status: string, elapsedSeconds: number): number {
+    if (status === "pending") {
+        return Math.round(8 * (1 - Math.exp(-elapsedSeconds / 15)));
+    }
+    // running: base 8% + asymptotic curve up to 95%
+    return Math.round(8 + 87 * (1 - Math.exp(-elapsedSeconds / 70)));
+}
+
+function useElapsedSeconds(startTimestamp: number | null): number {
+    const [elapsed, setElapsed] = React.useState(0);
+    React.useEffect(() => {
+        if (startTimestamp == null) {
+            setElapsed(0);
+            return;
+        }
+        const calc = () =>
+            Math.max(0, Math.floor((Date.now() - startTimestamp) / 1000));
+        setElapsed(calc());
+        const id = setInterval(() => setElapsed(calc()), 1000);
+        return () => clearInterval(id);
+    }, [startTimestamp]);
+    return elapsed;
+}
+
 interface ProjectHealthTabProps {
     project: Project;
 }
@@ -168,6 +202,10 @@ export const ProjectHealthTab = React.memo(
                     (r) => r.status === "pending" || r.status === "running",
                 ),
             [runs],
+        );
+
+        const elapsedSeconds = useElapsedSeconds(
+            activeRun ? activeRun.createdAt : null,
         );
 
         const [triggerLoading, doTrigger] = useHappyAction(
@@ -314,17 +352,45 @@ export const ProjectHealthTab = React.memo(
 
                         {/* Action buttons */}
                         <View style={styles.actionRow}>
-                            {activeRun ? (
-                                <>
+                            {!loaded ? (
+                                <ActivityIndicator
+                                    size="small"
+                                    color={theme.colors.textSecondary}
+                                />
+                            ) : activeRun ? (
+                                <View style={styles.activeRunContainer}>
                                     <View style={styles.statusChip}>
                                         <ActivityIndicator
                                             size="small"
                                             color={theme.colors.header.tint}
                                         />
                                         <Text style={styles.statusChipText}>
-                                            {statusLabel(activeRun.status)}
+                                            {activeRun.status === "pending"
+                                                ? t("supervisor.statusWaitingCli")
+                                                : t("supervisor.statusAnalyzing")}
                                         </Text>
                                     </View>
+                                    <View style={styles.progressContainer}>
+                                        <View style={styles.progressBarBg}>
+                                            <View
+                                                style={[
+                                                    styles.progressBarFill,
+                                                    {
+                                                        width: `${estimateProgress(activeRun.status, elapsedSeconds)}%`,
+                                                        backgroundColor: theme.colors.header.tint,
+                                                    },
+                                                ]}
+                                            />
+                                        </View>
+                                        <Text style={styles.progressText}>
+                                            {estimateProgress(activeRun.status, elapsedSeconds)}%
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.elapsedText}>
+                                        {t("supervisor.elapsed", {
+                                            time: formatElapsed(elapsedSeconds),
+                                        })}
+                                    </Text>
                                     <Pressable
                                         style={[
                                             styles.actionButton,
@@ -337,7 +403,7 @@ export const ProjectHealthTab = React.memo(
                                             {t("common.cancel")}
                                         </Text>
                                     </Pressable>
-                                </>
+                                </View>
                             ) : (
                                 <Pressable
                                     style={styles.scanButton}
@@ -635,6 +701,41 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 13,
         color: theme.colors.text,
+    },
+    activeRunContainer: {
+        alignItems: "center",
+        gap: 8,
+        width: "100%",
+    },
+    progressContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        width: "100%",
+        paddingHorizontal: 16,
+    },
+    progressBarBg: {
+        flex: 1,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: theme.colors.surface,
+        overflow: "hidden" as const,
+    },
+    progressBarFill: {
+        height: "100%",
+        borderRadius: 3,
+    },
+    progressText: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        width: 32,
+        textAlign: "right" as const,
+    },
+    elapsedText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
     },
     actionButton: {
         paddingHorizontal: 16,

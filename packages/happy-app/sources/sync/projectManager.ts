@@ -150,7 +150,8 @@ class ProjectManager {
 
     const projectKey: ProjectKey = {
       machineId: session.metadata.machineId,
-      path: session.metadata.path,
+      // Worktree sessions belong to the parent project, not the worktree path
+      path: session.metadata.worktree?.parentRepoPath || session.metadata.path,
     };
 
     const project = this.getOrCreateProject(projectKey, machineMetadata);
