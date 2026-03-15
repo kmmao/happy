@@ -27,8 +27,6 @@ import {
   RawRecord,
 } from "./typesRaw";
 import { getCurrentLanguage, t } from "@/text";
-import { kanbanStore } from "./kanbanStore";
-import { isKanbanKey } from "./kanbanTypes";
 import { issueSessionStore } from "./issueSessionStore";
 import type { IssueSessionLink } from "./issueSessionTypes";
 import { isIssueSessionKey, buildIssueKey } from "./issueSessionTypes";
@@ -38,12 +36,6 @@ import {
   updateIssueStateViaMachine,
 } from "./issueFetch";
 import { machineBash } from "./ops";
-import { promptTemplateStore } from "./promptTemplateStore";
-import { isTemplateKey } from "./promptTemplateTypes";
-import { ideationStore } from "./ideationStore";
-import { isIdeationKey } from "./ideationTypes";
-import { roadmapStore } from "./roadmapStore";
-import { isRoadmapKey } from "./roadmapTypes";
 import {
   applySettings,
   Settings,
@@ -58,6 +50,8 @@ import {
   loadLastSeqs,
   saveLastSeq,
   deleteLastSeq,
+  isProjectMigrationDone,
+  markProjectMigrationDone,
 } from "./persistence";
 import { initializeTracking, tracking } from "@/track";
 import { parseToken } from "@/utils/parseToken";
@@ -108,6 +102,11 @@ import {
   deleteMessageCache,
 } from "./messageCache";
 import { getSessionName } from "@/utils/sessionUtils";
+import {
+  fetchProjects,
+  resolveProject,
+  linkSessionsToProject,
+} from "./apiProjects";
 import {
   notifyTaskComplete,
   notifyPermissionRequest,
@@ -183,8 +182,11 @@ class Sync {
   private friendsSync: InvalidateSync;
   private friendRequestsSync: InvalidateSync;
   private feedSync: InvalidateSync;
+  private projectsSync: InvalidateSync;
   private activityAccumulator: ActivityUpdateAccumulator;
+  private supervisorStatusListeners = new Set<(event: { projectId: string; status: string; runId: string }) => void>();
   private preferencesMigrationDone = false;
+  private projectMigrationDone = isProjectMigrationDone();
   private pendingSettings: Partial<Settings> = loadPendingSettings();
   private appState: AppStateStatus = AppState.currentState;
   private backgroundSendTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -207,6 +209,7 @@ class Sync {
     this.friendsSync = new InvalidateSync(this.fetchFriends);
     this.friendRequestsSync = new InvalidateSync(this.fetchFriendRequests);
     this.feedSync = new InvalidateSync(this.fetchFeed);
+    this.projectsSync = new InvalidateSync(this.fetchAndSyncProjects);
 
     const registerPushToken = async () => {
       if (__DEV__) {
@@ -249,6 +252,7 @@ class Sync {
         this.friendsSync.invalidate();
         this.friendRequestsSync.invalidate();
         this.feedSync.invalidate();
+        this.projectsSync.invalidate();
       } else {
         log.log(`📱 App state changed to: ${nextAppState}`);
         this.maybeStartBackgroundSendWatchdog();
@@ -333,6 +337,7 @@ class Sync {
     this.friendRequestsSync.invalidate();
     this.artifactsSync.invalidate();
     this.feedSync.invalidate();
+    this.projectsSync.invalidate();
     log.log("🔄 #init: All syncs invalidated, including artifacts");
 
     // Wait for both sessions and machines to load, then mark as ready
@@ -1109,6 +1114,81 @@ class Sync {
         `📤 Preferences migration: queued ${migratedCount} sessions for server sync`,
       );
     }
+  };
+
+  /**
+   * Fetch projects from server and merge into projectManager.
+   * On first run, migrates local in-memory projects to server.
+   */
+  private fetchAndSyncProjects = async () => {
+    if (!this.credentials) return;
+
+    try {
+      // Fetch server projects
+      const serverProjects = await fetchProjects(this.credentials);
+
+      // Merge into projectManager
+      projectManager.mergeServerProjects(serverProjects);
+
+      // Run migration if needed (one-time per app lifecycle)
+      if (!this.projectMigrationDone) {
+        this.projectMigrationDone = true;
+        await this.migrateProjectsToServer();
+      }
+
+      log.log(
+        `📁 Projects sync completed — ${serverProjects.length} from server`,
+      );
+    } catch (error) {
+      log.log(`📁 Projects sync failed: ${error}`);
+      throw error;
+    }
+  };
+
+  /**
+   * One-time migration: create server-side Project records for
+   * all in-memory projects that have sessions but no serverId.
+   */
+  private migrateProjectsToServer = async () => {
+    if (!this.credentials) return;
+
+    const unsyncedProjects = projectManager.getUnsyncedProjects();
+    if (unsyncedProjects.length === 0) {
+      markProjectMigrationDone();
+      return;
+    }
+
+    log.log(
+      `📁 Migrating ${unsyncedProjects.length} projects to server`,
+    );
+
+    for (const project of unsyncedProjects) {
+      try {
+        const result = await resolveProject(this.credentials, {
+          machineId: project.key.machineId,
+          path: project.key.path,
+        });
+
+        // Store serverId in projectManager
+        projectManager.setServerId(project.key, result.project.id);
+
+        // Link sessions to the server project
+        if (project.sessionIds.length > 0) {
+          await linkSessionsToProject(
+            this.credentials,
+            result.project.id,
+            project.sessionIds,
+          );
+        }
+      } catch (error) {
+        log.log(
+          `📁 Failed to migrate project ${project.key.machineId}:${project.key.path}: ${error}`,
+        );
+      }
+    }
+
+    // Persist migration completion
+    markProjectMigrationDone();
   };
 
   public refreshMachines = async () => {
@@ -3115,38 +3195,6 @@ class Sync {
       log.log("📋 Received kv-batch-update");
       const kvUpdate = updateData.body;
 
-      // Filter kanban-related changes and forward to kanban store
-      const kanbanChanges = kvUpdate.changes.filter((c: { key: string }) =>
-        isKanbanKey(c.key),
-      );
-      if (kanbanChanges.length > 0) {
-        kanbanStore.getState().handleKvUpdate(kanbanChanges);
-      }
-
-      // Filter prompt template changes and forward to template store
-      const templateChanges = kvUpdate.changes.filter((c: { key: string }) =>
-        isTemplateKey(c.key),
-      );
-      if (templateChanges.length > 0) {
-        promptTemplateStore.getState().handleKvUpdate(templateChanges);
-      }
-
-      // Filter ideation-related changes and forward to ideation store
-      const ideationChanges = kvUpdate.changes.filter((c: { key: string }) =>
-        isIdeationKey(c.key),
-      );
-      if (ideationChanges.length > 0) {
-        ideationStore.getState().handleKvUpdate(ideationChanges);
-      }
-
-      // Filter roadmap-related changes and forward to roadmap store
-      const roadmapChanges = kvUpdate.changes.filter((c: { key: string }) =>
-        isRoadmapKey(c.key),
-      );
-      if (roadmapChanges.length > 0) {
-        roadmapStore.getState().handleKvUpdate(roadmapChanges);
-      }
-
       // Filter issue-session link changes and forward to issueSession store
       const issueSessionChanges = kvUpdate.changes.filter(
         (c: { key: string }) => isIssueSessionKey(c.key),
@@ -3154,6 +3202,13 @@ class Sync {
       if (issueSessionChanges.length > 0) {
         await issueSessionStore.getState().handleKvUpdate(issueSessionChanges);
       }
+    } else if (
+      updateData.body.t === "new-project" ||
+      updateData.body.t === "update-project" ||
+      updateData.body.t === "delete-project"
+    ) {
+      log.log(`📁 Received ${updateData.body.t} event`);
+      this.projectsSync.invalidate();
     }
   };
 
@@ -3262,6 +3317,14 @@ class Sync {
     // Handle webhook-pr-merged: archive session and mark IssueSessionLink as completed.
     if (updateData.type === "webhook-pr-merged") {
       void this.handleWebhookPRMerged(updateData);
+    }
+
+    // Handle supervisor-status: notify listeners for real-time Health Tab updates.
+    if (updateData.type === "supervisor-status") {
+      const event = { projectId: updateData.projectId, status: updateData.status, runId: updateData.runId };
+      for (const listener of this.supervisorStatusListeners) {
+        listener(event);
+      }
     }
   };
 
@@ -3540,35 +3603,8 @@ class Sync {
         voiceHooks.onSessionOnline(s.id, s.metadata ?? undefined);
       }
     }
-    // Auto-complete kanban tasks when their last linked session ends
     if (endedSessionIds.length > 0) {
-      this.autoCompleteTasksForEndedSessions(endedSessionIds, isActive);
       void this.markFailedIssueSessionsForEndedSessions(endedSessionIds);
-    }
-  };
-
-  private autoCompleteTasksForEndedSessions = (
-    endedSessionIds: string[],
-    activeSessionIds: Set<string>,
-  ) => {
-    const endedSet = new Set(endedSessionIds);
-    const tasks = Object.values(kanbanStore.getState().tasks);
-
-    for (const task of tasks) {
-      // Only auto-complete tasks that are in_progress
-      if (task.columnId !== "in_progress") continue;
-      // Task must have linked sessions
-      if (task.sessionIds.length === 0) continue;
-      // Check if any of the ended sessions belong to this task
-      const hasEndedSession = task.sessionIds.some((id) => endedSet.has(id));
-      if (!hasEndedSession) continue;
-      // Only move to done if the task has NO remaining active sessions
-      const hasActiveSession = task.sessionIds.some((id) =>
-        activeSessionIds.has(id),
-      );
-      if (hasActiveSession) continue;
-
-      kanbanStore.getState().moveTask(task.id, "done");
     }
   };
 
@@ -4016,9 +4052,14 @@ class Sync {
       }
     }
   };
-}
 
-// Global singleton instance
+  // --- Supervisor status event subscription ---
+
+  onSupervisorStatus(listener: (event: { projectId: string; status: string; runId: string }) => void): () => void {
+    this.supervisorStatusListeners.add(listener);
+    return () => { this.supervisorStatusListeners.delete(listener); };
+  }
+}
 export const sync = new Sync();
 
 //

@@ -26,6 +26,11 @@ import { enableAuthentication } from "./utils/enableAuthentication";
 import { userRoutes } from "./routes/userRoutes";
 import { feedRoutes } from "./routes/feedRoutes";
 import { kvRoutes } from "./routes/kvRoutes";
+import { projectRoutes } from "./routes/projectRoutes";
+import { supervisorRoutes } from "./routes/supervisorRoutes";
+import { supervisorReportRoutes } from "./routes/supervisorReportRoutes";
+import { supervisorActionRoutes } from "./routes/supervisorActionRoutes";
+import { supervisorAnalyticsRoutes } from "./routes/supervisorAnalyticsRoutes";
 import { v3SessionRoutes } from "./routes/v3SessionRoutes";
 import { webhookRoutes } from "./routes/webhookRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
@@ -44,7 +49,7 @@ export async function startApi() {
   app.register(import("@fastify/cors"), {
     origin: "*",
     allowedHeaders: "*",
-    methods: ["GET", "POST", "DELETE"],
+    methods: ["GET", "POST", "PATCH", "DELETE"],
   });
   app.register(import("@fastify/multipart"), {
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max audio file
@@ -102,6 +107,11 @@ export async function startApi() {
   userRoutes(typed);
   feedRoutes(typed);
   kvRoutes(typed);
+  projectRoutes(typed);
+  supervisorRoutes(typed);
+  supervisorReportRoutes(typed);
+  supervisorActionRoutes(typed);
+  supervisorAnalyticsRoutes(typed);
   v3SessionRoutes(typed);
 
   // Start HTTP

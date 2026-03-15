@@ -4,14 +4,12 @@ import {
   ActivityIndicator,
   Text,
   Pressable,
-  Platform,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import {
   useFriendRequests,
   useSocketStatus,
   useRealtimeStatus,
-  useSettingMutable,
 } from "@/sync/storage";
 import { useVisibleSessionListViewData } from "@/hooks/useVisibleSessionListViewData";
 import { useIsTablet } from "@/utils/responsive";
@@ -24,9 +22,7 @@ import { InboxView } from "./InboxView";
 import { SettingsViewWrapper } from "./SettingsViewWrapper";
 import { SessionsListWrapper } from "./SessionsListWrapper";
 import { OpenClawViewWrapper } from "./OpenClawViewWrapper";
-import { ProjectView, getProjectSegment } from "./project/ProjectView";
-import { NewKanbanTaskSheet } from "./kanban/NewKanbanTaskSheet";
-import { Modal } from "@/modal";
+import { ProjectListView } from "./project/ProjectListView";
 import { hasOpenClawConfig } from "@/openclaw";
 import { Header } from "./navigation/Header";
 import { HeaderLogo } from "./HeaderLogo";
@@ -233,35 +229,6 @@ const HeaderRight = React.memo(
       );
     }
 
-    if (activeTab === "project") {
-      const handleProjectAdd = () => {
-        const seg = getProjectSegment();
-        if (seg === "ideas") {
-          router.push("/ideation/idea/new");
-        } else if (seg === "roadmap") {
-          router.push("/roadmap/milestone/new");
-        } else if (Platform.OS === "web") {
-          Modal.show({ component: NewKanbanTaskSheet });
-        } else {
-          router.push("/kanban/task/new");
-        }
-      };
-
-      return (
-        <Pressable
-          onPress={handleProjectAdd}
-          hitSlop={15}
-          style={styles.headerButton}
-        >
-          <Ionicons
-            name="add-outline"
-            size={28}
-            color={theme.colors.header.tint}
-          />
-        </Pressable>
-      );
-    }
-
     if (activeTab === "settings") {
       if (!isCustomServer) {
         // Empty view to maintain header centering
@@ -297,7 +264,6 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
   // Tab state management
   const [activeTab, setActiveTab] = React.useState<TabType>("sessions");
   const showOpenClaw = hasOpenClawConfig();
-  const [showProjectTab] = useSettingMutable("showProjectTab");
 
   // If openclaw tab is hidden but was active, switch to sessions
   React.useEffect(() => {
@@ -305,13 +271,6 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
       setActiveTab("sessions");
     }
   }, [showOpenClaw, activeTab]);
-
-  // If project tab is hidden but was active, switch to sessions
-  React.useEffect(() => {
-    if (!showProjectTab && activeTab === "project") {
-      setActiveTab("sessions");
-    }
-  }, [showProjectTab, activeTab]);
 
   const handleNewSession = React.useCallback(() => {
     router.push("/new");
@@ -327,7 +286,7 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
       case "inbox":
         return <InboxView />;
       case "project":
-        return <ProjectView />;
+        return <ProjectListView />;
       case "openclaw":
         return <OpenClawViewWrapper />;
       case "settings":
@@ -406,7 +365,6 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
         onTabPress={handleTabPress}
         inboxBadgeCount={friendRequests.length}
         showOpenClaw={showOpenClaw}
-        showProject={showProjectTab}
       />
     </>
   );

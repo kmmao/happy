@@ -185,6 +185,31 @@ export type UpdateEvent =
         value: string | null; // null indicates deletion
         version: number; // -1 for deleted keys
       }>;
+    }
+  | {
+      type: "new-project";
+      projectId: string;
+      machineId: string;
+      path: string;
+      repoUrl: string | null;
+      metadata: string | null;
+      metadataVersion: number;
+      archived: boolean;
+      createdAt: number;
+      updatedAt: number;
+    }
+  | {
+      type: "update-project";
+      projectId: string;
+      metadata?: {
+        value: string | null;
+        version: number;
+      };
+      archived?: boolean;
+    }
+  | {
+      type: "delete-project";
+      projectId: string;
     };
 
 // === EPHEMERAL EVENT TYPES (Transient) ===
@@ -251,6 +276,33 @@ export type EphemeralEvent =
       sessionId: string;
       machineId: string;
       repoPath: string;
+    }
+  | {
+      type: "supervisor-trigger";
+      projectId: string;
+      runId: string;
+      trigger: string;
+      machineId: string;
+      repoPath: string;
+      mode?: string;
+      dimensions?: string[];
+      changedFiles?: string[];
+      customRules?: string;
+      fixAction?: {
+        title: string;
+        description: string;
+        suggestedFix: string | null;
+        category: string;
+        severity: string;
+      };
+    }
+  | {
+      type: "supervisor-status";
+      runId: string;
+      projectId: string;
+      status: string;
+      artifactId?: string;
+      errorMessage?: string;
     };
 
 // === EVENT PAYLOAD TYPES ===
@@ -790,5 +842,119 @@ export function buildKVBatchUpdateUpdate(
       changes,
     },
     createdAt: Date.now(),
+  };
+}
+
+export function buildNewProjectUpdate(
+  project: {
+    id: string;
+    machineId: string;
+    path: string;
+    repoUrl: string | null;
+    metadata: string | null;
+    metadataVersion: number;
+    archived: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  updateSeq: number,
+  updateId: string,
+): UpdatePayload {
+  return {
+    id: updateId,
+    seq: updateSeq,
+    body: {
+      t: "new-project",
+      projectId: project.id,
+      machineId: project.machineId,
+      path: project.path,
+      repoUrl: project.repoUrl,
+      metadata: project.metadata,
+      metadataVersion: project.metadataVersion,
+      archived: project.archived,
+      createdAt: project.createdAt.getTime(),
+      updatedAt: project.updatedAt.getTime(),
+    },
+    createdAt: Date.now(),
+  };
+}
+
+export function buildUpdateProjectUpdate(
+  projectId: string,
+  updateSeq: number,
+  updateId: string,
+  metadata?: { value: string | null; version: number },
+  archived?: boolean,
+): UpdatePayload {
+  return {
+    id: updateId,
+    seq: updateSeq,
+    body: {
+      t: "update-project",
+      projectId,
+      metadata,
+      archived,
+    },
+    createdAt: Date.now(),
+  };
+}
+
+export function buildDeleteProjectUpdate(
+  projectId: string,
+  updateSeq: number,
+  updateId: string,
+): UpdatePayload {
+  return {
+    id: updateId,
+    seq: updateSeq,
+    body: {
+      t: "delete-project",
+      projectId,
+    },
+    createdAt: Date.now(),
+  };
+}
+
+export function buildSupervisorTriggerEphemeral(
+  projectId: string,
+  runId: string,
+  trigger: string,
+  machineId: string,
+  repoPath: string,
+  mode?: string,
+  dimensions?: string[],
+  changedFiles?: string[],
+  customRules?: string,
+  fixAction?: { title: string; description: string; suggestedFix: string | null; category: string; severity: string },
+): EphemeralPayload {
+  return {
+    type: "supervisor-trigger",
+    projectId,
+    runId,
+    trigger,
+    machineId,
+    repoPath,
+    mode,
+    dimensions,
+    changedFiles,
+    customRules,
+    fixAction,
+  };
+}
+
+export function buildSupervisorStatusEphemeral(
+  runId: string,
+  projectId: string,
+  status: string,
+  artifactId?: string,
+  errorMessage?: string,
+): EphemeralPayload {
+  return {
+    type: "supervisor-status",
+    runId,
+    projectId,
+    status,
+    artifactId,
+    errorMessage,
   };
 }

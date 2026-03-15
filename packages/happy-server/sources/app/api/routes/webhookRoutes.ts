@@ -263,4 +263,69 @@ export function webhookRoutes(app: Fastify) {
       reply.send({ deleted: true });
     },
   );
+
+  // ── List webhook events ─────────────────────────────────
+
+  app.get(
+    "/v1/webhooks/events",
+    {
+      preHandler: app.authenticate,
+      schema: {
+        querystring: z
+          .object({
+            projectId: z.string().optional(),
+            limit: z.coerce.number().int().min(1).max(100).default(20),
+            offset: z.coerce.number().int().min(0).default(0),
+          })
+          .optional(),
+      },
+    },
+    async (request, reply) => {
+      const userId = request.userId;
+      const limit = request.query?.limit ?? 20;
+      const offset = request.query?.offset ?? 0;
+      const projectId = request.query?.projectId;
+
+      // Build where clause
+      const where: { accountId: string; repoUrl?: string } = {
+        accountId: userId,
+      };
+
+      // If projectId given, find project's repoUrl to filter
+      if (projectId) {
+        const project = await db.project.findFirst({
+          where: { id: projectId, accountId: userId },
+          select: { repoUrl: true },
+        });
+        if (project?.repoUrl) {
+          where.repoUrl = project.repoUrl;
+        }
+      }
+
+      const [events, total] = await Promise.all([
+        db.webhookEvent.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip: offset,
+        }),
+        db.webhookEvent.count({ where }),
+      ]);
+
+      reply.send({
+        events: events.map((e) => ({
+          id: e.id,
+          provider: e.provider,
+          repoUrl: e.repoUrl,
+          issueNumber: e.issueNumber,
+          issueTitle: e.issueTitle,
+          issueUrl: e.issueUrl,
+          status: e.status,
+          errorMessage: e.errorMessage,
+          createdAt: e.createdAt.getTime(),
+        })),
+        total,
+      });
+    },
+  );
 }

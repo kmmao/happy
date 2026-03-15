@@ -341,64 +341,39 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
-        name="kanban/index"
+        name="project/index"
         options={{
           headerShown: false,
         }}
       />
       <Stack.Screen
-        name="kanban/task/new"
+        name="project/[id]"
         options={{
-          headerShown: false,
-          presentation: "formSheet",
+          headerBackTitle: t("common.back"),
         }}
       />
       <Stack.Screen
-        name="kanban/task/[id]"
+        name="project/[id]/supervisor-settings"
         options={{
-          headerShown: false,
+          headerBackTitle: t("common.back"),
         }}
       />
       <Stack.Screen
-        name="kanban/templates"
+        name="project/[id]/supervisor-run/[runId]"
         options={{
-          headerShown: false,
+          headerBackTitle: t("common.back"),
         }}
       />
       <Stack.Screen
-        name="ideation/idea/new"
+        name="project/[id]/supervisor-actions"
         options={{
-          headerShown: false,
+          headerBackTitle: t("common.back"),
         }}
       />
       <Stack.Screen
-        name="ideation/idea/[id]"
+        name="project/[id]/webhook-events"
         options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="roadmap/milestone/new"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="roadmap/milestone/[id]"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="roadmap/feature/new"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="roadmap/feature/[id]"
-        options={{
-          headerShown: false,
+          headerBackTitle: t("common.back"),
         }}
       />
       <Stack.Screen

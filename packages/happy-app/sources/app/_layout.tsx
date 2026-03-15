@@ -35,6 +35,7 @@ import { StatusBarProvider } from "@/components/StatusBarProvider";
 import { monkeyPatchConsoleForRemoteLoggingForFasterAiAutoDebuggingOnlyInLocalBuilds } from "@/utils/remoteLogger";
 import { useUnistyles } from "react-native-unistyles";
 import { AsyncLock } from "@/utils/lock";
+import { useNotificationNavigation } from "@/hooks/useNotificationNavigation";
 
 // Configure notification handler for foreground notifications
 Notifications.setNotificationHandler({
@@ -220,6 +221,9 @@ export default function RootLayout() {
 
   // Track the screens
   useTrackScreens();
+
+  // Handle push notification deep links
+  useNotificationNavigation();
 
   //
   // Not inited

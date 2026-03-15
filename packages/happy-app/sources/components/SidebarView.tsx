@@ -2,7 +2,6 @@ import {
   useSocketStatus,
   useFriendRequests,
   useSettings,
-  useSettingMutable,
 } from "@/sync/storage";
 import * as React from "react";
 import { Text, View, Pressable } from "react-native";
@@ -205,7 +204,6 @@ export const SidebarView = React.memo(() => {
   const friendRequests = useFriendRequests();
   const inboxHasContent = useInboxHasContent();
   const settings = useSettings();
-  const [showProjectTab] = useSettingMutable("showProjectTab");
   const { collapsed, toggleCollapsed } = useSidebarState();
 
   const connectionStatus = React.useMemo(() => {
@@ -309,21 +307,19 @@ export const SidebarView = React.memo(() => {
             )}
           </Pressable>
 
-          {/* Project (conditional) */}
-          {showProjectTab && (
-            <Pressable
-              onPress={() => router.push("/kanban")}
-              hitSlop={8}
-              style={styles.railButton}
-            >
-              <Image
-                source={require("@/assets/images/brutalist/Brutalism 22.png")}
-                contentFit="contain"
-                style={{ width: 28, height: 28 }}
-                tintColor={theme.colors.header.tint}
-              />
-            </Pressable>
-          )}
+          {/* Project */}
+          <Pressable
+            onPress={() => router.push("/project")}
+            hitSlop={8}
+            style={styles.railButton}
+          >
+            <Image
+              source={require("@/assets/images/brutalist/Brutalism 22.png")}
+              contentFit="contain"
+              style={{ width: 28, height: 28 }}
+              tintColor={theme.colors.header.tint}
+            />
+          </Pressable>
 
           {/* Settings */}
           <Pressable
@@ -414,16 +410,14 @@ export const SidebarView = React.memo(() => {
                 <View style={styles.indicatorDot} />
               )}
             </Pressable>
-            {showProjectTab && (
-              <Pressable onPress={() => router.push("/kanban")} hitSlop={15}>
-                <Image
-                  source={require("@/assets/images/brutalist/Brutalism 22.png")}
-                  contentFit="contain"
-                  style={[{ width: 32, height: 32 }]}
-                  tintColor={theme.colors.header.tint}
-                />
-              </Pressable>
-            )}
+            <Pressable onPress={() => router.push("/project")} hitSlop={15}>
+              <Image
+                source={require("@/assets/images/brutalist/Brutalism 22.png")}
+                contentFit="contain"
+                style={[{ width: 32, height: 32 }]}
+                tintColor={theme.colors.header.tint}
+              />
+            </Pressable>
             <Pressable onPress={() => router.push("/settings")} hitSlop={15}>
               <Image
                 source={require("@/assets/images/brutalist/Brutalism 9.png")}

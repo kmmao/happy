@@ -1,0 +1,276 @@
+/**
+ * Handle incoming supervisor-trigger events from the Server.
+ *
+ * Orchestrates: prompt building → session spawning →
+ * initial prompt delivery via temp file → status reporting.
+ *
+ * Supports two modes:
+ * - Analysis (trigger != "fix"): read-only project scanning
+ * - Fix (trigger == "fix"): applies a fix for a specific finding
+ */
+
+import { writeFile, mkdir, unlink } from "fs/promises";
+import { join } from "path";
+import { logger } from "@/ui/logger";
+import { buildSupervisorPrompt } from "./buildSupervisorPrompt";
+import { buildFixPrompt } from "./buildFixPrompt";
+import type {
+  SupervisorTriggerData,
+  SupervisorRunStatusData,
+  SupervisorFixStatusData,
+} from "@/api/apiMachine";
+import type {
+  SpawnSessionOptions,
+  SpawnSessionResult,
+} from "@/modules/common/registerCommonHandlers";
+
+export interface SupervisorHandlerDeps {
+  readonly spawnSession: (
+    options: SpawnSessionOptions,
+  ) => Promise<SpawnSessionResult>;
+  readonly emitSupervisorRunStatus: (data: SupervisorRunStatusData) => void;
+  readonly emitSupervisorFixStatus: (data: SupervisorFixStatusData) => void;
+}
+
+// Track in-flight supervisor runs to prevent duplicate processing
+const processingRuns = new Set<string>();
+
+export async function handleSupervisorTrigger(
+  data: SupervisorTriggerData,
+  deps: SupervisorHandlerDeps,
+): Promise<void> {
+  const {
+    runId,
+    projectId,
+    repoPath,
+    trigger,
+    mode,
+    dimensions,
+    changedFiles,
+    customRules,
+    fixAction,
+  } = data;
+
+  // Guard against duplicate processing
+  if (processingRuns.has(runId)) {
+    logger.debug(
+      `[SUPERVISOR] Run ${runId} already being processed, skipping`,
+    );
+    return;
+  }
+  processingRuns.add(runId);
+
+  try {
+    if (trigger === "fix" && fixAction) {
+      await handleFixTrigger(
+        runId,
+        projectId,
+        repoPath,
+        fixAction,
+        deps,
+      );
+    } else {
+      await handleAnalysisTrigger(
+        runId,
+        projectId,
+        repoPath,
+        trigger,
+        mode,
+        dimensions,
+        changedFiles,
+        customRules,
+        deps,
+      );
+    }
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : String(error);
+    logger.debug(
+      `[SUPERVISOR] Failed to handle run ${runId}: ${errorMessage}`,
+    );
+    if (trigger === "fix") {
+      deps.emitSupervisorFixStatus({
+        actionId: runId,
+        projectId,
+        fixStatus: "failed",
+      });
+    } else {
+      deps.emitSupervisorRunStatus({
+        runId,
+        projectId,
+        status: "failed",
+        errorMessage,
+      });
+    }
+  } finally {
+    processingRuns.delete(runId);
+  }
+}
+
+async function handleAnalysisTrigger(
+  runId: string,
+  projectId: string,
+  repoPath: string,
+  trigger: string,
+  mode: string | undefined,
+  dimensions: readonly string[] | undefined,
+  changedFiles: readonly string[] | undefined,
+  customRules: string | undefined,
+  deps: SupervisorHandlerDeps,
+): Promise<void> {
+  logger.debug(
+    `[SUPERVISOR] Processing analysis ${runId} for project ${projectId} at ${repoPath} (mode: ${mode ?? "suggest"})`,
+  );
+
+  // 1. Report running status
+  deps.emitSupervisorRunStatus({
+    runId,
+    projectId,
+    status: "running",
+  });
+
+  // 2. Build the analysis prompt
+  const prompt = buildSupervisorPrompt({
+    projectId,
+    runId,
+    repoPath,
+    trigger,
+    mode,
+    dimensions,
+    changedFiles,
+    customRules,
+  });
+
+  // 3. Write prompt to temp file in the project
+  const promptFilePath = await writePromptFile(repoPath, runId, prompt);
+
+  // 4. Spawn session in the project directory (read-only analysis)
+  const spawnResult = await deps.spawnSession({
+    directory: repoPath,
+    approvedNewDirectoryCreation: false,
+    agent: "claude",
+    environmentVariables: {
+      HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
+    },
+  });
+
+  if (spawnResult.type !== "success") {
+    const errorMessage =
+      spawnResult.type === "error"
+        ? spawnResult.errorMessage
+        : "Failed to spawn supervisor session";
+    logger.debug(`[SUPERVISOR] Session spawn failed: ${errorMessage}`);
+    deps.emitSupervisorRunStatus({
+      runId,
+      projectId,
+      status: "failed",
+      errorMessage,
+    });
+    await cleanupPromptFile(promptFilePath);
+    return;
+  }
+
+  logger.debug(
+    `[SUPERVISOR] Session ${spawnResult.sessionId} spawned for run ${runId}`,
+  );
+  deps.emitSupervisorRunStatus({
+    runId,
+    projectId,
+    status: "running",
+    sessionId: spawnResult.sessionId,
+  });
+}
+
+async function handleFixTrigger(
+  actionId: string,
+  projectId: string,
+  repoPath: string,
+  fixAction: NonNullable<SupervisorTriggerData["fixAction"]>,
+  deps: SupervisorHandlerDeps,
+): Promise<void> {
+  logger.debug(
+    `[SUPERVISOR] Processing fix ${actionId} for project ${projectId}: "${fixAction.title}"`,
+  );
+
+  // 1. Report running status
+  deps.emitSupervisorFixStatus({
+    actionId,
+    projectId,
+    fixStatus: "running",
+  });
+
+  // 2. Build the fix prompt
+  const prompt = buildFixPrompt({
+    projectId,
+    actionId,
+    repoPath,
+    title: fixAction.title,
+    description: fixAction.description,
+    suggestedFix: fixAction.suggestedFix,
+    category: fixAction.category,
+    severity: fixAction.severity,
+  });
+
+  // 3. Write prompt to temp file
+  const promptFilePath = await writePromptFile(
+    repoPath,
+    `fix-${actionId}`,
+    prompt,
+  );
+
+  // 4. Spawn fix session (allows file modifications)
+  const spawnResult = await deps.spawnSession({
+    directory: repoPath,
+    approvedNewDirectoryCreation: false,
+    agent: "claude",
+    environmentVariables: {
+      HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
+    },
+  });
+
+  if (spawnResult.type !== "success") {
+    const errorMessage =
+      spawnResult.type === "error"
+        ? spawnResult.errorMessage
+        : "Failed to spawn fix session";
+    logger.debug(`[SUPERVISOR] Fix session spawn failed: ${errorMessage}`);
+    deps.emitSupervisorFixStatus({
+      actionId,
+      projectId,
+      fixStatus: "failed",
+    });
+    await cleanupPromptFile(promptFilePath);
+    return;
+  }
+
+  logger.debug(
+    `[SUPERVISOR] Fix session ${spawnResult.sessionId} spawned for action ${actionId}`,
+  );
+  deps.emitSupervisorFixStatus({
+    actionId,
+    projectId,
+    fixStatus: "running",
+    fixSessionId: spawnResult.sessionId,
+  });
+}
+
+async function writePromptFile(
+  repoPath: string,
+  id: string,
+  prompt: string,
+): Promise<string> {
+  const promptDir = join(repoPath, ".claude");
+  await mkdir(promptDir, { recursive: true });
+  const promptFilePath = join(promptDir, `supervisor-prompt-${id}.txt`);
+  await writeFile(promptFilePath, prompt, "utf-8");
+  logger.debug(`[SUPERVISOR] Wrote prompt to ${promptFilePath}`);
+  return promptFilePath;
+}
+
+async function cleanupPromptFile(path: string): Promise<void> {
+  try {
+    await unlink(path);
+  } catch {
+    // best-effort
+  }
+}

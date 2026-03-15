@@ -1718,6 +1718,24 @@ export const en = {
     },
   },
 
+  projects: {
+    notFound: "Project not found",
+    emptyTitle: "No Projects",
+    emptySubtitle: "Projects will appear here when you connect a CLI",
+    allProjects: "All Projects",
+    tabSessions: "Sessions",
+    tabGit: "Git",
+    tabHealth: "Health",
+    noSessions: "No sessions yet",
+    sessions: "Sessions",
+    noGitInfo: "No git information available",
+    gitInfo: "Git Info",
+    branch: "Branch",
+    ahead: "Ahead",
+    behind: "Behind",
+    dirty: "Uncommitted Changes",
+  },
+
   project: {
     segments: {
       ideas: "Ideas",
@@ -1940,6 +1958,186 @@ export const en = {
       "Install agent-browser on the CLI machine to use the preview feature. Run: npm install -g @anthropic-ai/agent-browser",
     emptyHint:
       "Select a dev server or enter a URL to capture a screenshot of your frontend.",
+  },
+
+  supervisor: {
+    // General
+    title: "Health Monitor",
+    description:
+      "AI-powered code analysis that monitors your project's health across multiple dimensions.",
+    notSynced: "Project not synced to server yet",
+    scanNow: "Scan Now",
+    alreadyRunning: "A scan is already in progress",
+    settings: "Supervisor Settings",
+
+    // Status
+    status_pending: "Pending",
+    status_running: "Running",
+    status_completed: "Completed",
+    status_failed: "Failed",
+    status_cancelled: "Cancelled",
+
+    // Triggers
+    triggerManual: "Manual Scan",
+    triggerScheduled: "Scheduled",
+    triggerEvent: "Event",
+    triggerPush: "Push Trigger",
+
+    // Severity
+    severityCritical: "Critical",
+    severityHigh: "High",
+    severityMedium: "Medium",
+    severityLow: "Low",
+
+    // Actions
+    pendingActions: ({ count }: { count: number }) =>
+      `Pending Actions (${count})`,
+    actionsCount: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "action" : "actions"}`,
+    approve: "Approve",
+    skip: "Skip",
+    ignore: "Ignore",
+    triggerFix: "Fix",
+    suggestedFix: "Suggested Fix",
+    fixStatus: "Fix Status",
+
+    // Run history
+    runHistory: "Run History",
+    noRuns: "No scan runs yet",
+    moreRuns: ({ count }: { count: number }) =>
+      `${count} more ${count === 1 ? "run" : "runs"}`,
+    justNow: "Just now",
+    minutesAgo: ({ count }: { count: number }) => `${count}m ago`,
+    hoursAgo: ({ count }: { count: number }) => `${count}h ago`,
+    daysAgo: ({ count }: { count: number }) => `${count}d ago`,
+
+    // Cost
+    costSection: "Cost (30 days)",
+    costRunsCount: "Runs",
+    costTotalTokens: "Total Tokens",
+    costTotalUsd: "Total Cost",
+    costPeriod: ({ days }: { days: number }) => `Last ${days} days`,
+
+    // Trend
+    trendSection: "Severity Trend",
+
+    // Related projects
+    relatedProjects: "Related Projects",
+
+    // Summary card (Phase 6b)
+    summaryGrade: "Grade",
+    trendImproving: "Improving",
+    trendStable: "Stable",
+    trendDeclining: "Declining",
+    lastScan: "Last Scan",
+    openIssues: "Open Issues",
+    runs30d: "Runs (30d)",
+
+    // Run detail / comparison (Phase 6b)
+    runDetail: "Run Detail",
+    runTrigger: "Trigger",
+    runDuration: "Duration",
+    runCost: "Cost",
+    runActions: "Actions",
+    newIssues: "New Issues",
+    resolvedIssues: "Resolved",
+    persistentIssues: "Persistent",
+    noPreviousRun: "First scan — no previous run to compare",
+
+    // Dimensions
+    dimensionsSection: "Analysis Dimensions",
+    dimSecurity: "Security",
+    dimDependencies: "Dependencies",
+    dimArchitecture: "Architecture",
+    dimTechDebt: "Tech Debt",
+    dimCodeQuality: "Code Quality",
+    dimCodeQualityNote: "Style, complexity, best practices",
+    dimTestCoverage: "Test Coverage",
+    dimTestCoverageNote: "Coverage gaps, test quality",
+    dimDocumentation: "Documentation",
+    dimPerformance: "Performance",
+
+    // Settings: Mode
+    modeSection: "Analysis Mode",
+    modeSuggest: "Suggest",
+    modeSuggestDesc: "AI suggests actions, you approve manually",
+    modeSemiAuto: "Semi-Auto",
+    modeSemiAutoDesc:
+      "Auto-approve low-risk fixes, manual approval for high-risk",
+    modeAuto: "Auto",
+    modeAutoDesc: "AI auto-fixes and creates issues/PRs",
+
+    // Settings: Schedule
+    scheduleSection: "Schedule",
+    scheduleEnabled: "Enable Scheduled Scans",
+    scheduleEvery6h: "Every 6 hours",
+    scheduleEvery12h: "Every 12 hours",
+    scheduleEvery24h: "Every 24 hours",
+    scheduleEvery48h: "Every 48 hours",
+    scheduleEveryWeek: "Weekly",
+
+    // Settings: Push trigger
+    pushTriggerSection: "Push Trigger",
+    pushTriggerEnabled: "Scan on Push",
+    pushTriggerDesc: "Run incremental analysis when code is pushed",
+
+    // Settings: Custom rules
+    customRulesSection: "Custom Rules",
+    customRulesDesc: "Add project-specific analysis rules",
+    customRulesPlaceholder:
+      "e.g. Check that all API endpoints have rate limiting",
+
+    // Settings: Notifications
+    notificationsSection: "Notifications",
+    notifAnalysisComplete: "Analysis Complete",
+    notifIssueCreated: "Issue Created",
+    notifPRCreated: "PR Created",
+    notifError: "Errors",
+
+    // Phase 7: Batch operations
+    approveAll: "Approve All",
+    skipAll: "Skip All",
+    viewAllActions: "View All Actions",
+    approveAllConfirm: ({ count }: { count: number }) => `Approve all ${count} pending actions?`,
+    skipAllConfirm: ({ count }: { count: number }) => `Skip all ${count} pending actions?`,
+    approveAllSuccess: ({ count }: { count: number }) => `${count} actions approved`,
+    skipAllSuccess: ({ count }: { count: number }) => `${count} actions skipped`,
+
+    // Phase 7: Action history
+    actionHistory: "Action History",
+    tabPending: "Pending",
+    tabApproved: "Approved",
+    tabSkipped: "Skipped",
+    tabIgnored: "Ignored",
+    noActions: "No actions",
+    loadMore: "Load More",
+
+    // Phase 7: Report export
+    exportReport: "Export Report",
+    exportCopied: "Report copied to clipboard",
+
+    // Phase 8: Health score trend
+    healthScore: "Score",
+
+    // Settings: Safety
+    autoWarningTitle: "Enable Auto Mode?",
+    autoWarningBody:
+      "Auto mode will automatically apply fixes and create issues/PRs without manual approval. Use with caution.",
+    autoWarningConfirm: "Enable",
+    autoModeSafetyNote:
+      "Auto mode is limited to low-risk fixes. High-risk changes still require approval.",
+    safetyNote:
+      "All changes are made in separate branches and require PR review.",
+    dailyLimitNote: "Daily token limit applies to prevent runaway costs.",
+    settingsSaved: "Settings saved",
+    settingsSaveError: "Failed to save settings",
+    recurring: "Recurring",
+  },
+  webhook: {
+    eventHistory: "Webhook Events",
+    noEvents: "No webhook events",
+    loadMore: "Load More",
+    issue: "Issue",
   },
 } as const;
 

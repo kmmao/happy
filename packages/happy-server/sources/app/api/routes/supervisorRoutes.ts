@@ -1,0 +1,545 @@
+import {
+    eventRouter,
+    buildSupervisorTriggerEphemeral,
+    buildSupervisorStatusEphemeral,
+} from "@/app/events/eventRouter";
+import { type Fastify } from "../types";
+import { db } from "@/storage/db";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
+import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
+import { computeHealthScore, countSeverities } from "@/modules/supervisorScoring";
+
+/**
+ * Supervisor routes for project health scanning.
+ * Trigger runs, list history, get details, cancel, and update status.
+ */
+export function supervisorRoutes(app: Fastify) {
+    // POST /v1/projects/:id/supervisor/run — Trigger a manual supervisor run
+    app.post(
+        "/v1/projects/:id/supervisor/run",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                body: z
+                    .object({
+                        machineId: z.string(),
+                        repoPath: z.string(),
+                    })
+                    .optional(),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+                select: { id: true, machineId: true, path: true, supervisorMode: true, supervisorEnabledDimensions: true, supervisorCustomRules: true },
+            });
+
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            // Check daily run limit
+            const limitCheck = await checkDailyRunLimit(id);
+            if (!limitCheck.allowed) {
+                return reply.code(429).send({
+                    error: `Daily supervisor run limit reached (${limitCheck.currentCount}/${limitCheck.limit})`,
+                });
+            }
+
+            // Atomically check-and-create inside a transaction to prevent
+            // concurrent requests from both passing the check
+            let run;
+            try {
+                run = await db.$transaction(async (tx) => {
+                    const existingRun = await tx.supervisorRun.findFirst({
+                        where: {
+                            projectId: id,
+                            accountId: userId,
+                            status: { in: ["pending", "running"] },
+                        },
+                        select: { id: true },
+                    });
+
+                    if (existingRun) {
+                        throw new ConflictError(existingRun.id);
+                    }
+
+                    return tx.supervisorRun.create({
+                        data: {
+                            projectId: id,
+                            accountId: userId,
+                            trigger: "manual",
+                            status: "pending",
+                        },
+                    });
+                });
+            } catch (e) {
+                if (e instanceof ConflictError) {
+                    return reply.code(409).send({
+                        error: "A supervisor run is already in progress",
+                        runId: e.runId,
+                    });
+                }
+                throw e;
+            }
+
+            // Increment daily run count
+            await incrementDailyRunCount(id);
+
+            // Emit ephemeral trigger event to CLI daemon
+            const machineId = request.body?.machineId || project.machineId;
+            const repoPath = request.body?.repoPath || project.path;
+
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildSupervisorTriggerEphemeral(
+                    id,
+                    run.id,
+                    "manual",
+                    machineId,
+                    repoPath,
+                    project.supervisorMode ?? undefined,
+                    parseDimensions(project.supervisorEnabledDimensions),
+                    undefined, // changedFiles
+                    project.supervisorCustomRules ?? undefined,
+                ),
+                recipientFilter: {
+                    type: "machine-scoped-only",
+                    machineId,
+                },
+            });
+
+            return reply.send({
+                run: serializeSupervisorRun(run),
+            });
+        },
+    );
+
+    // GET /v1/projects/:id/supervisor/runs — List supervisor run history
+    app.get(
+        "/v1/projects/:id/supervisor/runs",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                querystring: z
+                    .object({
+                        limit: z.coerce
+                            .number()
+                            .int()
+                            .min(1)
+                            .max(100)
+                            .default(20),
+                        offset: z.coerce.number().int().min(0).default(0),
+                    })
+                    .optional(),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+            const limit = request.query?.limit ?? 20;
+            const offset = request.query?.offset ?? 0;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+                select: { id: true },
+            });
+
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const [runs, total] = await Promise.all([
+                db.supervisorRun.findMany({
+                    where: { projectId: id, accountId: userId },
+                    orderBy: { createdAt: "desc" },
+                    take: limit,
+                    skip: offset,
+                }),
+                db.supervisorRun.count({
+                    where: { projectId: id, accountId: userId },
+                }),
+            ]);
+
+            return reply.send({
+                runs: runs.map(serializeSupervisorRun),
+                total,
+            });
+        },
+    );
+
+    // GET /v1/projects/:id/supervisor/runs/:runId — Get run details
+    app.get(
+        "/v1/projects/:id/supervisor/runs/:runId",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({
+                    id: z.string(),
+                    runId: z.string(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id, runId } = request.params;
+
+            const run = await db.supervisorRun.findFirst({
+                where: {
+                    id: runId,
+                    projectId: id,
+                    accountId: userId,
+                },
+            });
+
+            if (!run) {
+                return reply
+                    .code(404)
+                    .send({ error: "Supervisor run not found" });
+            }
+
+            return reply.send({
+                run: serializeSupervisorRun(run),
+            });
+        },
+    );
+
+    // POST /v1/projects/:id/supervisor/cancel/:runId — Cancel a running supervisor
+    app.post(
+        "/v1/projects/:id/supervisor/cancel/:runId",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({
+                    id: z.string(),
+                    runId: z.string(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id, runId } = request.params;
+
+            // Atomic: only cancel if status is still pending/running
+            const result = await db.supervisorRun.updateMany({
+                where: {
+                    id: runId,
+                    projectId: id,
+                    accountId: userId,
+                    status: { in: ["pending", "running"] },
+                },
+                data: {
+                    status: "cancelled",
+                    completedAt: new Date(),
+                },
+            });
+
+            if (result.count === 0) {
+                return reply.code(404).send({
+                    error: "Active supervisor run not found",
+                });
+            }
+
+            // Fetch the updated run for response
+            const updated = await db.supervisorRun.findUnique({
+                where: { id: runId },
+            });
+
+            // Notify App about cancellation
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildSupervisorStatusEphemeral(
+                    runId,
+                    id,
+                    "cancelled",
+                ),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+
+            return reply.send({
+                run: updated ? serializeSupervisorRun(updated) : { id: runId },
+            });
+        },
+    );
+
+    // POST /v1/projects/:id/supervisor/runs/:runId/status — CLI callback to update run status
+    // NOTE: Currently uses standard authenticate. Phase 4 should add machine-scoped auth
+    // to prevent App clients from spoofing CLI status callbacks.
+    app.post(
+        "/v1/projects/:id/supervisor/runs/:runId/status",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({
+                    id: z.string(),
+                    runId: z.string(),
+                }),
+                body: z.object({
+                    status: z.enum(["running", "completed", "failed"]),
+                    artifactId: z.string().optional(),
+                    sessionId: z.string().optional(),
+                    actionsCount: z.number().int().min(0).optional(),
+                    issuesCreated: z.number().int().min(0).optional(),
+                    errorMessage: z.string().max(500).optional(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id, runId } = request.params;
+            const {
+                status,
+                artifactId,
+                sessionId,
+                actionsCount,
+                issuesCreated,
+                errorMessage,
+            } = request.body;
+
+            // Atomic: only update if status is still pending/running
+            const data: Prisma.SupervisorRunUpdateManyMutationInput = {
+                status,
+            };
+            if (artifactId !== undefined) data.artifactId = artifactId;
+            if (sessionId !== undefined) data.sessionId = sessionId;
+            if (actionsCount !== undefined) data.actionsCount = actionsCount;
+            if (issuesCreated !== undefined) data.issuesCreated = issuesCreated;
+            if (errorMessage !== undefined) data.errorMessage = errorMessage;
+            if (status === "completed" || status === "failed") {
+                data.completedAt = new Date();
+            }
+
+            const result = await db.supervisorRun.updateMany({
+                where: {
+                    id: runId,
+                    projectId: id,
+                    accountId: userId,
+                    status: { in: ["pending", "running"] },
+                },
+                data,
+            });
+
+            if (result.count === 0) {
+                // Check if run exists but is already in a terminal state
+                const existing = await db.supervisorRun.findFirst({
+                    where: { id: runId, projectId: id, accountId: userId },
+                    select: { status: true },
+                });
+
+                if (!existing) {
+                    return reply
+                        .code(404)
+                        .send({ error: "Supervisor run not found" });
+                }
+
+                return reply.code(409).send({
+                    error: `Run is already ${existing.status}`,
+                });
+            }
+
+            // Compute and persist healthScore on completion
+            if (status === "completed") {
+                const actions = await db.supervisorAction.findMany({
+                    where: { runId, projectId: id, accountId: userId },
+                    select: { severity: true },
+                });
+                const counts = countSeverities(actions);
+                const healthScore = computeHealthScore(counts);
+                await db.supervisorRun.update({
+                    where: { id: runId },
+                    data: { healthScore },
+                });
+            }
+
+            // Fetch the updated run for response
+            const updated = await db.supervisorRun.findUnique({
+                where: { id: runId },
+            });
+
+            // Notify App clients about status change
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildSupervisorStatusEphemeral(
+                    runId,
+                    id,
+                    status,
+                    artifactId,
+                    errorMessage,
+                ),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+
+            return reply.send({
+                run: updated ? serializeSupervisorRun(updated) : { id: runId },
+            });
+        },
+    );
+
+    // PATCH /v1/projects/:id/supervisor/config — Update supervisor config
+    app.patch(
+        "/v1/projects/:id/supervisor/config",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                body: z.object({
+                    supervisorConfig: z.string().nullable(),
+                    supervisorMode: z
+                        .enum(["disabled", "suggest", "semi-auto", "auto"])
+                        .optional(),
+                    supervisorScheduleEnabled: z.boolean().optional(),
+                    supervisorScheduleIntervalHours: z
+                        .number()
+                        .int()
+                        .min(1)
+                        .max(168)
+                        .optional(),
+                    supervisorEnabledDimensions: z.string().max(500).optional(),
+                    supervisorPushTriggerEnabled: z.boolean().optional(),
+                    supervisorNotifyPrefs: z.string().max(200).nullable().optional(),
+                    supervisorCustomRules: z.string().max(2000).nullable().optional(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+            const {
+                supervisorConfig,
+                supervisorMode,
+                supervisorScheduleEnabled,
+                supervisorScheduleIntervalHours,
+                supervisorEnabledDimensions,
+                supervisorPushTriggerEnabled,
+                supervisorNotifyPrefs,
+                supervisorCustomRules,
+            } = request.body;
+
+            const existing = await db.project.findFirst({
+                where: { id, accountId: userId },
+                select: { id: true },
+            });
+
+            if (!existing) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            // Build update data with plaintext scheduling fields
+            const updateData: Prisma.ProjectUpdateInput = {
+                supervisorConfig,
+                supervisorConfigVersion: { increment: 1 },
+            };
+
+            if (supervisorMode !== undefined) {
+                updateData.supervisorMode = supervisorMode;
+            }
+            if (supervisorScheduleEnabled !== undefined) {
+                updateData.supervisorScheduleEnabled =
+                    supervisorScheduleEnabled;
+            }
+            if (supervisorScheduleIntervalHours !== undefined) {
+                updateData.supervisorScheduleIntervalHours =
+                    supervisorScheduleIntervalHours;
+            }
+            if (supervisorEnabledDimensions !== undefined) {
+                updateData.supervisorEnabledDimensions =
+                    supervisorEnabledDimensions;
+            }
+            if (supervisorPushTriggerEnabled !== undefined) {
+                updateData.supervisorPushTriggerEnabled =
+                    supervisorPushTriggerEnabled;
+            }
+            if (supervisorNotifyPrefs !== undefined) {
+                updateData.supervisorNotifyPrefs = supervisorNotifyPrefs;
+            }
+            if (supervisorCustomRules !== undefined) {
+                updateData.supervisorCustomRules = supervisorCustomRules;
+            }
+
+            // Compute nextRunAt when scheduling is enabled/changed
+            if (supervisorScheduleEnabled === true) {
+                const intervalHours =
+                    supervisorScheduleIntervalHours ?? 24;
+                updateData.supervisorNextRunAt = new Date(
+                    Date.now() + intervalHours * 60 * 60 * 1000,
+                );
+            } else if (supervisorScheduleEnabled === false) {
+                updateData.supervisorNextRunAt = null;
+            }
+
+            const updated = await db.project.update({
+                where: { id },
+                data: updateData,
+            });
+
+            return reply.send({
+                supervisorConfig: updated.supervisorConfig,
+                supervisorConfigVersion: updated.supervisorConfigVersion,
+            });
+        },
+    );
+
+}
+
+class ConflictError extends Error {
+    public readonly runId: string;
+    constructor(runId: string) {
+        super("Conflict");
+        this.runId = runId;
+    }
+}
+
+/**
+ * Parse comma-separated dimensions string into an array.
+ * Returns undefined (use defaults) if empty or null.
+ */
+function parseDimensions(raw: string | null | undefined): string[] | undefined {
+    if (!raw) return undefined;
+    const dims = raw
+        .split(",")
+        .map((d) => d.trim())
+        .filter(Boolean);
+    return dims.length > 0 ? dims : undefined;
+}
+
+function serializeSupervisorRun(run: {
+    id: string;
+    projectId: string;
+    trigger: string;
+    status: string;
+    artifactId: string | null;
+    actionsCount: number;
+    issuesCreated: number;
+    sessionId: string | null;
+    errorMessage: string | null;
+    tokenCount: number | null;
+    costUsd: number | null;
+    healthScore: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+    completedAt: Date | null;
+}) {
+    return {
+        id: run.id,
+        projectId: run.projectId,
+        trigger: run.trigger,
+        status: run.status,
+        artifactId: run.artifactId,
+        actionsCount: run.actionsCount,
+        issuesCreated: run.issuesCreated,
+        sessionId: run.sessionId,
+        errorMessage: run.errorMessage,
+        tokenCount: run.tokenCount,
+        costUsd: run.costUsd,
+        healthScore: run.healthScore,
+        createdAt: run.createdAt.getTime(),
+        updatedAt: run.updatedAt.getTime(),
+        completedAt: run.completedAt?.getTime() ?? null,
+    };
+}

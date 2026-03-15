@@ -80,6 +80,14 @@ export interface ServerToClientEvents {
           repoUrl: string;
           repoPath: string;
           provider: string;
+        }
+      | {
+          type: "supervisor-trigger";
+          projectId: string;
+          runId: string;
+          trigger: string;
+          machineId: string;
+          repoPath: string;
         },
   ) => void;
   auth: (data: { success: boolean; user: string }) => void;
@@ -164,6 +172,22 @@ export interface ClientToServerEvents {
     status: "dispatched" | "completed" | "failed";
     sessionId?: string;
     errorMessage?: string;
+  }) => void;
+  "supervisor-run-status": (data: {
+    runId: string;
+    projectId: string;
+    status: "running" | "completed" | "failed";
+    sessionId?: string;
+    actionsCount?: number;
+    issuesCreated?: number;
+    errorMessage?: string;
+    actions?: readonly {
+      severity: "critical" | "high" | "medium" | "low";
+      category: string;
+      title: string;
+      description: string;
+      suggestedFix?: string;
+    }[];
   }) => void;
 }
 

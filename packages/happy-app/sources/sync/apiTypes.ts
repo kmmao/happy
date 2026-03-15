@@ -119,6 +119,37 @@ export const ApiKvBatchUpdateSchema = z.object({
   ),
 });
 
+// Project update schemas
+export const ApiNewProjectSchema = z.object({
+  t: z.literal("new-project"),
+  projectId: z.string(),
+  machineId: z.string(),
+  path: z.string(),
+  repoUrl: z.string().nullable(),
+  metadata: z.string().nullable(),
+  metadataVersion: z.number(),
+  archived: z.boolean(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+
+export const ApiUpdateProjectSchema = z.object({
+  t: z.literal("update-project"),
+  projectId: z.string(),
+  metadata: z
+    .object({
+      value: z.string().nullable(),
+      version: z.number(),
+    })
+    .optional(),
+  archived: z.boolean().optional(),
+});
+
+export const ApiDeleteProjectSchema = z.object({
+  t: z.literal("delete-project"),
+  projectId: z.string(),
+});
+
 // Use a plain union here to avoid runtime discriminator extraction issues
 // when some schemas come from shared package exports.
 export const ApiUpdateSchema = z.union([
@@ -134,6 +165,9 @@ export const ApiUpdateSchema = z.union([
   ApiRelationshipUpdatedSchema,
   ApiNewFeedPostSchema,
   ApiKvBatchUpdateSchema,
+  ApiNewProjectSchema,
+  ApiUpdateProjectSchema,
+  ApiDeleteProjectSchema,
 ]);
 
 export type ApiUpdateNewMessage = z.infer<typeof ApiUpdateNewMessageSchema>;
@@ -218,12 +252,32 @@ export const ApiEphemeralWebhookPRMergedSchema = z.object({
   repoPath: z.string(),
 });
 
+export const ApiEphemeralSupervisorTriggerSchema = z.object({
+  type: z.literal("supervisor-trigger"),
+  projectId: z.string(),
+  runId: z.string(),
+  trigger: z.string(),
+  machineId: z.string(),
+  repoPath: z.string(),
+});
+
+export const ApiEphemeralSupervisorStatusSchema = z.object({
+  type: z.literal("supervisor-status"),
+  runId: z.string(),
+  projectId: z.string(),
+  status: z.string(),
+  artifactId: z.string().optional(),
+  errorMessage: z.string().optional(),
+});
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
   ApiEphemeralMachineActivityUpdateSchema,
   ApiEphemeralWebhookIssueLinkSchema,
   ApiEphemeralWebhookPRMergedSchema,
+  ApiEphemeralSupervisorTriggerSchema,
+  ApiEphemeralSupervisorStatusSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

@@ -6,6 +6,19 @@ import { db } from "@/storage/db";
 import { Socket } from "socket.io";
 import { allocateUserSeq } from "@/storage/seq";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
+import { checkAndTriggerScheduledRuns } from "@/modules/supervisorScheduler";
+
+// Throttle schedule checks to once per 5 minutes per machine
+const SCHEDULE_CHECK_INTERVAL = 5 * 60 * 1000;
+const lastScheduleCheck = new Map<string, number>();
+
+function shouldCheckSchedule(machineId: string): boolean {
+    const now = Date.now();
+    const last = lastScheduleCheck.get(machineId) ?? 0;
+    if (now - last < SCHEDULE_CHECK_INTERVAL) return false;
+    lastScheduleCheck.set(machineId, now);
+    return true;
+}
 
 export function machineUpdateHandler(userId: string, socket: Socket) {
     socket.on('machine-alive', async (data: {
@@ -45,6 +58,13 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 payload: machineActivity,
                 recipientFilter: { type: 'user-scoped-only' }
             });
+
+            // Check for scheduled supervisor runs (fire-and-forget, throttled)
+            if (shouldCheckSchedule(data.machineId)) {
+                checkAndTriggerScheduledRuns(data.machineId, userId).catch(err =>
+                    log({ module: 'supervisor', level: 'error' }, `Schedule check error: ${err}`)
+                );
+            }
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in machine-alive: ${error}`);
         }

@@ -19,6 +19,8 @@ import { pingHandler } from "./socket/pingHandler";
 import { sessionUpdateHandler } from "./socket/sessionUpdateHandler";
 import { machineUpdateHandler } from "./socket/machineUpdateHandler";
 import { webhookStatusHandler } from "./socket/webhookStatusHandler";
+import { supervisorRunStatusHandler } from "./socket/supervisorRunStatusHandler";
+import { supervisorFixStatusHandler } from "./socket/supervisorFixStatusHandler";
 import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
 import { accessKeyHandler } from "./socket/accessKeyHandler";
 import { sessionPreferencesHandler } from "./socket/sessionPreferencesHandler";
@@ -182,6 +184,8 @@ export function startSocket(app: Fastify) {
     artifactUpdateHandler(userId, socket);
     accessKeyHandler(userId, socket);
     webhookStatusHandler(socket, userId);
+    supervisorRunStatusHandler(socket, userId);
+    supervisorFixStatusHandler(socket, userId);
 
     // Ready
     log({ module: "websocket" }, `User connected: ${userId}`);

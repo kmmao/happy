@@ -99,6 +99,8 @@ interface DaemonToServerEvents {
     sessionId?: string;
     errorMessage?: string;
   }) => void;
+  "supervisor-run-status": (data: SupervisorRunStatusData) => void;
+  "supervisor-fix-status": (data: SupervisorFixStatusData) => void;
 }
 
 type MachineRpcHandlers = {
@@ -122,17 +124,68 @@ export type WebhookTriggerData = {
   apiToken?: string;
 };
 
+export type SupervisorTriggerData = {
+  type: "supervisor-trigger";
+  projectId: string;
+  runId: string;
+  trigger: string;
+  machineId: string;
+  repoPath: string;
+  mode?: string;
+  dimensions?: string[];
+  changedFiles?: string[];
+  customRules?: string;
+  fixAction?: {
+    title: string;
+    description: string;
+    suggestedFix: string | null;
+    category: string;
+    severity: string;
+  };
+};
+
+export type SupervisorRunStatusData = {
+  runId: string;
+  projectId: string;
+  status: "running" | "completed" | "failed";
+  sessionId?: string;
+  actionsCount?: number;
+  issuesCreated?: number;
+  errorMessage?: string;
+  actions?: readonly SupervisorActionData[];
+};
+
+export type SupervisorActionData = {
+  severity: "critical" | "high" | "medium" | "low";
+  category: string;
+  title: string;
+  description: string;
+  suggestedFix?: string;
+};
+
+export type SupervisorFixStatusData = {
+  actionId: string;
+  projectId: string;
+  fixStatus: "running" | "completed" | "failed";
+  fixSessionId?: string;
+};
+
 export class ApiMachineClient {
   private socket!: Socket<ServerToDaemonEvents, DaemonToServerEvents>;
   private keepAliveInterval: NodeJS.Timeout | null = null;
   private rpcHandlerManager: RpcHandlerManager;
   private webhookHandler: ((data: WebhookTriggerData) => void) | null = null;
+  private supervisorHandler:
+    | ((data: SupervisorTriggerData) => void)
+    | null = null;
   private pendingWebhookStatuses: Array<{
     webhookEventId: string;
     status: "dispatched" | "completed" | "failed";
     sessionId?: string;
     errorMessage?: string;
   }> = [];
+  private pendingSupervisorStatuses: Array<SupervisorRunStatusData> = [];
+  private pendingFixStatuses: Array<SupervisorFixStatusData> = [];
 
   constructor(
     private token: string,
@@ -254,6 +307,14 @@ export class ApiMachineClient {
   }
 
   /**
+   * Set handler for incoming supervisor trigger events.
+   * Called when Server dispatches a supervisor-trigger ephemeral event to this machine.
+   */
+  setSupervisorHandler(handler: (data: SupervisorTriggerData) => void) {
+    this.supervisorHandler = handler;
+  }
+
+  /**
    * Report webhook processing status back to server.
    * Queues the status if the socket is disconnected and flushes on reconnect.
    */
@@ -278,6 +339,52 @@ export class ApiMachineClient {
     this.pendingWebhookStatuses = [];
     for (const item of pending) {
       this.socket.emit("webhook-status", item);
+    }
+  }
+
+  /**
+   * Report supervisor run status back to server.
+   * Queues the status if the socket is disconnected and flushes on reconnect.
+   */
+  emitSupervisorRunStatus(data: SupervisorRunStatusData) {
+    if (!this.socket.connected) {
+      logger.debug(
+        `[SUPERVISOR] Socket disconnected, queuing status for run ${data.runId}`,
+      );
+      this.pendingSupervisorStatuses.push(data);
+      return;
+    }
+    this.socket.emit("supervisor-run-status", data);
+  }
+
+  private flushPendingSupervisorStatuses() {
+    const pending = [...this.pendingSupervisorStatuses];
+    this.pendingSupervisorStatuses = [];
+    for (const item of pending) {
+      this.socket.emit("supervisor-run-status", item);
+    }
+  }
+
+  /**
+   * Report supervisor fix status back to server.
+   * Queues the status if the socket is disconnected and flushes on reconnect.
+   */
+  emitSupervisorFixStatus(data: SupervisorFixStatusData) {
+    if (!this.socket.connected) {
+      logger.debug(
+        `[SUPERVISOR] Socket disconnected, queuing fix status for action ${data.actionId}`,
+      );
+      this.pendingFixStatuses.push(data);
+      return;
+    }
+    this.socket.emit("supervisor-fix-status", data);
+  }
+
+  private flushPendingFixStatuses() {
+    const pending = [...this.pendingFixStatuses];
+    this.pendingFixStatuses = [];
+    for (const item of pending) {
+      this.socket.emit("supervisor-fix-status", item);
     }
   }
 
@@ -407,6 +514,8 @@ export class ApiMachineClient {
 
       // Flush any webhook statuses queued during disconnect
       this.flushPendingWebhookStatuses();
+      this.flushPendingSupervisorStatuses();
+      this.flushPendingFixStatuses();
 
       // Start keep-alive
       this.startKeepAlive();
@@ -466,13 +575,19 @@ export class ApiMachineClient {
       }
     });
 
-    // Handle ephemeral events (webhook triggers, etc.)
+    // Handle ephemeral events (webhook triggers, supervisor triggers, etc.)
     this.socket.on("ephemeral", (data) => {
       if (data.type === "webhook-trigger" && this.webhookHandler) {
         logger.debug(
           `[API MACHINE] Received webhook-trigger for issue #${data.issueNumber}`,
         );
         this.webhookHandler(data as WebhookTriggerData);
+      }
+      if (data.type === "supervisor-trigger" && this.supervisorHandler) {
+        logger.debug(
+          `[API MACHINE] Received supervisor-trigger for project ${data.projectId}, run ${data.runId}`,
+        );
+        this.supervisorHandler(data as SupervisorTriggerData);
       }
     });
 

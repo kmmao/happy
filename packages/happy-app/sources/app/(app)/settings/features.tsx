@@ -27,8 +27,6 @@ export default function FeaturesSettingsScreen() {
   const [useEnhancedSessionWizard, setUseEnhancedSessionWizard] =
     useSettingMutable("useEnhancedSessionWizard");
   const [sttCorrection, setSttCorrection] = useSettingMutable("sttCorrection");
-  const [showProjectTab, setShowProjectTab] =
-    useSettingMutable("showProjectTab");
   const [webNotifications, setWebNotifications] =
     useSettingMutable("webNotifications");
   const [webNotificationsPersistent, setWebNotificationsPersistent] =
@@ -93,15 +91,6 @@ export default function FeaturesSettingsScreen() {
               value={useEnhancedSessionWizard}
               onValueChange={setUseEnhancedSessionWizard}
             />
-          }
-          showChevron={false}
-        />
-        <Item
-          title={t("settingsFeatures.showProjectTab")}
-          subtitle={t("settingsFeatures.showProjectTabSubtitle")}
-          icon={<Ionicons name="folder-outline" size={29} color="#3B82F6" />}
-          rightElement={
-            <Switch value={showProjectTab} onValueChange={setShowProjectTab} />
           }
           showChevron={false}
         />

@@ -364,3 +364,111 @@ export function getDeliveryId(
       return "";
   }
 }
+
+// ── Push Event Parsing (for supervisor incremental scan) ──
+
+export interface ParsedWebhookPush {
+  readonly ref: string;
+  readonly branch: string;
+  readonly repoUrl: string;
+  readonly changedFiles: string[];
+  readonly pusher: string;
+}
+
+/**
+ * Parse a push event from any provider to extract changed files.
+ */
+export function parseWebhookPush(
+  provider: string,
+  body: any,
+  eventType: string,
+): ParsedWebhookPush | null {
+  switch (provider) {
+    case "github":
+      return parseGitHubPush(body, eventType);
+    case "gitea":
+      return parseGiteaPush(body, eventType);
+    case "gitlab":
+      return parseGitLabPush(body, eventType);
+    default:
+      return null;
+  }
+}
+
+function parseGitHubPush(
+  body: any,
+  eventType: string,
+): ParsedWebhookPush | null {
+  if (eventType !== "push") return null;
+  const ref = body?.ref ?? "";
+  if (!ref.startsWith("refs/heads/")) return null;
+
+  const changedFiles = extractChangedFilesFromCommits(body?.commits);
+  if (changedFiles.length === 0) return null;
+
+  return {
+    ref,
+    branch: ref.replace("refs/heads/", ""),
+    repoUrl: body?.repository?.html_url ?? "",
+    changedFiles,
+    pusher: body?.pusher?.name ?? body?.sender?.login ?? "",
+  };
+}
+
+function parseGiteaPush(
+  body: any,
+  eventType: string,
+): ParsedWebhookPush | null {
+  if (eventType !== "push") return null;
+  const ref = body?.ref ?? "";
+  if (!ref.startsWith("refs/heads/")) return null;
+
+  const changedFiles = extractChangedFilesFromCommits(body?.commits);
+  if (changedFiles.length === 0) return null;
+
+  return {
+    ref,
+    branch: ref.replace("refs/heads/", ""),
+    repoUrl: body?.repository?.html_url ?? "",
+    changedFiles,
+    pusher: body?.pusher?.login ?? body?.sender?.login ?? "",
+  };
+}
+
+function parseGitLabPush(
+  body: any,
+  eventType: string,
+): ParsedWebhookPush | null {
+  if (eventType !== "Push Hook") return null;
+  const ref = body?.ref ?? "";
+  if (!ref.startsWith("refs/heads/")) return null;
+
+  const changedFiles = extractChangedFilesFromCommits(body?.commits);
+  if (changedFiles.length === 0) return null;
+
+  return {
+    ref,
+    branch: ref.replace("refs/heads/", ""),
+    repoUrl: body?.project?.web_url ?? "",
+    changedFiles,
+    pusher: body?.user_username ?? body?.user_name ?? "",
+  };
+}
+
+/**
+ * Collect unique changed file paths from commit payloads.
+ * GitHub/Gitea/GitLab all use added/removed/modified arrays.
+ */
+function extractChangedFilesFromCommits(
+  commits: any[] | undefined,
+): string[] {
+  if (!Array.isArray(commits)) return [];
+
+  const files = new Set<string>();
+  for (const commit of commits) {
+    for (const f of commit.added ?? []) files.add(f);
+    for (const f of commit.modified ?? []) files.add(f);
+    for (const f of commit.removed ?? []) files.add(f);
+  }
+  return Array.from(files);
+}

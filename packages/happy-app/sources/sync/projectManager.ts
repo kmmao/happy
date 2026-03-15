@@ -1,9 +1,11 @@
 /**
  * Project Management System
- * Groups sessions by machine ID and path to create project entities
+ * Groups sessions by machine ID and path to create project entities.
+ * Hybrid mode: in-memory cache + optional server-side persistence.
  */
 
 import { Session, MachineMetadata, GitStatus } from "./storageTypes";
+import { ServerProject } from "./apiProjects";
 
 /**
  * Unique project identifier based on machine ID and path
@@ -29,6 +31,8 @@ export interface SubmoduleInfo {
 export interface Project {
   /** Unique internal ID (not stable between app restarts) */
   id: string;
+  /** Server-side persistent ID (null if not yet synced) */
+  serverId?: string | null;
   /** Project identifier */
   key: ProjectKey;
   /** List of active session IDs in this project */
@@ -43,6 +47,28 @@ export interface Project {
   submodules?: SubmoduleInfo[];
   /** Timestamp when submodule status was last updated */
   submodulesLastUpdatedAt?: number;
+  /** Whether the project is archived on the server */
+  archived?: boolean;
+  /** Server-side encrypted metadata */
+  serverMetadata?: string | null;
+  /** Server-side metadata version */
+  serverMetadataVersion?: number;
+  /** Supervisor config JSON (encrypted on server) */
+  supervisorConfig?: string | null;
+  /** Supervisor config version */
+  supervisorConfigVersion?: number;
+  /** Supervisor mode (plaintext, synced from server) */
+  supervisorMode?: string | null;
+  /** Whether scheduled scanning is enabled */
+  supervisorScheduleEnabled?: boolean;
+  /** Schedule interval in hours */
+  supervisorScheduleIntervalHours?: number | null;
+  /** Comma-separated enabled analysis dimensions */
+  supervisorEnabledDimensions?: string | null;
+  /** Whether push-triggered incremental scans are enabled */
+  supervisorPushTriggerEnabled?: boolean;
+  /** User-defined custom analysis rules */
+  supervisorCustomRules?: string | null;
   /** Project creation timestamp */
   createdAt: number;
   /** Last update timestamp */
@@ -139,8 +165,8 @@ class ProjectManager {
           previousProject.sessionIds.splice(index, 1);
           previousProject.updatedAt = Date.now();
 
-          // Remove empty projects
-          if (previousProject.sessionIds.length === 0) {
+          // Remove empty projects only if they have no server backing
+          if (previousProject.sessionIds.length === 0 && !previousProject.serverId) {
             this.removeProject(previousProjectId);
           }
         }
@@ -180,8 +206,8 @@ class ProjectManager {
 
     this.sessionToProject.delete(sessionId);
 
-    // Remove empty projects
-    if (project.sessionIds.length === 0) {
+    // Remove empty projects only if they have no server backing
+    if (project.sessionIds.length === 0 && !project.serverId) {
       this.removeProject(projectId);
     }
   }
@@ -435,6 +461,109 @@ class ProjectManager {
       sessionCount,
       avgSessionsPerProject: Math.round(avgSessionsPerProject * 100) / 100,
     };
+  }
+
+  // === Server Sync Methods ===
+
+  /**
+   * Merge server projects into the in-memory cache.
+   * Server projects without matching local sessions are kept as "server-only"
+   * so they appear in the project list even with 0 active sessions.
+   */
+  mergeServerProjects(serverProjects: ServerProject[]): void {
+    for (const sp of serverProjects) {
+      const keyString = this.getProjectKeyString({
+        machineId: sp.machineId,
+        path: sp.path,
+      });
+      const existingId = this.projectKeyToId.get(keyString);
+
+      if (existingId) {
+        // Merge server data into existing in-memory project
+        const project = this.projects.get(existingId);
+        if (project) {
+          project.serverId = sp.id;
+          project.archived = sp.archived;
+          project.serverMetadata = sp.metadata;
+          project.serverMetadataVersion = sp.metadataVersion;
+          project.supervisorConfig = sp.supervisorConfig;
+          project.supervisorConfigVersion = sp.supervisorConfigVersion;
+          project.supervisorMode = sp.supervisorMode;
+          project.supervisorScheduleEnabled = sp.supervisorScheduleEnabled;
+          project.supervisorScheduleIntervalHours = sp.supervisorScheduleIntervalHours;
+          project.supervisorEnabledDimensions = sp.supervisorEnabledDimensions;
+          project.supervisorPushTriggerEnabled = sp.supervisorPushTriggerEnabled;
+          project.supervisorCustomRules = sp.supervisorCustomRules;
+        }
+      } else {
+        // Server-only project (no active sessions locally)
+        const projectId = this.generateProjectId();
+        const project: Project = {
+          id: projectId,
+          serverId: sp.id,
+          key: { machineId: sp.machineId, path: sp.path },
+          sessionIds: [],
+          archived: sp.archived,
+          serverMetadata: sp.metadata,
+          serverMetadataVersion: sp.metadataVersion,
+          supervisorConfig: sp.supervisorConfig,
+          supervisorConfigVersion: sp.supervisorConfigVersion,
+          supervisorMode: sp.supervisorMode,
+          supervisorScheduleEnabled: sp.supervisorScheduleEnabled,
+          supervisorScheduleIntervalHours: sp.supervisorScheduleIntervalHours,
+          supervisorEnabledDimensions: sp.supervisorEnabledDimensions,
+          supervisorPushTriggerEnabled: sp.supervisorPushTriggerEnabled,
+          supervisorCustomRules: sp.supervisorCustomRules,
+          createdAt: sp.createdAt,
+          updatedAt: sp.updatedAt,
+        };
+        this.projects.set(projectId, project);
+        this.projectKeyToId.set(keyString, projectId);
+      }
+    }
+  }
+
+  /**
+   * Get all projects that need to be synced to the server
+   * (have sessions but no serverId)
+   */
+  getUnsyncedProjects(): Project[] {
+    return Array.from(this.projects.values()).filter(
+      (p) => !p.serverId && p.sessionIds.length > 0,
+    );
+  }
+
+  /**
+   * Set the server ID for a project identified by its key
+   */
+  setServerId(key: ProjectKey, serverId: string): void {
+    const keyString = this.getProjectKeyString(key);
+    const projectId = this.projectKeyToId.get(keyString);
+    if (!projectId) return;
+
+    const project = this.projects.get(projectId);
+    if (project) {
+      project.serverId = serverId;
+    }
+  }
+
+  /**
+   * Get project by server ID
+   */
+  getProjectByServerId(serverId: string): Project | null {
+    for (const project of this.projects.values()) {
+      if (project.serverId === serverId) {
+        return project;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Check if any projects need migration (have sessions but no server ID)
+   */
+  needsMigration(): boolean {
+    return this.getUnsyncedProjects().length > 0;
   }
 }
 

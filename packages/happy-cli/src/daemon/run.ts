@@ -46,6 +46,7 @@ import {
 } from "@/utils/tmux";
 import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
 import { handleWebhookTrigger } from "@/webhook/handleWebhookTrigger";
+import { handleSupervisorTrigger } from "@/supervisor/handleSupervisorTrigger";
 
 // Prepare initial metadata
 export const initialMachineMetadata: MachineMetadata = {
@@ -919,6 +920,17 @@ export async function startDaemon(): Promise<void> {
         spawnSession,
         emitWebhookStatus: (statusData) =>
           apiMachine.emitWebhookStatus(statusData),
+      });
+    });
+
+    // Set up supervisor trigger handler
+    apiMachine.setSupervisorHandler((data) => {
+      handleSupervisorTrigger(data, {
+        spawnSession,
+        emitSupervisorRunStatus: (statusData) =>
+          apiMachine.emitSupervisorRunStatus(statusData),
+        emitSupervisorFixStatus: (statusData) =>
+          apiMachine.emitSupervisorFixStatus(statusData),
       });
     });
 

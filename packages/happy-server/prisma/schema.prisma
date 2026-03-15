@@ -53,6 +53,7 @@ model Account {
     UserFeedItem        UserFeedItem[]
     UserKVStore         UserKVStore[]
     WebhookRoute        WebhookRoute[]
+    Project             Project[]
 }
 
 model TerminalAuthRequest {
@@ -96,6 +97,8 @@ model Session {
     tag               String
     accountId         String
     account           Account          @relation(fields: [accountId], references: [id])
+    projectId         String?
+    project           Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
     metadata          String
     metadataVersion   Int              @default(0)
     agentState        String?
@@ -114,6 +117,7 @@ model Session {
 
     @@unique([accountId, tag])
     @@index([accountId, updatedAt(sort: Desc)])
+    @@index([projectId])
 }
 
 model SessionMessage {
@@ -363,6 +367,135 @@ model UserKVStore {
 
     @@unique([accountId, key])
     @@index([accountId])
+}
+
+//
+// Projects
+//
+
+model Project {
+    id              String    @id @default(cuid())
+    accountId       String
+    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    // Physical location identifier
+    machineId       String
+    path            String
+
+    // Optional logical association
+    repoUrl         String?   // Normalized git remote URL
+
+    // User-defined metadata (encrypted)
+    metadata        String?   // Encrypted JSON: { displayName?, color?, notes? }
+    metadataVersion Int       @default(0)
+
+    // Supervisor configuration (encrypted)
+    supervisorConfig        String?
+    supervisorConfigVersion Int       @default(0)
+
+    // Supervisor scheduling (plaintext — Server needs these for scheduling queries)
+    supervisorMode                    String?   // "disabled" | "suggest" | "semi-auto" | "auto"
+    supervisorScheduleEnabled         Boolean   @default(false)
+    supervisorScheduleIntervalHours   Int?
+    supervisorNextRunAt               DateTime?
+    supervisorDailyRunCount           Int       @default(0)
+    supervisorDailyRunCountResetAt    DateTime?
+    supervisorEnabledDimensions       String?   // Comma-separated: "security,dependencies,architecture,techDebt,..."
+    supervisorPushTriggerEnabled      Boolean   @default(false)
+    supervisorNotifyPrefs             String?   // Comma-separated: "onAnalysisComplete,onIssueCreated,onPRCreated,onError" — null means all enabled
+    supervisorCustomRules             String?   // User-defined analysis rules (plaintext, appended to prompt)
+
+    // Lifecycle
+    archived        Boolean   @default(false)
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    // Relations
+    sessions        Session[]
+    supervisorRuns  SupervisorRun[]
+
+    @@unique([accountId, machineId, path])
+    @@index([accountId])
+    @@index([accountId, archived])
+    @@index([supervisorNextRunAt])
+}
+
+//
+// Supervisor Runs
+//
+
+model SupervisorRun {
+    id              String    @id @default(cuid())
+    projectId       String
+    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    accountId       String
+
+    trigger         String    // "scheduled" | "manual" | "event"
+    status          String    @default("pending")  // pending | running | completed | failed | cancelled
+
+    // Report stored as Artifact (encrypted), reference by artifactId
+    artifactId      String?
+
+    actionsCount    Int       @default(0)
+    issuesCreated   Int       @default(0)
+    sessionId       String?   // Claude Code session running the supervisor
+    errorMessage    String?
+
+    // Cost tracking
+    tokenCount      Int?      // Total tokens consumed by the analysis session
+    costUsd         Float?    // Estimated cost in USD
+    healthScore     Int?      // Computed health score at run completion
+
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+    completedAt     DateTime?
+
+    actions         SupervisorAction[]
+
+    @@index([projectId])
+    @@index([accountId, status])
+    @@index([projectId, createdAt(sort: Desc)])
+}
+
+//
+// Supervisor Actions (individual findings from a run)
+//
+
+model SupervisorAction {
+    id              String    @id @default(cuid())
+    runId           String
+    run             SupervisorRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+    projectId       String
+    accountId       String
+
+    // Finding metadata (unencrypted — used for filtering/sorting)
+    severity        String    // "critical" | "high" | "medium" | "low"
+    category        String    // "security" | "dependencies" | "architecture" | "techDebt" | "codeQuality" | "testCoverage"
+
+    // Finding content (encrypted — user-visible text)
+    title           String    // Encrypted
+    description     String    // Encrypted
+    suggestedFix    String?   // Encrypted
+    confidence      Int?      // 0-100 AI confidence in suggestedFix
+
+    // Approval workflow
+    approval        String    @default("pending")  // pending | approved | skipped | ignored
+
+    // Fix tracking
+    fixSessionId    String?   // Claude Code session executing the fix
+    fixStatus       String?   // pending | running | completed | failed
+    issueUrl        String?   // GitHub Issue URL if created
+
+    // Deduplication — tracks last run that detected this issue
+    lastSeenRunId   String?
+
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    @@index([runId])
+    @@index([projectId, approval])
+    @@index([accountId, approval])
+    @@index([projectId, category, title, approval])
 }
 
 //

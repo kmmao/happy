@@ -1,9 +1,10 @@
 import * as React from "react";
-import { View, Text, StyleSheet, Platform, Pressable } from "react-native";
+import { Animated, Easing, View, Text, StyleSheet, Platform, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { Avatar } from "@/components/Avatar";
+import { hapticsLight } from "@/components/haptics";
 import { Typography } from "@/constants/Typography";
 import { useHeaderHeight } from "@/utils/responsive";
 import { layout } from "@/components/layout";
@@ -15,6 +16,7 @@ interface ChatHeaderViewProps {
   onBackPress?: () => void;
   onAvatarPress?: () => void;
   onPreviewPress?: () => void;
+  onRefreshPress?: () => void;
   avatarId?: string;
   backgroundColor?: string;
   tintColor?: string;
@@ -28,6 +30,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   onBackPress,
   onAvatarPress,
   onPreviewPress,
+  onRefreshPress,
   avatarId,
   isConnected = true,
   flavor,
@@ -36,6 +39,30 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
+
+  const spinAnim = React.useRef(new Animated.Value(0)).current;
+  const isSpinning = React.useRef(false);
+
+  const handleRefreshPress = React.useCallback(() => {
+    if (isSpinning.current || !onRefreshPress) return;
+    isSpinning.current = true;
+    onRefreshPress();
+    spinAnim.setValue(0);
+    Animated.timing(spinAnim, {
+      toValue: 1,
+      duration: 1500,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }).start(() => {
+      isSpinning.current = false;
+      hapticsLight();
+    });
+  }, [onRefreshPress, spinAnim]);
+
+  const spinInterpolation = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "720deg"],
+  });
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -100,6 +127,22 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
               </Text>
             )}
           </View>
+
+          {onRefreshPress && (
+            <Pressable
+              onPress={handleRefreshPress}
+              hitSlop={15}
+              style={styles.actionButton}
+            >
+              <Animated.View style={{ transform: [{ rotate: spinInterpolation }] }}>
+                <Ionicons
+                  name="refresh-outline"
+                  size={20}
+                  color={theme.colors.header.tint}
+                />
+              </Animated.View>
+            </Pressable>
+          )}
 
           {onPreviewPress && (
             <Pressable

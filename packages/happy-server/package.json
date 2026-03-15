@@ -51,6 +51,7 @@
     "chalk": "4.1.2",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.5",
+    "expo-server-sdk": "^6.1.0",
     "fastify": "^5.7.3",
     "fastify-type-provider-zod": "5",
     "ioredis": "^5.6.1",

@@ -16,6 +16,7 @@ import { verifyWebhookSignature } from "./webhookVerify";
 import {
   parseWebhookIssue,
   parseWebhookPRMerge,
+  parseWebhookPush,
   getEventTypeHeader,
   getDeliveryId,
 } from "./webhookParsers";
@@ -25,9 +26,11 @@ import type {
 } from "./webhookParsers";
 import {
   buildSessionActivityEphemeral,
+  buildSupervisorTriggerEphemeral,
   eventRouter,
 } from "@/app/events/eventRouter";
 import { fetchIssueLabelsFromProvider } from "./webhookFetchLabels";
+import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
 
 /**
  * Extract the repository URL from a webhook body.
@@ -129,12 +132,25 @@ export async function dispatchWebhook(
     return { dispatched: false, reason: "no_delivery_id" };
   }
 
-  // 4. Parse the issue data — or try PR merge
+  // 4. Parse the issue data — or try PR merge / push
   const issue = parseWebhookIssue(provider, body, eventType);
   if (!issue) {
     // Not an issue event — check if it's a PR merge
     const prMerge = parseWebhookPRMerge(provider, body, eventType);
     if (!prMerge) {
+      // Not a PR merge — check if it's a push event
+      const pushEvent = parseWebhookPush(provider, body, eventType);
+      if (pushEvent && pushEvent.changedFiles.length > 0) {
+        return await handlePushSupervisorTrigger(
+          normalizedUrl,
+          pushEvent.changedFiles,
+          pushEvent.branch,
+          routes,
+          provider,
+          rawBody,
+          headers,
+        );
+      }
       return { dispatched: false, reason: "not_supported_event" };
     }
 
@@ -515,4 +531,144 @@ async function processRoutePRMerge(
   }
 
   return anyArchived;
+}
+
+/**
+ * Handle a push event by triggering incremental supervisor scans
+ * for projects that have push trigger enabled.
+ */
+async function handlePushSupervisorTrigger(
+  normalizedRepoUrl: string,
+  changedFiles: string[],
+  branch: string,
+  routes: Array<{
+    id: string;
+    accountId: string;
+    repoUrl: string;
+    webhookSecret: Uint8Array<ArrayBuffer>;
+    machineId: string;
+    repoPath: string;
+    provider: string;
+  }>,
+  provider: string,
+  rawBody: string,
+  headers: Record<string, string | undefined>,
+): Promise<DispatchResult> {
+  // Find projects with push trigger enabled that match this repo
+  const projects = await db.project.findMany({
+    where: {
+      repoUrl: normalizedRepoUrl,
+      archived: false,
+      supervisorPushTriggerEnabled: true,
+      supervisorConfig: { not: null },
+    },
+    select: {
+      id: true,
+      accountId: true,
+      machineId: true,
+      path: true,
+      supervisorMode: true,
+      supervisorEnabledDimensions: true,
+      supervisorCustomRules: true,
+    },
+  });
+
+  if (projects.length === 0) {
+    return { dispatched: false, reason: "no_push_trigger_projects" };
+  }
+
+  let anyTriggered = false;
+
+  for (const project of projects) {
+    try {
+      // Find a matching route for signature verification
+      const route = routes.find(
+        (r) => r.accountId === project.accountId,
+      );
+      if (!route) continue;
+
+      // Verify signature
+      const secret = decryptString(
+        ["webhook-route", `${route.accountId}:${route.repoUrl}`],
+        route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
+      );
+      const valid = verifyWebhookSignature(provider, secret, rawBody, headers);
+      if (!valid) continue;
+
+      // Check daily limit
+      const limitCheck = await checkDailyRunLimit(project.id);
+      if (!limitCheck.allowed) {
+        log(
+          { module: "webhook" },
+          `Push trigger: daily limit reached for project ${project.id}`,
+        );
+        continue;
+      }
+
+      // Check no active run
+      const existingRun = await db.supervisorRun.findFirst({
+        where: {
+          projectId: project.id,
+          accountId: project.accountId,
+          status: { in: ["pending", "running"] },
+        },
+        select: { id: true },
+      });
+      if (existingRun) continue;
+
+      // Create the run
+      const run = await db.supervisorRun.create({
+        data: {
+          projectId: project.id,
+          accountId: project.accountId,
+          trigger: "push",
+          status: "pending",
+        },
+      });
+
+      await incrementDailyRunCount(project.id);
+
+      // Parse dimensions
+      const dimensions = project.supervisorEnabledDimensions
+        ? project.supervisorEnabledDimensions.split(",").map((d) => d.trim()).filter(Boolean)
+        : undefined;
+
+      // Emit trigger with changed files
+      eventRouter.emitEphemeral({
+        userId: project.accountId,
+        payload: buildSupervisorTriggerEphemeral(
+          project.id,
+          run.id,
+          "push",
+          project.machineId,
+          project.path,
+          project.supervisorMode ?? undefined,
+          dimensions,
+          changedFiles,
+          project.supervisorCustomRules ?? undefined,
+        ),
+        recipientFilter: {
+          type: "machine-scoped-only",
+          machineId: project.machineId,
+        },
+      });
+
+      log(
+        { module: "webhook" },
+        `Push trigger: started supervisor run ${run.id} for project ${project.id} (${changedFiles.length} files on ${branch})`,
+      );
+
+      anyTriggered = true;
+    } catch (error) {
+      log(
+        { module: "webhook", level: "error" },
+        `Push trigger failed for project ${project.id}: ${error}`,
+      );
+    }
+  }
+
+  return {
+    dispatched: anyTriggered,
+    reason: anyTriggered ? undefined : "push_trigger_failed",
+  };
 }

@@ -20,7 +20,6 @@ interface TabBarProps {
   onTabPress: (tab: TabType) => void;
   inboxBadgeCount?: number;
   showOpenClaw?: boolean;
-  showProject?: boolean;
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -93,7 +92,6 @@ export const TabBar = React.memo(
     onTabPress,
     inboxBadgeCount = 0,
     showOpenClaw = false,
-    showProject = false,
   }: TabBarProps) => {
     const { theme } = useUnistyles();
     const insets = useSafeAreaInsets();
@@ -130,10 +128,9 @@ export const TabBar = React.memo(
         ];
         return allTabs.filter((tab) => {
           if (tab.key === "openclaw" && !showOpenClaw) return false;
-          if (tab.key === "project" && !showProject) return false;
           return true;
         });
-      }, [showOpenClaw, showProject]);
+      }, [showOpenClaw]);
 
     return (
       <View style={[styles.outerContainer, { paddingBottom: insets.bottom }]}>
