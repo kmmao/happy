@@ -7,6 +7,7 @@ import {
     ActivityIndicator,
     TextInput,
     RefreshControl,
+    Switch,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,6 +28,45 @@ import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { sync } from "@/sync/sync";
 import { layout } from "@/components/layout";
 import { useRouter } from "expo-router";
+import {
+    loadResearchPrefs,
+    saveResearchPrefs,
+} from "@/sync/persistence";
+
+const RESEARCH_DIMENSIONS = [
+    "pricing",
+    "features",
+    "devExperience",
+    "positioning",
+    "techStack",
+    "community",
+    "funding",
+    "userFeedback",
+] as const;
+
+type ResearchDimension = (typeof RESEARCH_DIMENSIONS)[number];
+
+const DIMENSION_LABELS: Record<ResearchDimension, { label: () => string; note: () => string }> = {
+    pricing: { label: () => t("competitorResearch.dim_pricing"), note: () => t("competitorResearch.dim_pricing_note") },
+    features: { label: () => t("competitorResearch.dim_features"), note: () => t("competitorResearch.dim_features_note") },
+    devExperience: { label: () => t("competitorResearch.dim_devExperience"), note: () => t("competitorResearch.dim_devExperience_note") },
+    positioning: { label: () => t("competitorResearch.dim_positioning"), note: () => t("competitorResearch.dim_positioning_note") },
+    techStack: { label: () => t("competitorResearch.dim_techStack"), note: () => t("competitorResearch.dim_techStack_note") },
+    community: { label: () => t("competitorResearch.dim_community"), note: () => t("competitorResearch.dim_community_note") },
+    funding: { label: () => t("competitorResearch.dim_funding"), note: () => t("competitorResearch.dim_funding_note") },
+    userFeedback: { label: () => t("competitorResearch.dim_userFeedback"), note: () => t("competitorResearch.dim_userFeedback_note") },
+};
+
+const defaultDimensions: Record<ResearchDimension, boolean> = {
+    pricing: true,
+    features: true,
+    devExperience: false,
+    positioning: false,
+    techStack: false,
+    community: false,
+    funding: false,
+    userFeedback: false,
+};
 
 interface ProjectResearchTabProps {
     project: Project;
@@ -42,9 +82,50 @@ export const ProjectResearchTab = React.memo(
         const [loading, setLoading] = React.useState(true);
         const [refreshing, setRefreshing] = React.useState(false);
 
-        // Input fields
-        const [knownCompetitors, setKnownCompetitors] = React.useState("");
-        const [focusAreas, setFocusAreas] = React.useState("");
+        // Input fields — load saved preferences
+        const savedPrefs = React.useMemo(() => {
+            if (!serverId) return null;
+            return loadResearchPrefs(serverId);
+        }, [serverId]);
+
+        const [knownCompetitors, setKnownCompetitors] = React.useState(
+            savedPrefs?.knownCompetitors ?? "",
+        );
+        const [dimensions, setDimensions] = React.useState(
+            savedPrefs ? { ...defaultDimensions, ...savedPrefs.dimensions } : defaultDimensions,
+        );
+        const [additionalNotes, setAdditionalNotes] = React.useState(
+            savedPrefs?.additionalNotes ?? "",
+        );
+
+        // Persist all research prefs on change
+        const prefsRef = React.useRef({ dimensions, knownCompetitors, additionalNotes });
+        prefsRef.current = { dimensions, knownCompetitors, additionalNotes };
+
+        const persistTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+        const debouncedPersist = React.useCallback(() => {
+            if (persistTimerRef.current) {
+                clearTimeout(persistTimerRef.current);
+            }
+            persistTimerRef.current = setTimeout(() => {
+                if (serverId) {
+                    saveResearchPrefs(serverId, prefsRef.current);
+                }
+            }, 500);
+        }, [serverId]);
+
+        // Flush on unmount
+        React.useEffect(() => {
+            return () => {
+                if (persistTimerRef.current) {
+                    clearTimeout(persistTimerRef.current);
+                    if (serverId) {
+                        saveResearchPrefs(serverId, prefsRef.current);
+                    }
+                }
+            };
+        }, [serverId]);
 
         // Active run tracking
         const activeRun = React.useMemo(
@@ -96,6 +177,44 @@ export const ProjectResearchTab = React.memo(
             return unsubscribe;
         }, [serverId, loadData]);
 
+        const toggleDimension = React.useCallback(
+            (key: ResearchDimension) => {
+                setDimensions((prev) => {
+                    const next = { ...prev, [key]: !prev[key] };
+                    prefsRef.current = { ...prefsRef.current, dimensions: next };
+                    if (serverId) {
+                        saveResearchPrefs(serverId, prefsRef.current);
+                    }
+                    return next;
+                });
+            },
+            [serverId],
+        );
+
+        const handleKnownCompetitorsChange = React.useCallback(
+            (text: string) => {
+                setKnownCompetitors(text);
+                prefsRef.current = { ...prefsRef.current, knownCompetitors: text };
+                debouncedPersist();
+            },
+            [debouncedPersist],
+        );
+
+        const handleAdditionalNotesChange = React.useCallback(
+            (text: string) => {
+                setAdditionalNotes(text);
+                prefsRef.current = { ...prefsRef.current, additionalNotes: text };
+                debouncedPersist();
+            },
+            [debouncedPersist],
+        );
+
+        const selectedDimensions = React.useMemo(
+            () =>
+                RESEARCH_DIMENSIONS.filter((d) => dimensions[d]).join(","),
+            [dimensions],
+        );
+
         const [triggerLoading, doTrigger] = useHappyAction(
             React.useCallback(async () => {
                 if (!serverId) return;
@@ -106,7 +225,8 @@ export const ProjectResearchTab = React.memo(
                         trigger: "research",
                         researchParams: {
                             knownCompetitors: knownCompetitors.trim() || undefined,
-                            focusAreas: focusAreas.trim() || undefined,
+                            focusAreas: selectedDimensions || undefined,
+                            additionalNotes: additionalNotes.trim() || undefined,
                         },
                     });
                     setRuns((prev) => [run, ...prev]);
@@ -116,7 +236,7 @@ export const ProjectResearchTab = React.memo(
                     }
                     throw e;
                 }
-            }, [serverId, knownCompetitors, focusAreas, loadData]),
+            }, [serverId, knownCompetitors, selectedDimensions, additionalNotes, loadData]),
         );
 
         const [cancelLoading, doCancel] = useHappyAction(
@@ -176,21 +296,32 @@ export const ProjectResearchTab = React.memo(
                                 placeholder={t("competitorResearch.knownCompetitorsPlaceholder")}
                                 placeholderTextColor={theme.colors.textSecondary}
                                 value={knownCompetitors}
-                                onChangeText={setKnownCompetitors}
+                                onChangeText={handleKnownCompetitorsChange}
                                 multiline
                                 numberOfLines={2}
                                 editable={!isRunning}
                             />
+                        </View>
+                    </ItemGroup>
 
-                            <Text
-                                style={[
-                                    styles.inputLabel,
-                                    styles.inputLabelSpaced,
-                                    { color: theme.colors.text },
-                                ]}
-                            >
-                                {t("competitorResearch.focusAreas")}
-                            </Text>
+                    {/* Analysis Dimensions */}
+                    <ItemGroup title={t("competitorResearch.dimensionsSection")}>
+                        {RESEARCH_DIMENSIONS.map((dim, index) => (
+                            <DimensionToggle
+                                key={dim}
+                                label={DIMENSION_LABELS[dim].label()}
+                                subtitle={DIMENSION_LABELS[dim].note()}
+                                value={dimensions[dim]}
+                                onToggle={() => toggleDimension(dim)}
+                                isLast={index === RESEARCH_DIMENSIONS.length - 1}
+                                disabled={isRunning}
+                            />
+                        ))}
+                    </ItemGroup>
+
+                    {/* Additional Notes */}
+                    <ItemGroup title={t("competitorResearch.additionalNotes")}>
+                        <View style={styles.inputSection}>
                             <TextInput
                                 style={[
                                     styles.textInput,
@@ -200,10 +331,10 @@ export const ProjectResearchTab = React.memo(
                                         borderColor: theme.colors.divider,
                                     },
                                 ]}
-                                placeholder={t("competitorResearch.focusAreasPlaceholder")}
+                                placeholder={t("competitorResearch.additionalNotesPlaceholder")}
                                 placeholderTextColor={theme.colors.textSecondary}
-                                value={focusAreas}
-                                onChangeText={setFocusAreas}
+                                value={additionalNotes}
+                                onChangeText={handleAdditionalNotesChange}
                                 multiline
                                 numberOfLines={2}
                                 editable={!isRunning}
@@ -353,6 +484,50 @@ export const ProjectResearchTab = React.memo(
     },
 );
 
+// --- Dimension Toggle ---
+
+interface DimensionToggleProps {
+    label: string;
+    subtitle: string;
+    value: boolean;
+    onToggle: () => void;
+    isLast?: boolean;
+    disabled?: boolean;
+}
+
+const DimensionToggle = React.memo(
+    ({ label, subtitle, value, onToggle, isLast, disabled }: DimensionToggleProps) => {
+        const { theme } = useUnistyles();
+
+        return (
+            <View
+                style={[
+                    styles.toggleRow,
+                    !isLast && styles.toggleRowBorder,
+                ]}
+            >
+                <View style={styles.toggleRowContent}>
+                    <Text style={[styles.toggleRowLabel, { color: theme.colors.text }]}>
+                        {label}
+                    </Text>
+                    <Text style={[styles.toggleRowSubtitle, { color: theme.colors.textSecondary }]}>
+                        {subtitle}
+                    </Text>
+                </View>
+                <Switch
+                    value={value}
+                    onValueChange={onToggle}
+                    disabled={disabled}
+                    trackColor={{
+                        false: theme.colors.surface,
+                        true: theme.colors.header.tint,
+                    }}
+                />
+            </View>
+        );
+    },
+);
+
 const styles = StyleSheet.create((theme) => ({
     container: {
         flex: 1,
@@ -378,9 +553,6 @@ const styles = StyleSheet.create((theme) => ({
     inputLabel: {
         ...Typography.default("semiBold"),
         fontSize: 13,
-    },
-    inputLabelSpaced: {
-        marginTop: 12,
     },
     textInput: {
         ...Typography.default(),
@@ -469,5 +641,28 @@ const styles = StyleSheet.create((theme) => ({
     emptyText: {
         ...Typography.default(),
         fontSize: 15,
+    },
+    toggleRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    toggleRowBorder: {
+        borderBottomWidth: 0.5,
+        borderBottomColor: theme.colors.divider,
+    },
+    toggleRowContent: {
+        flex: 1,
+        marginRight: 12,
+    },
+    toggleRowLabel: {
+        ...Typography.default(),
+        fontSize: 15,
+    },
+    toggleRowSubtitle: {
+        ...Typography.default(),
+        fontSize: 12,
+        marginTop: 2,
     },
 }));

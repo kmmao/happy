@@ -485,3 +485,64 @@ export function clearPersistence() {
   mmkv.clearAll();
   clearAllMessageCaches();
 }
+
+// Research preferences per project (dimensions + text fields)
+const RESEARCH_PREFS_PREFIX = "research-prefs-";
+
+export interface ResearchPrefs {
+  dimensions: Record<string, boolean>;
+  knownCompetitors: string;
+  additionalNotes: string;
+}
+
+export function loadResearchPrefs(projectId: string): ResearchPrefs | null {
+  const raw = mmkv.getString(`${RESEARCH_PREFS_PREFIX}${projectId}`);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return {
+          dimensions:
+            parsed.dimensions && typeof parsed.dimensions === "object"
+              ? (parsed.dimensions as Record<string, boolean>)
+              : {},
+          knownCompetitors:
+            typeof parsed.knownCompetitors === "string"
+              ? parsed.knownCompetitors
+              : "",
+          additionalNotes:
+            typeof parsed.additionalNotes === "string"
+              ? parsed.additionalNotes
+              : "",
+        };
+      }
+    } catch (e) {
+      console.error("Failed to parse research prefs", e);
+    }
+  }
+  // Migrate from old dimensions-only key
+  const legacyRaw = mmkv.getString(`research-dims-${projectId}`);
+  if (legacyRaw) {
+    try {
+      const dims = JSON.parse(legacyRaw);
+      mmkv.delete(`research-dims-${projectId}`);
+      if (dims && typeof dims === "object" && !Array.isArray(dims)) {
+        return {
+          dimensions: dims as Record<string, boolean>,
+          knownCompetitors: "",
+          additionalNotes: "",
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
+export function saveResearchPrefs(
+  projectId: string,
+  prefs: ResearchPrefs,
+) {
+  mmkv.set(`${RESEARCH_PREFS_PREFIX}${projectId}`, JSON.stringify(prefs));
+}
