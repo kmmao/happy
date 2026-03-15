@@ -1971,6 +1971,8 @@ export const en: TranslationStructure = {
       "AI-powered code analysis that monitors your project's health across multiple dimensions.",
     notSynced: "Project not synced to server yet",
     scanNow: "Scan Now",
+    scanStarting: "Starting...",
+    loading: "Loading...",
     alreadyRunning: "A scan is already in progress",
     settings: "Supervisor Settings",
     status_pending: "Pending",
@@ -2080,6 +2082,8 @@ export const en: TranslationStructure = {
     tabIgnored: "Ignored",
     noActions: "No actions",
     loadMore: "Load More",
+
+    viewSession: "View Session",
 
     // Phase 7: Report export
     exportReport: "Export Report",

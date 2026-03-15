@@ -379,7 +379,11 @@ export async function startDaemon(): Promise<void> {
 
         if (guiProfileProvided) {
           // GUI explicitly provided profile environment variables — use as-is, no fallback
-          profileEnv = options.environmentVariables!;
+          // Filter out undefined values to satisfy Record<string, string>
+          const raw = options.environmentVariables!;
+          profileEnv = Object.fromEntries(
+            Object.entries(raw).filter((entry): entry is [string, string] => entry[1] !== undefined),
+          );
           const varCount = Object.keys(profileEnv).length;
           logger.info(
             `[DAEMON RUN] Using GUI-provided profile environment variables (${varCount} vars)`,
@@ -931,6 +935,8 @@ export async function startDaemon(): Promise<void> {
           apiMachine.emitSupervisorRunStatus(statusData),
         emitSupervisorFixStatus: (statusData) =>
           apiMachine.emitSupervisorFixStatus(statusData),
+        serverUrl: configuration.serverUrl,
+        authToken: credentials.token,
       });
     });
 

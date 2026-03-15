@@ -24,8 +24,8 @@ export function supervisorRoutes(app: Fastify) {
                 params: z.object({ id: z.string() }),
                 body: z
                     .object({
-                        machineId: z.string(),
-                        repoPath: z.string(),
+                        machineId: z.string().optional(),
+                        repoPath: z.string().optional(),
                     })
                     .optional(),
             },
@@ -287,6 +287,14 @@ export function supervisorRoutes(app: Fastify) {
                     actionsCount: z.number().int().min(0).optional(),
                     issuesCreated: z.number().int().min(0).optional(),
                     errorMessage: z.string().max(500).optional(),
+                    actions: z.array(z.object({
+                        severity: z.enum(["critical", "high", "medium", "low"]),
+                        category: z.string().max(50),
+                        title: z.string().max(500),
+                        description: z.string().max(2000),
+                        suggestedFix: z.string().max(2000).optional(),
+                        confidence: z.number().int().min(0).max(100).optional(),
+                    })).max(20).optional(),
                 }),
             },
         },
@@ -300,6 +308,7 @@ export function supervisorRoutes(app: Fastify) {
                 actionsCount,
                 issuesCreated,
                 errorMessage,
+                actions: reportedActions,
             } = request.body;
 
             // Atomic: only update if status is still pending/running
@@ -345,11 +354,69 @@ export function supervisorRoutes(app: Fastify) {
 
             // Compute and persist healthScore on completion
             if (status === "completed") {
-                const actions = await db.supervisorAction.findMany({
+                // Create SupervisorAction entries if provided — with deduplication
+                if (reportedActions && reportedActions.length > 0) {
+                    const existingPending = await db.supervisorAction.findMany({
+                        where: {
+                            projectId: id,
+                            accountId: userId,
+                            approval: "pending",
+                        },
+                        select: { id: true, category: true, title: true },
+                    });
+
+                    const existingKeys = new Map(
+                        existingPending.map((a) => [`${a.category}::${a.title}`, a.id]),
+                    );
+
+                    const newActions: typeof reportedActions = [];
+
+                    for (const action of reportedActions) {
+                        const key = `${action.category}::${action.title}`;
+                        const existingId = existingKeys.get(key);
+                        if (existingId) {
+                            await db.supervisorAction.update({
+                                where: { id: existingId },
+                                data: {
+                                    lastSeenRunId: runId,
+                                    description: action.description,
+                                    suggestedFix: action.suggestedFix ?? null,
+                                    confidence: action.confidence ?? null,
+                                    severity: action.severity,
+                                },
+                            });
+                        } else {
+                            newActions.push(action);
+                        }
+                    }
+
+                    if (newActions.length > 0) {
+                        await db.supervisorAction.createMany({
+                            data: newActions.map((action) => ({
+                                runId,
+                                projectId: id,
+                                accountId: userId,
+                                severity: action.severity,
+                                category: action.category,
+                                title: action.title,
+                                description: action.description,
+                                suggestedFix: action.suggestedFix ?? null,
+                                confidence: action.confidence ?? null,
+                            })),
+                        });
+                    }
+
+                    await db.supervisorRun.update({
+                        where: { id: runId },
+                        data: { actionsCount: reportedActions.length },
+                    });
+                }
+
+                const allActions = await db.supervisorAction.findMany({
                     where: { runId, projectId: id, accountId: userId },
                     select: { severity: true },
                 });
-                const counts = countSeverities(actions);
+                const counts = countSeverities(allActions);
                 const healthScore = computeHealthScore(counts);
                 await db.supervisorRun.update({
                     where: { id: runId },

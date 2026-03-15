@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
+import { NonRetryableError } from "@/utils/time";
 import { getServerUrl } from "./serverConfig";
 
 /**
@@ -76,7 +77,7 @@ export async function triggerSupervisorRun(
         }
 
         if (!response.ok) {
-            throw new Error(
+            throw new NonRetryableError(
                 `Failed to trigger supervisor run: ${response.status}`,
             );
         }
@@ -219,12 +220,13 @@ export async function updateSupervisorConfig(
 /**
  * Error thrown when a supervisor run is already in progress
  */
-export class SupervisorAlreadyRunningError extends Error {
+export class SupervisorAlreadyRunningError extends NonRetryableError {
     public readonly runId: string;
 
     constructor(message: string, runId: string) {
         super(message);
         this.name = "SupervisorAlreadyRunningError";
+        Object.setPrototypeOf(this, SupervisorAlreadyRunningError.prototype);
         this.runId = runId;
     }
 }

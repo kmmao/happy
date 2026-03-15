@@ -6,6 +6,8 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import type { SupervisorRun } from "@/sync/apiSupervisor";
 import type { TranslationKey } from "@/text";
+import { useSession } from "@/sync/storage";
+import { useRouter } from "expo-router";
 
 const statusKeyMap: Record<string, TranslationKey> = {
     pending: "supervisor.status_pending",
@@ -29,6 +31,8 @@ interface SupervisorRunHistoryItemProps {
 export const SupervisorRunHistoryItem = React.memo(
     ({ run, isLast, onPress }: SupervisorRunHistoryItemProps) => {
         const { theme } = useUnistyles();
+        const router = useRouter();
+        const linkedSession = useSession(run.sessionId ?? "");
 
         const statusIcon = React.useMemo(() => {
             switch (run.status) {
@@ -159,6 +163,26 @@ export const SupervisorRunHistoryItem = React.memo(
                             {run.errorMessage}
                         </Text>
                     )}
+                    {linkedSession && run.sessionId && (
+                        <Pressable
+                            style={styles.sessionLinkRow}
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                router.push(
+                                    `/session/${run.sessionId}` as any,
+                                );
+                            }}
+                        >
+                            <Ionicons
+                                name="terminal-outline"
+                                size={12}
+                                color={theme.colors.header.tint}
+                            />
+                            <Text style={styles.sessionLinkText}>
+                                {t("supervisor.viewSession")}
+                            </Text>
+                        </Pressable>
+                    )}
                 </View>
                 {onPress && (
                     <Ionicons
@@ -232,5 +256,16 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 12,
         color: theme.colors.textSecondary,
+    },
+    sessionLinkRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        marginTop: 4,
+    },
+    sessionLinkText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.header.tint,
     },
 }));

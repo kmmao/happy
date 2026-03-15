@@ -31,17 +31,6 @@ export const ProjectDetailView = React.memo(
             [],
         );
 
-        const renderContent = React.useCallback(() => {
-            switch (activeTab) {
-                case "sessions":
-                    return <ProjectSessionsTab project={project} />;
-                case "git":
-                    return <ProjectGitTab project={project} />;
-                case "health":
-                    return <ProjectHealthTab project={project} />;
-            }
-        }, [activeTab, project]);
-
         return (
             <View style={styles.container}>
                 <View style={styles.segmentContainer}>
@@ -68,7 +57,35 @@ export const ProjectDetailView = React.memo(
                         );
                     })}
                 </View>
-                <View style={styles.content}>{renderContent()}</View>
+                <View style={styles.content}>
+                    <View
+                        style={
+                            activeTab === "sessions"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectSessionsTab project={project} />
+                    </View>
+                    <View
+                        style={
+                            activeTab === "git"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectGitTab project={project} />
+                    </View>
+                    <View
+                        style={
+                            activeTab === "health"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectHealthTab project={project} />
+                    </View>
+                </View>
             </View>
         );
     },
@@ -108,5 +125,12 @@ const styles = StyleSheet.create((theme) => ({
     },
     content: {
         flex: 1,
+    },
+    tabVisible: {
+        flex: 1,
+    },
+    tabHidden: {
+        flex: 1,
+        display: "none",
     },
 }));

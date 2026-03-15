@@ -3,7 +3,8 @@
  *
  * The session runs in **read-only mode** — the prompt explicitly forbids
  * file modifications. It instructs Claude to analyze the project against
- * configured dimensions and output a structured JSON report.
+ * configured dimensions and output a structured JSON report, then report
+ * results back to the server via curl and exit.
  */
 
 import {
@@ -24,6 +25,8 @@ export interface SupervisorPromptOptions {
   readonly changedFiles?: readonly string[];
   /** User-defined custom analysis rules (appended to prompt). */
   readonly customRules?: string;
+  /** Server URL for reporting results back. */
+  readonly serverUrl: string;
 }
 
 export function buildSupervisorPrompt(
@@ -73,6 +76,8 @@ ${options.customRules.trim()}
   const categories = getEnabledCategories(dims);
   const categoryUnion = categories.map((c) => `"${c}"`).join(" | ");
 
+  const reportUrl = `${options.serverUrl}/v1/projects/${options.projectId}/supervisor/runs/${options.runId}/status`;
+
   return `You are a **Project Health Supervisor** running an automated analysis.
 
 ## Context
@@ -92,7 +97,7 @@ Analyze the project across these dimensions:
 ${buildDimensionsSection(dims)}
 
 ## Output Format
-After your analysis, output a JSON block (and ONLY a JSON block) at the very end of your response, enclosed in \`\`\`json fences:
+After your analysis, you MUST produce a JSON object with an \`actions\` array containing your findings:
 
 \`\`\`json
 {
@@ -122,5 +127,43 @@ Rate how confident you are in the \`suggestedFix\` (0-100):
 - **low**: Cosmetic issues, minor naming preferences
 
 Focus on actionable findings. Do not report more than 10 findings per run.
+
+## MANDATORY: Report Results (CRITICAL — do this AFTER your analysis)
+
+After completing your analysis, you MUST execute the following two steps in order:
+
+### Step 1: Report results to the server
+Write your actions JSON to a temp file, then POST it to the server using curl.
+Use the Bash tool to run this exact sequence:
+
+\`\`\`
+# Write the actions JSON to a temp file (replace the actions array with your actual findings)
+cat > /tmp/supervisor-result-${options.runId}.json << 'SUPERVISOR_EOF'
+{"status":"completed","actions":[... your actual actions array here ...]}
+SUPERVISOR_EOF
+
+# POST results to server
+curl -s -X POST "${reportUrl}" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d @/tmp/supervisor-result-${options.runId}.json
+
+# Cleanup
+rm -f /tmp/supervisor-result-${options.runId}.json
+\`\`\`
+
+**Important**: The JSON body must contain \`"status": "completed"\` and the \`"actions"\` array with your findings. Use the HAPPY_SUPERVISOR_AUTH_TOKEN environment variable (already set) for authentication.
+
+### Step 2: Exit the session
+After successfully reporting results, send the text "/exit" to end this session.
+
+If the curl command fails, report failure instead:
+\`\`\`
+curl -s -X POST "${reportUrl}" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"status":"failed","errorMessage":"Failed to report results"}'
+\`\`\`
+
 Begin your analysis now.`;
 }

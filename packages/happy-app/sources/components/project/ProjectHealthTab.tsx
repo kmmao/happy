@@ -39,6 +39,8 @@ import {
 import { ItemGroup } from "@/components/ItemGroup";
 import { useRouter } from "expo-router";
 import { sync } from "@/sync/sync";
+import { sessionKill } from "@/sync/ops";
+import { useSession } from "@/sync/storage";
 import { SupervisorActionCard } from "./SupervisorActionCard";
 import { SupervisorSummaryCard } from "./SupervisorSummaryCard";
 import { SupervisorTrendChart } from "./SupervisorTrendChart";
@@ -174,7 +176,7 @@ export const ProjectHealthTab = React.memo(
                 if (event.status === "completed" || event.status === "failed" || event.status === "cancelled") {
                     loadData();
                 }
-                // Running state: optimistic UI update
+                // Running state: optimistic UI update + fetch full data for sessionId
                 if (event.status === "running") {
                     setRuns((prev) => {
                         const exists = prev.some((r) => r.id === event.runId);
@@ -185,6 +187,7 @@ export const ProjectHealthTab = React.memo(
                         }
                         return prev;
                     });
+                    loadData();
                 }
             });
             return unsubscribe;
@@ -203,6 +206,25 @@ export const ProjectHealthTab = React.memo(
                 ),
             [runs],
         );
+
+        // Archive the supervisor session when a run completes
+        const prevActiveRunIdRef = React.useRef<string | null>(null);
+        React.useEffect(() => {
+            const prevId = prevActiveRunIdRef.current;
+            const currentId = activeRun?.id ?? null;
+            prevActiveRunIdRef.current = currentId;
+
+            // Active run just finished (was non-null, now null)
+            if (prevId && !currentId) {
+                const finishedRun = runs.find((r) => r.id === prevId);
+                if (finishedRun?.status === "completed" && finishedRun.sessionId) {
+                    sessionKill(finishedRun.sessionId).catch(() => {});
+                }
+            }
+        }, [activeRun, runs]);
+
+        // Check if the active run's linked session still exists
+        const activeRunSession = useSession(activeRun?.sessionId ?? "");
 
         const elapsedSeconds = useElapsedSeconds(
             activeRun ? activeRun.createdAt : null,
@@ -353,10 +375,15 @@ export const ProjectHealthTab = React.memo(
                         {/* Action buttons */}
                         <View style={styles.actionRow}>
                             {!loaded ? (
-                                <ActivityIndicator
-                                    size="small"
-                                    color={theme.colors.textSecondary}
-                                />
+                                <View style={styles.initialLoadingContainer}>
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={theme.colors.textSecondary}
+                                    />
+                                    <Text style={styles.initialLoadingText}>
+                                        {t("supervisor.loading")}
+                                    </Text>
+                                </View>
                             ) : activeRun ? (
                                 <View style={styles.activeRunContainer}>
                                     <View style={styles.statusChip}>
@@ -391,6 +418,25 @@ export const ProjectHealthTab = React.memo(
                                             time: formatElapsed(elapsedSeconds),
                                         })}
                                     </Text>
+                                    {activeRunSession && activeRun?.sessionId && (
+                                        <Pressable
+                                            style={styles.sessionLink}
+                                            onPress={() =>
+                                                router.push(
+                                                    `/session/${activeRun.sessionId}` as any,
+                                                )
+                                            }
+                                        >
+                                            <Ionicons
+                                                name="terminal-outline"
+                                                size={14}
+                                                color={theme.colors.header.tint}
+                                            />
+                                            <Text style={styles.sessionLinkText}>
+                                                {t("supervisor.viewSession")}
+                                            </Text>
+                                        </Pressable>
+                                    )}
                                     <Pressable
                                         style={[
                                             styles.actionButton,
@@ -411,10 +457,15 @@ export const ProjectHealthTab = React.memo(
                                     disabled={triggerLoading}
                                 >
                                     {triggerLoading ? (
-                                        <ActivityIndicator
-                                            size="small"
-                                            color="#FFFFFF"
-                                        />
+                                        <>
+                                            <ActivityIndicator
+                                                size="small"
+                                                color="#FFFFFF"
+                                            />
+                                            <Text style={styles.scanButtonText}>
+                                                {t("supervisor.scanStarting")}
+                                            </Text>
+                                        </>
                                     ) : (
                                         <>
                                             <Ionicons
@@ -749,6 +800,26 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
         fontSize: 13,
         color: "#FF3B30",
+    },
+    sessionLink: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingVertical: 4,
+    },
+    sessionLinkText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.header.tint,
+    },
+    initialLoadingContainer: {
+        alignItems: "center",
+        gap: 8,
+    },
+    initialLoadingText: {
+        ...Typography.default(),
+        fontSize: 13,
+        color: theme.colors.textSecondary,
     },
     loadingContainer: {
         padding: 24,

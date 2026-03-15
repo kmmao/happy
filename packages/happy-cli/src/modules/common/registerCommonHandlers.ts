@@ -152,6 +152,9 @@ export interface SpawnSessionOptions {
 
     // Webhook-triggered session: path to a file containing the initial prompt
     HAPPY_INITIAL_PROMPT_FILE?: string;
+
+    // Allow arbitrary env vars for supervisor and other use cases
+    [key: string]: string | undefined;
   };
 }
 

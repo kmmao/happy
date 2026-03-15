@@ -30,6 +30,8 @@ export interface SupervisorHandlerDeps {
   ) => Promise<SpawnSessionResult>;
   readonly emitSupervisorRunStatus: (data: SupervisorRunStatusData) => void;
   readonly emitSupervisorFixStatus: (data: SupervisorFixStatusData) => void;
+  readonly serverUrl: string;
+  readonly authToken: string;
 }
 
 // Track in-flight supervisor runs to prevent duplicate processing
@@ -139,6 +141,7 @@ async function handleAnalysisTrigger(
     dimensions,
     changedFiles,
     customRules,
+    serverUrl: deps.serverUrl,
   });
 
   // 3. Write prompt to temp file in the project
@@ -151,6 +154,10 @@ async function handleAnalysisTrigger(
     agent: "claude",
     environmentVariables: {
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
+      HAPPY_SUPERVISOR_RUN_ID: runId,
+      HAPPY_SUPERVISOR_PROJECT_ID: projectId,
+      HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
+      HAPPY_SUPERVISOR_AUTH_TOKEN: deps.authToken,
     },
   });
 

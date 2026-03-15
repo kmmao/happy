@@ -6,6 +6,7 @@ const baseOptions: SupervisorPromptOptions = {
     runId: 'run-1',
     repoPath: '/home/user/my-project',
     trigger: 'manual',
+    serverUrl: 'https://happyserve.example.com',
 };
 
 describe('buildSupervisorPrompt', () => {
