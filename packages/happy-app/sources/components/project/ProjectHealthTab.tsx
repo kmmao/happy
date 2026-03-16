@@ -544,6 +544,87 @@ export const ProjectHealthTab = React.memo(
                     </View>
                 </ItemGroup>
 
+                {/* Quick access: pending actions + clear all */}
+                {serverId && loaded && (
+                    <ItemGroup>
+                        <Pressable
+                            style={styles.quickActionCard}
+                            onPress={() =>
+                                router.push(
+                                    `/project/${serverId}/supervisor-actions` as any,
+                                )
+                            }
+                        >
+                            <View style={styles.quickActionLeft}>
+                                <View
+                                    style={[
+                                        styles.quickActionIconWrap,
+                                        pendingActions.length > 0
+                                            ? styles.quickActionIconActive
+                                            : styles.quickActionIconInactive,
+                                    ]}
+                                >
+                                    <Ionicons
+                                        name="clipboard-outline"
+                                        size={20}
+                                        color={
+                                            pendingActions.length > 0
+                                                ? "#FFFFFF"
+                                                : theme.colors.textSecondary
+                                        }
+                                    />
+                                </View>
+                                <View>
+                                    <Text style={styles.quickActionTitle}>
+                                        {t("supervisor.viewAllActions")}
+                                    </Text>
+                                    {pendingActions.length > 0 && (
+                                        <Text style={styles.quickActionSubtitle}>
+                                            {t("supervisor.pendingActions", {
+                                                count: pendingActions.length,
+                                            })}
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+                            <View style={styles.quickActionRight}>
+                                {pendingActions.length > 0 && (
+                                    <View style={styles.quickActionBadge}>
+                                        <Text style={styles.quickActionBadgeText}>
+                                            {pendingActions.length}
+                                        </Text>
+                                    </View>
+                                )}
+                                <Ionicons
+                                    name="chevron-forward"
+                                    size={18}
+                                    color={theme.colors.textSecondary}
+                                />
+                            </View>
+                        </Pressable>
+                        <Pressable
+                            style={styles.quickActionClearAll}
+                            onPress={doClearAll}
+                            disabled={clearAllLoading}
+                        >
+                            {clearAllLoading ? (
+                                <ActivityIndicator size="small" color="#FF3B30" />
+                            ) : (
+                                <>
+                                    <Ionicons
+                                        name="trash-outline"
+                                        size={16}
+                                        color="#FF3B30"
+                                    />
+                                    <Text style={styles.clearAllLinkText}>
+                                        {t("supervisor.clearAll")}
+                                    </Text>
+                                </>
+                            )}
+                        </Pressable>
+                    </ItemGroup>
+                )}
+
                 {/* Health Summary */}
                 {summary && (
                     <ItemGroup>
@@ -600,48 +681,6 @@ export const ProjectHealthTab = React.memo(
                     </ItemGroup>
                 )}
 
-                {/* View All Actions link */}
-                {serverId && (
-                    <ItemGroup>
-                        <Pressable
-                            style={styles.viewAllLink}
-                            onPress={() =>
-                                router.push(
-                                    `/project/${serverId}/supervisor-actions` as any,
-                                )
-                            }
-                        >
-                            <Text style={styles.viewAllLinkText}>
-                                {t("supervisor.viewAllActions")}
-                            </Text>
-                            <Ionicons
-                                name="chevron-forward"
-                                size={16}
-                                color={theme.colors.header.tint}
-                            />
-                        </Pressable>
-                        <Pressable
-                            style={styles.clearAllLink}
-                            onPress={doClearAll}
-                            disabled={clearAllLoading}
-                        >
-                            {clearAllLoading ? (
-                                <ActivityIndicator size="small" color="#FF3B30" />
-                            ) : (
-                                <>
-                                    <Ionicons
-                                        name="trash-outline"
-                                        size={16}
-                                        color="#FF3B30"
-                                    />
-                                    <Text style={styles.clearAllLinkText}>
-                                        {t("supervisor.clearAll")}
-                                    </Text>
-                                </>
-                            )}
-                        </Pressable>
-                    </ItemGroup>
-                )}
 
                 {/* Cost Summary */}
                 {costSummary && (
@@ -973,20 +1012,63 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 14,
         color: theme.colors.text,
     },
-    viewAllLink: {
+    quickActionCard: {
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "center",
-        gap: 4,
+        justifyContent: "space-between",
         paddingHorizontal: 16,
         paddingVertical: 14,
     },
-    viewAllLinkText: {
-        ...Typography.default("semiBold"),
-        fontSize: 14,
-        color: theme.colors.header.tint,
+    quickActionLeft: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        flex: 1,
     },
-    clearAllLink: {
+    quickActionIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    quickActionIconActive: {
+        backgroundColor: theme.colors.header.tint,
+    },
+    quickActionIconInactive: {
+        backgroundColor: theme.colors.surface,
+    },
+    quickActionTitle: {
+        ...Typography.default("semiBold"),
+        fontSize: 15,
+        color: theme.colors.text,
+    },
+    quickActionSubtitle: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        marginTop: 2,
+    },
+    quickActionRight: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    quickActionBadge: {
+        backgroundColor: "#FF3B30",
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 6,
+    },
+    quickActionBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        color: "#FFFFFF",
+    },
+    quickActionClearAll: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
