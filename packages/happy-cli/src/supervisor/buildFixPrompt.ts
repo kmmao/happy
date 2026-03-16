@@ -3,6 +3,7 @@
  *
  * Unlike the analysis prompt (read-only), the fix prompt instructs Claude
  * to actually modify files to address a specific supervisor finding.
+ * After completing the fix, it reports status back to the server via curl.
  */
 
 export interface FixPromptOptions {
@@ -14,6 +15,7 @@ export interface FixPromptOptions {
   readonly suggestedFix: string | null;
   readonly category: string;
   readonly severity: string;
+  readonly serverUrl: string;
 }
 
 export function buildFixPrompt(options: FixPromptOptions): string {
@@ -23,6 +25,8 @@ export function buildFixPrompt(options: FixPromptOptions): string {
 ${options.suggestedFix}
 `
     : "";
+
+  const reportUrl = `${options.serverUrl}/v1/projects/${options.projectId}/supervisor/actions/${options.actionId}/fix-status`;
 
   return `You are a **Project Fix Agent** executing an automated fix for a supervisor finding.
 
@@ -52,17 +56,27 @@ ${suggestedFixSection}
 3. Run tests if available (\`npm test\`, \`yarn test\`, or similar)
 4. Commit the fix with message: "fix: ${options.title}"
 
-## Output Format
-After completing the fix, output a JSON block at the very end of your response:
+## MANDATORY: Report Results (CRITICAL — do this AFTER your fix)
 
-\`\`\`json
-{
-  "status": "completed" | "failed",
-  "filesChanged": ["path/to/file1.ts", "path/to/file2.ts"],
-  "testsPassed": true | false | null,
-  "summary": "Brief description of what was changed"
-}
+After completing (or failing) your fix, you MUST report back to the server using curl.
+
+### On Success:
 \`\`\`
+curl -s -X PATCH "${reportUrl}" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"fixStatus":"completed"}'
+\`\`\`
+
+### On Failure:
+\`\`\`
+curl -s -X PATCH "${reportUrl}" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"fixStatus":"failed"}'
+\`\`\`
+
+After reporting, send "/exit" to end this session.
 
 Begin fixing now.`;
 }

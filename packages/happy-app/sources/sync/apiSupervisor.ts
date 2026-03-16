@@ -73,7 +73,7 @@ export async function triggerSupervisorRun(
             {
                 method: "POST",
                 headers: authHeaders(credentials),
-                body: params ? JSON.stringify(params) : undefined,
+                body: JSON.stringify(params ?? {}),
             },
         );
 
@@ -125,7 +125,7 @@ export async function fetchSupervisorRuns(
         );
 
         if (!response.ok) {
-            throw new Error(
+            throw new NonRetryableError(
                 `Failed to fetch supervisor runs: ${response.status}`,
             );
         }
@@ -151,7 +151,7 @@ export async function fetchSupervisorRun(
         );
 
         if (!response.ok) {
-            throw new Error(
+            throw new NonRetryableError(
                 `Failed to fetch supervisor run: ${response.status}`,
             );
         }
@@ -181,7 +181,7 @@ export async function cancelSupervisorRun(
         );
 
         if (!response.ok) {
-            throw new Error(
+            throw new NonRetryableError(
                 `Failed to cancel supervisor run: ${response.status}`,
             );
         }
@@ -224,7 +224,7 @@ export async function updateSupervisorConfig(
         );
 
         if (!response.ok) {
-            throw new Error(
+            throw new NonRetryableError(
                 `Failed to update supervisor config: ${response.status}`,
             );
         }
@@ -291,7 +291,7 @@ export async function fetchSupervisorCost(
         );
 
         if (!response.ok) {
-            throw new Error(
+            throw new NonRetryableError(
                 `Failed to fetch supervisor cost: ${response.status}`,
             );
         }
@@ -318,7 +318,7 @@ export async function fetchSupervisorTrend(
         );
 
         if (!response.ok) {
-            throw new Error(
+            throw new NonRetryableError(
                 `Failed to fetch supervisor trend: ${response.status}`,
             );
         }
@@ -382,7 +382,7 @@ export async function fetchSupervisorActions(
         );
 
         if (!response.ok) {
-            throw new Error(
+            throw new NonRetryableError(
                 `Failed to fetch supervisor actions: ${response.status}`,
             );
         }
@@ -413,8 +413,9 @@ export async function updateActionApproval(
         );
 
         if (!response.ok) {
-            throw new Error(
-                `Failed to update action approval: ${response.status}`,
+            const text = await response.text().catch(() => "");
+            throw new NonRetryableError(
+                text || `Failed to update action approval: ${response.status}`,
             );
         }
 
@@ -440,13 +441,14 @@ export async function triggerActionFix(
             {
                 method: "POST",
                 headers: authHeaders(credentials),
-                body: params ? JSON.stringify(params) : undefined,
+                body: JSON.stringify(params ?? {}),
             },
         );
 
         if (!response.ok) {
-            throw new Error(
-                `Failed to trigger action fix: ${response.status}`,
+            const text = await response.text().catch(() => "");
+            throw new NonRetryableError(
+                text || `Failed to trigger action fix: ${response.status}`,
             );
         }
 
@@ -483,7 +485,7 @@ export async function fetchSupervisorSummary(
         );
 
         if (!response.ok) {
-            throw new Error(
+            throw new NonRetryableError(
                 `Failed to fetch supervisor summary: ${response.status}`,
             );
         }
@@ -528,7 +530,7 @@ export async function batchUpdateActionApproval(
             },
         );
         if (!response.ok) {
-            throw new Error(`Failed to batch update actions: ${response.status}`);
+            throw new NonRetryableError(`Failed to batch update actions: ${response.status}`);
         }
         return (await response.json()) as { updatedCount: number };
     });
@@ -551,7 +553,7 @@ export async function clearAllActions(
             },
         );
         if (!response.ok) {
-            throw new Error(`Failed to clear actions: ${response.status}`);
+            throw new NonRetryableError(`Failed to clear actions: ${response.status}`);
         }
         return (await response.json()) as { deletedCount: number };
     });
@@ -571,7 +573,7 @@ export async function fetchActionStats(
             { headers: authHeaders(credentials) },
         );
         if (!response.ok) {
-            throw new Error(`Failed to fetch action stats: ${response.status}`);
+            throw new NonRetryableError(`Failed to fetch action stats: ${response.status}`);
         }
         return (await response.json()) as SupervisorActionStats;
     });
@@ -593,7 +595,7 @@ export async function exportRunReport(
             { headers: authHeaders(credentials) },
         );
         if (!response.ok) {
-            throw new Error(`Failed to export run report: ${response.status}`);
+            throw new NonRetryableError(`Failed to export run report: ${response.status}`);
         }
         return (await response.json()) as RunExport;
     });
@@ -652,7 +654,7 @@ export async function fetchRunComparison(
         );
 
         if (!response.ok) {
-            throw new Error(
+            throw new NonRetryableError(
                 `Failed to fetch run comparison: ${response.status}`,
             );
         }

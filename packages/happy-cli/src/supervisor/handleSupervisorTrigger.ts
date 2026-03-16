@@ -297,6 +297,7 @@ async function handleFixTrigger(
     suggestedFix: fixAction.suggestedFix,
     category: fixAction.category,
     severity: fixAction.severity,
+    serverUrl: deps.serverUrl,
   });
 
   // 3. Write prompt to temp file
@@ -313,6 +314,10 @@ async function handleFixTrigger(
     agent: "claude",
     environmentVariables: {
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
+      HAPPY_SUPERVISOR_ACTION_ID: actionId,
+      HAPPY_SUPERVISOR_PROJECT_ID: projectId,
+      HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
+      HAPPY_SUPERVISOR_AUTH_TOKEN: deps.authToken,
     },
   });
 

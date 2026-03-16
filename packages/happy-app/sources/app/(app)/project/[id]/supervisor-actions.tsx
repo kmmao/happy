@@ -19,6 +19,7 @@ import {
     type SupervisorActionStats,
 } from "@/sync/apiSupervisor";
 import { SupervisorActionCard } from "@/components/project/SupervisorActionCard";
+import { sync } from "@/sync/sync";
 
 // --- Types ---
 
@@ -212,6 +213,21 @@ function SupervisorActionsScreen() {
             // Silently fail
         }
     }, [id, activeTab, actions.length]);
+
+    // Subscribe to real-time fix status updates
+    React.useEffect(() => {
+        const unsubscribe = sync.onSupervisorStatus((event) => {
+            if (event.projectId !== id) return;
+            if (
+                event.status === "fix-running" ||
+                event.status === "fix-completed" ||
+                event.status === "fix-failed"
+            ) {
+                handleUpdated();
+            }
+        });
+        return unsubscribe;
+    }, [id, handleUpdated]);
 
     const hasMore = actions.length < total;
 

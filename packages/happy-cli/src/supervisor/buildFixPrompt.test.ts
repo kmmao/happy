@@ -10,6 +10,7 @@ const baseOptions: FixPromptOptions = {
     suggestedFix: 'Run yarn upgrade lodash',
     category: 'dependencies',
     severity: 'high',
+    serverUrl: 'https://example.com',
 };
 
 describe('buildFixPrompt', () => {
@@ -58,11 +59,12 @@ describe('buildFixPrompt', () => {
         expect(prompt).toContain(`fix: ${baseOptions.title}`);
     });
 
-    it('should include JSON output format', () => {
+    it('should include curl reporting instructions', () => {
         const prompt = buildFixPrompt(baseOptions);
-        expect(prompt).toContain('"status"');
-        expect(prompt).toContain('"filesChanged"');
-        expect(prompt).toContain('"testsPassed"');
+        expect(prompt).toContain('curl');
+        expect(prompt).toContain('HAPPY_SUPERVISOR_AUTH_TOKEN');
+        expect(prompt).toContain('"fixStatus":"completed"');
+        expect(prompt).toContain('"fixStatus":"failed"');
     });
 
     it('should forbid creating branches or PRs', () => {
