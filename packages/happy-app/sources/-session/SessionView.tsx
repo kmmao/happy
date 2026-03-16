@@ -673,6 +673,18 @@ function SessionViewInner({
 
   const usageSource = sessionUsage ?? session.latestUsage;
 
+  // Primary: turn start time from reducer (survives page refresh).
+  // Fallback: ref frozen at first thinking=true (covers the gap before
+  // the "Turn started" message arrives through the message stream).
+  const reducerTurnStart = usageSource?.currentTurnStartedAt;
+  const fallbackTurnStartRef = React.useRef<number | undefined>(undefined);
+  if (session.thinking && !reducerTurnStart && !fallbackTurnStartRef.current) {
+    fallbackTurnStartRef.current = Date.now();
+  } else if (!session.thinking || reducerTurnStart) {
+    fallbackTurnStartRef.current = undefined;
+  }
+  const turnStartedAt = reducerTurnStart ?? fallbackTurnStartRef.current;
+
   const fabStatusInfo = React.useMemo<InputFABStatusInfo>(
     () => ({
       statusText: sessionStatus.statusText,
@@ -695,7 +707,7 @@ function SessionViewInner({
       totalDurationMs: usageSource?.totalDurationMs,
       completedTurnsDurationMs: usageSource?.completedTurnsDurationMs,
       isThinking: session.thinking === true,
-      turnStartedAt: usageSource?.currentTurnStartedAt,
+      turnStartedAt,
     }),
     [
       sessionStatus.statusText,
@@ -709,6 +721,7 @@ function SessionViewInner({
       alwaysShowContextSize,
       effectiveModelCode,
       session.thinking,
+      turnStartedAt,
     ],
   );
 
@@ -899,7 +912,7 @@ function SessionViewInner({
         totalDurationMs={usageSource?.totalDurationMs}
         completedTurnsDurationMs={usageSource?.completedTurnsDurationMs}
         isThinking={session.thinking === true}
-        turnStartedAt={usageSource?.currentTurnStartedAt}
+        turnStartedAt={turnStartedAt}
       />
     </>
   );

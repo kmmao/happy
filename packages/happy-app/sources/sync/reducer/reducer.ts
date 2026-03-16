@@ -427,6 +427,18 @@ export function reducer(
           ...state.latestUsage,
           currentTurnStartedAt: msg.createdAt,
         };
+      } else {
+        state.latestUsage = {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreation: 0,
+          cacheRead: 0,
+          contextSize: 0,
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          timestamp: msg.createdAt,
+          currentTurnStartedAt: msg.createdAt,
+        };
       }
       continue;
     }
