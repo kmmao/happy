@@ -19,6 +19,7 @@ export interface FixPromptOptions {
   readonly serverUrl: string;
   readonly branchName: string;
   readonly parentBranch: string;
+  readonly issueNumber?: number;
 }
 
 export function buildFixPrompt(options: FixPromptOptions): string {
@@ -30,6 +31,10 @@ ${options.suggestedFix}
     : "";
 
   const reportUrl = `${options.serverUrl}/v1/projects/${options.projectId}/supervisor/actions/${options.actionId}/fix-status`;
+
+  const prBody = options.issueNumber
+    ? `Closes #${options.issueNumber}\\n\\nAutomated fix for supervisor finding: ${options.title}`
+    : `Automated fix for supervisor finding: ${options.title}`;
 
   return `You are a **Project Fix Agent** executing an automated fix for a supervisor finding.
 
@@ -62,7 +67,7 @@ ${suggestedFixSection}
 4. Commit the fix with message: "fix: ${options.title}"
 5. Sync with the latest base branch to avoid merge conflicts: git fetch origin ${options.parentBranch} && git rebase origin/${options.parentBranch} (resolve any conflicts if they arise)
 6. Push your branch to the remote: git push -u origin ${options.branchName}
-7. Create a pull request: gh pr create --base "${options.parentBranch}" --head "${options.branchName}" --title "fix: ${options.title}" --body "Automated fix for supervisor finding: ${options.title}"
+7. Create a pull request: gh pr create --base "${options.parentBranch}" --head "${options.branchName}" --title "fix: ${options.title}" --body "${prBody}"
 8. Get the PR URL for reporting: PR_URL=$(gh pr view --json url -q .url 2>/dev/null || echo "")
 
 ## MANDATORY: Report Results (CRITICAL — do this AFTER your fix)

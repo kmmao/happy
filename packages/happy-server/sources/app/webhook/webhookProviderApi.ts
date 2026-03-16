@@ -459,6 +459,180 @@ async function deleteGitLabWebhook(
     }
 }
 
+// ── Issue Creation ────────────────────────────────────────
+
+export interface CreateIssueResult {
+    readonly issueNumber: number;
+    readonly issueUrl: string;
+}
+
+/**
+ * Create an issue on the Git platform.
+ * Returns null on any error — callers should treat issue creation as best-effort.
+ */
+export async function createIssueOnProvider(
+    provider: string,
+    repoUrl: string,
+    apiToken: string,
+    title: string,
+    body: string,
+    labels?: readonly string[],
+): Promise<CreateIssueResult | null> {
+    const coords = parseRepoCoordinates(provider, repoUrl);
+    if (!coords) {
+        log(
+            { module: "webhook", level: "warn" },
+            `Cannot parse repo coordinates for issue creation: ${repoUrl}`,
+        );
+        return null;
+    }
+
+    try {
+        if (provider === "github") {
+            return await createGitHubIssue(coords, apiToken, title, body, labels);
+        }
+        if (provider === "gitea") {
+            return await createGiteaIssue(coords, apiToken, title, body, labels);
+        }
+        log(
+            { module: "webhook" },
+            `Issue creation not supported for provider: ${provider}`,
+        );
+        return null;
+    } catch (error) {
+        log(
+            { module: "webhook", level: "error" },
+            `Failed to create issue on ${provider} for ${repoUrl}: ${error}`,
+        );
+        return null;
+    }
+}
+
+async function createGitHubIssue(
+    coords: RepoCoordinates,
+    apiToken: string,
+    title: string,
+    body: string,
+    labels?: readonly string[],
+): Promise<CreateIssueResult> {
+    const response = await fetch(
+        `${coords.apiBase}/repos/${coords.owner}/${coords.repo}/issues`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${apiToken}`,
+                "Content-Type": "application/json",
+                Accept: "application/vnd.github+json",
+            },
+            body: JSON.stringify({
+                title,
+                body,
+                labels: labels ? [...labels] : undefined,
+            }),
+        },
+    );
+
+    if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        throw new Error(`GitHub create issue failed: ${response.status} ${text}`);
+    }
+
+    const data = await response.json() as { number: number; html_url: string };
+    return { issueNumber: data.number, issueUrl: data.html_url };
+}
+
+async function createGiteaIssue(
+    coords: RepoCoordinates,
+    apiToken: string,
+    title: string,
+    body: string,
+    labels?: readonly string[],
+): Promise<CreateIssueResult> {
+    // Gitea issue API uses label IDs, not names.
+    // First resolve label names to IDs, then create the issue.
+    let labelIds: number[] | undefined;
+    if (labels && labels.length > 0) {
+        labelIds = await resolveGiteaLabelIds(coords, apiToken, labels);
+    }
+
+    const response = await fetch(
+        `${coords.apiBase}/repos/${coords.owner}/${coords.repo}/issues`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `token ${apiToken}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                title,
+                body,
+                labels: labelIds,
+            }),
+        },
+    );
+
+    if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        throw new Error(`Gitea create issue failed: ${response.status} ${text}`);
+    }
+
+    const data = await response.json() as { number: number; html_url: string };
+    return { issueNumber: data.number, issueUrl: data.html_url };
+}
+
+/**
+ * Resolve Gitea label names to IDs. Creates missing labels automatically.
+ */
+async function resolveGiteaLabelIds(
+    coords: RepoCoordinates,
+    apiToken: string,
+    labels: readonly string[],
+): Promise<number[]> {
+    const listResponse = await fetch(
+        `${coords.apiBase}/repos/${coords.owner}/${coords.repo}/labels`,
+        { headers: { Authorization: `token ${apiToken}` } },
+    );
+
+    if (!listResponse.ok) return [];
+
+    const existingLabels = await listResponse.json() as ReadonlyArray<{
+        id: number;
+        name: string;
+    }>;
+
+    const ids: number[] = [];
+    for (const name of labels) {
+        const existing = existingLabels.find(
+            (l) => l.name.toLowerCase() === name.toLowerCase(),
+        );
+        if (existing) {
+            ids.push(existing.id);
+        } else {
+            // Create the label
+            const createResponse = await fetch(
+                `${coords.apiBase}/repos/${coords.owner}/${coords.repo}/labels`,
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `token ${apiToken}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        name,
+                        color: "#6366f1",
+                    }),
+                },
+            );
+            if (createResponse.ok) {
+                const created = await createResponse.json() as { id: number };
+                ids.push(created.id);
+            }
+        }
+    }
+
+    return ids;
+}
+
 // ── Public API ────────────────────────────────────────────
 
 /**

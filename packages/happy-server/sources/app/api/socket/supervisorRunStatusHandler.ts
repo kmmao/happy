@@ -17,6 +17,8 @@ import {
 import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { aggregateSessionUsage } from "@/modules/supervisorUsage";
+import { createIssueOnProvider } from "@/app/webhook/webhookProviderApi";
+import { decryptString } from "@/modules/encrypt";
 
 const supervisorActionSchema = z.object({
     severity: z.enum(["critical", "high", "medium", "low"]),
@@ -350,6 +352,7 @@ async function handleAutoMode(
                 supervisorMode: true,
                 machineId: true,
                 path: true,
+                repoUrl: true,
             },
         });
 
@@ -393,8 +396,65 @@ async function handleAutoMode(
             `Auto mode: approved ${actions.length} critical/high actions for project ${projectId}`,
         );
 
+        // Find WebhookRoute for issue creation (best-effort)
+        let webhookRoute: {
+            apiToken: Uint8Array<ArrayBuffer> | null;
+            provider: string;
+            repoUrl: string;
+        } | null = null;
+        if (project.repoUrl) {
+            webhookRoute = await db.webhookRoute.findFirst({
+                where: {
+                    accountId: userId,
+                    repoUrl: project.repoUrl,
+                    enabled: true,
+                },
+                select: { apiToken: true, provider: true, repoUrl: true },
+            });
+        }
+
+        // Decrypt API token once for all actions
+        let decryptedApiToken: string | undefined;
+        if (webhookRoute?.apiToken) {
+            try {
+                decryptedApiToken = decryptString(
+                    ["webhook-route-token", `${userId}:${webhookRoute.repoUrl}`],
+                    webhookRoute.apiToken as unknown as Uint8Array<ArrayBuffer>,
+                );
+            } catch {
+                log(
+                    { module: "supervisor", level: "warn" },
+                    `Auto mode: failed to decrypt API token for ${webhookRoute.repoUrl}`,
+                );
+            }
+        }
+
         // Trigger fix for each approved action
         for (const action of actions) {
+            // Create Issue on provider for tracking (best-effort)
+            let issueNumber: number | undefined;
+            if (webhookRoute && decryptedApiToken) {
+                const issueResult = await createIssueOnProvider(
+                    webhookRoute.provider,
+                    webhookRoute.repoUrl,
+                    decryptedApiToken,
+                    `[Supervisor] ${action.title}`,
+                    buildAutoModeIssueBody(action),
+                    ["supervisor"],
+                );
+                if (issueResult) {
+                    issueNumber = issueResult.issueNumber;
+                    await db.supervisorAction.update({
+                        where: { id: action.id },
+                        data: { issueUrl: issueResult.issueUrl },
+                    });
+                    log(
+                        { module: "supervisor" },
+                        `Auto mode: created issue #${issueResult.issueNumber} for action ${action.id}`,
+                    );
+                }
+            }
+
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildSupervisorTriggerEphemeral(
@@ -413,6 +473,7 @@ async function handleAutoMode(
                         suggestedFix: action.suggestedFix,
                         category: action.category,
                         severity: action.severity,
+                        issueNumber,
                     },
                 ),
                 recipientFilter: {
@@ -436,4 +497,23 @@ async function handleAutoMode(
             `Auto mode handler error for project ${projectId}: ${error}`,
         );
     }
+}
+
+function buildAutoModeIssueBody(action: {
+    readonly severity: string;
+    readonly category: string;
+    readonly description: string;
+    readonly suggestedFix: string | null;
+}): string {
+    const parts = [
+        `**Severity**: ${action.severity}`,
+        `**Category**: ${action.category}`,
+        "",
+        action.description,
+    ];
+    if (action.suggestedFix) {
+        parts.push("", "**Suggested Fix**:", action.suggestedFix);
+    }
+    parts.push("", "---", "*Auto-created by Happy Supervisor*");
+    return parts.join("\n");
 }

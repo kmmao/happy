@@ -294,6 +294,7 @@ export type EphemeralEvent =
         suggestedFix: string | null;
         category: string;
         severity: string;
+        issueNumber?: number;
       };
     }
   | {
@@ -925,7 +926,7 @@ export function buildSupervisorTriggerEphemeral(
   dimensions?: string[],
   changedFiles?: string[],
   customRules?: string,
-  fixAction?: { title: string; description: string; suggestedFix: string | null; category: string; severity: string },
+  fixAction?: { title: string; description: string; suggestedFix: string | null; category: string; severity: string; issueNumber?: number },
   researchParams?: string,
 ): EphemeralPayload {
   return {

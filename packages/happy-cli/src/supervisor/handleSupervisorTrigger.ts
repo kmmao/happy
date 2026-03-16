@@ -347,6 +347,7 @@ async function handleFixTrigger(
     serverUrl: deps.serverUrl,
     branchName: worktreeResult.branchName,
     parentBranch: worktreeResult.parentBranch,
+    issueNumber: fixAction.issueNumber,
   });
 
   // 4. Write prompt to temp file in the worktree

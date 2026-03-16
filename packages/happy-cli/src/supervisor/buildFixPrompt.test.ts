@@ -86,4 +86,17 @@ describe('buildFixPrompt', () => {
         expect(prompt).toContain('issueUrl');
         expect(prompt).toContain('gh pr view --json url');
     });
+
+    it('should include Closes #N in PR body when issueNumber is provided', () => {
+        const prompt = buildFixPrompt({
+            ...baseOptions,
+            issueNumber: 42,
+        });
+        expect(prompt).toContain('Closes #42');
+    });
+
+    it('should not include Closes reference when issueNumber is absent', () => {
+        const prompt = buildFixPrompt(baseOptions);
+        expect(prompt).not.toContain('Closes #');
+    });
 });

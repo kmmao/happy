@@ -141,6 +141,7 @@ export type SupervisorTriggerData = {
     suggestedFix: string | null;
     category: string;
     severity: string;
+    issueNumber?: number;
   };
   researchParams?: string;
 };
