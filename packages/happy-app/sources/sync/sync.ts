@@ -14,6 +14,7 @@ import type { ApiEphemeralActivityUpdate } from "./apiTypes";
 import { Session, Machine } from "./storageTypes";
 import { InvalidateSync } from "@/utils/sync";
 import { ActivityUpdateAccumulator } from "./reducer/activityUpdateAccumulator";
+import { resolveActivityThinking } from "./reducer/resolveActivityThinking";
 import { randomUUID } from "expo-crypto";
 import * as Notifications from "expo-notifications";
 import { registerPushToken } from "./apiPush";
@@ -3232,12 +3233,20 @@ class Sync {
         // Ephemeral activity updates carry the CLI's real-time thinking state.
         // Lifecycle events (turn-end via result messages) provide authoritative
         // turn boundaries and are applied separately via applySessions in handleUpdate.
+        //
+        // Guard: if a lifecycle event set thinkingAt more recently than this
+        // ephemeral heartbeat's activeAt, keep the lifecycle thinking state
+        // to avoid a stale heartbeat flashing the status back to "online".
+        const resolved = resolveActivityThinking(
+          { thinking: session.thinking, thinkingAt: session.thinkingAt },
+          { active: update.active, activeAt: update.activeAt, thinking: update.thinking },
+        );
         sessions.push({
           ...session,
           active: update.active,
           activeAt: update.activeAt,
-          thinking: update.active ? update.thinking : false,
-          thinkingAt: update.thinking ? update.activeAt : session.thinkingAt,
+          thinking: resolved.thinking,
+          thinkingAt: resolved.thinkingAt,
         });
       }
     }
