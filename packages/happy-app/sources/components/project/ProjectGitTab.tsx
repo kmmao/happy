@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text } from "react-native";
+import { View, Text, Linking } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ItemList } from "@/components/ItemList";
 import { ItemGroup } from "@/components/ItemGroup";
@@ -63,6 +63,26 @@ function extractRepoName(
         const url = new URL(remoteUrl);
         const path = url.pathname.replace(/^\//, "").replace(/\.git$/, "");
         return path || null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Convert a git remote URL to a browser-openable HTTPS URL.
+ */
+function toBrowserUrl(remoteUrl: string | null | undefined): string | null {
+    if (!remoteUrl) return null;
+
+    // SSH: git@github.com:owner/repo.git -> https://github.com/owner/repo
+    const sshMatch = remoteUrl.match(/^[\w-]+@([^:]+):(.+?)(?:\.git)?$/);
+    if (sshMatch) return `https://${sshMatch[1]}/${sshMatch[2]}`;
+
+    // Already HTTPS/HTTP
+    try {
+        const url = new URL(remoteUrl);
+        const path = url.pathname.replace(/\.git$/, "");
+        return `${url.protocol}//${url.host}${path}`;
     } catch {
         return null;
     }
@@ -144,6 +164,7 @@ export const ProjectGitTab = React.memo(({ project }: ProjectGitTabProps) => {
 
     const matchedHost = findMatchingGitHost(gitStatus.remoteUrl, gitHosts);
     const repoName = extractRepoName(gitStatus.remoteUrl);
+    const browserUrl = toBrowserUrl(gitStatus.remoteUrl);
 
     return (
         <ItemList>
@@ -227,7 +248,12 @@ export const ProjectGitTab = React.memo(({ project }: ProjectGitTabProps) => {
                                 color={theme.colors.text}
                             />
                         }
-                        showChevron={false}
+                        onPress={
+                            browserUrl
+                                ? () => Linking.openURL(browserUrl)
+                                : undefined
+                        }
+                        showChevron={!!browserUrl}
                     />
                 )}
             </ItemGroup>
