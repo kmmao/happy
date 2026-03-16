@@ -862,6 +862,12 @@ export const en: TranslationStructure = {
       `${count} Git ${count === 1 ? "repository" : "repositories"}`,
   },
 
+  changes: {
+    summary: ({ files }) => `${files} file${files === 1 ? "" : "s"} changed`,
+    noChanges: "No file changes in this session",
+    editCount: ({ count }) => `${count} edits`,
+  },
+
   settingsVoice: {
     // Voice settings screen
     languageTitle: "Language",

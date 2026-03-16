@@ -826,6 +826,12 @@ export const zhHant: TranslationStructure = {
     childReposSummary: ({ count }) => `${count} 個 Git 倉庫`,
   },
 
+  changes: {
+    summary: ({ files }) => `${files} 個檔案已更改`,
+    noChanges: "本次會話無檔案變更",
+    editCount: ({ count }) => `${count} 處編輯`,
+  },
+
   settingsVoice: {
     // Voice settings screen
     languageTitle: "語言",

@@ -16,6 +16,7 @@ interface ChatHeaderViewProps {
   onBackPress?: () => void;
   onAvatarPress?: () => void;
   onPreviewPress?: () => void;
+  onChangesPress?: () => void;
   onRefreshPress?: () => void;
   avatarId?: string;
   backgroundColor?: string;
@@ -30,6 +31,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   onBackPress,
   onAvatarPress,
   onPreviewPress,
+  onChangesPress,
   onRefreshPress,
   avatarId,
   isConnected = true,
@@ -141,6 +143,20 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                   color={theme.colors.header.tint}
                 />
               </Animated.View>
+            </Pressable>
+          )}
+
+          {onChangesPress && (
+            <Pressable
+              onPress={onChangesPress}
+              hitSlop={15}
+              style={styles.actionButton}
+            >
+              <Ionicons
+                name="code-slash-outline"
+                size={20}
+                color={theme.colors.header.tint}
+              />
             </Pressable>
           )}
 

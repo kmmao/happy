@@ -878,6 +878,12 @@ export const pl: TranslationStructure = {
       `${count} ${count === 1 ? "repozytorium" : "repozytoriów"} Git`,
   },
 
+  changes: {
+    summary: ({ files }) => `${files} zmienion${files === 1 ? "y plik" : "ych plików"}`,
+    noChanges: "Brak zmian plików w tej sesji",
+    editCount: ({ count }) => `${count} edycji`,
+  },
+
   settingsVoice: {
     // Voice settings screen
     languageTitle: "Język",

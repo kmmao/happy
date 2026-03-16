@@ -847,6 +847,13 @@ export const en = {
       `${count} Git ${count === 1 ? "repository" : "repositories"}`,
   },
 
+  changes: {
+    summary: ({ files }: { files: number }) =>
+      `${files} file${files === 1 ? "" : "s"} changed`,
+    noChanges: "No file changes in this session",
+    editCount: ({ count }: { count: number }) => `${count} edits`,
+  },
+
   settingsVoice: {
     // Voice settings screen
     languageTitle: "Language",

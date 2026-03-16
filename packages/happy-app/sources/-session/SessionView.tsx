@@ -81,6 +81,23 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUnistyles } from "react-native-unistyles";
+import { Message } from "@/sync/typesMessage";
+
+const FILE_EDIT_TOOLS = new Set(["Edit", "edit", "MultiEdit", "Write"]);
+
+function hasFileChanges(messages: readonly Message[]): boolean {
+  for (const msg of messages) {
+    if (msg.kind === "tool-call") {
+      if (msg.tool && FILE_EDIT_TOOLS.has(msg.tool.name) && msg.tool.state === "completed") {
+        return true;
+      }
+      if (msg.children.length > 0 && hasFileChanges(msg.children)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 export const SessionView = React.memo((props: { id: string }) => {
   const sessionId = props.id;
@@ -96,6 +113,16 @@ export const SessionView = React.memo((props: { id: string }) => {
   const isTablet = useIsTablet();
 
   const showAgentActivity = useSetting("showAgentActivity");
+
+  const hasChanges = storage((state) => {
+    const msgs = state.sessionMessages[sessionId]?.messages;
+    if (!msgs || !hasFileChanges(msgs)) return false;
+    // Hide when all changes have been committed (clean working tree)
+    const gitStatus = state.getSessionProjectGitStatus(sessionId)
+      ?? state.sessionGitStatus[sessionId];
+    if (gitStatus && !gitStatus.isDirty) return false;
+    return true;
+  });
 
   // Compute header props based on session state
   const headerProps = useMemo(() => {
@@ -194,6 +221,7 @@ export const SessionView = React.memo((props: { id: string }) => {
                 ? () => router.push(`/session/${sessionId}/preview`)
                 : undefined
             }
+            onChangesPress={hasChanges ? () => router.push(`/session/${sessionId}/changes`) : undefined}
           />
           {/* Voice status bar below header - not on tablet (shown in sidebar) */}
           {!isTablet && realtimeStatus !== "disconnected" && (

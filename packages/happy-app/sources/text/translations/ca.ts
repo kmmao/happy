@@ -867,6 +867,12 @@ export const ca: TranslationStructure = {
       `${count} ${count === 1 ? "repositori" : "repositoris"} Git`,
   },
 
+  changes: {
+    summary: ({ files }) => `${files} fitxer${files === 1 ? "" : "s"} modificat${files === 1 ? "" : "s"}`,
+    noChanges: "Sense canvis de fitxers en aquesta sessió",
+    editCount: ({ count }) => `${count} edicions`,
+  },
+
   settingsVoice: {
     // Voice settings screen
     languageTitle: "Idioma",

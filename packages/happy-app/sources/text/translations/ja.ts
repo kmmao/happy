@@ -919,6 +919,12 @@ export const ja: TranslationStructure = {
       `${count} 個の Git リポジトリ`,
   },
 
+  changes: {
+    summary: ({ files }) => `${files} ファイル変更`,
+    noChanges: "このセッションではファイルの変更はありません",
+    editCount: ({ count }) => `${count} 箇所の編集`,
+  },
+
   settingsVoice: {
     // Voice settings screen
     languageTitle: "言語",

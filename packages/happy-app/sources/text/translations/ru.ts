@@ -879,6 +879,12 @@ export const ru: TranslationStructure = {
       `${count} Git ${count === 1 ? "репозиторий" : "репозиториев"}`,
   },
 
+  changes: {
+    summary: ({ files }) => `${files} файл(ов) изменено`,
+    noChanges: "В этой сессии нет изменений файлов",
+    editCount: ({ count }) => `${count} правок`,
+  },
+
   settingsVoice: {
     // Voice settings screen
     languageTitle: "Язык",
