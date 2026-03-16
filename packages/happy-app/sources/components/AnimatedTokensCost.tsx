@@ -99,8 +99,9 @@ export const AnimatedTokensCost = React.memo(
         ? ` · $${displayCost < 0.01 ? displayCost.toFixed(4) : displayCost.toFixed(2)}`
         : "";
 
+    const currentTurnMs = isThinking ? currentTurnElapsedSec * 1000 : 0;
     const effectiveDurationMs = isThinking
-      ? (completedTurnsDurationMs ?? 0) + currentTurnElapsedSec * 1000
+      ? (completedTurnsDurationMs ?? 0) + currentTurnMs
       : (totalDurationMs ?? 0);
     const durationStr =
       effectiveDurationMs > 0

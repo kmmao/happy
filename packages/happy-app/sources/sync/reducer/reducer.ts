@@ -1478,6 +1478,9 @@ function processUsageData(
       modelUsage: state.latestUsage?.modelUsage,
       totalDurationMs:
         (state.latestUsage?.totalDurationMs ?? 0) + (durationMs ?? 0),
+      // Preserve real-time elapsed time fields across usage updates
+      completedTurnsDurationMs: state.latestUsage?.completedTurnsDurationMs,
+      currentTurnStartedAt: state.latestUsage?.currentTurnStartedAt,
     };
   }
 }

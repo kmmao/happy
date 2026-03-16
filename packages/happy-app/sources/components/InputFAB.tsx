@@ -268,9 +268,18 @@ const CompactStatus = React.memo(function CompactStatus({
 
   // Combine accumulated duration with current turn elapsed
   const elapsedLabel = React.useMemo(() => {
-    const totalMs = info.isThinking
-      ? (info.completedTurnsDurationMs ?? 0) + currentTurnElapsedSec * 1000
-      : (info.totalDurationMs ?? 0);
+    const currentTurnMs = currentTurnElapsedSec * 1000;
+    if (info.isThinking) {
+      const totalMs = (info.completedTurnsDurationMs ?? 0) + currentTurnMs;
+      if (totalMs <= 0) return null;
+      const totalStr = formatDurationMs(totalMs);
+      // Show current turn time in brackets when there are previous turns
+      if ((info.completedTurnsDurationMs ?? 0) > 0 && currentTurnMs > 0) {
+        return `${totalStr} (${formatDurationMs(currentTurnMs)})`;
+      }
+      return totalStr;
+    }
+    const totalMs = info.totalDurationMs ?? 0;
     if (totalMs <= 0) return null;
     return formatDurationMs(totalMs);
   }, [info.totalDurationMs, info.completedTurnsDurationMs, info.isThinking, currentTurnElapsedSec]);
