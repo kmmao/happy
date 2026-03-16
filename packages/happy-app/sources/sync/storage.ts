@@ -653,6 +653,8 @@ export const storage = create<StorageState>()((set, get) => {
             effortLevel: resolvedEffortLevel,
             maxBudgetUsd: resolvedMaxBudgetUsd,
             needsAttention: resolvedNeedsAttention,
+            // Preserve client-only latestUsage — server doesn't return it
+            latestUsage: state.sessions[session.id]?.latestUsage,
           };
         });
 
