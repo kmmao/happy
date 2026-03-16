@@ -199,6 +199,7 @@ export interface Session {
     totalCostUsd?: number;
     contextWindow?: number;
     totalDurationMs?: number;
+    completedTurnsDurationMs?: number;
     modelUsage?: Record<
       string,
       {

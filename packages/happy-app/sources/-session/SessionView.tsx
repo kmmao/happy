@@ -692,6 +692,7 @@ function SessionViewInner({
       alwaysShowContext: alwaysShowContextSize,
       modelCode: effectiveModelCode,
       totalDurationMs: usageSource?.totalDurationMs,
+      completedTurnsDurationMs: usageSource?.completedTurnsDurationMs,
       isThinking: session.thinking === true,
       turnStartedAt: session.thinking && session.thinkingAt > 0 ? session.thinkingAt : undefined,
     }),
@@ -896,6 +897,7 @@ function SessionViewInner({
           sync.sendMessage(sessionId, "", undefined, { continue: true });
         }}
         totalDurationMs={usageSource?.totalDurationMs}
+        completedTurnsDurationMs={usageSource?.completedTurnsDurationMs}
         isThinking={session.thinking === true}
         turnStartedAt={session.thinking && session.thinkingAt > 0 ? session.thinkingAt : undefined}
       />

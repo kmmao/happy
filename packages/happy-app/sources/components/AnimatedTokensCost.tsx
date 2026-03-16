@@ -19,11 +19,12 @@ export const AnimatedTokensCost = React.memo(
     totalTokens: number;
     totalCostUsd?: number;
     totalDurationMs?: number;
+    completedTurnsDurationMs?: number;
     isThinking?: boolean;
     turnStartedAt?: number;
     style?: TextStyle;
   }) => {
-    const { totalTokens, totalCostUsd, totalDurationMs, isThinking, turnStartedAt } = props;
+    const { totalTokens, totalCostUsd, totalDurationMs, completedTurnsDurationMs, isThinking, turnStartedAt } = props;
 
     // Real-time elapsed time — ticks every second while AI is thinking
     const currentTurnElapsedSec = useElapsedTime(
@@ -98,8 +99,9 @@ export const AnimatedTokensCost = React.memo(
         ? ` · $${displayCost < 0.01 ? displayCost.toFixed(4) : displayCost.toFixed(2)}`
         : "";
 
-    const currentTurnMs = isThinking ? currentTurnElapsedSec * 1000 : 0;
-    const effectiveDurationMs = (totalDurationMs ?? 0) + currentTurnMs;
+    const effectiveDurationMs = isThinking
+      ? (completedTurnsDurationMs ?? 0) + currentTurnElapsedSec * 1000
+      : (totalDurationMs ?? 0);
     const durationStr =
       effectiveDurationMs > 0
         ? ` · ${formatDurationMs(effectiveDurationMs)}`

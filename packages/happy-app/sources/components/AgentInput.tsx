@@ -142,6 +142,7 @@ interface AgentInputProps {
   needsContinue?: boolean;
   onContinuePress?: () => void;
   totalDurationMs?: number;
+  completedTurnsDurationMs?: number;
   isThinking?: boolean;
   turnStartedAt?: number;
 }
@@ -1490,6 +1491,7 @@ export const AgentInput = React.memo(
                               }
                               totalCostUsd={props.usageData.totalCostUsd}
                               totalDurationMs={props.totalDurationMs}
+                              completedTurnsDurationMs={props.completedTurnsDurationMs}
                               isThinking={props.isThinking}
                               turnStartedAt={props.turnStartedAt}
                             />

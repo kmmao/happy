@@ -172,6 +172,7 @@ export type ReducerState = {
     totalCostUsd?: number;
     contextWindow?: number;
     totalDurationMs?: number;
+    completedTurnsDurationMs?: number;
     modelUsage?: Record<
       string,
       {
@@ -223,6 +224,7 @@ export type ReducerResult = {
     totalCostUsd?: number;
     contextWindow?: number;
     totalDurationMs?: number;
+    completedTurnsDurationMs?: number;
     modelUsage?: Record<
       string,
       {
@@ -371,6 +373,14 @@ export function reducer(
 
       // Reset turn tracking
       state.turnHadUsageStats = false;
+
+      // Snapshot completed turns duration for real-time UI display
+      if (state.latestUsage) {
+        state.latestUsage = {
+          ...state.latestUsage,
+          completedTurnsDurationMs: state.latestUsage.totalDurationMs,
+        };
+      }
 
       // Show session summary if we have any useful data
       const hasStats =
@@ -1393,6 +1403,7 @@ export function reducer(
           contextWindow: state.latestUsage.contextWindow,
           modelUsage: state.latestUsage.modelUsage,
           totalDurationMs: state.latestUsage.totalDurationMs,
+          completedTurnsDurationMs: state.latestUsage.completedTurnsDurationMs,
         }
       : undefined,
     hasReadyEvent: hasReadyEvent || undefined,

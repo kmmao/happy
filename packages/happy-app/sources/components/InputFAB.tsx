@@ -90,6 +90,7 @@ export interface InputFABStatusInfo {
   alwaysShowContext?: boolean;
   modelCode?: string | null;
   totalDurationMs?: number;
+  completedTurnsDurationMs?: number;
   isThinking?: boolean;
   turnStartedAt?: number;
 }
@@ -267,12 +268,12 @@ const CompactStatus = React.memo(function CompactStatus({
 
   // Combine accumulated duration with current turn elapsed
   const elapsedLabel = React.useMemo(() => {
-    const accumulatedMs = info.totalDurationMs ?? 0;
-    const currentTurnMs = info.isThinking ? currentTurnElapsedSec * 1000 : 0;
-    const totalMs = accumulatedMs + currentTurnMs;
+    const totalMs = info.isThinking
+      ? (info.completedTurnsDurationMs ?? 0) + currentTurnElapsedSec * 1000
+      : (info.totalDurationMs ?? 0);
     if (totalMs <= 0) return null;
     return formatDurationMs(totalMs);
-  }, [info.totalDurationMs, info.isThinking, currentTurnElapsedSec]);
+  }, [info.totalDurationMs, info.completedTurnsDurationMs, info.isThinking, currentTurnElapsedSec]);
 
   // Context bar computation
   const contextSize = info.contextSize ?? 0;
