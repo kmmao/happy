@@ -22,6 +22,7 @@ import { AgentDot } from "./AgentDot";
 import { MessageImage } from "./MessageImage";
 import { parseImageRefs } from "@/utils/parseImageRefs";
 import { useBookmarks } from "@/hooks/useBookmarks";
+import { useAppendToInput } from "@/hooks/useInputContext";
 
 export const MessageView = (props: {
   message: Message;
@@ -105,6 +106,7 @@ function RenderBlock(props: {
 
 function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
   const { toggleBookmark, isBookmarked } = useBookmarks();
+  const appendToInput = useAppendToInput();
   const { theme } = useUnistyles();
 
   const queuedIds = storage((s) => s.queuedMessageLocalIds[props.sessionId]);
@@ -146,6 +148,21 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
       )}
       {displayText.length > 0 && (
         <View style={styles.userBubbleRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.userBookmarkButton,
+              pressed && { opacity: 0.5 },
+            ]}
+            onPress={() => appendToInput(displayText)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={t("session.appendToInput")}
+          >
+            <Ionicons
+              name="copy-outline"
+              size={14}
+              color={theme.colors.textSecondary}
+            />
+          </Pressable>
           <Pressable
             style={({ pressed }) => [
               styles.userBookmarkButton,
