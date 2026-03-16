@@ -272,8 +272,8 @@ export function supervisorActionRoutes(app: Fastify) {
                 }),
                 body: z
                     .object({
-                        machineId: z.string(),
-                        repoPath: z.string(),
+                        machineId: z.string().optional(),
+                        repoPath: z.string().optional(),
                     })
                     .optional(),
             },
