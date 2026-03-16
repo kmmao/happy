@@ -70,9 +70,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
-      if (process.env.DEBUG) {
-        console.error(error);
-      }
+      logger.debug("Auth command error:", error);
       process.exit(1);
     }
     return;
@@ -85,9 +83,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
-      if (process.env.DEBUG) {
-        console.error(error);
-      }
+      logger.debug("Connect command error:", error);
       process.exit(1);
     }
     return;
@@ -99,9 +95,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
-      if (process.env.DEBUG) {
-        console.error(error);
-      }
+      logger.debug("Sandbox command error:", error);
       process.exit(1);
     }
     return;
@@ -134,9 +128,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
-      if (process.env.DEBUG) {
-        console.error(error);
-      }
+      logger.debug("Codex command error:", error);
       process.exit(1);
     }
     return;
@@ -383,9 +375,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
-      if (process.env.DEBUG) {
-        console.error(error);
-      }
+      logger.debug("Gemini command error:", error);
       process.exit(1);
     }
     return;
@@ -442,9 +432,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
-      if (process.env.DEBUG) {
-        console.error(error);
-      }
+      logger.debug("ACP command error:", error);
       process.exit(1);
     }
     return;
@@ -462,9 +450,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
-      if (process.env.DEBUG) {
-        console.error(error);
-      }
+      logger.debug("Logout command error:", error);
       process.exit(1);
     }
     return;
@@ -477,9 +463,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
-      if (process.env.DEBUG) {
-        console.error(error);
-      }
+      logger.debug("Notify command error:", error);
       process.exit(1);
     }
     return;
@@ -492,9 +476,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         chalk.red("Worktree error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
-      if (process.env.DEBUG) {
-        console.error(error);
-      }
+      logger.debug("Worktree command error:", error);
       process.exit(1);
     }
     return;
@@ -828,9 +810,7 @@ ${chalk.bold.cyan("Claude Code Options (from `claude --help`):")}
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
-      if (process.env.DEBUG) {
-        console.error(error);
-      }
+      logger.debug("CLI startup error:", error);
       process.exit(1);
     }
   }
