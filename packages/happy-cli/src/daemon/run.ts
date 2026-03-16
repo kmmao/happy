@@ -46,7 +46,7 @@ import {
 } from "@/utils/tmux";
 import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
 import { handleWebhookTrigger } from "@/webhook/handleWebhookTrigger";
-import { handleSupervisorTrigger } from "@/supervisor/handleSupervisorTrigger";
+import { handleSupervisorTrigger, cleanupFixWorktree } from "@/supervisor/handleSupervisorTrigger";
 
 // Prepare initial metadata
 export const initialMachineMetadata: MachineMetadata = {
@@ -862,7 +862,15 @@ export async function startDaemon(): Promise<void> {
       logger.debug(
         `[DAEMON RUN] Removing exited process PID ${pid} from tracking`,
       );
+      const session = pidToTrackedSession.get(pid);
       pidToTrackedSession.delete(pid);
+
+      // Clean up fix worktree if this was a supervisor fix session
+      if (session?.happySessionId) {
+        cleanupFixWorktree(session.happySessionId).catch(() => {
+          // best-effort, cleanupFixWorktree already handles errors
+        });
+      }
     };
 
     // Start control server

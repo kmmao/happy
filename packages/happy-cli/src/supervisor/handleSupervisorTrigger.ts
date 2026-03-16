@@ -15,6 +15,10 @@ import { logger } from "@/ui/logger";
 import { buildSupervisorPrompt } from "./buildSupervisorPrompt";
 import { buildFixPrompt } from "./buildFixPrompt";
 import { buildResearchPrompt } from "./buildResearchPrompt";
+import {
+  createWorktreeLocal,
+  removeWorktreeForced,
+} from "@/webhook/createWorktreeLocal";
 import type {
   SupervisorTriggerData,
   SupervisorRunStatusData,
@@ -37,6 +41,32 @@ export interface SupervisorHandlerDeps {
 
 // Track in-flight supervisor runs to prevent duplicate processing
 const processingRuns = new Set<string>();
+
+// Track fix session worktrees for cleanup on session exit
+const fixWorktrees = new Map<
+  string,
+  { readonly repoPath: string; readonly branchName: string }
+>();
+
+/**
+ * Clean up a fix session's worktree after the session exits.
+ * Best-effort: never throws.
+ */
+export async function cleanupFixWorktree(
+  sessionId: string,
+): Promise<void> {
+  const info = fixWorktrees.get(sessionId);
+  if (!info) return;
+  fixWorktrees.delete(sessionId);
+  try {
+    await removeWorktreeForced(info.repoPath, info.branchName);
+    logger.debug(
+      `[SUPERVISOR] Cleaned up fix worktree ${info.branchName} for session ${sessionId}`,
+    );
+  } catch {
+    // best-effort
+  }
+}
 
 export async function handleSupervisorTrigger(
   data: SupervisorTriggerData,
@@ -280,14 +310,31 @@ async function handleFixTrigger(
     `[SUPERVISOR] Processing fix ${actionId} for project ${projectId}: "${fixAction.title}"`,
   );
 
-  // 1. Report running status
+  // 1. Create worktree for isolated fix
+  const worktreeResult = await createWorktreeLocal(repoPath, { prefix: "fix" });
+  if (!worktreeResult.success) {
+    const errorMessage = worktreeResult.error ?? "Failed to create worktree";
+    logger.debug(`[SUPERVISOR] Worktree creation failed: ${errorMessage}`);
+    deps.emitSupervisorFixStatus({
+      actionId,
+      projectId,
+      fixStatus: "failed",
+    });
+    return;
+  }
+
+  logger.debug(
+    `[SUPERVISOR] Worktree created: ${worktreeResult.worktreePath} (branch: ${worktreeResult.branchName})`,
+  );
+
+  // 2. Report running status
   deps.emitSupervisorFixStatus({
     actionId,
     projectId,
     fixStatus: "running",
   });
 
-  // 2. Build the fix prompt
+  // 3. Build the fix prompt with worktree info
   const prompt = buildFixPrompt({
     projectId,
     actionId,
@@ -298,19 +345,21 @@ async function handleFixTrigger(
     category: fixAction.category,
     severity: fixAction.severity,
     serverUrl: deps.serverUrl,
+    branchName: worktreeResult.branchName,
+    parentBranch: worktreeResult.parentBranch,
   });
 
-  // 3. Write prompt to temp file
-  const promptFilePath = await writePromptFile(
-    repoPath,
-    `fix-${actionId}`,
-    prompt,
-  );
+  // 4. Write prompt to temp file in the worktree
+  const promptDir = join(worktreeResult.worktreePath, ".claude");
+  await mkdir(promptDir, { recursive: true });
+  const promptFilePath = join(promptDir, `supervisor-prompt-fix-${actionId}.txt`);
+  await writeFile(promptFilePath, prompt, "utf-8");
+  logger.debug(`[SUPERVISOR] Wrote fix prompt to ${promptFilePath}`);
 
-  // 4. Spawn fix session (allows file modifications)
+  // 5. Spawn fix session in worktree directory
   const spawnResult = await deps.spawnSession({
-    directory: repoPath,
-    approvedNewDirectoryCreation: false,
+    directory: worktreeResult.worktreePath,
+    approvedNewDirectoryCreation: true,
     agent: "claude",
     environmentVariables: {
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
@@ -332,9 +381,17 @@ async function handleFixTrigger(
       projectId,
       fixStatus: "failed",
     });
-    await cleanupPromptFile(promptFilePath);
+    // Clean up prompt file and worktree on failure
+    try { await unlink(promptFilePath); } catch { /* best-effort */ }
+    try { await removeWorktreeForced(repoPath, worktreeResult.branchName); } catch { /* best-effort */ }
     return;
   }
+
+  // 6. Track worktree for cleanup on session exit
+  fixWorktrees.set(spawnResult.sessionId, {
+    repoPath,
+    branchName: worktreeResult.branchName,
+  });
 
   logger.debug(
     `[SUPERVISOR] Fix session ${spawnResult.sessionId} spawned for action ${actionId}`,

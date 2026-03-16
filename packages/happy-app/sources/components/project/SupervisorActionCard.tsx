@@ -4,6 +4,7 @@ import {
     Text,
     Pressable,
     ActivityIndicator,
+    Linking,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -210,11 +211,16 @@ export const SupervisorActionCard = React.memo(
                     </View>
                 )}
 
-                {/* Issue URL */}
+                {/* Issue URL / PR link */}
                 {action.issueUrl && (
-                    <View style={styles.issueRow}>
+                    <Pressable
+                        style={styles.issueRow}
+                        onPress={() => {
+                            Linking.openURL(action.issueUrl!);
+                        }}
+                    >
                         <Ionicons
-                            name="link-outline"
+                            name="git-pull-request-outline"
                             size={14}
                             color={theme.colors.header.tint}
                         />
@@ -222,9 +228,9 @@ export const SupervisorActionCard = React.memo(
                             style={styles.issueUrl}
                             numberOfLines={1}
                         >
-                            {action.issueUrl}
+                            {t("supervisor.viewPR")}
                         </Text>
-                    </View>
+                    </Pressable>
                 )}
 
                 {/* Action buttons */}
@@ -273,6 +279,28 @@ export const SupervisorActionCard = React.memo(
                             ) : (
                                 <Text style={styles.approveButtonText}>
                                     {t("supervisor.triggerFix")}
+                                </Text>
+                            )}
+                        </Pressable>
+                    </View>
+                )}
+
+                {/* Retry button for failed fixes */}
+                {isApproved && action.fixStatus === "failed" && (
+                    <View style={styles.buttonRow}>
+                        <Pressable
+                            style={styles.approveButton}
+                            onPress={doFix}
+                            disabled={fixLoading}
+                        >
+                            {fixLoading ? (
+                                <ActivityIndicator
+                                    size="small"
+                                    color="#FFFFFF"
+                                />
+                            ) : (
+                                <Text style={styles.approveButtonText}>
+                                    {t("supervisor.retryFix")}
                                 </Text>
                             )}
                         </Pressable>

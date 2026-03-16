@@ -2148,13 +2148,16 @@ export const en = {
     actionHistory: "Action History",
     tabPending: "Pending",
     tabApproved: "Approved",
-    tabSkipped: "Skipped",
-    tabIgnored: "Ignored",
+    tabFixing: "Fixing",
+    tabDone: "Done",
+    tabDismissed: "Dismissed",
     noActions: "No actions",
     loadMore: "Load More",
 
     // Session link
     viewSession: "View Session",
+    viewPR: "View PR",
+    retryFix: "Retry",
 
     // Phase 7: Report export
     exportReport: "Export Report",

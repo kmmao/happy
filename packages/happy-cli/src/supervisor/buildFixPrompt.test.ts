@@ -11,6 +11,8 @@ const baseOptions: FixPromptOptions = {
     category: 'dependencies',
     severity: 'high',
     serverUrl: 'https://example.com',
+    branchName: 'fix-clever-ocean-a3f1',
+    parentBranch: 'main',
 };
 
 describe('buildFixPrompt', () => {
@@ -67,8 +69,21 @@ describe('buildFixPrompt', () => {
         expect(prompt).toContain('"fixStatus":"failed"');
     });
 
-    it('should forbid creating branches or PRs', () => {
+    it('should include worktree branch info', () => {
         const prompt = buildFixPrompt(baseOptions);
-        expect(prompt).toContain('Do NOT create new branches or PRs');
+        expect(prompt).toContain('fix-clever-ocean-a3f1');
+        expect(prompt).toContain('Parent branch: main');
+    });
+
+    it('should include push and PR creation instructions', () => {
+        const prompt = buildFixPrompt(baseOptions);
+        expect(prompt).toContain('git push -u origin fix-clever-ocean-a3f1');
+        expect(prompt).toContain('gh pr create --base "main"');
+    });
+
+    it('should include PR URL in success report', () => {
+        const prompt = buildFixPrompt(baseOptions);
+        expect(prompt).toContain('issueUrl');
+        expect(prompt).toContain('gh pr view --json url');
     });
 });

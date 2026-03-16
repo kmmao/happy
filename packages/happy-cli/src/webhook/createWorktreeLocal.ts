@@ -136,14 +136,23 @@ export async function removeWorktreeForced(
   }
 }
 
+export interface CreateWorktreeOptions {
+  readonly issueNumber?: number;
+  readonly prefix?: string;
+}
+
 export async function createWorktreeLocal(
   basePath: string,
-  issueNumber?: number,
+  options?: CreateWorktreeOptions,
 ): Promise<CreateWorktreeResult> {
   const randomPart = generateWorktreeName();
+  const issueNumber = options?.issueNumber;
+  const prefix = options?.prefix;
   const name = issueNumber != null
     ? `issue-${issueNumber}-${randomPart}`
-    : randomPart;
+    : prefix
+      ? `${prefix}-${randomPart}`
+      : randomPart;
 
   // Check if it's a git repository
   const gitCheck = await execFileAsync(

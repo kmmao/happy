@@ -23,6 +23,9 @@ export function supervisorActionRoutes(app: Fastify) {
                         approval: z
                             .enum(["pending", "approved", "skipped", "ignored"])
                             .optional(),
+                        view: z
+                            .enum(["approved", "fixing", "done", "dismissed"])
+                            .optional(),
                         runId: z.string().optional(),
                         limit: z.coerce
                             .number()
@@ -39,6 +42,7 @@ export function supervisorActionRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
             const approval = request.query?.approval;
+            const view = request.query?.view;
             const runId = request.query?.runId;
             const limit = request.query?.limit ?? 50;
             const offset = request.query?.offset ?? 0;
@@ -56,8 +60,23 @@ export function supervisorActionRoutes(app: Fastify) {
                 projectId: id,
                 accountId: userId,
             };
-            if (approval) where.approval = approval;
             if (runId) where.runId = runId;
+
+            // view takes precedence over approval
+            if (view === "approved") {
+                where.approval = "approved";
+                where.fixStatus = null;
+            } else if (view === "fixing") {
+                where.approval = "approved";
+                where.fixStatus = { in: ["pending", "running"] };
+            } else if (view === "done") {
+                where.approval = "approved";
+                where.fixStatus = { in: ["completed", "failed"] };
+            } else if (view === "dismissed") {
+                where.approval = { in: ["skipped", "ignored"] };
+            } else if (approval) {
+                where.approval = approval;
+            }
 
             const [actions, total] = await Promise.all([
                 db.supervisorAction.findMany({
@@ -231,7 +250,6 @@ export function supervisorActionRoutes(app: Fastify) {
                         projectId: id,
                         accountId: userId,
                         approval: "approved",
-                        fixStatus: { in: ["completed", "failed"] },
                     },
                     _count: { _all: true },
                 }),
@@ -244,9 +262,8 @@ export function supervisorActionRoutes(app: Fastify) {
 
             const fixMap: Record<string, number> = {};
             for (const row of fixGroups) {
-                if (row.fixStatus) {
-                    fixMap[row.fixStatus] = row._count._all;
-                }
+                const key = row.fixStatus ?? "none";
+                fixMap[key] = row._count._all;
             }
 
             return reply.send({
@@ -254,6 +271,9 @@ export function supervisorActionRoutes(app: Fastify) {
                 approved: approvalMap["approved"] ?? 0,
                 skipped: approvalMap["skipped"] ?? 0,
                 ignored: approvalMap["ignored"] ?? 0,
+                approvedNoFix: fixMap["none"] ?? 0,
+                fixPending: fixMap["pending"] ?? 0,
+                fixRunning: fixMap["running"] ?? 0,
                 fixCompleted: fixMap["completed"] ?? 0,
                 fixFailed: fixMap["failed"] ?? 0,
             });

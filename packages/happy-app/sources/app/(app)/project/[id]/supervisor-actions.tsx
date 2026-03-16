@@ -23,28 +23,30 @@ import { sync } from "@/sync/sync";
 
 // --- Types ---
 
-type ApprovalTab = "pending" | "approved" | "skipped" | "ignored";
+type ActionTab = "pending" | "approved" | "fixing" | "done" | "dismissed";
 
-const TABS: ApprovalTab[] = ["pending", "approved", "skipped", "ignored"];
+const TABS: ActionTab[] = ["pending", "approved", "fixing", "done", "dismissed"];
 const PAGE_SIZE = 20;
 
 // --- Tab label mapping ---
 
-function getTabLabel(tab: ApprovalTab): string {
+function getTabLabel(tab: ActionTab): string {
     switch (tab) {
         case "pending":
             return t("supervisor.tabPending");
         case "approved":
             return t("supervisor.tabApproved");
-        case "skipped":
-            return t("supervisor.tabSkipped");
-        case "ignored":
-            return t("supervisor.tabIgnored");
+        case "fixing":
+            return t("supervisor.tabFixing");
+        case "done":
+            return t("supervisor.tabDone");
+        case "dismissed":
+            return t("supervisor.tabDismissed");
     }
 }
 
 function getTabCount(
-    tab: ApprovalTab,
+    tab: ActionTab,
     stats: SupervisorActionStats | null,
 ): number | null {
     if (!stats) return null;
@@ -52,12 +54,23 @@ function getTabCount(
         case "pending":
             return stats.pending ?? null;
         case "approved":
-            return stats.approved ?? null;
-        case "skipped":
-            return stats.skipped ?? null;
-        case "ignored":
-            return stats.ignored ?? null;
+            return stats.approvedNoFix ?? null;
+        case "fixing":
+            return (stats.fixPending ?? 0) + (stats.fixRunning ?? 0) || null;
+        case "done":
+            return (stats.fixCompleted ?? 0) + (stats.fixFailed ?? 0) || null;
+        case "dismissed":
+            return (stats.skipped ?? 0) + (stats.ignored ?? 0) || null;
     }
+}
+
+/**
+ * Build fetch params for a given tab.
+ * "pending" uses approval filter; all others use the view filter.
+ */
+function getTabFetchParams(tab: ActionTab): { approval?: string; view?: string } {
+    if (tab === "pending") return { approval: "pending" };
+    return { view: tab };
 }
 
 // --- Main Screen ---
@@ -67,7 +80,7 @@ function SupervisorActionsScreen() {
     const navigation = useNavigation();
     const { theme } = useUnistyles();
 
-    const [activeTab, setActiveTab] = React.useState<ApprovalTab>("pending");
+    const [activeTab, setActiveTab] = React.useState<ActionTab>("pending");
     const [actions, setActions] = React.useState<SupervisorAction[]>([]);
     const [stats, setStats] = React.useState<SupervisorActionStats | null>(
         null,
@@ -119,7 +132,7 @@ function SupervisorActionsScreen() {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials || cancelled) return;
                 const data = await fetchSupervisorActions(credentials, id, {
-                    approval: activeTab,
+                    ...getTabFetchParams(activeTab),
                     limit: PAGE_SIZE,
                     offset: 0,
                 });
@@ -149,7 +162,7 @@ function SupervisorActionsScreen() {
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) return;
             const data = await fetchSupervisorActions(credentials, id, {
-                approval: activeTab,
+                ...getTabFetchParams(activeTab),
                 limit: PAGE_SIZE,
                 offset: actions.length,
             });
@@ -170,7 +183,7 @@ function SupervisorActionsScreen() {
 
             const [actionsData, statsData] = await Promise.all([
                 fetchSupervisorActions(credentials, id, {
-                    approval: activeTab,
+                    ...getTabFetchParams(activeTab),
                     limit: PAGE_SIZE,
                     offset: 0,
                 }),
@@ -197,7 +210,7 @@ function SupervisorActionsScreen() {
 
             const [actionsData, statsData] = await Promise.all([
                 fetchSupervisorActions(credentials, id, {
-                    approval: activeTab,
+                    ...getTabFetchParams(activeTab),
                     limit: Math.max(actions.length, PAGE_SIZE),
                     offset: 0,
                 }),

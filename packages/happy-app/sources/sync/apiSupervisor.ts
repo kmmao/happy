@@ -361,6 +361,7 @@ export async function fetchSupervisorActions(
     projectId: string,
     params?: {
         approval?: string;
+        view?: string;
         runId?: string;
         limit?: number;
         offset?: number;
@@ -369,6 +370,7 @@ export async function fetchSupervisorActions(
     const API_ENDPOINT = getServerUrl();
     const query = new URLSearchParams();
     if (params?.approval) query.set("approval", params.approval);
+    if (params?.view) query.set("view", params.view);
     if (params?.runId) query.set("runId", params.runId);
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
     if (params?.offset !== undefined)
@@ -501,6 +503,9 @@ export interface SupervisorActionStats {
     approved: number;
     skipped: number;
     ignored: number;
+    approvedNoFix: number;
+    fixPending: number;
+    fixRunning: number;
     fixCompleted: number;
     fixFailed: number;
 }
