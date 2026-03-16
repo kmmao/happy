@@ -200,6 +200,7 @@ export interface Session {
     contextWindow?: number;
     totalDurationMs?: number;
     completedTurnsDurationMs?: number;
+    currentTurnStartedAt?: number;
     modelUsage?: Record<
       string,
       {

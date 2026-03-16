@@ -673,17 +673,6 @@ function SessionViewInner({
 
   const usageSource = sessionUsage ?? session.latestUsage;
 
-  // Freeze turnStartedAt when thinking begins — thinkingAt keeps updating
-  // with each activity update, which would reset useElapsedTime every time.
-  const stableTurnStartRef = React.useRef<number | undefined>(undefined);
-  if (session.thinking && !stableTurnStartRef.current) {
-    stableTurnStartRef.current =
-      session.thinkingAt > 0 ? session.thinkingAt : Date.now();
-  } else if (!session.thinking) {
-    stableTurnStartRef.current = undefined;
-  }
-  const stableTurnStartedAt = stableTurnStartRef.current;
-
   const fabStatusInfo = React.useMemo<InputFABStatusInfo>(
     () => ({
       statusText: sessionStatus.statusText,
@@ -706,7 +695,7 @@ function SessionViewInner({
       totalDurationMs: usageSource?.totalDurationMs,
       completedTurnsDurationMs: usageSource?.completedTurnsDurationMs,
       isThinking: session.thinking === true,
-      turnStartedAt: stableTurnStartedAt,
+      turnStartedAt: usageSource?.currentTurnStartedAt,
     }),
     [
       sessionStatus.statusText,
@@ -720,7 +709,6 @@ function SessionViewInner({
       alwaysShowContextSize,
       effectiveModelCode,
       session.thinking,
-      stableTurnStartedAt,
     ],
   );
 
@@ -911,7 +899,7 @@ function SessionViewInner({
         totalDurationMs={usageSource?.totalDurationMs}
         completedTurnsDurationMs={usageSource?.completedTurnsDurationMs}
         isThinking={session.thinking === true}
-        turnStartedAt={stableTurnStartedAt}
+        turnStartedAt={usageSource?.currentTurnStartedAt}
       />
     </>
   );

@@ -173,6 +173,7 @@ export type ReducerState = {
     contextWindow?: number;
     totalDurationMs?: number;
     completedTurnsDurationMs?: number;
+    currentTurnStartedAt?: number;
     modelUsage?: Record<
       string,
       {
@@ -225,6 +226,7 @@ export type ReducerResult = {
     contextWindow?: number;
     totalDurationMs?: number;
     completedTurnsDurationMs?: number;
+    currentTurnStartedAt?: number;
     modelUsage?: Record<
       string,
       {
@@ -374,11 +376,12 @@ export function reducer(
       // Reset turn tracking
       state.turnHadUsageStats = false;
 
-      // Snapshot completed turns duration for real-time UI display
+      // Snapshot completed turns duration and clear turn start for real-time UI
       if (state.latestUsage) {
         state.latestUsage = {
           ...state.latestUsage,
           completedTurnsDurationMs: state.latestUsage.totalDurationMs,
+          currentTurnStartedAt: undefined,
         };
       }
 
@@ -418,6 +421,13 @@ export function reducer(
       msg.content.message === "Turn started"
     ) {
       state.messageIds.set(msg.id, msg.id);
+      // Record turn start time for real-time elapsed display
+      if (state.latestUsage) {
+        state.latestUsage = {
+          ...state.latestUsage,
+          currentTurnStartedAt: msg.createdAt,
+        };
+      }
       continue;
     }
 
@@ -1404,6 +1414,7 @@ export function reducer(
           modelUsage: state.latestUsage.modelUsage,
           totalDurationMs: state.latestUsage.totalDurationMs,
           completedTurnsDurationMs: state.latestUsage.completedTurnsDurationMs,
+          currentTurnStartedAt: state.latestUsage.currentTurnStartedAt,
         }
       : undefined,
     hasReadyEvent: hasReadyEvent || undefined,
