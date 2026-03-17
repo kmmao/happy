@@ -26,6 +26,7 @@ class ActivityCache {
   private sessionCache = new Map<string, SessionCacheEntry>();
   private machineCache = new Map<string, MachineCacheEntry>();
   private batchTimer: NodeJS.Timeout | null = null;
+  private cleanupTimer: NodeJS.Timeout | null = null;
 
   // Cache TTL (30 seconds)
   private readonly CACHE_TTL = 30 * 1000;
@@ -300,10 +301,19 @@ class ActivityCache {
     }
   }
 
+  registerCleanupTimer(timer: NodeJS.Timeout): void {
+    this.cleanupTimer = timer;
+  }
+
   shutdown(): void {
     if (this.batchTimer) {
       clearInterval(this.batchTimer);
       this.batchTimer = null;
+    }
+
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
     }
 
     // Flush any remaining updates
@@ -320,9 +330,12 @@ class ActivityCache {
 export const activityCache = new ActivityCache();
 
 // Cleanup every 5 minutes
-setInterval(
+const cleanupTimer = setInterval(
   () => {
     activityCache.cleanup();
   },
   5 * 60 * 1000,
 );
+
+// Register cleanup timer for shutdown
+activityCache.registerCleanupTimer(cleanupTimer);
