@@ -97,8 +97,8 @@ describe("buildNewMessageUpdate", () => {
         const message = {
             id: "msg-1",
             seq: 1,
-            content: { type: "text" as const, text: "hello" },
-            localId: "local-1",
+            content: { c: "encrypted-hello", t: "encrypted" as const },
+            localId: "local-1" as string | null,
             createdAt: new Date("2024-01-01"),
             updatedAt: new Date("2024-01-02"),
         };

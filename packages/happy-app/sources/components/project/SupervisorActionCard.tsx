@@ -17,6 +17,7 @@ import {
     type SupervisorAction,
     updateActionApproval,
     triggerActionFix,
+    deleteAction,
 } from "@/sync/apiSupervisor";
 import {
     SEVERITY_COLORS,
@@ -30,11 +31,12 @@ interface SupervisorActionCardProps {
     action: SupervisorAction;
     projectId: string;
     onUpdated: () => void;
+    onDeleted?: () => void;
     isLast?: boolean;
 }
 
 export const SupervisorActionCard = React.memo(
-    ({ action, projectId, onUpdated, isLast }: SupervisorActionCardProps) => {
+    ({ action, projectId, onUpdated, onDeleted, isLast }: SupervisorActionCardProps) => {
         const { theme } = useUnistyles();
         const router = useRouter();
         const borderColor =
@@ -103,8 +105,30 @@ export const SupervisorActionCard = React.memo(
             }, [projectId, action.id, onUpdated]),
         );
 
+        const [, doDelete] = useHappyAction(
+            React.useCallback(async () => {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                await deleteAction(credentials, projectId, action.id);
+                (onDeleted ?? onUpdated)();
+            }, [projectId, action.id, onUpdated, onDeleted]),
+        );
+
+        const handleDelete = React.useCallback(() => {
+            Modal.alert(
+                t("supervisor.deleteConfirm"),
+                t("supervisor.deleteConfirmBody"),
+                [
+                    { text: t("common.cancel"), style: "cancel" },
+                    { text: t("supervisor.delete"), style: "destructive", onPress: doDelete },
+                ],
+            );
+        }, [doDelete]);
+
         const isPending = action.approval === "pending";
         const isApproved = action.approval === "approved";
+        const isDismissed =
+            action.approval === "skipped" || action.approval === "ignored";
         const isFixing =
             action.fixStatus === "pending" ||
             action.fixStatus === "running";
@@ -280,6 +304,28 @@ export const SupervisorActionCard = React.memo(
                         >
                             <Text style={styles.secondaryButtonText}>
                                 {t("supervisor.ignore")}
+                            </Text>
+                        </Pressable>
+                    </View>
+                )}
+
+                {/* Skip/Ignore hint for pending */}
+                {isPending && (
+                    <Text style={styles.hintText}>
+                        {t("supervisor.skipIgnoreHint")}
+                    </Text>
+                )}
+
+                {/* Delete button for dismissed actions */}
+                {isDismissed && (
+                    <View style={styles.buttonRow}>
+                        <Pressable
+                            style={styles.deleteButton}
+                            onPress={handleDelete}
+                        >
+                            <Ionicons name="trash-outline" size={14} color="#FF3B30" />
+                            <Text style={styles.deleteButtonText}>
+                                {t("supervisor.delete")}
                             </Text>
                         </Pressable>
                     </View>
@@ -481,5 +527,26 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
         fontSize: 10,
         color: "#FF9500",
+    },
+    hintText: {
+        ...Typography.default(),
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        marginTop: 6,
+        opacity: 0.7,
+    },
+    deleteButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 6,
+        backgroundColor: "#FF3B3010",
+    },
+    deleteButtonText: {
+        ...Typography.default(),
+        fontSize: 13,
+        color: "#FF3B30",
     },
 }));

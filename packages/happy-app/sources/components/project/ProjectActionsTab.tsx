@@ -328,6 +328,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
                                 action={action}
                                 projectId={projectId}
                                 onUpdated={handleUpdated}
+                                onDeleted={handleUpdated}
                                 isLast={index === actions.length - 1}
                             />
                         ))}

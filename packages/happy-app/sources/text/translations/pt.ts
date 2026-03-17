@@ -2160,6 +2160,10 @@ export const pt: TranslationStructure = {
     settingsSaved: "Configurações salvas",
     settingsSaveError: "Falha ao salvar configurações",
     recurring: "Recorrente",
+    skipIgnoreHint: "Pular: reaparecerá no próximo scan. Ignorar: suprimido permanentemente.",
+    delete: "Excluir",
+    deleteConfirm: "Excluir ação",
+    deleteConfirmBody: "Excluir esta ação permanentemente? Se o problema ainda existir, será detectado novamente no próximo scan.",
   },
   webhook: {
     eventHistory: "Eventos Webhook",

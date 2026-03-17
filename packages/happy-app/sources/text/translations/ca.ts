@@ -2163,6 +2163,10 @@ export const ca: TranslationStructure = {
     settingsSaved: "Configuració guardada",
     settingsSaveError: "Error en guardar la configuració",
     recurring: "Recurrent",
+    skipIgnoreHint: "Omet: tornarà a aparèixer al proper escaneig. Ignora: suprimit permanentment.",
+    delete: "Elimina",
+    deleteConfirm: "Eliminar acció",
+    deleteConfirmBody: "Voleu eliminar aquesta acció permanentment? Si el problema encara existeix, es detectarà de nou al proper escaneig.",
   },
   webhook: {
     eventHistory: "Esdeveniments Webhook",

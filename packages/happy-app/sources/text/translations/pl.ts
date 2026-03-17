@@ -2177,6 +2177,10 @@ export const pl: TranslationStructure = {
     settingsSaved: "Ustawienia zapisane",
     settingsSaveError: "Nie udało się zapisać ustawień",
     recurring: "Powtarzające się",
+    skipIgnoreHint: "Pomiń: pojawi się ponownie przy następnym skanowaniu. Ignoruj: trwale ukryte.",
+    delete: "Usuń",
+    deleteConfirm: "Usuń akcję",
+    deleteConfirmBody: "Trwale usunąć tę akcję? Jeśli problem nadal istnieje, zostanie wykryty ponownie przy następnym skanowaniu.",
   },
   webhook: {
     eventHistory: "Zdarzenia Webhook",

@@ -2189,6 +2189,10 @@ export const en = {
     settingsSaved: "Settings saved",
     settingsSaveError: "Failed to save settings",
     recurring: "Recurring",
+    skipIgnoreHint: "Skip: will resurface on next scan. Ignore: permanently suppressed.",
+    delete: "Delete",
+    deleteConfirm: "Delete Action",
+    deleteConfirmBody: "Permanently delete this action? If the issue still exists, it will be detected again on the next scan.",
   },
   webhook: {
     eventHistory: "Webhook Events",

@@ -2127,6 +2127,10 @@ export const ja: TranslationStructure = {
     settingsSaved: "設定を保存しました",
     settingsSaveError: "設定の保存に失敗しました",
     recurring: "繰り返し",
+    skipIgnoreHint: "スキップ：次回スキャンで再表示。無視：永久に非表示。",
+    delete: "削除",
+    deleteConfirm: "アクションを削除",
+    deleteConfirmBody: "このアクションを完全に削除しますか？問題がまだ存在する場合、次回のスキャンで再検出されます。",
   },
   webhook: {
     eventHistory: "Webhookイベント",

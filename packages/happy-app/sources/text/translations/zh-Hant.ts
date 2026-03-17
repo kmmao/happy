@@ -2060,6 +2060,10 @@ export const zhHant: TranslationStructure = {
     settingsSaved: "設定已儲存",
     settingsSaveError: "儲存設定失敗",
     recurring: "重複",
+    skipIgnoreHint: "跳過：下次掃描仍會提醒。忽略：永久不再提醒。",
+    delete: "刪除",
+    deleteConfirm: "刪除操作",
+    deleteConfirmBody: "永久刪除此操作？如果問題仍然存在，下次掃描會重新檢測到。",
   },
   webhook: {
     eventHistory: "Webhook 事件",

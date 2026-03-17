@@ -115,35 +115,56 @@ export function supervisorRunStatusHandler(
             });
 
             // Create SupervisorAction entries if provided — with deduplication
+            // Skip = temporary dismiss, resurfaces on next scan
+            // Ignore = permanent dismiss, suppressed on next scan
             if (data.actions && data.actions.length > 0) {
-                // Find existing pending actions with matching category+title
-                const existingPending = await db.supervisorAction.findMany({
+                // Find existing actions with matching category+title (any approval state)
+                const existingActions = await db.supervisorAction.findMany({
                     where: {
                         projectId: data.projectId,
                         accountId: userId,
-                        approval: "pending",
+                        approval: { in: ["pending", "skipped", "ignored"] },
                     },
                     select: {
                         id: true,
                         category: true,
                         title: true,
+                        approval: true,
+                        updatedAt: true,
                     },
+                    orderBy: { updatedAt: "desc" },
                 });
 
-                const existingKeys = new Map(
-                    existingPending.map((a) => [`${a.category}::${a.title}`, a.id]),
-                );
+                // Build lookup: category::title → { id, approval }
+                // If multiple exist for same key, prefer pending > skipped > ignored
+                const approvalPriority: Record<string, number> = {
+                    pending: 3,
+                    skipped: 2,
+                    ignored: 1,
+                };
+                const existingKeys = new Map<string, { id: string; approval: string }>();
+                for (const a of existingActions) {
+                    const key = `${a.category}::${a.title}`;
+                    const existing = existingKeys.get(key);
+                    if (!existing || (approvalPriority[a.approval] ?? 0) > (approvalPriority[existing.approval] ?? 0)) {
+                        existingKeys.set(key, { id: a.id, approval: a.approval });
+                    }
+                }
 
                 const newActions: typeof data.actions = [];
                 const updatedIds: string[] = [];
+                const restoredIds: string[] = [];
+                const suppressedIds: string[] = [];
 
                 for (const action of data.actions) {
                     const key = `${action.category}::${action.title}`;
-                    const existingId = existingKeys.get(key);
-                    if (existingId) {
+                    const existing = existingKeys.get(key);
+                    if (!existing) {
+                        newActions.push(action);
+                    } else if (existing.approval === "pending") {
                         // Update existing pending action with latest data
                         await db.supervisorAction.update({
-                            where: { id: existingId },
+                            where: { id: existing.id },
                             data: {
                                 lastSeenRunId: data.runId,
                                 description: action.description,
@@ -152,9 +173,28 @@ export function supervisorRunStatusHandler(
                                 severity: action.severity,
                             },
                         });
-                        updatedIds.push(existingId);
-                    } else {
-                        newActions.push(action);
+                        updatedIds.push(existing.id);
+                    } else if (existing.approval === "skipped") {
+                        // Restore skipped action back to pending
+                        await db.supervisorAction.update({
+                            where: { id: existing.id },
+                            data: {
+                                approval: "pending",
+                                lastSeenRunId: data.runId,
+                                description: action.description,
+                                suggestedFix: action.suggestedFix ?? null,
+                                confidence: action.confidence ?? null,
+                                severity: action.severity,
+                            },
+                        });
+                        restoredIds.push(existing.id);
+                    } else if (existing.approval === "ignored") {
+                        // Suppress: only update lastSeenRunId, don't change approval
+                        await db.supervisorAction.update({
+                            where: { id: existing.id },
+                            data: { lastSeenRunId: data.runId },
+                        });
+                        suppressedIds.push(existing.id);
                     }
                 }
 
@@ -183,7 +223,7 @@ export function supervisorRunStatusHandler(
 
                 log(
                     { module: "supervisor" },
-                    `supervisor-run-status: ${newActions.length} new actions, ${updatedIds.length} deduped`,
+                    `supervisor-run-status: ${newActions.length} new, ${updatedIds.length} deduped, ${restoredIds.length} restored from skip, ${suppressedIds.length} suppressed by ignore`,
                 );
             }
 

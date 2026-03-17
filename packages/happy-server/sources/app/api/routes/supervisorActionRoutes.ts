@@ -218,6 +218,38 @@ export function supervisorActionRoutes(app: Fastify) {
         },
     );
 
+    // DELETE /v1/projects/:id/supervisor/actions/:actionId — Delete a single action
+    app.delete(
+        "/v1/projects/:id/supervisor/actions/:actionId",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({
+                    id: z.string(),
+                    actionId: z.string(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id, actionId } = request.params;
+
+            const result = await db.supervisorAction.deleteMany({
+                where: {
+                    id: actionId,
+                    projectId: id,
+                    accountId: userId,
+                },
+            });
+
+            if (result.count === 0) {
+                return reply.code(404).send({ error: "Action not found" });
+            }
+
+            return reply.send({ deleted: true });
+        },
+    );
+
     // GET /v1/projects/:id/supervisor/actions/stats — Action approval and fix status counts
     app.get(
         "/v1/projects/:id/supervisor/actions/stats",

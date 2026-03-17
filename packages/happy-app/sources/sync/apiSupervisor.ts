@@ -566,6 +566,30 @@ export async function clearAllActions(
 }
 
 /**
+ * Delete a single action
+ */
+export async function deleteAction(
+    credentials: AuthCredentials,
+    projectId: string,
+    actionId: string,
+): Promise<{ deleted: boolean }> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/actions/${actionId}`,
+            {
+                method: "DELETE",
+                headers: authHeaders(credentials),
+            },
+        );
+        if (!response.ok) {
+            throw new NonRetryableError(`Failed to delete action: ${response.status}`);
+        }
+        return (await response.json()) as { deleted: boolean };
+    });
+}
+
+/**
  * Fetch action stats (counts by approval status)
  */
 export async function fetchActionStats(
