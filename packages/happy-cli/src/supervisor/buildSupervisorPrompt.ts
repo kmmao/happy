@@ -223,16 +223,35 @@ function buildExistingActionsSection(
     return `| ${i + 1} | ${a.severity} | ${a.category} | ${a.title} | ${status} |`;
   });
 
+  const hasIgnored = actions.some((a) => a.approval === "ignored");
+  const hasSkipped = actions.some((a) => a.approval === "skipped");
+
+  let guidance = `**DO NOT report these again**, even with slightly different wording.
+Focus exclusively on **NEW** issues not covered below.`;
+
+  if (hasIgnored || hasSkipped) {
+    const parts: string[] = [];
+    if (hasIgnored) {
+      parts.push(`- **ignored**: The user permanently dismissed these. DO NOT report them again.`);
+    }
+    if (hasSkipped) {
+      parts.push(`- **skipped**: The user temporarily skipped these. You SHOULD re-report them if the issue still exists, so they resurface for review.`);
+    }
+    guidance = `Focus on **NEW** issues not already covered below.
+Status-specific rules:
+${parts.join("\n")}
+- **pending** / **approved**: DO NOT report these again.`;
+  }
+
   return `
-## Known Existing Findings (DO NOT DUPLICATE)
-The following issues have already been identified in previous analysis runs.
-**DO NOT report these again**, even with slightly different wording.
-Focus exclusively on **NEW** issues not covered below.
+## Known Existing Findings
+The following issues have been identified in previous analysis runs.
+${guidance}
 
 | # | Severity | Category | Title | Status |
 |---|----------|----------|-------|--------|
 ${rows.join("\n")}
 
-If you discover additional context about an existing finding, do NOT create a new action for it.
+If you discover additional context about an existing finding (other than skipped ones), do NOT create a new action for it.
 `;
 }

@@ -109,13 +109,13 @@ export function supervisorRoutes(app: Fastify) {
             const triggerType = request.body?.trigger ?? "manual";
             const researchParams = request.body?.researchParams;
 
-            // Query existing pending/approved actions for dedup in analysis prompt
+            // Query all existing actions (including dismissed) for dedup in analysis prompt
             const existingActions = triggerType !== "research"
                 ? await db.supervisorAction.findMany({
                     where: {
                         projectId: id,
                         accountId: userId,
-                        approval: { in: ["pending", "approved"] },
+                        approval: { in: ["pending", "approved", "skipped", "ignored"] },
                     },
                     select: { category: true, title: true, severity: true, approval: true, fixStatus: true },
                     take: 50,
