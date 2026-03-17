@@ -1,6 +1,31 @@
 {
   "entries": [
     {
+      "version": "2.3.0",
+      "date": "2026-03-18",
+      "summary": "Integrated Claude Agent SDK 0.2.77 features — fork sessions, cancel queued messages, MCP server input, API retry status, and enhanced plan viewing.",
+      "changes": [
+        "Added fork session button in session info to branch from current context",
+        "Added full fork flow: CLI creates SDK fork, App spawns new session and navigates to it",
+        "Added cancel button on queued messages to remove them before execution",
+        "Improved cancel flow to confirm server-side cancellation before updating UI",
+        "Added MCP server input banner for handling authentication and configuration requests",
+        "Added form mode with JSON Schema field rendering for structured input",
+        "Added URL mode with protocol-validated link opening",
+        "Added push notifications when MCP servers request user input",
+        "Added real-time API retry indicator showing attempt count, max retries, and delay",
+        "Added automatic clearing of retry status when requests succeed",
+        "Improved ExitPlanMode to display full plan content from file with refresh button",
+        "Added race-condition-safe plan file reading with in-memory content fallback",
+        "Added elicitation action validation and abort cleanup to prevent memory leaks",
+        "Added URL protocol validation restricting to http/https only",
+        "Added NaN guard for numeric elicitation inputs",
+        "Restricted supervisor action deletion to dismissed states only",
+        "Batched supervisor action dedup writes to reduce database round-trips"
+      ],
+      "rawMarkdown": "## 2.3.0 - 2026-03-18\n\n\nIntegrated Claude Agent SDK 0.2.77 features — fork sessions, cancel queued messages, MCP server input, API retry status, and enhanced plan viewing.\n\n### Session Fork\n- Added fork session button in session info to branch from current context\n- Added full fork flow: CLI creates SDK fork, App spawns new session and navigates to it\n\n### Cancel Queued Messages\n- Added cancel button on queued messages to remove them before execution\n- Improved cancel flow to confirm server-side cancellation before updating UI\n\n### MCP Elicitation\n- Added MCP server input banner for handling authentication and configuration requests\n- Added form mode with JSON Schema field rendering for structured input\n- Added URL mode with protocol-validated link opening\n- Added push notifications when MCP servers request user input\n\n### API Retry Status\n- Added real-time API retry indicator showing attempt count, max retries, and delay\n- Added automatic clearing of retry status when requests succeed\n\n### Plan File Viewing\n- Improved ExitPlanMode to display full plan content from file with refresh button\n- Added race-condition-safe plan file reading with in-memory content fallback\n\n### Security & Reliability\n- Added elicitation action validation and abort cleanup to prevent memory leaks\n- Added URL protocol validation restricting to http/https only\n- Added NaN guard for numeric elicitation inputs\n- Restricted supervisor action deletion to dismissed states only\n- Batched supervisor action dedup writes to reduce database round-trips"
+    },
+    {
       "version": "2.2.0",
       "date": "2026-03-14",
       "summary": "Added full Pull Request management for mobile AI DevOps workflow — browse PRs, review diffs, check CI status, and merge from your phone.",
@@ -159,5 +184,5 @@
       "rawMarkdown": "## 2.0.0 - 2026-02-27\n\n\nHappy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.\n\n- Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere\n- Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content\n- Added QR code scanning and manual URL entry for quick device authentication\n- Added Daemon mode for persistent background running with one-tap remote session launch\n- Added intelligent voice assistant supporting 15+ languages for natural conversation\n- Added GitHub and Claude account connection for unified developer identity management\n- Added multi-device real-time sync with online/offline status indicators\n- Added dark mode and appearance customization with automatic system theme following\n- Added Markdown table rendering and code syntax highlighting in chat\n- Streamlined settings page, removed upstream links, started maintaining own changelog\n- Supported iOS, Android, and Web platforms"
     }
   ],
-  "latestVersion": "2.2.0"
+  "latestVersion": "2.3.0"
 }

@@ -1,5 +1,38 @@
 # Changelog
 
+## 2.3.0 - 2026-03-18
+
+Integrated Claude Agent SDK 0.2.77 features — fork sessions, cancel queued messages, MCP server input, API retry status, and enhanced plan viewing.
+
+### Session Fork
+- Added fork session button in session info to branch from current context
+- Added full fork flow: CLI creates SDK fork, App spawns new session and navigates to it
+
+### Cancel Queued Messages
+- Added cancel button on queued messages to remove them before execution
+- Improved cancel flow to confirm server-side cancellation before updating UI
+
+### MCP Elicitation
+- Added MCP server input banner for handling authentication and configuration requests
+- Added form mode with JSON Schema field rendering for structured input
+- Added URL mode with protocol-validated link opening
+- Added push notifications when MCP servers request user input
+
+### API Retry Status
+- Added real-time API retry indicator showing attempt count, max retries, and delay
+- Added automatic clearing of retry status when requests succeed
+
+### Plan File Viewing
+- Improved ExitPlanMode to display full plan content from file with refresh button
+- Added race-condition-safe plan file reading with in-memory content fallback
+
+### Security & Reliability
+- Added elicitation action validation and abort cleanup to prevent memory leaks
+- Added URL protocol validation restricting to http/https only
+- Added NaN guard for numeric elicitation inputs
+- Restricted supervisor action deletion to dismissed states only
+- Batched supervisor action dedup writes to reduce database round-trips
+
 ## 2.2.0 - 2026-03-14
 
 Added full Pull Request management for mobile AI DevOps workflow — browse PRs, review diffs, check CI status, and merge from your phone.
