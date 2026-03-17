@@ -36,7 +36,7 @@ import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisor
  * Extract the repository URL from a webhook body.
  * Each provider puts it in a slightly different place.
  */
-function extractRepoUrl(provider: string, body: any): string | null {
+export function extractRepoUrl(provider: string, body: any): string | null {
   switch (provider) {
     case "github":
     case "gitea":
@@ -52,7 +52,7 @@ function extractRepoUrl(provider: string, body: any): string | null {
  * Normalize a repo URL for consistent matching.
  * Removes trailing slashes and .git suffix, lowercases.
  */
-function normalizeRepoUrl(url: string): string {
+export function normalizeRepoUrl(url: string): string {
   return url
     .replace(/\.git$/, "")
     .replace(/\/+$/, "")
@@ -62,7 +62,7 @@ function normalizeRepoUrl(url: string): string {
 /**
  * Check if an issue's labels match any of the route's trigger labels.
  */
-function labelsMatch(
+export function labelsMatch(
   issueLabels: readonly string[],
   routeLabels: readonly string[],
 ): boolean {
@@ -79,7 +79,7 @@ function labelsMatch(
 /**
  * Check if the issue author is in the route's allowed authors list.
  */
-function authorAllowed(
+export function authorAllowed(
   author: string,
   allowedAuthors: readonly string[],
 ): boolean {
