@@ -948,6 +948,41 @@ export async function startDaemon(): Promise<void> {
       });
     });
 
+    // Set up fix-kill handler: terminate fix sessions after completion/failure
+    apiMachine.setFixKillHandler((data) => {
+      logger.debug(
+        `[DAEMON RUN] Received fix-kill-session for session ${data.fixSessionId} (status: ${data.fixStatus})`,
+      );
+
+      // Find the tracked session by happySessionId
+      for (const [pid, session] of pidToTrackedSession.entries()) {
+        if (session.happySessionId === data.fixSessionId) {
+          logger.debug(
+            `[DAEMON RUN] Killing fix session PID ${pid} (session ${data.fixSessionId})`,
+          );
+          // Kill the tmux session if applicable, otherwise kill the process
+          if (session.tmuxSessionId) {
+            const [tmuxSession] = session.tmuxSessionId.split(":");
+            const { execFile: execFileCb } = require("child_process");
+            execFileCb("tmux", ["kill-session", "-t", tmuxSession], (err: any) => {
+              if (err) {
+                logger.debug(
+                  `[DAEMON RUN] Failed to kill tmux session ${tmuxSession}: ${err.message}`,
+                );
+                // Fallback: kill the process directly
+                try { process.kill(pid, "SIGTERM"); } catch { /* best-effort */ }
+              }
+            });
+          } else if (session.childProcess) {
+            session.childProcess.kill("SIGTERM");
+          } else {
+            try { process.kill(pid, "SIGTERM"); } catch { /* best-effort */ }
+          }
+          break;
+        }
+      }
+    });
+
     // Every 60 seconds:
     // 1. Prune stale sessions
     // 2. Check if daemon needs update

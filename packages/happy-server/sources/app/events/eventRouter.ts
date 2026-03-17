@@ -305,6 +305,12 @@ export type EphemeralEvent =
       status: string;
       artifactId?: string;
       errorMessage?: string;
+    }
+  | {
+      type: "supervisor-fix-kill-session";
+      fixSessionId: string;
+      projectId: string;
+      fixStatus: string;
     };
 
 // === EVENT PAYLOAD TYPES ===

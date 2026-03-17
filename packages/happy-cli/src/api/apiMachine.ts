@@ -188,6 +188,9 @@ export class ApiMachineClient {
   private supervisorHandler:
     | ((data: SupervisorTriggerData) => void)
     | null = null;
+  private fixKillHandler:
+    | ((data: { fixSessionId: string; projectId: string; fixStatus: string }) => void)
+    | null = null;
   private pendingWebhookStatuses: Array<{
     webhookEventId: string;
     status: "dispatched" | "completed" | "failed";
@@ -322,6 +325,14 @@ export class ApiMachineClient {
    */
   setSupervisorHandler(handler: (data: SupervisorTriggerData) => void) {
     this.supervisorHandler = handler;
+  }
+
+  /**
+   * Set handler for fix-kill-session events.
+   * Called when Server signals that a fix session should be terminated.
+   */
+  setFixKillHandler(handler: (data: { fixSessionId: string; projectId: string; fixStatus: string }) => void) {
+    this.fixKillHandler = handler;
   }
 
   /**
@@ -598,6 +609,12 @@ export class ApiMachineClient {
           `[API MACHINE] Received supervisor-trigger for project ${data.projectId}, run ${data.runId}`,
         );
         this.supervisorHandler(data as SupervisorTriggerData);
+      }
+      if (data.type === "supervisor-fix-kill-session" && this.fixKillHandler) {
+        logger.debug(
+          `[API MACHINE] Received fix-kill-session for session ${data.fixSessionId}`,
+        );
+        this.fixKillHandler(data as unknown as { fixSessionId: string; projectId: string; fixStatus: string });
       }
     });
 

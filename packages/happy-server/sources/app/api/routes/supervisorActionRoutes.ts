@@ -4,7 +4,9 @@ import { z } from "zod";
 import {
     eventRouter,
     buildSupervisorTriggerEphemeral,
+    buildSupervisorStatusEphemeral,
 } from "@/app/events/eventRouter";
+import { pushSupervisorNotification } from "@/modules/pushSend";
 
 /**
  * Supervisor action routes for the approval workflow.
@@ -441,6 +443,63 @@ export function supervisorActionRoutes(app: Fastify) {
             const updated = await db.supervisorAction.findUnique({
                 where: { id: actionId },
             });
+
+            // Notify App clients about fix status change (mirrors socket handler)
+            if (updated) {
+                eventRouter.emitEphemeral({
+                    userId,
+                    payload: buildSupervisorStatusEphemeral(
+                        updated.runId,
+                        id,
+                        `fix-${fixStatus}`,
+                    ),
+                    recipientFilter: { type: "user-scoped-only" },
+                });
+            }
+
+            // On completion/failure: tell CLI daemon to kill the fix session
+            if (
+                (fixStatus === "completed" || fixStatus === "failed") &&
+                updated?.fixSessionId
+            ) {
+                const project = await db.project.findUnique({
+                    where: { id },
+                    select: { machineId: true },
+                });
+
+                if (project?.machineId) {
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: {
+                            type: "supervisor-fix-kill-session",
+                            fixSessionId: updated.fixSessionId,
+                            projectId: id,
+                            fixStatus,
+                        },
+                        recipientFilter: {
+                            type: "machine-scoped-only",
+                            machineId: project.machineId,
+                        },
+                    });
+                }
+
+                // Send push notification
+                const title =
+                    fixStatus === "completed"
+                        ? "Fix Applied Successfully"
+                        : "Fix Failed";
+                const body =
+                    fixStatus === "completed"
+                        ? `Fixed: ${updated.title}`
+                        : `Failed to fix: ${updated.title}`;
+                await pushSupervisorNotification(userId, {
+                    projectId: id,
+                    runId: updated.runId,
+                    type: fixStatus === "completed" ? "fix_complete" : "error",
+                    title,
+                    body,
+                });
+            }
 
             return reply.send({
                 action: updated ? serializeSupervisorAction(updated) : null,
