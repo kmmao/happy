@@ -136,7 +136,7 @@ describe('buildSupervisorPrompt', () => {
             ],
         });
         expect(prompt).toContain('Known Existing Findings');
-        expect(prompt).toContain('DO NOT DUPLICATE');
+        expect(prompt).toContain('DO NOT report these again');
         expect(prompt).toContain('Hardcoded API key');
         expect(prompt).toContain('Outdated lodash');
         expect(prompt).toContain('pending');
@@ -166,5 +166,19 @@ describe('buildSupervisorPrompt', () => {
         });
         expect(prompt).toContain('approved (fix completed)');
         expect(prompt).toContain('| pending |');
+    });
+
+    it('should include differentiated guidance for skipped and ignored actions', () => {
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            existingActions: [
+                { category: 'security', title: 'Skipped issue', severity: 'high', approval: 'skipped', fixStatus: null },
+                { category: 'dependencies', title: 'Ignored issue', severity: 'medium', approval: 'ignored', fixStatus: null },
+            ],
+        });
+        expect(prompt).toContain('SHOULD re-report');
+        expect(prompt).toContain('DO NOT report them again');
+        expect(prompt).toContain('skipped');
+        expect(prompt).toContain('ignored');
     });
 });
