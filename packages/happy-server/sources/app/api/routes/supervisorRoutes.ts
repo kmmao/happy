@@ -562,6 +562,7 @@ export function supervisorRoutes(app: Fastify) {
                     supervisorPushTriggerEnabled: z.boolean().optional(),
                     supervisorNotifyPrefs: z.string().max(200).nullable().optional(),
                     supervisorCustomRules: z.string().max(2000).nullable().optional(),
+                    fixStrategy: z.enum(["direct", "pr"]).nullable().optional(),
                 }),
             },
         },
@@ -577,6 +578,7 @@ export function supervisorRoutes(app: Fastify) {
                 supervisorPushTriggerEnabled,
                 supervisorNotifyPrefs,
                 supervisorCustomRules,
+                fixStrategy,
             } = request.body;
 
             const existing = await db.project.findFirst({
@@ -618,6 +620,9 @@ export function supervisorRoutes(app: Fastify) {
             }
             if (supervisorCustomRules !== undefined) {
                 updateData.supervisorCustomRules = supervisorCustomRules;
+            }
+            if (fixStrategy !== undefined) {
+                updateData.fixStrategy = fixStrategy;
             }
 
             // Compute nextRunAt when scheduling is enabled/changed

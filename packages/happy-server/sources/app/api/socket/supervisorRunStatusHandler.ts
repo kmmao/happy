@@ -353,6 +353,7 @@ async function handleAutoMode(
                 machineId: true,
                 path: true,
                 repoUrl: true,
+                fixStrategy: true,
             },
         });
 
@@ -475,6 +476,8 @@ async function handleAutoMode(
                         severity: action.severity,
                         issueNumber,
                     },
+                    undefined, // researchParams
+                    project.fixStrategy ?? undefined,
                 ),
                 recipientFilter: {
                     type: "machine-scoped-only",

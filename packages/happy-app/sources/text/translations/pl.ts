@@ -2125,6 +2125,12 @@ export const pl: TranslationStructure = {
     pushTriggerSection: "Push trigger",
     pushTriggerEnabled: "Skanuj przy push",
     pushTriggerDesc: "Uruchom analizę przyrostową przy push kodu",
+
+    fixStrategySection: "Strategia napraw",
+    fixStrategyDirect: "Bezpośrednie scalanie",
+    fixStrategyDirectDesc: "Wyślij poprawki bezpośrednio do głównej gałęzi (z rozwiązywaniem konfliktów i siatką bezpieczeństwa testów)",
+    fixStrategyPr: "Pull Request",
+    fixStrategyPrDesc: "Utwórz PR dla każdej poprawki (wymaga ręcznego scalenia)",
     customRulesSection: "Niestandardowe reguły",
     customRulesDesc: "Dodaj reguły analizy specyficzne dla projektu",
     customRulesPlaceholder: "np. Sprawdź, czy wszystkie endpointy API mają rate limiting",

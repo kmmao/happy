@@ -83,6 +83,7 @@ export async function handleSupervisorTrigger(
     customRules,
     fixAction,
     researchParams,
+    fixStrategy,
   } = data;
 
   // Guard against duplicate processing
@@ -101,6 +102,7 @@ export async function handleSupervisorTrigger(
         projectId,
         repoPath,
         fixAction,
+        fixStrategy ?? "direct",
         deps,
       );
     } else if (trigger === "research") {
@@ -304,6 +306,7 @@ async function handleFixTrigger(
   projectId: string,
   repoPath: string,
   fixAction: NonNullable<SupervisorTriggerData["fixAction"]>,
+  fixStrategy: "direct" | "pr",
   deps: SupervisorHandlerDeps,
 ): Promise<void> {
   logger.debug(
@@ -348,6 +351,7 @@ async function handleFixTrigger(
     branchName: worktreeResult.branchName,
     parentBranch: worktreeResult.parentBranch,
     issueNumber: fixAction.issueNumber,
+    fixStrategy,
   });
 
   // 4. Write prompt to temp file in the worktree

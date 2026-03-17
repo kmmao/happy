@@ -296,6 +296,7 @@ export type EphemeralEvent =
         severity: string;
         issueNumber?: number;
       };
+      fixStrategy?: string;
     }
   | {
       type: "supervisor-status";
@@ -928,6 +929,7 @@ export function buildSupervisorTriggerEphemeral(
   customRules?: string,
   fixAction?: { title: string; description: string; suggestedFix: string | null; category: string; severity: string; issueNumber?: number },
   researchParams?: string,
+  fixStrategy?: string,
 ): EphemeralPayload {
   return {
     type: "supervisor-trigger",
@@ -942,6 +944,7 @@ export function buildSupervisorTriggerEphemeral(
     customRules,
     fixAction,
     researchParams,
+    fixStrategy,
   };
 }
 

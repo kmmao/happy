@@ -404,6 +404,7 @@ model Project {
     supervisorPushTriggerEnabled      Boolean   @default(false)
     supervisorNotifyPrefs             String?   // Comma-separated: "onAnalysisComplete,onIssueCreated,onPRCreated,onError" — null means all enabled
     supervisorCustomRules             String?   // User-defined analysis rules (plaintext, appended to prompt)
+    fixStrategy                       String?   // "direct" | "pr" — null means "direct" (default)
 
     // Lifecycle
     archived        Boolean   @default(false)

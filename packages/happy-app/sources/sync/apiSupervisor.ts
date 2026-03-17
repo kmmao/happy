@@ -206,6 +206,7 @@ export async function updateSupervisorConfig(
         supervisorPushTriggerEnabled?: boolean;
         supervisorNotifyPrefs?: string | null;
         supervisorCustomRules?: string | null;
+        fixStrategy?: "direct" | "pr" | null;
     },
 ): Promise<SupervisorConfigResponse> {
     const API_ENDPOINT = getServerUrl();

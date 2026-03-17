@@ -335,6 +335,7 @@ export function supervisorActionRoutes(app: Fastify) {
                     id: true,
                     machineId: true,
                     path: true,
+                    fixStrategy: true,
                 },
             });
 
@@ -373,6 +374,8 @@ export function supervisorActionRoutes(app: Fastify) {
                         category: action.category,
                         severity: action.severity,
                     },
+                    undefined, // researchParams
+                    project.fixStrategy ?? undefined,
                 ),
                 recipientFilter: {
                     type: "machine-scoped-only",

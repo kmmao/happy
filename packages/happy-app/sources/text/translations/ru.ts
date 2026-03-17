@@ -2123,6 +2123,12 @@ export const ru: TranslationStructure = {
     pushTriggerSection: "Push-триггер",
     pushTriggerEnabled: "Сканировать при push",
     pushTriggerDesc: "Запуск инкрементального анализа при push кода",
+
+    fixStrategySection: "Стратегия исправлений",
+    fixStrategyDirect: "Прямое слияние",
+    fixStrategyDirectDesc: "Отправлять исправления напрямую в основную ветку (с разрешением конфликтов и проверкой тестами)",
+    fixStrategyPr: "Pull Request",
+    fixStrategyPrDesc: "Создавать PR для каждого исправления (требуется ручное слияние)",
     customRulesSection: "Пользовательские правила",
     customRulesDesc: "Добавить правила анализа для проекта",
     customRulesPlaceholder: "Например: Проверить rate limiting на всех API-эндпоинтах",

@@ -2111,6 +2111,12 @@ export const ca: TranslationStructure = {
     pushTriggerSection: "Trigger de push",
     pushTriggerEnabled: "Escanejar al fer push",
     pushTriggerDesc: "Executar anàlisi incremental quan es fa push",
+
+    fixStrategySection: "Estratègia de correcció",
+    fixStrategyDirect: "Fusió directa",
+    fixStrategyDirectDesc: "Enviar correccions directament a la branca principal (amb resolució de conflictes i xarxa de seguretat de proves)",
+    fixStrategyPr: "Pull Request",
+    fixStrategyPrDesc: "Crear un PR per cada correcció (requereix fusió manual)",
     customRulesSection: "Regles personalitzades",
     customRulesDesc: "Afegir regles d'anàlisi específiques del projecte",
     customRulesPlaceholder: "Ex: Verificar que tots els endpoints tinguin rate limiting",

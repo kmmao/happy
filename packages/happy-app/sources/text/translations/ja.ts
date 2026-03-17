@@ -2075,6 +2075,12 @@ export const ja: TranslationStructure = {
     pushTriggerSection: "プッシュトリガー",
     pushTriggerEnabled: "プッシュ時にスキャン",
     pushTriggerDesc: "コードプッシュ時に増分分析を実行",
+
+    fixStrategySection: "修正戦略",
+    fixStrategyDirect: "直接マージ",
+    fixStrategyDirectDesc: "修正をメインブランチに直接プッシュ（競合解決とテストのセーフティネット付き）",
+    fixStrategyPr: "Pull Request",
+    fixStrategyPrDesc: "修正ごとにPRを作成（手動マージが必要）",
     customRulesSection: "カスタムルール",
     customRulesDesc: "プロジェクト固有の分析ルールを追加",
     customRulesPlaceholder: "例: すべてのAPIエンドポイントにレート制限があるか確認",

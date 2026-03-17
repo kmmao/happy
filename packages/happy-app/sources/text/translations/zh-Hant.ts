@@ -2008,6 +2008,12 @@ export const zhHant: TranslationStructure = {
     pushTriggerSection: "推送觸發",
     pushTriggerEnabled: "推送時掃描",
     pushTriggerDesc: "程式碼推送時執行增量分析",
+
+    fixStrategySection: "修復策略",
+    fixStrategyDirect: "直接合併",
+    fixStrategyDirectDesc: "將修復直接推送到主分支（含衝突解決和測試安全網）",
+    fixStrategyPr: "Pull Request",
+    fixStrategyPrDesc: "為每個修復建立 PR（需手動合併）",
     customRulesSection: "自訂規則",
     customRulesDesc: "新增專案特定的分析規則",
     customRulesPlaceholder: "例如：檢查所有 API 端點是否有速率限制",

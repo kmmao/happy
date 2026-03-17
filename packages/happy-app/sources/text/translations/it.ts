@@ -2104,6 +2104,12 @@ export const it: TranslationStructure = {
     pushTriggerSection: "Trigger push",
     pushTriggerEnabled: "Scansiona al push",
     pushTriggerDesc: "Esegui analisi incrementale quando viene fatto push",
+
+    fixStrategySection: "Strategia di correzione",
+    fixStrategyDirect: "Merge diretto",
+    fixStrategyDirectDesc: "Inviare le correzioni direttamente al branch principale (con risoluzione dei conflitti e rete di sicurezza dei test)",
+    fixStrategyPr: "Pull Request",
+    fixStrategyPrDesc: "Creare una PR per ogni correzione (richiede merge manuale)",
     customRulesSection: "Regole personalizzate",
     customRulesDesc: "Aggiungi regole di analisi specifiche del progetto",
     customRulesPlaceholder: "Es: Verifica che tutti gli endpoint API abbiano rate limiting",

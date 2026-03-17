@@ -22,6 +22,7 @@ type ScheduleInterval = (typeof SCHEDULE_INTERVALS)[number];
  */
 const defaultConfig = {
     mode: "suggest" as SupervisorMode,
+    fixStrategy: "direct" as "direct" | "pr",
     schedule: {
         enabled: false,
         intervalHours: 24 as ScheduleInterval,
@@ -138,6 +139,7 @@ export default function SupervisorSettingsScreen() {
                             .join(",") || null,
                     supervisorCustomRules:
                         config.customRules.trim() || null,
+                    fixStrategy: config.fixStrategy,
                 },
             );
             // Update local projectManager cache so re-entering this page shows fresh data
@@ -405,6 +407,33 @@ export default function SupervisorSettingsScreen() {
                     value={config.pushTrigger.enabled}
                     onToggle={togglePushTrigger}
                     subtitle={t("supervisor.pushTriggerDesc")}
+                    isLast
+                />
+            </ItemGroup>
+
+            {/* Fix Strategy */}
+            <ItemGroup title={t("supervisor.fixStrategySection")}>
+                <ModeOption
+                    label={t("supervisor.fixStrategyDirect")}
+                    subtitle={t("supervisor.fixStrategyDirectDesc")}
+                    selected={config.fixStrategy === "direct"}
+                    onPress={() =>
+                        updateConfig((prev) => ({
+                            ...prev,
+                            fixStrategy: "direct" as const,
+                        }))
+                    }
+                />
+                <ModeOption
+                    label={t("supervisor.fixStrategyPr")}
+                    subtitle={t("supervisor.fixStrategyPrDesc")}
+                    selected={config.fixStrategy === "pr"}
+                    onPress={() =>
+                        updateConfig((prev) => ({
+                            ...prev,
+                            fixStrategy: "pr" as const,
+                        }))
+                    }
                     isLast
                 />
             </ItemGroup>

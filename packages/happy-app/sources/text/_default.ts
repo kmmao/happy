@@ -2119,6 +2119,13 @@ export const en = {
     pushTriggerEnabled: "Scan on Push",
     pushTriggerDesc: "Run incremental analysis when code is pushed",
 
+    // Settings: Fix strategy
+    fixStrategySection: "Fix Strategy",
+    fixStrategyDirect: "Direct Merge",
+    fixStrategyDirectDesc: "Push fixes directly to main branch (with conflict resolution and test safety net)",
+    fixStrategyPr: "Pull Request",
+    fixStrategyPrDesc: "Create a PR for each fix (requires manual merge)",
+
     // Settings: Custom rules
     customRulesSection: "Custom Rules",
     customRulesDesc: "Add project-specific analysis rules",

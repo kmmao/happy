@@ -144,6 +144,7 @@ export type SupervisorTriggerData = {
     issueNumber?: number;
   };
   researchParams?: string;
+  fixStrategy?: "direct" | "pr";
 };
 
 export type SupervisorRunStatusData = {
