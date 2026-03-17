@@ -82,6 +82,7 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
             mermaid.initialize({
               startOnLoad: false,
               theme: "dark",
+              securityLevel: "strict",
             });
           }
 
@@ -186,7 +187,8 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
             <script>
                 mermaid.initialize({
                     startOnLoad: false,
-                    theme: 'dark'
+                    theme: 'dark',
+                    securityLevel: 'strict'
                 });
                 (async function() {
                     try {
