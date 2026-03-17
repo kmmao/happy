@@ -300,6 +300,7 @@ export function webhookRoutes(app: Fastify) {
         if (project?.repoUrl) {
           where.repoUrl = project.repoUrl;
         }
+        // If project has no repoUrl, fall through to show all events
       }
 
       const [events, total] = await Promise.all([

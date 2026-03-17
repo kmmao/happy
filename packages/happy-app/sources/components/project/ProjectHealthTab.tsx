@@ -632,6 +632,55 @@ export const ProjectHealthTab = React.memo(
                     </ItemGroup>
                 )}
 
+                {/* Settings & Webhook links (quick access) */}
+                <ItemGroup>
+                    <Pressable
+                        style={styles.settingsLink}
+                        onPress={() =>
+                            router.push(
+                                `/project/${project.id}/supervisor-settings` as any,
+                            )
+                        }
+                    >
+                        <Ionicons
+                            name="settings-outline"
+                            size={20}
+                            color={theme.colors.textSecondary}
+                        />
+                        <Text style={styles.settingsLinkText}>
+                            {t("supervisor.settings")}
+                        </Text>
+                        <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color={theme.colors.textSecondary}
+                        />
+                    </Pressable>
+                    <View style={styles.linkDivider} />
+                    <Pressable
+                        style={styles.settingsLink}
+                        onPress={() =>
+                            router.push(
+                                `/project/${project.serverId}/webhook-events` as any,
+                            )
+                        }
+                    >
+                        <Ionicons
+                            name="git-pull-request-outline"
+                            size={20}
+                            color={theme.colors.textSecondary}
+                        />
+                        <Text style={styles.settingsLinkText}>
+                            {t("webhook.eventHistory")}
+                        </Text>
+                        <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color={theme.colors.textSecondary}
+                        />
+                    </Pressable>
+                </ItemGroup>
+
                 {/* Pending Actions */}
                 {pendingActions.length > 0 && serverId && (
                     <ItemGroup
@@ -711,11 +760,11 @@ export const ProjectHealthTab = React.memo(
                         </View>
                     ) : (
                         <>
-                            {runs.map((run, index) => (
+                            {runs.slice(0, 3).map((run, index) => (
                                 <SupervisorRunHistoryItem
                                     key={run.id}
                                     run={run}
-                                    isLast={index === runs.length - 1}
+                                    isLast={index === Math.min(runs.length, 3) - 1}
                                     onPress={
                                         run.status === "completed" && serverId
                                             ? () =>
@@ -731,14 +780,26 @@ export const ProjectHealthTab = React.memo(
                                     }
                                 />
                             ))}
-                            {total > runs.length && (
-                                <View style={styles.moreRow}>
-                                    <Text style={styles.moreText}>
-                                        {t("supervisor.moreRuns", {
-                                            count: total - runs.length,
+                            {(runs.length > 3 || total > runs.length) && (
+                                <Pressable
+                                    style={styles.showMoreRow}
+                                    onPress={() =>
+                                        router.push(
+                                            `/project/${serverId}/supervisor-actions` as any,
+                                        )
+                                    }
+                                >
+                                    <Text style={styles.showMoreText}>
+                                        {t("supervisor.showMoreRuns", {
+                                            count: Math.max(total, runs.length) - 3,
                                         })}
                                     </Text>
-                                </View>
+                                    <Ionicons
+                                        name="chevron-forward"
+                                        size={16}
+                                        color={theme.colors.header.tint}
+                                    />
+                                </Pressable>
                             )}
                         </>
                     )}
@@ -746,58 +807,6 @@ export const ProjectHealthTab = React.memo(
 
                 {/* Related Projects (Cross-Machine) */}
                 <SupervisorRelatedProjects relatedProjects={relatedProjects} />
-
-                {/* Webhook Events link */}
-                <ItemGroup>
-                    <Pressable
-                        style={styles.settingsLink}
-                        onPress={() =>
-                            router.push(
-                                `/project/${project.serverId}/webhook-events` as any,
-                            )
-                        }
-                    >
-                        <Ionicons
-                            name="git-pull-request-outline"
-                            size={20}
-                            color={theme.colors.textSecondary}
-                        />
-                        <Text style={styles.settingsLinkText}>
-                            {t("webhook.eventHistory")}
-                        </Text>
-                        <Ionicons
-                            name="chevron-forward"
-                            size={18}
-                            color={theme.colors.textSecondary}
-                        />
-                    </Pressable>
-                </ItemGroup>
-
-                {/* Settings link */}
-                <ItemGroup>
-                    <Pressable
-                        style={styles.settingsLink}
-                        onPress={() =>
-                            router.push(
-                                `/project/${project.id}/supervisor-settings` as any,
-                            )
-                        }
-                    >
-                        <Ionicons
-                            name="settings-outline"
-                            size={20}
-                            color={theme.colors.textSecondary}
-                        />
-                        <Text style={styles.settingsLinkText}>
-                            {t("supervisor.settings")}
-                        </Text>
-                        <Ionicons
-                            name="chevron-forward"
-                            size={18}
-                            color={theme.colors.textSecondary}
-                        />
-                    </Pressable>
-                </ItemGroup>
             </ScrollView>
         );
     },
@@ -965,6 +974,25 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 13,
         color: theme.colors.textSecondary,
+    },
+    showMoreRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+        paddingVertical: 12,
+        borderTopWidth: 0.5,
+        borderTopColor: theme.colors.divider,
+    },
+    showMoreText: {
+        ...Typography.default("semiBold"),
+        fontSize: 13,
+        color: theme.colors.header.tint,
+    },
+    linkDivider: {
+        height: 0.5,
+        backgroundColor: theme.colors.divider,
+        marginHorizontal: 16,
     },
     settingsLink: {
         flexDirection: "row",

@@ -20,13 +20,15 @@ const PAGE_SIZE = 20;
 // --- Helpers ---
 
 function formatRelativeTime(timestamp: number): string {
+    // Server returns milliseconds (Date.getTime()), convert to seconds
+    const timestampSec = timestamp > 1e12 ? Math.floor(timestamp / 1000) : timestamp;
     const now = Math.floor(Date.now() / 1000);
-    const diff = now - timestamp;
+    const diff = now - timestampSec;
     if (diff < 60) return "just now";
     if (diff < 3600) return `${Math.floor(diff / 60)}m`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
     if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
-    const date = new Date(timestamp * 1000);
+    const date = new Date(timestampSec * 1000);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
@@ -117,6 +119,7 @@ function WebhookEventsScreen() {
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) return;
             const data = await fetchWebhookEvents(credentials, {
+                projectId: id,
                 limit: PAGE_SIZE,
                 offset: 0,
             });
@@ -136,6 +139,7 @@ function WebhookEventsScreen() {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials || cancelled) return;
                 const data = await fetchWebhookEvents(credentials, {
+                    projectId: id,
                     limit: PAGE_SIZE,
                     offset: 0,
                 });
@@ -171,6 +175,7 @@ function WebhookEventsScreen() {
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) return;
             const data = await fetchWebhookEvents(credentials, {
+                projectId: id,
                 limit: PAGE_SIZE,
                 offset: events.length,
             });

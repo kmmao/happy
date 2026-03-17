@@ -1733,6 +1733,7 @@ export const en = {
     tabSessions: "Sessions",
     tabGit: "Git",
     tabHealth: "Health",
+    tabActions: "Actions",
     tabResearch: "Research",
     noSessions: "No sessions yet",
     sessions: "Sessions",
@@ -2035,6 +2036,8 @@ export const en = {
     noRuns: "No scan runs yet",
     moreRuns: ({ count }: { count: number }) =>
       `${count} more ${count === 1 ? "run" : "runs"}`,
+    showMoreRuns: ({ count }: { count: number }) =>
+      `Show ${count} more ${count === 1 ? "run" : "runs"}`,
     justNow: "Just now",
     minutesAgo: ({ count }: { count: number }) => `${count}m ago`,
     hoursAgo: ({ count }: { count: number }) => `${count}h ago`,

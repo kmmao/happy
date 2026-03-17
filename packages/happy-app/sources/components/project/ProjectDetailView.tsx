@@ -7,12 +7,13 @@ import { ProjectSessionsTab } from "./ProjectSessionsTab";
 import { ProjectGitTab } from "./ProjectGitTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab } from "./ProjectResearchTab";
+import { ProjectActionsTab } from "./ProjectActionsTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { storage } from "@/sync/storage";
 import { gitStatusSync } from "@/sync/gitStatusSync";
 
-type TabKey = "sessions" | "git" | "health" | "research";
+type TabKey = "sessions" | "git" | "health" | "actions" | "research";
 
 interface ProjectDetailViewProps {
     project: Project;
@@ -42,6 +43,7 @@ export const ProjectDetailView = React.memo(
                 { key: "sessions", label: t("projects.tabSessions") },
                 { key: "git", label: t("projects.tabGit") },
                 { key: "health", label: t("projects.tabHealth") },
+                { key: "actions", label: t("projects.tabActions") },
                 { key: "research", label: t("projects.tabResearch") },
             ],
             [],
@@ -103,6 +105,15 @@ export const ProjectDetailView = React.memo(
                     </View>
                     <View
                         style={
+                            activeTab === "actions"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectActionsTab project={project} />
+                    </View>
+                    <View
+                        style={
                             activeTab === "research"
                                 ? styles.tabVisible
                                 : styles.tabHidden
@@ -144,7 +155,7 @@ const styles = StyleSheet.create((theme) => ({
     },
     segmentText: {
         ...Typography.default(),
-        fontSize: 13,
+        fontSize: 12,
         color: theme.colors.textSecondary,
     },
     segmentTextActive: {

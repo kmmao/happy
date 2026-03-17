@@ -16,10 +16,11 @@ export interface WebhookEvent {
 
 export async function fetchWebhookEvents(
     credentials: AuthCredentials,
-    params?: { limit?: number; offset?: number },
+    params?: { projectId?: string; limit?: number; offset?: number },
 ): Promise<{ events: WebhookEvent[]; total: number }> {
     const API_ENDPOINT = getServerUrl();
     const query = new URLSearchParams();
+    if (params?.projectId) query.set("projectId", params.projectId);
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
     if (params?.offset !== undefined) query.set("offset", String(params.offset));
     const qs = query.toString() ? `?${query.toString()}` : "";
