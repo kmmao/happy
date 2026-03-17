@@ -109,6 +109,20 @@ export function supervisorRoutes(app: Fastify) {
             const triggerType = request.body?.trigger ?? "manual";
             const researchParams = request.body?.researchParams;
 
+            // Query existing pending/approved actions for dedup in analysis prompt
+            const existingActions = triggerType !== "research"
+                ? await db.supervisorAction.findMany({
+                    where: {
+                        projectId: id,
+                        accountId: userId,
+                        approval: { in: ["pending", "approved"] },
+                    },
+                    select: { category: true, title: true, severity: true, approval: true, fixStatus: true },
+                    take: 50,
+                    orderBy: { createdAt: "desc" },
+                })
+                : undefined;
+
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildSupervisorTriggerEphemeral(
@@ -123,6 +137,8 @@ export function supervisorRoutes(app: Fastify) {
                     triggerType === "research" ? undefined : (project.supervisorCustomRules ?? undefined),
                     undefined, // fixAction
                     researchParams ? JSON.stringify(researchParams) : undefined,
+                    undefined, // fixStrategy
+                    existingActions,
                 ),
                 recipientFilter: {
                     type: "machine-scoped-only",

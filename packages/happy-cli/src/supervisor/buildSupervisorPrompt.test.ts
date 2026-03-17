@@ -124,4 +124,47 @@ describe('buildSupervisorPrompt', () => {
         const prompt = buildSupervisorPrompt(baseOptions);
         expect(prompt).toContain('not report more than 10 findings');
     });
+
+    // === Existing Actions Dedup ===
+
+    it('should include existing actions table when provided', () => {
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            existingActions: [
+                { category: 'security', title: 'Hardcoded API key', severity: 'critical', approval: 'pending', fixStatus: null },
+                { category: 'dependencies', title: 'Outdated lodash', severity: 'high', approval: 'approved', fixStatus: 'running' },
+            ],
+        });
+        expect(prompt).toContain('Known Existing Findings');
+        expect(prompt).toContain('DO NOT DUPLICATE');
+        expect(prompt).toContain('Hardcoded API key');
+        expect(prompt).toContain('Outdated lodash');
+        expect(prompt).toContain('pending');
+        expect(prompt).toContain('approved (fix running)');
+    });
+
+    it('should not include existing actions section when empty', () => {
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            existingActions: [],
+        });
+        expect(prompt).not.toContain('Known Existing Findings');
+    });
+
+    it('should not include existing actions section when undefined', () => {
+        const prompt = buildSupervisorPrompt(baseOptions);
+        expect(prompt).not.toContain('Known Existing Findings');
+    });
+
+    it('should format fixStatus in existing actions status column', () => {
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            existingActions: [
+                { category: 'security', title: 'Issue A', severity: 'high', approval: 'approved', fixStatus: 'completed' },
+                { category: 'dependencies', title: 'Issue B', severity: 'medium', approval: 'pending', fixStatus: null },
+            ],
+        });
+        expect(prompt).toContain('approved (fix completed)');
+        expect(prompt).toContain('| pending |');
+    });
 });

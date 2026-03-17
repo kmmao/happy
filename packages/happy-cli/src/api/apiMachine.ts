@@ -145,6 +145,13 @@ export type SupervisorTriggerData = {
   };
   researchParams?: string;
   fixStrategy?: "direct" | "pr";
+  existingActions?: ReadonlyArray<{
+    category: string;
+    title: string;
+    severity: string;
+    approval: string;
+    fixStatus: string | null;
+  }>;
 };
 
 export type SupervisorRunStatusData = {

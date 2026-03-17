@@ -930,6 +930,7 @@ export function buildSupervisorTriggerEphemeral(
   fixAction?: { title: string; description: string; suggestedFix: string | null; category: string; severity: string; issueNumber?: number },
   researchParams?: string,
   fixStrategy?: string,
+  existingActions?: readonly { category: string; title: string; severity: string; approval: string; fixStatus: string | null }[],
 ): EphemeralPayload {
   return {
     type: "supervisor-trigger",
@@ -945,6 +946,7 @@ export function buildSupervisorTriggerEphemeral(
     fixAction,
     researchParams,
     fixStrategy,
+    existingActions,
   };
 }
 

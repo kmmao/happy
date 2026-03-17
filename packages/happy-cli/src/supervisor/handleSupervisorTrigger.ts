@@ -110,6 +110,7 @@ export async function handleSupervisorTrigger(
     fixAction,
     researchParams,
     fixStrategy,
+    existingActions,
   } = data;
 
   // Guard against duplicate processing
@@ -149,6 +150,7 @@ export async function handleSupervisorTrigger(
         dimensions,
         changedFiles,
         customRules,
+        existingActions,
         deps,
       );
     }
@@ -186,6 +188,7 @@ async function handleAnalysisTrigger(
   dimensions: readonly string[] | undefined,
   changedFiles: readonly string[] | undefined,
   customRules: string | undefined,
+  existingActions: SupervisorTriggerData["existingActions"],
   deps: SupervisorHandlerDeps,
 ): Promise<void> {
   logger.debug(
@@ -209,6 +212,7 @@ async function handleAnalysisTrigger(
     dimensions,
     changedFiles,
     customRules,
+    existingActions,
     serverUrl: deps.serverUrl,
   });
 

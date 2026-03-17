@@ -26,6 +26,14 @@ export interface SupervisorPromptOptions {
   readonly changedFiles?: readonly string[];
   /** User-defined custom analysis rules (appended to prompt). */
   readonly customRules?: string;
+  /** Existing pending/approved actions to avoid duplicating. */
+  readonly existingActions?: ReadonlyArray<{
+    category: string;
+    title: string;
+    severity: string;
+    approval: string;
+    fixStatus: string | null;
+  }>;
   /** Server URL for reporting results back. */
   readonly serverUrl: string;
 }
@@ -74,6 +82,8 @@ ${options.customRules.trim()}
 `
       : "";
 
+  const existingActionsSection = buildExistingActionsSection(options.existingActions);
+
   const categories = getEnabledCategories(dims);
   const categoryUnion = categories.map((c) => `"${c}"`).join(" | ");
 
@@ -95,7 +105,7 @@ ${options.customRules.trim()}
 - Run ID: ${options.runId}
 - Trigger: ${options.trigger}
 - Repository: ${options.repoPath}
-${autoModeSection}${incrementalSection}${customRulesSection}## Rules (CRITICAL)
+${autoModeSection}${incrementalSection}${customRulesSection}${existingActionsSection}## Rules (CRITICAL)
 1. **DO NOT modify any files.** This is a read-only analysis session.
 2. **DO NOT create commits, branches, or PRs.**
 3. **DO NOT run destructive commands** (rm, git reset, etc.).
@@ -193,4 +203,36 @@ curl -s -X POST "${reportUrl}" \\
 \`\`\`
 
 Begin your analysis now.`;
+}
+
+function buildExistingActionsSection(
+  actions?: ReadonlyArray<{
+    category: string;
+    title: string;
+    severity: string;
+    approval: string;
+    fixStatus: string | null;
+  }>,
+): string {
+  if (!actions || actions.length === 0) return "";
+
+  const rows = actions.map((a, i) => {
+    const status = a.fixStatus
+      ? `${a.approval} (fix ${a.fixStatus})`
+      : a.approval;
+    return `| ${i + 1} | ${a.severity} | ${a.category} | ${a.title} | ${status} |`;
+  });
+
+  return `
+## Known Existing Findings (DO NOT DUPLICATE)
+The following issues have already been identified in previous analysis runs.
+**DO NOT report these again**, even with slightly different wording.
+Focus exclusively on **NEW** issues not covered below.
+
+| # | Severity | Category | Title | Status |
+|---|----------|----------|-------|--------|
+${rows.join("\n")}
+
+If you discover additional context about an existing finding, do NOT create a new action for it.
+`;
 }
