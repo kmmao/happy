@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { useHappyAction } from "@/hooks/useHappyAction";
@@ -35,6 +36,7 @@ interface SupervisorActionCardProps {
 export const SupervisorActionCard = React.memo(
     ({ action, projectId, onUpdated, isLast }: SupervisorActionCardProps) => {
         const { theme } = useUnistyles();
+        const router = useRouter();
         const borderColor =
             SEVERITY_COLORS[action.severity] ?? theme.colors.textSecondary;
 
@@ -209,6 +211,26 @@ export const SupervisorActionCard = React.memo(
                             {t("supervisor.fixStatus")}: {action.fixStatus}
                         </Text>
                     </View>
+                )}
+
+                {/* Fix session link */}
+                {action.fixSessionId && (
+                    <Pressable
+                        style={styles.sessionLinkRow}
+                        onPress={(e) => {
+                            e.stopPropagation();
+                            router.push(`/session/${action.fixSessionId}` as any);
+                        }}
+                    >
+                        <Ionicons
+                            name="terminal-outline"
+                            size={14}
+                            color={theme.colors.header.tint}
+                        />
+                        <Text style={styles.sessionLinkText}>
+                            {t("supervisor.viewSession")}
+                        </Text>
+                    </Pressable>
                 )}
 
                 {/* Issue URL / PR link */}
@@ -407,6 +429,17 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 12,
         color: theme.colors.header.tint,
         flex: 1,
+    },
+    sessionLinkRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        marginTop: 6,
+    },
+    sessionLinkText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.header.tint,
     },
     buttonRow: {
         flexDirection: "row",

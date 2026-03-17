@@ -45,7 +45,7 @@ const processingRuns = new Set<string>();
 // Track fix session worktrees for cleanup on session exit
 const fixWorktrees = new Map<
   string,
-  { readonly repoPath: string; readonly branchName: string }
+  { readonly repoPath: string; readonly branchName: string; readonly parentBranch: string }
 >();
 
 /**
@@ -63,6 +63,32 @@ export async function cleanupFixWorktree(
     logger.debug(
       `[SUPERVISOR] Cleaned up fix worktree ${info.branchName} for session ${sessionId}`,
     );
+  } catch {
+    // best-effort
+  }
+
+  // Sync local parent branch with remote after direct-push fix
+  try {
+    const { execFile: execFileCb } = await import("child_process");
+    await new Promise<void>((resolve) => {
+      execFileCb(
+        "git",
+        ["pull", "--ff-only", "origin", info.parentBranch],
+        { cwd: info.repoPath, timeout: 30_000 },
+        (error) => {
+          if (error) {
+            logger.debug(
+              `[SUPERVISOR] Failed to pull ${info.parentBranch} after fix cleanup: ${error.message}`,
+            );
+          } else {
+            logger.debug(
+              `[SUPERVISOR] Pulled latest ${info.parentBranch} after fix cleanup`,
+            );
+          }
+          resolve();
+        },
+      );
+    });
   } catch {
     // best-effort
   }
@@ -396,6 +422,7 @@ async function handleFixTrigger(
   fixWorktrees.set(spawnResult.sessionId, {
     repoPath,
     branchName: worktreeResult.branchName,
+    parentBranch: worktreeResult.parentBranch,
   });
 
   logger.debug(
