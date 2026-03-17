@@ -215,7 +215,7 @@ export const SessionView = React.memo((props: { id: string }) => {
           <ChatHeaderView
             {...headerProps}
             onBackPress={() => router.back()}
-            onRefreshPress={() => sync.onSessionVisible(sessionId)}
+            onRefreshPress={() => sync.refreshSession(sessionId)}
             onPreviewPress={
               headerProps.isConnected
                 ? () => router.push(`/session/${sessionId}/preview`)

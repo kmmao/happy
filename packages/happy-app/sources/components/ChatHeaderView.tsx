@@ -17,7 +17,7 @@ interface ChatHeaderViewProps {
   onAvatarPress?: () => void;
   onPreviewPress?: () => void;
   onChangesPress?: () => void;
-  onRefreshPress?: () => void;
+  onRefreshPress?: () => Promise<void> | void;
   avatarId?: string;
   backgroundColor?: string;
   tintColor?: string;
@@ -45,25 +45,44 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   const spinAnim = React.useRef(new Animated.Value(0)).current;
   const isSpinning = React.useRef(false);
 
-  const handleRefreshPress = React.useCallback(() => {
+  const handleRefreshPress = React.useCallback(async () => {
     if (isSpinning.current || !onRefreshPress) return;
     isSpinning.current = true;
-    onRefreshPress();
+    hapticsLight();
+
+    // Start looping spin animation
     spinAnim.setValue(0);
-    Animated.timing(spinAnim, {
-      toValue: 1,
-      duration: 1500,
-      easing: Easing.linear,
-      useNativeDriver: true,
-    }).start(() => {
-      isSpinning.current = false;
-      hapticsLight();
-    });
+    const loopAnim = Animated.loop(
+      Animated.timing(spinAnim, {
+        toValue: 1,
+        duration: 750,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loopAnim.start();
+
+    try {
+      await onRefreshPress();
+    } finally {
+      // Stop looping and finish one last clean rotation
+      loopAnim.stop();
+      spinAnim.setValue(0);
+      Animated.timing(spinAnim, {
+        toValue: 1,
+        duration: 300,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start(() => {
+        isSpinning.current = false;
+        hapticsLight();
+      });
+    }
   }, [onRefreshPress, spinAnim]);
 
   const spinInterpolation = spinAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ["0deg", "720deg"],
+    outputRange: ["0deg", "360deg"],
   });
 
   const handleBackPress = () => {
