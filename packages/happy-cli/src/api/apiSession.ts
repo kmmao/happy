@@ -873,7 +873,17 @@ export class ApiSessionClient extends EventEmitter {
   /**
    * Send a ping message to keep the connection alive
    */
-  keepAlive(thinking: boolean, mode: "local" | "remote", reliable?: boolean) {
+  keepAlive(
+    thinking: boolean,
+    mode: "local" | "remote",
+    reliable?: boolean,
+    apiRetry?: {
+      attempt: number;
+      maxRetries: number;
+      retryDelayMs: number;
+      errorStatus: number | null;
+    },
+  ) {
     if (process.env.DEBUG) {
       // too verbose for production
       logger.debug(`[API] Sending keep alive message: ${thinking}`);
@@ -883,6 +893,7 @@ export class ApiSessionClient extends EventEmitter {
       time: Date.now(),
       thinking,
       mode,
+      ...(apiRetry ? { apiRetry } : {}),
     };
     // Use reliable (non-volatile) emit for thinking state changes so the
     // update is queued and delivered even during brief disconnections.

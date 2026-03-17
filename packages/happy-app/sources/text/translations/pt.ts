@@ -93,6 +93,13 @@ export const pt: TranslationStructure = {
     lastSeen: ({ time }: { time: string }) => `visto por último ${time}`,
     permissionRequired: "permissão necessária",
     needsAttention: "aguardando sua resposta",
+    apiRetry: ({
+      attempt,
+      maxRetries,
+    }: {
+      attempt: number;
+      maxRetries: number;
+    }) => `tentando API novamente (${attempt}/${maxRetries})…`,
     activeNow: "Ativo agora",
     unknown: "desconhecido",
   },
@@ -410,6 +417,7 @@ export const pt: TranslationStructure = {
     bookmarkOption: "Favorito",
     appendToInput: "Editar no campo de entrada",
     messageQueued: "Na fila",
+    cancelQueued: "Cancelar",
   },
 
   bookmark: {
@@ -549,6 +557,10 @@ export const pt: TranslationStructure = {
     resumeSession: "Retomar sessão",
     resumeSessionSubtitle:
       "Retomar esta sessão com contexto completo na mesma máquina",
+    forkSession: "Bifurcar sessão",
+    forkSessionSubtitle: "Criar uma nova sessão bifurcada a partir deste ponto com contexto completo",
+    forkSessionSuccess: "Sessão bifurcada com sucesso",
+    forkSessionFailed: "Falha ao bifurcar a sessão",
     deleteSession: "Excluir sessão",
     deleteSessionSubtitle: "Remover permanentemente esta sessão",
     deleteSessionConfirm: "Excluir sessão permanentemente?",
@@ -825,6 +837,9 @@ export const pt: TranslationStructure = {
       otherDescription: "Digite sua própria resposta",
       otherPlaceholder: "Digite sua resposta...",
       recommended: "Recomendado",
+    },
+    planFile: {
+      refreshFromFile: "Atualizar do arquivo",
     },
   },
 
@@ -2203,6 +2218,12 @@ export const pt: TranslationStructure = {
     untitledReport: "Relatório sem título",
     reportDetail: "Relatório de pesquisa",
     reportNotFound: "Relatório não encontrado",
+  },
+
+  elicitation: {
+    accept: "Aceitar",
+    decline: "Recusar",
+    submit: "Enviar",
   },
 } as const;
 

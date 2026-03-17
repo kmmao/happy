@@ -200,6 +200,14 @@ export const ApiEphemeralActivityUpdateSchema = z.object({
   active: z.boolean(),
   activeAt: z.number(),
   thinking: z.boolean(),
+  apiRetry: z
+    .object({
+      attempt: z.number(),
+      maxRetries: z.number(),
+      retryDelayMs: z.number(),
+      errorStatus: z.number().nullable(),
+    })
+    .optional(),
 });
 
 export const ApiEphemeralUsageUpdateSchema = z.object({

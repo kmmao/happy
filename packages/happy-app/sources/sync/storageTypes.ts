@@ -119,6 +119,16 @@ export const AgentStateSchema = z.object({
       }),
     )
     .nullish(),
+  elicitation: z
+    .object({
+      id: z.string(),
+      serverName: z.string(),
+      message: z.string(),
+      mode: z.enum(["form", "url"]).default("form"),
+      url: z.string().nullish(),
+      requestedSchema: z.record(z.string(), z.unknown()).nullish(),
+    })
+    .nullish(),
 });
 
 export type AgentState = z.infer<typeof AgentStateSchema>;
@@ -212,6 +222,14 @@ export interface Session {
         contextWindow: number;
       }
     >;
+  } | null;
+  // Transient API retry state — set when SDK is retrying a failed API call, cleared on next success
+  apiRetry?: {
+    attempt: number;
+    maxRetries: number;
+    retryDelayMs: number;
+    errorStatus: number | null;
+    timestamp: number;
   } | null;
 }
 

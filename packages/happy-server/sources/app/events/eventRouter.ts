@@ -670,6 +670,12 @@ export function buildSessionActivityEphemeral(
   active: boolean,
   activeAt: number,
   thinking?: boolean,
+  apiRetry?: {
+    attempt: number;
+    maxRetries: number;
+    retryDelayMs: number;
+    errorStatus: number | null;
+  },
 ): EphemeralPayload {
   return {
     type: "activity",
@@ -677,6 +683,7 @@ export function buildSessionActivityEphemeral(
     active,
     activeAt,
     thinking: thinking || false,
+    ...(apiRetry ? { apiRetry } : {}),
   };
 }
 

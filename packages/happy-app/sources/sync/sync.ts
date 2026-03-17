@@ -2594,6 +2594,7 @@ class Sync {
                       thinking: false,
                       needsAttention: true,
                       thinkingAt: Date.now(),
+                      apiRetry: null,
                     }
                   : {}),
                 ...(isTaskStarted
@@ -3248,6 +3249,15 @@ class Sync {
           activeAt: update.activeAt,
           thinking: resolved.thinking,
           thinkingAt: resolved.thinkingAt,
+          apiRetry: update.apiRetry
+            ? {
+                attempt: update.apiRetry.attempt,
+                maxRetries: update.apiRetry.maxRetries,
+                retryDelayMs: update.apiRetry.retryDelayMs,
+                errorStatus: update.apiRetry.errorStatus,
+                timestamp: Date.now(),
+              }
+            : null,
         });
       }
     }

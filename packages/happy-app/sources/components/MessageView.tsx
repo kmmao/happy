@@ -18,6 +18,7 @@ import { AgentEvent } from "@/sync/typesRaw";
 import { sync } from "@/sync/sync";
 import { Option } from "./markdown/MarkdownView";
 import { useSetting, storage } from "@/sync/storage";
+import { sessionCancelQueuedMessage } from "@/sync/ops";
 import { AgentDot } from "./AgentDot";
 import { MessageImage } from "./MessageImage";
 import { parseImageRefs } from "@/utils/parseImageRefs";
@@ -114,6 +115,15 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
     props.message.localId != null &&
     (queuedIds ?? []).includes(props.message.localId);
 
+  const handleCancelQueued = React.useCallback(async () => {
+    const localId = props.message.localId;
+    if (!localId) return;
+    const cancelled = await sessionCancelQueuedMessage(props.sessionId, localId);
+    if (cancelled) {
+      storage.getState().removeQueuedMessageId(props.sessionId, localId);
+    }
+  }, [props.sessionId, props.message.localId]);
+
   const handleOptionPress = React.useCallback(
     (option: Option) => {
       sync.sendMessage(props.sessionId, option.title);
@@ -201,6 +211,24 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
           >
             {t("session.messageQueued")}
           </Text>
+          <Pressable
+            onPress={handleCancelQueued}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.cancelQueuedButton,
+              { backgroundColor: theme.colors.surfaceHighest },
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Text
+              style={[
+                styles.cancelQueuedText,
+                { color: theme.colors.textSecondary },
+              ]}
+            >
+              {t("session.cancelQueued")}
+            </Text>
+          </Pressable>
         </View>
       )}
     </View>
@@ -535,6 +563,16 @@ const styles = StyleSheet.create((theme) => ({
     opacity: 0.6,
   },
   queuedText: {
+    fontSize: 11,
+    ...Typography.default(),
+  },
+  cancelQueuedButton: {
+    marginLeft: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  cancelQueuedText: {
     fontSize: 11,
     ...Typography.default(),
   },

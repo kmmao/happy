@@ -92,6 +92,13 @@ export const es: TranslationStructure = {
     lastSeen: ({ time }: { time: string }) => `visto por última vez ${time}`,
     permissionRequired: "permiso requerido",
     needsAttention: "esperando tu respuesta",
+    apiRetry: ({
+      attempt,
+      maxRetries,
+    }: {
+      attempt: number;
+      maxRetries: number;
+    }) => `reintentando API (${attempt}/${maxRetries})…`,
     activeNow: "Activo ahora",
     unknown: "desconocido",
   },
@@ -414,6 +421,7 @@ export const es: TranslationStructure = {
     bookmarkOption: "Marcador",
     appendToInput: "Editar en el campo de entrada",
     messageQueued: "En cola",
+    cancelQueued: "Cancelar",
   },
 
   bookmark: {
@@ -553,6 +561,10 @@ export const es: TranslationStructure = {
     resumeSession: "Reanudar sesión",
     resumeSessionSubtitle:
       "Reanudar esta sesión con el contexto completo en la misma máquina",
+    forkSession: "Bifurcar sesión",
+    forkSessionSubtitle: "Crear una nueva sesión bifurcada desde este punto con contexto completo",
+    forkSessionSuccess: "Sesión bifurcada exitosamente",
+    forkSessionFailed: "Error al bifurcar la sesión",
     deleteSession: "Eliminar sesión",
     deleteSessionSubtitle: "Eliminar permanentemente esta sesión",
     deleteSessionConfirm: "¿Eliminar sesión permanentemente?",
@@ -828,6 +840,9 @@ export const es: TranslationStructure = {
       otherDescription: "Escribe tu propia respuesta",
       otherPlaceholder: "Escribe tu respuesta...",
       recommended: "Recomendado",
+    },
+    planFile: {
+      refreshFromFile: "Actualizar desde archivo",
     },
   },
 
@@ -2200,6 +2215,12 @@ export const es: TranslationStructure = {
     untitledReport: "Informe sin título",
     reportDetail: "Informe de investigación",
     reportNotFound: "Informe no encontrado",
+  },
+
+  elicitation: {
+    accept: "Aceptar",
+    decline: "Rechazar",
+    submit: "Enviar",
   },
 } as const;
 

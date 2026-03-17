@@ -79,6 +79,21 @@ export function useSessionStatus(session: Session): SessionStatus {
   }
 
   if (session.thinking === true) {
+    // Show retry status when API is being retried
+    if (session.apiRetry) {
+      return {
+        state: "thinking",
+        isConnected: true,
+        statusText: t("status.apiRetry", {
+          attempt: session.apiRetry.attempt,
+          maxRetries: session.apiRetry.maxRetries,
+        }),
+        shouldShowStatus: true,
+        statusColor: "#FF9500",
+        statusDotColor: "#FF9500",
+        isPulsing: true,
+      };
+    }
     return {
       state: "thinking",
       isConnected: true,

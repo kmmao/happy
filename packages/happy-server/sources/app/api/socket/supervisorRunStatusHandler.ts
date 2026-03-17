@@ -156,6 +156,9 @@ export function supervisorRunStatusHandler(
                 const restoredIds: string[] = [];
                 const suppressedIds: string[] = [];
 
+                // Collect batch updates to avoid N+1 DB writes
+                const batchOps: ReturnType<typeof db.supervisorAction.update>[] = [];
+
                 for (const action of data.actions) {
                     const key = `${action.category}::${action.title}`;
                     const existing = existingKeys.get(key);
@@ -163,39 +166,50 @@ export function supervisorRunStatusHandler(
                         newActions.push(action);
                     } else if (existing.approval === "pending") {
                         // Update existing pending action with latest data
-                        await db.supervisorAction.update({
-                            where: { id: existing.id },
-                            data: {
-                                lastSeenRunId: data.runId,
-                                description: action.description,
-                                suggestedFix: action.suggestedFix ?? null,
-                                confidence: action.confidence ?? null,
-                                severity: action.severity,
-                            },
-                        });
+                        batchOps.push(
+                            db.supervisorAction.update({
+                                where: { id: existing.id },
+                                data: {
+                                    lastSeenRunId: data.runId,
+                                    description: action.description,
+                                    suggestedFix: action.suggestedFix ?? null,
+                                    confidence: action.confidence ?? null,
+                                    severity: action.severity,
+                                },
+                            }),
+                        );
                         updatedIds.push(existing.id);
                     } else if (existing.approval === "skipped") {
                         // Restore skipped action back to pending
-                        await db.supervisorAction.update({
-                            where: { id: existing.id },
-                            data: {
-                                approval: "pending",
-                                lastSeenRunId: data.runId,
-                                description: action.description,
-                                suggestedFix: action.suggestedFix ?? null,
-                                confidence: action.confidence ?? null,
-                                severity: action.severity,
-                            },
-                        });
+                        batchOps.push(
+                            db.supervisorAction.update({
+                                where: { id: existing.id },
+                                data: {
+                                    approval: "pending",
+                                    lastSeenRunId: data.runId,
+                                    description: action.description,
+                                    suggestedFix: action.suggestedFix ?? null,
+                                    confidence: action.confidence ?? null,
+                                    severity: action.severity,
+                                },
+                            }),
+                        );
                         restoredIds.push(existing.id);
                     } else if (existing.approval === "ignored") {
                         // Suppress: only update lastSeenRunId, don't change approval
-                        await db.supervisorAction.update({
-                            where: { id: existing.id },
-                            data: { lastSeenRunId: data.runId },
-                        });
+                        batchOps.push(
+                            db.supervisorAction.update({
+                                where: { id: existing.id },
+                                data: { lastSeenRunId: data.runId },
+                            }),
+                        );
                         suppressedIds.push(existing.id);
                     }
+                }
+
+                // Execute all dedup updates in a single transaction
+                if (batchOps.length > 0) {
+                    await db.$transaction(batchOps);
                 }
 
                 // Create only genuinely new actions

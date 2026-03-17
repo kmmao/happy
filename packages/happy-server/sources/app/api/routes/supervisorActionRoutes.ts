@@ -239,6 +239,7 @@ export function supervisorActionRoutes(app: Fastify) {
                     id: actionId,
                     projectId: id,
                     accountId: userId,
+                    approval: { in: ["skipped", "ignored"] },
                 },
             });
 

@@ -91,6 +91,9 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // ── toolConfig (AskUserQuestion previewFormat etc.) ──
   if (opts.toolConfig) result.toolConfig = opts.toolConfig;
 
+  // ── onElicitation (MCP server user input requests) ──
+  if (opts.onElicitation) result.onElicitation = opts.onElicitation;
+
   // ── Load user & project settings so custom skills/commands are discovered ──
   // The SDK defaults settingSources to [] which produces --setting-sources "",
   // causing Claude Code to skip loading ~/.claude/commands/ and project commands.

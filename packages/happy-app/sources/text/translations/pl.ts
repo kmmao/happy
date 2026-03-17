@@ -105,6 +105,13 @@ export const pl: TranslationStructure = {
     lastSeen: ({ time }: { time: string }) => `ostatnio widziano ${time}`,
     permissionRequired: "wymagane uprawnienie",
     needsAttention: "czeka na twoją odpowiedź",
+    apiRetry: ({
+      attempt,
+      maxRetries,
+    }: {
+      attempt: number;
+      maxRetries: number;
+    }) => `ponowna próba API (${attempt}/${maxRetries})…`,
     activeNow: "Aktywny teraz",
     unknown: "nieznane",
   },
@@ -421,6 +428,7 @@ export const pl: TranslationStructure = {
     bookmarkOption: "Zakładka",
     appendToInput: "Edytuj w polu wpisywania",
     messageQueued: "W kolejce",
+    cancelQueued: "Anuluj",
   },
 
   bookmark: {
@@ -559,6 +567,10 @@ export const pl: TranslationStructure = {
     resumeSession: "Wznów sesję",
     resumeSessionSubtitle:
       "Wznów tę sesję z pełnym kontekstem na tej samej maszynie",
+    forkSession: "Rozwidl sesję",
+    forkSessionSubtitle: "Utwórz nową sesję rozgałęzioną od tego punktu z pełnym kontekstem",
+    forkSessionSuccess: "Sesja rozwidlona pomyślnie",
+    forkSessionFailed: "Nie udało się rozwidlić sesji",
     deleteSession: "Usuń sesję",
     deleteSessionSubtitle: "Trwale usuń tę sesję",
     deleteSessionConfirm: "Usunąć sesję na stałe?",
@@ -837,6 +849,9 @@ export const pl: TranslationStructure = {
       otherDescription: "Wpisz własną odpowiedź",
       otherPlaceholder: "Wpisz swoją odpowiedź...",
       recommended: "Zalecane",
+    },
+    planFile: {
+      refreshFromFile: "Odśwież z pliku",
     },
   },
 
@@ -2220,6 +2235,12 @@ export const pl: TranslationStructure = {
     untitledReport: "Raport bez tytułu",
     reportDetail: "Raport z badań",
     reportNotFound: "Nie znaleziono raportu",
+  },
+
+  elicitation: {
+    accept: "Zaakceptuj",
+    decline: "Odrzuć",
+    submit: "Wyślij",
   },
 } as const;
 

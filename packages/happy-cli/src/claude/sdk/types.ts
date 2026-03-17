@@ -12,12 +12,18 @@ export type {
   SDKResultMessage,
   SDKResultSuccess,
   SDKResultError,
+  SDKAPIRetryMessage,
   PermissionResult,
   ThinkingConfig,
   Settings,
+  ElicitationRequest,
+  ElicitationResult,
+  OnElicitation,
+  ForkSessionOptions,
+  ForkSessionResult,
 } from "@anthropic-ai/claude-agent-sdk";
 
-export { AbortError } from "@anthropic-ai/claude-agent-sdk";
+export { AbortError, forkSession } from "@anthropic-ai/claude-agent-sdk";
 
 // ── Adapter-specific types (our API, not the official SDK's) ──
 
@@ -77,6 +83,8 @@ export interface QueryOptions {
    * Use 'html' for web-based SDK consumers (happy-cli default).
    */
   toolConfig?: import("@anthropic-ai/claude-agent-sdk").ToolConfig;
+  /** Callback for handling MCP elicitation requests (user input from MCP servers) */
+  onElicitation?: import("@anthropic-ai/claude-agent-sdk").OnElicitation;
 }
 
 /** Query prompt — string or async stream of user messages */

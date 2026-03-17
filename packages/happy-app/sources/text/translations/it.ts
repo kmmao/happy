@@ -157,6 +157,13 @@ export const it: TranslationStructure = {
     lastSeen: ({ time }: { time: string }) => `visto l'ultima volta ${time}`,
     permissionRequired: "permesso richiesto",
     needsAttention: "in attesa della tua risposta",
+    apiRetry: ({
+      attempt,
+      maxRetries,
+    }: {
+      attempt: number;
+      maxRetries: number;
+    }) => `nuovo tentativo API (${attempt}/${maxRetries})…`,
     activeNow: "Attivo ora",
     unknown: "sconosciuto",
   },
@@ -476,6 +483,7 @@ export const it: TranslationStructure = {
     bookmarkOption: "Segnalibro",
     appendToInput: "Modifica nel campo di input",
     messageQueued: "In coda",
+    cancelQueued: "Annulla",
   },
 
   bookmark: {
@@ -613,6 +621,10 @@ export const it: TranslationStructure = {
     resumeSession: "Riprendi sessione",
     resumeSessionSubtitle:
       "Riprendi questa sessione con il contesto completo sulla stessa macchina",
+    forkSession: "Biforca sessione",
+    forkSessionSubtitle: "Crea una nuova sessione ramificata da questo punto con contesto completo",
+    forkSessionSuccess: "Sessione biforcata con successo",
+    forkSessionFailed: "Impossibile biforcare la sessione",
     deleteSession: "Elimina sessione",
     deleteSessionSubtitle: "Rimuovi definitivamente questa sessione",
     deleteSessionConfirm: "Eliminare definitivamente la sessione?",
@@ -828,6 +840,9 @@ export const it: TranslationStructure = {
       otherDescription: "Scrivi la tua risposta",
       otherPlaceholder: "Scrivi la tua risposta...",
       recommended: "Consigliato",
+    },
+    planFile: {
+      refreshFromFile: "Aggiorna dal file",
     },
     multiEdit: {
       editNumber: ({ index, total }: { index: number; total: number }) =>
@@ -2199,6 +2214,12 @@ export const it: TranslationStructure = {
     untitledReport: "Report senza titolo",
     reportDetail: "Report di ricerca",
     reportNotFound: "Report non trovato",
+  },
+
+  elicitation: {
+    accept: "Accetta",
+    decline: "Rifiuta",
+    submit: "Invia",
   },
 } as const;
 

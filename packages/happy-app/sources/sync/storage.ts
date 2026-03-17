@@ -128,6 +128,7 @@ interface StorageState {
   // Queued message tracking (in-memory only, not persisted)
   queuedMessageLocalIds: Record<string, string[]>;
   addQueuedMessageId: (sessionId: string, localId: string) => void;
+  removeQueuedMessageId: (sessionId: string, localId: string) => void;
   clearQueuedMessageIds: (sessionId: string) => void;
   machines: Record<string, Machine>;
   artifacts: Record<string, DecryptedArtifact>; // New artifacts storage
@@ -443,6 +444,19 @@ export const storage = create<StorageState>()((set, get) => {
           ],
         },
       })),
+    removeQueuedMessageId: (sessionId: string, localId: string) =>
+      set((prev) => {
+        const current = prev.queuedMessageLocalIds[sessionId];
+        if (!current) return prev;
+        const filtered = current.filter((id) => id !== localId);
+        if (filtered.length === current.length) return prev;
+        return {
+          queuedMessageLocalIds: {
+            ...prev.queuedMessageLocalIds,
+            [sessionId]: filtered,
+          },
+        };
+      }),
     clearQueuedMessageIds: (sessionId: string) =>
       set((prev) => {
         const { [sessionId]: _, ...rest } = prev.queuedMessageLocalIds;

@@ -107,6 +107,13 @@ export const en: TranslationStructure = {
     lastSeen: ({ time }: { time: string }) => `last seen ${time}`,
     permissionRequired: "permission required",
     needsAttention: "waiting for you",
+    apiRetry: ({
+      attempt,
+      maxRetries,
+    }: {
+      attempt: number;
+      maxRetries: number;
+    }) => `retrying API (${attempt}/${maxRetries})…`,
     activeNow: "Active now",
     unknown: "unknown",
   },
@@ -411,6 +418,7 @@ export const en: TranslationStructure = {
     bookmarkOption: "Bookmark",
     appendToInput: "Edit in input",
     messageQueued: "Queued",
+    cancelQueued: "Cancel",
   },
 
   bookmark: {
@@ -547,6 +555,10 @@ export const en: TranslationStructure = {
     resumeSession: "Resume Session",
     resumeSessionSubtitle:
       "Resume this session with full context on the same machine",
+    forkSession: "Fork Session",
+    forkSessionSubtitle: "Create a new session branching from this point with full context",
+    forkSessionSuccess: "Session forked successfully",
+    forkSessionFailed: "Failed to fork session",
     deleteSession: "Delete Session",
     deleteSessionSubtitle: "Permanently remove this session",
     deleteSessionConfirm: "Delete Session Permanently?",
@@ -790,6 +802,9 @@ export const en: TranslationStructure = {
       otherDescription: "Type your own answer",
       otherPlaceholder: "Type your answer...",
       recommended: "Recommended",
+    },
+    planFile: {
+      refreshFromFile: "Refresh from file",
     },
     desc: {
       terminalCmd: ({ cmd }: { cmd: string }) => `Terminal(cmd: ${cmd})`,
@@ -2188,6 +2203,12 @@ export const en: TranslationStructure = {
     untitledReport: "Untitled Report",
     reportDetail: "Research Report",
     reportNotFound: "Report not found",
+  },
+
+  elicitation: {
+    accept: "Accept",
+    decline: "Decline",
+    submit: "Submit",
   },
 } as const;
 

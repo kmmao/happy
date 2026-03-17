@@ -8,6 +8,7 @@ import {
   AbortError,
   SDKUserMessage,
 } from "@/claude/sdk";
+import type { OnElicitation } from "@/claude/sdk/types";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { join, resolve } from "node:path";
@@ -66,6 +67,8 @@ export async function claudeRemote(opts: {
   hookSettingsPath: string;
   /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
   jsRuntime?: JsRuntime;
+  /** Callback for handling MCP elicitation requests (forwarded to App) */
+  onElicitation?: OnElicitation;
 
   // Dynamic parameters
   nextMessage: () => Promise<{ message: string; mode: EnhancedMode } | null>;
@@ -265,6 +268,7 @@ export async function claudeRemote(opts: {
     thinking: initial.mode.thinking,
     effort: initial.mode.effort,
     promptSuggestions: true,
+    onElicitation: opts.onElicitation,
   };
 
   // Track thinking state

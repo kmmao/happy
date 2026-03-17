@@ -17,7 +17,7 @@ import {
 } from "@/utils/sessionUtils";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
-import { sessionKill, sessionDelete, machineSpawnNewSession } from "@/sync/ops";
+import { sessionKill, sessionDelete, machineSpawnNewSession, sessionForkSession } from "@/sync/ops";
 import { useUnistyles } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
@@ -163,6 +163,16 @@ function SessionInfoContent({ session }: { session: Session }) {
     !!machine &&
     isMachineOnline(machine);
 
+  // Fork preconditions: session has claudeSessionId, machineId, path, session is active, and machine online
+  const canFork =
+    sessionStatus.isConnected &&
+    !!session.metadata?.claudeSessionId &&
+    !!session.metadata?.machineId &&
+    !!session.metadata?.path &&
+    (!session.metadata?.flavor || session.metadata.flavor === "claude") &&
+    !!machine &&
+    isMachineOnline(machine);
+
   // Check if CLI version is outdated
   const isCliOutdated =
     session.metadata?.version &&
@@ -276,6 +286,32 @@ function SessionInfoContent({ session }: { session: Session }) {
   const handleResumeSession = useCallback(() => {
     performResume();
   }, [performResume]);
+
+  // Fork session — create a new session branching from the current one
+  const [forkingSession, performFork] = useHappyAction(async () => {
+    const forkResult = await sessionForkSession(session.id, {});
+    if ("error" in forkResult) {
+      throw new HappyError(forkResult.error, false);
+    }
+    // Spawn a new Happy session using the forked Claude session ID
+    const spawnResult = await machineSpawnNewSession({
+      machineId: session.metadata!.machineId!,
+      directory: forkResult.path,
+      claudeSessionId: forkResult.claudeSessionId,
+      agent: "claude",
+    });
+    if (spawnResult.type === "error") {
+      throw new HappyError(spawnResult.errorMessage, false);
+    }
+    if (spawnResult.type === "success") {
+      Modal.toast(t("sessionInfo.forkSessionSuccess"));
+      navigateToSession(spawnResult.sessionId);
+    }
+  });
+
+  const handleForkSession = useCallback(() => {
+    performFork();
+  }, [performFork]);
 
   const formatDate = useCallback((timestamp: number) => {
     return new Date(timestamp).toLocaleString();
@@ -485,6 +521,14 @@ function SessionInfoContent({ session }: { session: Session }) {
               subtitle={t("sessionInfo.resumeSessionSubtitle")}
               icon={<Ionicons name="play-outline" size={29} color="#34C759" />}
               onPress={handleResumeSession}
+            />
+          )}
+          {canFork && (
+            <Item
+              title={t("sessionInfo.forkSession")}
+              subtitle={t("sessionInfo.forkSessionSubtitle")}
+              icon={<Ionicons name="git-branch-outline" size={29} color={theme.colors.textLink} />}
+              onPress={handleForkSession}
             />
           )}
           {!sessionStatus.isConnected && !session.active && (

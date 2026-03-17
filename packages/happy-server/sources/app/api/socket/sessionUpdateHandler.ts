@@ -140,6 +140,12 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
         sid: string;
         time: number;
         thinking?: boolean;
+        apiRetry?: {
+            attempt: number;
+            maxRetries: number;
+            retryDelayMs: number;
+            errorStatus: number | null;
+        };
     }) => {
         try {
             // Track metrics
@@ -170,8 +176,8 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
             // Queue database update (will only update if time difference is significant)
             activityCache.queueSessionUpdate(sid, t);
 
-            // Emit session activity update
-            const sessionActivity = buildSessionActivityEphemeral(sid, true, t, thinking || false);
+            // Emit session activity update (include apiRetry if present)
+            const sessionActivity = buildSessionActivityEphemeral(sid, true, t, thinking || false, data.apiRetry);
             eventRouter.emitEphemeral({
                 userId,
                 payload: sessionActivity,

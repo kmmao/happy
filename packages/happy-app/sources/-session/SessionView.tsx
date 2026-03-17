@@ -1,5 +1,6 @@
 import { AgentContentView } from "@/components/AgentContentView";
 import { AgentInput } from "@/components/AgentInput";
+import { ElicitationBanner } from "@/components/ElicitationBanner";
 import { InputFAB, InputFABStatusInfo } from "@/components/InputFAB";
 import { IssueSummaryHeader } from "@/components/IssueSummaryHeader";
 import { useCollapsibleInput } from "@/hooks/useCollapsibleInput";
@@ -1017,6 +1018,12 @@ function SessionViewInner({
                   }
                 : null
             }
+          />
+        )}
+        {session.agentState?.elicitation && (
+          <ElicitationBanner
+            sessionId={sessionId}
+            elicitation={session.agentState.elicitation}
           />
         )}
         <AgentContentView

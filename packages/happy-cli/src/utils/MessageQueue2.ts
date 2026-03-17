@@ -5,6 +5,7 @@ interface QueueItem<T> {
   mode: T;
   modeHash: string;
   isolate?: boolean; // If true, this message must be processed alone
+  localKey?: string; // App-assigned ID for targeted cancellation
 }
 
 /**
@@ -38,19 +39,20 @@ export class MessageQueue2<T> {
   /**
    * Push a message to the queue with a mode.
    */
-  push(message: string, mode: T): void {
+  push(message: string, mode: T, localKey?: string): void {
     if (this.closed) {
       throw new Error("Cannot push to closed queue");
     }
 
     const modeHash = this.modeHasher(mode);
-    logger.debug(`[MessageQueue2] push() called with mode hash: ${modeHash}`);
+    logger.debug(`[MessageQueue2] push() called with mode hash: ${modeHash}${localKey ? `, localKey: ${localKey}` : ""}`);
 
     this.queue.push({
       message,
       mode,
       modeHash,
       isolate: false,
+      localKey,
     });
 
     // Trigger message handler if set
@@ -211,6 +213,25 @@ export class MessageQueue2<T> {
 
     // Clear waiter without calling it since we're not closing
     this.waiter = null;
+  }
+
+  /**
+   * Cancel a queued message by its localKey.
+   * Returns true if the message was found and removed.
+   */
+  cancelByLocalKey(localKey: string): boolean {
+    const idx = this.queue.findIndex((item) => item.localKey === localKey);
+    if (idx === -1) {
+      logger.debug(
+        `[MessageQueue2] cancelByLocalKey: localKey ${localKey} not found`,
+      );
+      return false;
+    }
+    this.queue = [...this.queue.slice(0, idx), ...this.queue.slice(idx + 1)];
+    logger.debug(
+      `[MessageQueue2] cancelByLocalKey: removed localKey ${localKey}, remaining: ${this.queue.length}`,
+    );
+    return true;
   }
 
   /**

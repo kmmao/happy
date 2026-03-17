@@ -94,6 +94,13 @@ export const zhHans: TranslationStructure = {
     lastSeen: ({ time }: { time: string }) => `最后活跃时间 ${time}`,
     permissionRequired: "需要权限",
     needsAttention: "等待你的回复",
+    apiRetry: ({
+      attempt,
+      maxRetries,
+    }: {
+      attempt: number;
+      maxRetries: number;
+    }) => `API 重试中 (${attempt}/${maxRetries})…`,
     activeNow: "当前活跃",
     unknown: "未知",
   },
@@ -383,6 +390,7 @@ export const zhHans: TranslationStructure = {
     bookmarkOption: "收藏",
     appendToInput: "编辑后发送",
     messageQueued: "已排队",
+    cancelQueued: "取消",
   },
 
   bookmark: {
@@ -516,6 +524,10 @@ export const zhHans: TranslationStructure = {
     updateCliInstructions: "请运行 npm install -g happy-coder@latest",
     resumeSession: "恢复会话",
     resumeSessionSubtitle: "在同一台机器上恢复此会话的完整上下文",
+    forkSession: "分叉会话",
+    forkSessionSubtitle: "从此处创建一个包含完整上下文的新会话分支",
+    forkSessionSuccess: "会话分叉成功",
+    forkSessionFailed: "会话分叉失败",
     deleteSession: "删除会话",
     deleteSessionSubtitle: "永久删除此会话",
     deleteSessionConfirm: "永久删除会话？",
@@ -788,6 +800,9 @@ export const zhHans: TranslationStructure = {
       otherDescription: "输入您自己的答案",
       otherPlaceholder: "输入您的答案...",
       recommended: "推荐",
+    },
+    planFile: {
+      refreshFromFile: "从文件刷新",
     },
   },
 
@@ -2100,5 +2115,11 @@ export const zhHans: TranslationStructure = {
     untitledReport: "未命名报告",
     reportDetail: "调研报告",
     reportNotFound: "报告未找到",
+  },
+
+  elicitation: {
+    accept: "接受",
+    decline: "拒绝",
+    submit: "提交",
   },
 } as const;

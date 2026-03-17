@@ -504,6 +504,10 @@ export const ru: TranslationStructure = {
     resumeSession: "Возобновить сессию",
     resumeSessionSubtitle:
       "Возобновить сессию с полным контекстом на той же машине",
+    forkSession: "Разветвить сессию",
+    forkSessionSubtitle: "Создать новую сессию, ответвлённую от этой точки с полным контекстом",
+    forkSessionSuccess: "Сессия успешно разветвлена",
+    forkSessionFailed: "Не удалось разветвить сессию",
     deleteSession: "Удалить сессию",
     deleteSessionSubtitle: "Удалить эту сессию навсегда",
     deleteSessionConfirm: "Удалить сессию навсегда?",
@@ -550,6 +554,13 @@ export const ru: TranslationStructure = {
     lastSeen: ({ time }: { time: string }) => `в сети ${time}`,
     permissionRequired: "требуется разрешение",
     needsAttention: "ожидает вашего ответа",
+    apiRetry: ({
+      attempt,
+      maxRetries,
+    }: {
+      attempt: number;
+      maxRetries: number;
+    }) => `повтор API (${attempt}/${maxRetries})…`,
     activeNow: "Активен сейчас",
     unknown: "неизвестно",
   },
@@ -577,6 +588,7 @@ export const ru: TranslationStructure = {
     bookmarkOption: "Закладка",
     appendToInput: "Редактировать в поле ввода",
     messageQueued: "В очереди",
+    cancelQueued: "Отменить",
   },
 
   bookmark: {
@@ -838,6 +850,9 @@ export const ru: TranslationStructure = {
       otherDescription: "Введите свой ответ",
       otherPlaceholder: "Введите ваш ответ...",
       recommended: "Рекомендуется",
+    },
+    planFile: {
+      refreshFromFile: "Обновить из файла",
     },
   },
 
@@ -2218,6 +2233,12 @@ export const ru: TranslationStructure = {
     untitledReport: "Без названия",
     reportDetail: "Отчёт об исследовании",
     reportNotFound: "Отчёт не найден",
+  },
+
+  elicitation: {
+    accept: "Принять",
+    decline: "Отклонить",
+    submit: "Отправить",
   },
 } as const;
 

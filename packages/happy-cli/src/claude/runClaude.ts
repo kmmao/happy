@@ -640,9 +640,24 @@ export async function runClaude(
       locale: messageLocale,
       ...(messageContinue && { continue: true }),
     };
-    messageQueue.push(message.content.text, enhancedMode);
+    messageQueue.push(message.content.text, enhancedMode, message.localKey);
     logger.debugLargeJson("User message pushed to queue:", message);
   });
+
+  // Register RPC handler for cancelling queued messages by localKey
+  session.rpcHandlerManager.registerHandler(
+    "cancelQueuedMessage",
+    async (args: { localKey: string }) => {
+      if (!args.localKey) {
+        return { cancelled: false };
+      }
+      const cancelled = messageQueue.cancelByLocalKey(args.localKey);
+      logger.debug(
+        `[loop] cancelQueuedMessage RPC: localKey=${args.localKey}, cancelled=${cancelled}`,
+      );
+      return { cancelled };
+    },
+  );
 
   // Guard flag to prevent double worktree cleanup (signal handler vs normal exit)
   let worktreeCleanedUp = false;

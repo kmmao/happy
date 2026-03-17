@@ -157,6 +157,13 @@ export const ja: TranslationStructure = {
     lastSeen: ({ time }: { time: string }) => `最終アクセス: ${time}`,
     permissionRequired: "権限が必要です",
     needsAttention: "あなたの返信を待っています",
+    apiRetry: ({
+      attempt,
+      maxRetries,
+    }: {
+      attempt: number;
+      maxRetries: number;
+    }) => `API リトライ中 (${attempt}/${maxRetries})…`,
     activeNow: "アクティブ",
     unknown: "不明",
   },
@@ -461,6 +468,7 @@ export const ja: TranslationStructure = {
     bookmarkOption: "ブックマーク",
     appendToInput: "入力欄で編集",
     messageQueued: "キュー中",
+    cancelQueued: "キャンセル",
   },
 
   bookmark: {
@@ -601,6 +609,10 @@ export const ja: TranslationStructure = {
     resumeSession: "セッションを再開",
     resumeSessionSubtitle:
       "同じマシンで完全なコンテキストを使ってセッションを再開",
+    forkSession: "セッションをフォーク",
+    forkSessionSubtitle: "この時点からフルコンテキストで新しいセッションを分岐",
+    forkSessionSuccess: "セッションのフォークに成功しました",
+    forkSessionFailed: "セッションのフォークに失敗しました",
     deleteSession: "セッションを削除",
     deleteSessionSubtitle: "このセッションを完全に削除",
     deleteSessionConfirm: "セッションを完全に削除しますか？",
@@ -817,6 +829,9 @@ export const ja: TranslationStructure = {
       otherDescription: "自分の回答を入力",
       otherPlaceholder: "回答を入力...",
       recommended: "推奨",
+    },
+    planFile: {
+      refreshFromFile: "ファイルから更新",
     },
     multiEdit: {
       editNumber: ({ index, total }: { index: number; total: number }) =>
@@ -2170,5 +2185,11 @@ export const ja: TranslationStructure = {
     untitledReport: "無題のレポート",
     reportDetail: "調査レポート",
     reportNotFound: "レポートが見つかりません",
+  },
+
+  elicitation: {
+    accept: "承認",
+    decline: "拒否",
+    submit: "送信",
   },
 } as const;

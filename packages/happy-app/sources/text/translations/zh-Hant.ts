@@ -94,6 +94,13 @@ export const zhHant: TranslationStructure = {
     lastSeen: ({ time }: { time: string }) => `最後活躍時間 ${time}`,
     permissionRequired: "需要權限",
     needsAttention: "等待你的回覆",
+    apiRetry: ({
+      attempt,
+      maxRetries,
+    }: {
+      attempt: number;
+      maxRetries: number;
+    }) => `API 重試中 (${attempt}/${maxRetries})…`,
     activeNow: "目前活躍",
     unknown: "未知",
   },
@@ -383,6 +390,7 @@ export const zhHant: TranslationStructure = {
     bookmarkOption: "收藏",
     appendToInput: "編輯後發送",
     messageQueued: "已排隊",
+    cancelQueued: "取消",
   },
 
   bookmark: {
@@ -516,6 +524,10 @@ export const zhHant: TranslationStructure = {
     updateCliInstructions: "請執行 npm install -g happy-coder@latest",
     resumeSession: "恢復會話",
     resumeSessionSubtitle: "在同一台機器上恢復此會話的完整上下文",
+    forkSession: "分叉工作階段",
+    forkSessionSubtitle: "從此處建立一個包含完整上下文的新工作階段分支",
+    forkSessionSuccess: "工作階段分叉成功",
+    forkSessionFailed: "工作階段分叉失敗",
     deleteSession: "刪除工作階段",
     deleteSessionSubtitle: "永久刪除此工作階段",
     deleteSessionConfirm: "永久刪除工作階段？",
@@ -757,6 +769,9 @@ export const zhHant: TranslationStructure = {
       otherDescription: "輸入您自己的答案",
       otherPlaceholder: "輸入您的答案...",
       recommended: "推薦",
+    },
+    planFile: {
+      refreshFromFile: "從檔案重新整理",
     },
     desc: {
       terminalCmd: ({ cmd }: { cmd: string }) => `終端機(命令: ${cmd})`,
@@ -2103,5 +2118,11 @@ export const zhHant: TranslationStructure = {
     untitledReport: "未命名報告",
     reportDetail: "調研報告",
     reportNotFound: "報告未找到",
+  },
+
+  elicitation: {
+    accept: "接受",
+    decline: "拒絕",
+    submit: "提交",
   },
 } as const;

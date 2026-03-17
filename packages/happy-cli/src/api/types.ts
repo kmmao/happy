@@ -104,6 +104,12 @@ export interface ClientToServerEvents {
     time: number;
     thinking: boolean;
     mode?: "local" | "remote";
+    apiRetry?: {
+      attempt: number;
+      maxRetries: number;
+      retryDelayMs: number;
+      errorStatus: number | null;
+    };
   }) => void;
   "session-end": (data: { sid: string; time: number }) => void;
   "update-metadata": (

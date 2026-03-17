@@ -8,6 +8,8 @@ import { mapToClaudeMode } from "./utils/permissionMode";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
 import { SDKAssistantMessage, SDKMessage, SDKUserMessage } from "./sdk";
+import { forkSession } from "./sdk/types";
+import type { ElicitationRequest, ElicitationResult } from "./sdk/types";
 import type {
   SDKStatusMessage as SDKStatusMsg,
   SDKCompactBoundaryMessage as SDKCompactMsg,
@@ -24,7 +26,7 @@ import { createEnvelope } from "@kmmao/happy-wire";
 import { hashObject } from "@/utils/deterministicJson";
 import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
 import { getProjectPath } from "./utils/path";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
@@ -178,6 +180,56 @@ export async function claudeRemoteLauncher(
     },
   );
 
+  // Register RPC handler for App to fetch plan file content
+  session.client.rpcHandlerManager.registerHandler(
+    "getPlanFileContent",
+    async () => {
+      if (!latestPlanFilePath) {
+        return { content: null, filePath: null };
+      }
+      try {
+        const content = await readFile(latestPlanFilePath, "utf-8");
+        return { content, filePath: latestPlanFilePath };
+      } catch {
+        // File write may still be in progress — fall back to cached content
+        return { content: latestPlanContent, filePath: latestPlanFilePath };
+      }
+    },
+  );
+
+  // Register RPC handler for forking a session at a specific message
+  session.client.rpcHandlerManager.registerHandler(
+    "forkSession",
+    async (args: { upToMessageId?: string; title?: string }) => {
+      const claudeSessionId = session.sessionId;
+      if (!claudeSessionId) {
+        return { error: "No active Claude session to fork" };
+      }
+      // Validate args — only accept strings
+      const upToMessageId = typeof args.upToMessageId === "string" ? args.upToMessageId : undefined;
+      const title = typeof args.title === "string" ? args.title : undefined;
+      try {
+        const result = await forkSession(claudeSessionId, {
+          upToMessageId,
+          title,
+          dir: session.path,
+        });
+        logger.debug(
+          `[remote]: forked session ${claudeSessionId} → ${result.sessionId}`,
+        );
+        return {
+          claudeSessionId: result.sessionId,
+          path: session.path,
+        };
+      } catch (err) {
+        logger.debug(`[remote]: forkSession failed: ${err}`);
+        return {
+          error: err instanceof Error ? err.message : "Fork failed",
+        };
+      }
+    },
+  );
+
   // Create permission handler
   const permissionHandler = new PermissionHandler(session);
 
@@ -203,6 +255,8 @@ export async function claudeRemoteLauncher(
 
   // Handle messages
   let planModeToolCalls = new Set<string>();
+  let latestPlanFilePath: string | null = null;
+  let latestPlanContent: string | null = null;
   let ongoingToolCalls = new Map<string, { parentToolCallId: string | null }>();
   let lastResultData: {
     totalCostUsd: number;
@@ -237,6 +291,24 @@ export async function claudeRemoteLauncher(
             if (c.name === "exit_plan_mode" || c.name === "ExitPlanMode") {
               logger.debug("[remote]: detected plan mode tool call " + c.id!);
               planModeToolCalls.add(c.id! as string);
+
+              // Save plan content to file for persistence and App full-screen viewing
+              const planText = (c as any).input?.plan;
+              if (planText && session.sessionId) {
+                const plansDir = join(getProjectPath(session.path), "plans");
+                const planPath = join(plansDir, `${session.sessionId}.md`);
+                // Set path immediately so RPC handler can find it even before write completes
+                latestPlanFilePath = planPath;
+                latestPlanContent = planText;
+                mkdir(plansDir, { recursive: true })
+                  .then(() => writeFile(planPath, planText, "utf-8"))
+                  .then(() => {
+                    logger.debug(`[remote]: plan saved to ${planPath}`);
+                  })
+                  .catch((err) =>
+                    logger.debug(`[remote]: failed to save plan file: ${err}`),
+                  );
+              }
             }
             // When SDK enters plan mode via EnterPlanMode tool, sync permissionHandler
             // so ExitPlanMode goes through the normal approval flow instead of auto-approving
@@ -358,6 +430,20 @@ export async function claudeRemoteLauncher(
           : undefined,
       });
       session.client.sendSessionProtocolMessage(envelope);
+    }
+
+    // Forward API retry status via keep-alive ephemeral channel
+    if (
+      message.type === "system" &&
+      (message as any).subtype === "api_retry"
+    ) {
+      const m = message as any;
+      session.client.keepAlive(true, "remote", true, {
+        attempt: m.attempt,
+        maxRetries: m.max_retries,
+        retryDelayMs: m.retry_delay_ms,
+        errorStatus: m.error_status ?? null,
+      });
     }
 
     // Forward Tool progress to session protocol
@@ -525,6 +611,91 @@ export async function claudeRemoteLauncher(
       }
     }
   }
+
+  // ── MCP Elicitation: forward to App, wait for response via RPC ──
+  // Hoisted outside the per-turn loop so pending elicitations survive across turns
+  const pendingElicitations = new Map<
+    string,
+    { resolve: (result: ElicitationResult) => void; reject: (err: Error) => void }
+  >();
+  let elicitationCounter = 0;
+
+  session.client.rpcHandlerManager.registerHandler(
+    "elicitationResponse",
+    async (response: { id: string; action: string; content?: Record<string, unknown> }) => {
+      const pendingItem = pendingElicitations.get(response.id);
+      if (!pendingItem) {
+        logger.debug(`[remote]: elicitationResponse for unknown id ${response.id}`);
+        return;
+      }
+      const validActions = ["accept", "decline", "cancel"] as const;
+      if (!validActions.includes(response.action as typeof validActions[number])) {
+        logger.debug(`[remote]: invalid elicitation action: ${response.action}`);
+        return;
+      }
+      pendingElicitations.delete(response.id);
+      // Clear the elicitation banner from App
+      session.client.updateAgentState((s) => ({ ...s, elicitation: null }));
+      pendingItem.resolve({
+        action: response.action as "accept" | "decline" | "cancel",
+        content: response.content,
+      } as ElicitationResult);
+    },
+  );
+
+  const handleElicitation = async (
+    request: ElicitationRequest,
+    options: { signal: AbortSignal },
+  ): Promise<ElicitationResult> => {
+    const id = `elicit-${++elicitationCounter}`;
+    logger.debug(`[remote]: MCP elicitation request from ${request.serverName}: ${id}`);
+
+    return new Promise<ElicitationResult>((resolve, reject) => {
+      const abortHandler = () => {
+        pendingElicitations.delete(id);
+        // Clear the elicitation banner on abort
+        session.client.updateAgentState((s) => ({ ...s, elicitation: null }));
+        reject(new Error("Elicitation aborted"));
+      };
+      options.signal.addEventListener("abort", abortHandler, { once: true });
+
+      pendingElicitations.set(id, {
+        resolve: (result) => {
+          options.signal.removeEventListener("abort", abortHandler);
+          resolve(result);
+        },
+        reject: (err) => {
+          options.signal.removeEventListener("abort", abortHandler);
+          reject(err);
+        },
+      });
+
+      // Push elicitation request to App via agent state
+      session.client.updateAgentState((currentState) => ({
+        ...currentState,
+        elicitation: {
+          id,
+          serverName: request.serverName,
+          message: request.message,
+          mode: request.mode ?? "form",
+          url: request.url,
+          requestedSchema: request.requestedSchema,
+        },
+      }));
+
+      // Send push notification
+      session.api
+        .push()
+        .sendToAllDevices(
+          "MCP Input Required",
+          `${request.serverName}: ${request.message}`,
+          {
+            sessionId: session.client.sessionId,
+            type: "elicitation_request",
+          },
+        );
+    });
+  };
 
   try {
     let pending: {
@@ -721,6 +892,7 @@ export async function claudeRemoteLauncher(
           hookSettingsPath: session.hookSettingsPath,
           jsRuntime: session.jsRuntime,
           canCallTool: permissionHandler.handleToolCall,
+          onElicitation: handleElicitation,
           isAborted: (toolCallId: string) => {
             return permissionHandler.isAborted(toolCallId);
           },
@@ -958,6 +1130,12 @@ export async function claudeRemoteLauncher(
       }
     }
   } finally {
+    // Drain any pending elicitations to prevent Promise/listener leaks
+    for (const [id, { reject }] of pendingElicitations) {
+      reject(new Error("Session ended"));
+    }
+    pendingElicitations.clear();
+
     // Clean up permission handler
     permissionHandler.reset();
 

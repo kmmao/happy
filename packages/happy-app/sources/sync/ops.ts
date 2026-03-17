@@ -704,4 +704,93 @@ export type {
   TreeNode,
   SessionRipgrepResponse,
   SessionKillResponse,
+  PlanFileContentResponse,
 };
+
+/**
+ * Response type for getPlanFileContent RPC
+ */
+interface PlanFileContentResponse {
+    content: string | null;
+    filePath: string | null;
+}
+
+/**
+ * Fetch the saved plan file content from the CLI
+ */
+export async function sessionGetPlanFileContent(
+    sessionId: string,
+): Promise<PlanFileContentResponse> {
+    try {
+        const response = await apiSocket.sessionRPC<
+            PlanFileContentResponse,
+            Record<string, never>
+        >(sessionId, "getPlanFileContent", {});
+        return response;
+    } catch {
+        return { content: null, filePath: null };
+    }
+}
+
+interface CancelQueuedMessageResponse {
+    cancelled: boolean;
+}
+
+/**
+ * Cancel a queued message that hasn't been processed yet
+ */
+export async function sessionCancelQueuedMessage(
+    sessionId: string,
+    localKey: string,
+): Promise<boolean> {
+    try {
+        const response = await apiSocket.sessionRPC<
+            CancelQueuedMessageResponse,
+            { localKey: string }
+        >(sessionId, "cancelQueuedMessage", { localKey });
+        return response.cancelled;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Fork a session from a specific point, creating a new session with context up to that message
+ */
+export async function sessionForkSession(
+    sessionId: string,
+    opts: { upToMessageId?: string; title?: string },
+): Promise<{ claudeSessionId: string; path: string } | { error: string }> {
+    try {
+        const response = await apiSocket.sessionRPC<
+            { claudeSessionId?: string; path?: string; error?: string },
+            { upToMessageId?: string; title?: string }
+        >(sessionId, "forkSession", opts);
+        if (response.error || !response.claudeSessionId || !response.path) {
+            return { error: response.error ?? "Fork failed" };
+        }
+        return { claudeSessionId: response.claudeSessionId, path: response.path };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : "Fork failed" };
+    }
+}
+
+/**
+ * Respond to an MCP elicitation request
+ */
+export async function sessionElicitationResponse(
+    sessionId: string,
+    elicitationId: string,
+    action: "accept" | "decline" | "cancel",
+    content?: Record<string, unknown>,
+): Promise<void> {
+    try {
+        await apiSocket.sessionRPC<void, { id: string; action: string; content?: Record<string, unknown> }>(
+            sessionId,
+            "elicitationResponse",
+            { id: elicitationId, action, content },
+        );
+    } catch {
+        // Best-effort — elicitation may have already been cancelled
+    }
+}

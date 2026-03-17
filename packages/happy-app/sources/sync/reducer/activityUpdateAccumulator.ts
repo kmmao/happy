@@ -19,10 +19,11 @@ export class ActivityUpdateAccumulator {
         const isCriticalTimestamp = timeSinceLastUpdate > 60000; // Half of 120 second timeout
 
         // Check if this is a significant state change that needs immediate emission
-        const isSignificantChange = !lastState || 
-            lastState.active !== update.active || 
+        const isSignificantChange = !lastState ||
+            lastState.active !== update.active ||
             lastState.thinking !== update.thinking ||
-            isCriticalTimestamp;
+            isCriticalTimestamp ||
+            !!update.apiRetry;
 
         if (isSignificantChange) {
             // Cancel any pending timeout
