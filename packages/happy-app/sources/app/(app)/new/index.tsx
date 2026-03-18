@@ -121,6 +121,40 @@ const transformProfileToEnvironmentVars = (
   return getProfileEnvironmentVariables(profile);
 };
 
+// Helper function to get cached metadata from the most recent session for a machine + agentType
+// Used to provide accurate model/mode lists when creating new sessions
+const getCachedMetadataForMachine = (
+    allSessions: import("@/sync/storage").SessionListItem[] | null,
+    machineId: string | null,
+    agentType: string,
+): import("@/sync/storageTypes").Metadata | null => {
+    if (!machineId || !allSessions) return null;
+
+    const flavorMatches = (sessionFlavor: string | null | undefined): boolean => {
+        if (agentType === "claude") {
+            return !sessionFlavor || sessionFlavor === "claude";
+        }
+        return sessionFlavor === agentType;
+    };
+
+    let bestSession: import("@/sync/storageTypes").Session | null = null;
+    for (const item of allSessions) {
+        if (typeof item === "string") continue;
+        if (
+            item.metadata?.machineId === machineId &&
+            flavorMatches(item.metadata?.flavor) &&
+            item.metadata?.models &&
+            item.metadata.models.length > 0
+        ) {
+            if (!bestSession || item.updatedAt > bestSession.updatedAt) {
+                bestSession = item;
+            }
+        }
+    }
+
+    return bestSession?.metadata ?? null;
+};
+
 // Helper function to get the most recent path for a machine
 // Returns the path from the most recently CREATED session for this machine
 const getRecentPathForMachine = (
@@ -265,41 +299,6 @@ function NewSessionWizard() {
   const [sessionType, setSessionType] = React.useState<"simple" | "worktree">(
     "simple",
   );
-  const availableModes = React.useMemo(
-    () => getAvailablePermissionModes(agentType, null, t),
-    [agentType],
-  );
-  const profileCustomModels = React.useMemo(() => {
-    if (!selectedProfileId) return undefined;
-    const profile =
-      profileMap.get(selectedProfileId) ?? getBuiltInProfile(selectedProfileId);
-    return profile?.customModels;
-  }, [selectedProfileId, profileMap]);
-
-  const availableModels = React.useMemo(
-    () => getAvailableModels(agentType, null, t, profileCustomModels),
-    [agentType, profileCustomModels],
-  );
-
-  const [permissionMode, setPermissionMode] = React.useState<PermissionMode>(
-    () => {
-      const modes = getAvailablePermissionModes(agentType, null, t);
-      return (
-        resolveCurrentOption(modes, [
-          lastUsedPermissionMode,
-          getDefaultPermissionModeKey(agentType),
-        ]) ?? modes[0]
-      );
-    },
-  );
-
-  const [modelMode, setModelMode] = React.useState<ModelMode | null>(() => {
-    const models = getAvailableModels(agentType, null, t);
-    return resolveCurrentOption(models, [
-      lastUsedModelMode,
-      getDefaultModelKey(agentType),
-    ]);
-  });
 
   const [thinkingMode, setThinkingMode] = React.useState<string | null>(
     () => lastUsedThinkingMode ?? null,
@@ -324,6 +323,78 @@ function NewSessionWizard() {
     }
     return null;
   });
+
+  // Cache metadata from most recent session matching this machine + agentType
+  const cachedMetadata = React.useMemo(
+    () => getCachedMetadataForMachine(sessions, selectedMachineId, agentType),
+    [sessions, selectedMachineId, agentType],
+  );
+
+  const availableModes = React.useMemo(
+    () => getAvailablePermissionModes(agentType, cachedMetadata, t),
+    [agentType, cachedMetadata],
+  );
+  const profileCustomModels = React.useMemo(() => {
+    if (!selectedProfileId) return undefined;
+    const profile =
+      profileMap.get(selectedProfileId) ?? getBuiltInProfile(selectedProfileId);
+    return profile?.customModels;
+  }, [selectedProfileId, profileMap]);
+
+  const availableModels = React.useMemo(
+    () => getAvailableModels(
+      agentType,
+      profileCustomModels?.length ? null : cachedMetadata,
+      t,
+      profileCustomModels,
+    ),
+    [agentType, cachedMetadata, profileCustomModels],
+  );
+
+  const [permissionMode, setPermissionMode] = React.useState<PermissionMode>(
+    () => {
+      const modes = getAvailablePermissionModes(agentType, null, t);
+      return (
+        resolveCurrentOption(modes, [
+          lastUsedPermissionMode,
+          getDefaultPermissionModeKey(agentType),
+        ]) ?? modes[0]
+      );
+    },
+  );
+
+  const [modelMode, setModelMode] = React.useState<ModelMode | null>(() => {
+    const models = getAvailableModels(agentType, null, t);
+    return resolveCurrentOption(models, [
+      lastUsedModelMode,
+      getDefaultModelKey(agentType),
+    ]);
+  });
+
+  // Reset permissionMode & modelMode when available options change (e.g. agentType or machine switch)
+  // Uses functional updater to avoid stale closure on current state
+  React.useEffect(() => {
+    setPermissionMode((current) => {
+      const resolved =
+        resolveCurrentOption(availableModes, [
+          current.key,
+          lastUsedPermissionMode,
+          getDefaultPermissionModeKey(agentType),
+        ]) ?? availableModes[0];
+      return resolved ?? current;
+    });
+  }, [availableModes, agentType, lastUsedPermissionMode]);
+
+  React.useEffect(() => {
+    setModelMode((current) => {
+      const resolved = resolveCurrentOption(availableModels, [
+        current?.key,
+        lastUsedModelMode,
+        getDefaultModelKey(agentType),
+      ]);
+      return resolved ?? current;
+    });
+  }, [availableModels, agentType, lastUsedModelMode]);
 
   const handlePermissionModeChange = React.useCallback(
     (mode: PermissionMode) => {
