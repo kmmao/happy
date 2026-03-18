@@ -26,6 +26,7 @@ import {
     SEVERITY_KEY_MAP,
     getConfidenceColor,
 } from "@/components/project/supervisorConstants";
+import { layout } from "@/components/layout";
 
 // --- Helpers ---
 
@@ -458,6 +459,9 @@ const styles = StyleSheet.create((theme) => ({
     },
     scrollContent: {
         paddingBottom: 32,
+        maxWidth: layout.maxWidth,
+        alignSelf: "center" as const,
+        width: "100%" as const,
     },
 
     // Metadata card

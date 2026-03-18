@@ -51,18 +51,25 @@ function getTabCount(
     stats: SupervisorActionStats | null,
 ): number | null {
     if (!stats) return null;
+    let count: number;
     switch (tab) {
         case "pending":
-            return stats.pending ?? null;
+            count = stats.pending ?? 0;
+            break;
         case "approved":
-            return stats.approvedNoFix ?? null;
+            count = stats.approvedNoFix ?? 0;
+            break;
         case "fixing":
-            return (stats.fixPending ?? 0) + (stats.fixRunning ?? 0) || null;
+            count = (stats.fixPending ?? 0) + (stats.fixRunning ?? 0);
+            break;
         case "done":
-            return (stats.fixCompleted ?? 0) + (stats.fixFailed ?? 0) || null;
+            count = (stats.fixCompleted ?? 0) + (stats.fixFailed ?? 0);
+            break;
         case "dismissed":
-            return (stats.skipped ?? 0) + (stats.ignored ?? 0) || null;
+            count = (stats.skipped ?? 0) + (stats.ignored ?? 0);
+            break;
     }
+    return count > 0 ? count : null;
 }
 
 function getTabFetchParams(tab: ActionTab): { approval?: string; view?: string } {
@@ -92,33 +99,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
     const [refreshing, setRefreshing] = React.useState(false);
     const [total, setTotal] = React.useState(0);
 
-    // Fetch stats for badge counts on mount
-    React.useEffect(() => {
-        if (!projectId) return;
-        let cancelled = false;
-
-        async function loadStats() {
-            try {
-                const credentials = await TokenStorage.getCredentials();
-                if (!credentials || cancelled) return;
-                const data = await fetchActionStats(credentials, projectId).catch(
-                    () => null,
-                );
-                if (!cancelled && data) {
-                    setStats(data);
-                }
-            } catch {
-                // Stats are optional — silently ignore
-            }
-        }
-
-        loadStats();
-        return () => {
-            cancelled = true;
-        };
-    }, [projectId]);
-
-    // Fetch actions when activeTab changes
+    // Fetch actions and stats when activeTab changes (stats also refreshed here)
     React.useEffect(() => {
         if (!projectId) return;
         let cancelled = false;
@@ -129,14 +110,22 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
                 setActions([]);
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials || cancelled) return;
-                const data = await fetchSupervisorActions(credentials, projectId, {
-                    ...getTabFetchParams(activeTab),
-                    limit: PAGE_SIZE,
-                    offset: 0,
-                });
+                const [data, statsData] = await Promise.all([
+                    fetchSupervisorActions(credentials, projectId, {
+                        ...getTabFetchParams(activeTab),
+                        limit: PAGE_SIZE,
+                        offset: 0,
+                    }),
+                    fetchActionStats(credentials, projectId).catch(
+                        () => null,
+                    ),
+                ]);
                 if (!cancelled) {
                     setActions(data.actions);
                     setTotal(data.total);
+                    if (statsData) {
+                        setStats(statsData);
+                    }
                 }
             } catch {
                 // Silently fail — list stays empty

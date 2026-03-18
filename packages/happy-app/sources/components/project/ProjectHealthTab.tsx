@@ -126,6 +126,8 @@ export const ProjectHealthTab = React.memo(
         const [pendingActions, setPendingActions] = React.useState<
             SupervisorAction[]
         >([]);
+        const [pendingActionsTotal, setPendingActionsTotal] =
+            React.useState(0);
         const [costSummary, setCostSummary] =
             React.useState<SupervisorCostSummary | null>(null);
         const [trendData, setTrendData] =
@@ -175,6 +177,7 @@ export const ProjectHealthTab = React.memo(
                 setRuns(runsResult.runs);
                 setTotal(runsResult.total);
                 setPendingActions(actionsResult.actions);
+                setPendingActionsTotal(actionsResult.total);
                 setCostSummary(costResult);
                 setTrendData(trendResult);
                 setRelatedProjects(relatedResult);
@@ -559,7 +562,7 @@ export const ProjectHealthTab = React.memo(
                                 <View
                                     style={[
                                         styles.quickActionIconWrap,
-                                        pendingActions.length > 0
+                                        pendingActionsTotal > 0
                                             ? styles.quickActionIconActive
                                             : styles.quickActionIconInactive,
                                     ]}
@@ -568,7 +571,7 @@ export const ProjectHealthTab = React.memo(
                                         name="clipboard-outline"
                                         size={20}
                                         color={
-                                            pendingActions.length > 0
+                                            pendingActionsTotal > 0
                                                 ? "#FFFFFF"
                                                 : theme.colors.textSecondary
                                         }
@@ -578,20 +581,20 @@ export const ProjectHealthTab = React.memo(
                                     <Text style={styles.quickActionTitle}>
                                         {t("supervisor.viewAllActions")}
                                     </Text>
-                                    {pendingActions.length > 0 && (
+                                    {pendingActionsTotal > 0 && (
                                         <Text style={styles.quickActionSubtitle}>
                                             {t("supervisor.pendingActions", {
-                                                count: pendingActions.length,
+                                                count: pendingActionsTotal,
                                             })}
                                         </Text>
                                     )}
                                 </View>
                             </View>
                             <View style={styles.quickActionRight}>
-                                {pendingActions.length > 0 && (
+                                {pendingActionsTotal > 0 && (
                                     <View style={styles.quickActionBadge}>
                                         <Text style={styles.quickActionBadgeText}>
-                                            {pendingActions.length}
+                                            {pendingActionsTotal}
                                         </Text>
                                     </View>
                                 )}
@@ -685,7 +688,7 @@ export const ProjectHealthTab = React.memo(
                 {pendingActions.length > 0 && serverId && (
                     <ItemGroup
                         title={t("supervisor.pendingActions", {
-                            count: pendingActions.length,
+                            count: pendingActionsTotal,
                         })}
                     >
                         {pendingActions.map((action, index) => (

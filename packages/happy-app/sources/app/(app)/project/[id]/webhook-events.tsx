@@ -14,6 +14,7 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchWebhookEvents, type WebhookEvent } from "@/sync/apiWebhook";
+import { layout } from "@/components/layout";
 
 const PAGE_SIZE = 20;
 
@@ -282,6 +283,9 @@ const styles = StyleSheet.create((theme) => ({
     scrollContent: {
         paddingTop: 16,
         paddingBottom: 32,
+        maxWidth: layout.maxWidth,
+        alignSelf: "center" as const,
+        width: "100%" as const,
     },
     eventsContainer: {
         marginHorizontal: 16,

@@ -637,7 +637,7 @@ export default function FileScreen() {
       {/* Content display */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, maxWidth: layout.maxWidth, alignSelf: "center" as const, width: "100%" as const }}
         showsVerticalScrollIndicator={true}
       >
         {displayMode === "diff" && diffContent ? (

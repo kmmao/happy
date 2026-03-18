@@ -22,6 +22,9 @@ const stylesheet = StyleSheet.create((theme) => ({
         flex: 1,
         alignItems: 'center',
         paddingHorizontal: 24,
+        maxWidth: layout.maxWidth,
+        alignSelf: "center" as const,
+        width: "100%" as const,
     },
     contentWrapper: {
         width: '100%',

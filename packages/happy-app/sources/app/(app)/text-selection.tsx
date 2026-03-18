@@ -9,6 +9,7 @@ import { t } from "@/text";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
 import { Ionicons } from "@expo/vector-icons";
+import { layout } from "@/components/layout";
 
 export default function TextSelectionScreen() {
   const router = useRouter();
@@ -137,6 +138,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   scrollContent: {
     flexGrow: 1,
+    maxWidth: layout.maxWidth,
+    alignSelf: "center" as const,
+    width: "100%" as const,
   },
   textInput: {
     ...Typography.mono(),

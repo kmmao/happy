@@ -11,6 +11,7 @@ import { updateSupervisorConfig } from "@/sync/apiSupervisor";
 import { projectManager } from "@/sync/projectManager";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal } from "@/modal";
+import { layout } from "@/components/layout";
 
 type SupervisorMode = "suggest" | "semi-auto" | "auto";
 
@@ -652,6 +653,9 @@ const styles = StyleSheet.create((theme) => ({
     },
     scrollContent: {
         paddingBottom: 32,
+        maxWidth: layout.maxWidth,
+        alignSelf: "center" as const,
+        width: "100%" as const,
     },
     notFound: {
         flex: 1,
