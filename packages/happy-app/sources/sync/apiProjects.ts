@@ -204,7 +204,8 @@ export async function deleteProject(
             },
         );
 
-        if (!response.ok) {
+        // 404 = already deleted, treat as success
+        if (!response.ok && response.status !== 404) {
             throw new Error(`Failed to delete project: ${response.status}`);
         }
     });

@@ -435,6 +435,86 @@ class ProjectManager {
   }
 
   /**
+   * Delete a project by its internal ID (for manual deletion).
+   * Returns true if the project was found and removed.
+   */
+  deleteProjectById(projectId: string): boolean {
+    const project = this.projects.get(projectId);
+    if (!project) {
+      return false;
+    }
+
+    // Clean up all references
+    const keyString = this.getProjectKeyString(project.key);
+    this.projectKeyToId.delete(keyString);
+    this.projects.delete(projectId);
+
+    // Remove session mappings
+    for (const sessionId of project.sessionIds) {
+      this.sessionToProject.delete(sessionId);
+    }
+
+    return true;
+  }
+
+  /**
+   * Add a manually created project from a server response.
+   * Returns the new or existing Project object.
+   */
+  addManualProject(serverProject: ServerProject): Project {
+    const key: ProjectKey = {
+      machineId: serverProject.machineId,
+      path: serverProject.path,
+    };
+    const keyString = this.getProjectKeyString(key);
+    const existingId = this.projectKeyToId.get(keyString);
+
+    if (existingId) {
+      const existing = this.projects.get(existingId)!;
+      existing.serverId = serverProject.id;
+      existing.archived = serverProject.archived;
+      existing.serverMetadata = serverProject.metadata;
+      existing.serverMetadataVersion = serverProject.metadataVersion;
+      existing.supervisorConfig = serverProject.supervisorConfig;
+      existing.supervisorConfigVersion = serverProject.supervisorConfigVersion;
+      existing.supervisorMode = serverProject.supervisorMode;
+      existing.supervisorScheduleEnabled = serverProject.supervisorScheduleEnabled;
+      existing.supervisorScheduleIntervalHours = serverProject.supervisorScheduleIntervalHours;
+      existing.supervisorEnabledDimensions = serverProject.supervisorEnabledDimensions;
+      existing.supervisorPushTriggerEnabled = serverProject.supervisorPushTriggerEnabled;
+      existing.supervisorCustomRules = serverProject.supervisorCustomRules;
+      existing.updatedAt = Date.now();
+      return existing;
+    }
+
+    const projectId = this.generateProjectId();
+    const project: Project = {
+      id: projectId,
+      serverId: serverProject.id,
+      key,
+      sessionIds: [],
+      archived: serverProject.archived,
+      serverMetadata: serverProject.metadata,
+      serverMetadataVersion: serverProject.metadataVersion,
+      supervisorConfig: serverProject.supervisorConfig,
+      supervisorConfigVersion: serverProject.supervisorConfigVersion,
+      supervisorMode: serverProject.supervisorMode,
+      supervisorScheduleEnabled: serverProject.supervisorScheduleEnabled,
+      supervisorScheduleIntervalHours: serverProject.supervisorScheduleIntervalHours,
+      supervisorEnabledDimensions: serverProject.supervisorEnabledDimensions,
+      supervisorPushTriggerEnabled: serverProject.supervisorPushTriggerEnabled,
+      supervisorCustomRules: serverProject.supervisorCustomRules,
+      createdAt: serverProject.createdAt,
+      updatedAt: serverProject.updatedAt,
+    };
+
+    this.projects.set(projectId, project);
+    this.projectKeyToId.set(keyString, projectId);
+
+    return project;
+  }
+
+  /**
    * Clear all projects (useful for testing or resetting state)
    */
   clear(): void {

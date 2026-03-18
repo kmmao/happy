@@ -147,6 +147,9 @@ interface StorageState {
   socketLastDisconnectedAt: number | null;
   isDataReady: boolean;
   nativeUpdateStatus: { available: boolean; updateUrl?: string } | null;
+  // Project list version counter (bumped on manual add/delete to trigger re-render)
+  projectVersion: number;
+  bumpProjectVersion: () => void;
   // Code review state (in-memory only, not persisted)
   sessionLastViewed: Record<string, number>;
   reviewedTools: Record<string, "accepted" | "rejected">;
@@ -469,6 +472,8 @@ export const storage = create<StorageState>()((set, get) => {
     socketLastDisconnectedAt: null,
     isDataReady: false,
     nativeUpdateStatus: null,
+    projectVersion: 0,
+    bumpProjectVersion: () => set((prev) => ({ projectVersion: prev.projectVersion + 1 })),
     sessionLastViewed,
     reviewedTools: {},
     setToolReview: (messageId: string, state: "accepted" | "rejected") =>

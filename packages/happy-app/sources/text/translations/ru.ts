@@ -1783,7 +1783,7 @@ export const ru: TranslationStructure = {
   projects: {
     notFound: "Проект не найден",
     emptyTitle: "Нет проектов",
-    emptySubtitle: "Проекты появятся здесь при подключении CLI",
+    emptySubtitle: "Подключите CLI или нажмите кнопку ниже, чтобы добавить проект",
     allProjects: "Все проекты",
     tabSessions: "Сессии",
     tabGit: "Git",
@@ -1814,6 +1814,16 @@ export const ru: TranslationStructure = {
     addGitHost: "Добавить Git хост",
     noRemoteUrl: "Удалённый URL не обнаружен",
     lastUpdated: "Последнее обновление",
+    addProject: "Добавить проект",
+    selectMachine: "Выберите машину",
+    projectPath: "Путь к проекту",
+    pathPlaceholder: "/path/to/your/project",
+    noMachines: "Нет доступных машин. Сначала подключите CLI.",
+    deleteProject: "Удалить проект",
+    deleteConfirmTitle: "Удалить проект",
+    deleteConfirmMessage: "Проект будет удалён из списка. Это действие нельзя отменить.",
+    hasActiveSessions: "Невозможно удалить: у проекта есть активные сессии",
+    create: "Создать",
   },
   project: {
     segments: {
@@ -2191,6 +2201,7 @@ export const ru: TranslationStructure = {
     settingsSaveError: "Не удалось сохранить настройки",
     recurring: "Повторяющееся",
     skipIgnoreHint: "Пропустить: появится при следующем сканировании. Игнорировать: навсегда скрыть.",
+    restore: "Восстановить",
     delete: "Удалить",
     deleteConfirm: "Удалить действие",
     deleteConfirmBody: "Удалить это действие навсегда? Если проблема ещё существует, она будет обнаружена при следующем сканировании.",

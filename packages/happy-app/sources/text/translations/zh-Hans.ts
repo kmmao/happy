@@ -1681,7 +1681,7 @@ export const zhHans: TranslationStructure = {
   projects: {
     notFound: "项目未找到",
     emptyTitle: "暂无项目",
-    emptySubtitle: "连接 CLI 后项目将显示在这里",
+    emptySubtitle: "连接 CLI 或点击下方按钮添加项目",
     allProjects: "所有项目",
     tabSessions: "会话",
     tabGit: "Git",
@@ -1712,6 +1712,16 @@ export const zhHans: TranslationStructure = {
     addGitHost: "添加 Git 托管",
     noRemoteUrl: "未检测到远程地址",
     lastUpdated: "最后更新",
+    addProject: "添加项目",
+    selectMachine: "选择机器",
+    projectPath: "项目路径",
+    pathPlaceholder: "/path/to/your/project",
+    noMachines: "暂无可用机器，请先连接 CLI",
+    deleteProject: "删除项目",
+    deleteConfirmTitle: "删除项目",
+    deleteConfirmMessage: "此操作将从列表中移除该项目，且不可撤销。",
+    hasActiveSessions: "无法删除：项目有活跃会话",
+    create: "创建",
   },
   project: {
     segments: {
@@ -2073,6 +2083,7 @@ export const zhHans: TranslationStructure = {
     settingsSaveError: "保存设置失败",
     recurring: "重复",
     skipIgnoreHint: "跳过：下次扫描仍会提醒。忽略：永久不再提醒。",
+    restore: "还原",
     delete: "删除",
     deleteConfirm: "删除操作",
     deleteConfirmBody: "永久删除此操作？如果问题仍然存在，下次扫描会重新检测到。",

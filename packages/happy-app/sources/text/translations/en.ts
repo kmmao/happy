@@ -1751,7 +1751,7 @@ export const en: TranslationStructure = {
   projects: {
     notFound: "Project not found",
     emptyTitle: "No Projects",
-    emptySubtitle: "Projects will appear here when you connect a CLI",
+    emptySubtitle: "Connect a CLI or tap the button below to add a project",
     allProjects: "All Projects",
     tabSessions: "Sessions",
     tabGit: "Git",
@@ -1782,6 +1782,16 @@ export const en: TranslationStructure = {
     addGitHost: "Add Git Host",
     noRemoteUrl: "No remote URL detected",
     lastUpdated: "Last updated",
+    addProject: "Add Project",
+    selectMachine: "Select Machine",
+    projectPath: "Project Path",
+    pathPlaceholder: "/path/to/your/project",
+    noMachines: "No machines available. Connect a CLI first.",
+    deleteProject: "Delete Project",
+    deleteConfirmTitle: "Delete Project",
+    deleteConfirmMessage: "This will remove the project from your list. This cannot be undone.",
+    hasActiveSessions: "Cannot delete: project has active sessions",
+    create: "Create",
   },
   project: {
     segments: {
@@ -2161,6 +2171,7 @@ export const en: TranslationStructure = {
     settingsSaveError: "Failed to save settings",
     recurring: "Recurring",
     skipIgnoreHint: "Skip: will resurface on next scan. Ignore: permanently suppressed.",
+    restore: "Restore",
     delete: "Delete",
     deleteConfirm: "Delete Action",
     deleteConfirmBody: "Permanently delete this action? If the issue still exists, it will be detected again on the next scan.",

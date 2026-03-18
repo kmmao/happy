@@ -105,6 +105,20 @@ export const SupervisorActionCard = React.memo(
             }, [projectId, action.id, onUpdated]),
         );
 
+        const [, doRestore] = useHappyAction(
+            React.useCallback(async () => {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                await updateActionApproval(
+                    credentials,
+                    projectId,
+                    action.id,
+                    "pending",
+                );
+                onUpdated();
+            }, [projectId, action.id, onUpdated]),
+        );
+
         const [, doDelete] = useHappyAction(
             React.useCallback(async () => {
                 const credentials = await TokenStorage.getCredentials();
@@ -316,9 +330,18 @@ export const SupervisorActionCard = React.memo(
                     </Text>
                 )}
 
-                {/* Delete button for dismissed actions */}
+                {/* Restore + Delete buttons for dismissed actions */}
                 {isDismissed && (
                     <View style={styles.buttonRow}>
+                        <Pressable
+                            style={styles.restoreButton}
+                            onPress={doRestore}
+                        >
+                            <Ionicons name="arrow-undo-outline" size={14} color={theme.colors.header.tint} />
+                            <Text style={[styles.restoreButtonText, { color: theme.colors.header.tint }]}>
+                                {t("supervisor.restore")}
+                            </Text>
+                        </Pressable>
                         <Pressable
                             style={styles.deleteButton}
                             onPress={handleDelete}
@@ -534,6 +557,19 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         marginTop: 6,
         opacity: 0.7,
+    },
+    restoreButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 6,
+        backgroundColor: theme.colors.surface,
+    },
+    restoreButtonText: {
+        ...Typography.default(),
+        fontSize: 13,
     },
     deleteButton: {
         flexDirection: "row",

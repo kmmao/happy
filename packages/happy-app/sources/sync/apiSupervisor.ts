@@ -401,7 +401,7 @@ export async function updateActionApproval(
     credentials: AuthCredentials,
     projectId: string,
     actionId: string,
-    approval: "approved" | "skipped" | "ignored",
+    approval: "approved" | "skipped" | "ignored" | "pending",
 ): Promise<SupervisorAction | null> {
     const API_ENDPOINT = getServerUrl();
 
@@ -523,7 +523,7 @@ export async function batchUpdateActionApproval(
     credentials: AuthCredentials,
     projectId: string,
     actionIds: string[],
-    approval: "approved" | "skipped" | "ignored",
+    approval: "approved" | "skipped" | "ignored" | "pending",
 ): Promise<{ updatedCount: number }> {
     const API_ENDPOINT = getServerUrl();
     return await backoff(async () => {

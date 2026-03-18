@@ -1765,7 +1765,7 @@ export const ca: TranslationStructure = {
   projects: {
     notFound: "Projecte no trobat",
     emptyTitle: "Sense projectes",
-    emptySubtitle: "Els projectes apareixeran aquí en connectar un CLI",
+    emptySubtitle: "Connecta un CLI o prem el botó de sota per afegir un projecte",
     allProjects: "Tots els projectes",
     tabSessions: "Sessions",
     tabGit: "Git",
@@ -1796,6 +1796,16 @@ export const ca: TranslationStructure = {
     addGitHost: "Afegir host Git",
     noRemoteUrl: "No s'ha detectat URL remot",
     lastUpdated: "Última actualització",
+    addProject: "Afegir projecte",
+    selectMachine: "Seleccionar màquina",
+    projectPath: "Ruta del projecte",
+    pathPlaceholder: "/path/to/your/project",
+    noMachines: "No hi ha màquines disponibles. Connecta un CLI primer.",
+    deleteProject: "Eliminar projecte",
+    deleteConfirmTitle: "Eliminar projecte",
+    deleteConfirmMessage: "El projecte s'eliminarà de la llista. Aquesta acció no es pot desfer.",
+    hasActiveSessions: "No es pot eliminar: el projecte té sessions actives",
+    create: "Crear",
   },
   project: {
     segments: {
@@ -2179,6 +2189,7 @@ export const ca: TranslationStructure = {
     settingsSaveError: "Error en guardar la configuració",
     recurring: "Recurrent",
     skipIgnoreHint: "Omet: tornarà a aparèixer al proper escaneig. Ignora: suprimit permanentment.",
+    restore: "Restaurar",
     delete: "Elimina",
     deleteConfirm: "Eliminar acció",
     deleteConfirmBody: "Voleu eliminar aquesta acció permanentment? Si el problema encara existeix, es detectarà de nou al proper escaneig.",

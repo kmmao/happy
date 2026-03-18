@@ -347,6 +347,13 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="project/add"
+        options={{
+          headerTitle: t("projects.addProject"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="project/[id]"
         options={{
           headerBackTitle: t("common.back"),

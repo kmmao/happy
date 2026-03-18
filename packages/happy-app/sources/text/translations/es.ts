@@ -1762,7 +1762,7 @@ export const es: TranslationStructure = {
   projects: {
     notFound: "Proyecto no encontrado",
     emptyTitle: "Sin proyectos",
-    emptySubtitle: "Los proyectos aparecerán aquí al conectar un CLI",
+    emptySubtitle: "Conecta un CLI o pulsa el botón de abajo para añadir un proyecto",
     allProjects: "Todos los proyectos",
     tabSessions: "Sesiones",
     tabGit: "Git",
@@ -1793,6 +1793,16 @@ export const es: TranslationStructure = {
     addGitHost: "Añadir host Git",
     noRemoteUrl: "No se detectó URL remoto",
     lastUpdated: "Última actualización",
+    addProject: "Añadir proyecto",
+    selectMachine: "Seleccionar máquina",
+    projectPath: "Ruta del proyecto",
+    pathPlaceholder: "/path/to/your/project",
+    noMachines: "No hay máquinas disponibles. Conecta un CLI primero.",
+    deleteProject: "Eliminar proyecto",
+    deleteConfirmTitle: "Eliminar proyecto",
+    deleteConfirmMessage: "El proyecto se eliminará de tu lista. Esta acción no se puede deshacer.",
+    hasActiveSessions: "No se puede eliminar: el proyecto tiene sesiones activas",
+    create: "Crear",
   },
   project: {
     segments: {
@@ -2173,6 +2183,7 @@ export const es: TranslationStructure = {
     settingsSaveError: "Error al guardar la configuración",
     recurring: "Recurrente",
     skipIgnoreHint: "Omitir: reaparecerá en el próximo escaneo. Ignorar: suprimido permanentemente.",
+    restore: "Restaurar",
     delete: "Eliminar",
     deleteConfirm: "Eliminar acción",
     deleteConfirmBody: "¿Eliminar esta acción permanentemente? Si el problema persiste, se detectará de nuevo en el próximo escaneo.",

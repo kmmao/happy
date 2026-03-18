@@ -106,6 +106,7 @@ import {
   fetchProjects,
   resolveProject,
   linkSessionsToProject,
+  deleteProject as apiDeleteProject,
 } from "./apiProjects";
 import {
   notifyTaskComplete,
@@ -1136,6 +1137,7 @@ class Sync {
 
       // Merge into projectManager
       projectManager.mergeServerProjects(serverProjects);
+      storage.getState().bumpProjectVersion();
 
       // Migrate any unsynced local projects to server (runs every sync cycle;
       // short-circuits immediately when there are no unsynced projects)
@@ -1196,6 +1198,57 @@ class Sync {
         );
       }
     }
+  };
+
+  /**
+   * Manually create a project from the app (user-initiated).
+   * Calls server API then merges into local projectManager.
+   */
+  public createManualProject = async (machineId: string, path: string) => {
+    if (!this.credentials) {
+      throw new Error("Not authenticated");
+    }
+
+    const result = await resolveProject(this.credentials, { machineId, path });
+    const project = projectManager.addManualProject(result.project);
+    storage.getState().bumpProjectVersion();
+    this.projectsSync.invalidate();
+
+    log.log(`📁 Manual project created: ${machineId}:${path}`);
+    return project;
+  };
+
+  /**
+   * Manually delete a project from the app (user-initiated).
+   * Only allowed for projects with no active sessions.
+   */
+  public deleteManualProject = async (projectId: string) => {
+    if (!this.credentials) {
+      throw new Error("Not authenticated");
+    }
+
+    const project = projectManager.getProject(projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    if (project.sessionIds.length > 0) {
+      throw new Error("Cannot delete project with active sessions");
+    }
+
+    if (!project.serverId) {
+      // Local-only project, just remove from memory
+      projectManager.deleteProjectById(projectId);
+      storage.getState().bumpProjectVersion();
+      return;
+    }
+
+    await apiDeleteProject(this.credentials, project.serverId);
+    projectManager.deleteProjectById(projectId);
+    storage.getState().bumpProjectVersion();
+    this.projectsSync.invalidate();
+
+    log.log(`📁 Manual project deleted: ${project.key.machineId}:${project.key.path}`);
   };
 
   public refreshMachines = async () => {

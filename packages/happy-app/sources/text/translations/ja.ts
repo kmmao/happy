@@ -1740,7 +1740,7 @@ export const ja: TranslationStructure = {
   projects: {
     notFound: "プロジェクトが見つかりません",
     emptyTitle: "プロジェクトなし",
-    emptySubtitle: "CLIを接続するとプロジェクトがここに表示されます",
+    emptySubtitle: "CLIを接続するか、下のボタンをタップしてプロジェクトを追加してください",
     allProjects: "すべてのプロジェクト",
     tabSessions: "セッション",
     tabGit: "Git",
@@ -1771,6 +1771,16 @@ export const ja: TranslationStructure = {
     addGitHost: "Git ホストを追加",
     noRemoteUrl: "リモートURLが検出されません",
     lastUpdated: "最終更新",
+    addProject: "プロジェクトを追加",
+    selectMachine: "マシンを選択",
+    projectPath: "プロジェクトパス",
+    pathPlaceholder: "/path/to/your/project",
+    noMachines: "利用可能なマシンがありません。先にCLIを接続してください。",
+    deleteProject: "プロジェクトを削除",
+    deleteConfirmTitle: "プロジェクトを削除",
+    deleteConfirmMessage: "プロジェクトがリストから削除されます。この操作は元に戻せません。",
+    hasActiveSessions: "削除できません：アクティブなセッションがあります",
+    create: "作成",
   },
   project: {
     segments: {
@@ -2143,6 +2153,7 @@ export const ja: TranslationStructure = {
     settingsSaveError: "設定の保存に失敗しました",
     recurring: "繰り返し",
     skipIgnoreHint: "スキップ：次回スキャンで再表示。無視：永久に非表示。",
+    restore: "復元",
     delete: "削除",
     deleteConfirm: "アクションを削除",
     deleteConfirmBody: "このアクションを完全に削除しますか？問題がまだ存在する場合、次回のスキャンで再検出されます。",

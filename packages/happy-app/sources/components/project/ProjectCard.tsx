@@ -14,9 +14,10 @@ import { t } from "@/text";
 interface ProjectCardProps {
     project: Project;
     onPress: () => void;
+    onLongPress?: () => void;
 }
 
-export const ProjectCard = React.memo(({ project, onPress }: ProjectCardProps) => {
+export const ProjectCard = React.memo(({ project, onPress, onLongPress }: ProjectCardProps) => {
     const { theme } = useUnistyles();
 
     const displayName = getProjectDisplayName(project);
@@ -55,6 +56,7 @@ export const ProjectCard = React.memo(({ project, onPress }: ProjectCardProps) =
                 />
             }
             onPress={onPress}
+            onLongPress={onLongPress}
             rightElement={
                 sessionCount > 0 ? (
                     <View style={styles.sessionBadge}>

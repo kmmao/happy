@@ -108,7 +108,7 @@ export function supervisorActionRoutes(app: Fastify) {
                     actionId: z.string(),
                 }),
                 body: z.object({
-                    approval: z.enum(["approved", "skipped", "ignored"]),
+                    approval: z.enum(["approved", "skipped", "ignored", "pending"]),
                 }),
             },
         },
@@ -117,20 +117,29 @@ export function supervisorActionRoutes(app: Fastify) {
             const { id, actionId } = request.params;
             const { approval } = request.body;
 
-            // Atomic update — only change if still pending
+            // Restore: dismissed → pending
+            // Forward: pending → approved/skipped/ignored
+            const fromApproval = approval === "pending"
+                ? { in: ["skipped", "ignored"] as string[] }
+                : "pending";
+
             const result = await db.supervisorAction.updateMany({
                 where: {
                     id: actionId,
                     projectId: id,
                     accountId: userId,
-                    approval: "pending",
+                    approval: fromApproval,
                 },
-                data: { approval },
+                data: {
+                    approval,
+                    // Reset fix status when restoring to pending
+                    ...(approval === "pending" ? { fixStatus: null, fixSessionId: null } : {}),
+                },
             });
 
             if (result.count === 0) {
                 return reply.code(404).send({
-                    error: "Pending action not found",
+                    error: "Action not found or invalid state transition",
                 });
             }
 

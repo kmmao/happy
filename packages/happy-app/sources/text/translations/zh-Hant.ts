@@ -1682,7 +1682,7 @@ export const zhHant: TranslationStructure = {
   projects: {
     notFound: "專案未找到",
     emptyTitle: "暫無專案",
-    emptySubtitle: "連接 CLI 後專案將顯示在這裡",
+    emptySubtitle: "連接 CLI 或點擊下方按鈕新增專案",
     allProjects: "所有專案",
     tabSessions: "工作階段",
     tabGit: "Git",
@@ -1713,6 +1713,16 @@ export const zhHant: TranslationStructure = {
     addGitHost: "新增 Git 託管",
     noRemoteUrl: "未偵測到遠端地址",
     lastUpdated: "最後更新",
+    addProject: "新增專案",
+    selectMachine: "選擇機器",
+    projectPath: "專案路徑",
+    pathPlaceholder: "/path/to/your/project",
+    noMachines: "暫無可用機器，請先連接 CLI",
+    deleteProject: "刪除專案",
+    deleteConfirmTitle: "刪除專案",
+    deleteConfirmMessage: "此操作將從列表中移除該專案，且不可撤銷。",
+    hasActiveSessions: "無法刪除：專案有活躍會話",
+    create: "建立",
   },
   project: {
     segments: {
@@ -2076,6 +2086,7 @@ export const zhHant: TranslationStructure = {
     settingsSaveError: "儲存設定失敗",
     recurring: "重複",
     skipIgnoreHint: "跳過：下次掃描仍會提醒。忽略：永久不再提醒。",
+    restore: "還原",
     delete: "刪除",
     deleteConfirm: "刪除操作",
     deleteConfirmBody: "永久刪除此操作？如果問題仍然存在，下次掃描會重新檢測到。",

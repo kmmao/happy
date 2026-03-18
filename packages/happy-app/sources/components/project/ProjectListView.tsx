@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ItemList } from "@/components/ItemList";
@@ -8,6 +8,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { useProjects } from "@/hooks/useProjects";
 import { ProjectCard } from "./ProjectCard";
+import { Modal } from "@/modal";
+import { sync } from "@/sync/sync";
 import { t } from "@/text";
 
 export const ProjectListView = React.memo(() => {
@@ -21,6 +23,41 @@ export const ProjectListView = React.memo(() => {
         },
         [router],
     );
+
+    const handleProjectLongPress = React.useCallback(
+        (projectId: string, sessionCount: number) => {
+            if (sessionCount > 0) {
+                Modal.alert(
+                    t("projects.deleteProject"),
+                    t("projects.hasActiveSessions"),
+                );
+                return;
+            }
+
+            void (async () => {
+                const confirmed = await Modal.confirm(
+                    t("projects.deleteConfirmTitle"),
+                    t("projects.deleteConfirmMessage"),
+                    { confirmText: t("common.delete"), destructive: true },
+                );
+                if (!confirmed) return;
+
+                try {
+                    await sync.deleteManualProject(projectId);
+                } catch (error) {
+                    Modal.alert(
+                        t("common.error"),
+                        error instanceof Error ? error.message : String(error),
+                    );
+                }
+            })();
+        },
+        [],
+    );
+
+    const handleAddProject = React.useCallback(() => {
+        router.push("/project/add");
+    }, [router]);
 
     if (projects.length === 0) {
         return (
@@ -36,18 +73,55 @@ export const ProjectListView = React.memo(() => {
                 <Text style={styles.emptySubtitle}>
                     {t("projects.emptySubtitle")}
                 </Text>
+                <Pressable
+                    style={styles.addButton}
+                    onPress={handleAddProject}
+                >
+                    <Ionicons
+                        name="add-circle-outline"
+                        size={20}
+                        color="#FFFFFF"
+                    />
+                    <Text style={styles.addButtonText}>
+                        {t("projects.addProject")}
+                    </Text>
+                </Pressable>
             </View>
         );
     }
 
+    const groupTitle = React.useMemo(
+        () => (
+            <View style={styles.groupHeader}>
+                <Text style={styles.groupHeaderTitle}>
+                    {t("projects.allProjects")}
+                </Text>
+                <Pressable onPress={handleAddProject} hitSlop={10}>
+                    <Ionicons
+                        name="add-circle-outline"
+                        size={22}
+                        color={theme.colors.header.tint}
+                    />
+                </Pressable>
+            </View>
+        ),
+        [handleAddProject, theme],
+    );
+
     return (
         <ItemList>
-            <ItemGroup title={t("projects.allProjects")}>
+            <ItemGroup title={groupTitle}>
                 {projects.map((project) => (
                     <ProjectCard
                         key={project.id}
                         project={project}
                         onPress={() => handleProjectPress(project.id)}
+                        onLongPress={() =>
+                            handleProjectLongPress(
+                                project.id,
+                                project.sessionIds.length,
+                            )
+                        }
                     />
                 ))}
             </ItemGroup>
@@ -76,5 +150,31 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         marginTop: 8,
         textAlign: "center",
+    },
+    groupHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    groupHeaderTitle: {
+        ...Typography.default("semiBold"),
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        textTransform: "uppercase",
+    },
+    addButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 24,
+        backgroundColor: theme.colors.header.tint,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 10,
+    },
+    addButtonText: {
+        ...Typography.default("semiBold"),
+        fontSize: 15,
+        color: "#FFFFFF",
     },
 }));

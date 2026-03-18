@@ -229,6 +229,22 @@ const HeaderRight = React.memo(
       );
     }
 
+    if (activeTab === "project") {
+      return (
+        <Pressable
+          onPress={() => router.push("/project/add")}
+          hitSlop={15}
+          style={styles.headerButton}
+        >
+          <Ionicons
+            name="add-outline"
+            size={28}
+            color={theme.colors.header.tint}
+          />
+        </Pressable>
+      );
+    }
+
     if (activeTab === "settings") {
       if (!isCustomServer) {
         // Empty view to maintain header centering
