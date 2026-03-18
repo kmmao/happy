@@ -57,6 +57,24 @@ const GEMINI_MODEL_FALLBACKS: ModelMode[] = [
   },
 ];
 
+// Known Claude model pricing for enriching CLI-reported descriptions
+const CLAUDE_MODEL_PRICING: Record<string, string> = {
+  "default": "$3/$15 \u00B7 200K",
+  "sonnet": "$3/$15 \u00B7 200K",
+  "sonnet-1m": "$6/$22.50 \u00B7 1M",
+  "haiku": "$1/$5 \u00B7 200K",
+  "opus": "$5/$25 \u00B7 200K",
+  "opus-1m": "$10/$37.50 \u00B7 1M",
+};
+
+function enrichDescription(code: string, description: string | null | undefined): string | null {
+  const pricing = CLAUDE_MODEL_PRICING[code];
+  if (!pricing) return description ?? null;
+  // Strip any existing pricing info (e.g. wrong $3/$15 on 1M models) and append correct pricing
+  const stripped = description?.replace(/\s*\u00B7?\s*\$[\d./]+\s*(per Mtok)?/gi, "").trim();
+  return stripped ? `${stripped} \u00B7 ${pricing}` : pricing;
+}
+
 export function mapMetadataOptions(
   options?: MetadataOption[] | null,
 ): ModeOption[] {
@@ -67,7 +85,7 @@ export function mapMetadataOptions(
   return options.map((option) => ({
     key: option.code,
     name: option.value,
-    description: option.description ?? null,
+    description: enrichDescription(option.code, option.description),
   }));
 }
 
@@ -159,36 +177,40 @@ export function getGeminiPermissionModes(
 
 export function getClaudeModelModes(): ModelMode[] {
   return [
-    { key: "default", name: "Default", description: "Use CLI settings" },
+    {
+      key: "default",
+      name: "Default",
+      description: "Sonnet 4.6 \u00B7 $3/$15 \u00B7 200K",
+    },
     {
       key: "haiku",
       name: "Haiku",
-      description: "Fastest \u00B7 $1/$5 \u00B7 200K",
+      description: "Haiku 4.5 \u00B7 Fastest \u00B7 $1/$5 \u00B7 200K",
     },
     {
       key: "sonnet",
       name: "Sonnet",
-      description: "Balanced \u00B7 $3/$15 \u00B7 200K",
+      description: "Sonnet 4.6 \u00B7 Balanced \u00B7 $3/$15 \u00B7 200K",
     },
     {
       key: "sonnet-1m",
       name: "Sonnet (1M)",
-      description: "Long context \u00B7 $6/$22.50",
+      description: "Sonnet 4.6 \u00B7 Long context \u00B7 $6/$22.50",
     },
     {
       key: "opus",
       name: "Opus",
-      description: "Most capable \u00B7 $5/$25 \u00B7 200K",
+      description: "Opus 4.6 \u00B7 Most capable \u00B7 $5/$25 \u00B7 200K",
     },
     {
       key: "opus-1m",
       name: "Opus (1M)",
-      description: "Long context \u00B7 $10/$37.50",
+      description: "Opus 4.6 \u00B7 Long context \u00B7 $10/$37.50",
     },
     {
       key: "opusplan",
       name: "Opus Plan",
-      description: "Plan: Opus \u00B7 Execute: Sonnet",
+      description: "Plan: Opus 4.6 \u00B7 Execute: Sonnet 4.6",
     },
   ];
 }
