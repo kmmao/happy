@@ -1,6 +1,20 @@
 {
   "entries": [
     {
+      "version": "2.3.1",
+      "date": "2026-03-18",
+      "summary": "Upgraded Claude Agent SDK to 0.2.78 — added StopFailure error banner and improved hook server reliability.",
+      "changes": [
+        "Added StopFailure error banner showing error details when Claude session stops unexpectedly",
+        "Added expandable last assistant message section for debugging context",
+        "Added local dismiss with auto-reset on new errors",
+        "Added automatic stopFailure state clearing at turn start",
+        "Fixed HTTP hook server timeout causing double-write Node.js exception (replaced setTimeout with AbortController)",
+        "Added port range validation in session hook forwarder script"
+      ],
+      "rawMarkdown": "## 2.3.1 - 2026-03-18\n\n\nUpgraded Claude Agent SDK to 0.2.78 — added StopFailure error banner and improved hook server reliability.\n\n### StopFailure Hook\n- Added StopFailure error banner showing error details when Claude session stops unexpectedly\n- Added expandable last assistant message section for debugging context\n- Added local dismiss with auto-reset on new errors\n- Added automatic stopFailure state clearing at turn start\n\n### Reliability\n- Fixed HTTP hook server timeout causing double-write Node.js exception (replaced setTimeout with AbortController)\n- Added port range validation in session hook forwarder script"
+    },
+    {
       "version": "2.3.0",
       "date": "2026-03-18",
       "summary": "Integrated Claude Agent SDK 0.2.77 features — fork sessions, cancel queued messages, MCP server input, API retry status, and enhanced plan viewing.",
@@ -184,5 +198,5 @@
       "rawMarkdown": "## 2.0.0 - 2026-02-27\n\n\nHappy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.\n\n- Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere\n- Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content\n- Added QR code scanning and manual URL entry for quick device authentication\n- Added Daemon mode for persistent background running with one-tap remote session launch\n- Added intelligent voice assistant supporting 15+ languages for natural conversation\n- Added GitHub and Claude account connection for unified developer identity management\n- Added multi-device real-time sync with online/offline status indicators\n- Added dark mode and appearance customization with automatic system theme following\n- Added Markdown table rendering and code syntax highlighting in chat\n- Streamlined settings page, removed upstream links, started maintaining own changelog\n- Supported iOS, Android, and Web platforms"
     }
   ],
-  "latestVersion": "2.3.0"
+  "latestVersion": "2.3.1"
 }

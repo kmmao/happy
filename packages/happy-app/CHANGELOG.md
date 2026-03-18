@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.3.1 - 2026-03-18
+
+Upgraded Claude Agent SDK to 0.2.78 — added StopFailure error banner and improved hook server reliability.
+
+### StopFailure Hook
+- Added StopFailure error banner showing error details when Claude session stops unexpectedly
+- Added expandable last assistant message section for debugging context
+- Added local dismiss with auto-reset on new errors
+- Added automatic stopFailure state clearing at turn start
+
+### Reliability
+- Fixed HTTP hook server timeout causing double-write Node.js exception (replaced setTimeout with AbortController)
+- Added port range validation in session hook forwarder script
+
 ## 2.3.0 - 2026-03-18
 
 Integrated Claude Agent SDK 0.2.77 features — fork sessions, cancel queued messages, MCP server input, API retry status, and enhanced plan viewing.
