@@ -52,8 +52,6 @@ import {
   loadLastSeqs,
   saveLastSeq,
   deleteLastSeq,
-  isProjectMigrationDone,
-  markProjectMigrationDone,
 } from "./persistence";
 import { initializeTracking, tracking } from "@/track";
 import { parseToken } from "@/utils/parseToken";
@@ -177,7 +175,7 @@ class Sync {
     totalDimensions?: number;
   }) => void>();
   private preferencesMigrationDone = false;
-  private projectMigrationDone = isProjectMigrationDone();
+  private projectMigrationFailures = new Map<string, number>();
   private pendingSettings: Partial<Settings> = loadPendingSettings();
   private appState: AppStateStatus = AppState.currentState;
   private backgroundSendTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -1139,11 +1137,9 @@ class Sync {
       // Merge into projectManager
       projectManager.mergeServerProjects(serverProjects);
 
-      // Run migration if needed (one-time per app lifecycle)
-      if (!this.projectMigrationDone) {
-        this.projectMigrationDone = true;
-        await this.migrateProjectsToServer();
-      }
+      // Migrate any unsynced local projects to server (runs every sync cycle;
+      // short-circuits immediately when there are no unsynced projects)
+      await this.migrateProjectsToServer();
 
       log.log(
         `📁 Projects sync completed — ${serverProjects.length} from server`,
@@ -1155,23 +1151,26 @@ class Sync {
   };
 
   /**
-   * One-time migration: create server-side Project records for
-   * all in-memory projects that have sessions but no serverId.
+   * Migrate unsynced local projects to the server.
+   * Short-circuits when there are no unsynced projects.
    */
   private migrateProjectsToServer = async () => {
     if (!this.credentials) return;
 
     const unsyncedProjects = projectManager.getUnsyncedProjects();
-    if (unsyncedProjects.length === 0) {
-      markProjectMigrationDone();
-      return;
-    }
+    if (unsyncedProjects.length === 0) return;
 
     log.log(
       `📁 Migrating ${unsyncedProjects.length} projects to server`,
     );
 
+    const MAX_MIGRATION_RETRIES = 5;
+
     for (const project of unsyncedProjects) {
+      const projectKey = `${project.key.machineId}:${project.key.path}`;
+      const failures = this.projectMigrationFailures.get(projectKey) ?? 0;
+      if (failures >= MAX_MIGRATION_RETRIES) continue;
+
       try {
         const result = await resolveProject(this.credentials, {
           machineId: project.key.machineId,
@@ -1180,6 +1179,7 @@ class Sync {
 
         // Store serverId in projectManager
         projectManager.setServerId(project.key, result.project.id);
+        this.projectMigrationFailures.delete(projectKey);
 
         // Link sessions to the server project
         if (project.sessionIds.length > 0) {
@@ -1190,14 +1190,12 @@ class Sync {
           );
         }
       } catch (error) {
+        this.projectMigrationFailures.set(projectKey, failures + 1);
         log.log(
-          `📁 Failed to migrate project ${project.key.machineId}:${project.key.path}: ${error}`,
+          `📁 Failed to migrate project ${projectKey} (attempt ${failures + 1}/${MAX_MIGRATION_RETRIES}): ${error}`,
         );
       }
     }
-
-    // Persist migration completion
-    markProjectMigrationDone();
   };
 
   public refreshMachines = async () => {

@@ -145,10 +145,13 @@ export async function runGemini(opts: {
     sandbox: sandboxConfig,
   });
   const metadata = await enrichMetadataWithWorktree(rawMetadata);
+  const projectPath_ = metadata.worktree?.parentRepoPath || metadata.path;
   const response = await api.getOrCreateSession({
     tag: sessionTag,
     metadata,
     state,
+    machineId,
+    path: projectPath_,
   });
 
   // Handle server unreachable case - create offline stub with hot reconnection
@@ -184,6 +187,8 @@ export async function runGemini(opts: {
       metadata,
       state,
       response,
+      machineId,
+      path: projectPath_,
       onSessionSwap: (newSession) => {
         // If we're processing a message, queue the swap for later
         // This prevents race conditions where session changes mid-processing

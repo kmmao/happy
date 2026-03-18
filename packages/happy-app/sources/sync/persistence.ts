@@ -471,16 +471,6 @@ export function deleteLastSeq(sessionId: string): void {
   mmkv.delete(`${LAST_SEQ_PREFIX}${sessionId}`);
 }
 
-const PROJECT_MIGRATION_KEY = "project-migration-done-v1";
-
-export function isProjectMigrationDone(): boolean {
-  return mmkv.getBoolean(PROJECT_MIGRATION_KEY) === true;
-}
-
-export function markProjectMigrationDone(): void {
-  mmkv.set(PROJECT_MIGRATION_KEY, true);
-}
-
 export function clearPersistence() {
   mmkv.clearAll();
   clearAllMessageCaches();

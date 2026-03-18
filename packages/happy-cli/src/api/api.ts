@@ -51,6 +51,8 @@ export class ApiClient {
     tag: string;
     metadata: Metadata;
     state: AgentState | null;
+    machineId?: string;
+    path?: string;
   }): Promise<Session | null> {
     // Resolve encryption key
     let dataEncryptionKey: Uint8Array | null = null;
@@ -93,6 +95,8 @@ export class ApiClient {
           dataEncryptionKey: dataEncryptionKey
             ? encodeBase64(dataEncryptionKey)
             : null,
+          machineId: opts.machineId || null,
+          path: opts.path || null,
         },
         {
           headers: {
@@ -361,6 +365,8 @@ export class ApiClient {
     sessionId: string;
     metadata: Metadata;
     state: AgentState | null;
+    machineId?: string;
+    path?: string;
   }): Promise<Session | null> {
     // Resolve encryption key (same logic as getOrCreateSession)
     let dataEncryptionKey: Uint8Array | null = null;
@@ -398,6 +404,8 @@ export class ApiClient {
           dataEncryptionKey: dataEncryptionKey
             ? encodeBase64(dataEncryptionKey)
             : null,
+          machineId: opts.machineId || null,
+          path: opts.path || null,
         },
         {
           headers: {

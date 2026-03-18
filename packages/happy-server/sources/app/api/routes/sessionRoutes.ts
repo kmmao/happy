@@ -1,4 +1,4 @@
-import { eventRouter, buildNewSessionUpdate } from "@/app/events/eventRouter";
+import { eventRouter, buildNewSessionUpdate, buildNewProjectUpdate } from "@/app/events/eventRouter";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
@@ -7,6 +7,63 @@ import { log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { allocateUserSeq } from "@/storage/seq";
 import { sessionDelete } from "@/app/session/sessionDelete";
+
+/**
+ * Resolve (find-or-create) a Project by accountId + machineId + path,
+ * then link the given session to it. No-op if machineId or path is missing.
+ */
+async function resolveAndLinkProject(
+    accountId: string,
+    sessionId: string,
+    machineId: string | null | undefined,
+    path: string | null | undefined,
+): Promise<void> {
+    if (!machineId || !path) return;
+
+    try {
+        const project = await db.project.upsert({
+            where: {
+                accountId_machineId_path: {
+                    accountId,
+                    machineId,
+                    path,
+                },
+            },
+            create: {
+                accountId,
+                machineId,
+                path,
+            },
+            update: {},
+        });
+
+        // Link session to project
+        await db.session.update({
+            where: { id: sessionId },
+            data: { projectId: project.id },
+        });
+
+        // Always emit project event — App merge is idempotent,
+        // and skipping on false negatives would defeat the purpose of this fix
+        const updSeq = await allocateUserSeq(accountId);
+        const payload = buildNewProjectUpdate(
+            project,
+            updSeq,
+            randomKeyNaked(12),
+        );
+        eventRouter.emitUpdate({
+            userId: accountId,
+            payload,
+            recipientFilter: { type: "user-scoped-only" },
+        });
+    } catch (error) {
+        // Non-critical: log and continue — session still works without project link
+        log(
+            { module: "session-create", sessionId, accountId },
+            `Failed to resolve/link project (machineId=${machineId}, path=${path}): ${error}`,
+        );
+    }
+}
 
 export function sessionRoutes(app: Fastify) {
   // Sessions API
@@ -248,13 +305,15 @@ export function sessionRoutes(app: Fastify) {
           agentState: z.string().nullish(),
           dataEncryptionKey: z.string().nullish(),
           sessionId: z.string().nullish(),
+          machineId: z.string().nullish(),
+          path: z.string().nullish(),
         }),
       },
       preHandler: app.authenticate,
     },
     async (request, reply) => {
       const userId = request.userId;
-      const { tag, metadata, dataEncryptionKey, sessionId } = request.body;
+      const { tag, metadata, dataEncryptionKey, sessionId, machineId, path } = request.body;
 
       // Reconnect to existing session by ID (for resume functionality)
       if (sessionId) {
@@ -289,6 +348,11 @@ export function sessionRoutes(app: Fastify) {
             lastActiveAt: new Date(),
           },
         });
+
+        // Auto-resolve project if machineId + path provided and session has no project
+        if (!existing.projectId) {
+          await resolveAndLinkProject(userId, existing.id, machineId, path);
+        }
 
         // Emit new-session event so App re-fetches sessions and picks up the new dataEncryptionKey
         const updatePayload = buildNewSessionUpdate(
@@ -333,6 +397,12 @@ export function sessionRoutes(app: Fastify) {
           { module: "session-create", sessionId: session.id, userId, tag },
           `Found existing session: ${session.id} for tag ${tag}`,
         );
+
+        // Auto-resolve project if machineId + path provided and session has no project
+        if (!session.projectId) {
+          await resolveAndLinkProject(userId, session.id, machineId, path);
+        }
+
         return reply.send({
           session: {
             id: session.id,
@@ -374,6 +444,9 @@ export function sessionRoutes(app: Fastify) {
           { module: "session-create", sessionId: session.id, userId },
           `Session created: ${session.id}`,
         );
+
+        // Auto-resolve project if machineId + path provided
+        await resolveAndLinkProject(userId, session.id, machineId, path);
 
         // Emit new session update
         const updatePayload = buildNewSessionUpdate(

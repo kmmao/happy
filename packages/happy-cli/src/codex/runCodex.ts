@@ -140,10 +140,13 @@ export async function runCodex(opts: {
     sandbox: sandboxConfig,
   });
   const metadata = await enrichMetadataWithWorktree(rawMetadata);
+  const projectPath_ = metadata.worktree?.parentRepoPath || metadata.path;
   const response = await api.getOrCreateSession({
     tag: sessionTag,
     metadata,
     state,
+    machineId,
+    path: projectPath_,
   });
 
   // Handle server unreachable case - create offline stub with hot reconnection
@@ -158,6 +161,8 @@ export async function runCodex(opts: {
       metadata,
       state,
       response,
+      machineId,
+      path: projectPath_,
       onSessionSwap: (newSession) => {
         session = newSession;
         // Update permission handler with new session to avoid stale reference

@@ -172,6 +172,9 @@ export async function runClaude(
     );
   }
 
+  // Project path for server-side auto-resolve (worktree → parent repo)
+  const projectPath_ = metadata.worktree?.parentRepoPath || metadata.path;
+
   // Session creation: reconnect to existing or create new
   let response;
   if (options.happySessionId) {
@@ -182,6 +185,8 @@ export async function runClaude(
       sessionId: options.happySessionId,
       metadata,
       state,
+      machineId,
+      path: projectPath_,
     });
   } else {
     const sessionTag = randomUUID();
@@ -189,6 +194,8 @@ export async function runClaude(
       tag: sessionTag,
       metadata,
       state,
+      machineId,
+      path: projectPath_,
     });
   }
 
@@ -206,6 +213,8 @@ export async function runClaude(
             sessionId: options.happySessionId,
             metadata,
             state,
+            machineId,
+            path: projectPath_,
           });
         } else {
           const sessionTag = randomUUID();
@@ -213,6 +222,8 @@ export async function runClaude(
             tag: sessionTag,
             metadata,
             state,
+            machineId,
+            path: projectPath_,
           });
         }
         if (!resp) throw new Error("Server unavailable");

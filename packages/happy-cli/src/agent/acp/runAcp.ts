@@ -546,10 +546,13 @@ export async function runAcp(opts: {
     sandbox: settings.sandboxConfig,
   });
   const metadata = await enrichMetadataWithWorktree(rawMetadata);
+  const projectPath_ = metadata.worktree?.parentRepoPath || metadata.path;
   const response = await api.getOrCreateSession({
     tag: sessionTag,
     metadata,
     state,
+    machineId: settings.machineId,
+    path: projectPath_,
   });
   if (response) {
     logAcp("muted", `Happy Session ID: ${response.id}`);
@@ -564,6 +567,8 @@ export async function runAcp(opts: {
       metadata,
       state,
       response,
+      machineId: settings.machineId,
+      path: projectPath_,
       onSessionSwap: (newSession) => {
         session = newSession;
         if (permissionHandler) {

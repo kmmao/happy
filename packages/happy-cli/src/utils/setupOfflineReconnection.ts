@@ -33,6 +33,10 @@ export interface SetupOfflineReconnectionOptions {
      * Use this to update the session reference in the calling code.
      */
     onSessionSwap: (newSession: ApiSessionClient) => void;
+    /** Machine ID for server-side project auto-resolve */
+    machineId?: string;
+    /** Project path for server-side project auto-resolve */
+    path?: string;
 }
 
 /**
@@ -75,7 +79,7 @@ export interface SetupOfflineReconnectionResult {
  * ```
  */
 export function setupOfflineReconnection(opts: SetupOfflineReconnectionOptions): SetupOfflineReconnectionResult {
-    const { api, sessionTag, metadata, state, response, onSessionSwap } = opts;
+    const { api, sessionTag, metadata, state, response, onSessionSwap, machineId, path } = opts;
 
     let session: ApiSessionClient;
     let reconnectionHandle: ReturnType<typeof startOfflineReconnection<ApiSessionClient>> | null = null;
@@ -89,7 +93,7 @@ export function setupOfflineReconnection(opts: SetupOfflineReconnectionOptions):
         reconnectionHandle = startOfflineReconnection<ApiSessionClient>({
             serverUrl: configuration.serverUrl,
             onReconnected: async () => {
-                const resp = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
+                const resp = await api.getOrCreateSession({ tag: sessionTag, metadata, state, machineId, path });
                 if (!resp) throw new Error('Server unavailable');
                 const realSession = api.sessionSyncClient(resp);
                 // Notify caller to swap the session reference
