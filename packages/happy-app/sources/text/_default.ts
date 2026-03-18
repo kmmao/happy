@@ -2255,6 +2255,11 @@ export const en = {
     decline: "Decline",
     submit: "Submit",
   },
+
+  stopFailure: {
+    title: "Session Stopped Unexpectedly",
+    lastMessage: "Last assistant message",
+  },
 } as const;
 
 export type Translations = typeof en;

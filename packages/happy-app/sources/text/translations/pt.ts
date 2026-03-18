@@ -2225,6 +2225,10 @@ export const pt: TranslationStructure = {
     decline: "Recusar",
     submit: "Enviar",
   },
+  stopFailure: {
+    title: "Sessão parou inesperadamente",
+    lastMessage: "Última mensagem do assistente",
+  },
 } as const;
 
 export type TranslationsPt = typeof pt;

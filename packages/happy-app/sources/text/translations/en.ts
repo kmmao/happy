@@ -2210,6 +2210,10 @@ export const en: TranslationStructure = {
     decline: "Decline",
     submit: "Submit",
   },
+  stopFailure: {
+    title: "Session Stopped Unexpectedly",
+    lastMessage: "Last assistant message",
+  },
 } as const;
 
 export type TranslationsEn = typeof en;

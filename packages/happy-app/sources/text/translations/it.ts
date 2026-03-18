@@ -2221,6 +2221,10 @@ export const it: TranslationStructure = {
     decline: "Rifiuta",
     submit: "Invia",
   },
+  stopFailure: {
+    title: "Sessione interrotta inaspettatamente",
+    lastMessage: "Ultimo messaggio dell'assistente",
+  },
 } as const;
 
 export type TranslationsIt = typeof it;

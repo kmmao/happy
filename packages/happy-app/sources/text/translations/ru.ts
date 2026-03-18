@@ -2240,6 +2240,10 @@ export const ru: TranslationStructure = {
     decline: "Отклонить",
     submit: "Отправить",
   },
+  stopFailure: {
+    title: "Сессия неожиданно остановлена",
+    lastMessage: "Последнее сообщение ассистента",
+  },
 } as const;
 
 export type TranslationsRu = typeof ru;

@@ -2228,6 +2228,10 @@ export const ca: TranslationStructure = {
     decline: "Rebutja",
     submit: "Envia",
   },
+  stopFailure: {
+    title: "La sessió s'ha aturat inesperadament",
+    lastMessage: "Últim missatge de l'assistent",
+  },
 } as const;
 
 export type TranslationsCa = typeof ca;

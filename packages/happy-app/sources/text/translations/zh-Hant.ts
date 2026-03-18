@@ -2125,4 +2125,8 @@ export const zhHant: TranslationStructure = {
     decline: "拒絕",
     submit: "提交",
   },
+  stopFailure: {
+    title: "會話意外停止",
+    lastMessage: "最後一條助手訊息",
+  },
 } as const;

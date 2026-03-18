@@ -1,6 +1,7 @@
 import { AgentContentView } from "@/components/AgentContentView";
 import { AgentInput } from "@/components/AgentInput";
 import { ElicitationBanner } from "@/components/ElicitationBanner";
+import { StopFailureBanner } from "@/components/StopFailureBanner";
 import { InputFAB, InputFABStatusInfo } from "@/components/InputFAB";
 import { IssueSummaryHeader } from "@/components/IssueSummaryHeader";
 import { useCollapsibleInput } from "@/hooks/useCollapsibleInput";
@@ -1024,6 +1025,11 @@ function SessionViewInner({
           <ElicitationBanner
             sessionId={sessionId}
             elicitation={session.agentState.elicitation}
+          />
+        )}
+        {session.agentState?.stopFailure && (
+          <StopFailureBanner
+            stopFailure={session.agentState.stopFailure}
           />
         )}
         <AgentContentView

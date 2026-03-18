@@ -29,19 +29,22 @@ export function generateHookSettingsFile(port: number): string {
     const forwarderScript = resolve(projectPath(), 'scripts', 'session_hook_forwarder.cjs');
     const hookCommand = `node "${forwarderScript}" ${port}`;
 
-    const settings = {
-        hooks: {
-            SessionStart: [
+    const hookEntry = [
+        {
+            matcher: "*",
+            hooks: [
                 {
-                    matcher: "*",
-                    hooks: [
-                        {
-                            type: "command",
-                            command: hookCommand
-                        }
-                    ]
+                    type: "command",
+                    command: hookCommand
                 }
             ]
+        }
+    ];
+
+    const settings = {
+        hooks: {
+            SessionStart: hookEntry,
+            StopFailure: hookEntry,
         }
     };
 

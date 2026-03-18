@@ -129,6 +129,13 @@ export const AgentStateSchema = z.object({
       requestedSchema: z.record(z.string(), z.unknown()).nullish(),
     })
     .nullish(),
+  stopFailure: z
+    .object({
+      error: z.string(),
+      errorType: z.string().nullish(),
+      lastAssistantMessage: z.string().nullish(),
+    })
+    .nullish(),
 });
 
 export type AgentState = z.infer<typeof AgentStateSchema>;

@@ -713,6 +713,12 @@ export async function claudeRemoteLauncher(
       logger.debug("[remote]: launch");
       messageBuffer.addMessage("═".repeat(40), "status");
 
+      // Clear transient agentState from previous turn
+      session.client.updateAgentState((s) => ({
+        ...s,
+        stopFailure: null,
+      }));
+
       // Only reset parent chain and show "new session" message when session ID actually changes
       const isNewSession = session.sessionId !== previousSessionId;
       if (isNewSession) {

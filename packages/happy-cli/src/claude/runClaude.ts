@@ -322,6 +322,24 @@ export async function runClaude(
         }
       }
     },
+    onStopFailure: (data) => {
+      logger.debug(`[START] StopFailure hook: ${data.error_details ?? data.error?.message ?? "unknown"}`);
+      if (currentSession) {
+        const errorMsg = data.error_details ?? data.error?.message ?? "Session stopped unexpectedly";
+        currentSession.client.sendSessionEvent({
+          type: "message",
+          message: `StopFailure: ${errorMsg}`,
+        });
+        currentSession.client.updateAgentState((s) => ({
+          ...s,
+          stopFailure: {
+            error: errorMsg,
+            errorType: data.error?.type ?? null,
+            lastAssistantMessage: data.last_assistant_message ?? null,
+          },
+        }));
+      }
+    },
   });
   logger.debug(`[START] Hook server started on port ${hookServer.port}`);
 

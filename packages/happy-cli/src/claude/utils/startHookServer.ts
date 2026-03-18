@@ -73,9 +73,20 @@ export interface SessionHookData {
     [key: string]: unknown;
 }
 
+export interface StopFailureHookData {
+    hook_event_name: 'StopFailure';
+    session_id?: string;
+    error?: { type?: string; message?: string };
+    error_details?: string;
+    last_assistant_message?: string;
+    [key: string]: unknown;
+}
+
 export interface HookServerOptions {
     /** Called when a session hook is received with a valid session ID */
     onSessionHook: (sessionId: string, data: SessionHookData) => void;
+    /** Called when a StopFailure hook is received */
+    onStopFailure?: (data: StopFailureHookData) => void;
 }
 
 export interface HookServer {
@@ -92,54 +103,76 @@ export interface HookServer {
  * @returns Promise resolving to the server instance with port info
  */
 export async function startHookServer(options: HookServerOptions): Promise<HookServer> {
-    const { onSessionHook } = options;
+    const { onSessionHook, onStopFailure } = options;
+
+    async function parseBody(req: IncomingMessage): Promise<Record<string, unknown> | null> {
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), 5000);
+
+        try {
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) {
+                if (ac.signal.aborted) break;
+                chunks.push(chunk as Buffer);
+            }
+            clearTimeout(timer);
+
+            if (ac.signal.aborted) {
+                logger.debug('[hookServer] Request timeout');
+                return null;
+            }
+
+            const body = Buffer.concat(chunks).toString('utf-8');
+            logger.debug('[hookServer] Received hook:', body);
+
+            try {
+                return JSON.parse(body);
+            } catch (parseError) {
+                logger.debug('[hookServer] Failed to parse hook data as JSON:', parseError);
+                return {};
+            }
+        } catch (error) {
+            clearTimeout(timer);
+            logger.debug('[hookServer] Error reading body:', error);
+            return null;
+        }
+    }
+
+    function handleSessionStart(data: SessionHookData) {
+        const sessionId = data.session_id || data.sessionId;
+        if (sessionId) {
+            logger.debug(`[hookServer] Session hook received session ID: ${sessionId}`);
+            onSessionHook(sessionId, data);
+        } else {
+            logger.debug('[hookServer] Session hook received but no session_id found in data');
+        }
+    }
+
+    function handleStopFailure(data: StopFailureHookData) {
+        logger.debug(`[hookServer] StopFailure hook: ${data.error_details ?? data.error?.message ?? 'unknown'}`);
+        onStopFailure?.(data);
+    }
 
     return new Promise((resolve, reject) => {
         const server: Server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-            // Only handle POST to /hook/session-start
-            if (req.method === 'POST' && req.url === '/hook/session-start') {
-                // Set timeout to prevent hanging if Claude doesn't close stdin
-                const timeout = setTimeout(() => {
-                    if (!res.headersSent) {
-                        logger.debug('[hookServer] Request timeout');
-                        res.writeHead(408).end('timeout');
-                    }
-                }, 5000);
-
-                try {
-                    const chunks: Buffer[] = [];
-                    for await (const chunk of req) {
-                        chunks.push(chunk as Buffer);
-                    }
-                    clearTimeout(timeout);
-                    
-                    const body = Buffer.concat(chunks).toString('utf-8');
-                    logger.debug('[hookServer] Received session hook:', body);
-
-                    let data: SessionHookData = {};
-                    try {
-                        data = JSON.parse(body);
-                    } catch (parseError) {
-                        logger.debug('[hookServer] Failed to parse hook data as JSON:', parseError);
-                    }
-
-                    // Support both snake_case (from Claude) and camelCase
-                    const sessionId = data.session_id || data.sessionId;
-                    if (sessionId) {
-                        logger.debug(`[hookServer] Session hook received session ID: ${sessionId}`);
-                        onSessionHook(sessionId, data);
-                    } else {
-                        logger.debug('[hookServer] Session hook received but no session_id found in data');
-                    }
-
-                    res.writeHead(200, { 'Content-Type': 'text/plain' }).end('ok');
-                } catch (error) {
-                    clearTimeout(timeout);
-                    logger.debug('[hookServer] Error handling session hook:', error);
-                    if (!res.headersSent) {
-                        res.writeHead(500).end('error');
-                    }
+            // Handle POST /hook (generic) and POST /hook/session-start (backwards compat)
+            if (req.method === 'POST' && (req.url === '/hook' || req.url === '/hook/session-start')) {
+                const data = await parseBody(req);
+                if (data === null) {
+                    res.writeHead(408).end('timeout');
+                    return;
                 }
+
+                const eventName = (data as SessionHookData).hook_event_name;
+
+                if (eventName === 'StopFailure') {
+                    handleStopFailure(data as StopFailureHookData);
+                } else {
+                    // Default: treat as SessionStart (or any session-related hook)
+                    handleSessionStart(data as SessionHookData);
+                }
+
+                res.writeHead(200, { 'Content-Type': 'text/plain' }).end('ok');
                 return;
             }
 

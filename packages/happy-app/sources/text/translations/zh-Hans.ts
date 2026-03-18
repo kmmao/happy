@@ -2122,4 +2122,8 @@ export const zhHans: TranslationStructure = {
     decline: "拒绝",
     submit: "提交",
   },
+  stopFailure: {
+    title: "会话意外停止",
+    lastMessage: "最后一条助手消息",
+  },
 } as const;

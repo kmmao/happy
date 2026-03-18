@@ -2192,4 +2192,8 @@ export const ja: TranslationStructure = {
     decline: "拒否",
     submit: "送信",
   },
+  stopFailure: {
+    title: "セッションが予期せず停止しました",
+    lastMessage: "最後のアシスタントメッセージ",
+  },
 } as const;

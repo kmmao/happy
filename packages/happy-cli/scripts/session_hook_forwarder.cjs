@@ -12,7 +12,7 @@ const http = require('http');
 
 const port = parseInt(process.argv[2], 10);
 
-if (!port || isNaN(port)) {
+if (!port || isNaN(port) || port < 1 || port > 65535) {
     process.exit(1);
 }
 
@@ -24,12 +24,12 @@ process.stdin.on('data', (chunk) => {
 
 process.stdin.on('end', () => {
     const body = Buffer.concat(chunks);
-    
+
     const req = http.request({
         host: '127.0.0.1',
         port: port,
         method: 'POST',
-        path: '/hook/session-start',
+        path: '/hook',
         headers: {
             'Content-Type': 'application/json',
             'Content-Length': body.length
@@ -37,11 +37,11 @@ process.stdin.on('end', () => {
     }, (res) => {
         res.resume(); // Drain response
     });
-    
+
     req.on('error', () => {
         // Silently ignore errors - don't break Claude
     });
-    
+
     req.end(body);
 });
 
