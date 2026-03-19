@@ -11,7 +11,9 @@ import { log } from "@/utils/log";
 import {
     eventRouter,
     buildSupervisorStatusEphemeral,
+    buildSessionActivityEphemeral,
 } from "@/app/events/eventRouter";
+import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 
 const supervisorFixStatusSchema = z.object({
@@ -45,7 +47,7 @@ export function supervisorFixStatusHandler(
                     accountId: userId,
                     approval: "approved",
                 },
-                select: { id: true, fixStatus: true, runId: true, title: true },
+                select: { id: true, fixStatus: true, fixSessionId: true, runId: true, title: true },
             });
 
             if (!action) {
@@ -75,22 +77,42 @@ export function supervisorFixStatusHandler(
                 `supervisor-fix-status: action ${data.actionId} → ${data.fixStatus}`,
             );
 
-            // Notify App clients about fix status change
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSupervisorStatusEphemeral(
-                    action.runId,
-                    data.projectId,
-                    `fix-${data.fixStatus}`,
-                ),
-                recipientFilter: { type: "user-scoped-only" },
-            });
-
-            // Send push notification on fix completion/failure
+            // Archive fix session and send notifications on terminal status.
+            // Both completed and failed are terminal: the fix session is done
+            // regardless of outcome (unlike run handler which only archives on completed).
             if (
                 data.fixStatus === "completed" ||
                 data.fixStatus === "failed"
             ) {
+                // Archive the fix session first (before broadcasting status)
+                // so clients see active: false when they query after the status event.
+                const resolvedFixSessionId =
+                    data.fixSessionId ?? action.fixSessionId;
+                if (resolvedFixSessionId) {
+                    const now = Date.now();
+                    await db.session.updateMany({
+                        where: {
+                            id: resolvedFixSessionId,
+                            active: true,
+                        },
+                        data: {
+                            lastActiveAt: new Date(now),
+                            active: false,
+                        },
+                    });
+                    activityCache.invalidateSession(resolvedFixSessionId);
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: buildSessionActivityEphemeral(
+                            resolvedFixSessionId,
+                            false,
+                            now,
+                            false,
+                        ),
+                        recipientFilter: { type: "user-scoped-only" },
+                    });
+                }
+
                 const title =
                     data.fixStatus === "completed"
                         ? "Fix Applied Successfully"
@@ -111,6 +133,17 @@ export function supervisorFixStatusHandler(
                     body,
                 });
             }
+
+            // Notify App clients about fix status change
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildSupervisorStatusEphemeral(
+                    action.runId,
+                    data.projectId,
+                    `fix-${data.fixStatus}`,
+                ),
+                recipientFilter: { type: "user-scoped-only" },
+            });
         } catch (error) {
             log(
                 { module: "supervisor", level: "error" },
