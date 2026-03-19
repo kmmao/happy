@@ -272,6 +272,23 @@ export const ProjectResearchTab = React.memo(
                     <View style={styles.innerContainer}>
                         {/* Single config group: inputs + dimensions + button */}
                         <ItemGroup title={t("competitorResearch.title")}>
+                            {/* Dimension toggles first */}
+                            <View style={styles.dimensionHeader}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                    {t("competitorResearch.dimensionsSection")}
+                                </Text>
+                            </View>
+                            {RESEARCH_DIMENSIONS.map((dim) => (
+                                <DimensionToggle
+                                    key={dim}
+                                    label={DIMENSION_LABELS[dim].label()}
+                                    subtitle={DIMENSION_LABELS[dim].note()}
+                                    value={dimensions[dim]}
+                                    onToggle={() => toggleDimension(dim)}
+                                    disabled={isRunning}
+                                />
+                            ))}
+
                             {/* Known Competitors */}
                             <View style={styles.inputSection}>
                                 <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
@@ -295,23 +312,6 @@ export const ProjectResearchTab = React.memo(
                                     editable={!isRunning}
                                 />
                             </View>
-
-                            {/* Dimension toggles inline */}
-                            <View style={styles.dimensionHeader}>
-                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                                    {t("competitorResearch.dimensionsSection")}
-                                </Text>
-                            </View>
-                            {RESEARCH_DIMENSIONS.map((dim) => (
-                                <DimensionToggle
-                                    key={dim}
-                                    label={DIMENSION_LABELS[dim].label()}
-                                    subtitle={DIMENSION_LABELS[dim].note()}
-                                    value={dimensions[dim]}
-                                    onToggle={() => toggleDimension(dim)}
-                                    disabled={isRunning}
-                                />
-                            ))}
 
                             {/* Custom Rules */}
                             <View style={styles.inputSection}>
