@@ -54,7 +54,7 @@ export const SupervisorActionCard = React.memo(
 
         const isRecurring = action.lastSeenRunId != null && action.lastSeenRunId !== action.runId;
 
-        const [, doApprove] = useHappyAction(
+        const [approveLoading, doApprove] = useHappyAction(
             React.useCallback(async () => {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
@@ -68,7 +68,7 @@ export const SupervisorActionCard = React.memo(
             }, [projectId, action.id, onUpdated]),
         );
 
-        const [, doSkip] = useHappyAction(
+        const [skipLoading, doSkip] = useHappyAction(
             React.useCallback(async () => {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
@@ -82,7 +82,7 @@ export const SupervisorActionCard = React.memo(
             }, [projectId, action.id, onUpdated]),
         );
 
-        const [, doIgnore] = useHappyAction(
+        const [ignoreLoading, doIgnore] = useHappyAction(
             React.useCallback(async () => {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
@@ -105,7 +105,7 @@ export const SupervisorActionCard = React.memo(
             }, [projectId, action.id, onUpdated]),
         );
 
-        const [, doRestore] = useHappyAction(
+        const [restoreLoading, doRestore] = useHappyAction(
             React.useCallback(async () => {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
@@ -119,7 +119,7 @@ export const SupervisorActionCard = React.memo(
             }, [projectId, action.id, onUpdated]),
         );
 
-        const [, doDelete] = useHappyAction(
+        const [deleteLoading, doDelete] = useHappyAction(
             React.useCallback(async () => {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
@@ -138,6 +138,8 @@ export const SupervisorActionCard = React.memo(
                 ],
             );
         }, [doDelete]);
+
+        const actionBusy = approveLoading || skipLoading || ignoreLoading || restoreLoading || deleteLoading;
 
         const isPending = action.approval === "pending";
         const isApproved = action.approval === "approved";
@@ -295,30 +297,45 @@ export const SupervisorActionCard = React.memo(
 
                 {/* Action buttons */}
                 {isPending && (
-                    <View style={styles.buttonRow}>
+                    <View style={[styles.buttonRow, actionBusy && styles.buttonRowBusy]}>
                         <Pressable
-                            style={styles.approveButton}
+                            style={[styles.approveButton, actionBusy && !approveLoading && styles.buttonDisabled]}
                             onPress={doApprove}
+                            disabled={actionBusy}
                         >
-                            <Text style={styles.approveButtonText}>
-                                {t("supervisor.approve")}
-                            </Text>
+                            {approveLoading ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.approveButtonText}>
+                                    {t("supervisor.approve")}
+                                </Text>
+                            )}
                         </Pressable>
                         <Pressable
-                            style={styles.secondaryButton}
+                            style={[styles.secondaryButton, actionBusy && !skipLoading && styles.buttonDisabled]}
                             onPress={doSkip}
+                            disabled={actionBusy}
                         >
-                            <Text style={styles.secondaryButtonText}>
-                                {t("supervisor.skip")}
-                            </Text>
+                            {skipLoading ? (
+                                <ActivityIndicator size="small" color={theme.colors.text} />
+                            ) : (
+                                <Text style={styles.secondaryButtonText}>
+                                    {t("supervisor.skip")}
+                                </Text>
+                            )}
                         </Pressable>
                         <Pressable
-                            style={styles.secondaryButton}
+                            style={[styles.secondaryButton, actionBusy && !ignoreLoading && styles.buttonDisabled]}
                             onPress={doIgnore}
+                            disabled={actionBusy}
                         >
-                            <Text style={styles.secondaryButtonText}>
-                                {t("supervisor.ignore")}
-                            </Text>
+                            {ignoreLoading ? (
+                                <ActivityIndicator size="small" color={theme.colors.text} />
+                            ) : (
+                                <Text style={styles.secondaryButtonText}>
+                                    {t("supervisor.ignore")}
+                                </Text>
+                            )}
                         </Pressable>
                     </View>
                 )}
@@ -334,22 +351,36 @@ export const SupervisorActionCard = React.memo(
                 {isDismissed && (
                     <View style={styles.buttonRow}>
                         <Pressable
-                            style={styles.restoreButton}
+                            style={[styles.restoreButton, actionBusy && !restoreLoading && styles.buttonDisabled]}
                             onPress={doRestore}
+                            disabled={actionBusy}
                         >
-                            <Ionicons name="arrow-undo-outline" size={14} color={theme.colors.header.tint} />
-                            <Text style={[styles.restoreButtonText, { color: theme.colors.header.tint }]}>
-                                {t("supervisor.restore")}
-                            </Text>
+                            {restoreLoading ? (
+                                <ActivityIndicator size="small" color={theme.colors.header.tint} />
+                            ) : (
+                                <>
+                                    <Ionicons name="arrow-undo-outline" size={14} color={theme.colors.header.tint} />
+                                    <Text style={[styles.restoreButtonText, { color: theme.colors.header.tint }]}>
+                                        {t("supervisor.restore")}
+                                    </Text>
+                                </>
+                            )}
                         </Pressable>
                         <Pressable
-                            style={styles.deleteButton}
+                            style={[styles.deleteButton, actionBusy && !deleteLoading && styles.buttonDisabled]}
                             onPress={handleDelete}
+                            disabled={actionBusy}
                         >
-                            <Ionicons name="trash-outline" size={14} color="#FF3B30" />
-                            <Text style={styles.deleteButtonText}>
-                                {t("supervisor.delete")}
-                            </Text>
+                            {deleteLoading ? (
+                                <ActivityIndicator size="small" color="#FF3B30" />
+                            ) : (
+                                <>
+                                    <Ionicons name="trash-outline" size={14} color="#FF3B30" />
+                                    <Text style={styles.deleteButtonText}>
+                                        {t("supervisor.delete")}
+                                    </Text>
+                                </>
+                            )}
                         </Pressable>
                     </View>
                 )}
@@ -514,6 +545,12 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         gap: 8,
         marginTop: 10,
+    },
+    buttonRowBusy: {
+        opacity: 0.85,
+    },
+    buttonDisabled: {
+        opacity: 0.4,
     },
     approveButton: {
         backgroundColor: theme.colors.header.tint,
