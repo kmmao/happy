@@ -38,7 +38,6 @@ import {
     clearAllActions,
     type SupervisorLoop,
     fetchActiveLoop,
-    startSupervisorLoop,
 } from "@/sync/apiSupervisor";
 import { ItemGroup } from "@/components/ItemGroup";
 import { useRouter } from "expo-router";
@@ -53,6 +52,7 @@ import { Modal } from "@/modal";
 import { useElapsedSeconds, type DimensionProgress } from "./supervisorUtils";
 import { SupervisorProgressView } from "./SupervisorProgressView";
 import { SupervisorLoopStatusCard } from "./SupervisorLoopStatusCard";
+import { SupervisorLoopConfigPanel } from "./SupervisorLoopConfigPanel";
 
 
 interface ProjectHealthTabProps {
@@ -85,6 +85,7 @@ export const ProjectHealthTab = React.memo(
             React.useState<DimensionProgress | null>(null);
         const [activeLoop, setActiveLoop] =
             React.useState<SupervisorLoop | null>(null);
+        const [showLoopConfig, setShowLoopConfig] = React.useState(false);
 
         const serverId = project.serverId;
 
@@ -272,18 +273,10 @@ export const ProjectHealthTab = React.memo(
             }, [serverId]),
         );
 
-        const [startLoopLoading, doStartLoop] = useHappyAction(
-            React.useCallback(async () => {
-                if (!serverId) return;
-                const credentials = await TokenStorage.getCredentials();
-                if (!credentials) return;
-                const loop = await startSupervisorLoop(credentials, serverId, {
-                    maxIterations: 5,
-                    autoApproveThreshold: 80,
-                });
-                setActiveLoop(loop);
-            }, [serverId]),
-        );
+        const handleLoopStarted = React.useCallback((loop: SupervisorLoop) => {
+            setActiveLoop(loop);
+            setShowLoopConfig(false);
+        }, []);
 
         const [cancelLoading, doCancel] = useHappyAction(
             React.useCallback(async () => {
@@ -487,12 +480,18 @@ export const ProjectHealthTab = React.memo(
                                         </Text>
                                     </Pressable>
                                 </View>
+                            ) : showLoopConfig ? (
+                                <SupervisorLoopConfigPanel
+                                    projectId={serverId}
+                                    onStarted={handleLoopStarted}
+                                    onCancel={() => setShowLoopConfig(false)}
+                                />
                             ) : (
                                 <View style={styles.buttonRow}>
                                     <Pressable
                                         style={styles.scanButton}
                                         onPress={doTrigger}
-                                        disabled={triggerLoading || startLoopLoading}
+                                        disabled={triggerLoading}
                                     >
                                         {triggerLoading ? (
                                             <>
@@ -519,31 +518,22 @@ export const ProjectHealthTab = React.memo(
                                     </Pressable>
                                     <Pressable
                                         style={styles.loopButton}
-                                        onPress={doStartLoop}
-                                        disabled={triggerLoading || startLoopLoading}
+                                        onPress={() => setShowLoopConfig(true)}
+                                        disabled={triggerLoading}
                                     >
-                                        {startLoopLoading ? (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color={theme.colors.header.tint}
-                                            />
-                                        ) : (
-                                            <>
-                                                <Ionicons
-                                                    name="repeat-outline"
-                                                    size={18}
-                                                    color={theme.colors.header.tint}
-                                                />
-                                                <Text
-                                                    style={[
-                                                        styles.loopButtonText,
-                                                        { color: theme.colors.header.tint },
-                                                    ]}
-                                                >
-                                                    {t("supervisor.loopMode")}
-                                                </Text>
-                                            </>
-                                        )}
+                                        <Ionicons
+                                            name="repeat-outline"
+                                            size={18}
+                                            color={theme.colors.header.tint}
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.loopButtonText,
+                                                { color: theme.colors.header.tint },
+                                            ]}
+                                        >
+                                            {t("supervisor.loopMode")}
+                                        </Text>
                                     </Pressable>
                                 </View>
                             )}

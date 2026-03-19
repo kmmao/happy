@@ -2092,7 +2092,16 @@ export const ca: TranslationStructure = {
     deleteConfirmBody: "Voleu eliminar aquesta acció permanentment? Si el problema encara existeix, es detectarà de nou al proper escaneig.",
 
     // Loop mode
-    loopMode: "Mode Bucle",
+    loopMode: "Bucle",
+    loopConfig: "Configuració del bucle",
+    loopConfigIterations: "Iteracions màximes",
+    loopConfigIterationsHint: "Quants cicles d'anàlisi→correcció executar abans d'aturar-se",
+    loopConfigThreshold: "Confiança d'aprovació automàtica",
+    loopConfigThresholdHint: "Corregeix automàticament només les accions amb confiança d'IA superior a aquest nivell",
+    loopConfigCostCap: "Límit de cost",
+    loopConfigCostCapHint: "Atura el bucle quan el cost acumulat arribi a aquesta quantitat",
+    loopConfigSafety: "El bucle utilitza fusió directa. Cada correcció s'executa en un arbre de treball aïllat. Pots pausar o aturar en qualsevol moment.",
+    loopConfigStart: "Iniciar bucle",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iteració ${current}/${max}`,
     loopFound: "Trobats",
     loopFixed: "Corregits",

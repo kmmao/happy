@@ -2080,7 +2080,16 @@ export const en: TranslationStructure = {
     deleteConfirmBody: "Permanently delete this action? If the issue still exists, it will be detected again on the next scan.",
 
     // Loop mode
-    loopMode: "Loop Mode",
+    loopMode: "Loop",
+    loopConfig: "Loop Configuration",
+    loopConfigIterations: "Max Iterations",
+    loopConfigIterationsHint: "How many analyze→fix cycles to run before stopping",
+    loopConfigThreshold: "Auto-Approve Confidence",
+    loopConfigThresholdHint: "Only auto-fix actions with AI confidence above this level",
+    loopConfigCostCap: "Cost Limit",
+    loopConfigCostCapHint: "Stop the loop when cumulative cost reaches this amount",
+    loopConfigSafety: "Loop uses direct merge. Each fix runs in an isolated worktree. You can pause or stop at any time.",
+    loopConfigStart: "Start Loop",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iteration ${current}/${max}`,
     loopFound: "Found",
     loopFixed: "Fixed",

@@ -2107,7 +2107,16 @@ export const pl: TranslationStructure = {
     deleteConfirmBody: "Trwale usunąć tę akcję? Jeśli problem nadal istnieje, zostanie wykryty ponownie przy następnym skanowaniu.",
 
     // Loop mode
-    loopMode: "Tryb pętli",
+    loopMode: "Pętla",
+    loopConfig: "Konfiguracja pętli",
+    loopConfigIterations: "Maks. iteracji",
+    loopConfigIterationsHint: "Ile cykli analiza→naprawa wykonać przed zatrzymaniem",
+    loopConfigThreshold: "Próg automatycznego zatwierdzania",
+    loopConfigThresholdHint: "Automatycznie naprawiaj tylko akcje z pewnością AI powyżej tego poziomu",
+    loopConfigCostCap: "Limit kosztów",
+    loopConfigCostCapHint: "Zatrzymaj pętlę, gdy skumulowany koszt osiągnie tę kwotę",
+    loopConfigSafety: "Pętla używa bezpośredniego scalania. Każda naprawa działa w izolowanym drzewie roboczym. Możesz wstrzymać lub zatrzymać w dowolnym momencie.",
+    loopConfigStart: "Uruchom pętlę",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iteracja ${current}/${max}`,
     loopFound: "Znaleziono",
     loopFixed: "Naprawiono",

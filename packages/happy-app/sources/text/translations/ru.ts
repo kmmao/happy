@@ -2106,7 +2106,16 @@ export const ru: TranslationStructure = {
     deleteConfirmBody: "Удалить это действие навсегда? Если проблема ещё существует, она будет обнаружена при следующем сканировании.",
 
     // Loop mode
-    loopMode: "Режим цикла",
+    loopMode: "Цикл",
+    loopConfig: "Настройка цикла",
+    loopConfigIterations: "Макс. итераций",
+    loopConfigIterationsHint: "Сколько циклов анализ→исправление выполнить до остановки",
+    loopConfigThreshold: "Порог автоодобрения",
+    loopConfigThresholdHint: "Автоматически исправлять только действия с уверенностью ИИ выше этого уровня",
+    loopConfigCostCap: "Лимит стоимости",
+    loopConfigCostCapHint: "Остановить цикл, когда накопленная стоимость достигнет этой суммы",
+    loopConfigSafety: "Цикл использует прямое слияние. Каждое исправление выполняется в изолированном рабочем дереве. Вы можете приостановить или остановить в любой момент.",
+    loopConfigStart: "Запустить цикл",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Итерация ${current}/${max}`,
     loopFound: "Найдено",
     loopFixed: "Исправлено",

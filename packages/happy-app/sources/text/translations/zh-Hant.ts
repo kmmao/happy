@@ -1997,7 +1997,16 @@ export const zhHant: TranslationStructure = {
     deleteConfirmBody: "永久刪除此操作？如果問題仍然存在，下次掃描會重新檢測到。",
 
     // Loop mode
-    loopMode: "循環模式",
+    loopMode: "循環",
+    loopConfig: "循環配置",
+    loopConfigIterations: "最大迭代次數",
+    loopConfigIterationsHint: "在停止前執行多少次分析→修復循環",
+    loopConfigThreshold: "自動批准信心度",
+    loopConfigThresholdHint: "僅自動修復 AI 信心度高於此級別的操作",
+    loopConfigCostCap: "費用上限",
+    loopConfigCostCapHint: "當累計費用達到此金額時停止循環",
+    loopConfigSafety: "循環使用直接合併。每次修復在隔離的工作樹中執行。你可以隨時暫停或停止。",
+    loopConfigStart: "開始循環",
     loopIteration: ({ current, max }: { current: number; max: number }) => `迭代 ${current}/${max}`,
     loopFound: "發現",
     loopFixed: "已修復",

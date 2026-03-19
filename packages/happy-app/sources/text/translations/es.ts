@@ -2087,7 +2087,16 @@ export const es: TranslationStructure = {
     deleteConfirmBody: "¿Eliminar esta acción permanentemente? Si el problema persiste, se detectará de nuevo en el próximo escaneo.",
 
     // Loop mode
-    loopMode: "Modo Bucle",
+    loopMode: "Bucle",
+    loopConfig: "Configuración del bucle",
+    loopConfigIterations: "Iteraciones máximas",
+    loopConfigIterationsHint: "Cuántos ciclos de análisis→corrección ejecutar antes de detenerse",
+    loopConfigThreshold: "Confianza de aprobación automática",
+    loopConfigThresholdHint: "Solo corregir automáticamente acciones con confianza de IA superior a este nivel",
+    loopConfigCostCap: "Límite de coste",
+    loopConfigCostCapHint: "Detener el bucle cuando el coste acumulado alcance esta cantidad",
+    loopConfigSafety: "El bucle usa fusión directa. Cada corrección se ejecuta en un árbol de trabajo aislado. Puedes pausar o detener en cualquier momento.",
+    loopConfigStart: "Iniciar bucle",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iteración ${current}/${max}`,
     loopFound: "Encontrados",
     loopFixed: "Corregidos",

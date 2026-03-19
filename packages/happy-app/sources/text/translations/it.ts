@@ -2086,7 +2086,16 @@ export const it: TranslationStructure = {
     deleteConfirmBody: "Eliminare questa azione in modo permanente? Se il problema esiste ancora, verrà rilevato di nuovo alla prossima scansione.",
 
     // Loop mode
-    loopMode: "Modalità Loop",
+    loopMode: "Loop",
+    loopConfig: "Configurazione loop",
+    loopConfigIterations: "Iterazioni massime",
+    loopConfigIterationsHint: "Quanti cicli analisi→correzione eseguire prima di fermarsi",
+    loopConfigThreshold: "Confidenza approvazione automatica",
+    loopConfigThresholdHint: "Correggi automaticamente solo le azioni con confidenza AI superiore a questo livello",
+    loopConfigCostCap: "Limite di costo",
+    loopConfigCostCapHint: "Ferma il loop quando il costo cumulativo raggiunge questo importo",
+    loopConfigSafety: "Il loop usa il merge diretto. Ogni correzione viene eseguita in un worktree isolato. Puoi mettere in pausa o fermare in qualsiasi momento.",
+    loopConfigStart: "Avvia loop",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iterazione ${current}/${max}`,
     loopFound: "Trovati",
     loopFixed: "Corretti",

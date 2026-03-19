@@ -2062,7 +2062,16 @@ export const ja: TranslationStructure = {
     deleteConfirmBody: "このアクションを完全に削除しますか？問題がまだ存在する場合、次回のスキャンで再検出されます。",
 
     // Loop mode
-    loopMode: "ループモード",
+    loopMode: "ループ",
+    loopConfig: "ループ設定",
+    loopConfigIterations: "最大イテレーション数",
+    loopConfigIterationsHint: "停止するまでに実行する分析→修正サイクルの回数",
+    loopConfigThreshold: "自動承認の信頼度",
+    loopConfigThresholdHint: "AIの信頼度がこのレベルを超えるアクションのみ自動修正",
+    loopConfigCostCap: "コスト上限",
+    loopConfigCostCapHint: "累積コストがこの金額に達したらループを停止",
+    loopConfigSafety: "ループは直接マージを使用します。各修正は隔離されたワークツリーで実行されます。いつでも一時停止または停止できます。",
+    loopConfigStart: "ループ開始",
     loopIteration: ({ current, max }: { current: number; max: number }) => `イテレーション ${current}/${max}`,
     loopFound: "検出",
     loopFixed: "修正済み",
