@@ -279,7 +279,7 @@ async function handleAnalysisTrigger(
   const promptFilePath = await writePromptFile(repoPath, runId, prompt);
 
   // 4. Spawn session in the project directory (read-only analysis)
-  const spawnResult = await deps.spawnSession({
+  const spawnResult = await spawnSessionWithRetry(deps.spawnSession, {
     directory: repoPath,
     approvedNewDirectoryCreation: false,
     agent: "claude",
@@ -350,7 +350,7 @@ async function handleResearchTrigger(
   const promptFilePath = await writePromptFile(repoPath, `research-${runId}`, prompt);
 
   // 4. Spawn session in the project directory (read-only research)
-  const spawnResult = await deps.spawnSession({
+  const spawnResult = await spawnSessionWithRetry(deps.spawnSession, {
     directory: repoPath,
     approvedNewDirectoryCreation: false,
     agent: "claude",
@@ -451,7 +451,7 @@ async function handleFixTrigger(
   logger.debug(`[SUPERVISOR] Wrote fix prompt to ${promptFilePath}`);
 
   // 5. Spawn fix session in worktree directory
-  const spawnResult = await deps.spawnSession({
+  const spawnResult = await spawnSessionWithRetry(deps.spawnSession, {
     directory: worktreeResult.worktreePath,
     approvedNewDirectoryCreation: true,
     agent: "claude",
@@ -518,4 +518,45 @@ async function cleanupPromptFile(path: string): Promise<void> {
   } catch {
     // best-effort
   }
+}
+
+/**
+ * Spawn a session with retry logic to handle the case where dist/ is
+ * temporarily missing during a CLI build (mv dist dist_prev → pkgroll).
+ * Retries up to 10 times with 2s delay (~20s total).
+ */
+async function spawnSessionWithRetry(
+  spawnSession: SupervisorHandlerDeps["spawnSession"],
+  options: SpawnSessionOptions,
+): Promise<SpawnSessionResult> {
+  const maxAttempts = 10;
+  const retryDelayMs = 2_000;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const result = await spawnSession(options);
+
+    if (result.type === "success") {
+      return result;
+    }
+
+    // Check if the error is related to missing entrypoint (build in progress)
+    const errorMsg =
+      result.type === "error" ? result.errorMessage : "";
+    const isBuildRelated =
+      errorMsg.includes("does not exist") ||
+      errorMsg.includes("ENOENT") ||
+      errorMsg.includes("Cannot find module");
+
+    if (!isBuildRelated || attempt === maxAttempts) {
+      return result;
+    }
+
+    logger.debug(
+      `[SUPERVISOR] Spawn attempt ${attempt}/${maxAttempts} failed (dist may be rebuilding), retrying in ${retryDelayMs}ms...`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+  }
+
+  // Should never reach here, but satisfy TypeScript
+  return { type: "error" as const, errorMessage: "Max spawn attempts exceeded" };
 }
