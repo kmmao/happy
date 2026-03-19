@@ -90,24 +90,35 @@ Write a comprehensive Markdown report with these sections:
 6. **Technology Comparison** — Tech stack differences and trade-offs
 7. **Strategic Recommendations** — Prioritized list of features/improvements to develop
 
-## Step 4: Extract Actionable Items
-After writing the report, extract **concrete, implementable tasks** from your analysis.
-Focus on items from Gap Analysis and Strategic Recommendations that can be turned into development work.
+## Step 4: Verify & Extract Actionable Items
+After writing the report, extract **concrete, implementable tasks** — but **verify each one against the actual codebase first**.
 
-For each actionable item, determine:
+### 4a: Verify before creating actions
+For each potential action from Gap Analysis and Strategic Recommendations:
+1. **Search the codebase** (grep, read files) to check if this feature/capability already exists
+2. If it already exists → **skip it** (do not create an action)
+3. If it partially exists → note what's missing and create an action for the gap only
+4. If it doesn't exist → create the action
+
+This verification is critical to avoid suggesting features the project already has.
+
+### 4b: Structure each action
+For each verified actionable item, determine:
 - **severity**: "critical" | "high" | "medium" | "low" — based on strategic priority
 - **category**: use "research" as the category for all research-derived actions
 - **title**: short, actionable title (e.g., "Add team collaboration with shared sessions")
-- **description**: what needs to be built and why (reference competitor evidence)
-- **suggestedFix**: concrete implementation approach for this codebase
-- **confidence**: 0-100, how confident you are this is worth implementing
+- **description**: what needs to be built and why (reference competitor evidence). If partially exists, describe what's missing.
+- **suggestedFix**: concrete implementation approach for this codebase, referencing actual file paths and modules you found during verification
+- **confidence**: 0-100, how confident you are this is worth implementing (lower if you couldn't fully verify)
 
 Rules for actions:
+- **NEVER suggest features that already exist in the codebase**
 - Only include items that are **concretely implementable** (not vague strategy)
 - High priority items from the report → severity "high" or "critical"
 - Medium priority → "medium", Low priority → "low"
 - Maximum 10 actions — focus on the most impactful ones
 - Each action should be a single, scoped task (not a multi-month initiative)
+- suggestedFix should reference real file paths from the codebase
 
 ## Disclaimer
 Add this at the end of the report:
