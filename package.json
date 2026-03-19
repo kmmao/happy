@@ -27,7 +27,7 @@
     },
     "packageManager": "yarn@1.22.22",
     "resolutions": {
-        "fast-xml-parser": "^4.5.4",
+        "fast-xml-parser": "^5.5.6",
         "basic-ftp": "^5.2.0",
         "rollup": "^4.59.0",
         "prismjs": "^1.30.0",
