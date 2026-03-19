@@ -270,8 +270,32 @@ export async function claudeLocal(opts: {
       // Prepare environment variables
       // Note: Local mode uses global Claude installation with --session-id flag
       // Launcher only intercepts fetch for thinking state tracking
+      //
+      // Security: Strip server-internal secrets so that Claude tool calls
+      // (e.g. Bash `printenv`) cannot leak operator infrastructure credentials.
+      // API keys needed by Claude (ANTHROPIC_AUTH_TOKEN etc.) are passed through
+      // claudeEnvVars which are already validated upstream.
+      const SERVER_ONLY_ENV_VARS = new Set([
+        "DATABASE_URL",
+        "REDIS_URL",
+        "JWT_SECRET",
+        "ENCRYPTION_KEY",
+        "GITHUB_CLIENT_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SESSION_TOKEN",
+        "STRIPE_SECRET_KEY",
+        "SENDGRID_API_KEY",
+        "S3_ACCESS_KEY",
+        "S3_SECRET_KEY",
+      ]);
+      const filteredProcessEnv = Object.fromEntries(
+        Object.entries(process.env).filter(
+          ([key]) => !SERVER_ONLY_ENV_VARS.has(key),
+        ),
+      );
       const env = {
-        ...process.env,
+        ...filteredProcessEnv,
         ...opts.claudeEnvVars,
       };
 

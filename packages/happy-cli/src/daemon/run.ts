@@ -378,13 +378,57 @@ export async function startDaemon(): Promise<void> {
         let profileEnv: Record<string, string> = {};
         const guiProfileProvided = options.environmentVariables !== undefined;
 
+        // ── Security: Sensitive env var keys that ONLY the daemon operator may set ──
+        // Remote (GUI/mobile) users must NEVER override these — doing so enables
+        // SSRF (redirect API traffic) or credential theft.
+        const OPERATOR_ONLY_ENV_VARS = new Set([
+          // Anthropic
+          "ANTHROPIC_BASE_URL",
+          "ANTHROPIC_AUTH_TOKEN",
+          "ANTHROPIC_API_KEY",
+          // OpenAI / Codex
+          "OPENAI_API_KEY",
+          "OPENAI_BASE_URL",
+          "AZURE_OPENAI_API_KEY",
+          "AZURE_OPENAI_ENDPOINT",
+          // Google / Gemini
+          "GOOGLE_API_KEY",
+          "GEMINI_API_KEY",
+          // Other providers
+          "TOGETHER_API_KEY",
+          "CODEX_HOME",
+          // OAuth
+          "CLAUDE_CODE_OAUTH_TOKEN",
+          // Server internals that must never leak
+          "DATABASE_URL",
+          "REDIS_URL",
+          "JWT_SECRET",
+          "ENCRYPTION_KEY",
+          "GITHUB_CLIENT_SECRET",
+          "AWS_SECRET_ACCESS_KEY",
+          "AWS_ACCESS_KEY_ID",
+        ]);
+
         if (guiProfileProvided) {
-          // GUI explicitly provided profile environment variables — use as-is, no fallback
-          // Filter out undefined values to satisfy Record<string, string>
+          // GUI explicitly provided profile environment variables
+          // Security: Strip any operator-only keys to prevent SSRF / credential override
           const raw = options.environmentVariables!;
+          const stripped: string[] = [];
           profileEnv = Object.fromEntries(
-            Object.entries(raw).filter((entry): entry is [string, string] => entry[1] !== undefined),
+            Object.entries(raw).filter((entry): entry is [string, string] => {
+              if (entry[1] === undefined) return false;
+              if (OPERATOR_ONLY_ENV_VARS.has(entry[0])) {
+                stripped.push(entry[0]);
+                return false;
+              }
+              return true;
+            }),
           );
+          if (stripped.length > 0) {
+            logger.warn(
+              `[DAEMON RUN] Security: Stripped ${stripped.length} operator-only env vars from GUI profile: ${stripped.join(", ")}`,
+            );
+          }
           const varCount = Object.keys(profileEnv).length;
           logger.info(
             `[DAEMON RUN] Using GUI-provided profile environment variables (${varCount} vars)`,
@@ -560,9 +604,15 @@ export async function startDaemon(): Promise<void> {
           const windowName = `happy-${Date.now()}-${agent}`;
           const tmuxEnv: Record<string, string> = {};
 
-          // Add all daemon environment variables (filtering out undefined)
+          // Add all daemon environment variables (filtering out undefined and server-only secrets)
+          const TMUX_SERVER_ONLY_ENV_VARS = new Set([
+            "DATABASE_URL", "REDIS_URL", "JWT_SECRET", "ENCRYPTION_KEY",
+            "GITHUB_CLIENT_SECRET", "AWS_SECRET_ACCESS_KEY", "AWS_ACCESS_KEY_ID",
+            "AWS_SESSION_TOKEN", "STRIPE_SECRET_KEY", "SENDGRID_API_KEY",
+            "S3_ACCESS_KEY", "S3_SECRET_KEY",
+          ]);
           for (const [key, value] of Object.entries(process.env)) {
-            if (value !== undefined) {
+            if (value !== undefined && !TMUX_SERVER_ONLY_ENV_VARS.has(key)) {
               tmuxEnv[key] = value;
             }
           }
@@ -696,12 +746,27 @@ export async function startDaemon(): Promise<void> {
             args.push("--claude-env", `${key}=${value}`);
           }
 
+          // Security: Strip server-internal secrets from child process environment
+          // so that Claude tool calls cannot leak operator infrastructure credentials.
+          // API keys needed by the session are already in extraEnv (from profile).
+          const SERVER_ONLY_ENV_VARS = new Set([
+            "DATABASE_URL", "REDIS_URL", "JWT_SECRET", "ENCRYPTION_KEY",
+            "GITHUB_CLIENT_SECRET", "AWS_SECRET_ACCESS_KEY", "AWS_ACCESS_KEY_ID",
+            "AWS_SESSION_TOKEN", "STRIPE_SECRET_KEY", "SENDGRID_API_KEY",
+            "S3_ACCESS_KEY", "S3_SECRET_KEY",
+          ]);
+          const filteredDaemonEnv = Object.fromEntries(
+            Object.entries(process.env).filter(
+              ([key]) => !SERVER_ONLY_ENV_VARS.has(key),
+            ),
+          );
+
           const happyProcess = spawnHappyCLI(args, {
             cwd: directory,
             detached: true, // Sessions stay alive when daemon stops
             stdio: ["ignore", "pipe", "pipe"], // Capture stdout/stderr for debugging
             env: {
-              ...process.env,
+              ...filteredDaemonEnv,
               ...extraEnv,
             },
           });

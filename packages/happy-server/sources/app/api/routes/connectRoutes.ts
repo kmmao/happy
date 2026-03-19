@@ -453,17 +453,20 @@ export function connectRoutes(app: Fastify) {
       const tokens = await db.serviceAccountToken.findMany({
         where: { accountId: userId },
       });
-      let decrypted = [];
-      for (const token of tokens) {
-        decrypted.push({
+      const masked = tokens.map((token) => {
+        const plaintext = decryptString(
+          ["user", userId, "vendors", token.vendor, "token"],
+          token.token,
+        );
+        return {
           vendor: token.vendor,
-          token: decryptString(
-            ["user", userId, "vendors", token.vendor, "token"],
-            token.token,
-          ),
-        });
-      }
-      return reply.send({ tokens: decrypted });
+          // Security: Never return full token — show only last 4 chars for identification
+          token: plaintext.length > 8
+            ? `${"*".repeat(plaintext.length - 4)}${plaintext.slice(-4)}`
+            : "****",
+        };
+      });
+      return reply.send({ tokens: masked });
     },
   );
 }

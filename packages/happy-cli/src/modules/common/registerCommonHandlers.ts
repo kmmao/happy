@@ -174,11 +174,53 @@ export function registerCommonHandlers(
   // Sanitize sessionId to prevent path traversal when used in filesystem paths
   const safeSessionId = sessionId.replace(/[^a-zA-Z0-9-]/g, "");
 
+  // ── Security: Block commands that can leak secrets via bash RPC ──────────
+  // These patterns prevent remote (mobile/web) users from extracting
+  // operator-configured API keys, tokens, or other sensitive environment data.
+  // Claude Code's own Bash tool is NOT affected — it runs via SDK, not RPC.
+  const BLOCKED_BASH_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
+    // Direct env var reading
+    { pattern: /\bprintenv\b/i, reason: "printenv is blocked for security" },
+    { pattern: /\benv\b(?:\s|$|;|\|)/i, reason: "env command is blocked for security" },
+    { pattern: /\bset\b\s*(?:$|;|\|)/i, reason: "set (list env) is blocked for security" },
+    { pattern: /\bexport\s+-p\b/i, reason: "export -p is blocked for security" },
+    { pattern: /\bcompgen\s+-e\b/i, reason: "compgen -e is blocked for security" },
+    { pattern: /\bdeclare\s+-x\b/i, reason: "declare -x is blocked for security" },
+    // Reading process environment from procfs or equivalent
+    { pattern: /\/proc\/[^/]*\/environ/i, reason: "reading /proc/environ is blocked for security" },
+    // Echoing specific secret env vars
+    { pattern: /\$\{?\s*(ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY|ANTHROPIC_BASE_URL|OPENAI_API_KEY|OPENAI_BASE_URL|DATABASE_URL|REDIS_URL|JWT_SECRET|ENCRYPTION_KEY|AWS_SECRET_ACCESS_KEY|GOOGLE_API_KEY|GEMINI_API_KEY|TOGETHER_API_KEY|GITHUB_CLIENT_SECRET|CLAUDE_CODE_OAUTH_TOKEN)\b/i, reason: "accessing sensitive environment variables is blocked" },
+    // Reading common credential files
+    { pattern: /\.(env|env\.local|env\.prod|env\.production|env\.dev)\b/i, reason: "reading .env files is blocked for security" },
+    { pattern: /\.aws\/credentials/i, reason: "reading AWS credentials is blocked for security" },
+    { pattern: /\.netrc/i, reason: "reading .netrc is blocked for security" },
+  ];
+
+  /**
+   * Check if a bash command matches any blocked pattern.
+   * Returns the reason string if blocked, or null if allowed.
+   */
+  function checkBlockedBashCommand(command: string): string | null {
+    for (const { pattern, reason } of BLOCKED_BASH_PATTERNS) {
+      if (pattern.test(command)) {
+        return reason;
+      }
+    }
+    return null;
+  }
+
   // Shell command handler - executes commands in the default shell
   rpcHandlerManager.registerHandler<BashRequest, BashResponse>(
     "bash",
     async (data) => {
       logger.debug("Shell command request:", data.command);
+
+      // Security: Block commands that could leak secrets
+      const blockedReason = checkBlockedBashCommand(data.command);
+      if (blockedReason) {
+        logger.warn(`[SECURITY] Blocked bash RPC command: ${blockedReason}`, { command: data.command });
+        return { success: false, error: blockedReason };
+      }
 
       // Validate cwd if provided
       // Special case: "/" means "use shell's default cwd" (used by CLI detection)
