@@ -2125,6 +2125,8 @@ export const ru: TranslationStructure = {
     dim_userFeedback_note: "Обзоры, болевые точки, удовлетворённость",
     additionalNotes: "Дополнительные заметки",
     additionalNotesPlaceholder: "Дополнительные направления или конкретные вопросы (необязательно)",
+    customRules: "Пользовательские правила",
+    customRulesPlaceholder: "Например: фокус только на open-source конкурентах, игнорировать корпоративные решения",
     noReports: "Отчётов пока нет",
     reportHistory: "Предыдущие отчёты",
     latestReport: "Последний отчёт",

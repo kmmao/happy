@@ -2143,6 +2143,8 @@ export const en = {
     dim_userFeedback_note: "Reviews, pain points, satisfaction",
     additionalNotes: "Additional Notes",
     additionalNotesPlaceholder: "Any extra focus areas or specific questions (optional)",
+    customRules: "Custom Rules",
+    customRulesPlaceholder: "e.g. Focus on open-source competitors only, ignore enterprise solutions",
     noReports: "No research reports yet",
     reportHistory: "Previous Reports",
     latestReport: "Latest Report",

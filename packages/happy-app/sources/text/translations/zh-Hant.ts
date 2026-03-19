@@ -2016,6 +2016,8 @@ export const zhHant: TranslationStructure = {
     dim_userFeedback_note: "評價、痛點、滿意度",
     additionalNotes: "補充說明",
     additionalNotesPlaceholder: "額外關注點或具體問題（可選）",
+    customRules: "自訂規則",
+    customRulesPlaceholder: "例如：只關注開源競品，忽略企業級解決方案",
     noReports: "暫無調研報告",
     reportHistory: "歷史報告",
     latestReport: "最新報告",

@@ -483,6 +483,7 @@ export interface ResearchPrefs {
   dimensions: Record<string, boolean>;
   knownCompetitors: string;
   additionalNotes: string;
+  customRules: string;
 }
 
 export function loadResearchPrefs(projectId: string): ResearchPrefs | null {
@@ -504,6 +505,10 @@ export function loadResearchPrefs(projectId: string): ResearchPrefs | null {
             typeof parsed.additionalNotes === "string"
               ? parsed.additionalNotes
               : "",
+          customRules:
+            typeof parsed.customRules === "string"
+              ? parsed.customRules
+              : "",
         };
       }
     } catch (e) {
@@ -521,6 +526,7 @@ export function loadResearchPrefs(projectId: string): ResearchPrefs | null {
           dimensions: dims as Record<string, boolean>,
           knownCompetitors: "",
           additionalNotes: "",
+          customRules: "",
         };
       }
     } catch {

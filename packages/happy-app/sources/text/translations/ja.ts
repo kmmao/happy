@@ -2081,6 +2081,8 @@ export const ja: TranslationStructure = {
     dim_userFeedback_note: "レビュー、課題、満足度",
     additionalNotes: "補足メモ",
     additionalNotesPlaceholder: "追加の関心事項や具体的な質問（任意）",
+    customRules: "カスタムルール",
+    customRulesPlaceholder: "例：オープンソースの競合のみに焦点を当て、エンタープライズソリューションは無視",
     noReports: "調査レポートはありません",
     reportHistory: "過去のレポート",
     latestReport: "最新レポート",

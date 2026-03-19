@@ -2013,6 +2013,8 @@ export const zhHans: TranslationStructure = {
     dim_userFeedback_note: "评价、痛点、满意度",
     additionalNotes: "补充说明",
     additionalNotesPlaceholder: "额外关注点或具体问题（可选）",
+    customRules: "自定义规则",
+    customRulesPlaceholder: "例如：只关注开源竞品，忽略企业级解决方案",
     noReports: "暂无调研报告",
     reportHistory: "历史报告",
     latestReport: "最新报告",

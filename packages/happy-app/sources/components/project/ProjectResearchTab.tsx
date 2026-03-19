@@ -8,6 +8,7 @@ import {
     TextInput,
     RefreshControl,
     Switch,
+    Modal as RNModal,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,7 +28,6 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { sync } from "@/sync/sync";
 import { layout } from "@/components/layout";
-import { useRouter } from "expo-router";
 import {
     loadResearchPrefs,
     saveResearchPrefs,
@@ -75,12 +75,12 @@ interface ProjectResearchTabProps {
 export const ProjectResearchTab = React.memo(
     ({ project }: ProjectResearchTabProps) => {
         const { theme } = useUnistyles();
-        const router = useRouter();
         const serverId = project.serverId;
 
         const [runs, setRuns] = React.useState<SupervisorRun[]>([]);
         const [loading, setLoading] = React.useState(true);
         const [refreshing, setRefreshing] = React.useState(false);
+        const [reportModalRun, setReportModalRun] = React.useState<SupervisorRun | null>(null);
 
         // Input fields — load saved preferences
         const savedPrefs = React.useMemo(() => {
@@ -97,10 +97,13 @@ export const ProjectResearchTab = React.memo(
         const [additionalNotes, setAdditionalNotes] = React.useState(
             savedPrefs?.additionalNotes ?? "",
         );
+        const [customRules, setCustomRules] = React.useState(
+            savedPrefs?.customRules ?? "",
+        );
 
         // Persist all research prefs on change
-        const prefsRef = React.useRef({ dimensions, knownCompetitors, additionalNotes });
-        prefsRef.current = { dimensions, knownCompetitors, additionalNotes };
+        const prefsRef = React.useRef({ dimensions, knownCompetitors, additionalNotes, customRules });
+        prefsRef.current = { dimensions, knownCompetitors, additionalNotes, customRules };
 
         const persistTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -130,12 +133,6 @@ export const ProjectResearchTab = React.memo(
         // Active run tracking
         const activeRun = React.useMemo(
             () => runs.find((r) => r.status === "pending" || r.status === "running"),
-            [runs],
-        );
-
-        // Latest completed report
-        const latestReport = React.useMemo(
-            () => runs.find((r) => r.status === "completed" && r.reportContent),
             [runs],
         );
 
@@ -191,19 +188,12 @@ export const ProjectResearchTab = React.memo(
             [serverId],
         );
 
-        const handleKnownCompetitorsChange = React.useCallback(
-            (text: string) => {
-                setKnownCompetitors(text);
-                prefsRef.current = { ...prefsRef.current, knownCompetitors: text };
-                debouncedPersist();
-            },
-            [debouncedPersist],
-        );
-
-        const handleAdditionalNotesChange = React.useCallback(
-            (text: string) => {
-                setAdditionalNotes(text);
-                prefsRef.current = { ...prefsRef.current, additionalNotes: text };
+        const handleTextChange = React.useCallback(
+            (field: "knownCompetitors" | "additionalNotes" | "customRules") => (text: string) => {
+                if (field === "knownCompetitors") setKnownCompetitors(text);
+                else if (field === "additionalNotes") setAdditionalNotes(text);
+                else setCustomRules(text);
+                prefsRef.current = { ...prefsRef.current, [field]: text };
                 debouncedPersist();
             },
             [debouncedPersist],
@@ -226,7 +216,10 @@ export const ProjectResearchTab = React.memo(
                         researchParams: {
                             knownCompetitors: knownCompetitors.trim() || undefined,
                             focusAreas: selectedDimensions || undefined,
-                            additionalNotes: additionalNotes.trim() || undefined,
+                            additionalNotes: [
+                                additionalNotes.trim(),
+                                customRules.trim() ? `Custom rules:\n${customRules.trim()}` : "",
+                            ].filter(Boolean).join("\n\n") || undefined,
                         },
                     });
                     setRuns((prev) => [run, ...prev]);
@@ -236,7 +229,7 @@ export const ProjectResearchTab = React.memo(
                     }
                     throw e;
                 }
-            }, [serverId, knownCompetitors, selectedDimensions, additionalNotes, loadData]),
+            }, [serverId, knownCompetitors, selectedDimensions, additionalNotes, customRules, loadData]),
         );
 
         const [cancelLoading, doCancel] = useHappyAction(
@@ -268,218 +261,259 @@ export const ProjectResearchTab = React.memo(
         );
 
         return (
-            <ScrollView
-                style={styles.container}
-                contentContainerStyle={styles.contentContainer}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                }
-            >
-                <View style={styles.innerContainer}>
-                    {/* Trigger Section */}
-                    <ItemGroup
-                        title={t("competitorResearch.title")}
-                    >
-                        <View style={styles.inputSection}>
-                            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                                {t("competitorResearch.knownCompetitors")}
-                            </Text>
-                            <TextInput
-                                style={[
-                                    styles.textInput,
-                                    {
-                                        color: theme.colors.text,
-                                        backgroundColor: theme.colors.surface,
-                                        borderColor: theme.colors.divider,
-                                    },
-                                ]}
-                                placeholder={t("competitorResearch.knownCompetitorsPlaceholder")}
-                                placeholderTextColor={theme.colors.textSecondary}
-                                value={knownCompetitors}
-                                onChangeText={handleKnownCompetitorsChange}
-                                multiline
-                                numberOfLines={2}
-                                editable={!isRunning}
-                            />
-                        </View>
-                    </ItemGroup>
+            <>
+                <ScrollView
+                    style={styles.container}
+                    contentContainerStyle={styles.contentContainer}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                    }
+                >
+                    <View style={styles.innerContainer}>
+                        {/* Single config group: inputs + dimensions + button */}
+                        <ItemGroup title={t("competitorResearch.title")}>
+                            {/* Known Competitors */}
+                            <View style={styles.inputSection}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                    {t("competitorResearch.knownCompetitors")}
+                                </Text>
+                                <TextInput
+                                    style={[
+                                        styles.textInput,
+                                        {
+                                            color: theme.colors.text,
+                                            backgroundColor: theme.colors.groupped.background,
+                                            borderColor: theme.colors.divider,
+                                        },
+                                    ]}
+                                    placeholder={t("competitorResearch.knownCompetitorsPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={knownCompetitors}
+                                    onChangeText={handleTextChange("knownCompetitors")}
+                                    multiline
+                                    numberOfLines={2}
+                                    editable={!isRunning}
+                                />
+                            </View>
 
-                    {/* Analysis Dimensions */}
-                    <ItemGroup title={t("competitorResearch.dimensionsSection")}>
-                        {RESEARCH_DIMENSIONS.map((dim, index) => (
-                            <DimensionToggle
-                                key={dim}
-                                label={DIMENSION_LABELS[dim].label()}
-                                subtitle={DIMENSION_LABELS[dim].note()}
-                                value={dimensions[dim]}
-                                onToggle={() => toggleDimension(dim)}
-                                isLast={index === RESEARCH_DIMENSIONS.length - 1}
-                                disabled={isRunning}
-                            />
-                        ))}
-                    </ItemGroup>
+                            {/* Dimension toggles inline */}
+                            <View style={styles.dimensionHeader}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                    {t("competitorResearch.dimensionsSection")}
+                                </Text>
+                            </View>
+                            {RESEARCH_DIMENSIONS.map((dim) => (
+                                <DimensionToggle
+                                    key={dim}
+                                    label={DIMENSION_LABELS[dim].label()}
+                                    subtitle={DIMENSION_LABELS[dim].note()}
+                                    value={dimensions[dim]}
+                                    onToggle={() => toggleDimension(dim)}
+                                    disabled={isRunning}
+                                />
+                            ))}
 
-                    {/* Additional Notes */}
-                    <ItemGroup title={t("competitorResearch.additionalNotes")}>
-                        <View style={styles.inputSection}>
-                            <TextInput
-                                style={[
-                                    styles.textInput,
-                                    {
-                                        color: theme.colors.text,
-                                        backgroundColor: theme.colors.surface,
-                                        borderColor: theme.colors.divider,
-                                    },
-                                ]}
-                                placeholder={t("competitorResearch.additionalNotesPlaceholder")}
-                                placeholderTextColor={theme.colors.textSecondary}
-                                value={additionalNotes}
-                                onChangeText={handleAdditionalNotesChange}
-                                multiline
-                                numberOfLines={2}
-                                editable={!isRunning}
-                            />
-                        </View>
+                            {/* Custom Rules */}
+                            <View style={styles.inputSection}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                    {t("competitorResearch.customRules")}
+                                </Text>
+                                <TextInput
+                                    style={[
+                                        styles.textInput,
+                                        {
+                                            color: theme.colors.text,
+                                            backgroundColor: theme.colors.groupped.background,
+                                            borderColor: theme.colors.divider,
+                                        },
+                                    ]}
+                                    placeholder={t("competitorResearch.customRulesPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={customRules}
+                                    onChangeText={handleTextChange("customRules")}
+                                    multiline
+                                    numberOfLines={2}
+                                    editable={!isRunning}
+                                />
+                            </View>
 
-                        <View style={styles.buttonRow}>
-                            {isRunning ? (
-                                <Pressable
-                                    style={[styles.button, styles.cancelButton]}
-                                    onPress={doCancel}
-                                    disabled={cancelLoading}
-                                >
-                                    {cancelLoading ? (
-                                        <ActivityIndicator size="small" color="#fff" />
-                                    ) : (
-                                        <>
-                                            <Ionicons
-                                                name="close-circle"
-                                                size={18}
-                                                color="#fff"
-                                            />
-                                            <Text style={styles.buttonText}>
-                                                {t("common.cancel")}
-                                            </Text>
-                                        </>
-                                    )}
-                                </Pressable>
-                            ) : (
-                                <Pressable
-                                    style={[styles.button, styles.startButton]}
-                                    onPress={doTrigger}
-                                    disabled={triggerLoading}
-                                >
-                                    {triggerLoading ? (
-                                        <ActivityIndicator size="small" color="#fff" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="search" size={18} color="#fff" />
-                                            <Text style={styles.buttonText}>
-                                                {t("competitorResearch.startAnalysis")}
-                                            </Text>
-                                        </>
-                                    )}
-                                </Pressable>
+                            {/* Additional Notes */}
+                            <View style={styles.inputSection}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                    {t("competitorResearch.additionalNotes")}
+                                </Text>
+                                <TextInput
+                                    style={[
+                                        styles.textInput,
+                                        {
+                                            color: theme.colors.text,
+                                            backgroundColor: theme.colors.groupped.background,
+                                            borderColor: theme.colors.divider,
+                                        },
+                                    ]}
+                                    placeholder={t("competitorResearch.additionalNotesPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={additionalNotes}
+                                    onChangeText={handleTextChange("additionalNotes")}
+                                    multiline
+                                    numberOfLines={2}
+                                    editable={!isRunning}
+                                />
+                            </View>
+
+                            {/* Action button */}
+                            <View style={styles.buttonRow}>
+                                {isRunning ? (
+                                    <Pressable
+                                        style={[styles.button, styles.cancelButton]}
+                                        onPress={doCancel}
+                                        disabled={cancelLoading}
+                                    >
+                                        {cancelLoading ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="close-circle" size={18} color="#fff" />
+                                                <Text style={styles.buttonText}>
+                                                    {t("common.cancel")}
+                                                </Text>
+                                            </>
+                                        )}
+                                    </Pressable>
+                                ) : (
+                                    <Pressable
+                                        style={[styles.button, styles.startButton]}
+                                        onPress={doTrigger}
+                                        disabled={triggerLoading}
+                                    >
+                                        {triggerLoading ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="search" size={18} color="#fff" />
+                                                <Text style={styles.buttonText}>
+                                                    {t("competitorResearch.startAnalysis")}
+                                                </Text>
+                                            </>
+                                        )}
+                                    </Pressable>
+                                )}
+                            </View>
+
+                            {isRunning && (
+                                <View style={styles.runningIndicator}>
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={theme.colors.header.tint}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.runningText,
+                                            { color: theme.colors.textSecondary },
+                                        ]}
+                                    >
+                                        {t("competitorResearch.analyzing")}
+                                    </Text>
+                                </View>
                             )}
-                        </View>
+                        </ItemGroup>
 
-                        {isRunning && (
-                            <View style={styles.runningIndicator}>
-                                <ActivityIndicator
-                                    size="small"
-                                    color={theme.colors.header.tint}
+                        {/* Reports — compact cards */}
+                        {completedRuns.length > 0 && (
+                            <ItemGroup title={t("competitorResearch.reportHistory")}>
+                                {completedRuns.map((run, index) => (
+                                    <Pressable
+                                        key={run.id}
+                                        style={[
+                                            styles.reportCard,
+                                            index < completedRuns.length - 1 && styles.reportCardBorder,
+                                        ]}
+                                        onPress={() => setReportModalRun(run)}
+                                    >
+                                        <View style={styles.reportCardContent}>
+                                            <Text
+                                                style={[styles.reportCardTitle, { color: theme.colors.text }]}
+                                                numberOfLines={1}
+                                            >
+                                                {run.reportTitle ?? t("competitorResearch.untitledReport")}
+                                            </Text>
+                                            <View style={styles.reportCardMeta}>
+                                                <Text style={[styles.reportCardDate, { color: theme.colors.textSecondary }]}>
+                                                    {new Date(run.completedAt!).toLocaleString()}
+                                                </Text>
+                                                {run.actionsCount > 0 && (
+                                                    <View style={[styles.actionsBadge, { backgroundColor: theme.colors.header.tint + "20" }]}>
+                                                        <Text style={[styles.actionsBadgeText, { color: theme.colors.header.tint }]}>
+                                                            {run.actionsCount} actions
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        </View>
+                                        <Ionicons
+                                            name="chevron-forward"
+                                            size={18}
+                                            color={theme.colors.textSecondary}
+                                        />
+                                    </Pressable>
+                                ))}
+                            </ItemGroup>
+                        )}
+
+                        {/* Empty state */}
+                        {!isRunning && completedRuns.length === 0 && (
+                            <View style={styles.emptyState}>
+                                <Ionicons
+                                    name="analytics-outline"
+                                    size={48}
+                                    color={theme.colors.textSecondary}
                                 />
                                 <Text
                                     style={[
-                                        styles.runningText,
+                                        styles.emptyText,
                                         { color: theme.colors.textSecondary },
                                     ]}
                                 >
-                                    {t("competitorResearch.analyzing")}
+                                    {t("competitorResearch.noReports")}
                                 </Text>
                             </View>
                         )}
-                    </ItemGroup>
+                    </View>
+                </ScrollView>
 
-                    {/* Latest Report */}
-                    {latestReport && (
-                        <ItemGroup title={latestReport.reportTitle ?? t("competitorResearch.latestReport")}>
-                            <View style={styles.reportContainer}>
-                                <MarkdownView markdown={latestReport.reportContent!} />
-                            </View>
+                {/* Full-screen report modal */}
+                <RNModal
+                    visible={reportModalRun !== null}
+                    animationType="slide"
+                    presentationStyle="pageSheet"
+                    onRequestClose={() => setReportModalRun(null)}
+                >
+                    <View style={[styles.modalContainer, { backgroundColor: theme.colors.groupped.background }]}>
+                        <View style={[styles.modalHeader, { borderBottomColor: theme.colors.divider }]}>
                             <Text
-                                style={[
-                                    styles.reportDate,
-                                    { color: theme.colors.textSecondary },
-                                ]}
+                                style={[styles.modalTitle, { color: theme.colors.text }]}
+                                numberOfLines={1}
                             >
-                                {new Date(latestReport.completedAt!).toLocaleString()}
+                                {reportModalRun?.reportTitle ?? t("competitorResearch.reportDetail")}
                             </Text>
-                        </ItemGroup>
-                    )}
-
-                    {/* History */}
-                    {completedRuns.length > 1 && (
-                        <ItemGroup title={t("competitorResearch.reportHistory")}>
-                            {completedRuns.slice(1).map((run) => (
-                                <Pressable
-                                    key={run.id}
-                                    style={styles.historyItem}
-                                    onPress={() =>
-                                        router.push(
-                                            `/project/${project.serverId}/research-report/${run.id}`,
-                                        )
-                                    }
-                                >
-                                    <View style={styles.historyItemContent}>
-                                        <Text
-                                            style={[
-                                                styles.historyTitle,
-                                                { color: theme.colors.text },
-                                            ]}
-                                            numberOfLines={1}
-                                        >
-                                            {run.reportTitle ?? t("competitorResearch.untitledReport")}
-                                        </Text>
-                                        <Text
-                                            style={[
-                                                styles.historyDate,
-                                                { color: theme.colors.textSecondary },
-                                            ]}
-                                        >
-                                            {new Date(run.completedAt!).toLocaleDateString()}
-                                        </Text>
-                                    </View>
-                                    <Ionicons
-                                        name="chevron-forward"
-                                        size={18}
-                                        color={theme.colors.textSecondary}
-                                    />
-                                </Pressable>
-                            ))}
-                        </ItemGroup>
-                    )}
-
-                    {/* Empty state */}
-                    {!isRunning && completedRuns.length === 0 && (
-                        <View style={styles.emptyState}>
-                            <Ionicons
-                                name="analytics-outline"
-                                size={48}
-                                color={theme.colors.textSecondary}
-                            />
-                            <Text
-                                style={[
-                                    styles.emptyText,
-                                    { color: theme.colors.textSecondary },
-                                ]}
+                            <Pressable
+                                onPress={() => setReportModalRun(null)}
+                                style={styles.modalCloseButton}
                             >
-                                {t("competitorResearch.noReports")}
-                            </Text>
+                                <Ionicons name="close" size={24} color={theme.colors.text} />
+                            </Pressable>
                         </View>
-                    )}
-                </View>
-            </ScrollView>
+                        <ScrollView
+                            style={styles.modalScroll}
+                            contentContainerStyle={styles.modalScrollContent}
+                        >
+                            {reportModalRun?.reportContent && (
+                                <MarkdownView markdown={reportModalRun.reportContent} />
+                            )}
+                        </ScrollView>
+                    </View>
+                </RNModal>
+            </>
         );
     },
 );
@@ -491,21 +525,15 @@ interface DimensionToggleProps {
     subtitle: string;
     value: boolean;
     onToggle: () => void;
-    isLast?: boolean;
     disabled?: boolean;
 }
 
 const DimensionToggle = React.memo(
-    ({ label, subtitle, value, onToggle, isLast, disabled }: DimensionToggleProps) => {
+    ({ label, subtitle, value, onToggle, disabled }: DimensionToggleProps) => {
         const { theme } = useUnistyles();
 
         return (
-            <View
-                style={[
-                    styles.toggleRow,
-                    !isLast && styles.toggleRowBorder,
-                ]}
-            >
+            <View style={styles.toggleRow}>
                 <View style={styles.toggleRowContent}>
                     <Text style={[styles.toggleRowLabel, { color: theme.colors.text }]}>
                         {label}
@@ -554,6 +582,11 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
         fontSize: 13,
     },
+    dimensionHeader: {
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 4,
+    },
     textInput: {
         ...Typography.default(),
         fontSize: 14,
@@ -601,36 +634,41 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 13,
     },
-    reportContainer: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 4,
-    },
-    reportDate: {
-        ...Typography.default(),
-        fontSize: 12,
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-    },
-    historyItem: {
+    reportCard: {
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderTopWidth: 0.5,
-        borderTopColor: theme.colors.divider,
     },
-    historyItemContent: {
+    reportCardBorder: {
+        borderBottomWidth: 0.5,
+        borderBottomColor: theme.colors.divider,
+    },
+    reportCardContent: {
         flex: 1,
-        gap: 2,
+        gap: 4,
     },
-    historyTitle: {
+    reportCardTitle: {
         ...Typography.default("semiBold"),
         fontSize: 14,
     },
-    historyDate: {
+    reportCardMeta: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    reportCardDate: {
         ...Typography.default(),
         fontSize: 12,
+    },
+    actionsBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 4,
+    },
+    actionsBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 11,
     },
     emptyState: {
         alignItems: "center",
@@ -646,9 +684,7 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 16,
-        paddingVertical: 12,
-    },
-    toggleRowBorder: {
+        paddingVertical: 10,
         borderBottomWidth: 0.5,
         borderBottomColor: theme.colors.divider,
     },
@@ -664,5 +700,33 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 12,
         marginTop: 2,
+    },
+    modalContainer: {
+        flex: 1,
+    },
+    modalHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 0.5,
+    },
+    modalTitle: {
+        ...Typography.default("semiBold"),
+        fontSize: 17,
+        flex: 1,
+        marginRight: 12,
+    },
+    modalCloseButton: {
+        padding: 4,
+    },
+    modalScroll: {
+        flex: 1,
+    },
+    modalScrollContent: {
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        paddingBottom: 48,
     },
 }));

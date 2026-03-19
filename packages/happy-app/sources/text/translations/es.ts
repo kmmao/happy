@@ -2106,6 +2106,8 @@ export const es: TranslationStructure = {
     dim_userFeedback_note: "Reseñas, puntos de dolor, satisfacción",
     additionalNotes: "Notas adicionales",
     additionalNotesPlaceholder: "Áreas de enfoque adicionales o preguntas específicas (opcional)",
+    customRules: "Reglas personalizadas",
+    customRulesPlaceholder: "Ej. enfocarse solo en competidores open-source, ignorar soluciones empresariales",
     noReports: "No hay informes todavía",
     reportHistory: "Informes anteriores",
     latestReport: "Último informe",
