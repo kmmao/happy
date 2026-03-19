@@ -37,6 +37,7 @@ export const lightTheme = {
     // Main colors
     //
 
+    primary: "#5e52a7",
     text: "#000000",
     textDestructive: Platform.select({ ios: "#FF3B30", default: "#F44336" }),
     textSecondary: Platform.select({ ios: "#8E8E93", default: "#49454F" }),
@@ -247,6 +248,7 @@ export const darkTheme = {
     // Main colors
     //
 
+    primary: "#c8bfff",
     text: "#ffffff",
     textDestructive: Platform.select({ ios: "#FF453A", default: "#F48FB1" }),
     textSecondary: Platform.select({ ios: "#8E8E93", default: "#CAC4D0" }),

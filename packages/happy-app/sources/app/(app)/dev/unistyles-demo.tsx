@@ -82,7 +82,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     },
     responsiveBox: {
         flex: 1,
-        backgroundColor: theme.colors.button.primary.background,
+        backgroundColor: theme.colors.primary,
         padding: 16,
         borderRadius: 8,
         minHeight: 80,
@@ -117,7 +117,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
         fontFamily: 'monospace',
     },
     themeButton: {
-        backgroundColor: theme.colors.button.primary.background,
+        backgroundColor: theme.colors.primary,
         padding: 12,
         borderRadius: 8,
         marginHorizontal: 4,
@@ -135,7 +135,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
         marginBottom: 12,
     },
     adaptiveBox: {
-        backgroundColor: theme.colors.button.primary.background,
+        backgroundColor: theme.colors.primary,
         padding: {
             xs: 8,
             sm: 12,
@@ -190,7 +190,7 @@ export default function UnistylesDemo() {
                             Current Theme: {rt.themeName}
                         </Text>
                         <Text style={[styles.themeText, { fontSize: 14, opacity: 0.8 }]}>
-                            Primary: {theme.colors.button.primary.background}
+                            Primary: {theme.colors.primary}
                         </Text>
                     </View>
 
