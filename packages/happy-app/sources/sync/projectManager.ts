@@ -667,6 +667,16 @@ export function createProjectKey(machineId: string, path: string): ProjectKey {
  * Helper function to get project display name
  */
 export function getProjectDisplayName(project: Project): string {
+  // Prefer alias from serverMetadata
+  if (project.serverMetadata) {
+    try {
+      const meta = JSON.parse(project.serverMetadata);
+      if (meta.alias) return meta.alias;
+    } catch {
+      // ignore parse errors
+    }
+  }
+
   // Try to extract folder name from path
   const pathParts = project.key.path.split("/").filter(Boolean);
   const folderName = pathParts[pathParts.length - 1];
