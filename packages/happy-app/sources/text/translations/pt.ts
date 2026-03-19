@@ -1809,65 +1809,10 @@ export const pt: TranslationStructure = {
   },
   project: {
     segments: {
-      ideas: "Ideias",
       board: "Quadro",
       roadmap: "Roteiro",
     },
   },
-
-  ideation: {
-    // Gerenciamento de ideias
-    emptyTitle: "Nenhuma ideia ainda",
-    emptySubtitle: "Capture suas ideias e converta as melhores em tarefas",
-    newIdea: "Nova ideia",
-    ideaDetail: "Detalhes da ideia",
-    ideaNotFound: "Ideia não encontrada",
-    details: "Detalhes",
-    titlePlaceholder: "Título da ideia",
-    titleRequired: "O título é obrigatório",
-    descriptionPlaceholder: "Descreva sua ideia...",
-    categoryLabel: "Categoria",
-    categories: {
-      feature: "Funcionalidade",
-      improvement: "Melhoria",
-      bugfix: "Correção",
-      refactor: "Refatoração",
-      documentation: "Documentação",
-      other: "Outro",
-    },
-    statusLabel: "Status",
-    statuses: {
-      draft: "Rascunho",
-      active: "Ativo",
-      converted: "Convertido",
-      dismissed: "Descartado",
-    },
-    priorityLabel: "Prioridade",
-    convertToTask: "Converter em tarefa",
-    convertConfirmTitle: "Converter em tarefa",
-    convertConfirmMessage:
-      "Isso criará uma nova tarefa kanban a partir desta ideia.",
-    dismiss: "Descartar",
-    dismissConfirmTitle: "Descartar ideia",
-    dismissConfirmMessage: "Tem certeza que deseja descartar esta ideia?",
-    deleteConfirmTitle: "Excluir ideia",
-    deleteConfirmMessage: "Tem certeza que deseja excluir esta ideia?",
-    converted: "Convertido em tarefa",
-    viewTask: "Ver tarefa",
-    actions: {
-      changeStatus: "Alterar status",
-    },
-    stats: {
-      totalIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, singular: "ideia", plural: "ideias" })}`,
-      activeIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, singular: "ativo", plural: "ativos" })}`,
-    },
-    filter: {
-      all: "Todas",
-    },
-  },
-
   roadmap: {
     emptyTitle: "Nenhum marco ainda",
     emptySubtitle: "Crie marcos para planejar o roteiro do seu projeto",
@@ -1896,6 +1841,12 @@ export const pt: TranslationStructure = {
       inProgress: "Em progresso",
       completed: "Concluído",
       cancelled: "Cancelado",
+    },
+    milestoneStatuses: {
+      planning: "Planejamento",
+      active: "Ativo",
+      completed: "Concluído",
+      onHold: "Em pausa",
     },
     statusLabel: "Status",
     complexity: {

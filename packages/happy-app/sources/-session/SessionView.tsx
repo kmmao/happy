@@ -1027,7 +1027,7 @@ function SessionViewInner({
             elicitation={session.agentState.elicitation}
           />
         )}
-        {session.agentState?.stopFailure && (
+        {session.agentState?.stopFailure && session.presence !== "online" && (
           <StopFailureBanner
             stopFailure={session.agentState.stopFailure}
           />

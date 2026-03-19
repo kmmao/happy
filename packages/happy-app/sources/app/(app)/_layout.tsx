@@ -383,6 +383,35 @@ export default function RootLayout() {
           headerBackTitle: t("common.back"),
         }}
       />
+      {/* Roadmap routes */}
+      <Stack.Screen
+        name="roadmap/new-milestone"
+        options={{
+          headerTitle: t("roadmap.newMilestone"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="roadmap/new-feature"
+        options={{
+          headerTitle: t("roadmap.newFeature"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="roadmap/milestone/[id]"
+        options={{
+          headerTitle: t("roadmap.milestoneDetail"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="roadmap/feature/[id]"
+        options={{
+          headerTitle: t("roadmap.featureDetail"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
       <Stack.Screen
         name="openclaw/index"
         options={{

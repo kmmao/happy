@@ -1806,65 +1806,10 @@ export const es: TranslationStructure = {
   },
   project: {
     segments: {
-      ideas: "Ideas",
       board: "Tablero",
       roadmap: "Hoja de ruta",
     },
   },
-
-  ideation: {
-    // Gestión de ideas
-    emptyTitle: "Aún no hay ideas",
-    emptySubtitle: "Captura tus ideas y convierte las mejores en tareas",
-    newIdea: "Nueva idea",
-    ideaDetail: "Detalle de la idea",
-    ideaNotFound: "Idea no encontrada",
-    details: "Detalles",
-    titlePlaceholder: "Título de la idea",
-    titleRequired: "El título es obligatorio",
-    descriptionPlaceholder: "Describe tu idea...",
-    categoryLabel: "Categoría",
-    categories: {
-      feature: "Función",
-      improvement: "Mejora",
-      bugfix: "Corrección",
-      refactor: "Refactorización",
-      documentation: "Documentación",
-      other: "Otro",
-    },
-    statusLabel: "Estado",
-    statuses: {
-      draft: "Borrador",
-      active: "Activo",
-      converted: "Convertido",
-      dismissed: "Descartado",
-    },
-    priorityLabel: "Prioridad",
-    convertToTask: "Convertir en tarea",
-    convertConfirmTitle: "Convertir en tarea",
-    convertConfirmMessage:
-      "Esto creará una nueva tarea kanban a partir de esta idea.",
-    dismiss: "Descartar",
-    dismissConfirmTitle: "Descartar idea",
-    dismissConfirmMessage: "¿Estás seguro de que quieres descartar esta idea?",
-    deleteConfirmTitle: "Eliminar idea",
-    deleteConfirmMessage: "¿Estás seguro de que quieres eliminar esta idea?",
-    converted: "Convertido en tarea",
-    viewTask: "Ver tarea",
-    actions: {
-      changeStatus: "Cambiar estado",
-    },
-    stats: {
-      totalIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, singular: "idea", plural: "ideas" })}`,
-      activeIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, singular: "activo", plural: "activos" })}`,
-    },
-    filter: {
-      all: "Todas",
-    },
-  },
-
   roadmap: {
     emptyTitle: "Aún no hay hitos",
     emptySubtitle: "Crea hitos para planificar la hoja de ruta de tu proyecto",
@@ -1893,6 +1838,12 @@ export const es: TranslationStructure = {
       inProgress: "En progreso",
       completed: "Completado",
       cancelled: "Cancelado",
+    },
+    milestoneStatuses: {
+      planning: "Planificación",
+      active: "Activo",
+      completed: "Completado",
+      onHold: "En pausa",
     },
     statusLabel: "Estado",
     complexity: {

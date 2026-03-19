@@ -1805,65 +1805,10 @@ export const it: TranslationStructure = {
   },
   project: {
     segments: {
-      ideas: "Idee",
       board: "Bacheca",
       roadmap: "Roadmap",
     },
   },
-
-  ideation: {
-    // Gestione idee
-    emptyTitle: "Nessuna idea ancora",
-    emptySubtitle: "Cattura le tue idee e converti le migliori in attività",
-    newIdea: "Nuova idea",
-    ideaDetail: "Dettaglio idea",
-    ideaNotFound: "Idea non trovata",
-    details: "Dettagli",
-    titlePlaceholder: "Titolo dell'idea",
-    titleRequired: "Il titolo è obbligatorio",
-    descriptionPlaceholder: "Descrivi la tua idea...",
-    categoryLabel: "Categoria",
-    categories: {
-      feature: "Funzionalità",
-      improvement: "Miglioramento",
-      bugfix: "Correzione",
-      refactor: "Refactoring",
-      documentation: "Documentazione",
-      other: "Altro",
-    },
-    statusLabel: "Stato",
-    statuses: {
-      draft: "Bozza",
-      active: "Attivo",
-      converted: "Convertito",
-      dismissed: "Scartato",
-    },
-    priorityLabel: "Priorità",
-    convertToTask: "Converti in attività",
-    convertConfirmTitle: "Converti in attività",
-    convertConfirmMessage:
-      "Questo creerà una nuova attività kanban da questa idea.",
-    dismiss: "Scarta",
-    dismissConfirmTitle: "Scarta idea",
-    dismissConfirmMessage: "Sei sicuro di voler scartare questa idea?",
-    deleteConfirmTitle: "Elimina idea",
-    deleteConfirmMessage: "Sei sicuro di voler eliminare questa idea?",
-    converted: "Convertito in attività",
-    viewTask: "Vedi attività",
-    actions: {
-      changeStatus: "Cambia stato",
-    },
-    stats: {
-      totalIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, singular: "idea", plural: "idee" })}`,
-      activeIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, singular: "attivo", plural: "attivi" })}`,
-    },
-    filter: {
-      all: "Tutte",
-    },
-  },
-
   roadmap: {
     emptyTitle: "Nessuna milestone ancora",
     emptySubtitle: "Crea milestone per pianificare la roadmap del tuo progetto",
@@ -1892,6 +1837,12 @@ export const it: TranslationStructure = {
       inProgress: "In corso",
       completed: "Completato",
       cancelled: "Annullato",
+    },
+    milestoneStatuses: {
+      planning: "Pianificazione",
+      active: "Attivo",
+      completed: "Completato",
+      onHold: "In pausa",
     },
     statusLabel: "Stato",
     complexity: {

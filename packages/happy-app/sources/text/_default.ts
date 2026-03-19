@@ -1789,62 +1789,10 @@ export const en = {
 
   project: {
     segments: {
-      ideas: "Ideas",
       board: "Board",
       roadmap: "Roadmap",
     },
   },
-
-  ideation: {
-    // Ideation - idea management
-    emptyTitle: "No Ideas Yet",
-    emptySubtitle: "Capture your ideas and convert the best ones to tasks",
-    newIdea: "New Idea",
-    ideaDetail: "Idea Detail",
-    ideaNotFound: "Idea Not Found",
-    details: "Details",
-    titlePlaceholder: "Idea title",
-    titleRequired: "Title is required",
-    descriptionPlaceholder: "Describe your idea...",
-    categoryLabel: "Category",
-    categories: {
-      feature: "Feature",
-      improvement: "Improvement",
-      bugfix: "Bug Fix",
-      refactor: "Refactor",
-      documentation: "Documentation",
-      other: "Other",
-    },
-    statusLabel: "Status",
-    statuses: {
-      draft: "Draft",
-      active: "Active",
-      converted: "Converted",
-      dismissed: "Dismissed",
-    },
-    priorityLabel: "Priority",
-    convertToTask: "Convert to Task",
-    convertConfirmTitle: "Convert to Task",
-    convertConfirmMessage: "This will create a new kanban task from this idea.",
-    dismiss: "Dismiss",
-    dismissConfirmTitle: "Dismiss Idea",
-    dismissConfirmMessage: "Are you sure you want to dismiss this idea?",
-    deleteConfirmTitle: "Delete Idea",
-    deleteConfirmMessage: "Are you sure you want to delete this idea?",
-    converted: "Converted to task",
-    viewTask: "View Task",
-    actions: {
-      changeStatus: "Change Status",
-    },
-    stats: {
-      totalIdeas: ({ count }: { count: number }) => `${count} ideas`,
-      activeIdeas: ({ count }: { count: number }) => `${count} active`,
-    },
-    filter: {
-      all: "All",
-    },
-  },
-
   roadmap: {
     // Roadmap - milestone & feature planning
     emptyTitle: "No Milestones Yet",
@@ -1874,6 +1822,12 @@ export const en = {
       inProgress: "In Progress",
       completed: "Completed",
       cancelled: "Cancelled",
+    },
+    milestoneStatuses: {
+      planning: "Planning",
+      active: "Active",
+      completed: "Completed",
+      onHold: "On Hold",
     },
     statusLabel: "Status",
     complexity: {

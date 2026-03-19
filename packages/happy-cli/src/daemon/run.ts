@@ -48,6 +48,7 @@ import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
 import { handleWebhookTrigger } from "@/webhook/handleWebhookTrigger";
 import { handleSupervisorTrigger, cleanupFixWorktree } from "@/supervisor/handleSupervisorTrigger";
 
+
 // Prepare initial metadata
 export const initialMachineMetadata: MachineMetadata = {
   host: os.hostname(),
@@ -947,6 +948,7 @@ export async function startDaemon(): Promise<void> {
         authToken: credentials.token,
       });
     });
+
 
     // Set up fix-kill handler: terminate fix sessions after completion/failure
     apiMachine.setFixKillHandler((data) => {

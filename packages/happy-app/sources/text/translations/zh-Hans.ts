@@ -1725,62 +1725,10 @@ export const zhHans: TranslationStructure = {
   },
   project: {
     segments: {
-      ideas: "创意",
       board: "看板",
       roadmap: "路线图",
     },
   },
-
-  ideation: {
-    // 创意管理
-    emptyTitle: "暂无创意",
-    emptySubtitle: "记录灵感，将好创意转为任务",
-    newIdea: "新建创意",
-    ideaDetail: "创意详情",
-    ideaNotFound: "未找到创意",
-    details: "详情",
-    titlePlaceholder: "创意标题",
-    titleRequired: "标题不能为空",
-    descriptionPlaceholder: "描述您的创意...",
-    categoryLabel: "分类",
-    categories: {
-      feature: "功能",
-      improvement: "改进",
-      bugfix: "修复",
-      refactor: "重构",
-      documentation: "文档",
-      other: "其他",
-    },
-    statusLabel: "状态",
-    statuses: {
-      draft: "草稿",
-      active: "活跃",
-      converted: "已转换",
-      dismissed: "已忽略",
-    },
-    priorityLabel: "优先级",
-    convertToTask: "转为任务",
-    convertConfirmTitle: "转为任务",
-    convertConfirmMessage: "这将从此创意创建一个新的看板任务。",
-    dismiss: "忽略",
-    dismissConfirmTitle: "忽略创意",
-    dismissConfirmMessage: "确定要忽略这个创意吗？",
-    deleteConfirmTitle: "删除创意",
-    deleteConfirmMessage: "确定要删除这个创意吗？",
-    converted: "已转为任务",
-    viewTask: "查看任务",
-    actions: {
-      changeStatus: "更改状态",
-    },
-    stats: {
-      totalIdeas: ({ count }: { count: number }) => `${count} 个创意`,
-      activeIdeas: ({ count }: { count: number }) => `${count} 个活跃`,
-    },
-    filter: {
-      all: "全部",
-    },
-  },
-
   roadmap: {
     emptyTitle: "暂无里程碑",
     emptySubtitle: "创建里程碑来规划您的项目路线图",
@@ -1809,6 +1757,12 @@ export const zhHans: TranslationStructure = {
       inProgress: "进行中",
       completed: "已完成",
       cancelled: "已取消",
+    },
+    milestoneStatuses: {
+      planning: "规划中",
+      active: "进行中",
+      completed: "已完成",
+      onHold: "暂停",
     },
     statusLabel: "状态",
     complexity: {

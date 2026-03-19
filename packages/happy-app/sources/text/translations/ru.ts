@@ -1827,65 +1827,10 @@ export const ru: TranslationStructure = {
   },
   project: {
     segments: {
-      ideas: "Идеи",
       board: "Доска",
       roadmap: "Дорожная карта",
     },
   },
-
-  ideation: {
-    // Управление идеями
-    emptyTitle: "Идей пока нет",
-    emptySubtitle: "Фиксируйте идеи и превращайте лучшие в задачи",
-    newIdea: "Новая идея",
-    ideaDetail: "Детали идеи",
-    ideaNotFound: "Идея не найдена",
-    details: "Детали",
-    titlePlaceholder: "Название идеи",
-    titleRequired: "Название обязательно",
-    descriptionPlaceholder: "Опишите вашу идею...",
-    categoryLabel: "Категория",
-    categories: {
-      feature: "Функция",
-      improvement: "Улучшение",
-      bugfix: "Исправление",
-      refactor: "Рефакторинг",
-      documentation: "Документация",
-      other: "Другое",
-    },
-    statusLabel: "Статус",
-    statuses: {
-      draft: "Черновик",
-      active: "Активная",
-      converted: "Преобразована",
-      dismissed: "Отклонена",
-    },
-    priorityLabel: "Приоритет",
-    convertToTask: "Преобразовать в задачу",
-    convertConfirmTitle: "Преобразовать в задачу",
-    convertConfirmMessage:
-      "Из этой идеи будет создана новая задача на канбан-доске.",
-    dismiss: "Отклонить",
-    dismissConfirmTitle: "Отклонить идею",
-    dismissConfirmMessage: "Вы уверены, что хотите отклонить эту идею?",
-    deleteConfirmTitle: "Удалить идею",
-    deleteConfirmMessage: "Вы уверены, что хотите удалить эту идею?",
-    converted: "Преобразовано в задачу",
-    viewTask: "Просмотр задачи",
-    actions: {
-      changeStatus: "Изменить статус",
-    },
-    stats: {
-      totalIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, one: "идея", few: "идеи", many: "идей" })}`,
-      activeIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, one: "активная", few: "активные", many: "активных" })}`,
-    },
-    filter: {
-      all: "Все",
-    },
-  },
-
   roadmap: {
     emptyTitle: "Вех пока нет",
     emptySubtitle: "Создайте вехи для планирования дорожной карты проекта",
@@ -1914,6 +1859,12 @@ export const ru: TranslationStructure = {
       inProgress: "В работе",
       completed: "Завершено",
       cancelled: "Отменено",
+    },
+    milestoneStatuses: {
+      planning: "Планирование",
+      active: "Активно",
+      completed: "Завершено",
+      onHold: "На паузе",
     },
     statusLabel: "Статус",
     complexity: {

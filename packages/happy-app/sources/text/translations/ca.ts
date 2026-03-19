@@ -1809,66 +1809,10 @@ export const ca: TranslationStructure = {
   },
   project: {
     segments: {
-      ideas: "Idees",
       board: "Tauler",
       roadmap: "Full de ruta",
     },
   },
-
-  ideation: {
-    // Gestió d'idees
-    emptyTitle: "Encara no hi ha idees",
-    emptySubtitle:
-      "Captura les teves idees i converteix les millors en tasques",
-    newIdea: "Nova idea",
-    ideaDetail: "Detall de la idea",
-    ideaNotFound: "Idea no trobada",
-    details: "Detalls",
-    titlePlaceholder: "Títol de la idea",
-    titleRequired: "El títol és obligatori",
-    descriptionPlaceholder: "Descriu la teva idea...",
-    categoryLabel: "Categoria",
-    categories: {
-      feature: "Funcionalitat",
-      improvement: "Millora",
-      bugfix: "Correcció",
-      refactor: "Refactorització",
-      documentation: "Documentació",
-      other: "Altre",
-    },
-    statusLabel: "Estat",
-    statuses: {
-      draft: "Esborrany",
-      active: "Actiu",
-      converted: "Convertit",
-      dismissed: "Descartat",
-    },
-    priorityLabel: "Prioritat",
-    convertToTask: "Convertir en tasca",
-    convertConfirmTitle: "Convertir en tasca",
-    convertConfirmMessage:
-      "Això crearà una nova tasca kanban a partir d'aquesta idea.",
-    dismiss: "Descartar",
-    dismissConfirmTitle: "Descartar idea",
-    dismissConfirmMessage: "Estàs segur que vols descartar aquesta idea?",
-    deleteConfirmTitle: "Eliminar idea",
-    deleteConfirmMessage: "Estàs segur que vols eliminar aquesta idea?",
-    converted: "Convertit en tasca",
-    viewTask: "Veure tasca",
-    actions: {
-      changeStatus: "Canviar estat",
-    },
-    stats: {
-      totalIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, singular: "idea", plural: "idees" })}`,
-      activeIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, singular: "actiu", plural: "actius" })}`,
-    },
-    filter: {
-      all: "Totes",
-    },
-  },
-
   roadmap: {
     emptyTitle: "Encara no hi ha fites",
     emptySubtitle: "Crea fites per planificar el full de ruta del teu projecte",
@@ -1897,6 +1841,12 @@ export const ca: TranslationStructure = {
       inProgress: "En curs",
       completed: "Completat",
       cancelled: "Cancel·lat",
+    },
+    milestoneStatuses: {
+      planning: "Planificació",
+      active: "Actiu",
+      completed: "Completat",
+      onHold: "En pausa",
     },
     statusLabel: "Estat",
     complexity: {

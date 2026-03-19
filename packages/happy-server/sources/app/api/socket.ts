@@ -186,7 +186,6 @@ export function startSocket(app: Fastify) {
     webhookStatusHandler(socket, userId);
     supervisorRunStatusHandler(socket, userId);
     supervisorFixStatusHandler(socket, userId);
-
     // Ready
     log({ module: "websocket" }, `User connected: ${userId}`);
   });

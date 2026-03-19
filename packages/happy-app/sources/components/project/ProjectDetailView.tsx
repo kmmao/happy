@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, ScrollView } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Project } from "@/sync/projectManager";
@@ -8,12 +8,13 @@ import { ProjectGitTab } from "./ProjectGitTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab } from "./ProjectResearchTab";
 import { ProjectActionsTab } from "./ProjectActionsTab";
+import { ProjectRoadmapTab } from "@/components/roadmap/ProjectRoadmapTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { storage } from "@/sync/storage";
 import { gitStatusSync } from "@/sync/gitStatusSync";
 
-type TabKey = "sessions" | "git" | "health" | "actions" | "research";
+type TabKey = "sessions" | "git" | "health" | "actions" | "research" | "roadmap";
 
 interface ProjectDetailViewProps {
     project: Project;
@@ -45,36 +46,44 @@ export const ProjectDetailView = React.memo(
                 { key: "health", label: t("projects.tabHealth") },
                 { key: "actions", label: t("projects.tabActions") },
                 { key: "research", label: t("projects.tabResearch") },
+                { key: "roadmap", label: t("project.segments.roadmap") },
             ],
             [],
         );
 
         return (
             <View style={styles.container}>
-                <View style={styles.segmentContainer}>
-                    {tabs.map((tab) => {
-                        const isActive = activeTab === tab.key;
-                        return (
-                            <Pressable
-                                key={tab.key}
-                                style={[
-                                    styles.segmentButton,
-                                    isActive && styles.segmentButtonActive,
-                                ]}
-                                onPress={() => setActiveTab(tab.key)}
-                            >
-                                <Text
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.segmentScrollContent}
+                    style={styles.segmentScroll}
+                >
+                    <View style={styles.segmentContainer}>
+                        {tabs.map((tab) => {
+                            const isActive = activeTab === tab.key;
+                            return (
+                                <Pressable
+                                    key={tab.key}
                                     style={[
-                                        styles.segmentText,
-                                        isActive && styles.segmentTextActive,
+                                        styles.segmentButton,
+                                        isActive && styles.segmentButtonActive,
                                     ]}
+                                    onPress={() => setActiveTab(tab.key)}
                                 >
-                                    {tab.label}
-                                </Text>
-                            </Pressable>
-                        );
-                    })}
-                </View>
+                                    <Text
+                                        style={[
+                                            styles.segmentText,
+                                            isActive && styles.segmentTextActive,
+                                        ]}
+                                    >
+                                        {tab.label}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                </ScrollView>
                 <View style={styles.content}>
                     <View
                         style={
@@ -121,6 +130,15 @@ export const ProjectDetailView = React.memo(
                     >
                         <ProjectResearchTab project={project} />
                     </View>
+                    <View
+                        style={
+                            activeTab === "roadmap"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectRoadmapTab project={project} />
+                    </View>
                 </View>
             </View>
         );
@@ -132,21 +150,28 @@ const styles = StyleSheet.create((theme) => ({
         flex: 1,
         backgroundColor: theme.colors.groupped.background,
     },
-    segmentContainer: {
-        flexDirection: "row",
-        marginHorizontal: 16,
+    segmentScroll: {
+        flexGrow: 0,
         marginTop: 8,
         marginBottom: 4,
+        maxWidth: layout.maxWidth,
+        alignSelf: "center",
+        width: "100%",
+    },
+    segmentScrollContent: {
+        paddingHorizontal: 16,
+    },
+    segmentContainer: {
+        flexDirection: "row",
         backgroundColor: theme.colors.surface,
         borderRadius: 8,
         padding: 2,
         maxWidth: layout.maxWidth - 32,
         alignSelf: "center",
-        width: "100%",
     },
     segmentButton: {
-        flex: 1,
         paddingVertical: 8,
+        paddingHorizontal: 12,
         alignItems: "center",
         borderRadius: 6,
     },

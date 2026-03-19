@@ -3405,6 +3405,7 @@ class Sync {
         listener(event);
       }
     }
+
   };
 
   /**
@@ -3603,6 +3604,7 @@ class Sync {
     this.supervisorStatusListeners.add(listener);
     return () => { this.supervisorStatusListeners.delete(listener); };
   }
+
 }
 export const sync = new Sync();
 

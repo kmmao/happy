@@ -311,7 +311,8 @@ export type EphemeralEvent =
       fixSessionId: string;
       projectId: string;
       fixStatus: string;
-    };
+    }
+;
 
 // === EVENT PAYLOAD TYPES ===
 
@@ -985,3 +986,4 @@ export function buildSupervisorStatusEphemeral(
     totalDimensions,
   };
 }
+

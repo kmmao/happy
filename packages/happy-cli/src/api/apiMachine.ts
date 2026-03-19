@@ -22,6 +22,7 @@ import { encodeBase64, decodeBase64, encrypt, decrypt } from "./encryption";
 import { backoff } from "@/utils/time";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 
+
 interface ServerToDaemonEvents {
   update: (data: Update) => void;
   "rpc-request": (
@@ -101,6 +102,7 @@ interface DaemonToServerEvents {
   }) => void;
   "supervisor-run-status": (data: SupervisorRunStatusData) => void;
   "supervisor-fix-status": (data: SupervisorFixStatusData) => void;
+
 }
 
 type MachineRpcHandlers = {
@@ -188,6 +190,7 @@ export class ApiMachineClient {
   private supervisorHandler:
     | ((data: SupervisorTriggerData) => void)
     | null = null;
+
   private fixKillHandler:
     | ((data: { fixSessionId: string; projectId: string; fixStatus: string }) => void)
     | null = null;
@@ -199,6 +202,7 @@ export class ApiMachineClient {
   }> = [];
   private pendingSupervisorStatuses: Array<SupervisorRunStatusData> = [];
   private pendingFixStatuses: Array<SupervisorFixStatusData> = [];
+
 
   constructor(
     private token: string,
@@ -335,6 +339,7 @@ export class ApiMachineClient {
     this.fixKillHandler = handler;
   }
 
+
   /**
    * Report webhook processing status back to server.
    * Queues the status if the socket is disconnected and flushes on reconnect.
@@ -408,6 +413,7 @@ export class ApiMachineClient {
       this.socket.emit("supervisor-fix-status", item);
     }
   }
+
 
   /**
    * Update machine metadata
@@ -610,6 +616,7 @@ export class ApiMachineClient {
         );
         this.supervisorHandler(data as SupervisorTriggerData);
       }
+
       if (data.type === "supervisor-fix-kill-session" && this.fixKillHandler) {
         logger.debug(
           `[API MACHINE] Received fix-kill-session for session ${data.fixSessionId}`,

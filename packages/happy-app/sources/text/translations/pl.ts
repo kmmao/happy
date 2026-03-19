@@ -1830,65 +1830,10 @@ export const pl: TranslationStructure = {
   },
   project: {
     segments: {
-      ideas: "Pomysły",
       board: "Tablica",
       roadmap: "Plan działania",
     },
   },
-
-  ideation: {
-    // Zarządzanie pomysłami
-    emptyTitle: "Brak pomysłów",
-    emptySubtitle: "Zapisuj pomysły i zamieniaj najlepsze w zadania",
-    newIdea: "Nowy pomysł",
-    ideaDetail: "Szczegóły pomysłu",
-    ideaNotFound: "Nie znaleziono pomysłu",
-    details: "Szczegóły",
-    titlePlaceholder: "Tytuł pomysłu",
-    titleRequired: "Tytuł jest wymagany",
-    descriptionPlaceholder: "Opisz swój pomysł...",
-    categoryLabel: "Kategoria",
-    categories: {
-      feature: "Funkcja",
-      improvement: "Ulepszenie",
-      bugfix: "Poprawka",
-      refactor: "Refaktoryzacja",
-      documentation: "Dokumentacja",
-      other: "Inne",
-    },
-    statusLabel: "Status",
-    statuses: {
-      draft: "Szkic",
-      active: "Aktywny",
-      converted: "Przekonwertowany",
-      dismissed: "Odrzucony",
-    },
-    priorityLabel: "Priorytet",
-    convertToTask: "Konwertuj na zadanie",
-    convertConfirmTitle: "Konwertuj na zadanie",
-    convertConfirmMessage:
-      "Spowoduje to utworzenie nowego zadania kanban z tego pomysłu.",
-    dismiss: "Odrzuć",
-    dismissConfirmTitle: "Odrzuć pomysł",
-    dismissConfirmMessage: "Czy na pewno chcesz odrzucić ten pomysł?",
-    deleteConfirmTitle: "Usuń pomysł",
-    deleteConfirmMessage: "Czy na pewno chcesz usunąć ten pomysł?",
-    converted: "Przekonwertowano na zadanie",
-    viewTask: "Zobacz zadanie",
-    actions: {
-      changeStatus: "Zmień status",
-    },
-    stats: {
-      totalIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, one: "pomysł", few: "pomysły", many: "pomysłów" })}`,
-      activeIdeas: ({ count }: { count: number }) =>
-        `${count} ${plural({ count, one: "aktywny", few: "aktywne", many: "aktywnych" })}`,
-    },
-    filter: {
-      all: "Wszystkie",
-    },
-  },
-
   roadmap: {
     emptyTitle: "Brak kamieni milowych",
     emptySubtitle:
@@ -1918,6 +1863,12 @@ export const pl: TranslationStructure = {
       inProgress: "W toku",
       completed: "Ukończone",
       cancelled: "Anulowane",
+    },
+    milestoneStatuses: {
+      planning: "Planowanie",
+      active: "Aktywne",
+      completed: "Ukończone",
+      onHold: "Wstrzymane",
     },
     statusLabel: "Status",
     complexity: {

@@ -1784,62 +1784,10 @@ export const ja: TranslationStructure = {
   },
   project: {
     segments: {
-      ideas: "アイデア",
       board: "ボード",
       roadmap: "ロードマップ",
     },
   },
-
-  ideation: {
-    // アイデア管理
-    emptyTitle: "アイデアはまだありません",
-    emptySubtitle: "アイデアを記録し、最適なものをタスクに変換",
-    newIdea: "新しいアイデア",
-    ideaDetail: "アイデア詳細",
-    ideaNotFound: "アイデアが見つかりません",
-    details: "詳細",
-    titlePlaceholder: "アイデアのタイトル",
-    titleRequired: "タイトルは必須です",
-    descriptionPlaceholder: "アイデアを説明してください...",
-    categoryLabel: "カテゴリ",
-    categories: {
-      feature: "機能",
-      improvement: "改善",
-      bugfix: "バグ修正",
-      refactor: "リファクタリング",
-      documentation: "ドキュメント",
-      other: "その他",
-    },
-    statusLabel: "ステータス",
-    statuses: {
-      draft: "下書き",
-      active: "アクティブ",
-      converted: "変換済み",
-      dismissed: "却下済み",
-    },
-    priorityLabel: "優先度",
-    convertToTask: "タスクに変換",
-    convertConfirmTitle: "タスクに変換",
-    convertConfirmMessage: "このアイデアから新しいカンバンタスクを作成します。",
-    dismiss: "却下",
-    dismissConfirmTitle: "アイデアを却下",
-    dismissConfirmMessage: "このアイデアを却下してもよろしいですか？",
-    deleteConfirmTitle: "アイデアを削除",
-    deleteConfirmMessage: "このアイデアを削除してもよろしいですか？",
-    converted: "タスクに変換しました",
-    viewTask: "タスクを見る",
-    actions: {
-      changeStatus: "ステータスを変更",
-    },
-    stats: {
-      totalIdeas: ({ count }: { count: number }) => `${count} 件のアイデア`,
-      activeIdeas: ({ count }: { count: number }) => `${count} 件アクティブ`,
-    },
-    filter: {
-      all: "すべて",
-    },
-  },
-
   roadmap: {
     emptyTitle: "マイルストーンはまだありません",
     emptySubtitle:
@@ -1869,6 +1817,12 @@ export const ja: TranslationStructure = {
       inProgress: "進行中",
       completed: "完了",
       cancelled: "キャンセル",
+    },
+    milestoneStatuses: {
+      planning: "計画中",
+      active: "進行中",
+      completed: "完了",
+      onHold: "保留中",
     },
     statusLabel: "ステータス",
     complexity: {
