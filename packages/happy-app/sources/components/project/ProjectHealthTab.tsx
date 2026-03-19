@@ -193,18 +193,27 @@ export const ProjectHealthTab = React.memo(
             loadData();
         }, [loadData]);
 
+        // Track known non-research runIds via ref to avoid effect dependency on runs
+        const healthRunIdsRef = React.useRef(new Set<string>());
+        React.useEffect(() => {
+            healthRunIdsRef.current = new Set(
+                runs.filter((r) => r.trigger !== "research").map((r) => r.id),
+            );
+        }, [runs]);
+
         // Subscribe to real-time supervisor status updates
         React.useEffect(() => {
             if (!serverId) return;
             const unsubscribe = sync.onSupervisorStatus((event) => {
                 if (event.projectId !== serverId) return;
-                // Terminal states: full refresh + clear progress
+                // Terminal states: always refresh (loadData returns all, activeRun filters)
                 if (event.status === "completed" || event.status === "failed" || event.status === "cancelled") {
                     setDimensionProgress(null);
                     loadData();
+                    return;
                 }
-                // Running state: update dimension progress if available
-                if (event.status === "running") {
+                // Running state: only update progress if this is a health run
+                if (event.status === "running" && healthRunIdsRef.current.has(event.runId)) {
                     if (event.currentDimension && event.dimensionIndex && event.totalDimensions) {
                         setDimensionProgress({
                             currentDimension: event.currentDimension,
@@ -233,12 +242,18 @@ export const ProjectHealthTab = React.memo(
             setRefreshing(false);
         }, [loadData]);
 
+        // Filter out research runs — they belong to the Research tab
+        const healthRuns = React.useMemo(
+            () => runs.filter((r) => r.trigger !== "research"),
+            [runs],
+        );
+
         const activeRun = React.useMemo(
             () =>
-                runs.find(
+                healthRuns.find(
                     (r) => r.status === "pending" || r.status === "running",
                 ),
-            [runs],
+            [healthRuns],
         );
 
         // Archive the supervisor session when a run completes
@@ -250,12 +265,12 @@ export const ProjectHealthTab = React.memo(
 
             // Active run just finished (was non-null, now null)
             if (prevId && !currentId) {
-                const finishedRun = runs.find((r) => r.id === prevId);
+                const finishedRun = healthRuns.find((r) => r.id === prevId);
                 if (finishedRun?.status === "completed" && finishedRun.sessionId) {
                     sessionKill(finishedRun.sessionId).catch(() => {});
                 }
             }
-        }, [activeRun, runs]);
+        }, [activeRun, healthRuns]);
 
         // Check if the active run's linked session still exists
         const activeRunSession = useSession(activeRun?.sessionId ?? "");
@@ -755,7 +770,7 @@ export const ProjectHealthTab = React.memo(
                         <View style={styles.loadingContainer}>
                             <ActivityIndicator size="small" />
                         </View>
-                    ) : runs.length === 0 ? (
+                    ) : healthRuns.length === 0 ? (
                         <View style={styles.emptyHistoryCard}>
                             <Text style={styles.emptyHistoryText}>
                                 {t("supervisor.noRuns")}
@@ -763,11 +778,11 @@ export const ProjectHealthTab = React.memo(
                         </View>
                     ) : (
                         <>
-                            {runs.slice(0, 3).map((run, index) => (
+                            {healthRuns.slice(0, 3).map((run, index) => (
                                 <SupervisorRunHistoryItem
                                     key={run.id}
                                     run={run}
-                                    isLast={index === Math.min(runs.length, 3) - 1}
+                                    isLast={index === Math.min(healthRuns.length, 3) - 1}
                                     onPress={
                                         run.status === "completed" && serverId
                                             ? () =>
@@ -783,7 +798,7 @@ export const ProjectHealthTab = React.memo(
                                     }
                                 />
                             ))}
-                            {(runs.length > 3 || total > runs.length) && (
+                            {(healthRuns.length > 3 || total > healthRuns.length) && (
                                 <Pressable
                                     style={styles.showMoreRow}
                                     onPress={() =>
@@ -794,7 +809,7 @@ export const ProjectHealthTab = React.memo(
                                 >
                                     <Text style={styles.showMoreText}>
                                         {t("supervisor.showMoreRuns", {
-                                            count: Math.max(total, runs.length) - 3,
+                                            count: Math.max(total, healthRuns.length) - 3,
                                         })}
                                     </Text>
                                     <Ionicons
