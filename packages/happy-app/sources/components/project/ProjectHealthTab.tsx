@@ -46,82 +46,10 @@ import { SupervisorActionCard } from "./SupervisorActionCard";
 import { SupervisorSummaryCard } from "./SupervisorSummaryCard";
 import { SupervisorTrendChart } from "./SupervisorTrendChart";
 import { SupervisorRunHistoryItem } from "./SupervisorRunHistoryItem";
-import type { TranslationKey } from "@/text";
 import { Modal } from "@/modal";
+import { useElapsedSeconds, type DimensionProgress } from "./supervisorUtils";
+import { SupervisorProgressView } from "./SupervisorProgressView";
 
-const statusKeyMap: Record<string, TranslationKey> = {
-    pending: "supervisor.status_pending",
-    running: "supervisor.status_running",
-    completed: "supervisor.status_completed",
-    failed: "supervisor.status_failed",
-    cancelled: "supervisor.status_cancelled",
-};
-
-function statusLabel(status: string): string {
-    const key = statusKeyMap[status];
-    return key ? t(key) : status;
-}
-
-function formatElapsed(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`;
-}
-
-// Asymptotic progress estimate: fast at first, slows down, never hits 100%.
-// pending phase: 0-8%  (tau=15s, cap=8%)
-// running phase: 8-95% (tau=70s, cap=95%)
-// Formula: cap * (1 - e^(-elapsed/tau))
-function estimateProgress(status: string, elapsedSeconds: number): number {
-    if (status === "pending") {
-        return Math.round(8 * (1 - Math.exp(-elapsedSeconds / 15)));
-    }
-    // running: base 8% + asymptotic curve up to 95%
-    return Math.round(8 + 87 * (1 - Math.exp(-elapsedSeconds / 70)));
-}
-
-// Map dimension key to i18n key
-const dimensionLabelMap: Record<string, TranslationKey> = {
-    security: "supervisor.dimSecurity",
-    dependencies: "supervisor.dimDependencies",
-    architecture: "supervisor.dimArchitecture",
-    techDebt: "supervisor.dimTechDebt",
-    codeQuality: "supervisor.dimCodeQuality",
-    testCoverage: "supervisor.dimTestCoverage",
-    documentation: "supervisor.dimDocumentation",
-    performance: "supervisor.dimPerformance",
-    // Preflight sync steps
-    preflight_start: "supervisor.dimPreflightStart",
-    preflight_check: "supervisor.dimPreflightCheck",
-    preflight_stash: "supervisor.dimPreflightStash",
-    preflight_fetch: "supervisor.dimPreflightFetch",
-    preflight_pull: "supervisor.dimPreflightPull",
-    preflight_resolve: "supervisor.dimPreflightResolve",
-    preflight_deploy: "supervisor.dimPreflightDeploy",
-    preflight_deploy_cli: "supervisor.dimPreflightDeployCli",
-    preflight_deploy_server: "supervisor.dimPreflightDeployServer",
-};
-
-function dimensionLabel(key: string): string {
-    const tk = dimensionLabelMap[key];
-    return tk ? t(tk) : key;
-}
-
-function useElapsedSeconds(startTimestamp: number | null): number {
-    const [elapsed, setElapsed] = React.useState(0);
-    React.useEffect(() => {
-        if (startTimestamp == null) {
-            setElapsed(0);
-            return;
-        }
-        const calc = () =>
-            Math.max(0, Math.floor((Date.now() - startTimestamp) / 1000));
-        setElapsed(calc());
-        const id = setInterval(() => setElapsed(calc()), 1000);
-        return () => clearInterval(id);
-    }, [startTimestamp]);
-    return elapsed;
-}
 
 interface ProjectHealthTabProps {
     project: Project;
@@ -149,11 +77,8 @@ export const ProjectHealthTab = React.memo(
             React.useState<SupervisorSummary | null>(null);
         const [loaded, setLoaded] = React.useState(false);
         const [refreshing, setRefreshing] = React.useState(false);
-        const [dimensionProgress, setDimensionProgress] = React.useState<{
-            currentDimension: string;
-            dimensionIndex: number;
-            totalDimensions: number;
-        } | null>(null);
+        const [dimensionProgress, setDimensionProgress] =
+            React.useState<DimensionProgress | null>(null);
 
         const serverId = project.serverId;
 
@@ -466,46 +391,11 @@ export const ProjectHealthTab = React.memo(
                                 </View>
                             ) : activeRun ? (
                                 <View style={styles.activeRunContainer}>
-                                    <View style={styles.statusChip}>
-                                        <ActivityIndicator
-                                            size="small"
-                                            color={theme.colors.header.tint}
-                                        />
-                                        <Text style={styles.statusChipText}>
-                                            {activeRun.status === "pending"
-                                                ? t("supervisor.statusWaitingCli")
-                                                : dimensionProgress
-                                                  ? t("supervisor.analyzingDimension", {
-                                                        dimension: dimensionLabel(dimensionProgress.currentDimension),
-                                                        index: dimensionProgress.dimensionIndex,
-                                                        total: dimensionProgress.totalDimensions,
-                                                    })
-                                                  : t("supervisor.statusAnalyzing")}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.progressContainer}>
-                                        <View style={styles.progressBarBg}>
-                                            <View
-                                                style={[
-                                                    styles.progressBarFill,
-                                                    {
-                                                        width: `${dimensionProgress ? Math.round((dimensionProgress.dimensionIndex / dimensionProgress.totalDimensions) * 95) : estimateProgress(activeRun.status, elapsedSeconds)}%`,
-                                                        backgroundColor: theme.colors.header.tint,
-                                                    },
-                                                ]}
-                                            />
-                                        </View>
-                                        <Text style={styles.progressText}>
-                                            {dimensionProgress
-                                                ? `${dimensionProgress.dimensionIndex}/${dimensionProgress.totalDimensions}`
-                                                : `${estimateProgress(activeRun.status, elapsedSeconds)}%`}
-                                        </Text>
-                                    </View>
-                                    <Text style={styles.elapsedText}>
-                                        {t("supervisor.elapsed", {
-                                            time: formatElapsed(elapsedSeconds),
-                                        })}
-                                    </Text>
+                                    <SupervisorProgressView
+                                        status={activeRun.status}
+                                        elapsedSeconds={elapsedSeconds}
+                                        dimensionProgress={dimensionProgress}
+                                    />
                                     {activeRunSession && activeRun?.sessionId && (
                                         <Pressable
                                             style={styles.sessionLink}
@@ -899,54 +789,10 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 15,
         color: "#FFFFFF",
     },
-    statusChip: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        backgroundColor: theme.colors.surface,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 8,
-    },
-    statusChipText: {
-        ...Typography.default(),
-        fontSize: 13,
-        color: theme.colors.text,
-    },
     activeRunContainer: {
         alignItems: "center",
         gap: 8,
         width: "100%",
-    },
-    progressContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        width: "100%",
-        paddingHorizontal: 16,
-    },
-    progressBarBg: {
-        flex: 1,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: theme.colors.surface,
-        overflow: "hidden" as const,
-    },
-    progressBarFill: {
-        height: "100%",
-        borderRadius: 3,
-    },
-    progressText: {
-        ...Typography.default("semiBold"),
-        fontSize: 12,
-        color: theme.colors.textSecondary,
-        width: 32,
-        textAlign: "right" as const,
-    },
-    elapsedText: {
-        ...Typography.default(),
-        fontSize: 12,
-        color: theme.colors.textSecondary,
     },
     actionButton: {
         paddingHorizontal: 16,

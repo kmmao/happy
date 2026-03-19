@@ -47,6 +47,10 @@ const defaultConfig = {
         maxIssuesPerRun: 3,
         requireApprovalForPR: true,
     },
+    concurrency: {
+        maxAnalysisSessions: 3,
+        maxFixSessions: 2,
+    },
     notifications: {
         onAnalysisComplete: true,
         onIssueCreated: true,
@@ -446,6 +450,92 @@ export default function SupervisorSettingsScreen() {
                 />
             </ItemGroup>
 
+            {/* Concurrency Limits */}
+            <ItemGroup title={t("supervisor.concurrencySection")}>
+                <View style={styles.concurrencyRow}>
+                    <View style={styles.toggleRowContent}>
+                        <Text style={styles.toggleRowLabel}>
+                            {t("supervisor.maxAnalysisSessions")}
+                        </Text>
+                        <Text style={styles.toggleRowSubtitle}>
+                            {t("supervisor.maxAnalysisSessionsNote")}
+                        </Text>
+                    </View>
+                    <View style={styles.concurrencyPicker}>
+                        {([1, 2, 3, 4, 5] as const).map((n) => (
+                            <Pressable
+                                key={n}
+                                style={[
+                                    styles.concurrencyOption,
+                                    config.concurrency.maxAnalysisSessions === n &&
+                                        styles.concurrencyOptionSelected,
+                                ]}
+                                onPress={() =>
+                                    updateConfig((prev) => ({
+                                        ...prev,
+                                        concurrency: {
+                                            ...prev.concurrency,
+                                            maxAnalysisSessions: n,
+                                        },
+                                    }))
+                                }
+                            >
+                                <Text
+                                    style={[
+                                        styles.concurrencyOptionText,
+                                        config.concurrency.maxAnalysisSessions === n &&
+                                            styles.concurrencyOptionTextSelected,
+                                    ]}
+                                >
+                                    {n}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </View>
+                </View>
+                <View style={[styles.concurrencyRow, { borderTopWidth: 0.5, borderTopColor: theme.colors.divider }]}>
+                    <View style={styles.toggleRowContent}>
+                        <Text style={styles.toggleRowLabel}>
+                            {t("supervisor.maxFixSessions")}
+                        </Text>
+                        <Text style={styles.toggleRowSubtitle}>
+                            {t("supervisor.maxFixSessionsNote")}
+                        </Text>
+                    </View>
+                    <View style={styles.concurrencyPicker}>
+                        {([1, 2, 3] as const).map((n) => (
+                            <Pressable
+                                key={n}
+                                style={[
+                                    styles.concurrencyOption,
+                                    config.concurrency.maxFixSessions === n &&
+                                        styles.concurrencyOptionSelected,
+                                ]}
+                                onPress={() =>
+                                    updateConfig((prev) => ({
+                                        ...prev,
+                                        concurrency: {
+                                            ...prev.concurrency,
+                                            maxFixSessions: n,
+                                        },
+                                    }))
+                                }
+                            >
+                                <Text
+                                    style={[
+                                        styles.concurrencyOptionText,
+                                        config.concurrency.maxFixSessions === n &&
+                                            styles.concurrencyOptionTextSelected,
+                                    ]}
+                                >
+                                    {n}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </View>
+                </View>
+            </ItemGroup>
+
             {/* Custom Analysis Rules */}
             <ItemGroup title={t("supervisor.customRulesSection")}>
                 <View style={styles.customRulesCard}>
@@ -748,6 +838,34 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 11,
         color: theme.colors.textSecondary,
         textAlign: "right",
+    },
+    concurrencyRow: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    concurrencyPicker: {
+        flexDirection: "row",
+        gap: 6,
+        marginTop: 8,
+    },
+    concurrencyOption: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: theme.colors.surface,
+    },
+    concurrencyOptionSelected: {
+        backgroundColor: theme.colors.header.tint,
+    },
+    concurrencyOptionText: {
+        ...Typography.default("semiBold"),
+        fontSize: 15,
+        color: theme.colors.text,
+    },
+    concurrencyOptionTextSelected: {
+        color: "#FFFFFF",
     },
     saveButtonContainer: {
         paddingHorizontal: 16,

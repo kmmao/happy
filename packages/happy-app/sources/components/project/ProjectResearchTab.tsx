@@ -34,35 +34,9 @@ import {
     type ResearchPrefs,
 } from "@/sync/persistence";
 import { kvGet, kvSet } from "@/sync/apiKv";
-function formatElapsed(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`;
-}
-
-// Asymptotic progress estimate: fast at first, slows down, never hits 100%.
-function estimateProgress(status: string, elapsedSeconds: number): number {
-    if (status === "pending") {
-        return Math.round(8 * (1 - Math.exp(-elapsedSeconds / 15)));
-    }
-    return Math.round(8 + 87 * (1 - Math.exp(-elapsedSeconds / 70)));
-}
-
-function useElapsedSeconds(startTimestamp: number | null): number {
-    const [elapsed, setElapsed] = React.useState(0);
-    React.useEffect(() => {
-        if (startTimestamp == null) {
-            setElapsed(0);
-            return;
-        }
-        const calc = () =>
-            Math.max(0, Math.floor((Date.now() - startTimestamp) / 1000));
-        setElapsed(calc());
-        const id = setInterval(() => setElapsed(calc()), 1000);
-        return () => clearInterval(id);
-    }, [startTimestamp]);
-    return elapsed;
-}
+import { useElapsedSeconds, type DimensionProgress } from "./supervisorUtils";
+import { resolveDimensionLabel } from "./supervisorDimensionLabels";
+import { SupervisorProgressView } from "./SupervisorProgressView";
 
 const RESEARCH_DIMENSIONS = [
     "pricing",
@@ -112,11 +86,8 @@ export const ProjectResearchTab = React.memo(
         const [loading, setLoading] = React.useState(true);
         const [refreshing, setRefreshing] = React.useState(false);
         const [reportModalRun, setReportModalRun] = React.useState<SupervisorRun | null>(null);
-        const [dimensionProgress, setDimensionProgress] = React.useState<{
-            currentDimension: string;
-            dimensionIndex: number;
-            totalDimensions: number;
-        } | null>(null);
+        const [dimensionProgress, setDimensionProgress] =
+            React.useState<DimensionProgress | null>(null);
 
         // Input fields — load from local cache first, then sync from KV Store
         const savedPrefs = React.useMemo(() => {
@@ -226,28 +197,6 @@ export const ProjectResearchTab = React.memo(
             activeRun ? activeRun.createdAt : null,
         );
 
-        // Resolve dimension label from key
-        const resolveDimensionLabel = React.useCallback((key: string): string => {
-            // Preflight dimension keys
-            if (key.startsWith("preflight_")) {
-                const keyMap: Record<string, () => string> = {
-                    preflight_start: () => t("supervisor.dimPreflightStart"),
-                    preflight_check: () => t("supervisor.dimPreflightCheck"),
-                    preflight_stash: () => t("supervisor.dimPreflightStash"),
-                    preflight_fetch: () => t("supervisor.dimPreflightFetch"),
-                    preflight_pull: () => t("supervisor.dimPreflightPull"),
-                    preflight_resolve: () => t("supervisor.dimPreflightResolve"),
-                    preflight_deploy: () => t("supervisor.dimPreflightDeploy"),
-                    preflight_deploy_cli: () => t("supervisor.dimPreflightDeployCli"),
-                    preflight_deploy_server: () => t("supervisor.dimPreflightDeployServer"),
-                };
-                const fn = keyMap[key];
-                return fn ? fn() : key;
-            }
-            // Research dimension keys
-            const entry = DIMENSION_LABELS[key as ResearchDimension];
-            return entry ? entry.label() : key;
-        }, []);
 
         const loadData = React.useCallback(async () => {
             if (!serverId) return;
@@ -536,46 +485,12 @@ export const ProjectResearchTab = React.memo(
 
                             {isRunning && activeRun && (
                                 <View style={styles.progressSection}>
-                                    <View style={styles.statusChip}>
-                                        <ActivityIndicator
-                                            size="small"
-                                            color={theme.colors.header.tint}
-                                        />
-                                        <Text style={[styles.statusChipText, { color: theme.colors.text }]}>
-                                            {activeRun.status === "pending"
-                                                ? t("supervisor.statusWaitingCli")
-                                                : dimensionProgress
-                                                  ? t("supervisor.analyzingDimension", {
-                                                        dimension: resolveDimensionLabel(dimensionProgress.currentDimension),
-                                                        index: dimensionProgress.dimensionIndex,
-                                                        total: dimensionProgress.totalDimensions,
-                                                    })
-                                                  : t("competitorResearch.analyzing")}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.progressContainer}>
-                                        <View style={styles.progressBarBg}>
-                                            <View
-                                                style={[
-                                                    styles.progressBarFill,
-                                                    {
-                                                        width: `${dimensionProgress ? Math.round((dimensionProgress.dimensionIndex / dimensionProgress.totalDimensions) * 95) : estimateProgress(activeRun.status, elapsedSeconds)}%`,
-                                                        backgroundColor: theme.colors.header.tint,
-                                                    },
-                                                ]}
-                                            />
-                                        </View>
-                                        <Text style={[styles.progressText, { color: theme.colors.textSecondary }]}>
-                                            {dimensionProgress
-                                                ? `${dimensionProgress.dimensionIndex}/${dimensionProgress.totalDimensions}`
-                                                : `${estimateProgress(activeRun.status, elapsedSeconds)}%`}
-                                        </Text>
-                                    </View>
-                                    <Text style={[styles.elapsedText, { color: theme.colors.textSecondary }]}>
-                                        {t("supervisor.elapsed", {
-                                            time: formatElapsed(elapsedSeconds),
-                                        })}
-                                    </Text>
+                                    <SupervisorProgressView
+                                        status={activeRun.status}
+                                        elapsedSeconds={elapsedSeconds}
+                                        dimensionProgress={dimensionProgress}
+                                        analyzingLabel={t("competitorResearch.analyzing")}
+                                    />
                                 </View>
                             )}
                         </ItemGroup>
@@ -790,46 +705,6 @@ const styles = StyleSheet.create((theme) => ({
         gap: 8,
         paddingHorizontal: 16,
         paddingBottom: 12,
-    },
-    statusChip: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        backgroundColor: theme.colors.surface,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 8,
-    },
-    statusChipText: {
-        ...Typography.default(),
-        fontSize: 13,
-    },
-    progressContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        width: "100%",
-    },
-    progressBarBg: {
-        flex: 1,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: theme.colors.surface,
-        overflow: "hidden" as const,
-    },
-    progressBarFill: {
-        height: "100%",
-        borderRadius: 3,
-    },
-    progressText: {
-        ...Typography.default("semiBold"),
-        fontSize: 12,
-        width: 32,
-        textAlign: "right" as const,
-    },
-    elapsedText: {
-        ...Typography.default(),
-        fontSize: 12,
     },
     reportCard: {
         flexDirection: "row",

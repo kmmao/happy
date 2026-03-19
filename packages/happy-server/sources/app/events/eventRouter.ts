@@ -297,6 +297,8 @@ export type EphemeralEvent =
         issueNumber?: number;
       };
       fixStrategy?: string;
+      maxConcurrentAnalysis?: number;
+      maxConcurrentFix?: number;
     }
   | {
       type: "supervisor-status";
@@ -945,6 +947,8 @@ export function buildSupervisorTriggerEphemeral(
   researchParams?: string,
   fixStrategy?: string,
   existingActions?: readonly { category: string; title: string; severity: string; approval: string; fixStatus: string | null }[],
+  maxConcurrentAnalysis?: number,
+  maxConcurrentFix?: number,
 ): EphemeralPayload {
   return {
     type: "supervisor-trigger",
@@ -961,6 +965,8 @@ export function buildSupervisorTriggerEphemeral(
     researchParams,
     fixStrategy,
     existingActions,
+    maxConcurrentAnalysis,
+    maxConcurrentFix,
   };
 }
 

@@ -476,13 +476,28 @@ export function clearPersistence() {
   clearAllMessageCaches();
 }
 
-// Research preferences per project (dimensions + text fields)
+/**
+ * Research-specific preferences stored locally (MMKV) and synced via KV Store.
+ *
+ * These are **run-level parameters** for competitor research, NOT the
+ * project-level supervisor config (which lives in the Project table fields
+ * like supervisorMode, supervisorEnabledDimensions, etc.).
+ *
+ * Two separate config paths by design:
+ * - Health analysis config → supervisor-settings.tsx → Server Project table
+ * - Research analysis config → ResearchTab → MMKV + KV Store (this interface)
+ */
 const RESEARCH_PREFS_PREFIX = "research-prefs-";
 
 export interface ResearchPrefs {
   dimensions: Record<string, boolean>;
   knownCompetitors: string;
   additionalNotes: string;
+  /**
+   * Research-specific custom rules (e.g. "focus on pricing comparison").
+   * Different from supervisorCustomRules in the Project table which applies
+   * to health analysis only.
+   */
   customRules: string;
 }
 

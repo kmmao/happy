@@ -147,6 +147,10 @@ export type SupervisorTriggerData = {
   };
   researchParams?: string;
   fixStrategy?: "direct" | "pr";
+  /** Max concurrent analysis/research sessions (from project config). */
+  maxConcurrentAnalysis?: number;
+  /** Max concurrent fix worktree sessions (from project config). */
+  maxConcurrentFix?: number;
   existingActions?: ReadonlyArray<{
     category: string;
     title: string;
@@ -159,7 +163,7 @@ export type SupervisorTriggerData = {
 export type SupervisorRunStatusData = {
   runId: string;
   projectId: string;
-  status: "running" | "completed" | "failed";
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
   sessionId?: string;
   actionsCount?: number;
   issuesCreated?: number;
@@ -181,7 +185,7 @@ export type SupervisorActionData = {
 export type SupervisorFixStatusData = {
   actionId: string;
   projectId: string;
-  fixStatus: "running" | "completed" | "failed";
+  fixStatus: "queued" | "running" | "completed" | "failed" | "cancelled";
   fixSessionId?: string;
 };
 

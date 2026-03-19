@@ -17,6 +17,13 @@ import { buildFixPrompt } from "./buildFixPrompt";
 import { buildResearchPrompt } from "./buildResearchPrompt";
 import { runPreflightSync } from "./preflightSync";
 import {
+  acquireSlot,
+  releaseSlot,
+  setMaxConcurrency,
+  ConcurrencyAbortedError,
+  type SlotType,
+} from "./concurrencyLimiter";
+import {
   createWorktreeLocal,
   removeWorktreeForced,
 } from "@/webhook/createWorktreeLocal";
@@ -112,7 +119,17 @@ export async function handleSupervisorTrigger(
     researchParams,
     fixStrategy,
     existingActions,
+    maxConcurrentAnalysis,
+    maxConcurrentFix,
   } = data;
+
+  // Apply concurrency limits from server config (if provided)
+  if (maxConcurrentAnalysis != null) {
+    setMaxConcurrency("analysis", maxConcurrentAnalysis);
+  }
+  if (maxConcurrentFix != null) {
+    setMaxConcurrency("fix", maxConcurrentFix);
+  }
 
   // Guard against duplicate processing
   if (processingRuns.has(runId)) {
@@ -122,6 +139,50 @@ export async function handleSupervisorTrigger(
     return;
   }
   processingRuns.add(runId);
+
+  // Determine which pool to use
+  const slotType: SlotType = trigger === "fix" ? "fix" : "analysis";
+
+  // Report queued status while waiting for a slot
+  if (trigger === "fix") {
+    deps.emitSupervisorFixStatus({
+      actionId: runId,
+      projectId,
+      fixStatus: "queued",
+    });
+  } else {
+    deps.emitSupervisorRunStatus({
+      runId,
+      projectId,
+      status: "queued",
+    });
+  }
+
+  try {
+    // Wait for a concurrency slot (queues if pool is full)
+    await acquireSlot(slotType);
+  } catch (error) {
+    processingRuns.delete(runId);
+    if (error instanceof ConcurrencyAbortedError) {
+      logger.debug(
+        `[SUPERVISOR] Run ${runId} cancelled while queued`,
+      );
+      if (trigger === "fix") {
+        deps.emitSupervisorFixStatus({
+          actionId: runId,
+          projectId,
+          fixStatus: "cancelled",
+        });
+      } else {
+        deps.emitSupervisorRunStatus({
+          runId,
+          projectId,
+          status: "cancelled",
+        });
+      }
+    }
+    return;
+  }
 
   try {
     if (trigger === "fix" && fixAction) {
@@ -234,6 +295,7 @@ export async function handleSupervisorTrigger(
       });
     }
   } finally {
+    releaseSlot(slotType);
     processingRuns.delete(runId);
   }
 }

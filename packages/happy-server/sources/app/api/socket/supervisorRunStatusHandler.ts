@@ -408,6 +408,7 @@ async function handleAutoMode(
                 path: true,
                 repoUrl: true,
                 fixStrategy: true,
+                supervisorConfig: true,
             },
         });
 
@@ -510,6 +511,20 @@ async function handleAutoMode(
                 }
             }
 
+            // Extract concurrency limits from project config
+            let maxConcurrentAnalysis: number | undefined;
+            let maxConcurrentFix: number | undefined;
+            if (project.supervisorConfig) {
+                try {
+                    const cfg = JSON.parse(project.supervisorConfig);
+                    const c = cfg?.concurrency;
+                    if (c && typeof c === "object") {
+                        maxConcurrentAnalysis = typeof c.maxAnalysisSessions === "number" ? c.maxAnalysisSessions : undefined;
+                        maxConcurrentFix = typeof c.maxFixSessions === "number" ? c.maxFixSessions : undefined;
+                    }
+                } catch { /* ignore */ }
+            }
+
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildSupervisorTriggerEphemeral(
@@ -532,6 +547,9 @@ async function handleAutoMode(
                     },
                     undefined, // researchParams
                     project.fixStrategy ?? undefined,
+                    undefined, // existingActions
+                    maxConcurrentAnalysis,
+                    maxConcurrentFix,
                 ),
                 recipientFilter: {
                     type: "machine-scoped-only",

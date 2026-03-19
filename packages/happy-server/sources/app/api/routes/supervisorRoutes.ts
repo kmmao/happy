@@ -44,7 +44,7 @@ export function supervisorRoutes(app: Fastify) {
 
             const project = await db.project.findFirst({
                 where: { id, accountId: userId },
-                select: { id: true, machineId: true, path: true, supervisorMode: true, supervisorEnabledDimensions: true, supervisorCustomRules: true },
+                select: { id: true, machineId: true, path: true, supervisorMode: true, supervisorEnabledDimensions: true, supervisorCustomRules: true, supervisorConfig: true },
             });
 
             if (!project) {
@@ -123,6 +123,9 @@ export function supervisorRoutes(app: Fastify) {
                 })
                 : undefined;
 
+            // Extract concurrency limits from supervisorConfig JSON
+            const concurrency = parseConcurrencyConfig(project.supervisorConfig);
+
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildSupervisorTriggerEphemeral(
@@ -139,6 +142,8 @@ export function supervisorRoutes(app: Fastify) {
                     researchParams ? JSON.stringify(researchParams) : undefined,
                     undefined, // fixStrategy
                     existingActions,
+                    concurrency.maxAnalysis,
+                    concurrency.maxFix,
                 ),
                 recipientFilter: {
                     type: "machine-scoped-only",
@@ -678,6 +683,28 @@ class ConflictError extends Error {
  * Parse comma-separated dimensions string into an array.
  * Returns undefined (use defaults) if empty or null.
  */
+/**
+ * Extract concurrency limits from the supervisorConfig JSON blob.
+ * Returns undefined values if not set (CLI will use its defaults).
+ */
+function parseConcurrencyConfig(configJson: string | null | undefined): {
+    maxAnalysis: number | undefined;
+    maxFix: number | undefined;
+} {
+    if (!configJson) return { maxAnalysis: undefined, maxFix: undefined };
+    try {
+        const config = JSON.parse(configJson);
+        const c = config?.concurrency;
+        if (!c || typeof c !== "object") return { maxAnalysis: undefined, maxFix: undefined };
+        return {
+            maxAnalysis: typeof c.maxAnalysisSessions === "number" ? c.maxAnalysisSessions : undefined,
+            maxFix: typeof c.maxFixSessions === "number" ? c.maxFixSessions : undefined,
+        };
+    } catch {
+        return { maxAnalysis: undefined, maxFix: undefined };
+    }
+}
+
 function parseDimensions(raw: string | null | undefined): string[] | undefined {
     if (!raw) return undefined;
     const dims = raw
