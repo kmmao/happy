@@ -203,6 +203,7 @@ export interface Session {
   // IMPORTANT: latestUsage is extracted from reducerState.latestUsage after message processing.
   // We store it directly on Session to ensure it's available immediately on load.
   // Do NOT store reducerState itself on Session - it's mutable and should only exist in SessionMessages.
+  resolvedModelId?: string | null; // Actual model ID reported by CLI in turn-end (e.g. "claude-opus-4-6")
   needsAttention?: boolean; // true when turn-end received and user hasn't viewed the session
   latestUsage?: {
     inputTokens: number;

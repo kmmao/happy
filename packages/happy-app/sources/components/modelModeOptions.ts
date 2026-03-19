@@ -59,7 +59,6 @@ const GEMINI_MODEL_FALLBACKS: ModelMode[] = [
 
 // Known Claude model pricing for enriching CLI-reported descriptions
 const CLAUDE_MODEL_PRICING: Record<string, string> = {
-  "default": "$3/$15 \u00B7 200K",
   "sonnet": "$3/$15 \u00B7 200K",
   "sonnet-1m": "$6/$22.50 \u00B7 1M",
   "haiku": "$1/$5 \u00B7 200K",
@@ -180,17 +179,12 @@ export function getClaudeModelModes(): ModelMode[] {
     {
       key: "default",
       name: "Default",
-      description: "Sonnet 4.6 \u00B7 $3/$15 \u00B7 200K",
-    },
-    {
-      key: "haiku",
-      name: "Haiku",
-      description: "Haiku 4.5 \u00B7 Fastest \u00B7 $1/$5 \u00B7 200K",
+      description: "Use CLI configured model",
     },
     {
       key: "sonnet",
       name: "Sonnet",
-      description: "Sonnet 4.6 \u00B7 Balanced \u00B7 $3/$15 \u00B7 200K",
+      description: "Sonnet 4.6 \u00B7 $3/$15 \u00B7 200K",
     },
     {
       key: "sonnet-1m",
@@ -200,12 +194,17 @@ export function getClaudeModelModes(): ModelMode[] {
     {
       key: "opus",
       name: "Opus",
-      description: "Opus 4.6 \u00B7 Most capable \u00B7 $5/$25 \u00B7 200K",
+      description: "Opus 4.6 \u00B7 $5/$25 \u00B7 200K",
     },
     {
       key: "opus-1m",
       name: "Opus (1M)",
       description: "Opus 4.6 \u00B7 Long context \u00B7 $10/$37.50",
+    },
+    {
+      key: "haiku",
+      name: "Haiku",
+      description: "Haiku 4.5 \u00B7 Fastest \u00B7 $1/$5 \u00B7 200K",
     },
     {
       key: "opusplan",
@@ -292,13 +291,32 @@ export function getAvailableModels(
   translate: Translate,
   customModels?: CustomModel[] | null,
 ): ModelMode[] {
-  // Priority 1: CLI dynamically reported models
+  // For Claude: always use hardcoded models (ignore CLI's "Default (recommended)" wrapper)
+  // This ensures consistent UI with "Use CLI configured model" description and proper Sonnet option
+  if (flavor === "claude" || flavor === undefined) {
+    // Priority 1: Profile custom models (e.g., MiniMax, DeepSeek)
+    if (customModels && customModels.length > 0) {
+      return [
+        { key: "default", name: "Default", description: "Use CLI configured model" },
+        ...customModels.map((m) => ({
+          key: m.id,
+          name: m.name,
+          description: m.description ?? null,
+        })),
+      ];
+    }
+
+    // Priority 2: Hardcoded Claude models
+    return getHardcodedModelModes(flavor, translate);
+  }
+
+  // Priority 1 (non-Claude): CLI dynamically reported models
   const metadataModels = mapMetadataOptions(metadata?.models);
   if (metadataModels.length > 0) {
     return metadataModels;
   }
 
-  // Priority 2: Profile custom models (e.g., MiniMax, DeepSeek)
+  // Priority 2 (non-Claude): Profile custom models
   if (customModels && customModels.length > 0) {
     return [
       { key: "default", name: "Default", description: "Use CLI settings" },
@@ -310,7 +328,7 @@ export function getAvailableModels(
     ];
   }
 
-  // Priority 3: Hardcoded defaults
+  // Priority 3 (non-Claude): Hardcoded defaults
   return getHardcodedModelModes(flavor, translate);
 }
 
@@ -366,4 +384,36 @@ export function getDefaultModelKey(flavor: AgentFlavor): string {
 
 export function getDefaultPermissionModeKey(_flavor: AgentFlavor): string {
   return "default";
+}
+
+/**
+ * Format raw model IDs into user-friendly display names.
+ * e.g., "claude-sonnet-4-6" → "Sonnet 4.6"
+ *       "claude-opus-4-6[1m]" → "Opus 4.6 (1M)"
+ */
+export function formatModelName(modelId: string): string {
+  const is1M = modelId.includes("[1m]");
+  const base = modelId.replace("[1m]", "").replace("claude-", "");
+
+  const patterns: Array<[RegExp, string]> = [
+    [/^opus-(\d+)-(\d+)/, "Opus $1.$2"],
+    [/^sonnet-(\d+)-(\d+)/, "Sonnet $1.$2"],
+    [/^haiku-(\d+)-(\d+)/, "Haiku $1.$2"],
+    [/^opus-(\d+)/, "Opus $1"],
+    [/^sonnet-(\d+)/, "Sonnet $1"],
+    [/^haiku-(\d+)/, "Haiku $1"],
+  ];
+
+  let name = base;
+  for (const [pattern, replacement] of patterns) {
+    if (pattern.test(base)) {
+      name = base.replace(pattern, replacement);
+      break;
+    }
+  }
+
+  // Remove trailing date suffixes like "-20251001"
+  name = name.replace(/-\d{8}$/, "");
+
+  return is1M ? `${name} (1M)` : name;
 }

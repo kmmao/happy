@@ -11,6 +11,7 @@ import {
   getDefaultModelKey,
   getDefaultPermissionModeKey,
   resolveCurrentOption,
+  formatModelName,
 } from "@/components/modelModeOptions";
 import type { ModelMode, PermissionMode } from "@/components/modelModeOptions";
 import { getSuggestions } from "@/components/autocomplete/suggestions";
@@ -388,8 +389,8 @@ function SessionViewInner({
   // Claude API returns model IDs without [1m] suffix (e.g., "claude-sonnet-4-6"),
   // so we append it when the model mode indicates 1M context.
   // Falls back to the mode key itself (e.g., "sonnet-1m") if currentModelCode is absent.
-  const effectiveModelCode = modelMode?.key?.includes("1m")
-    ? `${session.metadata?.currentModelCode ?? ""}[1m]`
+  const effectiveModelCode = modelMode?.key && modelMode.key !== "default"
+    ? modelMode.key
     : (session.metadata?.currentModelCode ?? modelMode?.key);
 
   const sessionStatus = useSessionStatus(session);
@@ -723,7 +724,11 @@ function SessionViewInner({
       isPulsing: sessionStatus.isPulsing ?? false,
       permissionLabel: permissionMode?.name,
       permissionColor,
-      modelLabel: modelMode?.name,
+      modelLabel: modelMode?.key && modelMode.key !== "default"
+        ? modelMode.name
+        : session.resolvedModelId
+          ? formatModelName(session.resolvedModelId)
+          : modelMode?.name,
       contextSize: usageSource?.contextSize,
       contextWindow: usageSource?.contextWindow,
       totalSessionTokens:
@@ -746,10 +751,10 @@ function SessionViewInner({
       sessionStatus.isPulsing,
       permissionMode?.name,
       permissionColor,
+      effectiveModelCode,
       modelMode?.name,
       usageSource,
       alwaysShowContextSize,
-      effectiveModelCode,
       session.thinking,
       turnStartedAt,
     ],
@@ -805,6 +810,13 @@ function SessionViewInner({
         onPermissionModeChange={updatePermissionMode}
         availableModes={availableModes}
         modelMode={modelMode}
+        effectiveModelLabel={
+          modelMode?.key && modelMode.key !== "default"
+            ? undefined
+            : session.resolvedModelId
+              ? formatModelName(session.resolvedModelId)
+              : undefined
+        }
         availableModels={availableModels}
         onModelModeChange={updateModelMode}
         thinkingMode={session.thinkingMode}

@@ -187,6 +187,7 @@ export type ReducerState = {
     >;
   };
   latestAgentTextTime: number;
+  resolvedModelId?: string; // Actual model ID from turn-end (e.g. "claude-opus-4-6")
 };
 
 export function createReducer(): ReducerState {
@@ -311,6 +312,11 @@ export function reducer(
     if (msg.role === "event" && msg.content.type === "ready") {
       state.messageIds.set(msg.id, msg.id);
       hasReadyEvent = true;
+
+      // Store actual model ID reported by CLI (e.g. "claude-opus-4-6")
+      if (msg.content.model) {
+        state.resolvedModelId = msg.content.model;
+      }
 
       // Accumulate this turn's usage if not already done by usage-stats events
       if (msg.content.usage && !state.turnHadUsageStats) {

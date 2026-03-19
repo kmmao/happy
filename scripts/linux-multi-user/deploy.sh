@@ -15,6 +15,19 @@
 #   sudo ./deploy.sh 10           # 10 个用户
 #   sudo ./deploy.sh 3 dev        # 3 个用户，前缀 dev
 #
+# 环境变量（可选，覆盖默认值）:
+#   PROXY_HOST          代理地址       (默认: 127.0.0.1)
+#   PROXY_PORT          代理端口       (默认: 8317)
+#   PROXY_AUTH_TOKEN    代理认证 token (默认: quotio-local-A4DB6F36)
+#   DEFAULT_MODEL       默认模型       (默认: claude-sonnet-4-6)
+#   DEFAULT_OPUS        Opus 模型      (默认: claude-opus-4-6)
+#   DEFAULT_SONNET      Sonnet 模型    (默认: claude-sonnet-4-6)
+#   DEFAULT_HAIKU       Haiku 模型     (默认: claude-haiku-4-5-20251001)
+#   HAPPY_SERVER_URL    Happy 服务地址 (默认: https://happyserve.xycloud.info)
+#
+# 示例:
+#   PROXY_HOST=10.0.0.1 PROXY_PORT=9000 sudo -E ./deploy.sh 10
+#
 # 前提:
 #   - root 或 sudo 权限
 #   - Node.js >= 18 已安装
@@ -29,19 +42,19 @@ COUNT=${1:-5}
 PREFIX=${2:-happy}
 PASSWORD_LENGTH=16
 
-# 共享代理配置
-PROXY_HOST="127.0.0.1"
-PROXY_PORT="8317"
-PROXY_AUTH_TOKEN="quotio-local-A4DB6F36"
+# 共享代理配置（环境变量 > 默认值）
+PROXY_HOST="${PROXY_HOST:-127.0.0.1}"
+PROXY_PORT="${PROXY_PORT:-8317}"
+PROXY_AUTH_TOKEN="${PROXY_AUTH_TOKEN:-quotio-local-A4DB6F36}"
 
-# 默认模型
-DEFAULT_MODEL="claude-sonnet-4-6"
-DEFAULT_OPUS="claude-opus-4-6"
-DEFAULT_SONNET="claude-sonnet-4-6"
-DEFAULT_HAIKU="claude-haiku-4-5-20251001"
+# 默认模型（环境变量 > 默认值）
+DEFAULT_MODEL="${DEFAULT_MODEL:-claude-sonnet-4-6}"
+DEFAULT_OPUS="${DEFAULT_OPUS:-claude-opus-4-6}"
+DEFAULT_SONNET="${DEFAULT_SONNET:-claude-sonnet-4-6}"
+DEFAULT_HAIKU="${DEFAULT_HAIKU:-claude-haiku-4-5-20251001}"
 
-# Happy Server 地址
-HAPPY_SERVER_URL="https://happyserve.xycloud.info"
+# Happy Server 地址（环境变量 > 默认值）
+HAPPY_SERVER_URL="${HAPPY_SERVER_URL:-https://happyserve.xycloud.info}"
 
 # ======================== 颜色输出 ========================
 

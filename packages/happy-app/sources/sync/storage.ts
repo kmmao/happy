@@ -874,7 +874,8 @@ export const storage = create<StorageState>()((set, get) => {
         let updatedSessions = state.sessions;
         const needsUpdate =
           (reducerResult.todos !== undefined ||
-            existingSession.reducerState.latestUsage) &&
+            existingSession.reducerState.latestUsage ||
+            existingSession.reducerState.resolvedModelId) &&
           session;
 
         if (needsUpdate) {
@@ -891,6 +892,10 @@ export const storage = create<StorageState>()((set, get) => {
                     ...existingSession.reducerState.latestUsage,
                   }
                 : session.latestUsage,
+              // Copy actual model ID from turn-end events
+              ...(existingSession.reducerState.resolvedModelId && {
+                resolvedModelId: existingSession.reducerState.resolvedModelId,
+              }),
             },
           };
         }
@@ -944,14 +949,15 @@ export const storage = create<StorageState>()((set, get) => {
             );
           }
 
-          // Extract latestUsage from reducerState if available and update session
+          // Extract latestUsage and resolvedModelId from reducerState if available and update session
           let updatedSessions = state.sessions;
-          if (session && reducerState.latestUsage) {
+          if (session && (reducerState.latestUsage || reducerState.resolvedModelId)) {
             updatedSessions = {
               ...state.sessions,
               [sessionId]: {
                 ...session,
-                latestUsage: { ...reducerState.latestUsage },
+                ...(reducerState.latestUsage && { latestUsage: { ...reducerState.latestUsage } }),
+                ...(reducerState.resolvedModelId && { resolvedModelId: reducerState.resolvedModelId }),
               },
             };
           }

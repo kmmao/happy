@@ -140,38 +140,8 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 
-/**
- * Format raw model IDs into user-friendly display names.
- * e.g., "claude-sonnet-4-6" → "Sonnet 4.6"
- *       "claude-opus-4-6[1m]" → "Opus 4.6 (1M)"
- */
-function formatModelName(modelId: string): string {
-  const is1M = modelId.includes("[1m]");
-  const base = modelId.replace("[1m]", "").replace("claude-", "");
-
-  // Map known model patterns
-  const patterns: Array<[RegExp, string]> = [
-    [/^opus-(\d+)-(\d+)/, "Opus $1.$2"],
-    [/^sonnet-(\d+)-(\d+)/, "Sonnet $1.$2"],
-    [/^haiku-(\d+)-(\d+)/, "Haiku $1.$2"],
-    [/^opus-(\d+)/, "Opus $1"],
-    [/^sonnet-(\d+)/, "Sonnet $1"],
-    [/^haiku-(\d+)/, "Haiku $1"],
-  ];
-
-  let name = base;
-  for (const [pattern, replacement] of patterns) {
-    if (pattern.test(base)) {
-      name = base.replace(pattern, replacement);
-      break;
-    }
-  }
-
-  // Remove trailing date suffixes like "-20251001"
-  name = name.replace(/-\d{8}$/, "");
-
-  return is1M ? `${name} (1M)` : name;
-}
+// Re-export for backward compatibility — canonical source is modelModeOptions.ts
+import { formatModelName } from "@/components/modelModeOptions";
 
 const TOKEN_TYPE_LABELS: Record<string, string> = {
   input: "Input",

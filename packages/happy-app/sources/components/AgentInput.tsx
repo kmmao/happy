@@ -72,6 +72,7 @@ interface AgentInputProps {
   availableModes?: PermissionMode[];
   onPermissionModeChange?: (mode: PermissionMode) => void;
   modelMode?: ModelMode | null;
+  effectiveModelLabel?: string | null;
   availableModels?: ModelMode[];
   onModelModeChange?: (mode: ModelMode) => void;
   // SDK reasoning & budget settings
@@ -1649,7 +1650,7 @@ export const AgentInput = React.memo(
                     }}
                   >
                     {[
-                      props.modelMode.name,
+                      props.effectiveModelLabel ?? props.modelMode.name,
                       ...(!isCodex && !isGemini
                         ? [
                             (props.effortLevel ?? "medium") === "low"
