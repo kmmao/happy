@@ -25,6 +25,7 @@ export const CATEGORY_KEY_MAP: Record<string, TranslationKey> = {
     performance: "supervisor.dimPerformance",
     uiUx: "supervisor.dimUiUx",
     "ui-ux": "supervisor.dimUiUx",
+    research: "supervisor.dimResearch",
 };
 
 export function getConfidenceColor(confidence: number | null): string | null {

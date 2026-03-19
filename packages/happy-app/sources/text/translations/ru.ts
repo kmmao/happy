@@ -2019,6 +2019,7 @@ export const ru: TranslationStructure = {
     dimPerformanceNote: "Запросы N+1, отсутствующие индексы, утечки памяти",
     dimUiUx: "UI/UX",
     dimUiUxNote: "Отступы, состояния загрузки, доступность, использование темы",
+    dimResearch: "Исследование",
     modeSection: "Режим анализа",
     modeSuggest: "Предложения",
     modeSuggestDesc: "AI предлагает действия, вы одобряете вручную",

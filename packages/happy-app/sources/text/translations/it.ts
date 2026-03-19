@@ -1999,6 +1999,7 @@ export const it: TranslationStructure = {
     dimPerformanceNote: "Query N+1, indici mancanti, perdite di memoria",
     dimUiUx: "UI/UX",
     dimUiUxNote: "Spaziatura, stati di caricamento, accessibilità, uso del tema",
+    dimResearch: "Ricerca",
     modeSection: "Modalità di analisi",
     modeSuggest: "Suggerisci",
     modeSuggestDesc: "L'AI suggerisce azioni, tu approvi manualmente",

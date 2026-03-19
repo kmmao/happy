@@ -1907,6 +1907,7 @@ export const zhHans: TranslationStructure = {
     dimPerformanceNote: "N+1 查询、缺失索引、内存泄漏",
     dimUiUx: "UI/UX",
     dimUiUxNote: "间距、加载状态、无障碍、主题使用",
+    dimResearch: "调研",
     modeSection: "分析模式",
     modeSuggest: "建议",
     modeSuggestDesc: "AI 提供建议，由你手动审批",

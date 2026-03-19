@@ -2005,6 +2005,7 @@ export const ca: TranslationStructure = {
     dimPerformanceNote: "Consultes N+1, índexs que falten, fuites de memòria",
     dimUiUx: "UI/UX",
     dimUiUxNote: "Espaiat, estats de càrrega, accessibilitat, ús del tema",
+    dimResearch: "Investigació",
     modeSection: "Mode d'anàlisi",
     modeSuggest: "Suggerir",
     modeSuggestDesc: "L'IA suggereix accions, tu aproves manualment",

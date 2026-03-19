@@ -1987,6 +1987,7 @@ export const en: TranslationStructure = {
     dimPerformanceNote: "N+1 queries, missing indexes, memory leaks",
     dimUiUx: "UI/UX",
     dimUiUxNote: "Spacing, loading states, accessibility, theme usage",
+    dimResearch: "Research",
     modeSection: "Analysis Mode",
     modeSuggest: "Suggest",
     modeSuggestDesc: "AI suggests actions, you approve manually",

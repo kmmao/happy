@@ -2020,6 +2020,7 @@ export const pl: TranslationStructure = {
     dimPerformanceNote: "Zapytania N+1, brakujące indeksy, wycieki pamięci",
     dimUiUx: "UI/UX",
     dimUiUxNote: "Odstępy, stany ładowania, dostępność, użycie motywu",
+    dimResearch: "Badania",
     modeSection: "Tryb analizy",
     modeSuggest: "Sugestie",
     modeSuggestDesc: "AI sugeruje akcje, zatwierdzasz ręcznie",

@@ -90,6 +90,25 @@ Write a comprehensive Markdown report with these sections:
 6. **Technology Comparison** — Tech stack differences and trade-offs
 7. **Strategic Recommendations** — Prioritized list of features/improvements to develop
 
+## Step 4: Extract Actionable Items
+After writing the report, extract **concrete, implementable tasks** from your analysis.
+Focus on items from Gap Analysis and Strategic Recommendations that can be turned into development work.
+
+For each actionable item, determine:
+- **severity**: "critical" | "high" | "medium" | "low" — based on strategic priority
+- **category**: use "research" as the category for all research-derived actions
+- **title**: short, actionable title (e.g., "Add team collaboration with shared sessions")
+- **description**: what needs to be built and why (reference competitor evidence)
+- **suggestedFix**: concrete implementation approach for this codebase
+- **confidence**: 0-100, how confident you are this is worth implementing
+
+Rules for actions:
+- Only include items that are **concretely implementable** (not vague strategy)
+- High priority items from the report → severity "high" or "critical"
+- Medium priority → "medium", Low priority → "low"
+- Maximum 10 actions — focus on the most impactful ones
+- Each action should be a single, scoped task (not a multi-month initiative)
+
 ## Disclaimer
 Add this at the end of the report:
 > **Note**: This analysis is based on AI model knowledge (cutoff: early 2025). Market conditions and product features may have changed. Verify key findings with current data.
@@ -107,14 +126,28 @@ curl -s -X POST "${reportUrl}" \\
 ## MANDATORY: Report Results (CRITICAL — do this AFTER your analysis)
 
 ### Step 1: Report results to the server
-Write your report to a temp file, then POST it to the server using curl.
+Write your report AND actions to a temp file, then POST it to the server using curl.
 Use the Bash tool to run this exact sequence:
 
 \`\`\`
 # Write the report JSON to a temp file
-# IMPORTANT: reportTitle should be a short title, reportContent is the full Markdown report
+# IMPORTANT: Include both reportContent (full Markdown) AND actions (structured items from Step 4)
 cat > /tmp/research-result-${options.runId}.json << 'RESEARCH_EOF'
-{"status":"completed","reportTitle":"<Your Report Title>","reportContent":"<Full Markdown Report Content>"}
+{
+  "status": "completed",
+  "reportTitle": "<Your Report Title>",
+  "reportContent": "<Full Markdown Report Content>",
+  "actions": [
+    {
+      "severity": "high",
+      "category": "research",
+      "title": "<Short actionable title>",
+      "description": "<What to build and why>",
+      "suggestedFix": "<Concrete implementation approach>",
+      "confidence": 80
+    }
+  ]
+}
 RESEARCH_EOF
 
 # POST results to server
@@ -127,8 +160,13 @@ curl -s -X POST "${reportUrl}" \\
 rm -f /tmp/research-result-${options.runId}.json
 \`\`\`
 
-**Important**: The JSON body must contain \`"status": "completed"\`, \`"reportTitle"\`, and \`"reportContent"\` (the full Markdown report). Use the HAPPY_SUPERVISOR_AUTH_TOKEN environment variable (already set) for authentication.
+**Important**: The JSON body must contain:
+- \`"status": "completed"\`
+- \`"reportTitle"\` — short title for the report
+- \`"reportContent"\` — full Markdown report
+- \`"actions"\` — array of actionable items extracted in Step 4 (max 10)
 
+Use the HAPPY_SUPERVISOR_AUTH_TOKEN environment variable (already set) for authentication.
 Escape all special characters properly in the JSON. For newlines in reportContent, use \\n.
 
 ### Step 2: Exit the session

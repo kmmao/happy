@@ -1975,6 +1975,7 @@ export const ja: TranslationStructure = {
     dimPerformanceNote: "N+1クエリ、インデックス不足、メモリリーク",
     dimUiUx: "UI/UX",
     dimUiUxNote: "スペーシング、読み込み状態、アクセシビリティ、テーマ使用",
+    dimResearch: "リサーチ",
     modeSection: "分析モード",
     modeSuggest: "提案",
     modeSuggestDesc: "AIが提案し、手動で承認",

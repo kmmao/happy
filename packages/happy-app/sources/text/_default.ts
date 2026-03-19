@@ -2012,6 +2012,7 @@ export const en = {
     dimPerformanceNote: "N+1 queries, missing indexes, memory leaks",
     dimUiUx: "UI/UX",
     dimUiUxNote: "Spacing, loading states, accessibility, theme usage",
+    dimResearch: "Research",
 
     // Settings: Mode
     modeSection: "Analysis Mode",

@@ -1910,6 +1910,7 @@ export const zhHant: TranslationStructure = {
     dimPerformanceNote: "N+1 查詢、缺失索引、記憶體洩漏",
     dimUiUx: "UI/UX",
     dimUiUxNote: "間距、載入狀態、無障礙、主題使用",
+    dimResearch: "調研",
     modeSection: "分析模式",
     modeSuggest: "建議",
     modeSuggestDesc: "AI 提供建議，由你手動審批",
