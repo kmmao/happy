@@ -38,6 +38,7 @@ import {
     clearAllActions,
     type SupervisorLoop,
     fetchActiveLoop,
+    fetchLoopHistory,
 } from "@/sync/apiSupervisor";
 import { ItemGroup } from "@/components/ItemGroup";
 import { useRouter } from "expo-router";
@@ -53,6 +54,7 @@ import { useElapsedSeconds, type DimensionProgress } from "./supervisorUtils";
 import { SupervisorProgressView } from "./SupervisorProgressView";
 import { SupervisorLoopStatusCard } from "./SupervisorLoopStatusCard";
 import { SupervisorLoopConfigPanel } from "./SupervisorLoopConfigPanel";
+import { SupervisorLoopHistoryItem } from "./SupervisorLoopHistoryItem";
 
 
 interface ProjectHealthTabProps {
@@ -85,6 +87,8 @@ export const ProjectHealthTab = React.memo(
             React.useState<DimensionProgress | null>(null);
         const [activeLoop, setActiveLoop] =
             React.useState<SupervisorLoop | null>(null);
+        const [loopHistory, setLoopHistory] = React.useState<SupervisorLoop[]>([]);
+        const [loopHistoryTotal, setLoopHistoryTotal] = React.useState(0);
         const [showLoopConfig, setShowLoopConfig] = React.useState(false);
 
         const serverId = project.serverId;
@@ -94,7 +98,7 @@ export const ProjectHealthTab = React.memo(
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const [runsResult, actionsResult, costResult, trendResult, relatedResult, summaryResult, loopResult] =
+                const [runsResult, actionsResult, costResult, trendResult, relatedResult, summaryResult, loopResult, loopHistoryResult] =
                     await Promise.all([
                         fetchSupervisorRuns(credentials, serverId, {
                             limit: 20,
@@ -118,6 +122,9 @@ export const ProjectHealthTab = React.memo(
                         fetchActiveLoop(credentials, serverId).catch(
                             () => null,
                         ),
+                        fetchLoopHistory(credentials, serverId, { limit: 5 }).catch(
+                            () => ({ loops: [], total: 0 }),
+                        ),
                     ]);
                 setRuns(runsResult.runs);
                 setTotal(runsResult.total);
@@ -128,6 +135,8 @@ export const ProjectHealthTab = React.memo(
                 setRelatedProjects(relatedResult);
                 setSummary(summaryResult);
                 setActiveLoop(loopResult);
+                setLoopHistory(loopHistoryResult.loops);
+                setLoopHistoryTotal(loopHistoryResult.total);
             } catch (e) {
                 // Silently fail — user can pull to refresh
             } finally {
@@ -743,6 +752,28 @@ export const ProjectHealthTab = React.memo(
                         </ItemGroup>
                     )}
 
+                {/* Loop History */}
+                {loaded && loopHistory.length > 0 && (
+                    <ItemGroup title={t("supervisor.loopHistory")}>
+                        {loopHistory.slice(0, 3).map((loop, index) => (
+                            <SupervisorLoopHistoryItem
+                                key={loop.id}
+                                loop={loop}
+                                isLast={index === Math.min(loopHistory.length, 3) - 1}
+                            />
+                        ))}
+                        {loopHistoryTotal > 3 && (
+                            <View style={styles.loopHistoryFooter}>
+                                <Text style={styles.loopHistoryFooterText}>
+                                    {t("supervisor.moreRuns", {
+                                        count: loopHistoryTotal - 3,
+                                    })}
+                                </Text>
+                            </View>
+                        )}
+                    </ItemGroup>
+                )}
+
                 {/* Run History */}
                 <ItemGroup title={t("supervisor.runHistory")}>
                     {!loaded ? (
@@ -959,6 +990,16 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
         fontSize: 13,
         color: theme.colors.header.tint,
+    },
+    loopHistoryFooter: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        alignItems: "center",
+    },
+    loopHistoryFooterText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
     },
     linkDivider: {
         height: 0.5,

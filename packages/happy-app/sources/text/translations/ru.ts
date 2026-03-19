@@ -2116,6 +2116,7 @@ export const ru: TranslationStructure = {
     loopConfigCostCapHint: "Остановить цикл, когда накопленная стоимость достигнет этой суммы",
     loopConfigSafety: "Цикл использует прямое слияние. Каждое исправление выполняется в изолированном рабочем дереве. Вы можете приостановить или остановить в любой момент.",
     loopConfigStart: "Запустить цикл",
+    loopHistory: "История циклов",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Итерация ${current}/${max}`,
     loopFound: "Найдено",
     loopFixed: "Исправлено",

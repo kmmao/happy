@@ -2096,6 +2096,7 @@ export const it: TranslationStructure = {
     loopConfigCostCapHint: "Ferma il loop quando il costo cumulativo raggiunge questo importo",
     loopConfigSafety: "Il loop usa il merge diretto. Ogni correzione viene eseguita in un worktree isolato. Puoi mettere in pausa o fermare in qualsiasi momento.",
     loopConfigStart: "Avvia loop",
+    loopHistory: "Cronologia loop",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iterazione ${current}/${max}`,
     loopFound: "Trovati",
     loopFixed: "Corretti",

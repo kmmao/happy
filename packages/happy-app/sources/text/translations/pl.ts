@@ -2117,6 +2117,7 @@ export const pl: TranslationStructure = {
     loopConfigCostCapHint: "Zatrzymaj pętlę, gdy skumulowany koszt osiągnie tę kwotę",
     loopConfigSafety: "Pętla używa bezpośredniego scalania. Każda naprawa działa w izolowanym drzewie roboczym. Możesz wstrzymać lub zatrzymać w dowolnym momencie.",
     loopConfigStart: "Uruchom pętlę",
+    loopHistory: "Historia pętli",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iteracja ${current}/${max}`,
     loopFound: "Znaleziono",
     loopFixed: "Naprawiono",

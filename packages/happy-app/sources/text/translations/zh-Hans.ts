@@ -2004,6 +2004,7 @@ export const zhHans: TranslationStructure = {
     loopConfigCostCapHint: "当累计费用达到此金额时停止循环",
     loopConfigSafety: "循环使用直接合并。每次修复在隔离的工作树中运行。你可以随时暂停或停止。",
     loopConfigStart: "开始循环",
+    loopHistory: "循环历史",
     loopIteration: ({ current, max }: { current: number; max: number }) => `迭代 ${current}/${max}`,
     loopFound: "发现",
     loopFixed: "已修复",

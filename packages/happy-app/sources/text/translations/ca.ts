@@ -2102,6 +2102,7 @@ export const ca: TranslationStructure = {
     loopConfigCostCapHint: "Atura el bucle quan el cost acumulat arribi a aquesta quantitat",
     loopConfigSafety: "El bucle utilitza fusió directa. Cada correcció s'executa en un arbre de treball aïllat. Pots pausar o aturar en qualsevol moment.",
     loopConfigStart: "Iniciar bucle",
+    loopHistory: "Historial de bucles",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iteració ${current}/${max}`,
     loopFound: "Trobats",
     loopFixed: "Corregits",

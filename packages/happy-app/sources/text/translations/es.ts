@@ -2097,6 +2097,7 @@ export const es: TranslationStructure = {
     loopConfigCostCapHint: "Detener el bucle cuando el coste acumulado alcance esta cantidad",
     loopConfigSafety: "El bucle usa fusión directa. Cada corrección se ejecuta en un árbol de trabajo aislado. Puedes pausar o detener en cualquier momento.",
     loopConfigStart: "Iniciar bucle",
+    loopHistory: "Historial de bucles",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iteración ${current}/${max}`,
     loopFound: "Encontrados",
     loopFixed: "Corregidos",

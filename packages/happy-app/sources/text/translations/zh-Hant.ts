@@ -2007,6 +2007,7 @@ export const zhHant: TranslationStructure = {
     loopConfigCostCapHint: "當累計費用達到此金額時停止循環",
     loopConfigSafety: "循環使用直接合併。每次修復在隔離的工作樹中執行。你可以隨時暫停或停止。",
     loopConfigStart: "開始循環",
+    loopHistory: "循環歷史",
     loopIteration: ({ current, max }: { current: number; max: number }) => `迭代 ${current}/${max}`,
     loopFound: "發現",
     loopFixed: "已修復",

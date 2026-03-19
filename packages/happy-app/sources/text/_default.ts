@@ -2134,6 +2134,7 @@ export const en = {
     loopConfigCostCapHint: "Stop the loop when cumulative cost reaches this amount",
     loopConfigSafety: "Loop uses direct merge. Each fix runs in an isolated worktree. You can pause or stop at any time.",
     loopConfigStart: "Start Loop",
+    loopHistory: "Loop History",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iteration ${current}/${max}`,
     loopFound: "Found",
     loopFixed: "Fixed",

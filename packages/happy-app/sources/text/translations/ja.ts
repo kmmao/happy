@@ -2072,6 +2072,7 @@ export const ja: TranslationStructure = {
     loopConfigCostCapHint: "累積コストがこの金額に達したらループを停止",
     loopConfigSafety: "ループは直接マージを使用します。各修正は隔離されたワークツリーで実行されます。いつでも一時停止または停止できます。",
     loopConfigStart: "ループ開始",
+    loopHistory: "ループ履歴",
     loopIteration: ({ current, max }: { current: number; max: number }) => `イテレーション ${current}/${max}`,
     loopFound: "検出",
     loopFixed: "修正済み",
