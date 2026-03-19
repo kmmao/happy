@@ -281,6 +281,23 @@ export const ApiEphemeralSupervisorStatusSchema = z.object({
   totalDimensions: z.number().optional(),
 });
 
+export const ApiEphemeralSupervisorLoopStatusSchema = z.object({
+  type: z.literal("supervisor-loop-status"),
+  loopId: z.string(),
+  projectId: z.string(),
+  status: z.string(),
+  currentIteration: z.number(),
+  maxIterations: z.number(),
+  currentPhase: z.string(),
+  totalCostUsd: z.number(),
+  totalActionsFound: z.number(),
+  totalActionsFixed: z.number(),
+  currentHealthScore: z.number().nullable(),
+  initialHealthScore: z.number().nullable(),
+  exitReason: z.string().nullable(),
+  consecutiveFailures: z.number(),
+});
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
@@ -289,6 +306,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralWebhookPRMergedSchema,
   ApiEphemeralSupervisorTriggerSchema,
   ApiEphemeralSupervisorStatusSchema,
+  ApiEphemeralSupervisorLoopStatusSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

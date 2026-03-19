@@ -158,6 +158,9 @@ export type SupervisorTriggerData = {
     approval: string;
     fixStatus: string | null;
   }>;
+  /** Loop association — present when this run/fix is part of a loop. */
+  loopId?: string;
+  loopIteration?: number;
 };
 
 export type SupervisorRunStatusData = {

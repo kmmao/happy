@@ -31,6 +31,7 @@ import { supervisorRoutes } from "./routes/supervisorRoutes";
 import { supervisorReportRoutes } from "./routes/supervisorReportRoutes";
 import { supervisorActionRoutes } from "./routes/supervisorActionRoutes";
 import { supervisorAnalyticsRoutes } from "./routes/supervisorAnalyticsRoutes";
+import { supervisorLoopRoutes } from "./routes/supervisorLoopRoutes";
 import { v3SessionRoutes } from "./routes/v3SessionRoutes";
 import { webhookRoutes } from "./routes/webhookRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
@@ -112,6 +113,7 @@ export async function startApi() {
   supervisorReportRoutes(typed);
   supervisorActionRoutes(typed);
   supervisorAnalyticsRoutes(typed);
+  supervisorLoopRoutes(typed);
   v3SessionRoutes(typed);
 
   // Start HTTP

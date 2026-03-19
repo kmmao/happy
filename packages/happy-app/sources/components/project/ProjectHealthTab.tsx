@@ -36,6 +36,9 @@ import {
     fetchSupervisorSummary,
     batchUpdateActionApproval,
     clearAllActions,
+    type SupervisorLoop,
+    fetchActiveLoop,
+    startSupervisorLoop,
 } from "@/sync/apiSupervisor";
 import { ItemGroup } from "@/components/ItemGroup";
 import { useRouter } from "expo-router";
@@ -49,6 +52,7 @@ import { SupervisorRunHistoryItem } from "./SupervisorRunHistoryItem";
 import { Modal } from "@/modal";
 import { useElapsedSeconds, type DimensionProgress } from "./supervisorUtils";
 import { SupervisorProgressView } from "./SupervisorProgressView";
+import { SupervisorLoopStatusCard } from "./SupervisorLoopStatusCard";
 
 
 interface ProjectHealthTabProps {
@@ -79,6 +83,8 @@ export const ProjectHealthTab = React.memo(
         const [refreshing, setRefreshing] = React.useState(false);
         const [dimensionProgress, setDimensionProgress] =
             React.useState<DimensionProgress | null>(null);
+        const [activeLoop, setActiveLoop] =
+            React.useState<SupervisorLoop | null>(null);
 
         const serverId = project.serverId;
 
@@ -87,7 +93,7 @@ export const ProjectHealthTab = React.memo(
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const [runsResult, actionsResult, costResult, trendResult, relatedResult, summaryResult] =
+                const [runsResult, actionsResult, costResult, trendResult, relatedResult, summaryResult, loopResult] =
                     await Promise.all([
                         fetchSupervisorRuns(credentials, serverId, {
                             limit: 20,
@@ -108,6 +114,9 @@ export const ProjectHealthTab = React.memo(
                         fetchSupervisorSummary(credentials, serverId).catch(
                             () => null,
                         ),
+                        fetchActiveLoop(credentials, serverId).catch(
+                            () => null,
+                        ),
                     ]);
                 setRuns(runsResult.runs);
                 setTotal(runsResult.total);
@@ -117,6 +126,7 @@ export const ProjectHealthTab = React.memo(
                 setTrendData(trendResult);
                 setRelatedProjects(relatedResult);
                 setSummary(summaryResult);
+                setActiveLoop(loopResult);
             } catch (e) {
                 // Silently fail — user can pull to refresh
             } finally {
@@ -165,6 +175,36 @@ export const ProjectHealthTab = React.memo(
                         }
                         return prev;
                     });
+                    loadData();
+                }
+            });
+            return unsubscribe;
+        }, [serverId, loadData]);
+
+        // Subscribe to real-time loop status updates
+        React.useEffect(() => {
+            if (!serverId) return;
+            const unsubscribe = sync.onSupervisorLoopStatus((event) => {
+                if (event.projectId !== serverId) return;
+                setActiveLoop((prev) => {
+                    if (!prev || prev.id !== event.loopId) return prev;
+                    return {
+                        ...prev,
+                        status: event.status,
+                        currentIteration: event.currentIteration,
+                        maxIterations: event.maxIterations,
+                        currentPhase: event.currentPhase,
+                        totalCostUsd: event.totalCostUsd,
+                        totalActionsFound: event.totalActionsFound,
+                        totalActionsFixed: event.totalActionsFixed,
+                        currentHealthScore: event.currentHealthScore,
+                        initialHealthScore: event.initialHealthScore,
+                        exitReason: event.exitReason,
+                        consecutiveFailures: event.consecutiveFailures,
+                    };
+                });
+                // Refresh data when loop completes
+                if (event.status === "completed" || event.status === "failed" || event.status === "stopped") {
                     loadData();
                 }
             });
@@ -229,6 +269,19 @@ export const ProjectHealthTab = React.memo(
                     }
                     throw e;
                 }
+            }, [serverId]),
+        );
+
+        const [startLoopLoading, doStartLoop] = useHappyAction(
+            React.useCallback(async () => {
+                if (!serverId) return;
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                const loop = await startSupervisorLoop(credentials, serverId, {
+                    maxIterations: 5,
+                    autoApproveThreshold: 80,
+                });
+                setActiveLoop(loop);
             }, [serverId]),
         );
 
@@ -389,6 +442,12 @@ export const ProjectHealthTab = React.memo(
                                         {t("supervisor.loading")}
                                     </Text>
                                 </View>
+                            ) : activeLoop && (activeLoop.status === "running" || activeLoop.status === "paused") ? (
+                                <SupervisorLoopStatusCard
+                                    loop={activeLoop}
+                                    projectId={serverId}
+                                    onUpdate={loadData}
+                                />
                             ) : activeRun ? (
                                 <View style={styles.activeRunContainer}>
                                     <SupervisorProgressView
@@ -429,34 +488,64 @@ export const ProjectHealthTab = React.memo(
                                     </Pressable>
                                 </View>
                             ) : (
-                                <Pressable
-                                    style={styles.scanButton}
-                                    onPress={doTrigger}
-                                    disabled={triggerLoading}
-                                >
-                                    {triggerLoading ? (
-                                        <>
+                                <View style={styles.buttonRow}>
+                                    <Pressable
+                                        style={styles.scanButton}
+                                        onPress={doTrigger}
+                                        disabled={triggerLoading || startLoopLoading}
+                                    >
+                                        {triggerLoading ? (
+                                            <>
+                                                <ActivityIndicator
+                                                    size="small"
+                                                    color="#FFFFFF"
+                                                />
+                                                <Text style={styles.scanButtonText}>
+                                                    {t("supervisor.scanStarting")}
+                                                </Text>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Ionicons
+                                                    name="scan-outline"
+                                                    size={18}
+                                                    color="#FFFFFF"
+                                                />
+                                                <Text style={styles.scanButtonText}>
+                                                    {t("supervisor.scanNow")}
+                                                </Text>
+                                            </>
+                                        )}
+                                    </Pressable>
+                                    <Pressable
+                                        style={styles.loopButton}
+                                        onPress={doStartLoop}
+                                        disabled={triggerLoading || startLoopLoading}
+                                    >
+                                        {startLoopLoading ? (
                                             <ActivityIndicator
                                                 size="small"
-                                                color="#FFFFFF"
+                                                color={theme.colors.header.tint}
                                             />
-                                            <Text style={styles.scanButtonText}>
-                                                {t("supervisor.scanStarting")}
-                                            </Text>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Ionicons
-                                                name="scan-outline"
-                                                size={18}
-                                                color="#FFFFFF"
-                                            />
-                                            <Text style={styles.scanButtonText}>
-                                                {t("supervisor.scanNow")}
-                                            </Text>
-                                        </>
-                                    )}
-                                </Pressable>
+                                        ) : (
+                                            <>
+                                                <Ionicons
+                                                    name="repeat-outline"
+                                                    size={18}
+                                                    color={theme.colors.header.tint}
+                                                />
+                                                <Text
+                                                    style={[
+                                                        styles.loopButtonText,
+                                                        { color: theme.colors.header.tint },
+                                                    ]}
+                                                >
+                                                    {t("supervisor.loopMode")}
+                                                </Text>
+                                            </>
+                                        )}
+                                    </Pressable>
+                                </View>
                             )}
                         </View>
                     </View>
@@ -775,6 +864,11 @@ const styles = StyleSheet.create((theme) => ({
         gap: 12,
         marginTop: 4,
     },
+    buttonRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
     scanButton: {
         flexDirection: "row",
         alignItems: "center",
@@ -788,6 +882,19 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
         fontSize: 15,
         color: "#FFFFFF",
+    },
+    loopButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        backgroundColor: theme.colors.surface,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+    },
+    loopButtonText: {
+        ...Typography.default("semiBold"),
+        fontSize: 15,
     },
     activeRunContainer: {
         alignItems: "center",

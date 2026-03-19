@@ -12,6 +12,8 @@ import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisor
 import { computeHealthScore, countSeverities } from "@/modules/supervisorScoring";
 import { aggregateSessionUsage } from "@/modules/supervisorUsage";
 import { activityCache } from "@/app/presence/sessionCache";
+import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
+import { log } from "@/utils/log";
 
 /**
  * Supervisor routes for project health scanning.
@@ -553,6 +555,18 @@ export function supervisorRoutes(app: Fastify) {
                 ),
                 recipientFilter: { type: "user-scoped-only" },
             });
+
+            // Loop progression: if this run belongs to a loop, advance the state machine
+            if (status === "completed" || status === "failed") {
+                try {
+                    await loopOnRunCompleted(userId, runId, id);
+                } catch (loopError) {
+                    log(
+                        { module: "supervisor", level: "error" },
+                        `Loop progression error for run ${runId}: ${loopError}`,
+                    );
+                }
+            }
 
             return reply.send({
                 run: updated ? serializeSupervisorRun(updated) : { id: runId },

@@ -121,7 +121,15 @@ export async function handleSupervisorTrigger(
     existingActions,
     maxConcurrentAnalysis,
     maxConcurrentFix,
+    loopId,
+    loopIteration,
   } = data;
+
+  if (loopId) {
+    logger.debug(
+      `[SUPERVISOR] Loop ${loopId} iteration ${loopIteration ?? "?"}: trigger=${trigger} run=${runId}`,
+    );
+  }
 
   // Apply concurrency limits from server config (if provided)
   if (maxConcurrentAnalysis != null) {

@@ -248,6 +248,213 @@ export class SupervisorAlreadyRunningError extends NonRetryableError {
     }
 }
 
+// --- Supervisor Loop ---
+
+export interface SupervisorLoop {
+    id: string;
+    projectId: string;
+    status: string; // "running" | "paused" | "completed" | "failed" | "stopped"
+    currentPhase: string; // "idle" | "analyzing" | "fixing" | "deciding"
+    currentIteration: number;
+    maxIterations: number;
+    costCapUsd: number | null;
+    healthScoreTarget: number | null;
+    autoApproveThreshold: number;
+    maxConsecutiveFailures: number;
+    maxDurationMinutes: number;
+    totalCostUsd: number;
+    totalTokens: number;
+    totalActionsFound: number;
+    totalActionsFixed: number;
+    consecutiveFailures: number;
+    initialHealthScore: number | null;
+    currentHealthScore: number | null;
+    activeRunId: string | null;
+    exitReason: string | null;
+    createdAt: number;
+    updatedAt: number;
+    completedAt: number | null;
+}
+
+export interface LoopConfig {
+    maxIterations?: number;
+    costCapUsd?: number;
+    healthScoreTarget?: number;
+    autoApproveThreshold?: number;
+    maxConsecutiveFailures?: number;
+    maxDurationMinutes?: number;
+}
+
+export async function startSupervisorLoop(
+    credentials: AuthCredentials,
+    projectId: string,
+    config: LoopConfig,
+): Promise<SupervisorLoop> {
+    const API_ENDPOINT = getServerUrl();
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/loop`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+                body: JSON.stringify(config),
+            },
+        );
+
+        if (response.status === 409) {
+            const data = (await response.json()) as { error: string };
+            throw new NonRetryableError(data.error);
+        }
+
+        if (response.status === 429) {
+            const data = (await response.json()) as { error: string };
+            throw new NonRetryableError(data.error);
+        }
+
+        if (!response.ok) {
+            const text = await response.text().catch(() => "");
+            throw new NonRetryableError(
+                text || `Failed to start supervisor loop: ${response.status}`,
+            );
+        }
+
+        const data = (await response.json()) as { loop: SupervisorLoop };
+        return data.loop;
+    });
+}
+
+export async function fetchActiveLoop(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<SupervisorLoop | null> {
+    const API_ENDPOINT = getServerUrl();
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/loop`,
+            { headers: authHeaders(credentials) },
+        );
+
+        if (!response.ok) {
+            throw new NonRetryableError(
+                `Failed to fetch active loop: ${response.status}`,
+            );
+        }
+
+        const data = (await response.json()) as { loop: SupervisorLoop | null };
+        return data.loop;
+    });
+}
+
+export async function fetchLoopHistory(
+    credentials: AuthCredentials,
+    projectId: string,
+    params?: { limit?: number; offset?: number },
+): Promise<{ loops: SupervisorLoop[]; total: number }> {
+    const API_ENDPOINT = getServerUrl();
+    const query = new URLSearchParams();
+    if (params?.limit !== undefined) query.set("limit", String(params.limit));
+    if (params?.offset !== undefined) query.set("offset", String(params.offset));
+    const qs = query.toString() ? `?${query.toString()}` : "";
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/loops${qs}`,
+            { headers: authHeaders(credentials) },
+        );
+
+        if (!response.ok) {
+            throw new NonRetryableError(
+                `Failed to fetch loop history: ${response.status}`,
+            );
+        }
+
+        return (await response.json()) as { loops: SupervisorLoop[]; total: number };
+    });
+}
+
+export async function pauseSupervisorLoop(
+    credentials: AuthCredentials,
+    projectId: string,
+    loopId: string,
+): Promise<SupervisorLoop> {
+    const API_ENDPOINT = getServerUrl();
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/loop/${loopId}/pause`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+            },
+        );
+
+        if (!response.ok) {
+            throw new NonRetryableError(
+                `Failed to pause loop: ${response.status}`,
+            );
+        }
+
+        const data = (await response.json()) as { loop: SupervisorLoop };
+        return data.loop;
+    });
+}
+
+export async function resumeSupervisorLoop(
+    credentials: AuthCredentials,
+    projectId: string,
+    loopId: string,
+): Promise<SupervisorLoop> {
+    const API_ENDPOINT = getServerUrl();
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/loop/${loopId}/resume`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+            },
+        );
+
+        if (!response.ok) {
+            throw new NonRetryableError(
+                `Failed to resume loop: ${response.status}`,
+            );
+        }
+
+        const data = (await response.json()) as { loop: SupervisorLoop };
+        return data.loop;
+    });
+}
+
+export async function stopSupervisorLoop(
+    credentials: AuthCredentials,
+    projectId: string,
+    loopId: string,
+): Promise<SupervisorLoop> {
+    const API_ENDPOINT = getServerUrl();
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/loop/${loopId}/stop`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+            },
+        );
+
+        if (!response.ok) {
+            throw new NonRetryableError(
+                `Failed to stop loop: ${response.status}`,
+            );
+        }
+
+        const data = (await response.json()) as { loop: SupervisorLoop };
+        return data.loop;
+    });
+}
+
 // --- Cost Tracking ---
 
 export interface SupervisorCostSummary {

@@ -314,6 +314,22 @@ export type EphemeralEvent =
       projectId: string;
       fixStatus: string;
     }
+  | {
+      type: "supervisor-loop-status";
+      loopId: string;
+      projectId: string;
+      status: string;
+      currentIteration: number;
+      maxIterations: number;
+      currentPhase: string;
+      totalCostUsd: number;
+      totalActionsFound: number;
+      totalActionsFixed: number;
+      currentHealthScore: number | null;
+      initialHealthScore: number | null;
+      exitReason: string | null;
+      consecutiveFailures: number;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -990,6 +1006,39 @@ export function buildSupervisorStatusEphemeral(
     currentDimension,
     dimensionIndex,
     totalDimensions,
+  };
+}
+
+export function buildSupervisorLoopStatusEphemeral(
+  loopId: string,
+  projectId: string,
+  status: string,
+  currentIteration: number,
+  maxIterations: number,
+  currentPhase: string,
+  totalCostUsd: number,
+  totalActionsFound: number,
+  totalActionsFixed: number,
+  currentHealthScore: number | null,
+  initialHealthScore: number | null,
+  exitReason: string | null,
+  consecutiveFailures: number,
+): EphemeralPayload {
+  return {
+    type: "supervisor-loop-status",
+    loopId,
+    projectId,
+    status,
+    currentIteration,
+    maxIterations,
+    currentPhase,
+    totalCostUsd,
+    totalActionsFound,
+    totalActionsFixed,
+    currentHealthScore,
+    initialHealthScore,
+    exitReason,
+    consecutiveFailures,
   };
 }
 

@@ -414,11 +414,65 @@ model Project {
     // Relations
     sessions        Session[]
     supervisorRuns  SupervisorRun[]
+    supervisorLoops SupervisorLoop[]
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
     @@index([accountId, archived])
     @@index([supervisorNextRunAt])
+}
+
+//
+// Supervisor Loops (autopilot mode — iterative analyze → fix → re-analyze cycles)
+//
+
+model SupervisorLoop {
+    id                      String    @id @default(cuid())
+    projectId               String
+    project                 Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    accountId               String
+
+    // State machine
+    status                  String    @default("running")   // running | paused | completed | failed | stopped
+    currentPhase            String    @default("idle")      // idle | analyzing | fixing | deciding
+    currentIteration        Int       @default(0)
+
+    // Config snapshot (frozen at loop start)
+    maxIterations           Int       @default(5)
+    costCapUsd              Float?
+    healthScoreTarget       Int?                            // Exit when healthScore drops BELOW this (lower = healthier)
+    autoApproveThreshold    Int       @default(80)          // confidence >= N → auto-approve
+    maxConsecutiveFailures  Int       @default(2)
+
+    // Cumulative metrics
+    totalCostUsd            Float     @default(0)
+    totalTokens             Int       @default(0)
+    totalActionsFound       Int       @default(0)
+    totalActionsFixed       Int       @default(0)
+    consecutiveFailures     Int       @default(0)
+
+    // Health score snapshots
+    initialHealthScore      Int?
+    currentHealthScore      Int?
+
+    // Active run reference (convenience, not FK — avoids circular deps)
+    activeRunId             String?
+
+    // Exit
+    exitReason              String?   // "max_iterations" | "cost_cap" | "health_target" | "no_new_actions" | "consecutive_failures" | "user_stopped" | "timeout"
+
+    // Timeout protection
+    maxDurationMinutes      Int       @default(240)         // 4 hours hard cap
+
+    createdAt               DateTime  @default(now())
+    updatedAt               DateTime  @updatedAt
+    completedAt             DateTime?
+
+    runs                    SupervisorRun[]
+
+    @@index([projectId])
+    @@index([projectId, status])
+    @@index([accountId, status])
 }
 
 //
@@ -456,11 +510,18 @@ model SupervisorRun {
     updatedAt       DateTime  @updatedAt
     completedAt     DateTime?
 
+    // Loop association (optional — null for standalone runs)
+    loopId          String?
+    loop            SupervisorLoop?   @relation(fields: [loopId], references: [id], onDelete: SetNull)
+    loopIteration   Int?              // Which iteration of the loop this run belongs to
+    loopPhase       String?           // "analyzing" | "fixing"
+
     actions         SupervisorAction[]
 
     @@index([projectId])
     @@index([accountId, status])
     @@index([projectId, createdAt(sort: Desc)])
+    @@index([loopId])
 }
 
 //

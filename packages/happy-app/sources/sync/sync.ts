@@ -175,6 +175,21 @@ class Sync {
     dimensionIndex?: number;
     totalDimensions?: number;
   }) => void>();
+  private supervisorLoopStatusListeners = new Set<(event: {
+    loopId: string;
+    projectId: string;
+    status: string;
+    currentIteration: number;
+    maxIterations: number;
+    currentPhase: string;
+    totalCostUsd: number;
+    totalActionsFound: number;
+    totalActionsFixed: number;
+    currentHealthScore: number | null;
+    initialHealthScore: number | null;
+    exitReason: string | null;
+    consecutiveFailures: number;
+  }) => void>();
   private preferencesMigrationDone = false;
   private projectMigrationFailures = new Map<string, number>();
   private pendingSettings: Partial<Settings> = loadPendingSettings();
@@ -3406,6 +3421,28 @@ class Sync {
       }
     }
 
+    // Handle supervisor-loop-status: notify listeners for real-time Loop status updates.
+    if (updateData.type === "supervisor-loop-status") {
+      const loopEvent = {
+        loopId: updateData.loopId,
+        projectId: updateData.projectId,
+        status: updateData.status,
+        currentIteration: updateData.currentIteration,
+        maxIterations: updateData.maxIterations,
+        currentPhase: updateData.currentPhase,
+        totalCostUsd: updateData.totalCostUsd,
+        totalActionsFound: updateData.totalActionsFound,
+        totalActionsFixed: updateData.totalActionsFixed,
+        currentHealthScore: updateData.currentHealthScore,
+        initialHealthScore: updateData.initialHealthScore,
+        exitReason: updateData.exitReason,
+        consecutiveFailures: updateData.consecutiveFailures,
+      };
+      for (const listener of this.supervisorLoopStatusListeners) {
+        listener(loopEvent);
+      }
+    }
+
   };
 
   /**
@@ -3603,6 +3640,27 @@ class Sync {
   }) => void): () => void {
     this.supervisorStatusListeners.add(listener);
     return () => { this.supervisorStatusListeners.delete(listener); };
+  }
+
+  // --- Supervisor Loop status event subscription ---
+
+  onSupervisorLoopStatus(listener: (event: {
+    loopId: string;
+    projectId: string;
+    status: string;
+    currentIteration: number;
+    maxIterations: number;
+    currentPhase: string;
+    totalCostUsd: number;
+    totalActionsFound: number;
+    totalActionsFixed: number;
+    currentHealthScore: number | null;
+    initialHealthScore: number | null;
+    exitReason: string | null;
+    consecutiveFailures: number;
+  }) => void): () => void {
+    this.supervisorLoopStatusListeners.add(listener);
+    return () => { this.supervisorLoopStatusListeners.delete(listener); };
   }
 
 }

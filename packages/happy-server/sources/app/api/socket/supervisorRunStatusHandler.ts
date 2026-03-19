@@ -19,6 +19,7 @@ import { pushSupervisorNotification } from "@/modules/pushSend";
 import { aggregateSessionUsage } from "@/modules/supervisorUsage";
 import { createIssueOnProvider } from "@/app/webhook/webhookProviderApi";
 import { decryptString } from "@/modules/encrypt";
+import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 
 const supervisorActionSchema = z.object({
     severity: z.enum(["critical", "high", "medium", "low"]),
@@ -353,7 +354,13 @@ export function supervisorRunStatusHandler(
                     });
 
                     // Auto mode: automatically approve critical/high actions and trigger fixes
+                    // Skip if run belongs to a Loop — Loop engine handles its own approval flow
+                    const runForLoopCheck = await db.supervisorRun.findUnique({
+                        where: { id: data.runId },
+                        select: { loopId: true },
+                    });
                     if (
+                        !runForLoopCheck?.loopId &&
                         data.actions &&
                         data.actions.length > 0 &&
                         (criticalCount > 0 || highCount > 0)
@@ -374,6 +381,16 @@ export function supervisorRunStatusHandler(
                             data.errorMessage ??
                             "Analysis failed unexpectedly",
                     });
+                }
+
+                // Loop progression: if this run belongs to a loop, advance the state machine
+                try {
+                    await loopOnRunCompleted(userId, data.runId, data.projectId);
+                } catch (loopError) {
+                    log(
+                        { module: "supervisor", level: "error" },
+                        `Loop progression error for run ${data.runId}: ${loopError}`,
+                    );
                 }
             }
         } catch (error) {

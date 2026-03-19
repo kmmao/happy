@@ -15,6 +15,7 @@ import {
 } from "@/app/events/eventRouter";
 import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
+import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
 
 const supervisorFixStatusSchema = z.object({
     actionId: z.string().min(1),
@@ -144,6 +145,26 @@ export function supervisorFixStatusHandler(
                 ),
                 recipientFilter: { type: "user-scoped-only" },
             });
+
+            // Loop progression: if this fix belongs to a loop, check if all fixes are done
+            if (
+                data.fixStatus === "completed" ||
+                data.fixStatus === "failed"
+            ) {
+                try {
+                    await loopOnFixCompleted(
+                        userId,
+                        data.actionId,
+                        data.projectId,
+                        data.fixStatus,
+                    );
+                } catch (loopError) {
+                    log(
+                        { module: "supervisor", level: "error" },
+                        `Loop fix progression error for action ${data.actionId}: ${loopError}`,
+                    );
+                }
+            }
         } catch (error) {
             log(
                 { module: "supervisor", level: "error" },
