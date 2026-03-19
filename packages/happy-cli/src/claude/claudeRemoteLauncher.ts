@@ -744,17 +744,20 @@ export async function claudeRemoteLauncher(
 
       // "Cold hash" detects changes that require a process restart.
       // It intentionally excludes fields that can be hot-swapped:
-      //   - model: hot-swapped via setModel()
+      //   - model: hot-swapped via setModel() (within same context window tier)
       //   - permissionMode (between non-plan, non-bypass modes): via setPermissionMode()
       // Cold restart is required for:
       //   - plan ↔ non-plan: different tool sets (ExitPlanMode etc.)
       //   - bypassPermissions ↔ other: AskUserQuestion disallowedTools changes
+      //   - context window tier change (200K ↔ 1M): SDK bug — setModel() doesn't
+      //     update options.mainLoopModel, so auto-compact threshold stays stale
       //   - thinking, effort, maxBudgetUsd: SDK has no runtime set methods
       const coldModeHash = (m: EnhancedMode) => {
         const mapped = mapToClaudeMode(m.permissionMode);
         return hashObject({
           isPlan: mapped === "plan",
           isBypass: mapped === "bypassPermissions",
+          isExtendedContext: m.model?.endsWith("-1m") ?? false,
           fallbackModel: m.fallbackModel,
           customSystemPrompt: m.customSystemPrompt,
           appendSystemPrompt: m.appendSystemPrompt,
