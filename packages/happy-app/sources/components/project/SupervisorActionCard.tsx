@@ -24,6 +24,9 @@ import {
     SEVERITY_KEY_MAP,
     CATEGORY_KEY_MAP,
     getConfidenceColor,
+    getUrgencyLevel,
+    URGENCY_COLORS,
+    URGENCY_KEY_MAP,
 } from "./supervisorConstants";
 import { Modal } from "@/modal";
 
@@ -51,6 +54,12 @@ export const SupervisorActionCard = React.memo(
             : action.category;
 
         const confidenceColor = getConfidenceColor(action.confidence);
+
+        const urgency = getUrgencyLevel(action.severity, action.confidence);
+        const urgencyColor = URGENCY_COLORS[urgency];
+        const urgencyLabel = URGENCY_KEY_MAP[urgency]
+            ? t(URGENCY_KEY_MAP[urgency])
+            : urgency;
 
         const isRecurring = action.lastSeenRunId != null && action.lastSeenRunId !== action.runId;
 
@@ -176,6 +185,23 @@ export const SupervisorActionCard = React.memo(
                             {severityLabel}
                         </Text>
                     </View>
+                    {urgency !== "optional" && (
+                        <View
+                            style={[
+                                styles.urgencyBadge,
+                                { backgroundColor: urgencyColor + "18" },
+                            ]}
+                        >
+                            <Text
+                                style={[
+                                    styles.urgencyText,
+                                    { color: urgencyColor },
+                                ]}
+                            >
+                                {urgencyLabel}
+                            </Text>
+                        </View>
+                    )}
                     <Text style={styles.categoryText}>{categoryLabel}</Text>
                     {isRecurring && (
                         <View style={styles.recurringBadge}>
@@ -460,6 +486,15 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 11,
         color: "#FFFFFF",
         textTransform: "uppercase",
+    },
+    urgencyBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 4,
+    },
+    urgencyText: {
+        ...Typography.default("semiBold"),
+        fontSize: 10,
     },
     categoryText: {
         ...Typography.default(),

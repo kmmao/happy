@@ -1787,6 +1787,12 @@ export const ja: TranslationStructure = {
     deleteConfirmMessage: "プロジェクトがリストから削除されます。この操作は元に戻せません。",
     hasActiveSessions: "削除できません：アクティブなセッションがあります",
     create: "作成",
+    deleteArchivedSessions: "アーカイブ済みセッションを削除",
+    deleteArchivedSessionsConfirm: ({ count }: { count: number }) =>
+      `アーカイブ済みセッション ${count} 件を完全に削除しますか？この操作は元に戻せません。`,
+    deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
+      `アーカイブ済みセッション ${count} 件を削除しました`,
+    failedToDeleteArchivedSessions: "一部のアーカイブ済みセッションの削除に失敗しました",
   },
   project: {
     segments: {
@@ -2110,6 +2116,23 @@ export const ja: TranslationStructure = {
     dimPreflightDeploy: "変更をデプロイ中...",
     dimPreflightDeployCli: "CLIをリリース中...",
     dimPreflightDeployServer: "サーバーを再構築中...",
+
+    // 緊急度タグ
+    urgentTag: "緊急",
+    mustFixTag: "修正必須",
+    optionalTag: "任意",
+
+    // ソート＆フィルター
+    sortBy: "並べ替え",
+    sortSeverity: "重要度",
+    sortCategory: "カテゴリ",
+    sortConfidence: "信頼度",
+    sortUrgency: "緊急度",
+    filterUrgency: "緊急度",
+    urgencyAll: "すべて",
+    urgencyUrgent: "緊急",
+    urgencyMustFix: "修正必須",
+    urgencyOptional: "任意",
   },
   webhook: {
     eventHistory: "Webhookイベント",

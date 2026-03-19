@@ -1812,6 +1812,12 @@ export const ca: TranslationStructure = {
     deleteConfirmMessage: "El projecte s'eliminarà de la llista. Aquesta acció no es pot desfer.",
     hasActiveSessions: "No es pot eliminar: el projecte té sessions actives",
     create: "Crear",
+    deleteArchivedSessions: "Eliminar sessions arxivades",
+    deleteArchivedSessionsConfirm: ({ count }: { count: number }) =>
+      `Eliminar permanentment ${count} sessió${count === 1 ? "" : "ns"} arxivad${count === 1 ? "a" : "es"}? Aquesta acció no es pot desfer.`,
+    deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
+      `${count} sessió${count === 1 ? "" : "ns"} arxivad${count === 1 ? "a" : "es"} eliminad${count === 1 ? "a" : "es"}`,
+    failedToDeleteArchivedSessions: "Error en eliminar algunes sessions arxivades",
   },
   project: {
     segments: {
@@ -2140,6 +2146,23 @@ export const ca: TranslationStructure = {
     dimPreflightDeploy: "Desplegant canvis...",
     dimPreflightDeployCli: "Publicant CLI...",
     dimPreflightDeployServer: "Reconstruint servidor...",
+
+    // Etiquetes d'urgència
+    urgentTag: "Urgent",
+    mustFixTag: "Cal corregir",
+    optionalTag: "Opcional",
+
+    // Ordenació i filtre
+    sortBy: "Ordenar",
+    sortSeverity: "Gravetat",
+    sortCategory: "Categoria",
+    sortConfidence: "Confiança",
+    sortUrgency: "Urgència",
+    filterUrgency: "Urgència",
+    urgencyAll: "Tots",
+    urgencyUrgent: "Urgent",
+    urgencyMustFix: "Cal corregir",
+    urgencyOptional: "Opcional",
   },
   webhook: {
     eventHistory: "Esdeveniments Webhook",

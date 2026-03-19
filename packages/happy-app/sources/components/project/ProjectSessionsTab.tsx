@@ -1,6 +1,7 @@
 import * as React from "react";
-import { View, Text, FlatList, Pressable } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { Swipeable } from "react-native-gesture-handler";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
@@ -13,31 +14,137 @@ import { Session } from "@/sync/storageTypes";
 import { useSessionStatus, getSessionName } from "@/utils/sessionUtils";
 import { useRouter } from "expo-router";
 import { t } from "@/text";
+import { Modal } from "@/modal";
+import { sessionDelete, sessionKill } from "@/sync/ops";
+import { useHappyAction } from "@/hooks/useHappyAction";
+import { HappyError } from "@/utils/errors";
 
 interface ProjectSessionsTabProps {
     project: Project;
 }
 
-const SessionRow = React.memo(({ session }: { session: Session }) => {
+const SessionRow = React.memo(({ session, showDivider }: { session: Session; showDivider?: boolean }) => {
     const router = useRouter();
     const status = useSessionStatus(session);
     const { theme } = useUnistyles();
+    const swipeableRef = React.useRef<Swipeable | null>(null);
+
+    const [archiving, performArchive] = useHappyAction(async () => {
+        const result = await sessionKill(session.id);
+        if (!result.success) {
+            throw new HappyError(
+                result.message || t("sessionInfo.failedToArchiveSession"),
+                false,
+            );
+        }
+    });
+
+    const handleArchive = React.useCallback(() => {
+        swipeableRef.current?.close();
+        Modal.alert(
+            t("sessionInfo.archiveSession"),
+            t("sessionInfo.archiveSessionConfirm"),
+            [
+                { text: t("common.cancel"), style: "cancel" },
+                {
+                    text: t("sessionInfo.archiveSession"),
+                    style: "destructive",
+                    onPress: performArchive,
+                },
+            ],
+        );
+    }, [performArchive]);
+
+    const [deleting, performDelete] = useHappyAction(async () => {
+        const result = await sessionDelete(session.id);
+        if (!result.success) {
+            throw new HappyError(
+                result.message || t("sessionInfo.failedToDeleteSession"),
+                false,
+            );
+        }
+    });
+
+    const handleDelete = React.useCallback(() => {
+        swipeableRef.current?.close();
+        Modal.alert(
+            t("sessionInfo.deleteSession"),
+            t("sessionInfo.deleteSessionWarning"),
+            [
+                { text: t("common.cancel"), style: "cancel" },
+                {
+                    text: t("sessionInfo.deleteSession"),
+                    style: "destructive",
+                    onPress: performDelete,
+                },
+            ],
+        );
+    }, [performDelete]);
+
+    const isBusy = archiving || deleting;
+
+    const renderRightActions = React.useCallback(
+        () => (
+            <View style={{ flexDirection: "row" }}>
+                {session.active && (
+                    <Pressable
+                        style={styles.swipeActionArchive}
+                        onPress={handleArchive}
+                        disabled={isBusy}
+                    >
+                        <Ionicons
+                            name="archive-outline"
+                            size={20}
+                            color="#FFFFFF"
+                        />
+                        <Text style={styles.swipeActionText} numberOfLines={1}>
+                            {t("sessionInfo.archiveSession")}
+                        </Text>
+                    </Pressable>
+                )}
+                <Pressable
+                    style={styles.swipeActionDelete}
+                    onPress={handleDelete}
+                    disabled={isBusy}
+                >
+                    <Ionicons
+                        name="trash-outline"
+                        size={20}
+                        color="#FFFFFF"
+                    />
+                    <Text style={styles.swipeActionText} numberOfLines={1}>
+                        {t("sessionInfo.deleteSession")}
+                    </Text>
+                </Pressable>
+            </View>
+        ),
+        [session.active, handleArchive, handleDelete, isBusy],
+    );
 
     return (
-        <Item
-            title={getSessionName(session)}
-            subtitle={status.statusText}
-            icon={
-                <View
-                    style={[
-                        styles.statusDot,
-                        { backgroundColor: status.statusDotColor },
-                    ]}
-                />
-            }
-            onPress={() => router.push(`/session/${session.id}`)}
-            showChevron
-        />
+        <Swipeable
+            ref={swipeableRef}
+            renderRightActions={renderRightActions}
+            overshootRight={false}
+            enabled={!isBusy}
+        >
+            <Item
+                title={getSessionName(session)}
+                subtitle={status.statusText}
+                icon={
+                    <View
+                        style={[
+                            styles.statusDot,
+                            { backgroundColor: status.statusDotColor },
+                        ]}
+                    />
+                }
+                onPress={() => router.push(`/session/${session.id}`)}
+                showChevron
+                showDivider={showDivider}
+                loading={isBusy}
+            />
+        </Swipeable>
     );
 });
 
@@ -63,6 +170,11 @@ export const ProjectSessionsTab = React.memo(
             }),
         );
 
+        const archivedSessions = React.useMemo(
+            () => sessions.filter((s) => !s.active),
+            [sessions],
+        );
+
         const handleNewSession = React.useCallback(() => {
             router.push({
                 pathname: "/new",
@@ -72,6 +184,44 @@ export const ProjectSessionsTab = React.memo(
                 },
             });
         }, [router, project.key.machineId, project.key.path]);
+
+        const [deletingArchived, performDeleteArchived] = useHappyAction(
+            async () => {
+                const ids = archivedSessions.map((s) => s.id);
+                const results = await Promise.all(
+                    ids.map((id) => sessionDelete(id)),
+                );
+                const failed = results.filter((r) => !r.success);
+                if (failed.length > 0 && failed.length === ids.length) {
+                    throw new HappyError(
+                        t("projects.failedToDeleteArchivedSessions"),
+                        false,
+                    );
+                }
+                const deletedCount = ids.length - failed.length;
+                Modal.toast(
+                    t("projects.deleteArchivedSessionsSuccess", {
+                        count: deletedCount,
+                    }),
+                );
+            },
+        );
+
+        const handleDeleteArchivedSessions = React.useCallback(() => {
+            const count = archivedSessions.length;
+            Modal.alert(
+                t("projects.deleteArchivedSessions"),
+                t("projects.deleteArchivedSessionsConfirm", { count }),
+                [
+                    { text: t("common.cancel"), style: "cancel" },
+                    {
+                        text: t("projects.deleteArchivedSessions"),
+                        style: "destructive",
+                        onPress: performDeleteArchived,
+                    },
+                ],
+            );
+        }, [archivedSessions.length, performDeleteArchived]);
 
         if (sessions.length === 0) {
             return (
@@ -112,6 +262,21 @@ export const ProjectSessionsTab = React.memo(
                         onPress={handleNewSession}
                         titleStyle={{ color: theme.colors.header.tint }}
                     />
+                    {archivedSessions.length > 0 && (
+                        <Item
+                            title={t("projects.deleteArchivedSessions")}
+                            icon={
+                                <Ionicons
+                                    name="trash-outline"
+                                    size={20}
+                                    color={theme.colors.deleteAction}
+                                />
+                            }
+                            onPress={handleDeleteArchivedSessions}
+                            titleStyle={{ color: theme.colors.deleteAction }}
+                            disabled={deletingArchived}
+                        />
+                    )}
                     {sessions.map((session) => (
                         <SessionRow key={session.id} session={session} />
                     ))}
@@ -154,5 +319,26 @@ const styles = StyleSheet.create((theme) => ({
         width: 8,
         height: 8,
         borderRadius: 4,
+    },
+    swipeActionDelete: {
+        width: 80,
+        height: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: theme.colors.status.error,
+    },
+    swipeActionArchive: {
+        width: 80,
+        height: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: theme.colors.warning,
+    },
+    swipeActionText: {
+        marginTop: 4,
+        fontSize: 11,
+        color: "#FFFFFF",
+        textAlign: "center",
+        ...Typography.default("semiBold"),
     },
 }));

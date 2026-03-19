@@ -1729,6 +1729,12 @@ export const zhHant: TranslationStructure = {
     deleteConfirmMessage: "此操作將從列表中移除該專案，且不可撤銷。",
     hasActiveSessions: "無法刪除：專案有活躍會話",
     create: "建立",
+    deleteArchivedSessions: "刪除歸檔會話",
+    deleteArchivedSessionsConfirm: ({ count }: { count: number }) =>
+      `確定要永久刪除 ${count} 個歸檔會話嗎？此操作無法撤銷。`,
+    deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
+      `已刪除 ${count} 個歸檔會話`,
+    failedToDeleteArchivedSessions: "部分歸檔會話刪除失敗",
   },
   project: {
     segments: {
@@ -2045,6 +2051,23 @@ export const zhHant: TranslationStructure = {
     dimPreflightDeploy: "部署變更...",
     dimPreflightDeployCli: "發佈 CLI...",
     dimPreflightDeployServer: "重建伺服器...",
+
+    // 緊急度標籤
+    urgentTag: "緊急",
+    mustFixTag: "必須修復",
+    optionalTag: "可選",
+
+    // 排序與篩選
+    sortBy: "排序",
+    sortSeverity: "等級",
+    sortCategory: "分類",
+    sortConfidence: "信心度",
+    sortUrgency: "緊急度",
+    filterUrgency: "緊急度",
+    urgencyAll: "全部",
+    urgencyUrgent: "緊急",
+    urgencyMustFix: "必須修復",
+    urgencyOptional: "可選",
   },
   webhook: {
     eventHistory: "Webhook 事件",

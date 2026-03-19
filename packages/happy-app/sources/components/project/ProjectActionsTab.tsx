@@ -8,6 +8,7 @@ import {
     RefreshControl,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
@@ -21,12 +22,24 @@ import { SupervisorActionCard } from "@/components/project/SupervisorActionCard"
 import { sync } from "@/sync/sync";
 import { layout } from "@/components/layout";
 import { Project } from "@/sync/projectManager";
+import {
+    type SortField,
+    type UrgencyLevel,
+    SORT_KEY_MAP,
+    SEVERITY_ORDER,
+    URGENCY_ORDER,
+    URGENCY_COLORS,
+    getUrgencyLevel,
+} from "./supervisorConstants";
 
 // --- Types ---
 
 type ActionTab = "pending" | "approved" | "fixing" | "done" | "dismissed";
+type UrgencyFilter = "all" | UrgencyLevel;
 
 const TABS: ActionTab[] = ["pending", "approved", "fixing", "done", "dismissed"];
+const SORT_FIELDS: SortField[] = ["severity", "category", "confidence", "urgency"];
+const URGENCY_FILTERS: UrgencyFilter[] = ["all", "urgent", "must-fix", "optional"];
 const PAGE_SIZE = 20;
 
 // --- Tab label mapping ---
@@ -98,6 +111,9 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
     const [loadingMore, setLoadingMore] = React.useState(false);
     const [refreshing, setRefreshing] = React.useState(false);
     const [total, setTotal] = React.useState(0);
+    const [sortField, setSortField] = React.useState<SortField | null>(null);
+    const [sortAsc, setSortAsc] = React.useState(false);
+    const [urgencyFilter, setUrgencyFilter] = React.useState<UrgencyFilter>("all");
 
     // Fetch actions and stats when activeTab changes (stats also refreshed here)
     React.useEffect(() => {
@@ -228,6 +244,70 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
         return unsubscribe;
     }, [projectId, handleUpdated]);
 
+    const handleSortPress = React.useCallback((field: SortField) => {
+        setSortField((prev) => {
+            if (prev === field) {
+                // Toggle direction, or clear if already ascending
+                setSortAsc((asc) => {
+                    if (asc) {
+                        // Clear sort
+                        setSortField(null);
+                        return false;
+                    }
+                    return true;
+                });
+                return field;
+            }
+            setSortAsc(false);
+            return field;
+        });
+    }, []);
+
+    const handleUrgencyPress = React.useCallback((filter: UrgencyFilter) => {
+        setUrgencyFilter((prev) => (prev === filter ? "all" : filter));
+    }, []);
+
+    const displayedActions = React.useMemo(() => {
+        let result = actions;
+
+        // Filter by urgency
+        if (urgencyFilter !== "all") {
+            result = result.filter(
+                (a) => getUrgencyLevel(a.severity, a.confidence) === urgencyFilter,
+            );
+        }
+
+        // Sort
+        if (sortField) {
+            const dir = sortAsc ? 1 : -1;
+            result = [...result].sort((a, b) => {
+                switch (sortField) {
+                    case "severity": {
+                        const oa = SEVERITY_ORDER[a.severity] ?? 99;
+                        const ob = SEVERITY_ORDER[b.severity] ?? 99;
+                        return (oa - ob) * dir;
+                    }
+                    case "category":
+                        return a.category.localeCompare(b.category) * dir;
+                    case "confidence": {
+                        const ca = a.confidence ?? 0;
+                        const cb = b.confidence ?? 0;
+                        return (cb - ca) * dir; // Default: high confidence first
+                    }
+                    case "urgency": {
+                        const ua = URGENCY_ORDER[getUrgencyLevel(a.severity, a.confidence)];
+                        const ub = URGENCY_ORDER[getUrgencyLevel(b.severity, b.confidence)];
+                        return (ua - ub) * dir;
+                    }
+                    default:
+                        return 0;
+                }
+            });
+        }
+
+        return result;
+    }, [actions, sortField, sortAsc, urgencyFilter]);
+
     const hasMore = actions.length < total;
 
     return (
@@ -284,6 +364,101 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
                 </ScrollView>
             </View>
 
+            {/* Sort & Filter Bar */}
+            {!loading && actions.length > 0 && (
+                <View style={styles.filterBar}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.filterBarContent}
+                    >
+                        {/* Sort chips */}
+                        <View style={styles.filterGroup}>
+                            <Ionicons
+                                name="swap-vertical-outline"
+                                size={14}
+                                color={theme.colors.textSecondary}
+                            />
+                            {SORT_FIELDS.map((field) => {
+                                const isActive = sortField === field;
+                                return (
+                                    <Pressable
+                                        key={field}
+                                        style={[
+                                            styles.chip,
+                                            isActive && styles.chipActive,
+                                        ]}
+                                        onPress={() => handleSortPress(field)}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.chipText,
+                                                isActive && styles.chipTextActive,
+                                            ]}
+                                        >
+                                            {t(SORT_KEY_MAP[field])}
+                                        </Text>
+                                        {isActive && (
+                                            <Ionicons
+                                                name={sortAsc ? "arrow-up" : "arrow-down"}
+                                                size={10}
+                                                color="#FFFFFF"
+                                            />
+                                        )}
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+
+                        {/* Divider */}
+                        <View style={styles.filterDivider} />
+
+                        {/* Urgency filter chips */}
+                        <View style={styles.filterGroup}>
+                            <Ionicons
+                                name="flag-outline"
+                                size={14}
+                                color={theme.colors.textSecondary}
+                            />
+                            {URGENCY_FILTERS.map((filter) => {
+                                const isActive = urgencyFilter === filter;
+                                const chipColor =
+                                    filter !== "all"
+                                        ? URGENCY_COLORS[filter]
+                                        : undefined;
+                                return (
+                                    <Pressable
+                                        key={filter}
+                                        style={[
+                                            styles.chip,
+                                            isActive && (chipColor
+                                                ? { backgroundColor: chipColor }
+                                                : styles.chipActive),
+                                        ]}
+                                        onPress={() => handleUrgencyPress(filter)}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.chipText,
+                                                isActive && styles.chipTextActive,
+                                            ]}
+                                        >
+                                            {filter === "all"
+                                                ? t("supervisor.urgencyAll")
+                                                : filter === "urgent"
+                                                  ? t("supervisor.urgencyUrgent")
+                                                  : filter === "must-fix"
+                                                    ? t("supervisor.urgencyMustFix")
+                                                    : t("supervisor.urgencyOptional")}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+                    </ScrollView>
+                </View>
+            )}
+
             {/* Action List */}
             {loading ? (
                 <View style={styles.centered}>
@@ -310,18 +485,26 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
                         />
                     }
                 >
-                    <View style={styles.actionsContainer}>
-                        {actions.map((action, index) => (
-                            <SupervisorActionCard
-                                key={action.id}
-                                action={action}
-                                projectId={projectId}
-                                onUpdated={handleUpdated}
-                                onDeleted={handleUpdated}
-                                isLast={index === actions.length - 1}
-                            />
-                        ))}
-                    </View>
+                    {displayedActions.length === 0 ? (
+                        <View style={styles.filteredEmptyContainer}>
+                            <Text style={styles.emptyText}>
+                                {t("supervisor.noActions")}
+                            </Text>
+                        </View>
+                    ) : (
+                        <View style={styles.actionsContainer}>
+                            {displayedActions.map((action, index) => (
+                                <SupervisorActionCard
+                                    key={action.id}
+                                    action={action}
+                                    projectId={projectId}
+                                    onUpdated={handleUpdated}
+                                    onDeleted={handleUpdated}
+                                    isLast={index === displayedActions.length - 1}
+                                />
+                            ))}
+                        </View>
+                    )}
 
                     {/* Load More */}
                     {hasMore && (
@@ -409,6 +592,53 @@ const styles = StyleSheet.create((theme) => ({
     },
     tabBadgeTextActive: {
         color: "#FFFFFF",
+    },
+    filterBar: {
+        borderBottomWidth: 0.5,
+        borderBottomColor: theme.colors.divider,
+    },
+    filterBarContent: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        gap: 6,
+    },
+    filterGroup: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+    },
+    filterDivider: {
+        width: 1,
+        height: 16,
+        backgroundColor: theme.colors.divider,
+        marginHorizontal: 4,
+    },
+    chip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 3,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        backgroundColor: theme.colors.surface,
+    },
+    chipActive: {
+        backgroundColor: theme.colors.header.tint,
+    },
+    chipText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+    },
+    chipTextActive: {
+        ...Typography.default("semiBold"),
+        color: "#FFFFFF",
+    },
+    filteredEmptyContainer: {
+        paddingVertical: 48,
+        alignItems: "center",
     },
     centered: {
         flex: 1,

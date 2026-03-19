@@ -1830,6 +1830,12 @@ export const ru: TranslationStructure = {
     deleteConfirmMessage: "Проект будет удалён из списка. Это действие нельзя отменить.",
     hasActiveSessions: "Невозможно удалить: у проекта есть активные сессии",
     create: "Создать",
+    deleteArchivedSessions: "Удалить архивные сессии",
+    deleteArchivedSessionsConfirm: ({ count }: { count: number }) =>
+      `Вы уверены, что хотите навсегда удалить ${count} архивных сессий? Это действие нельзя отменить.`,
+    deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
+      `${count} архивных сессий удалено`,
+    failedToDeleteArchivedSessions: "Не удалось удалить некоторые архивные сессии",
   },
   project: {
     segments: {
@@ -2154,6 +2160,23 @@ export const ru: TranslationStructure = {
     dimPreflightDeploy: "Развёртывание изменений...",
     dimPreflightDeployCli: "Выпуск CLI...",
     dimPreflightDeployServer: "Пересборка сервера...",
+
+    // Теги срочности
+    urgentTag: "Срочно",
+    mustFixTag: "Обязательно",
+    optionalTag: "Необязательно",
+
+    // Сортировка и фильтрация
+    sortBy: "Сортировка",
+    sortSeverity: "Важность",
+    sortCategory: "Категория",
+    sortConfidence: "Уверенность",
+    sortUrgency: "Срочность",
+    filterUrgency: "Срочность",
+    urgencyAll: "Все",
+    urgencyUrgent: "Срочно",
+    urgencyMustFix: "Обязательно",
+    urgencyOptional: "Необязательно",
   },
   webhook: {
     eventHistory: "События Webhook",

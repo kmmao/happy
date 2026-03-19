@@ -1791,6 +1791,12 @@ export const en = {
     deleteConfirmMessage: "This will remove the project from your list. This cannot be undone.",
     hasActiveSessions: "Cannot delete: project has active sessions",
     create: "Create",
+    deleteArchivedSessions: "Delete Archived Sessions",
+    deleteArchivedSessionsConfirm: ({ count }: { count: number }) =>
+      `Are you sure you want to permanently delete ${count} archived session${count === 1 ? "" : "s"}? This cannot be undone.`,
+    deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
+      `${count} archived session${count === 1 ? "" : "s"} deleted`,
+    failedToDeleteArchivedSessions: "Failed to delete some archived sessions",
   },
 
   project: {
@@ -2172,6 +2178,23 @@ export const en = {
     dimPreflightDeploy: "Deploying changes...",
     dimPreflightDeployCli: "Releasing CLI...",
     dimPreflightDeployServer: "Rebuilding server...",
+
+    // Urgency tags
+    urgentTag: "Urgent",
+    mustFixTag: "Must Fix",
+    optionalTag: "Optional",
+
+    // Sort & filter
+    sortBy: "Sort",
+    sortSeverity: "Severity",
+    sortCategory: "Category",
+    sortConfidence: "Confidence",
+    sortUrgency: "Urgency",
+    filterUrgency: "Urgency",
+    urgencyAll: "All",
+    urgencyUrgent: "Urgent",
+    urgencyMustFix: "Must Fix",
+    urgencyOptional: "Optional",
   },
   webhook: {
     eventHistory: "Webhook Events",

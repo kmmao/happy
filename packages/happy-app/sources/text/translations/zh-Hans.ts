@@ -1728,6 +1728,12 @@ export const zhHans: TranslationStructure = {
     deleteConfirmMessage: "此操作将从列表中移除该项目，且不可撤销。",
     hasActiveSessions: "无法删除：项目有活跃会话",
     create: "创建",
+    deleteArchivedSessions: "删除归档会话",
+    deleteArchivedSessionsConfirm: ({ count }: { count: number }) =>
+      `确定要永久删除 ${count} 个归档会话吗？此操作无法撤销。`,
+    deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
+      `已删除 ${count} 个归档会话`,
+    failedToDeleteArchivedSessions: "部分归档会话删除失败",
   },
   project: {
     segments: {
@@ -2042,6 +2048,23 @@ export const zhHans: TranslationStructure = {
     dimPreflightDeploy: "部署变更...",
     dimPreflightDeployCli: "发布 CLI...",
     dimPreflightDeployServer: "重建服务器...",
+
+    // 紧急度标签
+    urgentTag: "紧急",
+    mustFixTag: "必须修复",
+    optionalTag: "可选",
+
+    // 排序与筛选
+    sortBy: "排序",
+    sortSeverity: "等级",
+    sortCategory: "分类",
+    sortConfidence: "置信度",
+    sortUrgency: "紧急度",
+    filterUrgency: "紧急度",
+    urgencyAll: "全部",
+    urgencyUrgent: "紧急",
+    urgencyMustFix: "必须修复",
+    urgencyOptional: "可选",
   },
   webhook: {
     eventHistory: "Webhook 事件",

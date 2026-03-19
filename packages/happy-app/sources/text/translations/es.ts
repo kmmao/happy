@@ -1809,6 +1809,12 @@ export const es: TranslationStructure = {
     deleteConfirmMessage: "El proyecto se eliminará de tu lista. Esta acción no se puede deshacer.",
     hasActiveSessions: "No se puede eliminar: el proyecto tiene sesiones activas",
     create: "Crear",
+    deleteArchivedSessions: "Eliminar sesiones archivadas",
+    deleteArchivedSessionsConfirm: ({ count }: { count: number }) =>
+      `¿Eliminar permanentemente ${count} sesión${count === 1 ? "" : "es"} archivada${count === 1 ? "" : "s"}? Esta acción no se puede deshacer.`,
+    deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
+      `${count} sesión${count === 1 ? "" : "es"} archivada${count === 1 ? "" : "s"} eliminada${count === 1 ? "" : "s"}`,
+    failedToDeleteArchivedSessions: "Error al eliminar algunas sesiones archivadas",
   },
   project: {
     segments: {
@@ -2135,6 +2141,23 @@ export const es: TranslationStructure = {
     dimPreflightDeploy: "Desplegando cambios...",
     dimPreflightDeployCli: "Publicando CLI...",
     dimPreflightDeployServer: "Reconstruyendo servidor...",
+
+    // Etiquetas de urgencia
+    urgentTag: "Urgente",
+    mustFixTag: "Corrección obligatoria",
+    optionalTag: "Opcional",
+
+    // Ordenación y filtro
+    sortBy: "Ordenar",
+    sortSeverity: "Gravedad",
+    sortCategory: "Categoría",
+    sortConfidence: "Confianza",
+    sortUrgency: "Urgencia",
+    filterUrgency: "Urgencia",
+    urgencyAll: "Todos",
+    urgencyUrgent: "Urgente",
+    urgencyMustFix: "Corrección obligatoria",
+    urgencyOptional: "Opcional",
   },
   webhook: {
     eventHistory: "Eventos Webhook",
