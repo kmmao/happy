@@ -2092,6 +2092,16 @@ export const ru: TranslationStructure = {
     delete: "Удалить",
     deleteConfirm: "Удалить действие",
     deleteConfirmBody: "Удалить это действие навсегда? Если проблема ещё существует, она будет обнаружена при следующем сканировании.",
+
+    dimPreflightStart: "Синхронизация кода...",
+    dimPreflightCheck: "Проверка репозитория...",
+    dimPreflightStash: "Сохранение изменений...",
+    dimPreflightFetch: "Получение обновлений...",
+    dimPreflightPull: "Загрузка обновлений...",
+    dimPreflightResolve: "Разрешение конфликтов...",
+    dimPreflightDeploy: "Развёртывание изменений...",
+    dimPreflightDeployCli: "Выпуск CLI...",
+    dimPreflightDeployServer: "Пересборка сервера...",
   },
   webhook: {
     eventHistory: "События Webhook",

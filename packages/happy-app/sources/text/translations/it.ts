@@ -2072,6 +2072,16 @@ export const it: TranslationStructure = {
     delete: "Elimina",
     deleteConfirm: "Elimina azione",
     deleteConfirmBody: "Eliminare questa azione in modo permanente? Se il problema esiste ancora, verrà rilevato di nuovo alla prossima scansione.",
+
+    dimPreflightStart: "Sincronizzazione codice...",
+    dimPreflightCheck: "Controllo repository...",
+    dimPreflightStash: "Salvataggio modifiche...",
+    dimPreflightFetch: "Recupero ultime versioni...",
+    dimPreflightPull: "Download aggiornamenti...",
+    dimPreflightResolve: "Risoluzione conflitti...",
+    dimPreflightDeploy: "Distribuzione modifiche...",
+    dimPreflightDeployCli: "Rilascio CLI...",
+    dimPreflightDeployServer: "Ricostruzione server...",
   },
   webhook: {
     eventHistory: "Eventi Webhook",

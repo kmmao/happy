@@ -2048,6 +2048,16 @@ export const ja: TranslationStructure = {
     delete: "削除",
     deleteConfirm: "アクションを削除",
     deleteConfirmBody: "このアクションを完全に削除しますか？問題がまだ存在する場合、次回のスキャンで再検出されます。",
+
+    dimPreflightStart: "コードを同期中...",
+    dimPreflightCheck: "リポジトリを確認中...",
+    dimPreflightStash: "変更を退避中...",
+    dimPreflightFetch: "最新を取得中...",
+    dimPreflightPull: "更新を取り込み中...",
+    dimPreflightResolve: "競合を解決中...",
+    dimPreflightDeploy: "変更をデプロイ中...",
+    dimPreflightDeployCli: "CLIをリリース中...",
+    dimPreflightDeployServer: "サーバーを再構築中...",
   },
   webhook: {
     eventHistory: "Webhookイベント",

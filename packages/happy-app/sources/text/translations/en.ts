@@ -2066,6 +2066,17 @@ export const en: TranslationStructure = {
     delete: "Delete",
     deleteConfirm: "Delete Action",
     deleteConfirmBody: "Permanently delete this action? If the issue still exists, it will be detected again on the next scan.",
+
+    // Preflight sync dimensions
+    dimPreflightStart: "Syncing code...",
+    dimPreflightCheck: "Checking repo...",
+    dimPreflightStash: "Stashing changes...",
+    dimPreflightFetch: "Fetching latest...",
+    dimPreflightPull: "Pulling updates...",
+    dimPreflightResolve: "Resolving conflicts...",
+    dimPreflightDeploy: "Deploying changes...",
+    dimPreflightDeployCli: "Releasing CLI...",
+    dimPreflightDeployServer: "Rebuilding server...",
   },
   webhook: {
     eventHistory: "Webhook Events",

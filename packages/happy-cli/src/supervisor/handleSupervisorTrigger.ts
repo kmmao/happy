@@ -15,6 +15,7 @@ import { logger } from "@/ui/logger";
 import { buildSupervisorPrompt } from "./buildSupervisorPrompt";
 import { buildFixPrompt } from "./buildFixPrompt";
 import { buildResearchPrompt } from "./buildResearchPrompt";
+import { runPreflightSync } from "./preflightSync";
 import {
   createWorktreeLocal,
   removeWorktreeForced,
@@ -124,6 +125,7 @@ export async function handleSupervisorTrigger(
 
   try {
     if (trigger === "fix" && fixAction) {
+      // Fix trigger uses worktree — no preflight needed
       await handleFixTrigger(
         runId,
         projectId,
@@ -132,27 +134,84 @@ export async function handleSupervisorTrigger(
         fixStrategy ?? "direct",
         deps,
       );
-    } else if (trigger === "research") {
-      await handleResearchTrigger(
-        runId,
-        projectId,
-        repoPath,
-        researchParams,
-        deps,
-      );
     } else {
-      await handleAnalysisTrigger(
+      // Analysis and research: run preflight sync first
+      const preflightStepMap: Record<string, { dimension: string; index: number; total: number }> = {
+        checking: { dimension: "preflight_check", index: 1, total: 5 },
+        stashing: { dimension: "preflight_stash", index: 1, total: 5 },
+        fetching: { dimension: "preflight_fetch", index: 2, total: 5 },
+        pulling: { dimension: "preflight_pull", index: 3, total: 5 },
+        "resolving-conflicts": { dimension: "preflight_resolve", index: 3, total: 5 },
+        deploying: { dimension: "preflight_deploy", index: 4, total: 5 },
+        "deploying-happy-cli": { dimension: "preflight_deploy_cli", index: 4, total: 5 },
+        "deploying-happy-server": { dimension: "preflight_deploy_server", index: 4, total: 5 },
+      };
+
+      deps.emitSupervisorRunStatus({
         runId,
         projectId,
-        repoPath,
-        trigger,
-        mode,
-        dimensions,
-        changedFiles,
-        customRules,
-        existingActions,
-        deps,
-      );
+        status: "running",
+        currentDimension: "preflight_start",
+        dimensionIndex: 1,
+        totalDimensions: 5,
+      });
+
+      const preflightResult = await runPreflightSync(repoPath, (step) => {
+        const mapped = preflightStepMap[step];
+        if (mapped) {
+          deps.emitSupervisorRunStatus({
+            runId,
+            projectId,
+            status: "running",
+            currentDimension: mapped.dimension,
+            dimensionIndex: mapped.index,
+            totalDimensions: mapped.total,
+          });
+        }
+      });
+
+      if (!preflightResult.success) {
+        logger.debug(
+          `[SUPERVISOR] Preflight failed for run ${runId}: ${preflightResult.error}`,
+        );
+        deps.emitSupervisorRunStatus({
+          runId,
+          projectId,
+          status: "failed",
+          errorMessage: preflightResult.error ?? "Preflight sync failed",
+        });
+        return;
+      }
+
+      if (preflightResult.pulled) {
+        logger.debug(
+          `[SUPERVISOR] Preflight pulled ${preflightResult.changedFiles.length} changed file(s), deployed: [${preflightResult.deployedPackages.join(", ")}]`,
+        );
+      }
+
+      // Dispatch to analysis or research
+      if (trigger === "research") {
+        await handleResearchTrigger(
+          runId,
+          projectId,
+          repoPath,
+          researchParams,
+          deps,
+        );
+      } else {
+        await handleAnalysisTrigger(
+          runId,
+          projectId,
+          repoPath,
+          trigger,
+          mode,
+          dimensions,
+          changedFiles,
+          customRules,
+          existingActions,
+          deps,
+        );
+      }
     }
   } catch (error) {
     const errorMessage =

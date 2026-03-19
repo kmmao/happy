@@ -228,6 +228,23 @@ export const ProjectResearchTab = React.memo(
 
         // Resolve dimension label from key
         const resolveDimensionLabel = React.useCallback((key: string): string => {
+            // Preflight dimension keys
+            if (key.startsWith("preflight_")) {
+                const keyMap: Record<string, () => string> = {
+                    preflight_start: () => t("supervisor.dimPreflightStart"),
+                    preflight_check: () => t("supervisor.dimPreflightCheck"),
+                    preflight_stash: () => t("supervisor.dimPreflightStash"),
+                    preflight_fetch: () => t("supervisor.dimPreflightFetch"),
+                    preflight_pull: () => t("supervisor.dimPreflightPull"),
+                    preflight_resolve: () => t("supervisor.dimPreflightResolve"),
+                    preflight_deploy: () => t("supervisor.dimPreflightDeploy"),
+                    preflight_deploy_cli: () => t("supervisor.dimPreflightDeployCli"),
+                    preflight_deploy_server: () => t("supervisor.dimPreflightDeployServer"),
+                };
+                const fn = keyMap[key];
+                return fn ? fn() : key;
+            }
+            // Research dimension keys
             const entry = DIMENSION_LABELS[key as ResearchDimension];
             return entry ? entry.label() : key;
         }, []);

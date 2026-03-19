@@ -2078,6 +2078,16 @@ export const ca: TranslationStructure = {
     delete: "Elimina",
     deleteConfirm: "Eliminar acció",
     deleteConfirmBody: "Voleu eliminar aquesta acció permanentment? Si el problema encara existeix, es detectarà de nou al proper escaneig.",
+
+    dimPreflightStart: "Sincronitzant codi...",
+    dimPreflightCheck: "Comprovant repositori...",
+    dimPreflightStash: "Desant canvis...",
+    dimPreflightFetch: "Obtenint les últimes versions...",
+    dimPreflightPull: "Baixant actualitzacions...",
+    dimPreflightResolve: "Resolent conflictes...",
+    dimPreflightDeploy: "Desplegant canvis...",
+    dimPreflightDeployCli: "Publicant CLI...",
+    dimPreflightDeployServer: "Reconstruint servidor...",
   },
   webhook: {
     eventHistory: "Esdeveniments Webhook",

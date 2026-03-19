@@ -1980,6 +1980,16 @@ export const zhHans: TranslationStructure = {
     delete: "删除",
     deleteConfirm: "删除操作",
     deleteConfirmBody: "永久删除此操作？如果问题仍然存在，下次扫描会重新检测到。",
+
+    dimPreflightStart: "正在同步代码...",
+    dimPreflightCheck: "检查仓库状态...",
+    dimPreflightStash: "暂存本地更改...",
+    dimPreflightFetch: "获取最新代码...",
+    dimPreflightPull: "拉取更新...",
+    dimPreflightResolve: "解决冲突中...",
+    dimPreflightDeploy: "部署变更...",
+    dimPreflightDeployCli: "发布 CLI...",
+    dimPreflightDeployServer: "重建服务器...",
   },
   webhook: {
     eventHistory: "Webhook 事件",

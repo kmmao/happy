@@ -164,6 +164,9 @@ export type SupervisorRunStatusData = {
   actionsCount?: number;
   issuesCreated?: number;
   errorMessage?: string;
+  currentDimension?: string;
+  dimensionIndex?: number;
+  totalDimensions?: number;
   actions?: readonly SupervisorActionData[];
 };
 

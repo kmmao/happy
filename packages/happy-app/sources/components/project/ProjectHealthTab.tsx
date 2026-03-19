@@ -90,6 +90,16 @@ const dimensionLabelMap: Record<string, TranslationKey> = {
     testCoverage: "supervisor.dimTestCoverage",
     documentation: "supervisor.dimDocumentation",
     performance: "supervisor.dimPerformance",
+    // Preflight sync steps
+    preflight_start: "supervisor.dimPreflightStart",
+    preflight_check: "supervisor.dimPreflightCheck",
+    preflight_stash: "supervisor.dimPreflightStash",
+    preflight_fetch: "supervisor.dimPreflightFetch",
+    preflight_pull: "supervisor.dimPreflightPull",
+    preflight_resolve: "supervisor.dimPreflightResolve",
+    preflight_deploy: "supervisor.dimPreflightDeploy",
+    preflight_deploy_cli: "supervisor.dimPreflightDeployCli",
+    preflight_deploy_server: "supervisor.dimPreflightDeployServer",
 };
 
 function dimensionLabel(key: string): string {
