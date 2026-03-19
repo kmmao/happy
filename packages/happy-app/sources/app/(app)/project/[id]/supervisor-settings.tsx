@@ -37,6 +37,7 @@ const defaultConfig = {
         testCoverage: false,
         documentation: false,
         performance: false,
+        uiUx: false,
     },
     pushTrigger: {
         enabled: false,
@@ -397,6 +398,12 @@ export default function SupervisorSettingsScreen() {
                     value={config.analysis.performance}
                     onToggle={() => toggleDimension("performance")}
                     subtitle={t("supervisor.dimPerformanceNote")}
+                />
+                <ToggleRow
+                    label={t("supervisor.dimUiUx")}
+                    value={config.analysis.uiUx}
+                    onToggle={() => toggleDimension("uiUx")}
+                    subtitle={t("supervisor.dimUiUxNote")}
                     isLast
                 />
             </ItemGroup>

@@ -2039,6 +2039,8 @@ export const ja: TranslationStructure = {
     dimDocumentationNote: "README、APIドキュメント、コメントの正確性",
     dimPerformance: "パフォーマンス",
     dimPerformanceNote: "N+1クエリ、インデックス不足、メモリリーク",
+    dimUiUx: "UI/UX",
+    dimUiUxNote: "スペーシング、読み込み状態、アクセシビリティ、テーマ使用",
     modeSection: "分析モード",
     modeSuggest: "提案",
     modeSuggestDesc: "AIが提案し、手動で承認",

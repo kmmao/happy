@@ -2051,6 +2051,8 @@ export const en: TranslationStructure = {
     dimDocumentationNote: "README, API docs, comment accuracy",
     dimPerformance: "Performance",
     dimPerformanceNote: "N+1 queries, missing indexes, memory leaks",
+    dimUiUx: "UI/UX",
+    dimUiUxNote: "Spacing, loading states, accessibility, theme usage",
     modeSection: "Analysis Mode",
     modeSuggest: "Suggest",
     modeSuggestDesc: "AI suggests actions, you approve manually",

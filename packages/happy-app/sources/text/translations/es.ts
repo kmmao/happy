@@ -2066,6 +2066,8 @@ export const es: TranslationStructure = {
     dimDocumentationNote: "README, documentación API, precisión de comentarios",
     dimPerformance: "Rendimiento",
     dimPerformanceNote: "Consultas N+1, índices faltantes, fugas de memoria",
+    dimUiUx: "UI/UX",
+    dimUiUxNote: "Espaciado, estados de carga, accesibilidad, uso del tema",
     modeSection: "Modo de análisis",
     modeSuggest: "Sugerir",
     modeSuggestDesc: "La IA sugiere acciones, tú apruebas manualmente",

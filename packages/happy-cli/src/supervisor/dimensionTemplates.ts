@@ -98,6 +98,19 @@ export const dimensionTemplates: Record<string, DimensionTemplate> = {
 - Look for unbounded list operations (no pagination, no limit)
 - Identify potential memory leaks (event listeners not cleaned up, growing caches)`,
   },
+
+  uiUx: {
+    key: "uiUx",
+    title: "UI/UX",
+    category: "ui-ux",
+    prompt: `- Check for inconsistent spacing, padding, and alignment patterns
+- Look for missing loading states, empty states, and error states
+- Identify inaccessible elements (missing labels, low contrast, no keyboard nav)
+- Check for hardcoded colors instead of theme tokens
+- Look for missing touch feedback (pressable without visual response)
+- Identify overly long text without truncation or wrapping
+- Check for missing i18n in user-visible strings`,
+  },
 };
 
 /**

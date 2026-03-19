@@ -2077,6 +2077,8 @@ export const en = {
     dimDocumentationNote: "README, API docs, comment accuracy",
     dimPerformance: "Performance",
     dimPerformanceNote: "N+1 queries, missing indexes, memory leaks",
+    dimUiUx: "UI/UX",
+    dimUiUxNote: "Spacing, loading states, accessibility, theme usage",
 
     // Settings: Mode
     modeSection: "Analysis Mode",
