@@ -31,7 +31,9 @@ import { layout } from "@/components/layout";
 import {
     loadResearchPrefs,
     saveResearchPrefs,
+    type ResearchPrefs,
 } from "@/sync/persistence";
+import { kvGet, kvSet } from "@/sync/apiKv";
 
 const RESEARCH_DIMENSIONS = [
     "pricing",
@@ -82,7 +84,7 @@ export const ProjectResearchTab = React.memo(
         const [refreshing, setRefreshing] = React.useState(false);
         const [reportModalRun, setReportModalRun] = React.useState<SupervisorRun | null>(null);
 
-        // Input fields — load saved preferences
+        // Input fields — load from local cache first, then sync from KV Store
         const savedPrefs = React.useMemo(() => {
             if (!serverId) return null;
             return loadResearchPrefs(serverId);
@@ -101,21 +103,70 @@ export const ProjectResearchTab = React.memo(
             savedPrefs?.customRules ?? "",
         );
 
-        // Persist all research prefs on change
+        // KV Store version tracking for optimistic concurrency
+        const kvVersionRef = React.useRef(-1);
+
+        // Persist prefs: local MMKV (instant) + KV Store (multi-device sync)
         const prefsRef = React.useRef({ dimensions, knownCompetitors, additionalNotes, customRules });
         prefsRef.current = { dimensions, knownCompetitors, additionalNotes, customRules };
 
         const persistTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+        const persistToServer = React.useCallback(async () => {
+            if (!serverId) return;
+            try {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                const kvKey = `researchConfig/${serverId}`;
+                const value = JSON.stringify(prefsRef.current);
+                const newVersion = await kvSet(credentials, kvKey, value, kvVersionRef.current);
+                kvVersionRef.current = newVersion;
+            } catch {
+                // Best-effort sync — local cache is authoritative
+            }
+        }, [serverId]);
+
         const debouncedPersist = React.useCallback(() => {
+            // Save locally immediately
+            if (serverId) {
+                saveResearchPrefs(serverId, prefsRef.current);
+            }
+            // Debounce server sync
             if (persistTimerRef.current) {
                 clearTimeout(persistTimerRef.current);
             }
-            persistTimerRef.current = setTimeout(() => {
-                if (serverId) {
-                    saveResearchPrefs(serverId, prefsRef.current);
+            persistTimerRef.current = setTimeout(persistToServer, 1000);
+        }, [serverId, persistToServer]);
+
+        // Load from KV Store on mount (overrides local cache if newer)
+        React.useEffect(() => {
+            if (!serverId) return;
+            let cancelled = false;
+
+            async function loadFromKv() {
+                try {
+                    const credentials = await TokenStorage.getCredentials();
+                    if (!credentials || cancelled) return;
+                    const kvKey = `researchConfig/${serverId}`;
+                    const item = await kvGet(credentials, kvKey);
+                    if (item && !cancelled) {
+                        kvVersionRef.current = item.version;
+                        const remote = JSON.parse(item.value) as ResearchPrefs;
+                        // Update state from remote
+                        setKnownCompetitors(remote.knownCompetitors ?? "");
+                        setDimensions({ ...defaultDimensions, ...remote.dimensions });
+                        setAdditionalNotes(remote.additionalNotes ?? "");
+                        setCustomRules(remote.customRules ?? "");
+                        // Update local cache
+                        saveResearchPrefs(serverId!, remote);
+                    }
+                } catch {
+                    // Fall back to local cache
                 }
-            }, 500);
+            }
+
+            loadFromKv();
+            return () => { cancelled = true; };
         }, [serverId]);
 
         // Flush on unmount
@@ -125,10 +176,11 @@ export const ProjectResearchTab = React.memo(
                     clearTimeout(persistTimerRef.current);
                     if (serverId) {
                         saveResearchPrefs(serverId, prefsRef.current);
+                        persistToServer();
                     }
                 }
             };
-        }, [serverId]);
+        }, [serverId, persistToServer]);
 
         // Active run tracking
         const activeRun = React.useMemo(
