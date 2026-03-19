@@ -157,6 +157,7 @@ const getCachedMetadataForMachine = (
 
 // Helper function to get the most recent path for a machine
 // Returns the path from the most recently CREATED session for this machine
+// If the most recent session was a worktree, returns the parent repo path instead
 const getRecentPathForMachine = (
   machineId: string | null,
   recentPaths: Array<{ machineId: string; path: string }>,
@@ -168,13 +169,20 @@ const getRecentPathForMachine = (
 
   // Get all sessions for this machine, sorted by creation time (most recent first)
   const sessions = Object.values(storage.getState().sessions);
-  const pathsWithTimestamps: Array<{ path: string; timestamp: number }> = [];
+  const pathsWithTimestamps: Array<{
+    path: string;
+    timestamp: number;
+    parentRepoPath?: string;
+  }> = [];
 
   sessions.forEach((session) => {
     if (session.metadata?.machineId === machineId && session.metadata?.path) {
       pathsWithTimestamps.push({
         path: session.metadata.path,
         timestamp: session.createdAt, // Use createdAt, not updatedAt
+        parentRepoPath: session.metadata.worktree?.isWorktree
+          ? session.metadata.worktree.parentRepoPath
+          : undefined,
       });
     }
   });
@@ -182,8 +190,12 @@ const getRecentPathForMachine = (
   // Sort by creation time (most recently created first)
   pathsWithTimestamps.sort((a, b) => b.timestamp - a.timestamp);
 
-  // Return the most recently created session's path, or default
-  return pathsWithTimestamps[0]?.path || defaultPath;
+  const mostRecent = pathsWithTimestamps[0];
+  if (!mostRecent) return defaultPath;
+
+  // If the most recent session was a worktree, use the parent repo path
+  // so new sessions default to the real project root, not the worktree directory
+  return mostRecent.parentRepoPath || mostRecent.path;
 };
 
 function NewSessionWizard() {
@@ -835,7 +847,10 @@ function NewSessionWizard() {
           session.metadata?.machineId === selectedMachineId &&
           session.metadata?.path
         ) {
-          const path = session.metadata.path;
+          // For worktree sessions, use the parent repo path instead
+          const path = session.metadata.worktree?.isWorktree
+            ? session.metadata.worktree.parentRepoPath
+            : session.metadata.path;
           if (!pathSet.has(path)) {
             pathSet.add(path);
             pathsWithTimestamps.push({
