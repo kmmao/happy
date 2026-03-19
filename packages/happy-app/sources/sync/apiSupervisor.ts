@@ -374,6 +374,62 @@ export async function fetchLoopHistory(
     });
 }
 
+export interface LoopDetailRun {
+    id: string;
+    trigger: string;
+    status: string;
+    loopIteration: number | null;
+    loopPhase: string | null;
+    actionsCount: number;
+    healthScore: number | null;
+    costUsd: number | null;
+    tokenCount: number | null;
+    errorMessage: string | null;
+    createdAt: number;
+    completedAt: number | null;
+}
+
+export interface LoopDetailAction {
+    id: string;
+    severity: string;
+    category: string;
+    title: string;
+    description: string;
+    confidence: number | null;
+    approval: string;
+    fixStatus: string | null;
+    createdAt: number;
+}
+
+export interface LoopDetail {
+    loop: SupervisorLoop;
+    runs: LoopDetailRun[];
+    actions: LoopDetailAction[];
+}
+
+export async function fetchLoopDetail(
+    credentials: AuthCredentials,
+    projectId: string,
+    loopId: string,
+): Promise<LoopDetail> {
+    const API_ENDPOINT = getServerUrl();
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/loops/${loopId}`,
+            { headers: authHeaders(credentials) },
+        );
+
+        if (!response.ok) {
+            throw new NonRetryableError(
+                `Failed to fetch loop detail: ${response.status}`,
+            );
+        }
+
+        return (await response.json()) as LoopDetail;
+    });
+}
+
 export async function pauseSupervisorLoop(
     credentials: AuthCredentials,
     projectId: string,
@@ -835,6 +891,49 @@ export async function exportRunReport(
             throw new NonRetryableError(`Failed to export run report: ${response.status}`);
         }
         return (await response.json()) as RunExport;
+    });
+}
+
+// --- Reprocess Pending Actions ---
+
+export interface ReprocessResult {
+    approvedCount: number;
+    remainingPending: number;
+}
+
+/**
+ * Reprocess pending actions using the specified mode's configured severities
+ */
+export async function reprocessPendingActions(
+    credentials: AuthCredentials,
+    projectId: string,
+    mode: "semi-auto" | "auto",
+): Promise<ReprocessResult> {
+    const API_ENDPOINT = getServerUrl();
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/actions/reprocess`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+                body: JSON.stringify({ mode }),
+            },
+        );
+
+        if (response.status === 409) {
+            const data = (await response.json()) as { error: string };
+            throw new NonRetryableError(data.error);
+        }
+
+        if (!response.ok) {
+            const text = await response.text().catch(() => "");
+            throw new NonRetryableError(
+                text || `Failed to reprocess actions: ${response.status}`,
+            );
+        }
+
+        return (await response.json()) as ReprocessResult;
     });
 }
 

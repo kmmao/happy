@@ -115,6 +115,87 @@ export function supervisorLoopRoutes(app: Fastify) {
         },
     );
 
+    // GET /v1/projects/:id/supervisor/loops/:loopId — Get loop detail with associated runs
+    app.get(
+        "/v1/projects/:id/supervisor/loops/:loopId",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({
+                    id: z.string(),
+                    loopId: z.string(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id, loopId } = request.params;
+
+            const loop = await db.supervisorLoop.findFirst({
+                where: {
+                    id: loopId,
+                    projectId: id,
+                    accountId: userId,
+                },
+            });
+
+            if (!loop) {
+                return reply.code(404).send({ error: "Loop not found" });
+            }
+
+            // Fetch all runs belonging to this loop
+            const runs = await db.supervisorRun.findMany({
+                where: {
+                    loopId,
+                    projectId: id,
+                    accountId: userId,
+                },
+                orderBy: { createdAt: "asc" },
+            });
+
+            // Fetch actions that were approved/fixed during this loop
+            const actions = await db.supervisorAction.findMany({
+                where: {
+                    projectId: id,
+                    accountId: userId,
+                    run: { loopId },
+                    approval: { in: ["approved", "pending"] },
+                },
+                orderBy: { createdAt: "desc" },
+                take: 50,
+            });
+
+            return reply.send({
+                loop: serializeLoop(loop),
+                runs: runs.map((r) => ({
+                    id: r.id,
+                    trigger: r.trigger,
+                    status: r.status,
+                    loopIteration: r.loopIteration,
+                    loopPhase: r.loopPhase,
+                    actionsCount: r.actionsCount,
+                    healthScore: r.healthScore,
+                    costUsd: r.costUsd,
+                    tokenCount: r.tokenCount,
+                    errorMessage: r.errorMessage,
+                    createdAt: r.createdAt.getTime(),
+                    completedAt: r.completedAt?.getTime() ?? null,
+                })),
+                actions: actions.map((a) => ({
+                    id: a.id,
+                    severity: a.severity,
+                    category: a.category,
+                    title: a.title,
+                    description: a.description,
+                    confidence: a.confidence,
+                    approval: a.approval,
+                    fixStatus: a.fixStatus,
+                    createdAt: a.createdAt.getTime(),
+                })),
+            });
+        },
+    );
+
     // POST /v1/projects/:id/supervisor/loop/:loopId/pause
     app.post(
         "/v1/projects/:id/supervisor/loop/:loopId/pause",

@@ -13,6 +13,7 @@ import type { SupervisorLoop } from "@/sync/apiSupervisor";
 interface SupervisorLoopHistoryItemProps {
     readonly loop: SupervisorLoop;
     readonly isLast: boolean;
+    readonly onPress?: () => void;
 }
 
 const statusIcons: Record<string, { name: any; color: string }> = {
@@ -22,7 +23,7 @@ const statusIcons: Record<string, { name: any; color: string }> = {
 };
 
 export const SupervisorLoopHistoryItem = React.memo(
-    ({ loop, isLast }: SupervisorLoopHistoryItemProps) => {
+    ({ loop, isLast, onPress }: SupervisorLoopHistoryItemProps) => {
         const { theme } = useUnistyles();
 
         const icon = statusIcons[loop.status] ?? {
@@ -80,7 +81,9 @@ export const SupervisorLoopHistoryItem = React.memo(
                 : null;
 
         return (
-            <View
+            <Pressable
+                onPress={onPress}
+                disabled={!onPress}
                 style={[
                     styles.container,
                     !isLast && styles.containerBorder,
@@ -149,7 +152,14 @@ export const SupervisorLoopHistoryItem = React.memo(
                         </Text>
                     )}
                 </View>
-            </View>
+                {onPress && (
+                    <Ionicons
+                        name="chevron-forward"
+                        size={18}
+                        color={theme.colors.textSecondary}
+                    />
+                )}
+            </Pressable>
         );
     },
 );

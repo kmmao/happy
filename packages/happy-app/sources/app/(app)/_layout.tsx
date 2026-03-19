@@ -372,6 +372,12 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="project/[id]/supervisor-loop/[loopId]"
+        options={{
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="project/[id]/supervisor-actions"
         options={{
           headerBackTitle: t("common.back"),

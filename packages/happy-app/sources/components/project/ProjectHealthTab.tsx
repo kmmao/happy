@@ -760,6 +760,12 @@ export const ProjectHealthTab = React.memo(
                                 key={loop.id}
                                 loop={loop}
                                 isLast={index === Math.min(loopHistory.length, 3) - 1}
+                                onPress={() =>
+                                    router.push({
+                                        pathname: "/project/[id]/supervisor-loop/[loopId]",
+                                        params: { id: serverId!, loopId: loop.id },
+                                    })
+                                }
                             />
                         ))}
                         {loopHistoryTotal > 3 && (
