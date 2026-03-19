@@ -7,6 +7,8 @@ import {
     buildSupervisorStatusEphemeral,
 } from "@/app/events/eventRouter";
 import { pushSupervisorNotification } from "@/modules/pushSend";
+import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
+import { log } from "@/utils/log";
 
 /**
  * Supervisor action routes for the approval workflow.
@@ -541,6 +543,18 @@ export function supervisorActionRoutes(app: Fastify) {
                     title,
                     body,
                 });
+            }
+
+            // Loop progression: if this fix belongs to a loop, check if all fixes are done
+            if (fixStatus === "completed" || fixStatus === "failed") {
+                try {
+                    await loopOnFixCompleted(userId, actionId, id, fixStatus);
+                } catch (loopError) {
+                    log(
+                        { module: "supervisor", level: "error" },
+                        `Loop fix progression error for action ${actionId}: ${loopError}`,
+                    );
+                }
             }
 
             return reply.send({
