@@ -299,6 +299,7 @@ function NewSessionWizard() {
   const [sessionType, setSessionType] = React.useState<"simple" | "worktree">(
     "simple",
   );
+  const [showProfileDropdown, setShowProfileDropdown] = React.useState(false);
 
   const [thinkingMode, setThinkingMode] = React.useState<string | null>(
     () => lastUsedThinkingMode ?? null,
@@ -1558,6 +1559,157 @@ function NewSessionWizard() {
         style={styles.container}
       >
         <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          {/* Backdrop to close profile dropdown */}
+          {showProfileDropdown && (
+            <Pressable
+              onPress={() => setShowProfileDropdown(false)}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 1,
+              }}
+            />
+          )}
+
+          {/* Profile selector dropdown - displayed in the upper empty area */}
+          {selectedProfileId && (
+            <View
+              style={{
+                paddingHorizontal: screenWidth > 700 ? 16 : 8,
+                marginBottom: 12,
+                zIndex: 2,
+              }}
+            >
+              <View
+                style={{
+                  maxWidth: layout.maxWidth,
+                  width: "100%",
+                  alignSelf: "center",
+                }}
+              >
+                <Pressable
+                  onPress={() => setShowProfileDropdown((prev) => !prev)}
+                  style={(p) => ({
+                    flexDirection: "row",
+                    alignItems: "center",
+                    alignSelf: "flex-start",
+                    borderRadius: 16,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    backgroundColor: theme.colors.surfacePressed,
+                    opacity: p.pressed ? 0.7 : 1,
+                    gap: 6,
+                  })}
+                >
+                  <Ionicons
+                    name="person-outline"
+                    size={14}
+                    color={theme.colors.textSecondary}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: theme.colors.textSecondary,
+                      fontWeight: "600",
+                      ...Typography.default("semiBold"),
+                    }}
+                  >
+                    {allProfiles.find((p) => p.id === selectedProfileId)?.name ||
+                      selectedProfileId}
+                  </Text>
+                  <Ionicons
+                    name={showProfileDropdown ? "chevron-up" : "chevron-down"}
+                    size={12}
+                    color={theme.colors.textSecondary}
+                  />
+                </Pressable>
+
+                {/* Dropdown list */}
+                {showProfileDropdown && (
+                  <View
+                    style={{
+                      marginTop: 4,
+                      borderRadius: 12,
+                      backgroundColor: theme.colors.surface,
+                      borderWidth: 1,
+                      borderColor: theme.colors.divider,
+                      overflow: "hidden",
+                      alignSelf: "flex-start",
+                      minWidth: 200,
+                    }}
+                  >
+                    {allProfiles.map((profile) => {
+                      const isSelected = profile.id === selectedProfileId;
+                      return (
+                        <Pressable
+                          key={profile.id}
+                          onPress={() => {
+                            selectProfile(profile.id);
+                            setShowProfileDropdown(false);
+                          }}
+                          style={({ pressed }) => ({
+                            flexDirection: "row",
+                            alignItems: "center",
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            backgroundColor: pressed
+                              ? theme.colors.surfacePressed
+                              : isSelected
+                                ? theme.colors.surfacePressed
+                                : "transparent",
+                            gap: 10,
+                          })}
+                        >
+                          <View
+                            style={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: 8,
+                              borderWidth: 2,
+                              borderColor: isSelected
+                                ? theme.colors.radio.active
+                                : theme.colors.radio.inactive,
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {isSelected && (
+                              <View
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: 3,
+                                  backgroundColor: theme.colors.radio.dot,
+                                }}
+                              />
+                            )}
+                          </View>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              color: isSelected
+                                ? theme.colors.radio.active
+                                : theme.colors.text,
+                              fontWeight: isSelected ? "600" : "400",
+                              ...Typography.default(
+                                isSelected ? "semiBold" : undefined,
+                              ),
+                            }}
+                          >
+                            {profile.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Session type selector */}
           <View
             style={{
@@ -1622,7 +1774,6 @@ function NewSessionWizard() {
                 onMachineClick={handleMachineClick}
                 currentPath={selectedPath}
                 onPathClick={handlePathClick}
-                profileId={selectedProfileId}
                 onSlashCommandPress={() => setShowCommandList(true)}
                 showCommandList={showCommandList}
                 onCommandSelect={handleCommandSelect}
