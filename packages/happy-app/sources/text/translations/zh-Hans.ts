@@ -113,6 +113,8 @@ export const zhHans: TranslationStructure = {
 
   connect: {
     restoreAccount: "恢复账户",
+    restoreWithSecretKey: "使用密钥恢复",
+    qrInstructions: "1. 在移动设备上打开 Happy\n2. 前往设置 → 账户\n3. 点击「关联新设备」\n4. 扫描此二维码",
     enterSecretKey: "请输入密钥",
     invalidSecretKey: "无效的密钥，请检查后重试。",
     enterUrlManually: "手动输入 URL",
@@ -328,6 +330,7 @@ export const zhHans: TranslationStructure = {
   newSession: {
     // Used by new-session screen and launch flows
     title: "启动新会话",
+    promptPlaceholder: "你想做什么？",
     noMachinesFound: "未找到设备。请先在您的计算机上启动 Happy 会话。",
     allMachinesOffline: "所有设备似乎都已离线",
     machineDetails: "查看设备详情 →",
@@ -1574,6 +1577,9 @@ export const zhHans: TranslationStructure = {
 
   quickCommands: {
     searchPlaceholder: "搜索命令...",
+    noCommandsFound: "未找到命令",
+    favorites: "收藏",
+    allCommands: "所有命令",
     noResults: "未找到命令",
     groups: {
       favorites: "收藏",

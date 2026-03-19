@@ -1599,7 +1599,7 @@ function NewSessionWizard() {
                 onSend={handleCreateSession}
                 isSendDisabled={!canCreate}
                 isSending={isCreating}
-                placeholder="What would you like to work on?"
+                placeholder={t("newSession.promptPlaceholder")}
                 autocompletePrefixes={["/"]}
                 autocompleteSuggestions={(query) => getSuggestions("", query)}
                 agentType={agentType}
@@ -3007,7 +3007,7 @@ function NewSessionWizard() {
               onSend={handleCreateSession}
               isSendDisabled={!canCreate}
               isSending={isCreating}
-              placeholder="What would you like to work on?"
+              placeholder={t("newSession.promptPlaceholder")}
               autocompletePrefixes={["/"]}
               autocompleteSuggestions={(query) => getSuggestions("", query)}
               agentType={agentType}

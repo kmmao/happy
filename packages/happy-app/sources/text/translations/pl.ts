@@ -126,6 +126,8 @@ export const pl: TranslationStructure = {
 
   connect: {
     restoreAccount: "Przywróć konto",
+    restoreWithSecretKey: "Przywróć za pomocą klucza tajnego",
+    qrInstructions: "1. Otwórz Happy na urządzeniu mobilnym\n2. Przejdź do Ustawienia → Konto\n3. Naciśnij \"Połącz nowe urządzenie\"\n4. Zeskanuj ten kod QR",
     enterSecretKey: "Proszę wprowadzić klucz tajny",
     invalidSecretKey: "Nieprawidłowy klucz tajny. Sprawdź i spróbuj ponownie.",
     enterUrlManually: "Wprowadź URL ręcznie",
@@ -359,6 +361,7 @@ export const pl: TranslationStructure = {
   newSession: {
     // Used by new-session screen and launch flows
     title: "Rozpocznij nową sesję",
+    promptPlaceholder: "Nad czym chcesz pracować?",
     noMachinesFound:
       "Nie znaleziono maszyn. Najpierw uruchom sesję Happy na swoim komputerze.",
     allMachinesOffline: "Wszystkie maszyny są offline",
@@ -1677,6 +1680,9 @@ export const pl: TranslationStructure = {
 
   quickCommands: {
     searchPlaceholder: "Szukaj poleceń...",
+    noCommandsFound: "Nie znaleziono poleceń",
+    favorites: "Ulubione",
+    allCommands: "Wszystkie polecenia",
     noResults: "Nie znaleziono poleceń",
     groups: {
       favorites: "Ulubione",

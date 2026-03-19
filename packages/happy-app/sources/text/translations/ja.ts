@@ -176,6 +176,8 @@ export const ja: TranslationStructure = {
 
   connect: {
     restoreAccount: "アカウントを復元",
+    restoreWithSecretKey: "シークレットキーで復元",
+    qrInstructions: "1. モバイルデバイスでHappyを開く\n2. 設定 → アカウントに移動\n3. 「新しいデバイスをリンク」をタップ\n4. このQRコードをスキャン",
     enterSecretKey: "シークレットキーを入力してください",
     invalidSecretKey:
       "シークレットキーが無効です。確認して再試行してください。",
@@ -399,6 +401,7 @@ export const ja: TranslationStructure = {
   newSession: {
     // Used by new-session screen and launch flows
     title: "新しいセッションを開始",
+    promptPlaceholder: "何に取り組みたいですか？",
     noMachinesFound:
       "マシンが見つかりません。まずコンピューターでHappyセッションを起動してください。",
     allMachinesOffline: "すべてのマシンがオフラインです",
@@ -1632,6 +1635,9 @@ export const ja: TranslationStructure = {
 
   quickCommands: {
     searchPlaceholder: "コマンドを検索...",
+    noCommandsFound: "コマンドが見つかりません",
+    favorites: "お気に入り",
+    allCommands: "すべてのコマンド",
     noResults: "コマンドが見つかりません",
     groups: {
       favorites: "お気に入り",

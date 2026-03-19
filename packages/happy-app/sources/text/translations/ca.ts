@@ -113,6 +113,8 @@ export const ca: TranslationStructure = {
 
   connect: {
     restoreAccount: "Restaura el compte",
+    restoreWithSecretKey: "Restaura amb clau secreta",
+    qrInstructions: "1. Obre Happy al teu dispositiu mòbil\n2. Ves a Configuració → Compte\n3. Toca \"Enllaça un nou dispositiu\"\n4. Escaneja aquest codi QR",
     enterSecretKey: "Introdueix la teva clau secreta",
     invalidSecretKey:
       "Clau secreta no vàlida. Comprova-ho i torna-ho a provar.",
@@ -349,6 +351,7 @@ export const ca: TranslationStructure = {
   newSession: {
     // Used by new-session screen and launch flows
     title: "Inicia una nova sessió",
+    promptPlaceholder: "En què t'agradaria treballar?",
     noMachinesFound:
       "No s'han trobat màquines. Inicia una sessió de Happy al teu ordinador primer.",
     allMachinesOffline: "Totes les màquines estan fora de línia",
@@ -1656,6 +1659,9 @@ export const ca: TranslationStructure = {
 
   quickCommands: {
     searchPlaceholder: "Cerca comandes...",
+    noCommandsFound: "No s'han trobat ordres",
+    favorites: "Preferits",
+    allCommands: "Totes les ordres",
     noResults: "No s'han trobat comandes",
     groups: {
       favorites: "Preferits",

@@ -113,6 +113,8 @@ export const en = {
 
   connect: {
     restoreAccount: "Restore Account",
+    restoreWithSecretKey: "Restore with Secret Key Instead",
+    qrInstructions: "1. Open Happy on your mobile device\n2. Go to Settings → Account\n3. Tap \"Link New Device\"\n4. Scan this QR code",
     enterSecretKey: "Please enter a secret key",
     invalidSecretKey: "Invalid secret key. Please check and try again.",
     enterUrlManually: "Enter URL manually",
@@ -335,6 +337,7 @@ export const en = {
   newSession: {
     // Used by new-session screen and launch flows
     title: "Start New Session",
+    promptPlaceholder: "What would you like to work on?",
     noMachinesFound:
       "No machines found. Start a Happy session on your computer first.",
     allMachinesOffline: "All machines appear offline",
@@ -1634,6 +1637,9 @@ export const en = {
 
   quickCommands: {
     searchPlaceholder: "Search commands...",
+    noCommandsFound: "No commands found",
+    favorites: "Favorites",
+    allCommands: "All Commands",
     noResults: "No commands found",
     groups: {
       favorites: "Favorites",

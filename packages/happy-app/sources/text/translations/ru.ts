@@ -88,6 +88,8 @@ export const ru: TranslationStructure = {
 
   connect: {
     restoreAccount: "Восстановить аккаунт",
+    restoreWithSecretKey: "Восстановить с помощью секретного ключа",
+    qrInstructions: "1. Откройте Happy на мобильном устройстве\n2. Перейдите в Настройки → Аккаунт\n3. Нажмите \"Привязать новое устройство\"\n4. Отсканируйте этот QR-код",
     enterSecretKey: "Пожалуйста, введите секретный ключ",
     invalidSecretKey: "Неверный секретный ключ. Проверьте и попробуйте снова.",
     enterUrlManually: "Ввести URL вручную",
@@ -322,6 +324,7 @@ export const ru: TranslationStructure = {
   newSession: {
     // Used by new-session screen and launch flows
     title: "Начать новую сессию",
+    promptPlaceholder: "Над чем вы хотите работать?",
     noMachinesFound:
       "Машины не найдены. Сначала запустите сессию Happy на вашем компьютере.",
     allMachinesOffline: "Все машины находятся offline",
@@ -1676,6 +1679,9 @@ export const ru: TranslationStructure = {
 
   quickCommands: {
     searchPlaceholder: "Поиск команд...",
+    noCommandsFound: "Команды не найдены",
+    favorites: "Избранное",
+    allCommands: "Все команды",
     noResults: "Команды не найдены",
     groups: {
       favorites: "Избранное",

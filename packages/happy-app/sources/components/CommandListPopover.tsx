@@ -14,6 +14,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { useLocalSettingMutable } from "@/sync/storage";
 import { getAllCommands, CommandItem } from "@/sync/suggestionCommands";
+import { t } from "@/text";
 import { layout } from "./layout";
 
 interface CommandListPopoverProps {
@@ -159,7 +160,7 @@ export const CommandListPopover = React.memo(
           <TextInput
             ref={inputRef}
             style={[styles.searchInput, { color: theme.colors.text }]}
-            placeholder="Search commands..."
+            placeholder={t("quickCommands.searchPlaceholder")}
             placeholderTextColor={theme.colors.input.placeholder}
             value={query}
             onChangeText={setQuery}
@@ -193,7 +194,7 @@ export const CommandListPopover = React.memo(
                     { color: theme.colors.textSecondary },
                   ]}
                 >
-                  Favorites
+                  {t("quickCommands.favorites")}
                 </Text>
               </View>
               {favoriteItems.map((cmd) => renderItem(cmd, true))}
@@ -209,7 +210,7 @@ export const CommandListPopover = React.memo(
                       { color: theme.colors.textSecondary },
                     ]}
                   >
-                    All Commands
+                    {t("quickCommands.allCommands")}
                   </Text>
                 </View>
               )}
@@ -224,7 +225,7 @@ export const CommandListPopover = React.memo(
                   { color: theme.colors.textSecondary },
                 ]}
               >
-                No commands found
+                {t("quickCommands.noCommandsFound")}
               </Text>
             </View>
           )}

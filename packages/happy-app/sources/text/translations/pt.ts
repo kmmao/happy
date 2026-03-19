@@ -114,6 +114,8 @@ export const pt: TranslationStructure = {
 
   connect: {
     restoreAccount: "Restaurar conta",
+    restoreWithSecretKey: "Restaurar com chave secreta",
+    qrInstructions: "1. Abra o Happy no seu dispositivo móvel\n2. Vá para Configurações → Conta\n3. Toque em \"Vincular novo dispositivo\"\n4. Escaneie este código QR",
     enterSecretKey: "Por favor, insira uma chave secreta",
     invalidSecretKey: "Chave secreta inválida. Verifique e tente novamente.",
     enterUrlManually: "Inserir URL manualmente",
@@ -349,6 +351,7 @@ export const pt: TranslationStructure = {
   newSession: {
     // Used by new-session screen and launch flows
     title: "Iniciar nova sessão",
+    promptPlaceholder: "No que você gostaria de trabalhar?",
     noMachinesFound:
       "Nenhuma máquina encontrada. Inicie uma sessão Happy no seu computador primeiro.",
     allMachinesOffline: "Todas as máquinas estão offline",
@@ -1655,6 +1658,9 @@ export const pt: TranslationStructure = {
 
   quickCommands: {
     searchPlaceholder: "Pesquisar comandos...",
+    noCommandsFound: "Nenhum comando encontrado",
+    favorites: "Favoritos",
+    allCommands: "Todos os comandos",
     noResults: "Nenhum comando encontrado",
     groups: {
       favorites: "Favoritos",

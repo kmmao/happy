@@ -113,6 +113,8 @@ export const zhHant: TranslationStructure = {
 
   connect: {
     restoreAccount: "恢復帳戶",
+    restoreWithSecretKey: "使用密鑰恢復",
+    qrInstructions: "1. 在行動裝置上開啟 Happy\n2. 前往設定 → 帳戶\n3. 點擊「連結新裝置」\n4. 掃描此 QR 碼",
     enterSecretKey: "請輸入金鑰",
     invalidSecretKey: "無效的金鑰，請檢查後重試。",
     enterUrlManually: "手動輸入 URL",
@@ -328,6 +330,7 @@ export const zhHant: TranslationStructure = {
   newSession: {
     // Used by new-session screen and launch flows
     title: "啟動新工作階段",
+    promptPlaceholder: "你想做什麼？",
     noMachinesFound: "未找到裝置。請先在您的電腦上啟動 Happy 工作階段。",
     allMachinesOffline: "所有裝置似乎都已離線",
     machineDetails: "查看裝置詳情 →",
@@ -1575,6 +1578,9 @@ export const zhHant: TranslationStructure = {
 
   quickCommands: {
     searchPlaceholder: "搜尋指令...",
+    noCommandsFound: "未找到指令",
+    favorites: "收藏",
+    allCommands: "所有指令",
     noResults: "未找到指令",
     groups: {
       favorites: "收藏",
