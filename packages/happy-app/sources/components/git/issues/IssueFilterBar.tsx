@@ -1,5 +1,6 @@
 import * as React from "react";
-import { View, Pressable, ActionSheetIOS, Alert, Platform } from "react-native";
+import { View, Pressable, ActionSheetIOS, Platform } from "react-native";
+import { Modal } from "@/modal";
 import { Text } from "@/components/StyledText";
 import { Ionicons } from "@expo/vector-icons";
 import { Octicons } from "@expo/vector-icons";
@@ -93,7 +94,7 @@ export const IssueFilterBar = React.memo<IssueFilterBarProps>(
           },
         );
       } else {
-        Alert.alert(t("issues.sortBy"), undefined, [
+        Modal.alert(t("issues.sortBy"), undefined, [
           ...options.map((o) => ({
             text: o.label,
             onPress: () => onSortChange(o.sort, o.dir),
