@@ -1,6 +1,45 @@
 {
   "entries": [
     {
+      "version": "2.4.0",
+      "date": "2026-03-20",
+      "summary": "Added Supervisor Loop Mode for autonomous analyze-fix-reanalyze cycles, project configuration tab, redesigned Research tab, and numerous supervisor and UI improvements.",
+      "changes": [
+        "Added Loop Mode — autonomous cycles that analyze code, apply fixes, and re-analyze until issues are resolved",
+        "Added Loop config panel with stepper controls for max iterations and concurrency",
+        "Added Loop detail page with timeline view showing each cycle's actions and results",
+        "Added Loop history section in Health Tab for reviewing past loop executions",
+        "Added configurable severity levels for semi-auto and auto supervisor modes",
+        "Added smart needsAttention detection based on AI response content",
+        "Added project configuration tab with basic settings",
+        "Added project alias — custom display name that overrides the default folder name",
+        "Added default model selection for new sessions per project",
+        "Added archive/unarchive project toggle",
+        "Added read-only project info display (path, machine, created date)",
+        "Redesigned Research tab with unified config panel and modal report viewer",
+        "Added custom analysis rules support",
+        "Added multi-device config sync via KV Store",
+        "Added research progress UI with loading indicators",
+        "Added concurrency limits for analysis and fix sessions",
+        "Improved Supervisor Actions with sorting, filtering, and severity display",
+        "Added supervisor action restore capability",
+        "Added loading indicators to supervisor action buttons",
+        "Moved profile selector from input bar to dropdown menu above input",
+        "Updated Claude model pricing — 200K and 1M context now same price",
+        "Added version numbers to model name display",
+        "Added UI/UX dimension to supervisor health monitoring",
+        "Added auto-create Project when a new session is created",
+        "Added manual project add/delete support",
+        "Fixed default path in new session to resolve worktree to parent repo",
+        "Fixed multiple hardcoded English strings missing i18n",
+        "Fixed model selector UI and status bar model display",
+        "Fixed IssueFilterBar/PRFilterBar using Alert module instead of Modal",
+        "Fixed cached daemon models for new session with reset on agent switch",
+        "Isolated health/research tab runs to prevent cross-contamination"
+      ],
+      "rawMarkdown": "## 2.4.0 - 2026-03-20\n\n\nAdded Supervisor Loop Mode for autonomous analyze-fix-reanalyze cycles, project configuration tab, redesigned Research tab, and numerous supervisor and UI improvements.\n\n### Supervisor Loop Mode\n- Added Loop Mode — autonomous cycles that analyze code, apply fixes, and re-analyze until issues are resolved\n- Added Loop config panel with stepper controls for max iterations and concurrency\n- Added Loop detail page with timeline view showing each cycle's actions and results\n- Added Loop history section in Health Tab for reviewing past loop executions\n- Added configurable severity levels for semi-auto and auto supervisor modes\n- Added smart needsAttention detection based on AI response content\n\n### Project Config Tab\n- Added project configuration tab with basic settings\n- Added project alias — custom display name that overrides the default folder name\n- Added default model selection for new sessions per project\n- Added archive/unarchive project toggle\n- Added read-only project info display (path, machine, created date)\n\n### Research Tab Redesign\n- Redesigned Research tab with unified config panel and modal report viewer\n- Added custom analysis rules support\n- Added multi-device config sync via KV Store\n- Added research progress UI with loading indicators\n\n### Supervisor Enhancements\n- Added concurrency limits for analysis and fix sessions\n- Improved Supervisor Actions with sorting, filtering, and severity display\n- Added supervisor action restore capability\n- Added loading indicators to supervisor action buttons\n\n### UI/UX Improvements\n- Moved profile selector from input bar to dropdown menu above input\n- Updated Claude model pricing — 200K and 1M context now same price\n- Added version numbers to model name display\n- Added UI/UX dimension to supervisor health monitoring\n\n### Project Management\n- Added auto-create Project when a new session is created\n- Added manual project add/delete support\n\n### Bug Fixes\n- Fixed default path in new session to resolve worktree to parent repo\n- Fixed multiple hardcoded English strings missing i18n\n- Fixed model selector UI and status bar model display\n- Fixed IssueFilterBar/PRFilterBar using Alert module instead of Modal\n- Fixed cached daemon models for new session with reset on agent switch\n- Isolated health/research tab runs to prevent cross-contamination"
+    },
+    {
       "version": "2.3.1",
       "date": "2026-03-18",
       "summary": "Upgraded Claude Agent SDK to 0.2.78 — added StopFailure error banner and improved hook server reliability.",
@@ -198,5 +237,5 @@
       "rawMarkdown": "## 2.0.0 - 2026-02-27\n\n\nHappy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.\n\n- Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere\n- Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content\n- Added QR code scanning and manual URL entry for quick device authentication\n- Added Daemon mode for persistent background running with one-tap remote session launch\n- Added intelligent voice assistant supporting 15+ languages for natural conversation\n- Added GitHub and Claude account connection for unified developer identity management\n- Added multi-device real-time sync with online/offline status indicators\n- Added dark mode and appearance customization with automatic system theme following\n- Added Markdown table rendering and code syntax highlighting in chat\n- Streamlined settings page, removed upstream links, started maintaining own changelog\n- Supported iOS, Android, and Web platforms"
     }
   ],
-  "latestVersion": "2.3.1"
+  "latestVersion": "2.4.0"
 }

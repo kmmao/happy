@@ -1,5 +1,54 @@
 # Changelog
 
+## 2.4.0 - 2026-03-20
+
+Added Supervisor Loop Mode for autonomous analyze-fix-reanalyze cycles, project configuration tab, redesigned Research tab, and numerous supervisor and UI improvements.
+
+### Supervisor Loop Mode
+- Added Loop Mode — autonomous cycles that analyze code, apply fixes, and re-analyze until issues are resolved
+- Added Loop config panel with stepper controls for max iterations and concurrency
+- Added Loop detail page with timeline view showing each cycle's actions and results
+- Added Loop history section in Health Tab for reviewing past loop executions
+- Added configurable severity levels for semi-auto and auto supervisor modes
+- Added smart needsAttention detection based on AI response content
+
+### Project Config Tab
+- Added project configuration tab with basic settings
+- Added project alias — custom display name that overrides the default folder name
+- Added default model selection for new sessions per project
+- Added archive/unarchive project toggle
+- Added read-only project info display (path, machine, created date)
+
+### Research Tab Redesign
+- Redesigned Research tab with unified config panel and modal report viewer
+- Added custom analysis rules support
+- Added multi-device config sync via KV Store
+- Added research progress UI with loading indicators
+
+### Supervisor Enhancements
+- Added concurrency limits for analysis and fix sessions
+- Improved Supervisor Actions with sorting, filtering, and severity display
+- Added supervisor action restore capability
+- Added loading indicators to supervisor action buttons
+
+### UI/UX Improvements
+- Moved profile selector from input bar to dropdown menu above input
+- Updated Claude model pricing — 200K and 1M context now same price
+- Added version numbers to model name display
+- Added UI/UX dimension to supervisor health monitoring
+
+### Project Management
+- Added auto-create Project when a new session is created
+- Added manual project add/delete support
+
+### Bug Fixes
+- Fixed default path in new session to resolve worktree to parent repo
+- Fixed multiple hardcoded English strings missing i18n
+- Fixed model selector UI and status bar model display
+- Fixed IssueFilterBar/PRFilterBar using Alert module instead of Modal
+- Fixed cached daemon models for new session with reset on agent switch
+- Isolated health/research tab runs to prevent cross-contamination
+
 ## 2.3.1 - 2026-03-18
 
 Upgraded Claude Agent SDK to 0.2.78 — added StopFailure error banner and improved hook server reliability.
