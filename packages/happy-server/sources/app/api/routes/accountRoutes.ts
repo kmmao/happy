@@ -233,7 +233,8 @@ export function accountRoutes(app: Fastify) {
                 where,
                 orderBy: {
                     createdAt: 'desc'
-                }
+                },
+                take: 1000
             });
 
             // Aggregate data by time period
