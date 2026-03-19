@@ -7,6 +7,7 @@
 
 import psList from 'ps-list';
 import spawn from 'cross-spawn';
+import { logger } from '@/ui/logger';
 
 /**
  * Find all Happy CLI processes (including current process)
@@ -87,7 +88,7 @@ export async function killRunawayHappyProcesses(): Promise<{ killed: number, err
   
   for (const { pid, command } of runawayProcesses) {
     try {
-      console.log(`Killing runaway process PID ${pid}: ${command}`);
+      logger.info(`Killing runaway process PID ${pid}: ${command}`);
       
       if (process.platform === 'win32') {
         // Windows: use taskkill
@@ -105,17 +106,17 @@ export async function killRunawayHappyProcesses(): Promise<{ killed: number, err
         const processes = await psList();
         const stillAlive = processes.find(p => p.pid === pid);
         if (stillAlive) {
-          console.log(`Process PID ${pid} ignored SIGTERM, using SIGKILL`);
+          logger.info(`Process PID ${pid} ignored SIGTERM, using SIGKILL`);
           process.kill(pid, 'SIGKILL');
         }
       }
       
-      console.log(`Successfully killed runaway process PID ${pid}`);
+      logger.info(`Successfully killed runaway process PID ${pid}`);
       killed++;
     } catch (error) {
       const errorMessage = (error as Error).message;
       errors.push({ pid, error: errorMessage });
-      console.log(`Failed to kill process PID ${pid}: ${errorMessage}`);
+      logger.warn(`Failed to kill process PID ${pid}: ${errorMessage}`);
     }
   }
 

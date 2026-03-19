@@ -75,7 +75,7 @@ class Configuration {
 
     // Visual indicator on CLI startup (only if not daemon process to avoid log clutter)
     if (!this.isDaemonProcess && variant === "dev") {
-      console.log("\x1b[33m🔧 DEV MODE\x1b[0m - Data: " + this.happyHomeDir);
+      process.stderr.write("\x1b[33m🔧 DEV MODE\x1b[0m - Data: " + this.happyHomeDir + "\n");
     }
 
     if (!existsSync(this.happyHomeDir)) {

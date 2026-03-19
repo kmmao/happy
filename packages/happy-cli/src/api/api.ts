@@ -21,7 +21,6 @@ import {
 } from "./encryption";
 import { PushNotificationClient } from "./pushNotifications";
 import { configuration } from "@/configuration";
-import chalk from "chalk";
 import { Credentials } from "@/persistence";
 import {
   connectionState,
@@ -304,28 +303,20 @@ export class ApiClient {
 
         if (status === 403 || status === 409) {
           // Re-auth conflict: machine registered to old account, re-association not allowed
-          console.log(
-            chalk.yellow(
-              `⚠️  Machine registration rejected by the server with status ${status}`,
-            ),
+          logger.warn(
+            `⚠️  Machine registration rejected by the server with status ${status}`,
           );
-          console.log(
-            chalk.yellow(
-              `   → This machine ID is already registered to another account on the server`,
-            ),
+          logger.warn(
+            `   → This machine ID is already registered to another account on the server`,
           );
-          console.log(
-            chalk.yellow(
-              `   → This usually happens after re-authenticating with a different account`,
-            ),
+          logger.warn(
+            `   → This usually happens after re-authenticating with a different account`,
           );
-          console.log(
-            chalk.yellow(
-              `   → Run 'happy doctor clean' to reset local state and generate a new machine ID`,
-            ),
+          logger.warn(
+            `   → Run 'happy doctor clean' to reset local state and generate a new machine ID`,
           );
-          console.log(
-            chalk.yellow(`   → Open a GitHub issue if this problem persists`),
+          logger.warn(
+            `   → Open a GitHub issue if this problem persists`,
           );
           return createMinimalMachine();
         }

@@ -189,7 +189,7 @@ export async function startDaemon(): Promise<void> {
     logger.debug(
       "[DAEMON RUN] Daemon version matches, keeping existing daemon",
     );
-    console.log("Daemon already running with matching version");
+    logger.debug("Daemon already running with matching version");
     process.exit(0);
   }
 

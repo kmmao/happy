@@ -59,15 +59,15 @@ function logAcpBackendMuted(message: string): void {
   const line = `[${formatAcpTime()}] ${message}`;
   const forceColor = process.env.FORCE_COLOR;
   if (forceColor === '0') {
-    console.log(line);
+    logger.info(line);
     return;
   }
   const useColor = forceColor !== undefined || process.stdout.isTTY === true || process.stderr.isTTY === true;
   if (useColor) {
-    console.log(`${ACP_MUTED_COLOR}${line}${ACP_COLOR_RESET}`);
+    logger.info(`${ACP_MUTED_COLOR}${line}${ACP_COLOR_RESET}`);
     return;
   }
-  console.log(line);
+  logger.info(line);
 }
 
 function summarizeSessionMetadataPayload(payload: unknown): string {
