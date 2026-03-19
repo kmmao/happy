@@ -7,11 +7,12 @@ import { useProject } from "@/hooks/useProjects";
 import { ItemGroup } from "@/components/ItemGroup";
 import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { updateSupervisorConfig } from "@/sync/apiSupervisor";
+import { updateSupervisorConfig, fetchActionStats, reprocessPendingActions } from "@/sync/apiSupervisor";
 import { projectManager } from "@/sync/projectManager";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
+import { SEVERITY_COLORS, SEVERITY_KEY_MAP } from "@/components/project/supervisorConstants";
 
 type SupervisorMode = "suggest" | "semi-auto" | "auto";
 
@@ -21,6 +22,9 @@ type ScheduleInterval = (typeof SCHEDULE_INTERVALS)[number];
 /**
  * Default supervisor config values.
  */
+type Severity = "low" | "medium" | "high" | "critical";
+const ALL_SEVERITIES: readonly Severity[] = ["low", "medium", "high", "critical"] as const;
+
 const defaultConfig = {
     mode: "suggest" as SupervisorMode,
     fixStrategy: "direct" as "direct" | "pr",
@@ -38,6 +42,10 @@ const defaultConfig = {
         documentation: false,
         performance: false,
         uiUx: false,
+    },
+    autoApprove: {
+        semiAutoSeverities: ["low", "medium"] as Severity[],
+        autoSeverities: ["low", "medium", "high", "critical"] as Severity[],
     },
     pushTrigger: {
         enabled: false,
@@ -91,6 +99,10 @@ export default function SupervisorSettingsScreen() {
                     customRules: parsed.customRules ?? defaultConfig.customRules,
                     schedule: { ...defaultConfig.schedule, ...parsed.schedule },
                     analysis: { ...defaultConfig.analysis, ...parsed.analysis },
+                    autoApprove: {
+                        ...defaultConfig.autoApprove,
+                        ...parsed.autoApprove,
+                    },
                     pushTrigger: {
                         ...defaultConfig.pushTrigger,
                         ...parsed.pushTrigger,
@@ -117,9 +129,14 @@ export default function SupervisorSettingsScreen() {
         [config, initialConfig],
     );
 
+    const mountedRef = React.useRef(true);
+    React.useEffect(() => () => { mountedRef.current = false; }, []);
+
     const handleSave = React.useCallback(async () => {
         if (!project?.serverId || !isDirty) return;
         setSaving(true);
+        // Capture before setInitialConfig mutates the ref
+        const previousMode = initialConfig.mode;
         try {
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) return;
@@ -162,14 +179,56 @@ export default function SupervisorSettingsScreen() {
                 localProject.supervisorPushTriggerEnabled = config.pushTrigger.enabled;
                 localProject.supervisorCustomRules = config.customRules.trim() || null;
             }
+            if (!mountedRef.current) return;
             setInitialConfig(config);
             Modal.toast(t("supervisor.settingsSaved"));
+
+            // Check if mode was upgraded and offer to reprocess pending actions
+            const modeOrder: Record<string, number> = { suggest: 0, "semi-auto": 1, auto: 2 };
+            const oldOrder = modeOrder[previousMode] ?? 0;
+            const newOrder = modeOrder[config.mode] ?? 0;
+            if (newOrder > oldOrder && (config.mode === "semi-auto" || config.mode === "auto")) {
+                try {
+                    const stats = await fetchActionStats(credentials, project.serverId);
+                    if (!mountedRef.current || stats.pending === 0) return;
+                    const modeLabel = config.mode === "auto"
+                        ? t("supervisor.modeAuto")
+                        : t("supervisor.modeSemiAuto");
+                    const confirmed = await Modal.confirm(
+                        t("supervisor.reprocessTitle"),
+                        t("supervisor.reprocessBody", { count: stats.pending, mode: modeLabel }),
+                        {
+                            confirmText: t("supervisor.reprocessConfirm"),
+                            cancelText: t("common.cancel"),
+                        },
+                    );
+                    if (confirmed && mountedRef.current) {
+                        const result = await reprocessPendingActions(
+                            credentials,
+                            project.serverId,
+                            config.mode,
+                        );
+                        if (mountedRef.current) {
+                            Modal.toast(
+                                t("supervisor.reprocessSuccess", {
+                                    approved: result.approvedCount,
+                                    remaining: result.remainingPending,
+                                }),
+                            );
+                        }
+                    }
+                } catch {
+                    // Reprocess is best-effort — don't fail the save
+                }
+            }
         } catch {
             Modal.toast(t("supervisor.settingsSaveError"));
         } finally {
-            setSaving(false);
+            if (mountedRef.current) {
+                setSaving(false);
+            }
         }
-    }, [project?.serverId, isDirty, config]);
+    }, [project?.serverId, isDirty, config, initialConfig.mode]);
 
     const updateConfig = React.useCallback(
         (updater: (prev: SupervisorConfig) => SupervisorConfig) => {
@@ -193,6 +252,22 @@ export default function SupervisorSettingsScreen() {
                 if (!confirmed) return;
             }
             updateConfig((prev) => ({ ...prev, mode }));
+        },
+        [updateConfig],
+    );
+
+    const toggleSeverity = React.useCallback(
+        (severity: Severity, target: "semiAutoSeverities" | "autoSeverities") => {
+            updateConfig((prev) => {
+                const current = prev.autoApprove[target];
+                const next = current.includes(severity)
+                    ? current.filter((s) => s !== severity)
+                    : [...current, severity];
+                return {
+                    ...prev,
+                    autoApprove: { ...prev.autoApprove, [target]: next },
+                };
+            });
         },
         [updateConfig],
     );
@@ -294,14 +369,34 @@ export default function SupervisorSettingsScreen() {
                     subtitle={t("supervisor.modeSemiAutoDesc")}
                     selected={config.mode === "semi-auto"}
                     onPress={() => setMode("semi-auto")}
-                />
+                >
+                    {config.mode === "semi-auto" && (
+                        <SeverityChips
+                            severities={config.autoApprove.semiAutoSeverities}
+                            onToggle={(sev) => toggleSeverity(sev, "semiAutoSeverities")}
+                        />
+                    )}
+                    {config.mode !== "semi-auto" && config.autoApprove.semiAutoSeverities.length > 0 && (
+                        <SeverityTags severities={config.autoApprove.semiAutoSeverities} />
+                    )}
+                </ModeOption>
                 <ModeOption
                     label={t("supervisor.modeAuto")}
                     subtitle={t("supervisor.modeAutoDesc")}
                     selected={config.mode === "auto"}
                     onPress={() => setMode("auto")}
                     isLast
-                />
+                >
+                    {config.mode === "auto" && (
+                        <SeverityChips
+                            severities={config.autoApprove.autoSeverities}
+                            onToggle={(sev) => toggleSeverity(sev, "autoSeverities")}
+                        />
+                    )}
+                    {config.mode !== "auto" && config.autoApprove.autoSeverities.length > 0 && (
+                        <SeverityTags severities={config.autoApprove.autoSeverities} />
+                    )}
+                </ModeOption>
             </ItemGroup>
 
             {/* Scan Schedule */}
@@ -631,41 +726,117 @@ interface ModeOptionProps {
     selected: boolean;
     onPress: () => void;
     isLast?: boolean;
+    children?: React.ReactNode;
 }
 
 const ModeOption = React.memo(
-    ({ label, subtitle, selected, onPress, isLast }: ModeOptionProps) => {
+    ({ label, subtitle, selected, onPress, isLast, children }: ModeOptionProps) => {
         const { theme } = useUnistyles();
 
         return (
-            <Pressable
-                style={[
-                    styles.modeOption,
-                    !isLast && styles.toggleRowBorder,
-                ]}
-                onPress={onPress}
-            >
-                <View style={styles.toggleRowContent}>
-                    <Text style={styles.toggleRowLabel}>{label}</Text>
-                    <Text style={styles.toggleRowSubtitle}>{subtitle}</Text>
-                </View>
-                <Ionicons
-                    name={
-                        selected
-                            ? "checkmark-circle"
-                            : "ellipse-outline"
-                    }
-                    size={24}
-                    color={
-                        selected
-                            ? theme.colors.header.tint
-                            : theme.colors.textSecondary
-                    }
-                />
-            </Pressable>
+            <View style={[!isLast && styles.toggleRowBorder]}>
+                <Pressable
+                    style={styles.modeOption}
+                    onPress={onPress}
+                >
+                    <View style={styles.toggleRowContent}>
+                        <Text style={styles.toggleRowLabel}>{label}</Text>
+                        <Text style={styles.toggleRowSubtitle}>{subtitle}</Text>
+                    </View>
+                    <Ionicons
+                        name={
+                            selected
+                                ? "checkmark-circle"
+                                : "ellipse-outline"
+                        }
+                        size={24}
+                        color={
+                            selected
+                                ? theme.colors.header.tint
+                                : theme.colors.textSecondary
+                        }
+                    />
+                </Pressable>
+                {children}
+            </View>
         );
     },
 );
+
+// --- Severity Chips (editable, shown when mode is active) ---
+
+interface SeverityChipsProps {
+    severities: Severity[];
+    onToggle: (severity: Severity) => void;
+}
+
+const SeverityChips = React.memo(({ severities, onToggle }: SeverityChipsProps) => {
+    const { theme } = useUnistyles();
+
+    return (
+        <View style={styles.severityChipsContainer}>
+            <Text style={styles.severityChipsLabel}>
+                {t("supervisor.autoApproveSeverities")}
+            </Text>
+            <View style={styles.severityChips}>
+                {ALL_SEVERITIES.map((sev) => {
+                    const selected = severities.includes(sev);
+                    const color = SEVERITY_COLORS[sev] ?? theme.colors.textSecondary;
+                    return (
+                        <Pressable
+                            key={sev}
+                            style={[
+                                styles.severityChip,
+                                selected
+                                    ? { backgroundColor: color }
+                                    : {
+                                          backgroundColor: theme.colors.surface,
+                                          borderWidth: 1,
+                                          borderColor: theme.colors.divider,
+                                      },
+                            ]}
+                            onPress={() => onToggle(sev)}
+                        >
+                            <Text
+                                style={[
+                                    styles.severityChipText,
+                                    selected
+                                        ? styles.severityChipTextSelected
+                                        : { color: theme.colors.textSecondary },
+                                ]}
+                            >
+                                {t(SEVERITY_KEY_MAP[sev])}
+                            </Text>
+                        </Pressable>
+                    );
+                })}
+            </View>
+        </View>
+    );
+});
+
+// --- Severity Tags (read-only summary, shown when mode is NOT active) ---
+
+interface SeverityTagsProps {
+    severities: Severity[];
+}
+
+const SeverityTags = React.memo(({ severities }: SeverityTagsProps) => (
+    <View style={styles.severityTagsContainer}>
+        {ALL_SEVERITIES
+            .filter((sev) => severities.includes(sev))
+            .map((sev) => (
+                <View
+                    key={sev}
+                    style={[styles.severityTag, { backgroundColor: `${SEVERITY_COLORS[sev]}18` }]}
+                >
+                    <Text style={[styles.severityTagText, { color: SEVERITY_COLORS[sev] }]}>
+                        {t(SEVERITY_KEY_MAP[sev])}
+                    </Text>
+                </View>
+            ))}
+    </View>
+));
 
 // --- Interval Option ---
 
@@ -887,5 +1058,50 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 16,
         fontWeight: "600",
         color: "#fff",
+    },
+    severityChipsContainer: {
+        paddingBottom: 12,
+    },
+    severityChipsLabel: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        marginTop: 2,
+        paddingHorizontal: 16,
+        marginBottom: 4,
+    },
+    severityChips: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+        paddingHorizontal: 16,
+    },
+    severityChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: 16,
+    },
+    severityChipText: {
+        ...Typography.default("semiBold"),
+        fontSize: 13,
+    },
+    severityChipTextSelected: {
+        color: "#FFFFFF",
+    },
+    severityTagsContainer: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingBottom: 10,
+    },
+    severityTag: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+    },
+    severityTagText: {
+        ...Typography.default(),
+        fontSize: 11,
     },
 }));

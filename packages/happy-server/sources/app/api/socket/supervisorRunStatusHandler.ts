@@ -18,6 +18,7 @@ import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { aggregateSessionUsage } from "@/modules/supervisorUsage";
 import { createIssueOnProvider } from "@/app/webhook/webhookProviderApi";
+import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
 import { decryptString } from "@/modules/encrypt";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 
@@ -353,7 +354,7 @@ export function supervisorRunStatusHandler(
                         body,
                     });
 
-                    // Auto mode: automatically approve critical/high actions and trigger fixes
+                    // Auto/semi-auto mode: automatically approve actions based on configured severities
                     // Skip if run belongs to a Loop — Loop engine handles its own approval flow
                     const runForLoopCheck = await db.supervisorRun.findUnique({
                         where: { id: data.runId },
@@ -362,10 +363,9 @@ export function supervisorRunStatusHandler(
                     if (
                         !runForLoopCheck?.loopId &&
                         data.actions &&
-                        data.actions.length > 0 &&
-                        (criticalCount > 0 || highCount > 0)
+                        data.actions.length > 0
                     ) {
-                        await handleAutoMode(
+                        await handleAutoApproval(
                             userId,
                             data.projectId,
                             data.runId,
@@ -403,20 +403,19 @@ export function supervisorRunStatusHandler(
 }
 
 /**
- * In auto mode, automatically approve critical/high severity actions
- * and trigger fix sessions for them.
+ * Automatically approve actions based on configured severity levels
+ * for semi-auto and auto modes, then trigger fix sessions.
  *
  * IMPORTANT: PR merge ALWAYS requires human confirmation — this is a
- * hardcoded constraint, not a configuration option. Auto mode only
+ * hardcoded constraint, not a configuration option. This function only
  * triggers fix sessions (which create PRs), it never merges them.
  */
-async function handleAutoMode(
+async function handleAutoApproval(
     userId: string,
     projectId: string,
     runId: string,
 ): Promise<void> {
     try {
-        // Check if project is in auto mode
         const project = await db.project.findUnique({
             where: { id: projectId },
             select: {
@@ -429,16 +428,25 @@ async function handleAutoMode(
             },
         });
 
-        if (!project || project.supervisorMode !== "auto") return;
+        if (!project) return;
+        const mode = project.supervisorMode;
+        if (mode !== "auto" && mode !== "semi-auto") return;
 
-        // Find critical/high pending actions from this run
+        // Get configured severity levels for auto-approval
+        const severities = parseAutoApproveSeverities(
+            project.supervisorConfig,
+            mode as "semi-auto" | "auto",
+        );
+        if (severities.length === 0) return;
+
+        // Find pending actions from this run matching configured severities
         const actions = await db.supervisorAction.findMany({
             where: {
                 runId,
                 projectId,
                 accountId: userId,
                 approval: "pending",
-                severity: { in: ["critical", "high"] },
+                severity: { in: severities },
             },
             select: {
                 id: true,
@@ -452,7 +460,7 @@ async function handleAutoMode(
 
         if (actions.length === 0) return;
 
-        // Auto-approve all critical/high actions
+        // Batch-approve matching actions per configured severities
         await db.supervisorAction.updateMany({
             where: {
                 id: { in: actions.map((a) => a.id) },
@@ -466,7 +474,7 @@ async function handleAutoMode(
 
         log(
             { module: "supervisor" },
-            `Auto mode: approved ${actions.length} critical/high actions for project ${projectId}`,
+            `${mode} mode: approved ${actions.length} actions (severities: ${severities.join(",")}) for project ${projectId}`,
         );
 
         // Find WebhookRoute for issue creation (best-effort)
@@ -497,7 +505,7 @@ async function handleAutoMode(
             } catch {
                 log(
                     { module: "supervisor", level: "warn" },
-                    `Auto mode: failed to decrypt API token for ${webhookRoute.repoUrl}`,
+                    `${mode} mode: failed to decrypt API token for ${webhookRoute.repoUrl}`,
                 );
             }
         }
@@ -523,7 +531,7 @@ async function handleAutoMode(
                     });
                     log(
                         { module: "supervisor" },
-                        `Auto mode: created issue #${issueResult.issueNumber} for action ${action.id}`,
+                        `${mode} mode: created issue #${issueResult.issueNumber} for action ${action.id}`,
                     );
                 }
             }
@@ -550,7 +558,7 @@ async function handleAutoMode(
                     "fix",
                     project.machineId,
                     project.path,
-                    "auto",
+                    mode,
                     undefined, // dimensions
                     undefined, // changedFiles
                     undefined, // customRules
@@ -580,13 +588,13 @@ async function handleAutoMode(
             projectId,
             runId,
             type: "fix_complete",
-            title: "Auto Fix Triggered",
-            body: `Automatically triggered fixes for ${actions.length} critical/high finding(s)`,
+            title: mode === "auto" ? "Auto Fix Triggered" : "Semi-Auto Fix Triggered",
+            body: `Automatically triggered fixes for ${actions.length} action(s) (${severities.join(", ")})`,
         });
     } catch (error) {
         log(
             { module: "supervisor", level: "error" },
-            `Auto mode handler error for project ${projectId}: ${error}`,
+            `Auto-approval handler error for project ${projectId}: ${error}`,
         );
     }
 }

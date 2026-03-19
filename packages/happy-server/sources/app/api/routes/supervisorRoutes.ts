@@ -14,6 +14,7 @@ import { aggregateSessionUsage } from "@/modules/supervisorUsage";
 import { activityCache } from "@/app/presence/sessionCache";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 import { log } from "@/utils/log";
+import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
 
 /**
  * Supervisor routes for project health scanning.
@@ -683,6 +684,170 @@ export function supervisorRoutes(app: Fastify) {
         },
     );
 
+    // POST /v1/projects/:id/supervisor/actions/reprocess — Re-process pending actions with current mode
+    app.post(
+        "/v1/projects/:id/supervisor/actions/reprocess",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                body: z.object({
+                    mode: z.enum(["semi-auto", "auto"]),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+            const { mode } = request.body;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+                select: {
+                    id: true,
+                    supervisorConfig: true,
+                    machineId: true,
+                    path: true,
+                    repoUrl: true,
+                    fixStrategy: true,
+                },
+            });
+
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            // Parse configured severities from project config
+            const severities = parseAutoApproveSeverities(project.supervisorConfig, mode);
+            if (severities.length === 0) {
+                return reply.send({ approvedCount: 0, remainingPending: 0 });
+            }
+
+            // Atomic: check for conflicts + find + approve in a single transaction
+            const txResult = await db.$transaction(async (tx) => {
+                // Check for active loop
+                const activeLoop = await tx.supervisorLoop.findFirst({
+                    where: {
+                        projectId: id,
+                        accountId: userId,
+                        status: { in: ["running", "paused"] },
+                    },
+                    select: { id: true },
+                });
+                if (activeLoop) {
+                    return { conflict: "Cannot reprocess while a loop is active" as const };
+                }
+
+                // Check for active run
+                const activeRun = await tx.supervisorRun.findFirst({
+                    where: {
+                        projectId: id,
+                        accountId: userId,
+                        status: { in: ["pending", "running"] },
+                    },
+                    select: { id: true },
+                });
+                if (activeRun) {
+                    return { conflict: "Cannot reprocess while a scan is running" as const };
+                }
+
+                // Find all matching pending actions
+                const pendingActions = await tx.supervisorAction.findMany({
+                    where: {
+                        projectId: id,
+                        accountId: userId,
+                        approval: "pending",
+                        severity: { in: [...severities] },
+                    },
+                    select: {
+                        id: true,
+                        severity: true,
+                        title: true,
+                        description: true,
+                        suggestedFix: true,
+                        category: true,
+                    },
+                });
+
+                if (pendingActions.length === 0) {
+                    const totalPending = await tx.supervisorAction.count({
+                        where: { projectId: id, accountId: userId, approval: "pending" },
+                    });
+                    return { pendingActions: [] as typeof pendingActions, approvedCount: 0, remainingPending: totalPending };
+                }
+
+                // Batch approve
+                await tx.supervisorAction.updateMany({
+                    where: {
+                        id: { in: pendingActions.map((a) => a.id) },
+                        approval: "pending",
+                    },
+                    data: {
+                        approval: "approved",
+                        fixStatus: "pending",
+                    },
+                });
+
+                const remainingPending = await tx.supervisorAction.count({
+                    where: { projectId: id, accountId: userId, approval: "pending" },
+                });
+
+                return { pendingActions, approvedCount: pendingActions.length, remainingPending };
+            });
+
+            if ("conflict" in txResult) {
+                return reply.code(409).send({ error: txResult.conflict });
+            }
+
+            const { pendingActions, remainingPending } = txResult;
+
+            log(
+                { module: "supervisor" },
+                `Reprocess: approved ${pendingActions.length} actions (mode=${mode}, severities=${severities.join(",")}) for project ${id}`,
+            );
+
+            // Trigger fix for each approved action
+            const { maxAnalysis, maxFix } = parseConcurrencyConfig(project.supervisorConfig);
+            for (const action of pendingActions) {
+                eventRouter.emitEphemeral({
+                    userId,
+                    payload: buildSupervisorTriggerEphemeral(
+                        id,
+                        action.id,
+                        "fix",
+                        project.machineId,
+                        project.path,
+                        mode,
+                        undefined,
+                        undefined,
+                        undefined,
+                        {
+                            title: action.title,
+                            description: action.description,
+                            suggestedFix: action.suggestedFix,
+                            category: action.category,
+                            severity: action.severity,
+                        },
+                        undefined,
+                        project.fixStrategy ?? undefined,
+                        undefined,
+                        maxAnalysis,
+                        maxFix,
+                    ),
+                    recipientFilter: {
+                        type: "machine-scoped-only",
+                        machineId: project.machineId,
+                    },
+                });
+            }
+
+            return reply.send({
+                approvedCount: pendingActions.length,
+                remainingPending,
+            });
+        },
+    );
+
 }
 
 class ConflictError extends Error {
@@ -693,10 +858,6 @@ class ConflictError extends Error {
     }
 }
 
-/**
- * Parse comma-separated dimensions string into an array.
- * Returns undefined (use defaults) if empty or null.
- */
 /**
  * Extract concurrency limits from the supervisorConfig JSON blob.
  * Returns undefined values if not set (CLI will use its defaults).
