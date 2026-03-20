@@ -34,7 +34,6 @@ import {
     fetchSupervisorTrend,
     type SupervisorSummary,
     fetchSupervisorSummary,
-    batchUpdateActionApproval,
     clearAllActions,
     type SupervisorLoop,
     fetchActiveLoop,
@@ -45,7 +44,6 @@ import { useRouter } from "expo-router";
 import { sync } from "@/sync/sync";
 import { sessionKill } from "@/sync/ops";
 import { useSession } from "@/sync/storage";
-import { SupervisorActionCard } from "./SupervisorActionCard";
 import { SupervisorSummaryCard } from "./SupervisorSummaryCard";
 import { SupervisorTrendChart } from "./SupervisorTrendChart";
 import { SupervisorRunHistoryItem } from "./SupervisorRunHistoryItem";
@@ -299,64 +297,6 @@ export const ProjectHealthTab = React.memo(
                 );
                 await loadData();
             }, [serverId, activeRun, loadData]),
-        );
-
-        const [batchApproveLoading, doBatchApprove] = useHappyAction(
-            React.useCallback(async () => {
-                if (!serverId || pendingActions.length === 0) return;
-                const confirmed = await Modal.confirm(
-                    t("supervisor.approveAll"),
-                    t("supervisor.approveAllConfirm", {
-                        count: pendingActions.length,
-                    }),
-                    { confirmText: t("supervisor.approve"), destructive: false },
-                );
-                if (!confirmed) return;
-                const credentials = await TokenStorage.getCredentials();
-                if (!credentials) return;
-                const pendingIds = pendingActions.map((a) => a.id);
-                await batchUpdateActionApproval(
-                    credentials,
-                    serverId,
-                    pendingIds,
-                    "approved",
-                );
-                Modal.toast(
-                    t("supervisor.approveAllSuccess", {
-                        count: pendingIds.length,
-                    }),
-                );
-                await loadData();
-            }, [serverId, pendingActions, loadData]),
-        );
-
-        const [batchSkipLoading, doBatchSkip] = useHappyAction(
-            React.useCallback(async () => {
-                if (!serverId || pendingActions.length === 0) return;
-                const confirmed = await Modal.confirm(
-                    t("supervisor.skipAll"),
-                    t("supervisor.skipAllConfirm", {
-                        count: pendingActions.length,
-                    }),
-                    { confirmText: t("supervisor.skip"), destructive: true },
-                );
-                if (!confirmed) return;
-                const credentials = await TokenStorage.getCredentials();
-                if (!credentials) return;
-                const pendingIds = pendingActions.map((a) => a.id);
-                await batchUpdateActionApproval(
-                    credentials,
-                    serverId,
-                    pendingIds,
-                    "skipped",
-                );
-                Modal.toast(
-                    t("supervisor.skipAllSuccess", {
-                        count: pendingIds.length,
-                    }),
-                );
-                await loadData();
-            }, [serverId, pendingActions, loadData]),
         );
 
         const [clearAllLoading, doClearAll] = useHappyAction(
@@ -687,54 +627,6 @@ export const ProjectHealthTab = React.memo(
                     </Pressable>
                 </ItemGroup>
 
-                {/* Pending Actions */}
-                {pendingActions.length > 0 && serverId && (
-                    <ItemGroup
-                        title={t("supervisor.pendingActions", {
-                            count: pendingActionsTotal,
-                        })}
-                    >
-                        {pendingActions.map((action, index) => (
-                            <SupervisorActionCard
-                                key={action.id}
-                                action={action}
-                                projectId={serverId}
-                                onUpdated={loadData}
-                                isLast={
-                                    index === pendingActions.length - 1
-                                }
-                            />
-                        ))}
-                        <View style={styles.batchButtonsRow}>
-                            <Pressable
-                                style={styles.batchApproveButton}
-                                onPress={doBatchApprove}
-                                disabled={batchApproveLoading}
-                            >
-                                {batchApproveLoading ? (
-                                    <ActivityIndicator size="small" color="#FFFFFF" />
-                                ) : (
-                                    <Text style={styles.batchApproveText}>
-                                        {t("supervisor.approveAll")}
-                                    </Text>
-                                )}
-                            </Pressable>
-                            <Pressable
-                                style={styles.batchSkipButton}
-                                onPress={doBatchSkip}
-                                disabled={batchSkipLoading}
-                            >
-                                {batchSkipLoading ? (
-                                    <ActivityIndicator size="small" color={theme.colors.text} />
-                                ) : (
-                                    <Text style={styles.batchSkipText}>
-                                        {t("supervisor.skipAll")}
-                                    </Text>
-                                )}
-                            </Pressable>
-                        </View>
-                    </ItemGroup>
-                )}
 
 
                 {/* Cost Summary */}
@@ -1024,39 +916,6 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 15,
         color: theme.colors.text,
         flex: 1,
-    },
-    batchButtonsRow: {
-        flexDirection: "row",
-        gap: 8,
-        marginTop: 8,
-        marginBottom: 4,
-        paddingHorizontal: 16,
-    },
-    batchApproveButton: {
-        flex: 1,
-        backgroundColor: theme.colors.header.tint,
-        paddingVertical: 10,
-        borderRadius: 8,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    batchApproveText: {
-        ...Typography.default("semiBold"),
-        fontSize: 14,
-        color: "#FFFFFF",
-    },
-    batchSkipButton: {
-        flex: 1,
-        backgroundColor: theme.colors.surface,
-        paddingVertical: 10,
-        borderRadius: 8,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    batchSkipText: {
-        ...Typography.default("semiBold"),
-        fontSize: 14,
-        color: theme.colors.text,
     },
     quickActionCard: {
         flexDirection: "row",
