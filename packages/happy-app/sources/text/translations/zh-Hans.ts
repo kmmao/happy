@@ -541,6 +541,8 @@ export const zhHans: TranslationStructure = {
     deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
       `此会话包含 worktree branch '${branchName}'，且存在未关闭的 PR。该 branch 将为 PR 保留，但会话数据将被永久删除。`,
     failedToDeleteSession: "删除会话失败",
+    restoreSession: "恢复",
+    failedToRestoreSession: "恢复会话失败",
     sessionDeleted: "会话删除成功",
     deleteAllArchivedSessions: "删除所有已归档会话",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
@@ -1716,6 +1718,8 @@ export const zhHans: TranslationStructure = {
     configSaveFailed: "保存配置失败",
     noSessions: "暂无会话",
     sessions: "会话",
+    activeSessions: "活跃会话",
+    archivedSessions: "归档会话",
     noGitInfo: "暂无 git 信息",
     gitInfo: "Git 信息",
     branch: "分支",
@@ -1897,7 +1901,7 @@ export const zhHans: TranslationStructure = {
     minutesAgo: ({ count }: { count: number }) => `${count}分钟前`,
     hoursAgo: ({ count }: { count: number }) => `${count}小时前`,
     daysAgo: ({ count }: { count: number }) => `${count}天前`,
-    costSection: "开销（30天）",
+    costSection: "开销",
     costRunsCount: "运行次数",
     costTotalTokens: "总 Token 数",
     costTotalUsd: "总费用",

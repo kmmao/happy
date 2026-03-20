@@ -626,6 +626,8 @@ export const ja: TranslationStructure = {
     deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
       `このセッションにはオープン中の PR がある worktree branch '${branchName}' があります。branch は PR のために保持されますが、セッションデータは完全に削除されます。`,
     failedToDeleteSession: "セッションの削除に失敗しました",
+    restoreSession: "復元",
+    failedToRestoreSession: "セッションの復元に失敗しました",
     sessionDeleted: "セッションが正常に削除されました",
     deleteAllArchivedSessions: "アーカイブ済みセッションをすべて削除",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
@@ -1775,6 +1777,8 @@ export const ja: TranslationStructure = {
     configSaveFailed: "設定の保存に失敗しました",
     noSessions: "セッションはまだありません",
     sessions: "セッション",
+    activeSessions: "アクティブなセッション",
+    archivedSessions: "アーカイブ済みセッション",
     noGitInfo: "git情報はありません",
     gitInfo: "Git情報",
     branch: "ブランチ",
@@ -1965,7 +1969,7 @@ export const ja: TranslationStructure = {
     minutesAgo: ({ count }: { count: number }) => `${count}分前`,
     hoursAgo: ({ count }: { count: number }) => `${count}時間前`,
     daysAgo: ({ count }: { count: number }) => `${count}日前`,
-    costSection: "コスト（30日間）",
+    costSection: "コスト",
     costRunsCount: "実行回数",
     costTotalTokens: "総トークン数",
     costTotalUsd: "総コスト",

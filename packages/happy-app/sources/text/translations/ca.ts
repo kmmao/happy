@@ -576,6 +576,8 @@ export const ca: TranslationStructure = {
     deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
       `Aquesta sessió té un worktree branch '${branchName}' amb un PR obert. El branch es conservarà per al PR, però les dades de la sessió s'eliminaran permanentment.`,
     failedToDeleteSession: "Error en eliminar la sessió",
+    restoreSession: "Restaurar",
+    failedToRestoreSession: "Error en restaurar la sessió",
     sessionDeleted: "Sessió eliminada amb èxit",
     deleteAllArchivedSessions: "Elimina totes les sessions arxivades",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
@@ -1800,6 +1802,8 @@ export const ca: TranslationStructure = {
     configSaveFailed: "Error en desar la configuració",
     noSessions: "Sense sessions encara",
     sessions: "Sessions",
+    activeSessions: "Sessions actives",
+    archivedSessions: "Sessions arxivades",
     noGitInfo: "Sense informació de git disponible",
     gitInfo: "Informació Git",
     branch: "Branca",
@@ -1995,7 +1999,7 @@ export const ca: TranslationStructure = {
     minutesAgo: ({ count }: { count: number }) => `fa ${count} min`,
     hoursAgo: ({ count }: { count: number }) => `fa ${count}h`,
     daysAgo: ({ count }: { count: number }) => `fa ${count}d`,
-    costSection: "Costos (30 dies)",
+    costSection: "Costos",
     costRunsCount: "Execucions",
     costTotalTokens: "Tokens totals",
     costTotalUsd: "Cost total",

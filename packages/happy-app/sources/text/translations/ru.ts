@@ -521,6 +521,8 @@ export const ru: TranslationStructure = {
     deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
       `Эта сессия содержит worktree branch '${branchName}' с открытым PR. Branch будет сохранён для PR, но данные сессии будут удалены навсегда.`,
     failedToDeleteSession: "Не удалось удалить сессию",
+    restoreSession: "Восстановить",
+    failedToRestoreSession: "Не удалось восстановить сессию",
     sessionDeleted: "Сессия успешно удалена",
     deleteAllArchivedSessions: "Удалить все архивные сессии",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
@@ -1818,6 +1820,8 @@ export const ru: TranslationStructure = {
     configSaveFailed: "Не удалось сохранить настройки",
     noSessions: "Сессий пока нет",
     sessions: "Сессии",
+    activeSessions: "Активные сессии",
+    archivedSessions: "Архивные сессии",
     noGitInfo: "Информация о git недоступна",
     gitInfo: "Информация Git",
     branch: "Ветка",
@@ -2009,7 +2013,7 @@ export const ru: TranslationStructure = {
     minutesAgo: ({ count }: { count: number }) => `${count} мин назад`,
     hoursAgo: ({ count }: { count: number }) => `${count} ч назад`,
     daysAgo: ({ count }: { count: number }) => `${count} дн назад`,
-    costSection: "Расходы (30 дней)",
+    costSection: "Расходы",
     costRunsCount: "Запуски",
     costTotalTokens: "Всего токенов",
     costTotalUsd: "Общая стоимость",

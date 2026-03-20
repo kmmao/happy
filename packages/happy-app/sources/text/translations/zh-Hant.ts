@@ -541,6 +541,8 @@ export const zhHant: TranslationStructure = {
     deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
       `此工作階段包含 worktree branch '${branchName}'，且存在未關閉的 PR。該 branch 將為 PR 保留，但工作階段資料將被永久刪除。`,
     failedToDeleteSession: "刪除工作階段失敗",
+    restoreSession: "恢復",
+    failedToRestoreSession: "恢復工作階段失敗",
     sessionDeleted: "工作階段刪除成功",
     deleteAllArchivedSessions: "刪除所有已封存工作階段",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
@@ -1717,6 +1719,8 @@ export const zhHant: TranslationStructure = {
     configSaveFailed: "儲存設定失敗",
     noSessions: "暫無工作階段",
     sessions: "工作階段",
+    activeSessions: "進行中的工作階段",
+    archivedSessions: "已封存的工作階段",
     noGitInfo: "暫無 git 資訊",
     gitInfo: "Git 資訊",
     branch: "分支",
@@ -1900,7 +1904,7 @@ export const zhHant: TranslationStructure = {
     minutesAgo: ({ count }: { count: number }) => `${count}分鐘前`,
     hoursAgo: ({ count }: { count: number }) => `${count}小時前`,
     daysAgo: ({ count }: { count: number }) => `${count}天前`,
-    costSection: "開銷（30天）",
+    costSection: "開銷",
     costRunsCount: "執行次數",
     costTotalTokens: "總 Token 數",
     costTotalUsd: "總費用",

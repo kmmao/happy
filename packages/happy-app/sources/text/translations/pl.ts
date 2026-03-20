@@ -584,6 +584,8 @@ export const pl: TranslationStructure = {
     deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
       `Ta sesja zawiera worktree branch '${branchName}' z otwartym PR. Branch zostanie zachowany dla PR, ale dane sesji zostaną trwale usunięte.`,
     failedToDeleteSession: "Nie udało się usunąć sesji",
+    restoreSession: "Przywróć",
+    failedToRestoreSession: "Nie udało się przywrócić sesji",
     sessionDeleted: "Sesja została pomyślnie usunięta",
     deleteAllArchivedSessions: "Usuń wszystkie zarchiwizowane sesje",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
@@ -1821,6 +1823,8 @@ export const pl: TranslationStructure = {
     configSaveFailed: "Nie udało się zapisać konfiguracji",
     noSessions: "Brak sesji",
     sessions: "Sesje",
+    activeSessions: "Aktywne sesje",
+    archivedSessions: "Zarchiwizowane sesje",
     noGitInfo: "Brak informacji o git",
     gitInfo: "Informacje Git",
     branch: "Gałąź",
@@ -2010,7 +2014,7 @@ export const pl: TranslationStructure = {
     minutesAgo: ({ count }: { count: number }) => `${count} min temu`,
     hoursAgo: ({ count }: { count: number }) => `${count} godz. temu`,
     daysAgo: ({ count }: { count: number }) => `${count} dni temu`,
-    costSection: "Koszty (30 dni)",
+    costSection: "Koszty",
     costRunsCount: "Uruchomienia",
     costTotalTokens: "Łączne tokeny",
     costTotalUsd: "Łączny koszt",

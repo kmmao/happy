@@ -1,7 +1,7 @@
 import * as React from "react";
 import { View, Text, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { Swipeable } from "react-native-gesture-handler";
+import { Swipeable, RectButton } from "react-native-gesture-handler";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
@@ -15,7 +15,7 @@ import { useSessionStatus, getSessionName } from "@/utils/sessionUtils";
 import { useRouter } from "expo-router";
 import { t } from "@/text";
 import { Modal } from "@/modal";
-import { sessionDelete, sessionKill } from "@/sync/ops";
+import { sessionDelete, sessionKill, sessionRestore } from "@/sync/ops";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
 
@@ -28,6 +28,7 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
     const status = useSessionStatus(session);
     const { theme } = useUnistyles();
     const swipeableRef = React.useRef<Swipeable | null>(null);
+    const isSwipeOpen = React.useRef(false);
 
     const [archiving, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
@@ -81,12 +82,27 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
         );
     }, [performDelete]);
 
-    const isBusy = archiving || deleting;
+    const [restoring, performRestore] = useHappyAction(async () => {
+        const result = await sessionRestore(session.id);
+        if (!result.success) {
+            throw new HappyError(
+                result.message || t("sessionInfo.failedToRestoreSession"),
+                false,
+            );
+        }
+    });
+
+    const handleRestore = React.useCallback(() => {
+        swipeableRef.current?.close();
+        performRestore();
+    }, [performRestore]);
+
+    const isBusy = archiving || deleting || restoring;
 
     const renderRightActions = React.useCallback(
         () => (
             <View style={{ flexDirection: "row" }}>
-                {session.active && (
+                {session.active ? (
                     <Pressable
                         style={styles.swipeActionArchive}
                         onPress={handleArchive}
@@ -99,6 +115,21 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
                         />
                         <Text style={styles.swipeActionText} numberOfLines={1}>
                             {t("sessionInfo.archiveSession")}
+                        </Text>
+                    </Pressable>
+                ) : (
+                    <Pressable
+                        style={styles.swipeActionRestore}
+                        onPress={handleRestore}
+                        disabled={isBusy}
+                    >
+                        <Ionicons
+                            name="arrow-undo-outline"
+                            size={20}
+                            color="#FFFFFF"
+                        />
+                        <Text style={styles.swipeActionText} numberOfLines={1}>
+                            {t("sessionInfo.restoreSession")}
                         </Text>
                     </Pressable>
                 )}
@@ -118,32 +149,44 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
                 </Pressable>
             </View>
         ),
-        [session.active, handleArchive, handleDelete, isBusy],
+        [session.active, handleArchive, handleRestore, handleDelete, isBusy],
     );
+
+    const handlePress = React.useCallback(() => {
+        if (isSwipeOpen.current) {
+            swipeableRef.current?.close();
+            return;
+        }
+        router.push(`/session/${session.id}`);
+    }, [router, session.id]);
 
     return (
         <Swipeable
             ref={swipeableRef}
             renderRightActions={renderRightActions}
             overshootRight={false}
+            rightThreshold={40}
             enabled={!isBusy}
+            onSwipeableWillOpen={() => { isSwipeOpen.current = true; }}
+            onSwipeableClose={() => { isSwipeOpen.current = false; }}
         >
-            <Item
-                title={getSessionName(session)}
-                subtitle={status.statusText}
-                icon={
-                    <View
-                        style={[
-                            styles.statusDot,
-                            { backgroundColor: status.statusDotColor },
-                        ]}
-                    />
-                }
-                onPress={() => router.push(`/session/${session.id}`)}
-                showChevron
-                showDivider={showDivider}
-                loading={isBusy}
-            />
+            <RectButton onPress={handlePress} enabled={!isBusy}>
+                <Item
+                    title={getSessionName(session)}
+                    subtitle={status.statusText}
+                    icon={
+                        <View
+                            style={[
+                                styles.statusDot,
+                                { backgroundColor: status.statusDotColor },
+                            ]}
+                        />
+                    }
+                    showChevron={session.active}
+                    showDivider={showDivider}
+                    loading={isBusy}
+                />
+            </RectButton>
         </Swipeable>
     );
 });
@@ -168,6 +211,11 @@ export const ProjectSessionsTab = React.memo(
                         return a.id < b.id ? -1 : 1;
                     });
             }),
+        );
+
+        const activeSessions = React.useMemo(
+            () => sessions.filter((s) => s.active),
+            [sessions],
         );
 
         const archivedSessions = React.useMemo(
@@ -249,7 +297,7 @@ export const ProjectSessionsTab = React.memo(
 
         return (
             <ItemList>
-                <ItemGroup title={t("projects.sessions")}>
+                <ItemGroup>
                     <Item
                         title={t("newSession.title")}
                         icon={
@@ -261,8 +309,18 @@ export const ProjectSessionsTab = React.memo(
                         }
                         onPress={handleNewSession}
                         titleStyle={{ color: theme.colors.header.tint }}
+                        showChevron
                     />
-                    {archivedSessions.length > 0 && (
+                </ItemGroup>
+                {activeSessions.length > 0 && (
+                    <ItemGroup title={t("projects.activeSessions")}>
+                        {activeSessions.map((session) => (
+                            <SessionRow key={session.id} session={session} />
+                        ))}
+                    </ItemGroup>
+                )}
+                {archivedSessions.length > 0 && (
+                    <ItemGroup title={t("projects.archivedSessions")}>
                         <Item
                             title={t("projects.deleteArchivedSessions")}
                             icon={
@@ -276,11 +334,11 @@ export const ProjectSessionsTab = React.memo(
                             titleStyle={{ color: theme.colors.deleteAction }}
                             disabled={deletingArchived}
                         />
-                    )}
-                    {sessions.map((session) => (
-                        <SessionRow key={session.id} session={session} />
-                    ))}
-                </ItemGroup>
+                        {archivedSessions.map((session) => (
+                            <SessionRow key={session.id} session={session} />
+                        ))}
+                    </ItemGroup>
+                )}
             </ItemList>
         );
     },
@@ -333,6 +391,13 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: theme.colors.warning,
+    },
+    swipeActionRestore: {
+        width: 80,
+        height: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: theme.colors.header.tint,
     },
     swipeActionText: {
         marginTop: 4,

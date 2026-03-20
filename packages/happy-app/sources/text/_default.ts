@@ -558,6 +558,8 @@ export const en = {
     deleteSessionWorktreePrWarning: ({ branchName }: { branchName: string }) =>
       `This session has a worktree branch '${branchName}' with an open PR. The branch will be kept for the PR, but the session data will be permanently deleted.`,
     failedToDeleteSession: "Failed to delete session",
+    restoreSession: "Restore",
+    failedToRestoreSession: "Failed to restore session",
     sessionDeleted: "Session deleted successfully",
     deleteAllArchivedSessions: "Delete All Archived Sessions",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
@@ -1779,6 +1781,8 @@ export const en = {
     configSaveFailed: "Failed to save configuration",
     noSessions: "No sessions yet",
     sessions: "Sessions",
+    activeSessions: "Active Sessions",
+    archivedSessions: "Archived Sessions",
     noGitInfo: "No git information available",
     gitInfo: "Git Info",
     branch: "Branch",
@@ -1990,7 +1994,7 @@ export const en = {
     daysAgo: ({ count }: { count: number }) => `${count}d ago`,
 
     // Cost
-    costSection: "Cost (30 days)",
+    costSection: "Cost",
     costRunsCount: "Runs",
     costTotalTokens: "Total Tokens",
     costTotalUsd: "Total Cost",
