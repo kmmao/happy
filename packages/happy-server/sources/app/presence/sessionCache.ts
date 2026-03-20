@@ -28,6 +28,9 @@ class ActivityCache {
   private batchTimer: NodeJS.Timeout | null = null;
   private cleanupTimer: NodeJS.Timeout | null = null;
 
+  // Maximum cache entries per cache to prevent unbounded growth
+  private readonly MAX_ENTRIES = 10_000;
+
   // Cache TTL (30 seconds)
   private readonly CACHE_TTL = 30 * 1000;
 
@@ -39,6 +42,33 @@ class ActivityCache {
 
   constructor() {
     this.startBatchTimer();
+  }
+
+  private evictIfNeeded<T extends { validUntil: number }>(
+    cache: Map<string, T>,
+  ): void {
+    if (cache.size < this.MAX_ENTRIES) {
+      return;
+    }
+
+    // First pass: remove expired entries
+    const now = Date.now();
+    for (const [key, entry] of cache.entries()) {
+      if (entry.validUntil < now) {
+        cache.delete(key);
+      }
+    }
+
+    // If still over limit, remove oldest entries by validUntil
+    if (cache.size >= this.MAX_ENTRIES) {
+      const sorted = [...cache.entries()].sort(
+        (a, b) => a[1].validUntil - b[1].validUntil,
+      );
+      const toRemove = sorted.slice(0, cache.size - this.MAX_ENTRIES + 1);
+      for (const [key] of toRemove) {
+        cache.delete(key);
+      }
+    }
   }
 
   private startBatchTimer(): void {
@@ -90,6 +120,7 @@ class ActivityCache {
 
       if (session) {
         // Cache the result (including active status)
+        this.evictIfNeeded(this.sessionCache);
         this.sessionCache.set(sessionId, {
           validUntil: now + this.CACHE_TTL,
           lastUpdateSent: session.lastActiveAt.getTime(),
@@ -141,6 +172,7 @@ class ActivityCache {
 
       if (machine) {
         // Cache the result
+        this.evictIfNeeded(this.machineCache);
         this.machineCache.set(machineId, {
           validUntil: now + this.CACHE_TTL,
           lastUpdateSent: machine.lastActiveAt?.getTime() || 0,
