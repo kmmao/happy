@@ -4,6 +4,7 @@ import { GitHubProfile } from "@/app/api/types";
 import { AccountProfile } from "@/types";
 import { getPublicUrl } from "@/storage/files";
 import type { SessionMessageContent } from "@kmmao/happy-wire";
+import * as privacyKit from "privacy-kit";
 
 // === CONNECTION TYPES ===
 
@@ -522,7 +523,7 @@ export function buildNewSessionUpdate(
       agentState: session.agentState,
       agentStateVersion: session.agentStateVersion,
       dataEncryptionKey: session.dataEncryptionKey
-        ? Buffer.from(session.dataEncryptionKey).toString("base64")
+        ? privacyKit.encodeBase64(new Uint8Array(session.dataEncryptionKey))
         : null,
       active: session.active,
       activeAt: session.lastActiveAt.getTime(),
@@ -653,7 +654,7 @@ export function buildNewMachineUpdate(
       daemonState: machine.daemonState,
       daemonStateVersion: machine.daemonStateVersion,
       dataEncryptionKey: machine.dataEncryptionKey
-        ? Buffer.from(machine.dataEncryptionKey).toString("base64")
+        ? privacyKit.encodeBase64(new Uint8Array(machine.dataEncryptionKey))
         : null,
       active: machine.active,
       activeAt: machine.lastActiveAt.getTime(),
@@ -769,13 +770,11 @@ export function buildNewArtifactUpdate(
       t: "new-artifact",
       artifactId: artifact.id,
       seq: artifact.seq,
-      header: Buffer.from(artifact.header).toString("base64"),
+      header: privacyKit.encodeBase64(new Uint8Array(artifact.header)),
       headerVersion: artifact.headerVersion,
-      body: Buffer.from(artifact.body).toString("base64"),
+      body: privacyKit.encodeBase64(new Uint8Array(artifact.body)),
       bodyVersion: artifact.bodyVersion,
-      dataEncryptionKey: Buffer.from(artifact.dataEncryptionKey).toString(
-        "base64",
-      ),
+      dataEncryptionKey: privacyKit.encodeBase64(new Uint8Array(artifact.dataEncryptionKey)),
       createdAt: artifact.createdAt.getTime(),
       updatedAt: artifact.updatedAt.getTime(),
     },

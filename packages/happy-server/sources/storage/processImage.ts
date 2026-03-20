@@ -1,4 +1,5 @@
 import { thumbhash } from "./thumbhash";
+import * as privacyKit from "privacy-kit";
 
 export async function processImage(src: Buffer) {
     const sharp = (await import("sharp")).default;
@@ -25,7 +26,7 @@ export async function processImage(src: Buffer) {
 
     // Thumbhash
     const binaryThumbHash = thumbhash(info.width, info.height, data);
-    const thumbhashStr = Buffer.from(binaryThumbHash).toString('base64');
+    const thumbhashStr = privacyKit.encodeBase64(binaryThumbHash);
 
     return {
         pixels: data,

@@ -79,7 +79,7 @@ export async function kvMutate(
                     data: {
                         accountId: ctx.uid,
                         key: mutation.key,
-                        value: mutation.value ? new Uint8Array(Buffer.from(mutation.value, 'base64')) : null,
+                        value: mutation.value ? privacyKit.decodeBase64(mutation.value) : null,
                         version: 0
                     }
                 });
