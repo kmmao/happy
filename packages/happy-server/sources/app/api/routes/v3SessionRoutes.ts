@@ -10,6 +10,7 @@ import { type Fastify } from "../types";
 // If a client repeatedly hits a non-existent session within the window, skip the DB query.
 const notFoundCache = new Map<string, number>();
 const NOT_FOUND_WINDOW_MS = 30_000; // 30 seconds
+const NOT_FOUND_CACHE_MAX_SIZE = 10_000;
 
 // Cleanup stale entries every 60 seconds. Use unref() so the timer
 // does not prevent the process from exiting gracefully.
@@ -22,6 +23,13 @@ const notFoundCacheCleanupTimer = setInterval(() => {
     }
 }, 60_000);
 notFoundCacheCleanupTimer.unref();
+
+function cacheNotFound(key: string): void {
+    if (notFoundCache.size >= NOT_FOUND_CACHE_MAX_SIZE) {
+        notFoundCache.clear();
+    }
+    notFoundCache.set(key, Date.now());
+}
 
 const getMessagesQuerySchema = z.object({
   after_seq: z.coerce.number().int().min(0).default(0),
@@ -106,7 +114,7 @@ export function v3SessionRoutes(app: Fastify) {
       });
 
       if (!session) {
-        notFoundCache.set(cacheKey, Date.now());
+        cacheNotFound(cacheKey);
         return reply.code(404).send({ error: "Session not found" });
       }
 
@@ -201,7 +209,7 @@ export function v3SessionRoutes(app: Fastify) {
       });
 
       if (!session) {
-        notFoundCache.set(cacheKey, Date.now());
+        cacheNotFound(cacheKey);
         return reply.code(404).send({ error: "Session not found" });
       }
 
