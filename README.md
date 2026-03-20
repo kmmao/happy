@@ -37,6 +37,7 @@ happy codex
 | happy-server | `packages/happy-server` | Fastify 后端（Prisma / PostgreSQL / Redis） |
 | happy-app | `packages/happy-app` | React Native + Expo 移动端/Web 客户端 |
 | happy-agent | `packages/happy-agent` | 远程 Agent 控制 CLI |
+| happy-wire | `packages/happy-wire` | 共享消息类型和 Zod schemas，发布为 `@kmmao/happy-wire` |
 
 ## 本地开发
 
