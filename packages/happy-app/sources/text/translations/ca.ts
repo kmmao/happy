@@ -1803,6 +1803,7 @@ export const ca: TranslationStructure = {
     noGitInfo: "Sense informació de git disponible",
     gitInfo: "Informació Git",
     branch: "Branca",
+    switchBranch: "Canviar branca",
     ahead: "Endavant",
     behind: "Endarrere",
     dirty: "Canvis sense confirmar",

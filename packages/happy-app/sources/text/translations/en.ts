@@ -1789,6 +1789,7 @@ export const en: TranslationStructure = {
     noGitInfo: "No git information available",
     gitInfo: "Git Info",
     branch: "Branch",
+    switchBranch: "Switch Branch",
     ahead: "Ahead",
     behind: "Behind",
     dirty: "Uncommitted Changes",

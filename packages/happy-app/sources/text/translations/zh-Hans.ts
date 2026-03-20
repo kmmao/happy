@@ -1719,6 +1719,7 @@ export const zhHans: TranslationStructure = {
     noGitInfo: "暂无 git 信息",
     gitInfo: "Git 信息",
     branch: "分支",
+    switchBranch: "切换分支",
     ahead: "超前",
     behind: "落后",
     dirty: "未提交的更改",

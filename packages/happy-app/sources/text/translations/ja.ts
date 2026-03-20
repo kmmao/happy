@@ -1778,6 +1778,7 @@ export const ja: TranslationStructure = {
     noGitInfo: "git情報はありません",
     gitInfo: "Git情報",
     branch: "ブランチ",
+    switchBranch: "ブランチを切り替え",
     ahead: "先行",
     behind: "遅延",
     dirty: "未コミットの変更",

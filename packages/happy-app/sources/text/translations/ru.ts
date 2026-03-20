@@ -1821,6 +1821,7 @@ export const ru: TranslationStructure = {
     noGitInfo: "Информация о git недоступна",
     gitInfo: "Информация Git",
     branch: "Ветка",
+    switchBranch: "Сменить ветку",
     ahead: "Впереди",
     behind: "Позади",
     dirty: "Незафиксированные изменения",

@@ -7,9 +7,12 @@ import { Item } from "@/components/Item";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { Project } from "@/sync/projectManager";
-import { useSetting } from "@/sync/storage";
+import { useSetting, storage } from "@/sync/storage";
 import { useRouter } from "expo-router";
 import { t } from "@/text";
+import { Modal } from "@/modal";
+import { fetchGitBranches } from "@/sync/gitBranches";
+import { BranchPickerModal } from "./BranchPickerModal";
 import type { GitHost } from "@/components/settings/git-hosts/types";
 
 interface ProjectGitTabProps {
@@ -141,11 +144,54 @@ const LineChangeDetail = React.memo(
     },
 );
 
+function findActiveSessionId(project: Project): string | null {
+    const sessions = storage.getState().sessions;
+    return (
+        project.sessionIds.find((id) => sessions[id]?.active) ??
+        (project.sessionIds.length > 0 ? project.sessionIds[0] : null)
+    );
+}
+
 export const ProjectGitTab = React.memo(({ project }: ProjectGitTabProps) => {
     const { theme } = useUnistyles();
     const router = useRouter();
     const gitStatus = project.gitStatus;
     const gitHosts = useSetting("gitHosts");
+    const [loadingBranches, setLoadingBranches] = React.useState(false);
+    const loadingRef = React.useRef(false);
+
+    const handleBranchPress = React.useCallback(async () => {
+        const sessionId = findActiveSessionId(project);
+        if (!sessionId || loadingRef.current) return;
+
+        loadingRef.current = true;
+        setLoadingBranches(true);
+        try {
+            const branches = await fetchGitBranches(sessionId);
+            if (
+                branches.local.length === 0 &&
+                branches.remote.length === 0
+            ) {
+                Modal.alert(t("git.noBranches"));
+                return;
+            }
+
+            Modal.show({
+                component: BranchPickerModal,
+                props: {
+                    sessionId,
+                    localBranches: branches.local,
+                    remoteBranches: branches.remote,
+                    currentBranch: gitStatus?.branch ?? null,
+                },
+            });
+        } catch {
+            Modal.alert(t("common.error"), t("git.branchSwitchFailed"));
+        } finally {
+            loadingRef.current = false;
+            setLoadingBranches(false);
+        }
+    }, [project, gitStatus?.branch]);
 
     if (!gitStatus) {
         return (
@@ -180,7 +226,9 @@ export const ProjectGitTab = React.memo(({ project }: ProjectGitTabProps) => {
                             color={theme.colors.text}
                         />
                     }
-                    showChevron={false}
+                    onPress={handleBranchPress}
+                    loading={loadingBranches}
+                    showChevron
                 />
                 {gitStatus.upstreamBranch && (
                     <Item

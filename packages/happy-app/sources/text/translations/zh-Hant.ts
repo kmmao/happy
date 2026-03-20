@@ -1720,6 +1720,7 @@ export const zhHant: TranslationStructure = {
     noGitInfo: "暫無 git 資訊",
     gitInfo: "Git 資訊",
     branch: "分支",
+    switchBranch: "切換分支",
     ahead: "超前",
     behind: "落後",
     dirty: "未提交的變更",
