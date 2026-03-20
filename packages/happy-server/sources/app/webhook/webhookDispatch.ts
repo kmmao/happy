@@ -30,7 +30,7 @@ import {
   eventRouter,
 } from "@/app/events/eventRouter";
 import { fetchIssueLabelsFromProvider } from "./webhookFetchLabels";
-import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
+import { checkDailyRunLimit } from "@/modules/supervisorLimits";
 
 /**
  * Extract the repository URL from a webhook body.
@@ -605,28 +605,43 @@ async function handlePushSupervisorTrigger(
         continue;
       }
 
-      // Check no active run
-      const existingRun = await db.supervisorRun.findFirst({
-        where: {
-          projectId: project.id,
-          accountId: project.accountId,
-          status: { in: ["pending", "running"] },
-        },
-        select: { id: true },
-      });
-      if (existingRun) continue;
+      // Check no active run + create in a single transaction to prevent race conditions
+      const run = await inTx(async (tx) => {
+        const existingRun = await tx.supervisorRun.findFirst({
+          where: {
+            projectId: project.id,
+            accountId: project.accountId,
+            status: { in: ["pending", "running"] },
+          },
+          select: { id: true },
+        });
+        if (existingRun) return null;
 
-      // Create the run
-      const run = await db.supervisorRun.create({
-        data: {
-          projectId: project.id,
-          accountId: project.accountId,
-          trigger: "push",
-          status: "pending",
-        },
-      });
+        const created = await tx.supervisorRun.create({
+          data: {
+            projectId: project.id,
+            accountId: project.accountId,
+            trigger: "push",
+            status: "pending",
+          },
+        });
 
-      await incrementDailyRunCount(project.id);
+        const todayStart = new Date(Date.UTC(
+          new Date().getUTCFullYear(),
+          new Date().getUTCMonth(),
+          new Date().getUTCDate(),
+        ));
+        await tx.project.update({
+          where: { id: project.id },
+          data: {
+            supervisorDailyRunCount: { increment: 1 },
+            supervisorDailyRunCountResetAt: todayStart,
+          },
+        });
+
+        return created;
+      });
+      if (!run) continue;
 
       // Parse dimensions
       const dimensions = project.supervisorEnabledDimensions
