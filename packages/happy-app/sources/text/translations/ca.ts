@@ -398,6 +398,15 @@ export const ca: TranslationStructure = {
     },
   },
 
+  pickPath: {
+    selectPath: "Selecciona la ruta",
+    noMachineSelected: "Cap màquina seleccionada",
+    enterPath: "Introdueix la ruta",
+    enterPathPlaceholder: "Introdueix la ruta (p. ex. /home/user/projects)",
+    recentPaths: "Rutes recents",
+    suggestedPaths: "Rutes suggerides",
+  },
+
   sessionHistory: {
     // Used by session history screen
     title: "Historial de sessions",

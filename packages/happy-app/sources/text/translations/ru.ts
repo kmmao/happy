@@ -370,6 +370,15 @@ export const ru: TranslationStructure = {
     },
   },
 
+  pickPath: {
+    selectPath: "Выбрать путь",
+    noMachineSelected: "Машина не выбрана",
+    enterPath: "Ввести путь",
+    enterPathPlaceholder: "Введите путь (напр. /home/user/projects)",
+    recentPaths: "Недавние пути",
+    suggestedPaths: "Предложенные пути",
+  },
+
   sessionHistory: {
     // Used by session history screen
     title: "История сессий",

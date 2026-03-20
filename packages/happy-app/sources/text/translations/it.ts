@@ -463,6 +463,15 @@ export const it: TranslationStructure = {
     },
   },
 
+  pickPath: {
+    selectPath: "Seleziona percorso",
+    noMachineSelected: "Nessuna macchina selezionata",
+    enterPath: "Inserisci percorso",
+    enterPathPlaceholder: "Inserisci percorso (es. /home/user/projects)",
+    recentPaths: "Percorsi recenti",
+    suggestedPaths: "Percorsi suggeriti",
+  },
+
   sessionHistory: {
     // Used by session history screen
     title: "Cronologia sessioni",

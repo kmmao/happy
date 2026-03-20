@@ -401,6 +401,15 @@ export const es: TranslationStructure = {
     },
   },
 
+  pickPath: {
+    selectPath: "Seleccionar ruta",
+    noMachineSelected: "Ninguna máquina seleccionada",
+    enterPath: "Introducir ruta",
+    enterPathPlaceholder: "Introducir ruta (ej. /home/user/projects)",
+    recentPaths: "Rutas recientes",
+    suggestedPaths: "Rutas sugeridas",
+  },
+
   sessionHistory: {
     // Used by session history screen
     title: "Historial de sesiones",

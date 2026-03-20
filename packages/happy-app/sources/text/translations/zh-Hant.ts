@@ -371,6 +371,15 @@ export const zhHant: TranslationStructure = {
     },
   },
 
+  pickPath: {
+    selectPath: "選擇路徑",
+    noMachineSelected: "未選擇機器",
+    enterPath: "輸入路徑",
+    enterPathPlaceholder: "輸入路徑（例如 /home/user/projects）",
+    recentPaths: "最近路徑",
+    suggestedPaths: "推薦路徑",
+  },
+
   sessionHistory: {
     // Used by session history screen
     title: "工作階段歷史",

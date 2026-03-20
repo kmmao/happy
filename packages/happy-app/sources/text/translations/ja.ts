@@ -448,6 +448,15 @@ export const ja: TranslationStructure = {
     },
   },
 
+  pickPath: {
+    selectPath: "パスを選択",
+    noMachineSelected: "マシンが選択されていません",
+    enterPath: "パスを入力",
+    enterPathPlaceholder: "パスを入力（例：/home/user/projects）",
+    recentPaths: "最近のパス",
+    suggestedPaths: "おすすめのパス",
+  },
+
   sessionHistory: {
     // Used by session history screen
     title: "セッション履歴",

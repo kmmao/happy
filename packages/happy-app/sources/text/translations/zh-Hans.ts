@@ -371,6 +371,15 @@ export const zhHans: TranslationStructure = {
     },
   },
 
+  pickPath: {
+    selectPath: "选择路径",
+    noMachineSelected: "未选择机器",
+    enterPath: "输入路径",
+    enterPathPlaceholder: "输入路径（例如 /home/user/projects）",
+    recentPaths: "最近路径",
+    suggestedPaths: "推荐路径",
+  },
+
   sessionHistory: {
     // Used by session history screen
     title: "会话历史",

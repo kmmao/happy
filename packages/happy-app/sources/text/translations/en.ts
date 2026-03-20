@@ -398,6 +398,15 @@ export const en: TranslationStructure = {
     },
   },
 
+  pickPath: {
+    selectPath: "Select Path",
+    noMachineSelected: "No machine selected",
+    enterPath: "Enter Path",
+    enterPathPlaceholder: "Enter path (e.g. /home/user/projects)",
+    recentPaths: "Recent Paths",
+    suggestedPaths: "Suggested Paths",
+  },
+
   sessionHistory: {
     // Used by session history screen
     title: "Session History",

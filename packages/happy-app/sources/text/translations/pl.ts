@@ -408,6 +408,15 @@ export const pl: TranslationStructure = {
     },
   },
 
+  pickPath: {
+    selectPath: "Wybierz ścieżkę",
+    noMachineSelected: "Nie wybrano maszyny",
+    enterPath: "Wprowadź ścieżkę",
+    enterPathPlaceholder: "Wprowadź ścieżkę (np. /home/user/projects)",
+    recentPaths: "Ostatnie ścieżki",
+    suggestedPaths: "Sugerowane ścieżki",
+  },
+
   sessionHistory: {
     // Used by session history screen
     title: "Historia sesji",
