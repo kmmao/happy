@@ -18,6 +18,7 @@ import { useBookmarks } from "@/hooks/useBookmarks";
 import { useAppendToInput } from "@/hooks/useInputContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
+import { ShimmerOverlay } from "../ShimmerOverlay";
 
 // Option type for callback
 export type Option = {
@@ -334,21 +335,39 @@ function RenderOptionsBlock(props: {
       ]}
     >
       {props.items.map((item, index) => {
+        const isRecommended = index === 0 && props.items.length > 1;
         if (props.onOptionPress) {
           const bookmarked = isBookmarked(item);
           return (
-            <View key={index} style={style.optionItemRow}>
+            <View key={index} style={[style.optionItemRow, isRecommended && style.optionItemRowRecommended]}>
               <Pressable
                 style={({ pressed }) => [
                   style.optionItem,
                   style.optionItemFlex,
+                  isRecommended && style.optionItemRecommended,
                   pressed && style.optionItemPressed,
                 ]}
                 onPress={() => props.onOptionPress?.({ title: item })}
               >
-                <Text selectable={props.selectable} style={style.optionText}>
-                  {item}
-                </Text>
+                <View style={style.optionContentRow}>
+                  <Text selectable={props.selectable} style={[style.optionText, style.optionTextFlex]}>
+                    {item}
+                  </Text>
+                  {isRecommended && (
+                    <View style={style.recommendedTag}>
+                      <Ionicons
+                        name="sparkles"
+                        size={11}
+                        color={theme.colors.radio.active}
+                        style={style.recommendedIcon}
+                      />
+                      <Text style={style.recommendedText}>
+                        {t("tools.askUserQuestion.recommended")}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                {isRecommended && <ShimmerOverlay />}
               </Pressable>
               <Pressable
                 style={({ pressed }) => [
@@ -388,10 +407,26 @@ function RenderOptionsBlock(props: {
           );
         } else {
           return (
-            <View key={index} style={style.optionItem}>
-              <Text selectable={props.selectable} style={style.optionText}>
-                {item}
-              </Text>
+            <View key={index} style={[style.optionItem, isRecommended && style.optionItemRecommended]}>
+              <View style={style.optionContentRow}>
+                <Text selectable={props.selectable} style={[style.optionText, style.optionTextFlex]}>
+                  {item}
+                </Text>
+                {isRecommended && (
+                  <View style={style.recommendedTag}>
+                    <Ionicons
+                      name="sparkles"
+                      size={11}
+                      color={theme.colors.radio.active}
+                      style={style.recommendedIcon}
+                    />
+                    <Text style={style.recommendedText}>
+                      {t("tools.askUserQuestion.recommended")}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {isRecommended && <ShimmerOverlay />}
             </View>
           );
         }
@@ -705,18 +740,49 @@ const style = StyleSheet.create((theme) => ({
     alignItems: "center" as const,
     gap: 4,
   },
+  optionItemRowRecommended: {
+    position: "relative" as const,
+  },
   optionItemFlex: {
     flex: 1,
+  },
+  optionItemRecommended: {
+    // same as other options, only shimmer + tag differentiates
   },
   optionItemPressed: {
     opacity: 0.7,
     backgroundColor: theme.colors.surfaceHigh,
+  },
+  optionContentRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
   },
   optionText: {
     ...Typography.default(),
     fontSize: 16,
     lineHeight: 24,
     color: theme.colors.text,
+  },
+  optionTextFlex: {
+    flex: 1,
+  },
+  recommendedTag: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: theme.colors.radio.active + "20",
+  },
+  recommendedIcon: {
+    marginRight: 3,
+  },
+  recommendedText: {
+    ...Typography.default(),
+    fontSize: 11,
+    fontWeight: "600" as const,
+    color: theme.colors.radio.active,
   },
   bookmarkButton: {
     padding: 6,
