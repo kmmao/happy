@@ -2175,6 +2175,8 @@ export const ca: TranslationStructure = {
     loopDetailExitReason: "Motiu de sortida",
     loopDetailTimeline: "Cronologia d'iteracions",
     loopDetailActions: ({ count }: { count: number }) => `Accions (${count})`,
+    loopDetailNoRuns: "Sense iteracions encara",
+    loopDetailNoActions: "Sense accions encara",
     loadRunError: "No s'han pogut carregar els detalls de l'execució",
     loadLoopError: "No s'han pogut carregar els detalls del bucle",
 

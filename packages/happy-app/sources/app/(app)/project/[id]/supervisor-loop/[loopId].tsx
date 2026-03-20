@@ -435,22 +435,34 @@ function SupervisorLoopDetailScreen() {
             </ItemGroup>
 
             {/* Iteration Timeline */}
-            {runs.length > 0 && (
-                <ItemGroup title={t("supervisor.loopDetailTimeline")}>
+            <ItemGroup title={t("supervisor.loopDetailTimeline")}>
+                {runs.length > 0 ? (
                     <View style={styles.timelineContainer}>
                         <IterationTimeline runs={runs} />
                     </View>
-                </ItemGroup>
-            )}
+                ) : (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyStateText}>
+                            {t("supervisor.loopDetailNoRuns")}
+                        </Text>
+                    </View>
+                )}
+            </ItemGroup>
 
             {/* Actions */}
-            {actions.length > 0 && (
-                <ItemGroup title={t("supervisor.loopDetailActions", { count: actions.length })}>
-                    {actions.map((action) => (
+            <ItemGroup title={t("supervisor.loopDetailActions", { count: actions.length })}>
+                {actions.length > 0 ? (
+                    actions.map((action) => (
                         <ActionItem key={action.id} action={action} />
-                    ))}
-                </ItemGroup>
-            )}
+                    ))
+                ) : (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyStateText}>
+                            {t("supervisor.loopDetailNoActions")}
+                        </Text>
+                    </View>
+                )}
+            </ItemGroup>
         </ScrollView>
     );
 }
@@ -482,6 +494,17 @@ const styles = StyleSheet.create((theme) => ({
     timelineContainer: {
         paddingHorizontal: 16,
         paddingVertical: 12,
+    },
+    emptyState: {
+        paddingHorizontal: 16,
+        paddingVertical: 24,
+        alignItems: "center" as const,
+    },
+    emptyStateText: {
+        ...Typography.default(),
+        fontSize: 14,
+        color: theme.colors.textSecondary,
+        textAlign: "center" as const,
     },
 }));
 

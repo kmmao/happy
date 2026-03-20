@@ -2080,6 +2080,8 @@ export const zhHant: TranslationStructure = {
     loopDetailExitReason: "退出原因",
     loopDetailTimeline: "迭代時間線",
     loopDetailActions: ({ count }: { count: number }) => `操作 (${count})`,
+    loopDetailNoRuns: "暫無迭代記錄",
+    loopDetailNoActions: "暫無操作記錄",
     loadRunError: "載入運行詳情失敗",
     loadLoopError: "載入循環詳情失敗",
 

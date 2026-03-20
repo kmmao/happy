@@ -2145,6 +2145,8 @@ export const ja: TranslationStructure = {
     loopDetailExitReason: "終了理由",
     loopDetailTimeline: "イテレーションタイムライン",
     loopDetailActions: ({ count }: { count: number }) => `アクション (${count})`,
+    loopDetailNoRuns: "イテレーション記録はありません",
+    loopDetailNoActions: "アクション記録はありません",
     loadRunError: "実行詳細の読み込みに失敗しました",
     loadLoopError: "ループ詳細の読み込みに失敗しました",
 

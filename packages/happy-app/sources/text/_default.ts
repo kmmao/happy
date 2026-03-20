@@ -2207,6 +2207,8 @@ export const en = {
     loopDetailExitReason: "Exit Reason",
     loopDetailTimeline: "Iteration Timeline",
     loopDetailActions: ({ count }: { count: number }) => `Actions (${count})`,
+    loopDetailNoRuns: "No iterations yet",
+    loopDetailNoActions: "No actions yet",
 
     // Preflight sync dimensions
     dimPreflightStart: "Syncing code...",

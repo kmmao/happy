@@ -2189,6 +2189,8 @@ export const ru: TranslationStructure = {
     loopDetailExitReason: "Причина завершения",
     loopDetailTimeline: "Хронология итераций",
     loopDetailActions: ({ count }: { count: number }) => `Действия (${count})`,
+    loopDetailNoRuns: "Итераций пока нет",
+    loopDetailNoActions: "Действий пока нет",
     loadRunError: "Не удалось загрузить данные запуска",
     loadLoopError: "Не удалось загрузить данные цикла",
 

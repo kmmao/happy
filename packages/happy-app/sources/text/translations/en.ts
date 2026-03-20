@@ -2163,6 +2163,8 @@ export const en: TranslationStructure = {
     loopDetailExitReason: "Exit Reason",
     loopDetailTimeline: "Iteration Timeline",
     loopDetailActions: ({ count }: { count: number }) => `Actions (${count})`,
+    loopDetailNoRuns: "No iterations yet",
+    loopDetailNoActions: "No actions yet",
     loadRunError: "Failed to load run details",
     loadLoopError: "Failed to load loop details",
 

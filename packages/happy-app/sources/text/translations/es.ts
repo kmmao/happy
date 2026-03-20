@@ -2170,6 +2170,8 @@ export const es: TranslationStructure = {
     loopDetailExitReason: "Razón de salida",
     loopDetailTimeline: "Línea de tiempo",
     loopDetailActions: ({ count }: { count: number }) => `Acciones (${count})`,
+    loopDetailNoRuns: "Sin iteraciones aún",
+    loopDetailNoActions: "Sin acciones aún",
     loadRunError: "Error al cargar los detalles de la ejecución",
     loadLoopError: "Error al cargar los detalles del ciclo",
 

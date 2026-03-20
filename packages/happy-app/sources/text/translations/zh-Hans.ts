@@ -2077,6 +2077,8 @@ export const zhHans: TranslationStructure = {
     loopDetailExitReason: "退出原因",
     loopDetailTimeline: "迭代时间线",
     loopDetailActions: ({ count }: { count: number }) => `操作 (${count})`,
+    loopDetailNoRuns: "暂无迭代记录",
+    loopDetailNoActions: "暂无操作记录",
     loadRunError: "加载运行详情失败",
     loadLoopError: "加载循环详情失败",
 
