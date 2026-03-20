@@ -122,13 +122,20 @@ class ProfileSyncService {
     }
 
     /**
+     * Ensure no sync is currently in progress
+     */
+    private assertIdle(): void {
+        if (this.syncStatus === 'syncing') {
+            throw new Error('Sync already in progress');
+        }
+    }
+
+    /**
      * Sync profiles from GUI to CLI using proper Happy infrastructure
      * SECURITY NOTE: Direct file access is PROHIBITED - use Happy RPC infrastructure
      */
     public async syncGuiToCli(profiles: AIBackendProfile[]): Promise<void> {
-        if (this.syncStatus === 'syncing') {
-            throw new Error('Sync already in progress');
-        }
+        this.assertIdle();
 
         this.syncStatus = 'syncing';
         this.emitEvent({
@@ -173,9 +180,7 @@ class ProfileSyncService {
      * SECURITY NOTE: Direct file access is PROHIBITED - use Happy RPC infrastructure
      */
     public async syncCliToGui(): Promise<AIBackendProfile[]> {
-        if (this.syncStatus === 'syncing') {
-            throw new Error('Sync already in progress');
-        }
+        this.assertIdle();
 
         this.syncStatus = 'syncing';
         this.emitEvent({
@@ -222,9 +227,7 @@ class ProfileSyncService {
      * Perform bidirectional sync with conflict resolution
      */
     public async bidirectionalSync(guiProfiles: AIBackendProfile[]): Promise<AIBackendProfile[]> {
-        if (this.syncStatus === 'syncing') {
-            throw new Error('Sync already in progress');
-        }
+        this.assertIdle();
 
         this.syncStatus = 'syncing';
         this.emitEvent({
