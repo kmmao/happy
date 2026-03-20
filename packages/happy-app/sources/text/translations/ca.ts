@@ -157,6 +157,8 @@ export const ca: TranslationStructure = {
     connectGithubAccount: "Connecta el teu compte de GitHub",
     claudeAuthSuccess: "Connexió amb Claude realitzada amb èxit",
     exchangingTokens: "Intercanviant tokens...",
+    connectTitle: ({ name }: { name: string }) => `Connectar ${name}`,
+    connectTerminalInstruction: "Executa la següent comanda al terminal:",
     usage: "Ús",
     usageSubtitle: "Veure l'ús de l'API i costos",
     profiles: "Perfils",

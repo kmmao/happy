@@ -169,6 +169,8 @@ export const pl: TranslationStructure = {
     connectGithubAccount: "Połącz konto GitHub",
     claudeAuthSuccess: "Pomyślnie połączono z Claude",
     exchangingTokens: "Wymiana tokenów...",
+    connectTitle: ({ name }: { name: string }) => `Połącz ${name}`,
+    connectTerminalInstruction: "Uruchom następujące polecenie w terminalu:",
     usage: "Użycie",
     usageSubtitle: "Zobacz użycie API i koszty",
     profiles: "Profile",

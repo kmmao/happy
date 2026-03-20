@@ -219,6 +219,8 @@ export const ja: TranslationStructure = {
     connectGithubAccount: "GitHubアカウントを接続",
     claudeAuthSuccess: "Claudeへの接続に成功しました",
     exchangingTokens: "トークンを交換中...",
+    connectTitle: ({ name }: { name: string }) => `${name}に接続`,
+    connectTerminalInstruction: "ターミナルで以下のコマンドを実行してください：",
     usage: "使用状況",
     usageSubtitle: "API使用量とコストを確認",
     profiles: "プロファイル",

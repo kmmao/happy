@@ -155,6 +155,8 @@ export const zhHant: TranslationStructure = {
     connectGithubAccount: "連結您的 GitHub 帳戶",
     claudeAuthSuccess: "成功連結到 Claude",
     exchangingTokens: "正在交換權杖...",
+    connectTitle: ({ name }: { name: string }) => `連接 ${name}`,
+    connectTerminalInstruction: "在終端中執行以下命令：",
     usage: "使用情況",
     usageSubtitle: "查看 API 使用情況和費用",
     profiles: "設定檔",
