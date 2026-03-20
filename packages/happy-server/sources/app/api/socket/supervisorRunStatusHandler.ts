@@ -510,6 +510,15 @@ async function handleAutoApproval(
             }
         }
 
+        // Parse supervisor config once before the loop
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let parsedSupervisorConfig: any;
+        if (project.supervisorConfig) {
+            try {
+                parsedSupervisorConfig = JSON.parse(project.supervisorConfig);
+            } catch { /* ignore */ }
+        }
+
         // Trigger fix for each approved action
         for (const action of actions) {
             // Create Issue on provider for tracking (best-effort)
@@ -536,18 +545,15 @@ async function handleAutoApproval(
                 }
             }
 
-            // Extract concurrency limits from project config
+            // Extract concurrency limits from pre-parsed project config
             let maxConcurrentAnalysis: number | undefined;
             let maxConcurrentFix: number | undefined;
-            if (project.supervisorConfig) {
-                try {
-                    const cfg = JSON.parse(project.supervisorConfig);
-                    const c = cfg?.concurrency;
-                    if (c && typeof c === "object") {
-                        maxConcurrentAnalysis = typeof c.maxAnalysisSessions === "number" ? c.maxAnalysisSessions : undefined;
-                        maxConcurrentFix = typeof c.maxFixSessions === "number" ? c.maxFixSessions : undefined;
-                    }
-                } catch { /* ignore */ }
+            if (parsedSupervisorConfig) {
+                const c = parsedSupervisorConfig?.concurrency;
+                if (c && typeof c === "object") {
+                    maxConcurrentAnalysis = typeof c.maxAnalysisSessions === "number" ? c.maxAnalysisSessions : undefined;
+                    maxConcurrentFix = typeof c.maxFixSessions === "number" ? c.maxFixSessions : undefined;
+                }
             }
 
             eventRouter.emitEphemeral({
