@@ -549,13 +549,15 @@ export function supervisorRoutes(app: Fastify) {
 
             if (status === "completed" || status === "failed") {
                 // Auto/semi-auto mode: automatically approve actions based on configured severities
-                // Skip if run belongs to a loop — Loop engine handles its own approval flow
-                if (status === "completed" && reportedActions.length > 0) {
-                    const runForLoop = await db.supervisorRun.findUnique({
+                // Skip if run belongs to a loop — Loop engine handles its own approval flow.
+                // Check DB for actions (not request body) because Claude may report
+                // actions in a separate request from the "completed" status.
+                if (status === "completed") {
+                    const runForAutoApprove = await db.supervisorRun.findUnique({
                         where: { id: runId },
-                        select: { loopId: true },
+                        select: { loopId: true, actionsCount: true },
                     });
-                    if (!runForLoop?.loopId) {
+                    if (!runForAutoApprove?.loopId && (runForAutoApprove?.actionsCount ?? 0) > 0) {
                         try {
                             await handleAutoApproval(userId, id, runId);
                         } catch (autoApproveError) {
