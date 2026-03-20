@@ -15,7 +15,7 @@ yarn workspace happy-agent build
 Or link globally:
 
 ```bash
-cd packages/happy-agent && npm link
+cd packages/happy-agent && yarn link
 ```
 
 ## Authentication
