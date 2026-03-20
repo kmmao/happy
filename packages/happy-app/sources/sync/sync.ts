@@ -252,6 +252,7 @@ class Sync {
   private projectMigrationFailures = new Map<string, number>();
   private pendingSettings: Partial<Settings> = loadPendingSettings();
   private appState: AppStateStatus = AppState.currentState;
+  private appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
   private backgroundSendTimeout: ReturnType<typeof setTimeout> | null = null;
   private backgroundSendNotificationId: string | null = null;
   private backgroundSendStartedAt: number | null = null;
@@ -287,7 +288,7 @@ class Sync {
     );
 
     // Listen for app state changes to refresh purchases
-    AppState.addEventListener("change", (nextAppState) => {
+    this.appStateSubscription = AppState.addEventListener("change", (nextAppState) => {
       this.appState = nextAppState;
       if (nextAppState === "active") {
         const shouldFailAfterResume =
