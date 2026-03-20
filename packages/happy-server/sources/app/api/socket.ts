@@ -176,6 +176,12 @@ export function startSocket(app: Fastify) {
       rpcListeners.set(userId, userRpcListeners);
     }
     rpcHandler(userId, socket, userRpcListeners);
+    // Cleanup empty rpcListeners entry after rpcHandler's disconnect runs
+    socket.on("disconnect", () => {
+      if (userRpcListeners.size === 0) {
+        rpcListeners.delete(userId);
+      }
+    });
     usageHandler(userId, socket);
     sessionUpdateHandler(userId, socket, connection);
     sessionPreferencesHandler(userId, socket, connection);
