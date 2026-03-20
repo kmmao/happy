@@ -63,8 +63,8 @@ export function getLocalFilesDir() {
 
 export async function putLocalFile(filePath: string, data: Buffer) {
   const fullPath = path.join(localFilesDir, filePath);
-  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-  fs.writeFileSync(fullPath, data);
+  await fs.promises.mkdir(path.dirname(fullPath), { recursive: true });
+  await fs.promises.writeFile(fullPath, data);
 }
 
 export type ImageRef = {
