@@ -15,8 +15,8 @@
 
 | 参数 | 包路径 | 版本文件 | Changelog |
 |------|--------|---------|-----------|
-| `app` | `packages/happy-app` | `app.config.js` → `version: "X.Y.Z"` | `packages/happy-app/CHANGELOG.md` |
-| `cli` | `packages/happy-cli` | `package.json` → `version` | 无本地 CHANGELOG（使用 release-it 生成 GitHub Release） |
+| `app` | `packages/happy-app` | `app.config.js` → `version: "X.Y.Z"` | `packages/happy-app/CHANGELOG.md` + `CHANGELOG.zh-Hans.md` 等 |
+| `cli` | `packages/happy-cli` | `package.json` → `version` | 无本地 CHANGELOG（release-it 生成 GitHub Release） |
 | `agent` | `packages/happy-agent` | `package.json` → `version` | 无本地 CHANGELOG |
 | `wire` | `packages/happy-wire` | `package.json` → `version` | 无本地 CHANGELOG |
 
@@ -40,7 +40,6 @@ git log --oneline $LAST_VER_COMMIT..HEAD -- <包路径>/
 ### 1. 收集变更内容
 
 ```bash
-# 获取自上次版本以来的所有提交
 LAST_VER_COMMIT=$(git log -1 --format="%H" -- <版本文件>)
 git log --oneline $LAST_VER_COMMIT..HEAD -- <包路径>/
 ```
@@ -51,9 +50,11 @@ git log --oneline $LAST_VER_COMMIT..HEAD -- <包路径>/
 
 ### 2. 生成 Changelog 条目（仅 app）
 
-**仅 `app` 包有本地 CHANGELOG.md**，其他包跳过此步。
+**仅 `app` 包有本地 CHANGELOG**，其他包跳过此步。
 
-#### 格式规范
+#### 2a. 英文版（CHANGELOG.md）
+
+格式规范：
 
 ```markdown
 ## X.Y.Z - YYYY-MM-DD
@@ -68,7 +69,7 @@ git log --oneline $LAST_VER_COMMIT..HEAD -- <包路径>/
 - 变更描述
 ```
 
-#### 规则
+规则：
 - 日期使用当天日期
 - 摘要段落简洁描述核心变化
 - 变更以动词开头：Added、Fixed、Improved、Removed、Updated
@@ -76,15 +77,45 @@ git log --oneline $LAST_VER_COMMIT..HEAD -- <包路径>/
 - 描述面向最终用户，不写代码细节
 - 新版本条目插入到 `# Changelog` 标题之后、上一个版本之前
 
-#### 写入流程
+#### 2b. 中文版（CHANGELOG.zh-Hans.md）
+
+在写完英文版后，同步生成中文翻译版本：
+
+规则：
+- 保持与英文版完全相同的版本号、日期和分组结构
+- 变更以动词开头：新增、修复、改进、移除、更新
+- 专业术语保留英文原文（如 SDK、API、Worktree、Hook）
+- 功能名称首次出现时保留英文（如 Supervisor Loop Mode）
+- 新版本条目插入到 `# 更新日志` 标题之后、上一个版本之前
+
+翻译示例：
+| 英文 | 中文 |
+|------|------|
+| Added Loop Mode — autonomous cycles... | 新增循环模式 — 自动分析代码... |
+| Fixed HTTP hook server timeout... | 修复 HTTP hook 服务器超时... |
+| Improved Supervisor Actions with... | 改进 Supervisor 操作的排序... |
+
+#### 2c. 其他语言（按需）
+
+如果项目中存在其他 `CHANGELOG.{locale}.md` 文件（如 `CHANGELOG.ja.md`、`CHANGELOG.zh-Hant.md`），也需要同步翻译新版本条目。
+
+发现已有的语言文件：
+```bash
+ls packages/happy-app/CHANGELOG.*.md
+```
+
+#### 2d. 写入流程
+
 1. 读取现有 `packages/happy-app/CHANGELOG.md`
-2. 在第一个 `## X.Y.Z` 之前插入新版本条目
-3. 写入文件
-4. 运行解析器生成 JSON：
+2. 在第一个 `## X.Y.Z` 之前插入新版本英文条目
+3. 读取现有 `packages/happy-app/CHANGELOG.zh-Hans.md`
+4. 在第一个 `## X.Y.Z` 之前插入新版本中文条目
+5. 对其他已存在的语言文件重复此流程
+6. 运行解析器生成 JSON：
 ```bash
 cd packages/happy-app && npx tsx sources/scripts/parseChangelog.ts
 ```
-5. 验证生成的 `sources/changelog/changelog.json` 包含新版本
+7. 验证生成的 `sources/changelog/changelog.json` 包含新版本且所有语言都已收录
 
 ---
 
@@ -164,6 +195,9 @@ git push
 包：<包名>
 版本：<旧版本> → <新版本>
 Changelog：<已更新 / 不适用>
+  - en: ✅
+  - zh-Hans: ✅
+  - 其他语言: ✅ / ⚠️ 未找到语言文件
 README：<已更新 / 无需更新>
 提交：<commit SHA> - <message>
 已推送：origin/main
@@ -175,11 +209,41 @@ README：<已更新 / 无需更新>
 - wire: 运行 cd packages/happy-wire && npm publish --access public
 ```
 
+## 多语言 Changelog 架构
+
+### 文件结构
+```
+packages/happy-app/
+├── CHANGELOG.md              # 英文（source of truth）
+├── CHANGELOG.zh-Hans.md      # 简体中文
+├── CHANGELOG.ja.md           # 日文（按需创建）
+├── CHANGELOG.zh-Hant.md      # 繁体中文（按需创建）
+└── sources/
+    ├── scripts/parseChangelog.ts   # 扫描所有 CHANGELOG.*.md 生成 JSON
+    └── changelog/
+        ├── changelog.json          # 合并后的多语言 JSON
+        ├── types.ts                # LocalizedChangelogData 类型
+        ├── parser.ts               # 按 getCurrentLanguage() 返回对应语言
+        ├── storage.ts              # MMKV 已读版本存储
+        └── index.ts                # 导出
+```
+
+### 添加新语言
+1. 创建 `packages/happy-app/CHANGELOG.{locale}.md`，翻译已有条目
+2. 运行 `cd packages/happy-app && npx tsx sources/scripts/parseChangelog.ts`
+3. 新语言自动被发现和收录，无需改代码
+
+### 运行时行为
+- `parser.ts` 根据 `getCurrentLanguage()` 选择对应语言
+- 无翻译时自动 fallback 到英文
+- 相近语言自动回退（如 `zh-Hant` 无翻译时回退到 `zh-Hans`）
+
 ## 注意事项
 
 - **app 的版本在 `app.config.js` 而非 `package.json`**
-- **只有 app 有本地 CHANGELOG.md**，其他包的 changelog 在 release-it 发布时自动通过 git log 生成
+- **只有 app 有本地 CHANGELOG**，其他包的 changelog 在 release-it 发布时自动通过 git log 生成
 - Changelog 写完后必须运行 `parseChangelog.ts` 生成 JSON
 - 版本号必须严格遵循 semver
 - README 更新是可选的，只有功能性变更才需要
 - 不要修改 `runtimeVersion`（那是 Expo OTA 的原生兼容版本，只在原生代码变更时手动调整）
+- **所有已存在的语言文件都必须同步更新**，不能只更新英文版

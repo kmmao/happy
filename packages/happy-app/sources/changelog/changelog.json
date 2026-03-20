@@ -1,241 +1,485 @@
 {
-  "entries": [
-    {
-      "version": "2.4.0",
-      "date": "2026-03-20",
-      "summary": "Added Supervisor Loop Mode for autonomous analyze-fix-reanalyze cycles, project configuration tab, redesigned Research tab, and numerous supervisor and UI improvements.",
-      "changes": [
-        "Added Loop Mode — autonomous cycles that analyze code, apply fixes, and re-analyze until issues are resolved",
-        "Added Loop config panel with stepper controls for max iterations and concurrency",
-        "Added Loop detail page with timeline view showing each cycle's actions and results",
-        "Added Loop history section in Health Tab for reviewing past loop executions",
-        "Added configurable severity levels for semi-auto and auto supervisor modes",
-        "Added smart needsAttention detection based on AI response content",
-        "Added project configuration tab with basic settings",
-        "Added project alias — custom display name that overrides the default folder name",
-        "Added default model selection for new sessions per project",
-        "Added archive/unarchive project toggle",
-        "Added read-only project info display (path, machine, created date)",
-        "Redesigned Research tab with unified config panel and modal report viewer",
-        "Added custom analysis rules support",
-        "Added multi-device config sync via KV Store",
-        "Added research progress UI with loading indicators",
-        "Added concurrency limits for analysis and fix sessions",
-        "Improved Supervisor Actions with sorting, filtering, and severity display",
-        "Added supervisor action restore capability",
-        "Added loading indicators to supervisor action buttons",
-        "Moved profile selector from input bar to dropdown menu above input",
-        "Updated Claude model pricing — 200K and 1M context now same price",
-        "Added version numbers to model name display",
-        "Added UI/UX dimension to supervisor health monitoring",
-        "Added auto-create Project when a new session is created",
-        "Added manual project add/delete support",
-        "Fixed default path in new session to resolve worktree to parent repo",
-        "Fixed multiple hardcoded English strings missing i18n",
-        "Fixed model selector UI and status bar model display",
-        "Fixed IssueFilterBar/PRFilterBar using Alert module instead of Modal",
-        "Fixed cached daemon models for new session with reset on agent switch",
-        "Isolated health/research tab runs to prevent cross-contamination"
-      ],
-      "rawMarkdown": "## 2.4.0 - 2026-03-20\n\n\nAdded Supervisor Loop Mode for autonomous analyze-fix-reanalyze cycles, project configuration tab, redesigned Research tab, and numerous supervisor and UI improvements.\n\n### Supervisor Loop Mode\n- Added Loop Mode — autonomous cycles that analyze code, apply fixes, and re-analyze until issues are resolved\n- Added Loop config panel with stepper controls for max iterations and concurrency\n- Added Loop detail page with timeline view showing each cycle's actions and results\n- Added Loop history section in Health Tab for reviewing past loop executions\n- Added configurable severity levels for semi-auto and auto supervisor modes\n- Added smart needsAttention detection based on AI response content\n\n### Project Config Tab\n- Added project configuration tab with basic settings\n- Added project alias — custom display name that overrides the default folder name\n- Added default model selection for new sessions per project\n- Added archive/unarchive project toggle\n- Added read-only project info display (path, machine, created date)\n\n### Research Tab Redesign\n- Redesigned Research tab with unified config panel and modal report viewer\n- Added custom analysis rules support\n- Added multi-device config sync via KV Store\n- Added research progress UI with loading indicators\n\n### Supervisor Enhancements\n- Added concurrency limits for analysis and fix sessions\n- Improved Supervisor Actions with sorting, filtering, and severity display\n- Added supervisor action restore capability\n- Added loading indicators to supervisor action buttons\n\n### UI/UX Improvements\n- Moved profile selector from input bar to dropdown menu above input\n- Updated Claude model pricing — 200K and 1M context now same price\n- Added version numbers to model name display\n- Added UI/UX dimension to supervisor health monitoring\n\n### Project Management\n- Added auto-create Project when a new session is created\n- Added manual project add/delete support\n\n### Bug Fixes\n- Fixed default path in new session to resolve worktree to parent repo\n- Fixed multiple hardcoded English strings missing i18n\n- Fixed model selector UI and status bar model display\n- Fixed IssueFilterBar/PRFilterBar using Alert module instead of Modal\n- Fixed cached daemon models for new session with reset on agent switch\n- Isolated health/research tab runs to prevent cross-contamination"
-    },
-    {
-      "version": "2.3.1",
-      "date": "2026-03-18",
-      "summary": "Upgraded Claude Agent SDK to 0.2.78 — added StopFailure error banner and improved hook server reliability.",
-      "changes": [
-        "Added StopFailure error banner showing error details when Claude session stops unexpectedly",
-        "Added expandable last assistant message section for debugging context",
-        "Added local dismiss with auto-reset on new errors",
-        "Added automatic stopFailure state clearing at turn start",
-        "Fixed HTTP hook server timeout causing double-write Node.js exception (replaced setTimeout with AbortController)",
-        "Added port range validation in session hook forwarder script"
-      ],
-      "rawMarkdown": "## 2.3.1 - 2026-03-18\n\n\nUpgraded Claude Agent SDK to 0.2.78 — added StopFailure error banner and improved hook server reliability.\n\n### StopFailure Hook\n- Added StopFailure error banner showing error details when Claude session stops unexpectedly\n- Added expandable last assistant message section for debugging context\n- Added local dismiss with auto-reset on new errors\n- Added automatic stopFailure state clearing at turn start\n\n### Reliability\n- Fixed HTTP hook server timeout causing double-write Node.js exception (replaced setTimeout with AbortController)\n- Added port range validation in session hook forwarder script"
-    },
-    {
-      "version": "2.3.0",
-      "date": "2026-03-18",
-      "summary": "Integrated Claude Agent SDK 0.2.77 features — fork sessions, cancel queued messages, MCP server input, API retry status, and enhanced plan viewing.",
-      "changes": [
-        "Added fork session button in session info to branch from current context",
-        "Added full fork flow: CLI creates SDK fork, App spawns new session and navigates to it",
-        "Added cancel button on queued messages to remove them before execution",
-        "Improved cancel flow to confirm server-side cancellation before updating UI",
-        "Added MCP server input banner for handling authentication and configuration requests",
-        "Added form mode with JSON Schema field rendering for structured input",
-        "Added URL mode with protocol-validated link opening",
-        "Added push notifications when MCP servers request user input",
-        "Added real-time API retry indicator showing attempt count, max retries, and delay",
-        "Added automatic clearing of retry status when requests succeed",
-        "Improved ExitPlanMode to display full plan content from file with refresh button",
-        "Added race-condition-safe plan file reading with in-memory content fallback",
-        "Added elicitation action validation and abort cleanup to prevent memory leaks",
-        "Added URL protocol validation restricting to http/https only",
-        "Added NaN guard for numeric elicitation inputs",
-        "Restricted supervisor action deletion to dismissed states only",
-        "Batched supervisor action dedup writes to reduce database round-trips"
-      ],
-      "rawMarkdown": "## 2.3.0 - 2026-03-18\n\n\nIntegrated Claude Agent SDK 0.2.77 features — fork sessions, cancel queued messages, MCP server input, API retry status, and enhanced plan viewing.\n\n### Session Fork\n- Added fork session button in session info to branch from current context\n- Added full fork flow: CLI creates SDK fork, App spawns new session and navigates to it\n\n### Cancel Queued Messages\n- Added cancel button on queued messages to remove them before execution\n- Improved cancel flow to confirm server-side cancellation before updating UI\n\n### MCP Elicitation\n- Added MCP server input banner for handling authentication and configuration requests\n- Added form mode with JSON Schema field rendering for structured input\n- Added URL mode with protocol-validated link opening\n- Added push notifications when MCP servers request user input\n\n### API Retry Status\n- Added real-time API retry indicator showing attempt count, max retries, and delay\n- Added automatic clearing of retry status when requests succeed\n\n### Plan File Viewing\n- Improved ExitPlanMode to display full plan content from file with refresh button\n- Added race-condition-safe plan file reading with in-memory content fallback\n\n### Security & Reliability\n- Added elicitation action validation and abort cleanup to prevent memory leaks\n- Added URL protocol validation restricting to http/https only\n- Added NaN guard for numeric elicitation inputs\n- Restricted supervisor action deletion to dismissed states only\n- Batched supervisor action dedup writes to reduce database round-trips"
-    },
-    {
-      "version": "2.2.0",
-      "date": "2026-03-14",
-      "summary": "Added full Pull Request management for mobile AI DevOps workflow — browse PRs, review diffs, check CI status, and merge from your phone.",
-      "changes": [
-        "Added PR tab in Git section with badge showing open PR count",
-        "Added PR card with state icons, branch info, diff stats, labels, and draft badge",
-        "Added filter bar with Open/Closed/All states and sort options",
-        "Added infinite scroll pagination and 60-second auto-polling",
-        "Added multi-repository PR aggregation",
-        "Added PR detail sheet with full metadata, branch info, and description",
-        "Added unified diff patch viewer for reviewing file changes",
-        "Added collapsible changed files section with per-file diff rendering",
-        "Added CI Checks detail view showing individual check run status",
-        "Added Reviews section with author, state badge, and review body",
-        "Added Comments section with full comment history",
-        "Added merge with method selection (merge commit, squash, rebase)",
-        "Added approve and close PR actions",
-        "Added comment posting with text input",
-        "Added open in browser action",
-        "Supported GitHub via `gh api` CLI",
-        "Supported Gitea via REST API with token auth",
-        "Added i18n translations for all 10 languages"
-      ],
-      "rawMarkdown": "## 2.2.0 - 2026-03-14\n\n\nAdded full Pull Request management for mobile AI DevOps workflow — browse PRs, review diffs, check CI status, and merge from your phone.\n\n### PR List & Navigation\n- Added PR tab in Git section with badge showing open PR count\n- Added PR card with state icons, branch info, diff stats, labels, and draft badge\n- Added filter bar with Open/Closed/All states and sort options\n- Added infinite scroll pagination and 60-second auto-polling\n- Added multi-repository PR aggregation\n\n### PR Detail & Diff Review\n- Added PR detail sheet with full metadata, branch info, and description\n- Added unified diff patch viewer for reviewing file changes\n- Added collapsible changed files section with per-file diff rendering\n- Added CI Checks detail view showing individual check run status\n- Added Reviews section with author, state badge, and review body\n- Added Comments section with full comment history\n\n### PR Actions\n- Added merge with method selection (merge commit, squash, rebase)\n- Added approve and close PR actions\n- Added comment posting with text input\n- Added open in browser action\n\n### Platform Support\n- Supported GitHub via `gh api` CLI\n- Supported Gitea via REST API with token auth\n- Added i18n translations for all 10 languages"
-    },
-    {
-      "version": "2.1.2",
-      "date": "2026-03-14",
-      "summary": "Added copy-to-input button for AI suggestion options, allowing users to edit suggestions before sending.",
-      "changes": [
-        "Added copy-to-input icon on AI suggestion options to append text to input field for editing",
-        "Added copy-to-input icon in options popover and bookmarks popover"
-      ],
-      "rawMarkdown": "## 2.1.2 - 2026-03-14\n\n\nAdded copy-to-input button for AI suggestion options, allowing users to edit suggestions before sending.\n\n- Added copy-to-input icon on AI suggestion options to append text to input field for editing\n- Added copy-to-input icon in options popover and bookmarks popover"
-    },
-    {
-      "version": "2.1.1",
-      "date": "2026-03-13",
-      "summary": "Bug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.",
-      "changes": [
-        "Fixed message loss during pagination and backfill when switching between sessions",
-        "Improved usage trend chart with gap filling for missing dates and better layout",
-        "Fixed CLI thinking state accuracy in local mode to correctly reflect model status",
-        "Fixed server rejecting heartbeats for archived sessions to prevent ghost connections",
-        "Updated README to remove upstream branding and add fork disclaimers",
-        "Fixed collapsible input collapse button not responding due to stale closure"
-      ],
-      "rawMarkdown": "## 2.1.1 - 2026-03-13\n\n\nBug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.\n\n- Fixed message loss during pagination and backfill when switching between sessions\n- Improved usage trend chart with gap filling for missing dates and better layout\n- Fixed CLI thinking state accuracy in local mode to correctly reflect model status\n- Fixed server rejecting heartbeats for archived sessions to prevent ghost connections\n- Updated README to remove upstream branding and add fork disclaimers\n- Fixed collapsible input collapse button not responding due to stale closure"
-    },
-    {
-      "version": "2.1.0",
-      "date": "2026-03-09",
-      "summary": "GitHub/Gitea issue management, tablet sidebar, animated AI avatar, and major session loading performance improvements.",
-      "changes": [
-        "Added GitHub and Gitea issues integration with Git Hosts settings",
-        "Added multi-repository issue aggregation and detail sheet",
-        "Added issue session automation with CRUD management and completion lifecycle",
-        "Added issue tags display in session lists with clickable links and URL preview",
-        "Fixed issue session completion race condition and PR merge status checking",
-        "Fixed comma-separated labels and authors in auto-issue config",
-        "Fixed block archive/delete when issue has open PR",
-        "Added collapsible sidebar with icon rail for tablet",
-        "Added foldable inner screen detection as tablet for sidebar layout",
-        "Fixed split-screen not switching from tablet to phone layout",
-        "Improved SidebarNavigator and SidebarView components",
-        "Replaced AI avatar with animated status dot and improved AskUserQuestion UI",
-        "Added Claude Code-style turn metrics with animated tokens display",
-        "Added FAB action buttons with disabled state and pulse animation",
-        "Added expand tools setting for detailed tool view",
-        "Enhanced plan mode feedback with multiline input and image support",
-        "Enhanced kanban UI with pill selectors and board polish",
-        "Added project tab feature toggle in settings",
-        "Optimized session message loading with local cache and progressive rendering",
-        "Added secret key login option and navigate to login after logout",
-        "Removed Happy logo from settings page",
-        "Upgraded CLI to v0.29.36",
-        "Fixed plan mode permission handling (require manual approval for ExitPlanMode)",
-        "Fixed interrupt fallback when no active query"
-      ],
-      "rawMarkdown": "## 2.1.0 - 2026-03-09\n\n\nGitHub/Gitea issue management, tablet sidebar, animated AI avatar, and major session loading performance improvements.\n\n### Issues Integration\n- Added GitHub and Gitea issues integration with Git Hosts settings\n- Added multi-repository issue aggregation and detail sheet\n- Added issue session automation with CRUD management and completion lifecycle\n- Added issue tags display in session lists with clickable links and URL preview\n- Fixed issue session completion race condition and PR merge status checking\n- Fixed comma-separated labels and authors in auto-issue config\n- Fixed block archive/delete when issue has open PR\n\n### Tablet & Layout\n- Added collapsible sidebar with icon rail for tablet\n- Added foldable inner screen detection as tablet for sidebar layout\n- Fixed split-screen not switching from tablet to phone layout\n- Improved SidebarNavigator and SidebarView components\n\n### UI/UX\n- Replaced AI avatar with animated status dot and improved AskUserQuestion UI\n- Added Claude Code-style turn metrics with animated tokens display\n- Added FAB action buttons with disabled state and pulse animation\n- Added expand tools setting for detailed tool view\n- Enhanced plan mode feedback with multiline input and image support\n- Enhanced kanban UI with pill selectors and board polish\n- Added project tab feature toggle in settings\n\n### Performance\n- Optimized session message loading with local cache and progressive rendering\n\n### Auth & Settings\n- Added secret key login option and navigate to login after logout\n- Removed Happy logo from settings page\n\n### CLI\n- Upgraded CLI to v0.29.36\n- Fixed plan mode permission handling (require manual approval for ExitPlanMode)\n- Fixed interrupt fallback when no active query"
-    },
-    {
-      "version": "2.0.3",
-      "date": "2026-03-05",
-      "summary": "Fixed intermittent image upload failures.",
-      "changes": [
-        "Fixed multi-image upload failures by serializing uploads to avoid concurrent large file transfer timeouts"
-      ],
-      "rawMarkdown": "## 2.0.3 - 2026-03-05\n\n\nFixed intermittent image upload failures.\n\n- Fixed multi-image upload failures by serializing uploads to avoid concurrent large file transfer timeouts"
-    },
-    {
-      "version": "2.0.2",
-      "date": "2026-03-01",
-      "summary": "Major voice interaction upgrade, Worktree support, tool grouping with compact mode, and significant session management and UI improvements.",
-      "changes": [
-        "Added full voice pipeline: Edge TTS synthesis, Web VAD activity detection, status animations",
-        "Added WebSocket real-time speech-to-text service",
-        "Added Haiku model intelligent STT correction for improved recognition accuracy",
-        "Fixed mobile Web Chinese transcription issues",
-        "Reduced voice interaction latency with TTS interruption support",
-        "Removed unnecessary \"Done\" voice prompt after Claude Code completion",
-        "Added Worktree detection and session metadata support",
-        "Moved Worktree session type out of experimental features",
-        "Added i18n translations for 9 languages",
-        "Fixed merge conflict auto-abort, command injection vulnerability, and lifecycle management",
-        "Added tool grouping display with compact mode",
-        "Added auto-approve permissions within tool groups (TodoWrite excluded)",
-        "Removed review button for unknown tools",
-        "Added dontAsk permission mode and opusplan model support",
-        "Added swipe-to-archive and swipe-to-delete in session list",
-        "Added session preferences (permission mode, model mode) sync to server",
-        "Added session Profile tracking and persistence",
-        "Registered getCompactionSummary RPC for remote mode",
-        "Added real-time session sorting toggle",
-        "Improved code block interaction and tool description display",
-        "Added Agent type, real-time subtitle, and Copilot icon to Task tool cards",
-        "Added Modal.toast auto-dismiss notifications",
-        "Added toolbar auto-wrap on narrow screens",
-        "Added usage panel width constraints",
-        "Fixed Shell command results not displaying in App",
-        "Added App language preference forwarding to Claude system prompt",
-        "Upgraded SDK to 0.2.62",
-        "Upgraded CLI to v0.29.27",
-        "Patched 22 Dependabot security vulnerabilities"
-      ],
-      "rawMarkdown": "## 2.0.2 - 2026-03-01\n\n\nMajor voice interaction upgrade, Worktree support, tool grouping with compact mode, and significant session management and UI improvements.\n\n### Voice Assistant\n- Added full voice pipeline: Edge TTS synthesis, Web VAD activity detection, status animations\n- Added WebSocket real-time speech-to-text service\n- Added Haiku model intelligent STT correction for improved recognition accuracy\n- Fixed mobile Web Chinese transcription issues\n- Reduced voice interaction latency with TTS interruption support\n- Removed unnecessary \"Done\" voice prompt after Claude Code completion\n\n### Worktree\n- Added Worktree detection and session metadata support\n- Moved Worktree session type out of experimental features\n- Added i18n translations for 9 languages\n- Fixed merge conflict auto-abort, command injection vulnerability, and lifecycle management\n\n### Tools & Permissions\n- Added tool grouping display with compact mode\n- Added auto-approve permissions within tool groups (TodoWrite excluded)\n- Removed review button for unknown tools\n- Added dontAsk permission mode and opusplan model support\n\n### Session Management\n- Added swipe-to-archive and swipe-to-delete in session list\n- Added session preferences (permission mode, model mode) sync to server\n- Added session Profile tracking and persistence\n- Registered getCompactionSummary RPC for remote mode\n- Added real-time session sorting toggle\n\n### UI/UX\n- Improved code block interaction and tool description display\n- Added Agent type, real-time subtitle, and Copilot icon to Task tool cards\n- Added Modal.toast auto-dismiss notifications\n- Added toolbar auto-wrap on narrow screens\n- Added usage panel width constraints\n\n### CLI\n- Fixed Shell command results not displaying in App\n- Added App language preference forwarding to Claude system prompt\n- Upgraded SDK to 0.2.62\n- Upgraded CLI to v0.29.27\n\n### Security\n- Patched 22 Dependabot security vulnerabilities"
-    },
-    {
-      "version": "2.0.1",
-      "date": "2026-02-27",
-      "summary": "Fixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.",
-      "changes": [
-        "Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor",
-        "Fixed session title reverting to project name after resume by preserving the summary field during metadata updates",
-        "Added session resume V2 support — resume now reconnects to the same session instead of creating a new one"
-      ],
-      "rawMarkdown": "## 2.0.1 - 2026-02-27\n\n\nFixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.\n\n- Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor\n- Fixed session title reverting to project name after resume by preserving the summary field during metadata updates\n- Added session resume V2 support — resume now reconnects to the same session instead of creating a new one"
-    },
-    {
-      "version": "2.0.0",
-      "date": "2026-02-27",
-      "summary": "Happy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.",
-      "changes": [
-        "Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere",
-        "Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content",
-        "Added QR code scanning and manual URL entry for quick device authentication",
-        "Added Daemon mode for persistent background running with one-tap remote session launch",
-        "Added intelligent voice assistant supporting 15+ languages for natural conversation",
-        "Added GitHub and Claude account connection for unified developer identity management",
-        "Added multi-device real-time sync with online/offline status indicators",
-        "Added dark mode and appearance customization with automatic system theme following",
-        "Added Markdown table rendering and code syntax highlighting in chat",
-        "Streamlined settings page, removed upstream links, started maintaining own changelog",
-        "Supported iOS, Android, and Web platforms"
-      ],
-      "rawMarkdown": "## 2.0.0 - 2026-02-27\n\n\nHappy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.\n\n- Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere\n- Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content\n- Added QR code scanning and manual URL entry for quick device authentication\n- Added Daemon mode for persistent background running with one-tap remote session launch\n- Added intelligent voice assistant supporting 15+ languages for natural conversation\n- Added GitHub and Claude account connection for unified developer identity management\n- Added multi-device real-time sync with online/offline status indicators\n- Added dark mode and appearance customization with automatic system theme following\n- Added Markdown table rendering and code syntax highlighting in chat\n- Streamlined settings page, removed upstream links, started maintaining own changelog\n- Supported iOS, Android, and Web platforms"
-    }
-  ],
-  "latestVersion": "2.4.0"
+  "entries": {
+    "en": [
+      {
+        "version": "2.4.0",
+        "date": "2026-03-20",
+        "summary": "Added Supervisor Loop Mode for autonomous analyze-fix-reanalyze cycles, project configuration tab, redesigned Research tab, and numerous supervisor and UI improvements.",
+        "changes": [
+          "Added Loop Mode — autonomous cycles that analyze code, apply fixes, and re-analyze until issues are resolved",
+          "Added Loop config panel with stepper controls for max iterations and concurrency",
+          "Added Loop detail page with timeline view showing each cycle's actions and results",
+          "Added Loop history section in Health Tab for reviewing past loop executions",
+          "Added configurable severity levels for semi-auto and auto supervisor modes",
+          "Added smart needsAttention detection based on AI response content",
+          "Added project configuration tab with basic settings",
+          "Added project alias — custom display name that overrides the default folder name",
+          "Added default model selection for new sessions per project",
+          "Added archive/unarchive project toggle",
+          "Added read-only project info display (path, machine, created date)",
+          "Redesigned Research tab with unified config panel and modal report viewer",
+          "Added custom analysis rules support",
+          "Added multi-device config sync via KV Store",
+          "Added research progress UI with loading indicators",
+          "Added concurrency limits for analysis and fix sessions",
+          "Improved Supervisor Actions with sorting, filtering, and severity display",
+          "Added supervisor action restore capability",
+          "Added loading indicators to supervisor action buttons",
+          "Moved profile selector from input bar to dropdown menu above input",
+          "Updated Claude model pricing — 200K and 1M context now same price",
+          "Added version numbers to model name display",
+          "Added UI/UX dimension to supervisor health monitoring",
+          "Added auto-create Project when a new session is created",
+          "Added manual project add/delete support",
+          "Fixed default path in new session to resolve worktree to parent repo",
+          "Fixed multiple hardcoded English strings missing i18n",
+          "Fixed model selector UI and status bar model display",
+          "Fixed IssueFilterBar/PRFilterBar using Alert module instead of Modal",
+          "Fixed cached daemon models for new session with reset on agent switch",
+          "Isolated health/research tab runs to prevent cross-contamination"
+        ],
+        "rawMarkdown": "## 2.4.0 - 2026-03-20\n\n\nAdded Supervisor Loop Mode for autonomous analyze-fix-reanalyze cycles, project configuration tab, redesigned Research tab, and numerous supervisor and UI improvements.\n\n### Supervisor Loop Mode\n- Added Loop Mode — autonomous cycles that analyze code, apply fixes, and re-analyze until issues are resolved\n- Added Loop config panel with stepper controls for max iterations and concurrency\n- Added Loop detail page with timeline view showing each cycle's actions and results\n- Added Loop history section in Health Tab for reviewing past loop executions\n- Added configurable severity levels for semi-auto and auto supervisor modes\n- Added smart needsAttention detection based on AI response content\n\n### Project Config Tab\n- Added project configuration tab with basic settings\n- Added project alias — custom display name that overrides the default folder name\n- Added default model selection for new sessions per project\n- Added archive/unarchive project toggle\n- Added read-only project info display (path, machine, created date)\n\n### Research Tab Redesign\n- Redesigned Research tab with unified config panel and modal report viewer\n- Added custom analysis rules support\n- Added multi-device config sync via KV Store\n- Added research progress UI with loading indicators\n\n### Supervisor Enhancements\n- Added concurrency limits for analysis and fix sessions\n- Improved Supervisor Actions with sorting, filtering, and severity display\n- Added supervisor action restore capability\n- Added loading indicators to supervisor action buttons\n\n### UI/UX Improvements\n- Moved profile selector from input bar to dropdown menu above input\n- Updated Claude model pricing — 200K and 1M context now same price\n- Added version numbers to model name display\n- Added UI/UX dimension to supervisor health monitoring\n\n### Project Management\n- Added auto-create Project when a new session is created\n- Added manual project add/delete support\n\n### Bug Fixes\n- Fixed default path in new session to resolve worktree to parent repo\n- Fixed multiple hardcoded English strings missing i18n\n- Fixed model selector UI and status bar model display\n- Fixed IssueFilterBar/PRFilterBar using Alert module instead of Modal\n- Fixed cached daemon models for new session with reset on agent switch\n- Isolated health/research tab runs to prevent cross-contamination"
+      },
+      {
+        "version": "2.3.1",
+        "date": "2026-03-18",
+        "summary": "Upgraded Claude Agent SDK to 0.2.78 — added StopFailure error banner and improved hook server reliability.",
+        "changes": [
+          "Added StopFailure error banner showing error details when Claude session stops unexpectedly",
+          "Added expandable last assistant message section for debugging context",
+          "Added local dismiss with auto-reset on new errors",
+          "Added automatic stopFailure state clearing at turn start",
+          "Fixed HTTP hook server timeout causing double-write Node.js exception (replaced setTimeout with AbortController)",
+          "Added port range validation in session hook forwarder script"
+        ],
+        "rawMarkdown": "## 2.3.1 - 2026-03-18\n\n\nUpgraded Claude Agent SDK to 0.2.78 — added StopFailure error banner and improved hook server reliability.\n\n### StopFailure Hook\n- Added StopFailure error banner showing error details when Claude session stops unexpectedly\n- Added expandable last assistant message section for debugging context\n- Added local dismiss with auto-reset on new errors\n- Added automatic stopFailure state clearing at turn start\n\n### Reliability\n- Fixed HTTP hook server timeout causing double-write Node.js exception (replaced setTimeout with AbortController)\n- Added port range validation in session hook forwarder script"
+      },
+      {
+        "version": "2.3.0",
+        "date": "2026-03-18",
+        "summary": "Integrated Claude Agent SDK 0.2.77 features — fork sessions, cancel queued messages, MCP server input, API retry status, and enhanced plan viewing.",
+        "changes": [
+          "Added fork session button in session info to branch from current context",
+          "Added full fork flow: CLI creates SDK fork, App spawns new session and navigates to it",
+          "Added cancel button on queued messages to remove them before execution",
+          "Improved cancel flow to confirm server-side cancellation before updating UI",
+          "Added MCP server input banner for handling authentication and configuration requests",
+          "Added form mode with JSON Schema field rendering for structured input",
+          "Added URL mode with protocol-validated link opening",
+          "Added push notifications when MCP servers request user input",
+          "Added real-time API retry indicator showing attempt count, max retries, and delay",
+          "Added automatic clearing of retry status when requests succeed",
+          "Improved ExitPlanMode to display full plan content from file with refresh button",
+          "Added race-condition-safe plan file reading with in-memory content fallback",
+          "Added elicitation action validation and abort cleanup to prevent memory leaks",
+          "Added URL protocol validation restricting to http/https only",
+          "Added NaN guard for numeric elicitation inputs",
+          "Restricted supervisor action deletion to dismissed states only",
+          "Batched supervisor action dedup writes to reduce database round-trips"
+        ],
+        "rawMarkdown": "## 2.3.0 - 2026-03-18\n\n\nIntegrated Claude Agent SDK 0.2.77 features — fork sessions, cancel queued messages, MCP server input, API retry status, and enhanced plan viewing.\n\n### Session Fork\n- Added fork session button in session info to branch from current context\n- Added full fork flow: CLI creates SDK fork, App spawns new session and navigates to it\n\n### Cancel Queued Messages\n- Added cancel button on queued messages to remove them before execution\n- Improved cancel flow to confirm server-side cancellation before updating UI\n\n### MCP Elicitation\n- Added MCP server input banner for handling authentication and configuration requests\n- Added form mode with JSON Schema field rendering for structured input\n- Added URL mode with protocol-validated link opening\n- Added push notifications when MCP servers request user input\n\n### API Retry Status\n- Added real-time API retry indicator showing attempt count, max retries, and delay\n- Added automatic clearing of retry status when requests succeed\n\n### Plan File Viewing\n- Improved ExitPlanMode to display full plan content from file with refresh button\n- Added race-condition-safe plan file reading with in-memory content fallback\n\n### Security & Reliability\n- Added elicitation action validation and abort cleanup to prevent memory leaks\n- Added URL protocol validation restricting to http/https only\n- Added NaN guard for numeric elicitation inputs\n- Restricted supervisor action deletion to dismissed states only\n- Batched supervisor action dedup writes to reduce database round-trips"
+      },
+      {
+        "version": "2.2.0",
+        "date": "2026-03-14",
+        "summary": "Added full Pull Request management for mobile AI DevOps workflow — browse PRs, review diffs, check CI status, and merge from your phone.",
+        "changes": [
+          "Added PR tab in Git section with badge showing open PR count",
+          "Added PR card with state icons, branch info, diff stats, labels, and draft badge",
+          "Added filter bar with Open/Closed/All states and sort options",
+          "Added infinite scroll pagination and 60-second auto-polling",
+          "Added multi-repository PR aggregation",
+          "Added PR detail sheet with full metadata, branch info, and description",
+          "Added unified diff patch viewer for reviewing file changes",
+          "Added collapsible changed files section with per-file diff rendering",
+          "Added CI Checks detail view showing individual check run status",
+          "Added Reviews section with author, state badge, and review body",
+          "Added Comments section with full comment history",
+          "Added merge with method selection (merge commit, squash, rebase)",
+          "Added approve and close PR actions",
+          "Added comment posting with text input",
+          "Added open in browser action",
+          "Supported GitHub via `gh api` CLI",
+          "Supported Gitea via REST API with token auth",
+          "Added i18n translations for all 10 languages"
+        ],
+        "rawMarkdown": "## 2.2.0 - 2026-03-14\n\n\nAdded full Pull Request management for mobile AI DevOps workflow — browse PRs, review diffs, check CI status, and merge from your phone.\n\n### PR List & Navigation\n- Added PR tab in Git section with badge showing open PR count\n- Added PR card with state icons, branch info, diff stats, labels, and draft badge\n- Added filter bar with Open/Closed/All states and sort options\n- Added infinite scroll pagination and 60-second auto-polling\n- Added multi-repository PR aggregation\n\n### PR Detail & Diff Review\n- Added PR detail sheet with full metadata, branch info, and description\n- Added unified diff patch viewer for reviewing file changes\n- Added collapsible changed files section with per-file diff rendering\n- Added CI Checks detail view showing individual check run status\n- Added Reviews section with author, state badge, and review body\n- Added Comments section with full comment history\n\n### PR Actions\n- Added merge with method selection (merge commit, squash, rebase)\n- Added approve and close PR actions\n- Added comment posting with text input\n- Added open in browser action\n\n### Platform Support\n- Supported GitHub via `gh api` CLI\n- Supported Gitea via REST API with token auth\n- Added i18n translations for all 10 languages"
+      },
+      {
+        "version": "2.1.2",
+        "date": "2026-03-14",
+        "summary": "Added copy-to-input button for AI suggestion options, allowing users to edit suggestions before sending.",
+        "changes": [
+          "Added copy-to-input icon on AI suggestion options to append text to input field for editing",
+          "Added copy-to-input icon in options popover and bookmarks popover"
+        ],
+        "rawMarkdown": "## 2.1.2 - 2026-03-14\n\n\nAdded copy-to-input button for AI suggestion options, allowing users to edit suggestions before sending.\n\n- Added copy-to-input icon on AI suggestion options to append text to input field for editing\n- Added copy-to-input icon in options popover and bookmarks popover"
+      },
+      {
+        "version": "2.1.1",
+        "date": "2026-03-13",
+        "summary": "Bug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.",
+        "changes": [
+          "Fixed message loss during pagination and backfill when switching between sessions",
+          "Improved usage trend chart with gap filling for missing dates and better layout",
+          "Fixed CLI thinking state accuracy in local mode to correctly reflect model status",
+          "Fixed server rejecting heartbeats for archived sessions to prevent ghost connections",
+          "Updated README to remove upstream branding and add fork disclaimers",
+          "Fixed collapsible input collapse button not responding due to stale closure"
+        ],
+        "rawMarkdown": "## 2.1.1 - 2026-03-13\n\n\nBug fixes for message loading, usage charts, session management, and CLI thinking state. Updated README with fork disclaimers.\n\n- Fixed message loss during pagination and backfill when switching between sessions\n- Improved usage trend chart with gap filling for missing dates and better layout\n- Fixed CLI thinking state accuracy in local mode to correctly reflect model status\n- Fixed server rejecting heartbeats for archived sessions to prevent ghost connections\n- Updated README to remove upstream branding and add fork disclaimers\n- Fixed collapsible input collapse button not responding due to stale closure"
+      },
+      {
+        "version": "2.1.0",
+        "date": "2026-03-09",
+        "summary": "GitHub/Gitea issue management, tablet sidebar, animated AI avatar, and major session loading performance improvements.",
+        "changes": [
+          "Added GitHub and Gitea issues integration with Git Hosts settings",
+          "Added multi-repository issue aggregation and detail sheet",
+          "Added issue session automation with CRUD management and completion lifecycle",
+          "Added issue tags display in session lists with clickable links and URL preview",
+          "Fixed issue session completion race condition and PR merge status checking",
+          "Fixed comma-separated labels and authors in auto-issue config",
+          "Fixed block archive/delete when issue has open PR",
+          "Added collapsible sidebar with icon rail for tablet",
+          "Added foldable inner screen detection as tablet for sidebar layout",
+          "Fixed split-screen not switching from tablet to phone layout",
+          "Improved SidebarNavigator and SidebarView components",
+          "Replaced AI avatar with animated status dot and improved AskUserQuestion UI",
+          "Added Claude Code-style turn metrics with animated tokens display",
+          "Added FAB action buttons with disabled state and pulse animation",
+          "Added expand tools setting for detailed tool view",
+          "Enhanced plan mode feedback with multiline input and image support",
+          "Enhanced kanban UI with pill selectors and board polish",
+          "Added project tab feature toggle in settings",
+          "Optimized session message loading with local cache and progressive rendering",
+          "Added secret key login option and navigate to login after logout",
+          "Removed Happy logo from settings page",
+          "Upgraded CLI to v0.29.36",
+          "Fixed plan mode permission handling (require manual approval for ExitPlanMode)",
+          "Fixed interrupt fallback when no active query"
+        ],
+        "rawMarkdown": "## 2.1.0 - 2026-03-09\n\n\nGitHub/Gitea issue management, tablet sidebar, animated AI avatar, and major session loading performance improvements.\n\n### Issues Integration\n- Added GitHub and Gitea issues integration with Git Hosts settings\n- Added multi-repository issue aggregation and detail sheet\n- Added issue session automation with CRUD management and completion lifecycle\n- Added issue tags display in session lists with clickable links and URL preview\n- Fixed issue session completion race condition and PR merge status checking\n- Fixed comma-separated labels and authors in auto-issue config\n- Fixed block archive/delete when issue has open PR\n\n### Tablet & Layout\n- Added collapsible sidebar with icon rail for tablet\n- Added foldable inner screen detection as tablet for sidebar layout\n- Fixed split-screen not switching from tablet to phone layout\n- Improved SidebarNavigator and SidebarView components\n\n### UI/UX\n- Replaced AI avatar with animated status dot and improved AskUserQuestion UI\n- Added Claude Code-style turn metrics with animated tokens display\n- Added FAB action buttons with disabled state and pulse animation\n- Added expand tools setting for detailed tool view\n- Enhanced plan mode feedback with multiline input and image support\n- Enhanced kanban UI with pill selectors and board polish\n- Added project tab feature toggle in settings\n\n### Performance\n- Optimized session message loading with local cache and progressive rendering\n\n### Auth & Settings\n- Added secret key login option and navigate to login after logout\n- Removed Happy logo from settings page\n\n### CLI\n- Upgraded CLI to v0.29.36\n- Fixed plan mode permission handling (require manual approval for ExitPlanMode)\n- Fixed interrupt fallback when no active query"
+      },
+      {
+        "version": "2.0.3",
+        "date": "2026-03-05",
+        "summary": "Fixed intermittent image upload failures.",
+        "changes": [
+          "Fixed multi-image upload failures by serializing uploads to avoid concurrent large file transfer timeouts"
+        ],
+        "rawMarkdown": "## 2.0.3 - 2026-03-05\n\n\nFixed intermittent image upload failures.\n\n- Fixed multi-image upload failures by serializing uploads to avoid concurrent large file transfer timeouts"
+      },
+      {
+        "version": "2.0.2",
+        "date": "2026-03-01",
+        "summary": "Major voice interaction upgrade, Worktree support, tool grouping with compact mode, and significant session management and UI improvements.",
+        "changes": [
+          "Added full voice pipeline: Edge TTS synthesis, Web VAD activity detection, status animations",
+          "Added WebSocket real-time speech-to-text service",
+          "Added Haiku model intelligent STT correction for improved recognition accuracy",
+          "Fixed mobile Web Chinese transcription issues",
+          "Reduced voice interaction latency with TTS interruption support",
+          "Removed unnecessary \"Done\" voice prompt after Claude Code completion",
+          "Added Worktree detection and session metadata support",
+          "Moved Worktree session type out of experimental features",
+          "Added i18n translations for 9 languages",
+          "Fixed merge conflict auto-abort, command injection vulnerability, and lifecycle management",
+          "Added tool grouping display with compact mode",
+          "Added auto-approve permissions within tool groups (TodoWrite excluded)",
+          "Removed review button for unknown tools",
+          "Added dontAsk permission mode and opusplan model support",
+          "Added swipe-to-archive and swipe-to-delete in session list",
+          "Added session preferences (permission mode, model mode) sync to server",
+          "Added session Profile tracking and persistence",
+          "Registered getCompactionSummary RPC for remote mode",
+          "Added real-time session sorting toggle",
+          "Improved code block interaction and tool description display",
+          "Added Agent type, real-time subtitle, and Copilot icon to Task tool cards",
+          "Added Modal.toast auto-dismiss notifications",
+          "Added toolbar auto-wrap on narrow screens",
+          "Added usage panel width constraints",
+          "Fixed Shell command results not displaying in App",
+          "Added App language preference forwarding to Claude system prompt",
+          "Upgraded SDK to 0.2.62",
+          "Upgraded CLI to v0.29.27",
+          "Patched 22 Dependabot security vulnerabilities"
+        ],
+        "rawMarkdown": "## 2.0.2 - 2026-03-01\n\n\nMajor voice interaction upgrade, Worktree support, tool grouping with compact mode, and significant session management and UI improvements.\n\n### Voice Assistant\n- Added full voice pipeline: Edge TTS synthesis, Web VAD activity detection, status animations\n- Added WebSocket real-time speech-to-text service\n- Added Haiku model intelligent STT correction for improved recognition accuracy\n- Fixed mobile Web Chinese transcription issues\n- Reduced voice interaction latency with TTS interruption support\n- Removed unnecessary \"Done\" voice prompt after Claude Code completion\n\n### Worktree\n- Added Worktree detection and session metadata support\n- Moved Worktree session type out of experimental features\n- Added i18n translations for 9 languages\n- Fixed merge conflict auto-abort, command injection vulnerability, and lifecycle management\n\n### Tools & Permissions\n- Added tool grouping display with compact mode\n- Added auto-approve permissions within tool groups (TodoWrite excluded)\n- Removed review button for unknown tools\n- Added dontAsk permission mode and opusplan model support\n\n### Session Management\n- Added swipe-to-archive and swipe-to-delete in session list\n- Added session preferences (permission mode, model mode) sync to server\n- Added session Profile tracking and persistence\n- Registered getCompactionSummary RPC for remote mode\n- Added real-time session sorting toggle\n\n### UI/UX\n- Improved code block interaction and tool description display\n- Added Agent type, real-time subtitle, and Copilot icon to Task tool cards\n- Added Modal.toast auto-dismiss notifications\n- Added toolbar auto-wrap on narrow screens\n- Added usage panel width constraints\n\n### CLI\n- Fixed Shell command results not displaying in App\n- Added App language preference forwarding to Claude system prompt\n- Upgraded SDK to 0.2.62\n- Upgraded CLI to v0.29.27\n\n### Security\n- Patched 22 Dependabot security vulnerabilities"
+      },
+      {
+        "version": "2.0.1",
+        "date": "2026-02-27",
+        "summary": "Fixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.",
+        "changes": [
+          "Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor",
+          "Fixed session title reverting to project name after resume by preserving the summary field during metadata updates",
+          "Added session resume V2 support — resume now reconnects to the same session instead of creating a new one"
+        ],
+        "rawMarkdown": "## 2.0.1 - 2026-02-27\n\n\nFixed session resume to reuse the same Happy session instead of creating a new one, preserving message history and session identity.\n\n- Fixed session metadata showing as unknown after resume by detecting encryption key changes and reinitializing the encryptor\n- Fixed session title reverting to project name after resume by preserving the summary field during metadata updates\n- Added session resume V2 support — resume now reconnects to the same session instead of creating a new one"
+      },
+      {
+        "version": "2.0.0",
+        "date": "2026-02-27",
+        "summary": "Happy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.",
+        "changes": [
+          "Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere",
+          "Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content",
+          "Added QR code scanning and manual URL entry for quick device authentication",
+          "Added Daemon mode for persistent background running with one-tap remote session launch",
+          "Added intelligent voice assistant supporting 15+ languages for natural conversation",
+          "Added GitHub and Claude account connection for unified developer identity management",
+          "Added multi-device real-time sync with online/offline status indicators",
+          "Added dark mode and appearance customization with automatic system theme following",
+          "Added Markdown table rendering and code syntax highlighting in chat",
+          "Streamlined settings page, removed upstream links, started maintaining own changelog",
+          "Supported iOS, Android, and Web platforms"
+        ],
+        "rawMarkdown": "## 2.0.0 - 2026-02-27\n\n\nHappy Coder 2.0 — a deeply customized mobile AI development assistant based on upstream Happy Coder, supporting remote control of Claude Code and Codex with end-to-end encryption.\n\n- Added remote control of Claude Code and Codex from mobile, enabling AI coding sessions anywhere\n- Added end-to-end encryption (AES-256-GCM / NaCl secretbox) for fully private session content\n- Added QR code scanning and manual URL entry for quick device authentication\n- Added Daemon mode for persistent background running with one-tap remote session launch\n- Added intelligent voice assistant supporting 15+ languages for natural conversation\n- Added GitHub and Claude account connection for unified developer identity management\n- Added multi-device real-time sync with online/offline status indicators\n- Added dark mode and appearance customization with automatic system theme following\n- Added Markdown table rendering and code syntax highlighting in chat\n- Streamlined settings page, removed upstream links, started maintaining own changelog\n- Supported iOS, Android, and Web platforms"
+      }
+    ],
+    "zh-Hans": [
+      {
+        "version": "2.4.0",
+        "date": "2026-03-20",
+        "summary": "新增 Supervisor 循环模式（自动分析-修复-再分析循环）、项目配置标签页、Research 标签页重新设计，以及大量 Supervisor 和界面改进。",
+        "changes": [
+          "新增循环模式 — 自动分析代码、应用修复、再次分析，直到问题解决",
+          "新增循环配置面板，支持步进器控制最大迭代次数和并发数",
+          "新增循环详情页，时间轴视图展示每个周期的操作和结果",
+          "新增健康标签页中的循环历史记录",
+          "新增半自动和自动 Supervisor 模式的可配置严重级别",
+          "新增基于 AI 响应内容的智能 needsAttention 检测",
+          "新增项目配置标签页及基础设置",
+          "新增项目别名 — 自定义显示名称覆盖默认文件夹名",
+          "新增按项目设置新会话的默认模型",
+          "新增归档/取消归档项目开关",
+          "新增只读项目信息展示（路径、设备、创建日期）",
+          "重新设计 Research 标签页，统一配置面板和弹窗式报告查看器",
+          "新增自定义分析规则支持",
+          "新增通过 KV Store 的多设备配置同步",
+          "新增研究进度 UI 及加载指示器",
+          "新增分析和修复会话的并发限制",
+          "改进 Supervisor 操作的排序、筛选和严重级别显示",
+          "新增 Supervisor 操作恢复功能",
+          "新增 Supervisor 操作按钮加载指示器",
+          "将 Profile 选择器从输入栏移至输入框上方的下拉菜单",
+          "更新 Claude 模型定价 — 200K 和 1M 上下文价格相同",
+          "新增模型名称显示版本号",
+          "新增 UI/UX 维度的 Supervisor 健康监控",
+          "新增创建新会话时自动创建项目",
+          "新增手动添加/删除项目支持",
+          "修复新建会话默认路径将 worktree 解析到父仓库",
+          "修复多处硬编码英文字符串缺少 i18n",
+          "修复模型选择器 UI 和状态栏模型显示",
+          "修复 IssueFilterBar/PRFilterBar 使用 Alert 模块而非 Modal",
+          "修复切换 Agent 时新会话的缓存 daemon 模型未重置",
+          "隔离健康/研究标签页运行，防止交叉污染"
+        ],
+        "rawMarkdown": "## 2.4.0 - 2026-03-20\n\n\n新增 Supervisor 循环模式（自动分析-修复-再分析循环）、项目配置标签页、Research 标签页重新设计，以及大量 Supervisor 和界面改进。\n\n### Supervisor 循环模式\n- 新增循环模式 — 自动分析代码、应用修复、再次分析，直到问题解决\n- 新增循环配置面板，支持步进器控制最大迭代次数和并发数\n- 新增循环详情页，时间轴视图展示每个周期的操作和结果\n- 新增健康标签页中的循环历史记录\n- 新增半自动和自动 Supervisor 模式的可配置严重级别\n- 新增基于 AI 响应内容的智能 needsAttention 检测\n\n### 项目配置标签页\n- 新增项目配置标签页及基础设置\n- 新增项目别名 — 自定义显示名称覆盖默认文件夹名\n- 新增按项目设置新会话的默认模型\n- 新增归档/取消归档项目开关\n- 新增只读项目信息展示（路径、设备、创建日期）\n\n### Research 标签页重设计\n- 重新设计 Research 标签页，统一配置面板和弹窗式报告查看器\n- 新增自定义分析规则支持\n- 新增通过 KV Store 的多设备配置同步\n- 新增研究进度 UI 及加载指示器\n\n### Supervisor 增强\n- 新增分析和修复会话的并发限制\n- 改进 Supervisor 操作的排序、筛选和严重级别显示\n- 新增 Supervisor 操作恢复功能\n- 新增 Supervisor 操作按钮加载指示器\n\n### 界面改进\n- 将 Profile 选择器从输入栏移至输入框上方的下拉菜单\n- 更新 Claude 模型定价 — 200K 和 1M 上下文价格相同\n- 新增模型名称显示版本号\n- 新增 UI/UX 维度的 Supervisor 健康监控\n\n### 项目管理\n- 新增创建新会话时自动创建项目\n- 新增手动添加/删除项目支持\n\n### Bug 修复\n- 修复新建会话默认路径将 worktree 解析到父仓库\n- 修复多处硬编码英文字符串缺少 i18n\n- 修复模型选择器 UI 和状态栏模型显示\n- 修复 IssueFilterBar/PRFilterBar 使用 Alert 模块而非 Modal\n- 修复切换 Agent 时新会话的缓存 daemon 模型未重置\n- 隔离健康/研究标签页运行，防止交叉污染"
+      },
+      {
+        "version": "2.3.1",
+        "date": "2026-03-18",
+        "summary": "升级 Claude Agent SDK 至 0.2.78 — 新增 StopFailure 错误横幅，改进 hook 服务器可靠性。",
+        "changes": [
+          "新增 StopFailure 错误横幅，显示 Claude 会话意外停止时的错误详情",
+          "新增可展开的最后一条助手消息，用于调试上下文",
+          "新增本地关闭及新错误时自动重置",
+          "新增回合开始时自动清除 stopFailure 状态",
+          "修复 HTTP hook 服务器超时导致 Node.js 双写异常（用 AbortController 替换 setTimeout）",
+          "新增会话 hook 转发脚本的端口范围校验"
+        ],
+        "rawMarkdown": "## 2.3.1 - 2026-03-18\n\n\n升级 Claude Agent SDK 至 0.2.78 — 新增 StopFailure 错误横幅，改进 hook 服务器可靠性。\n\n### StopFailure Hook\n- 新增 StopFailure 错误横幅，显示 Claude 会话意外停止时的错误详情\n- 新增可展开的最后一条助手消息，用于调试上下文\n- 新增本地关闭及新错误时自动重置\n- 新增回合开始时自动清除 stopFailure 状态\n\n### 可靠性\n- 修复 HTTP hook 服务器超时导致 Node.js 双写异常（用 AbortController 替换 setTimeout）\n- 新增会话 hook 转发脚本的端口范围校验"
+      },
+      {
+        "version": "2.3.0",
+        "date": "2026-03-18",
+        "summary": "集成 Claude Agent SDK 0.2.77 功能 — 会话分叉、取消排队消息、MCP 服务器输入、API 重试状态和增强的计划查看。",
+        "changes": [
+          "新增会话信息中的分叉按钮，从当前上下文创建分支",
+          "新增完整分叉流程：CLI 创建 SDK 分叉，App 生成新会话并跳转",
+          "新增排队消息的取消按钮，在执行前移除",
+          "改进取消流程，先确认服务端取消后再更新 UI",
+          "新增 MCP 服务器输入横幅，处理认证和配置请求",
+          "新增表单模式，支持 JSON Schema 字段渲染的结构化输入",
+          "新增 URL 模式，带协议验证的链接打开",
+          "新增 MCP 服务器请求用户输入时的推送通知",
+          "新增实时 API 重试指示器，显示尝试次数、最大重试数和延迟",
+          "新增请求成功时自动清除重试状态",
+          "改进 ExitPlanMode，从文件显示完整计划内容并支持刷新",
+          "新增防竞态条件的计划文件读取，带内存内容回退",
+          "新增询问操作验证和中止清理，防止内存泄漏",
+          "新增 URL 协议验证，仅允许 http/https",
+          "新增数字询问输入的 NaN 防护",
+          "限制 Supervisor 操作删除仅限已关闭状态",
+          "批量 Supervisor 操作去重写入，减少数据库往返"
+        ],
+        "rawMarkdown": "## 2.3.0 - 2026-03-18\n\n\n集成 Claude Agent SDK 0.2.77 功能 — 会话分叉、取消排队消息、MCP 服务器输入、API 重试状态和增强的计划查看。\n\n### 会话分叉\n- 新增会话信息中的分叉按钮，从当前上下文创建分支\n- 新增完整分叉流程：CLI 创建 SDK 分叉，App 生成新会话并跳转\n\n### 取消排队消息\n- 新增排队消息的取消按钮，在执行前移除\n- 改进取消流程，先确认服务端取消后再更新 UI\n\n### MCP 询问\n- 新增 MCP 服务器输入横幅，处理认证和配置请求\n- 新增表单模式，支持 JSON Schema 字段渲染的结构化输入\n- 新增 URL 模式，带协议验证的链接打开\n- 新增 MCP 服务器请求用户输入时的推送通知\n\n### API 重试状态\n- 新增实时 API 重试指示器，显示尝试次数、最大重试数和延迟\n- 新增请求成功时自动清除重试状态\n\n### 计划文件查看\n- 改进 ExitPlanMode，从文件显示完整计划内容并支持刷新\n- 新增防竞态条件的计划文件读取，带内存内容回退\n\n### 安全与可靠性\n- 新增询问操作验证和中止清理，防止内存泄漏\n- 新增 URL 协议验证，仅允许 http/https\n- 新增数字询问输入的 NaN 防护\n- 限制 Supervisor 操作删除仅限已关闭状态\n- 批量 Supervisor 操作去重写入，减少数据库往返"
+      },
+      {
+        "version": "2.2.0",
+        "date": "2026-03-14",
+        "summary": "新增完整的 Pull Request 管理，实现移动端 AI DevOps 工作流 — 在手机上浏览 PR、审查 diff、检查 CI 状态并合并。",
+        "changes": [
+          "新增 Git 区域的 PR 标签页，徽章显示开放 PR 数量",
+          "新增 PR 卡片，包含状态图标、分支信息、diff 统计、标签和草稿徽章",
+          "新增筛选栏，支持 Open/Closed/All 状态和排序选项",
+          "新增无限滚动分页和 60 秒自动轮询",
+          "新增多仓库 PR 聚合",
+          "新增 PR 详情面板，包含完整元数据、分支信息和描述",
+          "新增统一 diff 补丁查看器，用于审查文件变更",
+          "新增可折叠的已更改文件区域，支持逐文件 diff 渲染",
+          "新增 CI 检查详情视图，显示各检查运行状态",
+          "新增评审区域，包含作者、状态徽章和评审内容",
+          "新增评论区域，包含完整评论历史",
+          "新增合并功能，支持合并方式选择（合并提交、压缩合并、变基合并）",
+          "新增批准和关闭 PR 操作",
+          "新增文本输入评论发布",
+          "新增在浏览器中打开操作",
+          "支持 GitHub（通过 `gh api` CLI）",
+          "支持 Gitea（通过 REST API token 认证）",
+          "新增全部 10 种语言的 i18n 翻译"
+        ],
+        "rawMarkdown": "## 2.2.0 - 2026-03-14\n\n\n新增完整的 Pull Request 管理，实现移动端 AI DevOps 工作流 — 在手机上浏览 PR、审查 diff、检查 CI 状态并合并。\n\n### PR 列表与导航\n- 新增 Git 区域的 PR 标签页，徽章显示开放 PR 数量\n- 新增 PR 卡片，包含状态图标、分支信息、diff 统计、标签和草稿徽章\n- 新增筛选栏，支持 Open/Closed/All 状态和排序选项\n- 新增无限滚动分页和 60 秒自动轮询\n- 新增多仓库 PR 聚合\n\n### PR 详情与 Diff 审查\n- 新增 PR 详情面板，包含完整元数据、分支信息和描述\n- 新增统一 diff 补丁查看器，用于审查文件变更\n- 新增可折叠的已更改文件区域，支持逐文件 diff 渲染\n- 新增 CI 检查详情视图，显示各检查运行状态\n- 新增评审区域，包含作者、状态徽章和评审内容\n- 新增评论区域，包含完整评论历史\n\n### PR 操作\n- 新增合并功能，支持合并方式选择（合并提交、压缩合并、变基合并）\n- 新增批准和关闭 PR 操作\n- 新增文本输入评论发布\n- 新增在浏览器中打开操作\n\n### 平台支持\n- 支持 GitHub（通过 `gh api` CLI）\n- 支持 Gitea（通过 REST API token 认证）\n- 新增全部 10 种语言的 i18n 翻译"
+      },
+      {
+        "version": "2.1.2",
+        "date": "2026-03-14",
+        "summary": "新增 AI 建议选项的复制到输入按钮，允许用户在发送前编辑建议。",
+        "changes": [
+          "新增 AI 建议选项上的复制到输入图标，将文本追加到输入框供编辑",
+          "新增选项弹出框和书签弹出框中的复制到输入图标"
+        ],
+        "rawMarkdown": "## 2.1.2 - 2026-03-14\n\n\n新增 AI 建议选项的复制到输入按钮，允许用户在发送前编辑建议。\n\n- 新增 AI 建议选项上的复制到输入图标，将文本追加到输入框供编辑\n- 新增选项弹出框和书签弹出框中的复制到输入图标"
+      },
+      {
+        "version": "2.1.1",
+        "date": "2026-03-13",
+        "summary": "修复消息加载、使用量图表、会话管理和 CLI 思考状态的 Bug。更新 README 添加 fork 声明。",
+        "changes": [
+          "修复切换会话时分页和回填导致的消息丢失",
+          "改进使用趋势图表，补填缺失日期并优化布局",
+          "修复本地模式下 CLI 思考状态准确性，正确反映模型状态",
+          "修复服务器拒绝已归档会话的心跳，防止幽灵连接",
+          "更新 README，移除上游品牌标识并添加 fork 声明",
+          "修复可折叠输入的折叠按钮因闭包过期无响应"
+        ],
+        "rawMarkdown": "## 2.1.1 - 2026-03-13\n\n\n修复消息加载、使用量图表、会话管理和 CLI 思考状态的 Bug。更新 README 添加 fork 声明。\n\n- 修复切换会话时分页和回填导致的消息丢失\n- 改进使用趋势图表，补填缺失日期并优化布局\n- 修复本地模式下 CLI 思考状态准确性，正确反映模型状态\n- 修复服务器拒绝已归档会话的心跳，防止幽灵连接\n- 更新 README，移除上游品牌标识并添加 fork 声明\n- 修复可折叠输入的折叠按钮因闭包过期无响应"
+      },
+      {
+        "version": "2.1.0",
+        "date": "2026-03-09",
+        "summary": "GitHub/Gitea Issue 管理、平板侧边栏、动画 AI 头像，以及会话加载性能大幅优化。",
+        "changes": [
+          "新增 GitHub 和 Gitea Issue 集成及 Git Hosts 设置",
+          "新增多仓库 Issue 聚合和详情面板",
+          "新增 Issue 会话自动化，支持 CRUD 管理和完成生命周期",
+          "新增会话列表中的 Issue 标签展示，支持可点击链接和 URL 预览",
+          "修复 Issue 会话完成竞态条件和 PR 合并状态检查",
+          "修复逗号分隔的标签和作者在自动 Issue 配置中的问题",
+          "修复 Issue 有开放 PR 时阻止归档/删除",
+          "新增平板端可折叠侧边栏及图标导航栏",
+          "新增可折叠内屏检测为平板以启用侧边栏布局",
+          "修复分屏模式未从平板切换到手机布局",
+          "改进 SidebarNavigator 和 SidebarView 组件",
+          "用动画状态点替换 AI 头像，改进 AskUserQuestion UI",
+          "新增 Claude Code 风格的回合指标，带动画 token 展示",
+          "新增 FAB 操作按钮，支持禁用状态和脉冲动画",
+          "新增展开工具设置，用于详细工具视图",
+          "增强计划模式反馈，支持多行输入和图片",
+          "增强看板 UI，添加药丸选择器和界面打磨",
+          "新增设置中的项目标签页功能开关",
+          "优化会话消息加载，使用本地缓存和渐进式渲染",
+          "新增密钥登录选项，退出后导航至登录页",
+          "移除设置页面中的 Happy Logo",
+          "升级 CLI 至 v0.29.36",
+          "修复计划模式权限处理（ExitPlanMode 需要手动批准）",
+          "修复无活跃查询时的中断回退"
+        ],
+        "rawMarkdown": "## 2.1.0 - 2026-03-09\n\n\nGitHub/Gitea Issue 管理、平板侧边栏、动画 AI 头像，以及会话加载性能大幅优化。\n\n### Issue 集成\n- 新增 GitHub 和 Gitea Issue 集成及 Git Hosts 设置\n- 新增多仓库 Issue 聚合和详情面板\n- 新增 Issue 会话自动化，支持 CRUD 管理和完成生命周期\n- 新增会话列表中的 Issue 标签展示，支持可点击链接和 URL 预览\n- 修复 Issue 会话完成竞态条件和 PR 合并状态检查\n- 修复逗号分隔的标签和作者在自动 Issue 配置中的问题\n- 修复 Issue 有开放 PR 时阻止归档/删除\n\n### 平板与布局\n- 新增平板端可折叠侧边栏及图标导航栏\n- 新增可折叠内屏检测为平板以启用侧边栏布局\n- 修复分屏模式未从平板切换到手机布局\n- 改进 SidebarNavigator 和 SidebarView 组件\n\n### 界面体验\n- 用动画状态点替换 AI 头像，改进 AskUserQuestion UI\n- 新增 Claude Code 风格的回合指标，带动画 token 展示\n- 新增 FAB 操作按钮，支持禁用状态和脉冲动画\n- 新增展开工具设置，用于详细工具视图\n- 增强计划模式反馈，支持多行输入和图片\n- 增强看板 UI，添加药丸选择器和界面打磨\n- 新增设置中的项目标签页功能开关\n\n### 性能\n- 优化会话消息加载，使用本地缓存和渐进式渲染\n\n### 认证与设置\n- 新增密钥登录选项，退出后导航至登录页\n- 移除设置页面中的 Happy Logo\n\n### CLI\n- 升级 CLI 至 v0.29.36\n- 修复计划模式权限处理（ExitPlanMode 需要手动批准）\n- 修复无活跃查询时的中断回退"
+      },
+      {
+        "version": "2.0.3",
+        "date": "2026-03-05",
+        "summary": "修复间歇性图片上传失败。",
+        "changes": [
+          "修复多图上传失败，通过串行化上传避免并发大文件传输超时"
+        ],
+        "rawMarkdown": "## 2.0.3 - 2026-03-05\n\n\n修复间歇性图片上传失败。\n\n- 修复多图上传失败，通过串行化上传避免并发大文件传输超时"
+      },
+      {
+        "version": "2.0.2",
+        "date": "2026-03-01",
+        "summary": "语音交互大幅升级、Worktree 支持、工具分组紧凑模式，以及会话管理和界面的重大改进。",
+        "changes": [
+          "新增完整语音管线：Edge TTS 语音合成、Web VAD 活动检测、状态动画",
+          "新增 WebSocket 实时语音转文本服务",
+          "新增 Haiku 模型智能 STT 纠错，提升识别准确率",
+          "修复移动端 Web 中文转录问题",
+          "降低语音交互延迟，支持 TTS 打断",
+          "移除 Claude Code 完成后多余的\"Done\"语音提示",
+          "新增 Worktree 检测和会话元数据支持",
+          "将 Worktree 会话类型移出实验性功能",
+          "新增 9 种语言的 i18n 翻译",
+          "修复合并冲突自动中止、命令注入漏洞和生命周期管理",
+          "新增工具分组显示及紧凑模式",
+          "新增工具组内自动批准权限（TodoWrite 除外）",
+          "移除未知工具的审查按钮",
+          "新增 dontAsk 权限模式和 opusplan 模型支持",
+          "新增会话列表中的左滑归档和左滑删除",
+          "新增会话偏好（权限模式、模型模式）同步到服务器",
+          "新增会话 Profile 跟踪和持久化",
+          "注册远程模式的 getCompactionSummary RPC",
+          "新增实时会话排序开关",
+          "改进代码块交互和工具描述显示",
+          "新增 Task 工具卡片的 Agent 类型、实时副标题和 Copilot 图标",
+          "新增 Modal.toast 自动消失通知",
+          "新增窄屏下工具栏自动换行",
+          "新增使用量面板宽度约束",
+          "修复 Shell 命令结果不在 App 中显示",
+          "新增 App 语言偏好转发到 Claude 系统提示",
+          "升级 SDK 至 0.2.62",
+          "升级 CLI 至 v0.29.27",
+          "修补 22 个 Dependabot 安全漏洞"
+        ],
+        "rawMarkdown": "## 2.0.2 - 2026-03-01\n\n\n语音交互大幅升级、Worktree 支持、工具分组紧凑模式，以及会话管理和界面的重大改进。\n\n### 语音助手\n- 新增完整语音管线：Edge TTS 语音合成、Web VAD 活动检测、状态动画\n- 新增 WebSocket 实时语音转文本服务\n- 新增 Haiku 模型智能 STT 纠错，提升识别准确率\n- 修复移动端 Web 中文转录问题\n- 降低语音交互延迟，支持 TTS 打断\n- 移除 Claude Code 完成后多余的\"Done\"语音提示\n\n### Worktree\n- 新增 Worktree 检测和会话元数据支持\n- 将 Worktree 会话类型移出实验性功能\n- 新增 9 种语言的 i18n 翻译\n- 修复合并冲突自动中止、命令注入漏洞和生命周期管理\n\n### 工具与权限\n- 新增工具分组显示及紧凑模式\n- 新增工具组内自动批准权限（TodoWrite 除外）\n- 移除未知工具的审查按钮\n- 新增 dontAsk 权限模式和 opusplan 模型支持\n\n### 会话管理\n- 新增会话列表中的左滑归档和左滑删除\n- 新增会话偏好（权限模式、模型模式）同步到服务器\n- 新增会话 Profile 跟踪和持久化\n- 注册远程模式的 getCompactionSummary RPC\n- 新增实时会话排序开关\n\n### 界面体验\n- 改进代码块交互和工具描述显示\n- 新增 Task 工具卡片的 Agent 类型、实时副标题和 Copilot 图标\n- 新增 Modal.toast 自动消失通知\n- 新增窄屏下工具栏自动换行\n- 新增使用量面板宽度约束\n\n### CLI\n- 修复 Shell 命令结果不在 App 中显示\n- 新增 App 语言偏好转发到 Claude 系统提示\n- 升级 SDK 至 0.2.62\n- 升级 CLI 至 v0.29.27\n\n### 安全\n- 修补 22 个 Dependabot 安全漏洞"
+      },
+      {
+        "version": "2.0.1",
+        "date": "2026-02-27",
+        "summary": "修复会话恢复时复用同一 Happy 会话而非创建新会话，保留消息历史和会话标识。",
+        "changes": [
+          "修复恢复后会话元数据显示为 unknown，通过检测加密密钥变更重新初始化加密器",
+          "修复恢复后会话标题回退到项目名称，在元数据更新时保留 summary 字段",
+          "新增会话恢复 V2 支持 — 恢复现在重新连接到同一会话而非创建新会话"
+        ],
+        "rawMarkdown": "## 2.0.1 - 2026-02-27\n\n\n修复会话恢复时复用同一 Happy 会话而非创建新会话，保留消息历史和会话标识。\n\n- 修复恢复后会话元数据显示为 unknown，通过检测加密密钥变更重新初始化加密器\n- 修复恢复后会话标题回退到项目名称，在元数据更新时保留 summary 字段\n- 新增会话恢复 V2 支持 — 恢复现在重新连接到同一会话而非创建新会话"
+      },
+      {
+        "version": "2.0.0",
+        "date": "2026-02-27",
+        "summary": "Happy Coder 2.0 — 基于上游 Happy Coder 深度定制的移动端 AI 开发助手，支持端到端加密远程控制 Claude Code 和 Codex。",
+        "changes": [
+          "新增从手机远程控制 Claude Code 和 Codex，随时随地进行 AI 编程",
+          "新增端到端加密（AES-256-GCM / NaCl secretbox），完全保护会话内容隐私",
+          "新增二维码扫描和手动 URL 输入，快速设备认证",
+          "新增 Daemon 后台常驻模式，一键启动远程会话",
+          "新增智能语音助手，支持 15+ 种语言自然对话",
+          "新增 GitHub 和 Claude 账户连接，统一开发者身份管理",
+          "新增多设备实时同步，在线/离线状态指示",
+          "新增深色模式和外观自定义，自动跟随系统主题",
+          "新增聊天中的 Markdown 表格渲染和代码语法高亮",
+          "精简设置页面，移除上游链接，开始维护自有更新日志",
+          "支持 iOS、Android 和 Web 平台"
+        ],
+        "rawMarkdown": "## 2.0.0 - 2026-02-27\n\n\nHappy Coder 2.0 — 基于上游 Happy Coder 深度定制的移动端 AI 开发助手，支持端到端加密远程控制 Claude Code 和 Codex。\n\n- 新增从手机远程控制 Claude Code 和 Codex，随时随地进行 AI 编程\n- 新增端到端加密（AES-256-GCM / NaCl secretbox），完全保护会话内容隐私\n- 新增二维码扫描和手动 URL 输入，快速设备认证\n- 新增 Daemon 后台常驻模式，一键启动远程会话\n- 新增智能语音助手，支持 15+ 种语言自然对话\n- 新增 GitHub 和 Claude 账户连接，统一开发者身份管理\n- 新增多设备实时同步，在线/离线状态指示\n- 新增深色模式和外观自定义，自动跟随系统主题\n- 新增聊天中的 Markdown 表格渲染和代码语法高亮\n- 精简设置页面，移除上游链接，开始维护自有更新日志\n- 支持 iOS、Android 和 Web 平台"
+      }
+    ]
+  },
+  "latestVersion": "2.4.0",
+  "availableLocales": [
+    "en",
+    "zh-Hans"
+  ]
 }

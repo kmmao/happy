@@ -6,7 +6,8 @@ export interface ChangelogEntry {
   rawMarkdown?: string;
 }
 
-export interface ChangelogData {
-  entries: ChangelogEntry[];
+export interface LocalizedChangelogData {
+  entries: Record<string, ChangelogEntry[]>;
   latestVersion: string;
+  availableLocales: string[];
 }
