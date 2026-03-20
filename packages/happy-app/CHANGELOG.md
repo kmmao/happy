@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.5.0 - 2026-03-20
+
+Improved session management with active/archived grouping and restore, added file browser with @reference in input bar, branch switching in Git tab, health analytics day range selector, and multi-locale changelog support.
+
+### Session Management
+- Added active/archived session grouping with section headers and action buttons
+- Added session restore API to reactivate archived sessions
+- Added "Delete Archived Sessions" button at top of archived group
+
+### File Browser & Git
+- Added file browser button in input bar with @reference insertion
+- Added branch switching modal in project Git tab with local/remote branches
+- Fixed file browser to show dotfiles (.claude/, .github/, .gitignore, etc.)
+
+### Health Analytics
+- Added day range selector (3d/7d/14d/30d) for cost and trend sections
+- Fixed cost calculation to include failed/cancelled runs
+- Lowered trend API minimum from 7 to 1 day for 3-day view
+
+### AI Suggestions
+- Added recommended badge with sparkles icon on first AI suggestion option
+- Added comet shimmer animation on recommended option border
+
+### Internationalization
+- Added multi-locale changelog support with automatic locale discovery
+- Added full Chinese (zh-Hans) changelog translation for all versions
+- Changelog page now displays in user's language with English fallback
+
+### Cleanup
+- Removed unused batch approve and action card from health tab
+
 ## 2.4.0 - 2026-03-20
 
 Added Supervisor Loop Mode for autonomous analyze-fix-reanalyze cycles, project configuration tab, redesigned Research tab, and numerous supervisor and UI improvements.

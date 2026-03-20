@@ -2,6 +2,29 @@
   "entries": {
     "en": [
       {
+        "version": "2.5.0",
+        "date": "2026-03-20",
+        "summary": "Improved session management with active/archived grouping and restore, added file browser with @reference in input bar, branch switching in Git tab, health analytics day range selector, and multi-locale changelog support.",
+        "changes": [
+          "Added active/archived session grouping with section headers and action buttons",
+          "Added session restore API to reactivate archived sessions",
+          "Added \"Delete Archived Sessions\" button at top of archived group",
+          "Added file browser button in input bar with @reference insertion",
+          "Added branch switching modal in project Git tab with local/remote branches",
+          "Fixed file browser to show dotfiles (.claude/, .github/, .gitignore, etc.)",
+          "Added day range selector (3d/7d/14d/30d) for cost and trend sections",
+          "Fixed cost calculation to include failed/cancelled runs",
+          "Lowered trend API minimum from 7 to 1 day for 3-day view",
+          "Added recommended badge with sparkles icon on first AI suggestion option",
+          "Added comet shimmer animation on recommended option border",
+          "Added multi-locale changelog support with automatic locale discovery",
+          "Added full Chinese (zh-Hans) changelog translation for all versions",
+          "Changelog page now displays in user's language with English fallback",
+          "Removed unused batch approve and action card from health tab"
+        ],
+        "rawMarkdown": "## 2.5.0 - 2026-03-20\n\n\nImproved session management with active/archived grouping and restore, added file browser with @reference in input bar, branch switching in Git tab, health analytics day range selector, and multi-locale changelog support.\n\n### Session Management\n- Added active/archived session grouping with section headers and action buttons\n- Added session restore API to reactivate archived sessions\n- Added \"Delete Archived Sessions\" button at top of archived group\n\n### File Browser & Git\n- Added file browser button in input bar with @reference insertion\n- Added branch switching modal in project Git tab with local/remote branches\n- Fixed file browser to show dotfiles (.claude/, .github/, .gitignore, etc.)\n\n### Health Analytics\n- Added day range selector (3d/7d/14d/30d) for cost and trend sections\n- Fixed cost calculation to include failed/cancelled runs\n- Lowered trend API minimum from 7 to 1 day for 3-day view\n\n### AI Suggestions\n- Added recommended badge with sparkles icon on first AI suggestion option\n- Added comet shimmer animation on recommended option border\n\n### Internationalization\n- Added multi-locale changelog support with automatic locale discovery\n- Added full Chinese (zh-Hans) changelog translation for all versions\n- Changelog page now displays in user's language with English fallback\n\n### Cleanup\n- Removed unused batch approve and action card from health tab"
+      },
+      {
         "version": "2.4.0",
         "date": "2026-03-20",
         "summary": "Added Supervisor Loop Mode for autonomous analyze-fix-reanalyze cycles, project configuration tab, redesigned Research tab, and numerous supervisor and UI improvements.",
@@ -240,6 +263,29 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.5.0",
+        "date": "2026-03-20",
+        "summary": "改进会话管理（活跃/归档分组和恢复功能）、输入栏新增文件浏览器及 @reference、Git 标签页分支切换、健康分析日期范围选择器，以及多语言 Changelog 支持。",
+        "changes": [
+          "新增活跃/归档会话分组，带分区标题和操作按钮",
+          "新增会话恢复 API，支持重新激活已归档会话",
+          "新增归档分组顶部的\"删除归档会话\"按钮",
+          "新增输入栏文件浏览器按钮，支持 @reference 插入文件路径",
+          "新增项目 Git 标签页分支切换弹窗，支持本地/远程分支",
+          "修复文件浏览器显示隐藏文件（.claude/、.github/、.gitignore 等）",
+          "新增日期范围选择器（3天/7天/14天/30天），适用于成本和趋势图",
+          "修复成本计算遗漏失败/已取消的运行",
+          "降低趋势 API 最小天数从 7 天到 1 天，支持 3 天视图",
+          "新增首个 AI 建议选项的推荐徽章和闪光图标",
+          "新增推荐选项边框的彗星闪烁动画",
+          "新增多语言 Changelog 支持，自动发现语言文件",
+          "新增全部版本的简体中文 Changelog 翻译",
+          "Changelog 页面现在按用户语言显示，英文作为 fallback",
+          "移除健康标签页中未使用的批量审批和操作卡片"
+        ],
+        "rawMarkdown": "## 2.5.0 - 2026-03-20\n\n\n改进会话管理（活跃/归档分组和恢复功能）、输入栏新增文件浏览器及 @reference、Git 标签页分支切换、健康分析日期范围选择器，以及多语言 Changelog 支持。\n\n### 会话管理\n- 新增活跃/归档会话分组，带分区标题和操作按钮\n- 新增会话恢复 API，支持重新激活已归档会话\n- 新增归档分组顶部的\"删除归档会话\"按钮\n\n### 文件浏览器与 Git\n- 新增输入栏文件浏览器按钮，支持 @reference 插入文件路径\n- 新增项目 Git 标签页分支切换弹窗，支持本地/远程分支\n- 修复文件浏览器显示隐藏文件（.claude/、.github/、.gitignore 等）\n\n### 健康分析\n- 新增日期范围选择器（3天/7天/14天/30天），适用于成本和趋势图\n- 修复成本计算遗漏失败/已取消的运行\n- 降低趋势 API 最小天数从 7 天到 1 天，支持 3 天视图\n\n### AI 建议\n- 新增首个 AI 建议选项的推荐徽章和闪光图标\n- 新增推荐选项边框的彗星闪烁动画\n\n### 国际化\n- 新增多语言 Changelog 支持，自动发现语言文件\n- 新增全部版本的简体中文 Changelog 翻译\n- Changelog 页面现在按用户语言显示，英文作为 fallback\n\n### 清理\n- 移除健康标签页中未使用的批量审批和操作卡片"
+      },
+      {
         "version": "2.4.0",
         "date": "2026-03-20",
         "summary": "新增 Supervisor 循环模式（自动分析-修复-再分析循环）、项目配置标签页、Research 标签页重新设计，以及大量 Supervisor 和界面改进。",
@@ -477,7 +523,7 @@
       }
     ]
   },
-  "latestVersion": "2.4.0",
+  "latestVersion": "2.5.0",
   "availableLocales": [
     "en",
     "zh-Hans"
