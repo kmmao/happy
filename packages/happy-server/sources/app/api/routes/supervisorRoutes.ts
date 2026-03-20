@@ -121,7 +121,7 @@ export function supervisorRoutes(app: Fastify) {
                         approval: { in: ["pending", "approved", "skipped", "ignored"] },
                     },
                     select: { category: true, title: true, severity: true, approval: true, fixStatus: true },
-                    take: 50,
+                    take: 100,
                     orderBy: { createdAt: "desc" },
                 })
                 : undefined;

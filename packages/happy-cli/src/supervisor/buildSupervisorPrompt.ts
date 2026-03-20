@@ -134,6 +134,11 @@ After your analysis, you MUST produce a JSON object with an \`actions\` array co
 }
 \`\`\`
 
+## Description Accuracy (CRITICAL)
+- In the \`description\` field, only reference file paths, line numbers, and code patterns that you have **actually verified** by reading the file.
+- **NEVER guess line numbers.** If you haven't read the file, describe the issue without specific line references.
+- The description must be accurate enough that another AI agent can locate and fix the issue by searching the codebase.
+
 ## Confidence Score Guidelines
 Rate how confident you are in the \`suggestedFix\` (0-100):
 - **80-100**: Clear, mechanical fix (e.g., bump dependency version, add missing import)
@@ -226,8 +231,14 @@ function buildExistingActionsSection(
   const hasIgnored = actions.some((a) => a.approval === "ignored");
   const hasSkipped = actions.some((a) => a.approval === "skipped");
 
-  let guidance = `**DO NOT report these again**, even with slightly different wording.
-Focus exclusively on **NEW** issues not covered below.`;
+  let guidance = `**CRITICAL DEDUPLICATION RULES:**
+1. **DO NOT report any issue that is semantically similar** to an existing finding below, even if:
+   - You use different wording or phrasing
+   - You reference a different file but the same class of issue (e.g., "X file too large" when "Y file too large" already exists)
+   - You add more specific detail to a general finding that already exists
+   - You report a subset or superset of an existing finding
+2. Before adding ANY action, mentally check: "Does an existing finding below already cover this concern?" If yes, SKIP it.
+3. Prefer reporting **zero** new actions over reporting duplicates. Quality over quantity.`;
 
   if (hasIgnored || hasSkipped) {
     const parts: string[] = [];
@@ -237,14 +248,15 @@ Focus exclusively on **NEW** issues not covered below.`;
     if (hasSkipped) {
       parts.push(`- **skipped**: The user temporarily skipped these. You SHOULD re-report them if the issue still exists, so they resurface for review.`);
     }
-    guidance = `Focus on **NEW** issues not already covered below.
+    guidance += `
+
 Status-specific rules:
 ${parts.join("\n")}
-- **pending** / **approved**: DO NOT report these again.`;
+- **pending** / **approved**: DO NOT report these again, not even with different wording.`;
   }
 
   return `
-## Known Existing Findings
+## Known Existing Findings (${actions.length} items)
 The following issues have been identified in previous analysis runs.
 ${guidance}
 
@@ -252,6 +264,6 @@ ${guidance}
 |---|----------|----------|-------|--------|
 ${rows.join("\n")}
 
-If you discover additional context about an existing finding (other than skipped ones), do NOT create a new action for it.
+**Remember**: If an existing finding says "X file is too large" and you find "Y file is too large", that is the SAME CLASS of issue — do NOT report it separately. Only report genuinely novel issues that represent a different category of concern.
 `;
 }

@@ -136,7 +136,7 @@ describe('buildSupervisorPrompt', () => {
             ],
         });
         expect(prompt).toContain('Known Existing Findings');
-        expect(prompt).toContain('DO NOT report these again');
+        expect(prompt).toContain('DO NOT report any issue that is semantically similar');
         expect(prompt).toContain('Hardcoded API key');
         expect(prompt).toContain('Outdated lodash');
         expect(prompt).toContain('pending');

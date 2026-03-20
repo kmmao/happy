@@ -452,14 +452,9 @@ async function decideNextStep(
     projectId: string,
     loop: NonNullable<Awaited<ReturnType<typeof db.supervisorLoop.findUnique>>>,
 ): Promise<void> {
-    // Check exit conditions first
-    const exitCheck = checkExitConditions(loop);
-    if (exitCheck.shouldExit) {
-        await completeLoop(userId, loop, exitCheck.reason!);
-        return;
-    }
-
-    // Find actions eligible for auto-approval from the latest analysis
+    // Find actions eligible for auto-approval BEFORE checking exit conditions.
+    // This ensures the last iteration's findings get processed even if we've
+    // reached max_iterations — exit happens after fixing, not after analysis.
     const approvableActions = await db.supervisorAction.findMany({
         where: {
             projectId,
@@ -485,8 +480,19 @@ async function decideNextStep(
     });
 
     if (approvableActions.length === 0) {
-        // Nothing to fix — loop is done
-        await completeLoop(userId, loop, "no_new_actions");
+        // Nothing to fix — check exit conditions and complete
+        const exitCheck = checkExitConditions(loop);
+        await completeLoop(userId, loop, exitCheck.shouldExit ? exitCheck.reason! : "no_new_actions");
+        return;
+    }
+
+    // Check exit conditions — but only for non-iteration limits.
+    // Even if max_iterations is reached, we still process the last batch of
+    // findings before stopping. The exit will happen after these fixes complete
+    // (in onFixCompleted → checkExitConditions).
+    const exitCheck = checkExitConditions(loop);
+    if (exitCheck.shouldExit && exitCheck.reason !== "max_iterations") {
+        await completeLoop(userId, loop, exitCheck.reason!);
         return;
     }
 
@@ -562,6 +568,12 @@ async function decideNextStep(
         { module: "supervisor" },
         `Loop ${loop.id}: iteration ${loop.currentIteration} — triggered ${approvableActions.length} fixes`,
     );
+
+    // Schedule a stale-fix watchdog: if fix sessions complete without reporting
+    // back (e.g. Claude didn't execute the curl callback), the loop would hang
+    // forever. After 15 minutes, check for orphaned "running" fixes whose
+    // sessions are no longer active and force-complete them.
+    scheduleFixWatchdog(userId, projectId, loop.id, approvableActions.map((a) => a.id));
 }
 
 async function triggerNextAnalysis(
@@ -631,7 +643,7 @@ async function triggerNextAnalysis(
             approval: { in: ["pending", "approved", "skipped", "ignored"] },
         },
         select: { category: true, title: true, severity: true, approval: true, fixStatus: true },
-        take: 50,
+        take: 100,
         orderBy: { createdAt: "desc" },
     });
 
@@ -769,4 +781,74 @@ function parseConcurrencyConfig(configJson: string | null | undefined): {
     } catch {
         return { maxAnalysis: undefined, maxFix: undefined };
     }
+}
+
+/**
+ * Watchdog for stale fix sessions within a loop.
+ *
+ * Fix sessions may complete without reporting back (e.g. Claude didn't execute
+ * the curl callback). After FIX_WATCHDOG_DELAY_MS, check if any of the
+ * triggered actions still have fixStatus="running" but their session is no
+ * longer active. Force-complete them and trigger loop progression.
+ */
+const FIX_WATCHDOG_DELAY_MS = 15 * 60_000; // 15 minutes
+
+function scheduleFixWatchdog(
+    userId: string,
+    projectId: string,
+    loopId: string,
+    actionIds: readonly string[],
+): void {
+    setTimeout(async () => {
+        try {
+            // Only act if loop is still running and in fixing phase
+            const loop = await db.supervisorLoop.findUnique({
+                where: { id: loopId },
+                select: { status: true, currentPhase: true },
+            });
+            if (!loop || loop.status !== "running" || loop.currentPhase !== "fixing") return;
+
+            // Find actions that are still "running" but whose session is inactive
+            const staleActions = await db.supervisorAction.findMany({
+                where: {
+                    id: { in: [...actionIds] },
+                    fixStatus: "running",
+                    approval: "approved",
+                },
+                select: { id: true, fixSessionId: true, title: true },
+            });
+
+            if (staleActions.length === 0) return;
+
+            for (const action of staleActions) {
+                // Verify session is no longer active
+                if (action.fixSessionId) {
+                    const session = await db.session.findUnique({
+                        where: { id: action.fixSessionId },
+                        select: { active: true },
+                    });
+                    if (session?.active) continue; // Session still running, skip
+                }
+
+                // Force-complete the stale fix
+                await db.supervisorAction.update({
+                    where: { id: action.id },
+                    data: { fixStatus: "failed" },
+                });
+
+                log(
+                    { module: "supervisor", level: "warn" },
+                    `Fix watchdog: force-failed stale action ${action.id} ("${action.title}") — session inactive but fixStatus was still "running"`,
+                );
+
+                // Trigger loop progression
+                await onFixCompleted(userId, action.id, projectId, "failed");
+            }
+        } catch (error) {
+            log(
+                { module: "supervisor", level: "error" },
+                `Fix watchdog error for loop ${loopId}: ${error}`,
+            );
+        }
+    }, FIX_WATCHDOG_DELAY_MS);
 }

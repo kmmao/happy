@@ -68,6 +68,8 @@ ${suggestedFixSection}
 2. **Make minimal, targeted changes.** Smaller diffs are better.
 3. **Run existing tests after your fix** to ensure nothing breaks.
 4. **Do NOT modify unrelated files.**
+5. **Verify before fixing**: The finding description may contain inaccurate line numbers or code snippets. Always search the actual codebase to locate the issue yourself. If the described code pattern does not exist in the codebase, report the fix as **failed** — do NOT attempt to fix something that isn't there.
+6. **If the finding is a false positive** (the described issue does not actually exist in the code), report \`{"fixStatus":"failed"}\` immediately. Do not waste time on non-existent issues.
 
 ${processSection}
 
