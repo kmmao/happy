@@ -1,3 +1,4 @@
+import React from "react";
 import { SettingsView } from "@/components/SettingsView";
 
-export default SettingsView;
+export default React.memo(SettingsView);

@@ -491,4 +491,4 @@ const profileManagerStyles = StyleSheet.create((theme) => ({
   },
 }));
 
-export default ProfileManager;
+export default React.memo(ProfileManager);
