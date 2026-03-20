@@ -41,7 +41,11 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-.claude/
+# Claude Code - ignore local state, keep commands
+.claude/settings.local.json
+.claude/worktrees/
+.claude/skills/
+.claude/todo.md
 logs/
 .plan
 
