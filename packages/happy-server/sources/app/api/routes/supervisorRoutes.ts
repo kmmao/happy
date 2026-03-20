@@ -428,24 +428,31 @@ export function supervisorRoutes(app: Fastify) {
                     );
 
                     const newActions: typeof reportedActions = [];
+                    const batchOps: ReturnType<typeof db.supervisorAction.update>[] = [];
 
                     for (const action of reportedActions) {
                         const key = `${action.category}::${action.title}`;
                         const existingId = existingKeys.get(key);
                         if (existingId) {
-                            await db.supervisorAction.update({
-                                where: { id: existingId },
-                                data: {
-                                    lastSeenRunId: runId,
-                                    description: action.description,
-                                    suggestedFix: action.suggestedFix ?? null,
-                                    confidence: action.confidence ?? null,
-                                    severity: action.severity,
-                                },
-                            });
+                            batchOps.push(
+                                db.supervisorAction.update({
+                                    where: { id: existingId },
+                                    data: {
+                                        lastSeenRunId: runId,
+                                        description: action.description,
+                                        suggestedFix: action.suggestedFix ?? null,
+                                        confidence: action.confidence ?? null,
+                                        severity: action.severity,
+                                    },
+                                }),
+                            );
                         } else {
                             newActions.push(action);
                         }
+                    }
+
+                    if (batchOps.length > 0) {
+                        await db.$transaction(batchOps);
                     }
 
                     if (newActions.length > 0) {
