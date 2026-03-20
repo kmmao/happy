@@ -16,7 +16,7 @@ import {
 } from "@/app/events/eventRouter";
 import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
-import { aggregateSessionUsage } from "@/modules/supervisorUsage";
+import { aggregateSessionUsage, scheduleDelayedCostAggregation } from "@/modules/supervisorUsage";
 import { createIssueOnProvider } from "@/app/webhook/webhookProviderApi";
 import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
 import { decryptString } from "@/modules/encrypt";
@@ -271,25 +271,9 @@ export function supervisorRunStatusHandler(
                 }
 
                 // Delayed re-aggregation: turn-end cost report may arrive after
-                // the completion event. Re-aggregate after 10s to capture actual cost.
+                // the completion event. Schedule multiple retry attempts.
                 if (resolvedSessionId) {
-                    const capturedRunId = data.runId;
-                    setTimeout(async () => {
-                        try {
-                            const delayed = await aggregateSessionUsage(resolvedSessionId);
-                            if (delayed && delayed.totalCostUsd > 0) {
-                                await db.supervisorRun.update({
-                                    where: { id: capturedRunId },
-                                    data: {
-                                        tokenCount: delayed.totalTokens,
-                                        costUsd: delayed.totalCostUsd,
-                                    },
-                                });
-                            }
-                        } catch {
-                            // best-effort
-                        }
-                    }, 10_000);
+                    scheduleDelayedCostAggregation(data.runId, resolvedSessionId);
                 }
 
                 // Archive the supervisor session so it doesn't stay active
@@ -406,7 +390,7 @@ export function supervisorRunStatusHandler(
  * hardcoded constraint, not a configuration option. This function only
  * triggers fix sessions (which create PRs), it never merges them.
  */
-async function handleAutoApproval(
+export async function handleAutoApproval(
     userId: string,
     projectId: string,
     runId: string,

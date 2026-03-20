@@ -10,11 +10,12 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
 import { computeHealthScore, countSeverities } from "@/modules/supervisorScoring";
-import { aggregateSessionUsage } from "@/modules/supervisorUsage";
+import { aggregateSessionUsage, scheduleDelayedCostAggregation } from "@/modules/supervisorUsage";
 import { activityCache } from "@/app/presence/sessionCache";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 import { log } from "@/utils/log";
 import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
+import { handleAutoApproval } from "@/app/api/socket/supervisorRunStatusHandler";
 
 /**
  * Supervisor routes for project health scanning.
@@ -503,25 +504,10 @@ export function supervisorRoutes(app: Fastify) {
                 });
 
                 // Delayed re-aggregation: the turn-end cost report arrives AFTER
-                // Claude's curl POST (which triggers this handler). Schedule a
-                // second aggregation to capture the actual cost data.
+                // Claude's curl POST (which triggers this handler). Schedule
+                // multiple retry attempts at increasing intervals.
                 if (resolvedSessionId) {
-                    setTimeout(async () => {
-                        try {
-                            const delayed = await aggregateSessionUsage(resolvedSessionId);
-                            if (delayed && delayed.totalCostUsd > 0) {
-                                await db.supervisorRun.update({
-                                    where: { id: runId },
-                                    data: {
-                                        tokenCount: delayed.totalTokens,
-                                        costUsd: delayed.totalCostUsd,
-                                    },
-                                });
-                            }
-                        } catch {
-                            // best-effort
-                        }
-                    }, 10_000);
+                    scheduleDelayedCostAggregation(runId, resolvedSessionId);
                 }
 
                 // Archive the supervisor session so it doesn't stay active
@@ -561,8 +547,27 @@ export function supervisorRoutes(app: Fastify) {
                 recipientFilter: { type: "user-scoped-only" },
             });
 
-            // Loop progression: if this run belongs to a loop, advance the state machine
             if (status === "completed" || status === "failed") {
+                // Auto/semi-auto mode: automatically approve actions based on configured severities
+                // Skip if run belongs to a loop — Loop engine handles its own approval flow
+                if (status === "completed" && reportedActions.length > 0) {
+                    const runForLoop = await db.supervisorRun.findUnique({
+                        where: { id: runId },
+                        select: { loopId: true },
+                    });
+                    if (!runForLoop?.loopId) {
+                        try {
+                            await handleAutoApproval(userId, id, runId);
+                        } catch (autoApproveError) {
+                            log(
+                                { module: "supervisor", level: "error" },
+                                `Auto-approval error for run ${runId}: ${autoApproveError}`,
+                            );
+                        }
+                    }
+                }
+
+                // Loop progression: if this run belongs to a loop, advance the state machine
                 try {
                     await loopOnRunCompleted(userId, runId, id);
                 } catch (loopError) {
