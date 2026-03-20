@@ -156,26 +156,6 @@ export default function AppearanceSettingsScreen() {
         />
       </ItemGroup>
 
-      {/* Text Settings */}
-      {/* <ItemGroup title="Text" footer="Adjust text size and font preferences">
-                <Item
-                    title="Text Size"
-                    subtitle="Make text larger or smaller"
-                    icon={<Ionicons name="text-outline" size={29} color="#FF9500" />}
-                    detail="Default"
-                    onPress={() => { }}
-                    disabled
-                />
-                <Item
-                    title="Font"
-                    subtitle="Choose your preferred font"
-                    icon={<Ionicons name="text-outline" size={29} color="#FF9500" />}
-                    detail="System"
-                    onPress={() => { }}
-                    disabled
-                />
-            </ItemGroup> */}
-
       {/* Display Settings */}
       <ItemGroup
         title={t("settingsAppearance.display")}
@@ -339,43 +319,7 @@ export default function AppearanceSettingsScreen() {
             />
           }
         />
-        {/* <Item
-                    title="Compact Mode"
-                    subtitle="Reduce spacing between elements"
-                    icon={<Ionicons name="contract-outline" size={29} color="#5856D6" />}
-                    disabled
-                    rightElement={
-                        <Switch
-                            value={false}
-                            disabled
-                        />
-                    }
-                />
-                <Item
-                    title="Show Avatars"
-                    subtitle="Display user and assistant avatars"
-                    icon={<Ionicons name="person-circle-outline" size={29} color="#5856D6" />}
-                    disabled
-                    rightElement={
-                        <Switch
-                            value={true}
-                            disabled
-                        />
-                    }
-                /> */}
       </ItemGroup>
-
-      {/* Colors */}
-      {/* <ItemGroup title="Colors" footer="Customize accent colors and highlights">
-                <Item
-                    title="Accent Color"
-                    subtitle="Choose your accent color"
-                    icon={<Ionicons name="color-palette-outline" size={29} color="#FF3B30" />}
-                    detail="Blue"
-                    onPress={() => { }}
-                    disabled
-                />
-            </ItemGroup> */}
     </ItemList>
   );
 }
