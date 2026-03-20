@@ -2,6 +2,7 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import {
+    type SeverityCounts,
     computeHealthScore,
     computeHealthGrade,
     countSeverities,
@@ -164,16 +165,29 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
             }
 
             // Open issues by severity (pending approval)
-            const openActions = await db.supervisorAction.findMany({
+            const severityGroups = await db.supervisorAction.groupBy({
+                by: ["severity"],
                 where: {
                     projectId: id,
                     accountId: userId,
                     approval: "pending",
                 },
-                select: { severity: true },
+                _count: { severity: true },
             });
 
-            const openCounts = countSeverities(openActions);
+            const openCounts: SeverityCounts = {
+                critical: 0,
+                high: 0,
+                medium: 0,
+                low: 0,
+            };
+            for (const group of severityGroups) {
+                const sev = group.severity as keyof SeverityCounts;
+                if (sev in openCounts) {
+                    openCounts[sev] = group._count.severity;
+                }
+            }
+
 
             // Compute health grade based on weighted severity score
             const score = computeHealthScore(openCounts);
