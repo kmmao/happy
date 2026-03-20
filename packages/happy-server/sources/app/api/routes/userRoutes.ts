@@ -91,17 +91,21 @@ export async function userRoutes(app: Fastify) {
             }
         });
 
-        // Resolve relationship status for each user
-        const userProfiles = await Promise.all(users.map(async (user) => {
-            const relationship = await db.userRelationship.findFirst({
-                where: {
-                    fromUserId: request.userId,
-                    toUserId: user.id
-                }
-            });
-            const status: RelationshipStatus = relationship?.status || RelationshipStatus.none;
+        // Resolve relationship status for all users in a single query
+        const userIds = users.map((user) => user.id);
+        const relationships = await db.userRelationship.findMany({
+            where: {
+                fromUserId: request.userId,
+                toUserId: { in: userIds }
+            }
+        });
+        const relationshipMap = new Map(
+            relationships.map((r) => [r.toUserId, r.status])
+        );
+        const userProfiles = users.map((user) => {
+            const status: RelationshipStatus = relationshipMap.get(user.id) || RelationshipStatus.none;
             return buildUserProfile(user, status);
-        }));
+        });
 
         return reply.send({
             users: userProfiles
