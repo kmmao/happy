@@ -997,36 +997,26 @@ export function buildSupervisorStatusEphemeral(
   };
 }
 
-export function buildSupervisorLoopStatusEphemeral(
-  loopId: string,
-  projectId: string,
-  status: string,
-  currentIteration: number,
-  maxIterations: number,
-  currentPhase: string,
-  totalCostUsd: number,
-  totalActionsFound: number,
-  totalActionsFixed: number,
-  currentHealthScore: number | null,
-  initialHealthScore: number | null,
-  exitReason: string | null,
-  consecutiveFailures: number,
-): EphemeralPayload {
+export interface SupervisorLoopStatusOptions {
+  loopId: string;
+  projectId: string;
+  status: string;
+  currentIteration: number;
+  maxIterations: number;
+  currentPhase: string;
+  totalCostUsd: number;
+  totalActionsFound: number;
+  totalActionsFixed: number;
+  currentHealthScore: number | null;
+  initialHealthScore: number | null;
+  exitReason: string | null;
+  consecutiveFailures: number;
+}
+
+export function buildSupervisorLoopStatusEphemeral(opts: SupervisorLoopStatusOptions): EphemeralPayload {
   return {
     type: "supervisor-loop-status",
-    loopId,
-    projectId,
-    status,
-    currentIteration,
-    maxIterations,
-    currentPhase,
-    totalCostUsd,
-    totalActionsFound,
-    totalActionsFixed,
-    currentHealthScore,
-    initialHealthScore,
-    exitReason,
-    consecutiveFailures,
+    ...opts,
   };
 }
 

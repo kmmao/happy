@@ -734,21 +734,21 @@ function emitLoopStatus(
 ): void {
     eventRouter.emitEphemeral({
         userId,
-        payload: buildSupervisorLoopStatusEphemeral(
-            loop.id,
-            loop.projectId,
-            loop.status,
-            loop.currentIteration,
-            loop.maxIterations,
-            loop.currentPhase,
-            loop.totalCostUsd,
-            loop.totalActionsFound,
-            loop.totalActionsFixed,
-            loop.currentHealthScore,
-            loop.initialHealthScore,
-            loop.exitReason,
-            loop.consecutiveFailures,
-        ),
+        payload: buildSupervisorLoopStatusEphemeral({
+            loopId: loop.id,
+            projectId: loop.projectId,
+            status: loop.status,
+            currentIteration: loop.currentIteration,
+            maxIterations: loop.maxIterations,
+            currentPhase: loop.currentPhase,
+            totalCostUsd: loop.totalCostUsd,
+            totalActionsFound: loop.totalActionsFound,
+            totalActionsFixed: loop.totalActionsFixed,
+            currentHealthScore: loop.currentHealthScore,
+            initialHealthScore: loop.initialHealthScore,
+            exitReason: loop.exitReason,
+            consecutiveFailures: loop.consecutiveFailures,
+        }),
         recipientFilter: { type: "user-scoped-only" },
     });
 }
