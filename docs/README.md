@@ -16,10 +16,17 @@ This folder documents how Happy works internally, with a focus on protocol, back
 - local-development.md: Local development setup and debugging for Server / CLI / App, including Docker Compose workflow.
 - adding-ai-models.md: Guide for adding or updating AI model definitions and pricing across the codebase.
 - happy-wire.md: Shared wire schemas/types package and migration notes.
+- sdk-features.md: SDK feature capability matrix across agent backends and the Happy system.
+- mcp-plugins.md: MCP servers and Claude Code plugins used in the development environment.
+- release-guide.md: Release workflow, ordering dependencies, and commands for each package after upstream merges.
+- claude-mem.md: Cross-session memory system plugin for Claude Code.
+- UPSTREAM_TRACKING.md: Upstream PR tracking for the slopus/happy fork.
+- architecture-project-supervisor.md: Architecture design for Project as first-class citizen with Supervisor Agent.
+- supervisor-operations-guide.md: Project Supervisor operations guide for autonomous code health analysis and fixes.
 
 ## Conventions
 - Paths and field names reflect the current implementation in `packages/happy-server`.
 - Examples are illustrative; the canonical source is the code.
 
 ## Last reviewed
-- 2026-02-27
+- 2026-03-20
