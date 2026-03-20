@@ -8,10 +8,10 @@
 
 | 包 | 发布目标 | 发布方式 | 当前版本 |
 |----|---------|---------|---------|
-| `@kmmao/happy-wire` | npm（上游维护） | 本地 workspace，不需要单独发布 | 0.1.0 |
+| `@kmmao/happy-wire` | npm（上游维护） | 本地 workspace，不需要单独发布 | 0.2.8 |
 | `happy-server` | Docker Compose | 重新构建镜像并重启 | 私有 |
 | `@kmmao/happy-coder` (CLI) | npm | `npm publish` | 0.14.0 |
-| `@kmmao/happy-agent` | npm | `npm publish`（暂不需要） | 0.1.0 |
+| `@kmmao/happy-agent` | npm | `npm publish`（暂不需要） | 0.2.3 |
 | `happy-app` | EAS | OTA 或原生构建 | 1.6.2 |
 
 ### 发布顺序
