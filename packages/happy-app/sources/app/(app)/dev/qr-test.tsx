@@ -50,7 +50,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
 }));
 
-export default function QRTest() {
+function QRTest() {
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const [customData, setCustomData] = useState('Hello World!');
@@ -166,3 +166,5 @@ export default function QRTest() {
         </ScrollView>
     );
 }
+
+export default React.memo(QRTest);

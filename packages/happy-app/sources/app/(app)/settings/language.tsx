@@ -18,7 +18,7 @@ interface LanguageItem {
     subtitle?: string;
 }
 
-export default function LanguageSettingsScreen() {
+function LanguageSettingsScreen() {
     const { theme } = useUnistyles();
     const [preferredLanguage, setPreferredLanguage] = useSettingMutable('preferredLanguage');
     const { reloadApp } = useUpdates();
@@ -104,3 +104,5 @@ export default function LanguageSettingsScreen() {
         </ItemList>
     );
 }
+
+export default React.memo(LanguageSettingsScreen);

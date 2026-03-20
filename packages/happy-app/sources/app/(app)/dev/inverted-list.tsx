@@ -10,7 +10,7 @@ import { LegendList } from '@legendapp/list';
 type ListType = 'flash' | 'flat' | 'legend';
 type PaddingType = 'animated' | 'non-animated' | 'header-footer';
 
-export default function InvertedListTest() {
+function InvertedListTest() {
     const [messages, setMessages] = useState<Array<{ id: string; text: string }>>([]);
     const [inputText, setInputText] = useState('');
     const [listType, setListType] = useState<ListType>('flash');
@@ -293,3 +293,5 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 });
+
+export default React.memo(InvertedListTest);

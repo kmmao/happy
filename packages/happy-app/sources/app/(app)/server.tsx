@@ -75,7 +75,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
 }));
 
-export default function ServerConfigScreen() {
+function ServerConfigScreen() {
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const router = useRouter();
@@ -234,3 +234,5 @@ export default function ServerConfigScreen() {
         </>
     );
 }
+
+export default React.memo(ServerConfigScreen);

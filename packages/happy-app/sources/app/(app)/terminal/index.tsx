@@ -12,7 +12,7 @@ import { Item } from '@/components/Item';
 import { useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 
-export default function TerminalScreen() {
+function TerminalScreen() {
     const router = useRouter();
     const searchParams = useLocalSearchParams();
     const { theme } = useUnistyles();
@@ -182,3 +182,5 @@ export default function TerminalScreen() {
         </>
     );
 }
+
+export default React.memo(TerminalScreen);

@@ -165,7 +165,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     },
 }));
 
-export default function UnistylesDemo() {
+function UnistylesDemo() {
     const { theme, rt } = useUnistyles();
     const styles = stylesheet;
     const [showRuntimeInfo, setShowRuntimeInfo] = useState(true);
@@ -374,3 +374,5 @@ export default function UnistylesDemo() {
         </View>
     );
 }
+
+export default React.memo(UnistylesDemo);

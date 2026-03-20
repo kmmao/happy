@@ -17,7 +17,7 @@ import { layout } from "@/components/layout";
 import { callbacks } from "../index";
 import { peekTempData } from "@/utils/tempDataStore";
 
-export default function ProfileEditScreen() {
+function ProfileEditScreen() {
   const { theme } = useUnistyles();
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -112,3 +112,5 @@ const profileEditScreenStyles = StyleSheet.create((theme, rt) => ({
     paddingBottom: rt.insets.bottom,
   },
 }));
+
+export default React.memo(ProfileEditScreen);

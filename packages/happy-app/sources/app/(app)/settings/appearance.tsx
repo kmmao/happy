@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
@@ -19,7 +20,7 @@ const isKnownAvatarStyle = (style: string): style is KnownAvatarStyle => {
   return style === "pixelated" || style === "gradient" || style === "brutalist";
 };
 
-export default function AppearanceSettingsScreen() {
+function AppearanceSettingsScreen() {
   const { theme } = useUnistyles();
   const router = useRouter();
   const [viewInline, setViewInline] = useSettingMutable("viewInline");
@@ -323,3 +324,5 @@ export default function AppearanceSettingsScreen() {
     </ItemList>
   );
 }
+
+export default React.memo(AppearanceSettingsScreen);

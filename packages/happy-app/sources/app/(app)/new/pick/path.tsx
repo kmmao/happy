@@ -69,7 +69,7 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
 }));
 
-export default function PathPickerScreen() {
+function PathPickerScreen() {
   const { theme } = useUnistyles();
   const styles = stylesheet;
   const router = useRouter();
@@ -471,3 +471,5 @@ export default function PathPickerScreen() {
     </>
   );
 }
+
+export default React.memo(PathPickerScreen);

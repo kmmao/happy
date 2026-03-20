@@ -179,7 +179,7 @@ function groupSessionsByDate(
   return items;
 }
 
-export default function SessionHistory() {
+function SessionHistory() {
   const safeArea = useSafeAreaInsets();
   const allSessions = useAllSessions();
   const realtimeSessionSort = useSetting("realtimeSessionSort");
@@ -298,3 +298,5 @@ export default function SessionHistory() {
     </View>
   );
 }
+
+export default React.memo(SessionHistory);

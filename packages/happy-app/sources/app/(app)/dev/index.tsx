@@ -19,7 +19,7 @@ import { Switch } from "@/components/Switch";
 import { useUnistyles } from "react-native-unistyles";
 import { setLastViewedVersion, getLatestVersion } from "@/changelog";
 
-export default function DevScreen() {
+function DevScreen() {
   const router = useRouter();
   const [debugMode, setDebugMode] = useLocalSettingMutable("debugMode");
   const [verboseLogging, setVerboseLogging] = React.useState(false);
@@ -376,3 +376,5 @@ export default function DevScreen() {
     </ItemList>
   );
 }
+
+export default React.memo(DevScreen);

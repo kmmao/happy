@@ -5,7 +5,7 @@ import { ItemGroup } from '@/components/ItemGroup';
 import { ItemList } from '@/components/ItemList';
 import { Switch } from '@/components/Switch';
 
-export default function ListDemoScreen() {
+function ListDemoScreen() {
     const [isEnabled, setIsEnabled] = React.useState(false);
     const [selectedItem, setSelectedItem] = React.useState<string | null>(null);
 
@@ -123,3 +123,5 @@ export default function ListDemoScreen() {
         </ItemList>
     );
 }
+
+export default React.memo(ListDemoScreen);

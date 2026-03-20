@@ -19,7 +19,7 @@ interface TestRunState {
     results: TestSuite[];
 }
 
-export default function TestsScreen() {
+function TestsScreen() {
     const [state, setState] = React.useState<TestRunState>({
         running: false,
         results: []
@@ -201,3 +201,5 @@ export default function TestsScreen() {
         </ItemList>
     );
 }
+
+export default React.memo(TestsScreen);

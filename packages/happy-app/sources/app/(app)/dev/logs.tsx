@@ -8,7 +8,7 @@ import { Item } from "@/components/Item";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
 
-export default function LogsScreen() {
+function LogsScreen() {
   const [logs, setLogs] = React.useState<string[]>([]);
   const flatListRef = React.useRef<FlatList>(null);
 
@@ -174,3 +174,5 @@ export default function LogsScreen() {
     </View>
   );
 }
+
+export default React.memo(LogsScreen);

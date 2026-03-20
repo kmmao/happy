@@ -11,7 +11,7 @@ import { ItemGroup } from '@/components/ItemGroup';
 import { Item } from '@/components/Item';
 import { t } from '@/text';
 
-export default function TerminalConnectScreen() {
+function TerminalConnectScreen() {
     const router = useRouter();
     const [publicKey, setPublicKey] = useState<string | null>(null);
     const [hashProcessed, setHashProcessed] = useState(false);
@@ -239,3 +239,5 @@ export default function TerminalConnectScreen() {
         </ItemList>
     );
 }
+
+export default React.memo(TerminalConnectScreen);

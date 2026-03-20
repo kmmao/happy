@@ -14,7 +14,7 @@ import { fetchSupervisorRun, type SupervisorRun } from "@/sync/apiSupervisor";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { layout } from "@/components/layout";
 
-export default function ResearchReportScreen() {
+function ResearchReportScreen() {
     const { id, runId } = useLocalSearchParams<{ id: string; runId: string }>();
     const navigation = useNavigation();
     const { theme } = useUnistyles();
@@ -113,3 +113,5 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 15,
     },
 }));
+
+export default React.memo(ResearchReportScreen);

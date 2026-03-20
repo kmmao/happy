@@ -72,7 +72,7 @@ function formatTokens(tokenCount: number | null): string {
 
 // --- Main Screen ---
 
-export default function SupervisorRunDetailScreen() {
+function SupervisorRunDetailScreen() {
     const { id, runId } = useLocalSearchParams<{
         id: string;
         runId: string;
@@ -654,3 +654,5 @@ const styles = StyleSheet.create((theme) => ({
         lineHeight: 18,
     },
 }));
+
+export default React.memo(SupervisorRunDetailScreen);

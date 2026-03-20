@@ -25,7 +25,7 @@ import {
 import { layout } from "@/components/layout";
 import { isRunningOnMac } from "@/utils/platform";
 
-export default function DeviceInfo() {
+function DeviceInfo() {
   const insets = useSafeAreaInsets();
   const { width, height } = Dimensions.get("window");
   const windowDims = useWindowDimensions();
@@ -202,3 +202,5 @@ export default function DeviceInfo() {
     </>
   );
 }
+
+export default React.memo(DeviceInfo);

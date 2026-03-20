@@ -11,7 +11,7 @@ type InputStyle = {
     preview: React.ReactNode;
 };
 
-export default function InputStylesDemo() {
+function InputStylesDemo() {
     const [selectedStyle, setSelectedStyle] = React.useState('slack');
     const safeArea = useSafeAreaInsets();
 
@@ -1949,3 +1949,5 @@ export default function InputStylesDemo() {
         </View>
     );
 }
+
+export default React.memo(InputStylesDemo);

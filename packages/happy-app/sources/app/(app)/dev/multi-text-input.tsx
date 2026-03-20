@@ -3,7 +3,7 @@ import { View, Text, ScrollView } from 'react-native';
 import { MultiTextInput, KeyPressEvent } from '@/components/MultiTextInput';
 import { Typography } from '@/constants/Typography';
 
-export default function MultiTextInputDemo() {
+function MultiTextInputDemo() {
     const [text1, setText1] = React.useState('');
     const [text2, setText2] = React.useState('This is some initial text that demonstrates how the component handles existing content.');
     const [text3, setText3] = React.useState('');
@@ -222,3 +222,5 @@ export default function MultiTextInputDemo() {
         </ScrollView>
     );
 }
+
+export default React.memo(MultiTextInputDemo);

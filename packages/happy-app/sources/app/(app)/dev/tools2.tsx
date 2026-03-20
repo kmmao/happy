@@ -5,7 +5,7 @@ import { ToolView } from '@/components/tools/ToolView';
 import { ItemGroup } from '@/components/ItemGroup';
 import { Item } from '@/components/Item';
 
-export default function Tools2Screen() {
+function Tools2Screen() {
     const [selectedExample, setSelectedExample] = useState<string>('all');
 
     // Example tool calls data - matching ToolCall interface
@@ -554,3 +554,5 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
 });
+
+export default React.memo(Tools2Screen);

@@ -13,7 +13,7 @@ import { Text } from '@/components/StyledText';
 import { StyleSheet } from 'react-native-unistyles';
 import { Platform } from 'react-native';
 
-export default function ClaudeOAuth() {
+function ClaudeOAuth() {
     // const router = useRouter();
     // const auth = useAuth();
 
@@ -176,3 +176,5 @@ const styles = StyleSheet.create((theme) => ({
         color: '#ffffff',
     },
 }));
+
+export default React.memo(ClaudeOAuth);

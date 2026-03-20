@@ -13,7 +13,7 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { Item } from "@/components/Item";
 import { t } from "@/text";
 
-export default function AddProjectScreen() {
+function AddProjectScreen() {
     const { theme } = useUnistyles();
     const router = useRouter();
     const machines = useAllMachines();
@@ -186,3 +186,5 @@ const styles = StyleSheet.create((theme) => ({
         color: "#FFFFFF",
     },
 }));
+
+export default React.memo(AddProjectScreen);

@@ -5,7 +5,7 @@ import { ShimmerView } from '@/components/ShimmerView';
 import { ItemGroup } from '@/components/ItemGroup';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function ShimmerDemoScreen() {
+function ShimmerDemoScreen() {
     return (
         <>
             <Stack.Screen
@@ -273,3 +273,5 @@ const styles = StyleSheet.create({
         color: '#333',
     },
 });
+
+export default React.memo(ShimmerDemoScreen);

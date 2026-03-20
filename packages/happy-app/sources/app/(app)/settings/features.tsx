@@ -12,7 +12,7 @@ import {
   getNotificationPermission,
 } from "@/utils/webNotification";
 
-export default function FeaturesSettingsScreen() {
+function FeaturesSettingsScreen() {
   const [experiments, setExperiments] = useSettingMutable("experiments");
   const [agentInputEnterToSend, setAgentInputEnterToSend] = useSettingMutable(
     "agentInputEnterToSend",
@@ -214,3 +214,5 @@ export default function FeaturesSettingsScreen() {
     </ItemList>
   );
 }
+
+export default React.memo(FeaturesSettingsScreen);

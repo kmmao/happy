@@ -65,7 +65,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
 }));
 
-export default function Restore() {
+function Restore() {
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const auth = useAuth();
@@ -165,3 +165,5 @@ export default function Restore() {
         </ScrollView>
     );
 }
+
+export default React.memo(Restore);

@@ -72,7 +72,7 @@ const styles = StyleSheet.create((theme) => ({
     },
 }));
 
-export default function InboxPage() {
+function InboxPage() {
     const { theme } = useUnistyles();
     const insets = useSafeAreaInsets();
     const isTablet = useIsTablet();
@@ -122,3 +122,5 @@ export default function InboxPage() {
         <InboxView />
     );
 }
+
+export default React.memo(InboxPage);

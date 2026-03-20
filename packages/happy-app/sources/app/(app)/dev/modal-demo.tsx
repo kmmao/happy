@@ -24,7 +24,7 @@ function CustomContentModal({ onClose, title, message }: { onClose: () => void; 
     );
 }
 
-export default function ModalDemoScreen() {
+function ModalDemoScreen() {
     const [lastResult, setLastResult] = React.useState<string>('No action taken yet');
 
     const showSimpleAlert = () => {
@@ -209,3 +209,5 @@ const styles = StyleSheet.create({
         width: '100%'
     }
 });
+
+export default React.memo(ModalDemoScreen);

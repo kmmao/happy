@@ -10,7 +10,7 @@ import { Typography } from '@/constants/Typography';
 import { Ionicons } from '@expo/vector-icons';
 import { Modal } from '@/modal';
 
-export default function PurchasesDevScreen() {
+function PurchasesDevScreen() {
     // Get purchases directly from storage
     const purchases = storage(state => state.purchases);
 
@@ -226,3 +226,5 @@ export default function PurchasesDevScreen() {
         </>
     );
 }
+
+export default React.memo(PurchasesDevScreen);

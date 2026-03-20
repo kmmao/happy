@@ -83,7 +83,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
 }));
 
-export default function EditArtifactScreen() {
+function EditArtifactScreen() {
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const router = useRouter();
@@ -316,3 +316,5 @@ export default function EditArtifactScreen() {
         </>
     );
 }
+
+export default React.memo(EditArtifactScreen);

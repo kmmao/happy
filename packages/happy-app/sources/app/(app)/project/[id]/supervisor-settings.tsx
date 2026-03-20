@@ -69,7 +69,7 @@ const defaultConfig = {
 
 type SupervisorConfig = typeof defaultConfig;
 
-export default function SupervisorSettingsScreen() {
+function SupervisorSettingsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const navigation = useNavigation();
     const project = useProject(id);
@@ -1105,3 +1105,5 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 11,
     },
 }));
+
+export default React.memo(SupervisorSettingsScreen);

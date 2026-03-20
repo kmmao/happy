@@ -305,7 +305,7 @@ const actionStyles = StyleSheet.create((theme) => ({
 
 // --- Main Screen ---
 
-export default function SupervisorLoopDetailScreen() {
+function SupervisorLoopDetailScreen() {
     const { id, loopId } = useLocalSearchParams<{
         id: string;
         loopId: string;
@@ -484,3 +484,5 @@ const styles = StyleSheet.create((theme) => ({
         paddingVertical: 12,
     },
 }));
+
+export default React.memo(SupervisorLoopDetailScreen);

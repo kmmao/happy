@@ -25,7 +25,7 @@ const ColorPair = ({ name, bg, text }: { name: string; bg: string; text: string 
     </View>
 );
 
-export default function ColorsScreen() {
+function ColorsScreen() {
     return (
         <ScrollView style={styles.container}>
             <View style={styles.content}>
@@ -195,3 +195,5 @@ const styles = StyleSheet.create({
         color: '#111827',
     },
 });
+
+export default React.memo(ColorsScreen);

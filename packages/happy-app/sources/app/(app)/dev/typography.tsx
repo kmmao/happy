@@ -20,7 +20,7 @@ const CodeSample = ({ title, style }: { title: string; style: any }) => (
     </View>
 );
 
-export default function TypographyScreen() {
+function TypographyScreen() {
     return (
         <ScrollView style={styles.container}>
             <View style={styles.content}>
@@ -175,3 +175,5 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
 });
+
+export default React.memo(TypographyScreen);

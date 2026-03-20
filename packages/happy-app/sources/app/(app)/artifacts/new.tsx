@@ -67,7 +67,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
 }));
 
-export default function NewArtifactScreen() {
+function NewArtifactScreen() {
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const router = useRouter();
@@ -217,3 +217,5 @@ export default function NewArtifactScreen() {
         </>
     );
 }
+
+export default React.memo(NewArtifactScreen);

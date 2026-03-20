@@ -73,7 +73,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
 }));
 
-export default function ArtifactDetailScreen() {
+function ArtifactDetailScreen() {
     const styles = stylesheet;
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
@@ -277,3 +277,5 @@ export default function ArtifactDetailScreen() {
         </>
     );
 }
+
+export default React.memo(ArtifactDetailScreen);

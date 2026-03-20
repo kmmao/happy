@@ -10,7 +10,7 @@ import { useUnistyles } from 'react-native-unistyles';
 import { LANGUAGES, getLanguageDisplayName, type Language } from '@/constants/Languages';
 import { t } from '@/text';
 
-export default function LanguageSelectionScreen() {
+function LanguageSelectionScreen() {
     const { theme } = useUnistyles();
     const router = useRouter();
     const [voiceAssistantLanguage, setVoiceAssistantLanguage] = useSettingMutable('voiceAssistantLanguage');
@@ -112,3 +112,5 @@ export default function LanguageSelectionScreen() {
         </ItemList>
     );
 }
+
+export default React.memo(LanguageSelectionScreen);

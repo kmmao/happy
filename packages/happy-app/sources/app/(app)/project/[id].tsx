@@ -8,7 +8,7 @@ import { ProjectDetailView } from "@/components/project/ProjectDetailView";
 import { getProjectDisplayName } from "@/sync/projectManager";
 import { t } from "@/text";
 
-export default function ProjectDetailScreen() {
+function ProjectDetailScreen() {
     const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
     const navigation = useNavigation();
     const project = useProject(id);
@@ -52,3 +52,5 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
     },
 }));
+
+export default React.memo(ProjectDetailScreen);
