@@ -191,23 +191,18 @@ export async function startLoop(
 
     eventRouter.emitEphemeral({
         userId: accountId,
-        payload: buildSupervisorTriggerEphemeral(
+        payload: buildSupervisorTriggerEphemeral({
             projectId,
-            loop.firstRunId,
-            "manual",
-            project.machineId,
-            project.path,
-            project.supervisorMode ?? undefined,
+            runId: loop.firstRunId,
+            trigger: "manual",
+            machineId: project.machineId,
+            repoPath: project.path,
+            mode: project.supervisorMode ?? undefined,
             dimensions,
-            undefined, // changedFiles
-            project.supervisorCustomRules ?? undefined,
-            undefined, // fixAction
-            undefined, // researchParams
-            undefined, // fixStrategy
-            undefined, // existingActions
-            concurrency.maxAnalysis,
-            concurrency.maxFix,
-        ),
+            customRules: project.supervisorCustomRules ?? undefined,
+            maxConcurrentAnalysis: concurrency.maxAnalysis,
+            maxConcurrentFix: concurrency.maxFix,
+        }),
         recipientFilter: {
             type: "machine-scoped-only",
             machineId: project.machineId,
@@ -535,29 +530,24 @@ async function decideNextStep(
     for (const action of approvableActions) {
         eventRouter.emitEphemeral({
             userId,
-            payload: buildSupervisorTriggerEphemeral(
+            payload: buildSupervisorTriggerEphemeral({
                 projectId,
-                action.id,
-                "fix",
-                project.machineId,
-                project.path,
-                "auto",
-                undefined,
-                undefined,
-                undefined,
-                {
+                runId: action.id,
+                trigger: "fix",
+                machineId: project.machineId,
+                repoPath: project.path,
+                mode: "auto",
+                fixAction: {
                     title: action.title,
                     description: action.description,
                     suggestedFix: action.suggestedFix,
                     category: action.category,
                     severity: action.severity,
                 },
-                undefined,
-                "direct", // Loop always uses direct strategy
-                undefined,
-                concurrency.maxAnalysis,
-                concurrency.maxFix,
-            ),
+                fixStrategy: "direct", // Loop always uses direct strategy
+                maxConcurrentAnalysis: concurrency.maxAnalysis,
+                maxConcurrentFix: concurrency.maxFix,
+            }),
             recipientFilter: {
                 type: "machine-scoped-only",
                 machineId: project.machineId,
@@ -647,23 +637,19 @@ async function triggerNextAnalysis(
 
     eventRouter.emitEphemeral({
         userId,
-        payload: buildSupervisorTriggerEphemeral(
+        payload: buildSupervisorTriggerEphemeral({
             projectId,
-            run.id,
-            "manual",
-            project.machineId,
-            project.path,
-            project.supervisorMode ?? undefined,
+            runId: run.id,
+            trigger: "manual",
+            machineId: project.machineId,
+            repoPath: project.path,
+            mode: project.supervisorMode ?? undefined,
             dimensions,
-            undefined,
-            project.supervisorCustomRules ?? undefined,
-            undefined,
-            undefined,
-            undefined,
+            customRules: project.supervisorCustomRules ?? undefined,
             existingActions,
-            concurrency.maxAnalysis,
-            concurrency.maxFix,
-        ),
+            maxConcurrentAnalysis: concurrency.maxAnalysis,
+            maxConcurrentFix: concurrency.maxFix,
+        }),
         recipientFilter: {
             type: "machine-scoped-only",
             machineId: project.machineId,

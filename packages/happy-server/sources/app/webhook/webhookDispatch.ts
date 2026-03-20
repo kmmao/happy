@@ -636,17 +636,17 @@ async function handlePushSupervisorTrigger(
       // Emit trigger with changed files
       eventRouter.emitEphemeral({
         userId: project.accountId,
-        payload: buildSupervisorTriggerEphemeral(
-          project.id,
-          run.id,
-          "push",
-          project.machineId,
-          project.path,
-          project.supervisorMode ?? undefined,
+        payload: buildSupervisorTriggerEphemeral({
+          projectId: project.id,
+          runId: run.id,
+          trigger: "push",
+          machineId: project.machineId,
+          repoPath: project.path,
+          mode: project.supervisorMode ?? undefined,
           dimensions,
           changedFiles,
-          project.supervisorCustomRules ?? undefined,
-        ),
+          customRules: project.supervisorCustomRules ?? undefined,
+        }),
         recipientFilter: {
           type: "machine-scoped-only",
           machineId: project.machineId,

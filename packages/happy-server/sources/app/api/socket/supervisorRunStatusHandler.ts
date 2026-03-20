@@ -558,17 +558,14 @@ async function handleAutoApproval(
 
             eventRouter.emitEphemeral({
                 userId,
-                payload: buildSupervisorTriggerEphemeral(
+                payload: buildSupervisorTriggerEphemeral({
                     projectId,
-                    action.id, // Use actionId as the runId for fix sessions
-                    "fix",
-                    project.machineId,
-                    project.path,
+                    runId: action.id, // Use actionId as the runId for fix sessions
+                    trigger: "fix",
+                    machineId: project.machineId,
+                    repoPath: project.path,
                     mode,
-                    undefined, // dimensions
-                    undefined, // changedFiles
-                    undefined, // customRules
-                    {
+                    fixAction: {
                         title: action.title,
                         description: action.description,
                         suggestedFix: action.suggestedFix,
@@ -576,12 +573,10 @@ async function handleAutoApproval(
                         severity: action.severity,
                         issueNumber,
                     },
-                    undefined, // researchParams
-                    project.fixStrategy ?? undefined,
-                    undefined, // existingActions
+                    fixStrategy: project.fixStrategy ?? undefined,
                     maxConcurrentAnalysis,
                     maxConcurrentFix,
-                ),
+                }),
                 recipientFilter: {
                     type: "machine-scoped-only",
                     machineId: project.machineId,

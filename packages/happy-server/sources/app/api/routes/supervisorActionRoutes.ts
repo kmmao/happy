@@ -403,26 +403,21 @@ export function supervisorActionRoutes(app: Fastify) {
             // Reuse supervisor-trigger with a "fix" trigger type
             eventRouter.emitEphemeral({
                 userId,
-                payload: buildSupervisorTriggerEphemeral(
-                    id,
-                    actionId, // Use actionId as the "runId" for fix sessions
-                    "fix",
+                payload: buildSupervisorTriggerEphemeral({
+                    projectId: id,
+                    runId: actionId, // Use actionId as the "runId" for fix sessions
+                    trigger: "fix",
                     machineId,
                     repoPath,
-                    undefined, // mode
-                    undefined, // dimensions
-                    undefined, // changedFiles
-                    undefined, // customRules
-                    {
+                    fixAction: {
                         title: action.title,
                         description: action.description,
                         suggestedFix: action.suggestedFix,
                         category: action.category,
                         severity: action.severity,
                     },
-                    undefined, // researchParams
-                    project.fixStrategy ?? undefined,
-                ),
+                    fixStrategy: project.fixStrategy ?? undefined,
+                }),
                 recipientFilter: {
                     type: "machine-scoped-only",
                     machineId,

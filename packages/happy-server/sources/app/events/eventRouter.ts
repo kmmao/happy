@@ -949,40 +949,28 @@ export function buildDeleteProjectUpdate(
   };
 }
 
-export function buildSupervisorTriggerEphemeral(
-  projectId: string,
-  runId: string,
-  trigger: string,
-  machineId: string,
-  repoPath: string,
-  mode?: string,
-  dimensions?: string[],
-  changedFiles?: string[],
-  customRules?: string,
-  fixAction?: { title: string; description: string; suggestedFix: string | null; category: string; severity: string; issueNumber?: number },
-  researchParams?: string,
-  fixStrategy?: string,
-  existingActions?: readonly { category: string; title: string; severity: string; approval: string; fixStatus: string | null }[],
-  maxConcurrentAnalysis?: number,
-  maxConcurrentFix?: number,
-): EphemeralPayload {
+export interface SupervisorTriggerOptions {
+  projectId: string;
+  runId: string;
+  trigger: string;
+  machineId: string;
+  repoPath: string;
+  mode?: string;
+  dimensions?: string[];
+  changedFiles?: string[];
+  customRules?: string;
+  fixAction?: { title: string; description: string; suggestedFix: string | null; category: string; severity: string; issueNumber?: number };
+  researchParams?: string;
+  fixStrategy?: string;
+  existingActions?: readonly { category: string; title: string; severity: string; approval: string; fixStatus: string | null }[];
+  maxConcurrentAnalysis?: number;
+  maxConcurrentFix?: number;
+}
+
+export function buildSupervisorTriggerEphemeral(opts: SupervisorTriggerOptions): EphemeralPayload {
   return {
     type: "supervisor-trigger",
-    projectId,
-    runId,
-    trigger,
-    machineId,
-    repoPath,
-    mode,
-    dimensions,
-    changedFiles,
-    customRules,
-    fixAction,
-    researchParams,
-    fixStrategy,
-    existingActions,
-    maxConcurrentAnalysis,
-    maxConcurrentFix,
+    ...opts,
   };
 }
 

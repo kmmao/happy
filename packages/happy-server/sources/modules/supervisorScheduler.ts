@@ -117,17 +117,16 @@ export async function checkAndTriggerScheduledRuns(
 
             eventRouter.emitEphemeral({
                 userId,
-                payload: buildSupervisorTriggerEphemeral(
-                    project.id,
-                    run.id,
-                    "scheduled",
+                payload: buildSupervisorTriggerEphemeral({
+                    projectId: project.id,
+                    runId: run.id,
+                    trigger: "scheduled",
                     machineId,
-                    project.path,
-                    project.supervisorMode ?? undefined,
+                    repoPath: project.path,
+                    mode: project.supervisorMode ?? undefined,
                     dimensions,
-                    undefined, // changedFiles
-                    project.supervisorCustomRules ?? undefined,
-                ),
+                    customRules: project.supervisorCustomRules ?? undefined,
+                }),
                 recipientFilter: {
                     type: "machine-scoped-only",
                     machineId,

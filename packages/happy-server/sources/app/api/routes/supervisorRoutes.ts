@@ -131,23 +131,20 @@ export function supervisorRoutes(app: Fastify) {
 
             eventRouter.emitEphemeral({
                 userId,
-                payload: buildSupervisorTriggerEphemeral(
-                    id,
-                    run.id,
-                    triggerType,
+                payload: buildSupervisorTriggerEphemeral({
+                    projectId: id,
+                    runId: run.id,
+                    trigger: triggerType,
                     machineId,
                     repoPath,
-                    triggerType === "research" ? undefined : (project.supervisorMode ?? undefined),
-                    triggerType === "research" ? undefined : parseDimensions(project.supervisorEnabledDimensions),
-                    undefined, // changedFiles
-                    triggerType === "research" ? undefined : (project.supervisorCustomRules ?? undefined),
-                    undefined, // fixAction
-                    researchParams ? JSON.stringify(researchParams) : undefined,
-                    undefined, // fixStrategy
+                    mode: triggerType === "research" ? undefined : (project.supervisorMode ?? undefined),
+                    dimensions: triggerType === "research" ? undefined : parseDimensions(project.supervisorEnabledDimensions),
+                    customRules: triggerType === "research" ? undefined : (project.supervisorCustomRules ?? undefined),
+                    researchParams: researchParams ? JSON.stringify(researchParams) : undefined,
                     existingActions,
-                    concurrency.maxAnalysis,
-                    concurrency.maxFix,
-                ),
+                    maxConcurrentAnalysis: concurrency.maxAnalysis,
+                    maxConcurrentFix: concurrency.maxFix,
+                }),
                 recipientFilter: {
                     type: "machine-scoped-only",
                     machineId,
@@ -818,29 +815,24 @@ export function supervisorRoutes(app: Fastify) {
             for (const action of pendingActions) {
                 eventRouter.emitEphemeral({
                     userId,
-                    payload: buildSupervisorTriggerEphemeral(
-                        id,
-                        action.id,
-                        "fix",
-                        project.machineId,
-                        project.path,
+                    payload: buildSupervisorTriggerEphemeral({
+                        projectId: id,
+                        runId: action.id,
+                        trigger: "fix",
+                        machineId: project.machineId,
+                        repoPath: project.path,
                         mode,
-                        undefined,
-                        undefined,
-                        undefined,
-                        {
+                        fixAction: {
                             title: action.title,
                             description: action.description,
                             suggestedFix: action.suggestedFix,
                             category: action.category,
                             severity: action.severity,
                         },
-                        undefined,
-                        project.fixStrategy ?? undefined,
-                        undefined,
-                        maxAnalysis,
-                        maxFix,
-                    ),
+                        fixStrategy: project.fixStrategy ?? undefined,
+                        maxConcurrentAnalysis: maxAnalysis,
+                        maxConcurrentFix: maxFix,
+                    }),
                     recipientFilter: {
                         type: "machine-scoped-only",
                         machineId: project.machineId,
