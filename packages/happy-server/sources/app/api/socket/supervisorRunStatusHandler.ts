@@ -408,15 +408,22 @@ export async function handleAutoApproval(
             },
         });
 
-        if (!project) return;
+        if (!project) {
+            log({ module: "supervisor" }, `handleAutoApproval: project ${projectId} not found`);
+            return;
+        }
         const mode = project.supervisorMode;
-        if (mode !== "auto" && mode !== "semi-auto") return;
+        if (mode !== "auto" && mode !== "semi-auto") {
+            log({ module: "supervisor" }, `handleAutoApproval: mode=${mode}, skipping`);
+            return;
+        }
 
         // Get configured severity levels for auto-approval
         const severities = parseAutoApproveSeverities(
             project.supervisorConfig,
             mode as "semi-auto" | "auto",
         );
+        log({ module: "supervisor" }, `handleAutoApproval: mode=${mode}, severities=[${severities}], runId=${runId}`);
         if (severities.length === 0) return;
 
         // Find pending actions from this run matching configured severities

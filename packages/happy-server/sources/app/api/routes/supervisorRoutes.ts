@@ -557,6 +557,10 @@ export function supervisorRoutes(app: Fastify) {
                         where: { id: runId },
                         select: { loopId: true, actionsCount: true },
                     });
+                    log(
+                        { module: "supervisor" },
+                        `Auto-approval check: run ${runId}, loopId=${runForAutoApprove?.loopId ?? "null"}, actionsCount=${runForAutoApprove?.actionsCount ?? "null"}`,
+                    );
                     if (!runForAutoApprove?.loopId && (runForAutoApprove?.actionsCount ?? 0) > 0) {
                         try {
                             await handleAutoApproval(userId, id, runId);
