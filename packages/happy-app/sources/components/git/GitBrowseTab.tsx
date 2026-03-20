@@ -87,7 +87,7 @@ export const GitBrowseTab = React.memo<{
                     if (result.success && result.entries) {
                         setEntries(
                             result.entries.filter(
-                                (e) => !e.name.startsWith(".") && e.type !== "other",
+                                (e) => e.type !== "other",
                             ),
                         );
                     } else {
