@@ -331,7 +331,7 @@ export default function SupervisorLoopDetailScreen() {
             } catch (err) {
                 if (!cancelled) {
                     setError(
-                        err instanceof Error ? err.message : "Failed to load loop details",
+                        err instanceof Error ? err.message : t("supervisor.loadLoopError"),
                     );
                 }
             } finally {
@@ -362,7 +362,7 @@ export default function SupervisorLoopDetailScreen() {
         return (
             <View style={styles.centered}>
                 <Text style={styles.errorText}>
-                    {error ?? "Failed to load loop details"}
+                    {error ?? t("supervisor.loadLoopError")}
                 </Text>
             </View>
         );

@@ -2187,6 +2187,8 @@ export const ru: TranslationStructure = {
     loopDetailExitReason: "Причина завершения",
     loopDetailTimeline: "Хронология итераций",
     loopDetailActions: ({ count }: { count: number }) => `Действия (${count})`,
+    loadRunError: "Не удалось загрузить данные запуска",
+    loadLoopError: "Не удалось загрузить данные цикла",
 
     // Preflight sync dimensions
     dimPreflightStart: "Синхронизация кода...",

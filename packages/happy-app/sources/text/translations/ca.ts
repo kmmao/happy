@@ -2173,6 +2173,8 @@ export const ca: TranslationStructure = {
     loopDetailExitReason: "Motiu de sortida",
     loopDetailTimeline: "Cronologia d'iteracions",
     loopDetailActions: ({ count }: { count: number }) => `Accions (${count})`,
+    loadRunError: "No s'han pogut carregar els detalls de l'execució",
+    loadLoopError: "No s'han pogut carregar els detalls del bucle",
 
     // Preflight sync dimensions
     dimPreflightStart: "Sincronitzant codi...",

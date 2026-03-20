@@ -2078,6 +2078,8 @@ export const zhHant: TranslationStructure = {
     loopDetailExitReason: "退出原因",
     loopDetailTimeline: "迭代時間線",
     loopDetailActions: ({ count }: { count: number }) => `操作 (${count})`,
+    loadRunError: "載入運行詳情失敗",
+    loadLoopError: "載入循環詳情失敗",
 
     // Preflight sync dimensions
     dimPreflightStart: "正在同步程式碼...",

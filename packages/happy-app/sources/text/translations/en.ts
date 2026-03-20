@@ -2161,6 +2161,8 @@ export const en: TranslationStructure = {
     loopDetailExitReason: "Exit Reason",
     loopDetailTimeline: "Iteration Timeline",
     loopDetailActions: ({ count }: { count: number }) => `Actions (${count})`,
+    loadRunError: "Failed to load run details",
+    loadLoopError: "Failed to load loop details",
 
     // Preflight sync dimensions
     dimPreflightStart: "Syncing code...",

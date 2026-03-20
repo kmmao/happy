@@ -2188,6 +2188,8 @@ export const pl: TranslationStructure = {
     loopDetailExitReason: "Powód zakończenia",
     loopDetailTimeline: "Oś czasu iteracji",
     loopDetailActions: ({ count }: { count: number }) => `Akcje (${count})`,
+    loadRunError: "Nie udało się załadować szczegółów uruchomienia",
+    loadLoopError: "Nie udało się załadować szczegółów pętli",
 
     // Preflight sync dimensions
     dimPreflightStart: "Synchronizacja kodu...",

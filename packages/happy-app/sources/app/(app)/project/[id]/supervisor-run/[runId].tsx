@@ -119,7 +119,7 @@ export default function SupervisorRunDetailScreen() {
                     setError(
                         err instanceof Error
                             ? err.message
-                            : "Failed to load run details",
+                            : t("supervisor.loadRunError"),
                     );
                 }
             } finally {
@@ -158,7 +158,7 @@ export default function SupervisorRunDetailScreen() {
         return (
             <View style={styles.centered}>
                 <Text style={styles.errorText}>
-                    {error ?? "Failed to load run details"}
+                    {error ?? t("supervisor.loadRunError")}
                 </Text>
             </View>
         );

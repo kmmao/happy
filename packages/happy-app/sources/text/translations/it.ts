@@ -2167,6 +2167,8 @@ export const it: TranslationStructure = {
     loopDetailExitReason: "Motivo di uscita",
     loopDetailTimeline: "Cronologia iterazioni",
     loopDetailActions: ({ count }: { count: number }) => `Azioni (${count})`,
+    loadRunError: "Impossibile caricare i dettagli dell'esecuzione",
+    loadLoopError: "Impossibile caricare i dettagli del ciclo",
 
     // Preflight sync dimensions
     dimPreflightStart: "Sincronizzazione codice...",

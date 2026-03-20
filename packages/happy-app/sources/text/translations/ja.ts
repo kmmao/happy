@@ -2143,6 +2143,8 @@ export const ja: TranslationStructure = {
     loopDetailExitReason: "終了理由",
     loopDetailTimeline: "イテレーションタイムライン",
     loopDetailActions: ({ count }: { count: number }) => `アクション (${count})`,
+    loadRunError: "実行詳細の読み込みに失敗しました",
+    loadLoopError: "ループ詳細の読み込みに失敗しました",
 
     // Preflight sync dimensions
     dimPreflightStart: "コードを同期中...",
