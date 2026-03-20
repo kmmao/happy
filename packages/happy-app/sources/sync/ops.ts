@@ -694,6 +694,34 @@ export async function sessionDelete(
   }
 }
 
+/**
+ * Restore an archived session back to active state
+ */
+export async function sessionRestore(
+  sessionId: string,
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const response = await apiSocket.request(`/v1/sessions/${sessionId}/restore`, {
+      method: "PATCH",
+    });
+
+    if (response.ok) {
+      return { success: true };
+    } else {
+      const error = await response.text();
+      return {
+        success: false,
+        message: error || "Failed to restore session",
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 // Export types for external use
 export type {
   SessionBashRequest,

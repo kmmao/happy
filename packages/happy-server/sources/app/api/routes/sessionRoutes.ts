@@ -7,6 +7,7 @@ import { log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { allocateUserSeq } from "@/storage/seq";
 import { sessionDelete } from "@/app/session/sessionDelete";
+import { activityCache } from "@/app/presence/sessionCache";
 
 /**
  * Resolve (find-or-create) a Project by accountId + machineId + path,
@@ -621,6 +622,64 @@ export function sessionRoutes(app: Fastify) {
         lastCacheRead,
         reportCount: reports.length,
       });
+    },
+  );
+
+  // Restore archived session
+  app.patch(
+    "/v1/sessions/:sessionId/restore",
+    {
+      schema: {
+        params: z.object({
+          sessionId: z.string(),
+        }),
+      },
+      preHandler: app.authenticate,
+    },
+    async (request, reply) => {
+      const userId = request.userId;
+      const { sessionId } = request.params;
+
+      const session = await db.session.findFirst({
+        where: {
+          id: sessionId,
+          accountId: userId,
+        },
+      });
+
+      if (!session) {
+        return reply.code(404).send({ error: "Session not found" });
+      }
+
+      if (session.active) {
+        return reply.code(400).send({ error: "Session is already active" });
+      }
+
+      const updSeq = await allocateUserSeq(userId);
+
+      const updated = await db.session.update({
+        where: { id: sessionId },
+        data: {
+          active: true,
+          lastActiveAt: new Date(),
+        },
+      });
+
+      // Evict stale cache so heartbeats are accepted immediately
+      activityCache.invalidateSession(sessionId);
+
+      const updatePayload = buildNewSessionUpdate(
+        updated,
+        updSeq,
+        randomKeyNaked(12),
+      );
+      eventRouter.emitUpdate({
+        userId,
+        payload: updatePayload,
+        recipientFilter: { type: "user-scoped-only" },
+      });
+
+      return reply.send({ success: true });
     },
   );
 
