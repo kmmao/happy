@@ -77,7 +77,7 @@ happy/                        ← 唯一的 Git Repo
 | **happy-cli** | `packages/happy-cli` | CLI 守护进程，连接 Claude Code/Codex | npm: `@kmmao/happy-coder` |
 | **happy-server** | `packages/happy-server` | Fastify 后端 + Prisma + PostgreSQL + Redis | 私有（Docker 部署） |
 | **happy-app** | `packages/happy-app` | React Native + Expo 移动/Web 客户端 | 私有（App Store） |
-| **happy-agent** | `packages/happy-agent` | 远程控制 Agent 的 CLI 工具 | npm: `@slopus/agent` |
+| **happy-agent** | `packages/happy-agent` | 远程控制 Agent 的 CLI 工具 | npm: `@kmmao/happy-agent` |
 
 ### 包之间的关系
 
