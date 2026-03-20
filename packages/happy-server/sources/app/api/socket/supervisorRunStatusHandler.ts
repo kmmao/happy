@@ -70,7 +70,7 @@ export function supervisorRunStatusHandler(
                     projectId: data.projectId,
                     accountId: userId,
                 },
-                select: { id: true, status: true },
+                select: { id: true, status: true, loopId: true },
             });
 
             if (!run) {
@@ -356,12 +356,8 @@ export function supervisorRunStatusHandler(
 
                     // Auto/semi-auto mode: automatically approve actions based on configured severities
                     // Skip if run belongs to a Loop — Loop engine handles its own approval flow
-                    const runForLoopCheck = await db.supervisorRun.findUnique({
-                        where: { id: data.runId },
-                        select: { loopId: true },
-                    });
                     if (
-                        !runForLoopCheck?.loopId &&
+                        !run.loopId &&
                         data.actions &&
                         data.actions.length > 0
                     ) {
