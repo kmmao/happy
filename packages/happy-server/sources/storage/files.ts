@@ -15,7 +15,7 @@ export { s3client, s3bucket, s3host };
 
 export async function loadFiles() {
   if (useLocalStorage) {
-    fs.mkdirSync(localFilesDir, { recursive: true });
+    await fs.promises.mkdir(localFilesDir, { recursive: true });
     return;
   }
 
