@@ -52,7 +52,10 @@ export const GitBrowseTab = React.memo<{
     sessionId: string;
     onPullDown?: () => void;
     onScrollUp?: () => void;
-}>(function GitBrowseTab({ sessionId, onPullDown, onScrollUp }) {
+    embedded?: boolean;
+    onFileOpen?: () => void;
+    onReference?: (path: string) => void;
+}>(function GitBrowseTab({ sessionId, onPullDown, onScrollUp, embedded, onFileOpen, onReference }) {
     const router = useRouter();
     const { theme } = useUnistyles();
 
@@ -107,11 +110,13 @@ export const GitBrowseTab = React.memo<{
         };
     }, [sessionId, currentPath, refreshKey]);
 
-    // Refresh listing on screen focus
+    // Refresh listing on screen focus (skip in embedded/overlay mode)
     useFocusEffect(
         React.useCallback(() => {
-            setRefreshKey((k) => k + 1);
-        }, []),
+            if (!embedded) {
+                setRefreshKey((k) => k + 1);
+            }
+        }, [embedded]),
     );
 
     const handleEntryPress = React.useCallback(
@@ -121,6 +126,7 @@ export const GitBrowseTab = React.memo<{
                 setPathHistory((prev) => [...prev, currentPath!]);
                 setCurrentPath(newPath);
             } else {
+                onFileOpen?.();
                 const fullPath = `${currentPath}/${entry.name}`;
                 const encodedPath = utf8ToBase64(fullPath);
                 router.push(`/session/${sessionId}/file?path=${encodedPath}`);
@@ -221,13 +227,16 @@ export const GitBrowseTab = React.memo<{
             {/* Directory listing */}
             <ItemList
                 style={{ flex: 1 }}
-                onScroll={onScrollUp ? handleScroll : undefined}
-                scrollEventThrottle={onScrollUp ? 16 : undefined}
+                onScroll={!embedded && onScrollUp ? handleScroll : undefined}
+                scrollEventThrottle={!embedded && onScrollUp ? 16 : undefined}
+                nestedScrollEnabled={embedded}
                 refreshControl={
-                    <RefreshControl
-                        refreshing={false}
-                        onRefresh={handleRefresh}
-                    />
+                    embedded ? undefined : (
+                        <RefreshControl
+                            refreshing={false}
+                            onRefresh={handleRefresh}
+                        />
+                    )
                 }
             >
                 {isLoading ? (
@@ -288,7 +297,12 @@ export const GitBrowseTab = React.memo<{
                             ? t("files.directory")
                             : formatFileSize(entry.size);
 
-                        const rightEl = isDir ? (
+                        const entryFullPath = `${currentPath}/${entry.name}`;
+                        const entryRelPath = basePath
+                            ? entryFullPath.slice(basePath.length + 1)
+                            : entry.name;
+
+                        const baseRightEl = isDir ? (
                             <Octicons
                                 name="chevron-right"
                                 size={16}
@@ -305,6 +319,30 @@ export const GitBrowseTab = React.memo<{
                                 binary
                             </Text>
                         ) : undefined;
+
+                        const rightEl = onReference ? (
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                                <Pressable
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        onReference(entryRelPath);
+                                    }}
+                                    hitSlop={6}
+                                    style={({ pressed }) => ({
+                                        padding: 4,
+                                        borderRadius: 6,
+                                        opacity: pressed ? 0.5 : 1,
+                                    })}
+                                >
+                                    <Octicons
+                                        name="mention"
+                                        size={16}
+                                        color={theme.colors.textLink}
+                                    />
+                                </Pressable>
+                                {baseRightEl}
+                            </View>
+                        ) : baseRightEl;
 
                         return (
                             <Item

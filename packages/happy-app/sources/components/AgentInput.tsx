@@ -55,6 +55,7 @@ import {
 } from "@/utils/formatUsage";
 import { SttWaveIndicator } from "./SttWaveIndicator";
 import { SttProgressLine } from "./SttProgressLine";
+import { GitBrowseTab } from "./git/GitBrowseTab";
 
 interface AgentInputProps {
   value: string;
@@ -211,6 +212,27 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     right: 0,
     marginBottom: 8,
     zIndex: 1000,
+  },
+  fileBrowserOverlay: {
+    position: "absolute",
+    bottom: "100%",
+    left: 0,
+    right: 0,
+    marginBottom: 8,
+    zIndex: 1000,
+  },
+  fileBrowserContainer: {
+    maxHeight: 450,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: theme.colors.surface,
+    borderWidth: Platform.OS === "web" ? 0 : 0.5,
+    borderColor: theme.colors.modal.border,
+    shadowColor: theme.colors.shadow.color,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3.84,
+    shadowOpacity: theme.colors.shadow.opacity,
+    elevation: 5,
   },
   overlayBackdrop: {
     position: "absolute",
@@ -648,6 +670,7 @@ export const AgentInput = React.memo(
     // Settings modal state
     const [showSettings, setShowSettings] = React.useState(false);
     const [showQuickCommands, setShowQuickCommands] = React.useState(false);
+    const [showFileBrowser, setShowFileBrowser] = React.useState(false);
 
     // Favorite commands (synced Settings — for QuickCommandsPanel shell commands)
     const [favoriteCommands, setFavoriteCommands] =
@@ -669,7 +692,13 @@ export const AgentInput = React.memo(
     // Handle settings button press
     const handleSettingsPress = React.useCallback(() => {
       hapticsLight();
-      setShowSettings((prev) => !prev);
+      setShowSettings((prev) => {
+        if (!prev) {
+          setShowQuickCommands(false);
+          setShowFileBrowser(false);
+        }
+        return !prev;
+      });
     }, []);
 
     // Handle settings selection
@@ -1432,6 +1461,36 @@ export const AgentInput = React.memo(
                     onToggleFavorite={handleToggleFavorite}
                   />
                 </FloatingOverlay>
+              </View>
+            </>
+          )}
+
+          {/* File browser overlay */}
+          {props.sessionId && showFileBrowser && (
+            <>
+              <TouchableWithoutFeedback
+                onPress={() => setShowFileBrowser(false)}
+              >
+                <View style={styles.overlayBackdrop} />
+              </TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.fileBrowserOverlay,
+                  { paddingHorizontal: screenWidth > 700 ? 0 : 8 },
+                ]}
+              >
+                <View style={styles.fileBrowserContainer}>
+                  <GitBrowseTab
+                    sessionId={props.sessionId}
+                    embedded
+                    onFileOpen={() => setShowFileBrowser(false)}
+                    onReference={(path) => {
+                      const current = props.value;
+                      const prefix = current.length > 0 && !current.endsWith(" ") ? " " : "";
+                      props.onChangeText(`${current}${prefix}@${path} `);
+                    }}
+                  />
+                </View>
               </View>
             </>
           )}
@@ -2330,7 +2389,13 @@ export const AgentInput = React.memo(
                       <Pressable
                         onPress={() => {
                           hapticsLight();
-                          setShowQuickCommands((prev) => !prev);
+                          setShowQuickCommands((prev) => {
+                            if (!prev) {
+                              setShowSettings(false);
+                              setShowFileBrowser(false);
+                            }
+                            return !prev;
+                          });
                         }}
                         hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                         style={(p) => ({
@@ -2352,6 +2417,46 @@ export const AgentInput = React.memo(
                           size={16}
                           color={
                             showQuickCommands
+                              ? theme.colors.success
+                              : theme.colors.button.secondary.tint
+                          }
+                        />
+                      </Pressable>
+                    )}
+
+                    {/* File browser button */}
+                    {props.sessionId && (
+                      <Pressable
+                        onPress={() => {
+                          hapticsLight();
+                          setShowFileBrowser((prev) => {
+                            if (!prev) {
+                              setShowSettings(false);
+                              setShowQuickCommands(false);
+                            }
+                            return !prev;
+                          });
+                        }}
+                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                        style={(p) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          borderRadius: Platform.select({
+                            default: 16,
+                            android: 20,
+                          }),
+                          paddingHorizontal: 8,
+                          paddingVertical: 6,
+                          justifyContent: "center",
+                          height: 32,
+                          opacity: p.pressed ? 0.7 : 1,
+                        })}
+                      >
+                        <Octicons
+                          name="file-directory"
+                          size={16}
+                          color={
+                            showFileBrowser
                               ? theme.colors.success
                               : theme.colors.button.secondary.tint
                           }
