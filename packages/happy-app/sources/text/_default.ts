@@ -2209,6 +2209,7 @@ export const en = {
     loopDetailActions: ({ count }: { count: number }) => `Actions (${count})`,
     loopDetailNoRuns: "No iterations yet",
     loopDetailNoActions: "No actions yet",
+    loadLoopError: "Failed to load loop details",
 
     // Preflight sync dimensions
     dimPreflightStart: "Syncing code...",
