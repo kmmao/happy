@@ -53,6 +53,7 @@ import { SupervisorProgressView } from "./SupervisorProgressView";
 import { SupervisorLoopStatusCard } from "./SupervisorLoopStatusCard";
 import { SupervisorLoopConfigPanel } from "./SupervisorLoopConfigPanel";
 import { SupervisorLoopHistoryItem } from "./SupervisorLoopHistoryItem";
+import { DayRangeSelector } from "./DayRangeSelector";
 
 
 interface ProjectHealthTabProps {
@@ -88,6 +89,9 @@ export const ProjectHealthTab = React.memo(
         const [loopHistory, setLoopHistory] = React.useState<SupervisorLoop[]>([]);
         const [loopHistoryTotal, setLoopHistoryTotal] = React.useState(0);
         const [showLoopConfig, setShowLoopConfig] = React.useState(false);
+        const [analyticsDays, setAnalyticsDays] = React.useState(3);
+        const analyticsDaysRef = React.useRef(3);
+        const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
 
         const serverId = project.serverId;
 
@@ -105,10 +109,10 @@ export const ProjectHealthTab = React.memo(
                             approval: "pending",
                             limit: 20,
                         }),
-                        fetchSupervisorCost(credentials, serverId, 30).catch(
+                        fetchSupervisorCost(credentials, serverId, analyticsDaysRef.current).catch(
                             () => null,
                         ),
-                        fetchSupervisorTrend(credentials, serverId, 30).catch(
+                        fetchSupervisorTrend(credentials, serverId, analyticsDaysRef.current).catch(
                             () => null,
                         ),
                         fetchRelatedProjects(credentials, serverId).catch(
@@ -218,6 +222,28 @@ export const ProjectHealthTab = React.memo(
             });
             return unsubscribe;
         }, [serverId, loadData]);
+
+        const handleAnalyticsDaysChange = React.useCallback(
+            async (days: number) => {
+                setAnalyticsDays(days);
+                analyticsDaysRef.current = days;
+                if (!serverId) return;
+                setAnalyticsLoading(true);
+                try {
+                    const credentials = await TokenStorage.getCredentials();
+                    if (!credentials) return;
+                    const [costResult, trendResult] = await Promise.all([
+                        fetchSupervisorCost(credentials, serverId, days).catch(() => null),
+                        fetchSupervisorTrend(credentials, serverId, days).catch(() => null),
+                    ]);
+                    if (costResult) setCostSummary(costResult);
+                    if (trendResult) setTrendData(trendResult);
+                } finally {
+                    setAnalyticsLoading(false);
+                }
+            },
+            [serverId],
+        );
 
         const onRefresh = React.useCallback(async () => {
             setRefreshing(true);
@@ -628,6 +654,15 @@ export const ProjectHealthTab = React.memo(
                 </ItemGroup>
 
 
+
+                {/* Analytics Day Range Selector */}
+                {loaded && (costSummary || (trendData && trendData.points.length >= 2)) && (
+                    <DayRangeSelector
+                        selectedDays={analyticsDays}
+                        loading={analyticsLoading}
+                        onDaysChange={handleAnalyticsDaysChange}
+                    />
+                )}
 
                 {/* Cost Summary */}
                 {costSummary && (

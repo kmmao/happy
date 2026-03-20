@@ -41,11 +41,6 @@ export const SupervisorCostSection = React.memo(
                             ${costSummary.totalCostUsd.toFixed(4)}
                         </Text>
                     </View>
-                    <Text style={styles.costPeriod}>
-                        {t("supervisor.costPeriod", {
-                            days: costSummary.days,
-                        })}
-                    </Text>
                 </View>
             </ItemGroup>
         );
@@ -71,12 +66,5 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
         fontSize: 14,
         color: theme.colors.text,
-    },
-    costPeriod: {
-        ...Typography.default(),
-        fontSize: 12,
-        color: theme.colors.textSecondary,
-        textAlign: "center",
-        marginTop: 4,
     },
 }));

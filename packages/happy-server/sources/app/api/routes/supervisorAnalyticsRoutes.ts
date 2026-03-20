@@ -48,7 +48,7 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
                     projectId: id,
                     accountId: userId,
                     completedAt: { gte: since },
-                    status: "completed",
+                    status: { in: ["completed", "failed", "cancelled"] },
                 },
                 select: {
                     tokenCount: true,
@@ -83,7 +83,7 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
                 params: z.object({ id: z.string() }),
                 querystring: z
                     .object({
-                        days: z.coerce.number().int().min(7).max(90).default(30),
+                        days: z.coerce.number().int().min(1).max(90).default(30),
                     })
                     .optional(),
             },
