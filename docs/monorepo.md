@@ -1,6 +1,6 @@
 # Monorepo 架构
 
-本项目采用 **Monorepo**（单仓多包）架构，使用 **Yarn v1.22.22 Workspaces** 在一个 Git 仓库中管理四个独立的包。
+本项目采用 **Monorepo**（单仓多包）架构，使用 **Yarn v1.22.22 Workspaces** 在一个 Git 仓库中管理五个独立的包。
 
 ---
 
@@ -14,6 +14,7 @@ happy-cli/       ← Git Repo A
 happy-server/    ← Git Repo B
 happy-app/       ← Git Repo C
 happy-agent/     ← Git Repo D
+happy-wire/      ← Git Repo E
 
 # Monorepo：一个仓库管所有项目
 happy/                        ← 唯一的 Git Repo
@@ -21,7 +22,8 @@ happy/                        ← 唯一的 Git Repo
 │   ├── happy-cli/            ← 包 1
 │   ├── happy-server/         ← 包 2
 │   ├── happy-app/            ← 包 3
-│   └── happy-agent/          ← 包 4
+│   ├── happy-agent/          ← 包 4
+│   └── happy-wire/           ← 包 5
 ├── package.json              ← 根配置（Yarn Workspaces）
 ├── docker-compose.yml
 └── docs/
@@ -42,7 +44,8 @@ happy/                        ← 唯一的 Git Repo
       "packages/happy-app",
       "packages/happy-agent",
       "packages/happy-cli",
-      "packages/happy-server"
+      "packages/happy-server",
+      "packages/happy-wire"
     ],
     "nohoist": [
       "**/zod",
@@ -70,7 +73,7 @@ happy/                        ← 唯一的 Git Repo
 
 ---
 
-## 四个包概览
+## 五个包概览
 
 | 包名 | 路径 | 用途 | 发布 |
 |------|------|------|------|
@@ -78,6 +81,7 @@ happy/                        ← 唯一的 Git Repo
 | **happy-server** | `packages/happy-server` | Fastify 后端 + Prisma + PostgreSQL + Redis | 私有（Docker 部署） |
 | **happy-app** | `packages/happy-app` | React Native + Expo 移动/Web 客户端 | 私有（App Store） |
 | **happy-agent** | `packages/happy-agent` | 远程控制 Agent 的 CLI 工具 | npm: `@kmmao/happy-agent` |
+| **happy-wire** | `packages/happy-wire` | 共享消息类型和 Zod schema | npm: `@kmmao/happy-wire` |
 
 ### 包之间的关系
 
@@ -155,7 +159,7 @@ yarn add -W -D <package>
 
 ### 依赖提升机制
 
-Yarn Workspaces 默认将所有包的依赖**提升**到根 `node_modules/`，避免重复安装。例如四个包都用了 `typescript`，只会在根 `node_modules/typescript` 安装一份。
+Yarn Workspaces 默认将所有包的依赖**提升**到根 `node_modules/`，避免重复安装。例如五个包都用了 `typescript`，只会在根 `node_modules/typescript` 安装一份。
 
 `nohoist` 中列出的例外（如 `react-native`）会保留在各自包的 `node_modules/` 下。
 
@@ -196,7 +200,7 @@ Yarn Workspaces 默认将所有包的依赖**提升**到根 `node_modules/`，�
 
 ### Q: 为什么不用 pnpm / Turborepo / Nx？
 
-本项目使用 Yarn v1 Workspaces，配置简单且满足需求。四个包体量适中、无复杂的包间依赖，Yarn Workspaces 足够胜任。
+本项目使用 Yarn v1 Workspaces，配置简单且满足需求。五个包体量适中、无复杂的包间依赖，Yarn Workspaces 足够胜任。
 
 ### Q: `nohoist` 是什么意思？
 
