@@ -422,6 +422,8 @@ export const en: TranslationStructure = {
     appendToInput: "Edit in input",
     messageQueued: "Queued",
     cancelQueued: "Cancel",
+    noMessages: "No messages yet",
+    created: ({ time }: { time: string }) => `Created ${time}`,
   },
 
   bookmark: {
@@ -1225,6 +1227,7 @@ export const en: TranslationStructure = {
     saving: "Saving...",
     loading: "Loading artifacts...",
     error: "Failed to load artifact",
+    untitled: "Untitled",
   },
 
   friends: {

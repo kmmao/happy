@@ -394,6 +394,8 @@ export const zhHant: TranslationStructure = {
     appendToInput: "編輯後發送",
     messageQueued: "已排隊",
     cancelQueued: "取消",
+    noMessages: "暫無訊息",
+    created: ({ time }: { time: string }) => `建立於 ${time}`,
   },
 
   bookmark: {
@@ -1175,6 +1177,7 @@ export const zhHant: TranslationStructure = {
     bodyLabel: "內容",
     emptyFieldsError: "请输入標題或內容",
     createError: "建立工件失敗。請重試。",
+    untitled: "無標題",
   },
 
   friends: {

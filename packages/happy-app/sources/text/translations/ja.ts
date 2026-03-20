@@ -472,6 +472,8 @@ export const ja: TranslationStructure = {
     appendToInput: "入力欄で編集",
     messageQueued: "キュー中",
     cancelQueued: "キャンセル",
+    noMessages: "メッセージはまだありません",
+    created: ({ time }: { time: string }) => `${time}に作成`,
   },
 
   bookmark: {
@@ -1280,6 +1282,7 @@ export const ja: TranslationStructure = {
     saving: "保存中...",
     loading: "アーティファクトを読み込み中...",
     error: "アーティファクトの読み込みに失敗しました",
+    untitled: "無題",
   },
 
   friends: {

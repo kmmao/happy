@@ -594,6 +594,8 @@ export const ru: TranslationStructure = {
     appendToInput: "Редактировать в поле ввода",
     messageQueued: "В очереди",
     cancelQueued: "Отменить",
+    noMessages: "Сообщений пока нет",
+    created: ({ time }: { time: string }) => `Создано ${time}`,
   },
 
   bookmark: {
@@ -1258,6 +1260,7 @@ export const ru: TranslationStructure = {
     saving: "Сохранение...",
     loading: "Загрузка артефактов...",
     error: "Не удалось загрузить артефакт",
+    untitled: "Без названия",
   },
 
   friends: {

@@ -421,6 +421,8 @@ export const pt: TranslationStructure = {
     appendToInput: "Editar no campo de entrada",
     messageQueued: "Na fila",
     cancelQueued: "Cancelar",
+    noMessages: "Sem mensagens ainda",
+    created: ({ time }: { time: string }) => `Criado ${time}`,
   },
 
   bookmark: {
@@ -1233,6 +1235,7 @@ export const pt: TranslationStructure = {
     bodyLabel: "CONTEÚDO",
     emptyFieldsError: "Por favor, insira um título ou conteúdo",
     createError: "Falha ao criar artefato. Por favor, tente novamente.",
+    untitled: "Sem título",
   },
 
   friends: {

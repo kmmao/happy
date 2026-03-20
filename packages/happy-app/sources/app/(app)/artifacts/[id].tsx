@@ -216,7 +216,7 @@ export default function ArtifactDetailScreen() {
             <Stack.Screen 
                 options={{
                     headerShown: true,
-                    headerTitle: artifact.title || 'Untitled',
+                    headerTitle: artifact.title || t('artifacts.untitled'),
                     headerRight: () => (
                         <View style={{ flexDirection: 'row' }}>
                             <Pressable
@@ -256,7 +256,7 @@ export default function ArtifactDetailScreen() {
                                 !artifact.title && styles.untitledTitle
                             ]}
                         >
-                            {artifact.title || 'Untitled'}
+                            {artifact.title || t('artifacts.untitled')}
                         </Text>
                         <Text style={styles.meta}>
                             {formattedDate}

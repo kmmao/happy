@@ -422,6 +422,8 @@ export const ca: TranslationStructure = {
     appendToInput: "Edita al camp d'entrada",
     messageQueued: "En cua",
     cancelQueued: "Cancel·la",
+    noMessages: "Encara no hi ha missatges",
+    created: ({ time }: { time: string }) => `Creat ${time}`,
   },
 
   bookmark: {
@@ -1238,6 +1240,7 @@ export const ca: TranslationStructure = {
     emptyFieldsError: "Si us plau, introdueix un títol o contingut",
     createError:
       "No s'ha pogut crear l'artefacte. Si us plau, torna-ho a provar.",
+    untitled: "Sense títol",
   },
 
   friends: {
