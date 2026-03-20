@@ -43,31 +43,30 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
 
             const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-            const runs = await db.supervisorRun.findMany({
-                where: {
-                    projectId: id,
-                    accountId: userId,
-                    completedAt: { gte: since },
-                    status: { in: ["completed", "failed", "cancelled"] },
-                },
-                select: {
-                    tokenCount: true,
-                    costUsd: true,
-                },
-            });
+            const whereClause = {
+                projectId: id,
+                accountId: userId,
+                completedAt: { gte: since },
+                status: { in: ["completed", "failed", "cancelled"] },
+            };
 
-            const totalTokens = runs.reduce(
-                (sum, r) => sum + (r.tokenCount ?? 0),
-                0,
-            );
-            const totalCostUsd = runs.reduce(
-                (sum, r) => sum + (r.costUsd ?? 0),
-                0,
-            );
+            const [aggregation, runsCount] = await Promise.all([
+                db.supervisorRun.aggregate({
+                    where: whereClause,
+                    _sum: {
+                        tokenCount: true,
+                        costUsd: true,
+                    },
+                }),
+                db.supervisorRun.count({ where: whereClause }),
+            ]);
+
+            const totalTokens = aggregation._sum?.tokenCount ?? 0;
+            const totalCostUsd = aggregation._sum?.costUsd ?? 0;
 
             return reply.send({
                 days,
-                runsCount: runs.length,
+                runsCount,
                 totalTokens,
                 totalCostUsd: Math.round(totalCostUsd * 10000) / 10000,
             });
