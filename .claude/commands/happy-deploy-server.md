@@ -8,20 +8,33 @@ docker compose version
 docker compose -f /Users/sangreal/Documents/dev-workspace/happy/docker-compose.yml ps
 ```
 
-### 2. 检查是否有 Prisma schema 变更
+### 2. 检查变更范围（决定构建策略）
 ```bash
-git diff HEAD~1 -- packages/happy-server/prisma/schema.prisma
+# 检查依赖文件是否有变更（package.json / yarn.lock / prisma schema）
+git diff HEAD~1 --name-only -- package.json yarn.lock packages/*/package.json packages/happy-server/prisma/schema.prisma patches/
 ```
-- 如果有变更，重启后需要跑迁移
-- 如果没有变更，不需要额外操作
+
+根据输出判断构建策略：
+- **依赖文件有变更**（package.json、yarn.lock、prisma/schema.prisma、patches/）→ 完全无缓存重建（`--no-cache`）
+- **仅源码变更**（.ts 文件等）→ 无缓存重建源码层，但保留依赖缓存（`--no-cache-filter builder`）
+
+> 原因：Dockerfile 的 deps stage 包含 yarn install，耗时最长。依赖没变时保留这层缓存可以从 2 分钟缩到 30 秒。但源码层（builder stage）必须始终重建，否则会用到旧的 .ts 编译结果。
 
 ## 部署流程
 
 ### 3. 重建 Server 镜像
+
+**如果依赖有变更**（完全无缓存）：
 ```bash
-docker compose -f /Users/sangreal/Documents/dev-workspace/happy/docker-compose.yml build server
+docker compose -f /Users/sangreal/Documents/dev-workspace/happy/docker-compose.yml build --no-cache server
 ```
-- 此步骤耗时较长（1-2 分钟），包含 yarn install、happy-wire 构建、happy-server 构建
+
+**如果仅源码变更**（只跳过 builder 缓存，保留 deps 缓存）：
+```bash
+DOCKER_BUILDKIT=1 docker compose -f /Users/sangreal/Documents/dev-workspace/happy/docker-compose.yml build --no-cache-filter builder server
+```
+
+> 注意：`--no-cache-filter` 需要 BuildKit。如果报错不支持，回退到 `--no-cache`。
 
 ### 4. 重启 Server 容器
 ```bash
@@ -46,5 +59,6 @@ curl -s http://localhost:3005/
 ## 注意事项
 - Docker Compose 文件路径：`/Users/sangreal/Documents/dev-workspace/happy/docker-compose.yml`
 - Server 端口：3005
+- 构建策略：依赖变更 → `--no-cache`；仅源码变更 → `--no-cache-filter builder`
 - 如果构建失败，检查 `Dockerfile.server` 是否包含所有必要的 COPY 步骤
 - 如果启动失败，用 `docker compose logs server` 查看完整日志
