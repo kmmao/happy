@@ -1,0 +1,330 @@
+/**
+ * Multi-strategy port detection for dev server preview.
+ *
+ * Detection chain: lsof → ss → netstat (fallback)
+ * Supplementary: package.json scripts parsing, Docker container ports, curl probing
+ * Results are merged, deduplicated, and sorted (common dev ports first).
+ */
+
+import { sessionBash } from "@/sync/ops";
+
+/** Common dev server ports to highlight in detection results. */
+export const COMMON_DEV_PORTS = [
+    3000, 3001, 4173, 5173, 5174, 8000, 8080, 8081, 8888, 9000, 9123,
+];
+
+export interface DetectedPort {
+    readonly port: number;
+    readonly process: string;
+    readonly isCommonDevPort: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Parsers — pure functions, each handles one command's stdout
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse `lsof -iTCP -sTCP:LISTEN -P -n` output.
+ *
+ * Example line:
+ *   node    1234 user   23u  IPv4 0x1234  0t0  TCP *:3000 (LISTEN)
+ */
+export function parseLsofOutput(stdout: string): ReadonlyMap<number, string> {
+    const ports = new Map<number, string>();
+    for (const line of stdout.trim().split("\n")) {
+        if (line.startsWith("COMMAND")) continue;
+        const parts = line.split(/\s+/);
+        if (parts.length < 9) continue;
+        const command = parts[0];
+        // NAME column is "address:port (LISTEN)" — port is in second-to-last token
+        const addressToken = parts[parts.length - 2];
+        const m = addressToken.match(/:(\d+)$/);
+        if (m) {
+            const port = parseInt(m[1], 10);
+            if (port > 0 && port < 65536 && !ports.has(port)) {
+                ports.set(port, command);
+            }
+        }
+    }
+    return ports;
+}
+
+/**
+ * Parse `ss -tlnp` output (Linux only).
+ *
+ * Example line:
+ *   LISTEN 0  511  *:3000  *:*  users:(("node",pid=1234,fd=23))
+ */
+export function parseSsOutput(stdout: string): ReadonlyMap<number, string> {
+    const ports = new Map<number, string>();
+    for (const line of stdout.trim().split("\n")) {
+        if (!line.startsWith("LISTEN")) continue;
+        const fields = line.trim().split(/\s+/);
+        // ss output: State Recv-Q Send-Q LocalAddr:Port PeerAddr:Port [Process]
+        // LocalAddr is field[3]
+        const localAddr = fields.length >= 4 ? fields[3] : "";
+        const portMatch = localAddr.match(/:(\d+)$/);
+        if (!portMatch) continue;
+        const port = parseInt(portMatch[1], 10);
+        if (port <= 0 || port >= 65536 || ports.has(port)) continue;
+        // Extract process name from users:(("name",...))
+        const procMatch = line.match(/users:\(\("([^"]+)"/);
+        ports.set(port, procMatch ? procMatch[1] : "unknown");
+    }
+    return ports;
+}
+
+/**
+ * Parse `netstat` output — handles both Linux and macOS formats.
+ *
+ * Linux `netstat -tlnp`:
+ *   tcp  0  0  0.0.0.0:3000  0.0.0.0:*  LISTEN  1234/node
+ *
+ * macOS `netstat -an -p tcp`:
+ *   tcp4  0  0  *.3000  *.*  LISTEN
+ */
+export function parseNetstatOutput(stdout: string): ReadonlyMap<number, string> {
+    const ports = new Map<number, string>();
+    for (const line of stdout.trim().split("\n")) {
+        if (!line.includes("LISTEN")) continue;
+        // Try Linux format: PID/program at end
+        const linuxMatch = line.match(/[:\.](\d+)\s+[\d.:*]+\s+LISTEN\s+(\d+\/(\S+))?/);
+        if (linuxMatch) {
+            const port = parseInt(linuxMatch[1], 10);
+            if (port > 0 && port < 65536 && !ports.has(port)) {
+                ports.set(port, linuxMatch[3] ?? "unknown");
+            }
+            continue;
+        }
+        // Try macOS format: *.PORT or 127.0.0.1.PORT — match local address (4th column)
+        const columns = line.trim().split(/\s+/);
+        const localAddr = columns.length >= 4 ? columns[3] : "";
+        const macMatch = localAddr.match(/[.*]\.(\d+)$/);
+        if (macMatch) {
+            const port = parseInt(macMatch[1], 10);
+            if (port > 0 && port < 65536 && !ports.has(port)) {
+                ports.set(port, "unknown");
+            }
+        }
+    }
+    return ports;
+}
+
+/**
+ * Parse `docker ps --format` output for exposed ports.
+ *
+ * Format: "0.0.0.0:8080->80/tcp, :::3000->3000/tcp  container-name"
+ * We extract the host port (left side of ->).
+ */
+export function parseDockerOutput(stdout: string): ReadonlyMap<number, string> {
+    const ports = new Map<number, string>();
+    for (const line of stdout.trim().split("\n")) {
+        if (!line.trim()) continue;
+        // Format: "PORTS\tNAME" — tab separated
+        const tabIdx = line.indexOf("\t");
+        const portsPart = tabIdx >= 0 ? line.substring(0, tabIdx) : line;
+        const namePart = tabIdx >= 0 ? line.substring(tabIdx + 1).trim() : "docker";
+        // Match host port mappings: 0.0.0.0:8080->80/tcp
+        const portMatches = portsPart.matchAll(/(?:\d+\.\d+\.\d+\.\d+|::):(\d+)->/g);
+        for (const m of portMatches) {
+            const port = parseInt(m[1], 10);
+            if (port > 0 && port < 65536 && !ports.has(port)) {
+                ports.set(port, `docker:${namePart}`);
+            }
+        }
+    }
+    return ports;
+}
+
+/**
+ * Extract port numbers from package.json scripts.
+ *
+ * Matches: --port 3000, --port=3000, -p 8080, -p=8080, PORT=3000
+ */
+export function parsePackageJsonPorts(json: string): readonly number[] {
+    try {
+        const pkg = JSON.parse(json);
+        const scripts: Record<string, string> = pkg.scripts ?? {};
+        const ports = new Set<number>();
+        for (const cmd of Object.values(scripts)) {
+            if (typeof cmd !== "string") continue;
+            // --port 3000 or --port=3000
+            for (const m of cmd.matchAll(/--port[=\s]+(\d+)/g)) {
+                ports.add(parseInt(m[1], 10));
+            }
+            // -p 3000 or -p=3000 (but not -pr, -prod etc.)
+            for (const m of cmd.matchAll(/\s-p[=\s]+(\d+)/g)) {
+                ports.add(parseInt(m[1], 10));
+            }
+            // PORT=3000
+            for (const m of cmd.matchAll(/\bPORT=(\d+)/g)) {
+                ports.add(parseInt(m[1], 10));
+            }
+        }
+        return Array.from(ports).filter((p) => p > 0 && p < 65536);
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Parse curl probe output to find responsive ports.
+ *
+ * Command output format: one line per port — "PORT:HEADER_LINE" or "PORT:ok"
+ * We also extract framework info from response headers.
+ */
+export function parseCurlProbeOutput(stdout: string): ReadonlyMap<number, string> {
+    const ports = new Map<number, string>();
+    for (const line of stdout.trim().split("\n")) {
+        const m = line.match(/^(\d+):(.+)/);
+        if (!m) continue;
+        const port = parseInt(m[1], 10);
+        if (ports.has(port)) continue;
+        const headerLine = m[2].trim();
+        // Try to extract framework from common response headers
+        const powered = headerLine.match(/x-powered-by:\s*(.+)/i);
+        const server = headerLine.match(/^server:\s*(.+)/i);
+        const framework = powered?.[1] ?? server?.[1] ?? "http";
+        ports.set(port, framework);
+    }
+    return ports;
+}
+
+// ---------------------------------------------------------------------------
+// Orchestrator — runs strategies and merges results
+// ---------------------------------------------------------------------------
+
+type BashFn = (
+    sessionId: string,
+    request: { command: string; timeout?: number },
+) => Promise<{ success: boolean; stdout?: string; exitCode?: number }>;
+
+/**
+ * Run the full detection pipeline and return merged, deduplicated ports.
+ * Each strategy is isolated — failure in one does not block others.
+ */
+export async function detectAllPorts(
+    sessionId: string,
+    bash: BashFn = sessionBash,
+): Promise<readonly DetectedPort[]> {
+    // Phase 1: run lsof + package.json + docker in parallel
+    const [lsofResult, pkgResult, dockerResult] = await Promise.all([
+        bash(sessionId, {
+            command: "lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null",
+            timeout: 10000,
+        }).catch(() => null),
+        bash(sessionId, {
+            command: "cat package.json 2>/dev/null",
+            timeout: 5000,
+        }).catch(() => null),
+        bash(sessionId, {
+            command: 'docker ps --format "{{.Ports}}\t{{.Names}}" 2>/dev/null',
+            timeout: 5000,
+        }).catch(() => null),
+    ]);
+
+    // Collect ports from all sources
+    const portMap = new Map<number, string>();
+
+    const mergeInto = (source: ReadonlyMap<number, string>) => {
+        for (const [port, process] of source) {
+            if (!portMap.has(port)) {
+                portMap.set(port, process);
+            }
+        }
+    };
+
+    // Try lsof first
+    let lsofWorked = false;
+    if (lsofResult?.success && lsofResult.exitCode === 0 && lsofResult.stdout) {
+        const parsed = parseLsofOutput(lsofResult.stdout);
+        if (parsed.size > 0) {
+            mergeInto(parsed);
+            lsofWorked = true;
+        }
+    }
+
+    // Phase 2: if lsof found nothing, try ss then netstat as fallback
+    if (!lsofWorked) {
+        // Try ss (Linux only)
+        const ssResult = await bash(sessionId, {
+            command: "ss -tlnp 2>/dev/null",
+            timeout: 5000,
+        }).catch(() => null);
+
+        if (ssResult?.success && ssResult.exitCode === 0 && ssResult.stdout) {
+            const parsed = parseSsOutput(ssResult.stdout);
+            if (parsed.size > 0) {
+                mergeInto(parsed);
+            } else {
+                // Try netstat as last resort
+                const netstatResult = await bash(sessionId, {
+                    command: "netstat -tlnp 2>/dev/null || netstat -an -p tcp 2>/dev/null",
+                    timeout: 5000,
+                }).catch(() => null);
+
+                if (netstatResult?.success && netstatResult.exitCode === 0 && netstatResult.stdout) {
+                    mergeInto(parseNetstatOutput(netstatResult.stdout));
+                }
+            }
+        }
+    }
+
+    // Merge Docker ports
+    if (dockerResult?.success && dockerResult.exitCode === 0 && dockerResult.stdout) {
+        mergeInto(parseDockerOutput(dockerResult.stdout));
+    }
+
+    // Collect candidate ports for curl probing: package.json ports + common ports not yet confirmed
+    const pkgPorts = pkgResult?.success && pkgResult.stdout
+        ? parsePackageJsonPorts(pkgResult.stdout)
+        : [];
+
+    const candidatesForProbe = new Set<number>();
+    for (const p of pkgPorts) {
+        if (!portMap.has(p)) candidatesForProbe.add(p);
+    }
+    for (const p of COMMON_DEV_PORTS) {
+        if (!portMap.has(p)) candidatesForProbe.add(p);
+    }
+
+    // Phase 3: curl probe unconfirmed candidates (single shell command, parallel)
+    if (candidatesForProbe.size > 0) {
+        // Defense-in-depth: ensure all values are safe integers before shell interpolation
+        const portList = Array.from(candidatesForProbe)
+            .filter((p) => Number.isInteger(p) && p > 0 && p < 65536)
+            .join(" ");
+        const probeResult = await bash(sessionId, {
+            command: `for p in ${portList}; do headers=$(curl -sI --max-time 1 http://localhost:$p 2>/dev/null | head -5) && echo "$p:$headers"; done`,
+            timeout: 15000,
+        }).catch(() => null);
+
+        if (probeResult?.success && probeResult.stdout) {
+            mergeInto(parseCurlProbeOutput(probeResult.stdout));
+        }
+    }
+
+    // Mark package.json ports that were confirmed by probe
+    for (const p of pkgPorts) {
+        if (portMap.has(p)) {
+            const current = portMap.get(p)!;
+            if (current === "http" || current === "unknown") {
+                portMap.set(p, "package.json");
+            }
+        }
+    }
+
+    // Build sorted result: common dev ports first, then by port number
+    return Array.from(portMap.entries())
+        .map(([port, process]) => ({
+            port,
+            process,
+            isCommonDevPort: COMMON_DEV_PORTS.includes(port),
+        }))
+        .sort((a, b) => {
+            if (a.isCommonDevPort !== b.isCommonDevPort) {
+                return a.isCommonDevPort ? -1 : 1;
+            }
+            return a.port - b.port;
+        });
+}

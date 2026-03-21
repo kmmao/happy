@@ -1,8 +1,9 @@
 /**
  * Hook for frontend preview: port detection, screenshot capture, diff comparison.
  *
- * Uses sessionBash to run agent-browser for screenshots and lsof for port detection.
- * Screenshots are saved to .happy-preview/ under the working directory and read back via sessionReadFile as base64.
+ * Uses sessionBash to run agent-browser for screenshots.
+ * Port detection uses multi-strategy fallback (lsof → ss → netstat + docker + curl probe).
+ * Screenshots are saved to happy-preview/ under the working directory and read back via sessionReadFile as base64.
  *
  * Layer 1: Port detection + single screenshot capture
  * Layer 2: Baseline management + before/after diff comparison
@@ -10,18 +11,12 @@
 
 import * as React from "react";
 import { sessionBash, sessionReadFile } from "@/sync/ops";
+import { detectAllPorts, type DetectedPort } from "@/hooks/portDetection";
 
-// Common dev server ports to highlight in detection results
-const COMMON_DEV_PORTS = [3000, 3001, 4173, 5173, 5174, 8000, 8080, 8888];
+export type { DetectedPort } from "@/hooks/portDetection";
 
 // Shell metacharacters that could enable command injection
 const SHELL_UNSAFE_PATTERN = /[;|&`$\\'"()\n\r]/;
-
-export interface DetectedPort {
-  readonly port: number;
-  readonly process: string;
-  readonly isCommonDevPort: boolean;
-}
 
 export interface PreviewScreenshot {
   readonly uri: string;
@@ -99,46 +94,6 @@ function validateUrl(raw: string): string {
 }
 
 /**
- * Parse lsof output to extract listening ports and process names.
- * Only supports lsof format — ss output is not parsed as its format differs.
- */
-function parseLsofOutput(stdout: string): readonly DetectedPort[] {
-  const lines = stdout.trim().split("\n");
-  const portSet = new Map<number, string>();
-
-  for (const line of lines) {
-    if (line.startsWith("COMMAND")) continue;
-
-    const parts = line.split(/\s+/);
-    if (parts.length < 9) continue;
-
-    const command = parts[0];
-    const name = parts[parts.length - 1];
-
-    const portMatch = name.match(/:(\d+)$/);
-    if (portMatch) {
-      const port = parseInt(portMatch[1], 10);
-      if (port > 0 && port < 65536 && !portSet.has(port)) {
-        portSet.set(port, command);
-      }
-    }
-  }
-
-  return Array.from(portSet.entries())
-    .map(([port, process]) => ({
-      port,
-      process,
-      isCommonDevPort: COMMON_DEV_PORTS.includes(port),
-    }))
-    .sort((a, b) => {
-      if (a.isCommonDevPort !== b.isCommonDevPort) {
-        return a.isCommonDevPort ? -1 : 1;
-      }
-      return a.port - b.port;
-    });
-}
-
-/**
  * Build a temp file path under the working directory's .happy-preview/ folder.
  * The working directory is always in the CLI's readFile allowed list.
  * Files are cleaned up immediately after reading.
@@ -213,17 +168,7 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
       return;
     }
 
-    const result = await sessionBash(sessionId, {
-      command: "lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null",
-      timeout: 10000,
-    });
-
-    if (!result.success || result.exitCode !== 0) {
-      setState({ status: "ports-detected", ports: [] });
-      return;
-    }
-
-    const ports = parseLsofOutput(result.stdout ?? "");
+    const ports = await detectAllPorts(sessionId);
     setState({ status: "ports-detected", ports });
   }, [sessionId]);
 
@@ -265,7 +210,7 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
         });
       }
 
-      sessionBash(sessionId, { command: `rm -f "${screenshotPath}"` }).catch(
+      sessionBash(sessionId, { command: `rm -f "$PWD/${screenshotPath}"` }).catch(
         () => {},
       );
     },
@@ -295,7 +240,7 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
       afterState.screenshot !== screenshot
     ) {
       // State changed during baseline save — discard to avoid inconsistency
-      sessionBash(sessionId, { command: `rm -f "${baselinePath}"` }).catch(
+      sessionBash(sessionId, { command: `rm -f "$PWD/${baselinePath}"` }).catch(
         () => {},
       );
       return;
@@ -315,7 +260,7 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
   const clearBaseline = React.useCallback(() => {
     if (sessionId && baselinePathRef.current) {
       sessionBash(sessionId, {
-        command: `rm -f "${baselinePathRef.current}"`,
+        command: `rm -f "$PWD/${baselinePathRef.current}"`,
       }).catch(() => {});
     }
     setBaselineState(null);
@@ -412,7 +357,7 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
 
       // Cleanup temp files
       sessionBash(sessionId, {
-        command: `rm -f "${currentPath}" "${diffPath}"`,
+        command: `rm -f "$PWD/${currentPath}" "$PWD/${diffPath}"`,
       }).catch(() => {});
     },
     [sessionId, baseline],
