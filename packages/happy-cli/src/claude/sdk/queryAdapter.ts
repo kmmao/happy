@@ -97,7 +97,8 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // ── Load user & project settings so custom skills/commands are discovered ──
   // The SDK defaults settingSources to [] which produces --setting-sources "",
   // causing Claude Code to skip loading ~/.claude/commands/ and project commands.
-  result.settingSources = ["user", "project", "local"];
+  // Allow callers to override via opts.settingSources; fall back to full set.
+  result.settingSources = opts.settingSources ?? ["user", "project", "local"];
 
   // ── System prompt mapping ──
   if (opts.customSystemPrompt) {

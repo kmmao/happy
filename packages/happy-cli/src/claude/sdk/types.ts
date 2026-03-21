@@ -85,6 +85,12 @@ export interface QueryOptions {
   toolConfig?: import("@anthropic-ai/claude-agent-sdk").ToolConfig;
   /** Callback for handling MCP elicitation requests (user input from MCP servers) */
   onElicitation?: import("@anthropic-ai/claude-agent-sdk").OnElicitation;
+  /**
+   * Which setting sources to load. Defaults to ['user', 'project', 'local']
+   * so that ~/.claude/commands/ and project commands are discovered.
+   * Set explicitly to override (e.g. ['project'] for project-only settings).
+   */
+  settingSources?: Array<"user" | "project" | "local">;
 }
 
 /** Query prompt — string or async stream of user messages */
