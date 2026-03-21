@@ -28,7 +28,6 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
 import { useMachine } from "@/sync/storage";
 import { isMachineOnline } from "@/utils/machineUtils";
-import { sync } from "@/sync/sync";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { WorktreeInfoSection } from "@/components/WorktreeInfoSection";
 
@@ -279,8 +278,6 @@ function SessionInfoContent({ session }: { session: Session }) {
       throw new HappyError(result.errorMessage, false);
     }
     if (result.type === "success") {
-      // Wait for sessions to refresh so the new encryption key is available
-      await sync.refreshSessions();
       // Same session reconnected — go back to the session view
       router.back();
     }

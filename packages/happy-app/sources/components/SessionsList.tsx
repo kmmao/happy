@@ -47,7 +47,6 @@ import { sessionDelete, machineSpawnNewSession } from "@/sync/ops";
 import { HappyError } from "@/utils/errors";
 import { Modal } from "@/modal";
 import { isMachineOnline } from "@/utils/machineUtils";
-import { sync } from "@/sync/sync";
 import { useIssueSessionBySessionId } from "@/sync/issueSessionStore";
 import {
   ISSUE_STATUS_COLORS,
@@ -615,8 +614,6 @@ const SessionItem = React.memo(
         throw new HappyError(result.errorMessage, false);
       }
       if (result.type === "success") {
-        // Wait for sessions to refresh so the new encryption key is available
-        await sync.refreshSessions();
         navigateToSession(session.id);
       }
     });

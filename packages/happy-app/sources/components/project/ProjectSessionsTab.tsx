@@ -20,7 +20,6 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
 import { useMachine } from "@/sync/storage";
 import { isMachineOnline } from "@/utils/machineUtils";
-import { sync } from "@/sync/sync";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 
 interface ProjectSessionsTabProps {
@@ -111,7 +110,6 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
                 throw new HappyError(result.errorMessage, false);
             }
             if (result.type === "success") {
-                await sync.refreshSessions();
                 navigateToSession(session.id);
             }
         } else {
