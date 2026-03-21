@@ -399,7 +399,7 @@ export const ProjectSessionsTab = React.memo(
                                                 pressed && { opacity: 0.5 },
                                             ]}
                                         >
-                                            <Ionicons name="git-branch-outline" size={14} color="#5856D6" />
+                                            <Ionicons name="git-branch-outline" size={14} color={theme.colors.accentPurple} />
                                             <Text style={styles.archivedHeaderButtonBranchText}>
                                                 {t("projects.clearBranch")}
                                             </Text>
@@ -484,10 +484,10 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
     },
     sessionTagBranchText: {
-        color: "#5856D6",
+        color: theme.colors.accentPurple,
     },
     sessionTagMainText: {
-        color: "#34C759",
+        color: theme.colors.success,
     },
     sessionTagMetaText: {
         fontSize: 10,
@@ -548,7 +548,7 @@ const styles = StyleSheet.create((theme) => ({
     },
     archivedHeaderButtonBranchText: {
         fontSize: 12,
-        color: "#5856D6",
+        color: theme.colors.accentPurple,
         ...Typography.default("semiBold"),
     },
 }));

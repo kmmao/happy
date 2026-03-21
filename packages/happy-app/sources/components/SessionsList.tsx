@@ -186,14 +186,14 @@ const stylesheet = StyleSheet.create((theme) => ({
     backgroundColor: "rgba(88, 86, 214, 0.12)",
   },
   tagBranchText: {
-    color: "#5856D6",
+    color: theme.colors.accentPurple,
     ...Typography.default("semiBold"),
   },
   tagMain: {
     backgroundColor: "rgba(52, 199, 89, 0.12)",
   },
   tagMainText: {
-    color: "#34C759",
+    color: theme.colors.success,
     ...Typography.default("semiBold"),
   },
   issueRow: {
@@ -222,6 +222,7 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   issuePrIcon: {
     marginLeft: 2,
+    color: theme.colors.accentBlue,
   },
   sessionTimestamp: {
     fontSize: 12,
@@ -772,7 +773,7 @@ const SessionItem = React.memo(
                         <Ionicons
                           name="git-pull-request-outline"
                           size={12}
-                          color="#007AFF"
+                          color={styles.issuePrIcon.color}
                         />
                       </Pressable>
                     ) : null}

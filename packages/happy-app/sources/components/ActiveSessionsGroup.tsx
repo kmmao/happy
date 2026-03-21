@@ -247,14 +247,14 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     backgroundColor: "rgba(88, 86, 214, 0.12)",
   },
   tagBranchText: {
-    color: "#5856D6",
+    color: theme.colors.accentPurple,
     ...Typography.default("semiBold"),
   },
   tagMain: {
     backgroundColor: "rgba(52, 199, 89, 0.12)",
   },
   tagMainText: {
-    color: "#34C759",
+    color: theme.colors.success,
     ...Typography.default("semiBold"),
   },
   worktreeBadge: {
@@ -299,6 +299,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   issuePrIcon: {
     marginLeft: 2,
+    color: theme.colors.accentBlue,
   },
 }));
 
@@ -699,7 +700,7 @@ const CompactSessionRow = React.memo(
                         <Ionicons
                           name="git-pull-request-outline"
                           size={12}
-                          color="#007AFF"
+                          color={styles.issuePrIcon.color}
                         />
                       </Pressable>
                     ) : null}

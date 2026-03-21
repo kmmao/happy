@@ -176,14 +176,14 @@ export const SettingsView = React.memo(function SettingsView() {
         <ItemGroup>
           <Item
             title={t("settings.scanQrCodeToAuthenticate")}
-            icon={<Ionicons name="qr-code-outline" size={29} color="#007AFF" />}
+            icon={<Ionicons name="qr-code-outline" size={29} color={theme.colors.accentBlue} />}
             onPress={connectTerminal}
             loading={isLoading}
             showChevron={false}
           />
           <Item
             title={t("connect.enterUrlManually")}
-            icon={<Ionicons name="link-outline" size={29} color="#007AFF" />}
+            icon={<Ionicons name="link-outline" size={29} color={theme.colors.accentBlue} />}
             onPress={async () => {
               const url = await Modal.prompt(
                 t("modals.authenticateTerminal"),
@@ -252,7 +252,7 @@ export const SettingsView = React.memo(function SettingsView() {
                 <Item
                     title={t('navigation.friends')}
                     subtitle={t('friends.manageFriends')}
-                    icon={<Ionicons name="people-outline" size={29} color="#007AFF" />}
+                    icon={<Ionicons name="people-outline" size={29} color={theme.colors.accentBlue} />}
                     onPress={() => router.push('/friends')}
                 />
             </ItemGroup> */}
@@ -312,7 +312,7 @@ export const SettingsView = React.memo(function SettingsView() {
           title={t("settings.account")}
           subtitle={t("settings.accountSubtitle")}
           icon={
-            <Ionicons name="person-circle-outline" size={29} color="#007AFF" />
+            <Ionicons name="person-circle-outline" size={29} color={theme.colors.accentBlue} />
           }
           onPress={() => router.push("/settings/account")}
         />
@@ -320,20 +320,20 @@ export const SettingsView = React.memo(function SettingsView() {
           title={t("settings.appearance")}
           subtitle={t("settings.appearanceSubtitle")}
           icon={
-            <Ionicons name="color-palette-outline" size={29} color="#5856D6" />
+            <Ionicons name="color-palette-outline" size={29} color={theme.colors.accentPurple} />
           }
           onPress={() => router.push("/settings/appearance")}
         />
         <Item
           title={t("settings.voiceAssistant")}
           subtitle={t("settings.voiceAssistantSubtitle")}
-          icon={<Ionicons name="mic-outline" size={29} color="#34C759" />}
+          icon={<Ionicons name="mic-outline" size={29} color={theme.colors.success} />}
           onPress={() => router.push("/settings/voice")}
         />
         <Item
           title={t("settings.featuresTitle")}
           subtitle={t("settings.featuresSubtitle")}
-          icon={<Ionicons name="flask-outline" size={29} color="#FF9500" />}
+          icon={<Ionicons name="flask-outline" size={29} color={theme.colors.accentOrange} />}
           onPress={() => router.push("/settings/features")}
         />
         <Item
@@ -355,7 +355,7 @@ export const SettingsView = React.memo(function SettingsView() {
             title={t("settings.usage")}
             subtitle={t("settings.usageSubtitle")}
             icon={
-              <Ionicons name="analytics-outline" size={29} color="#007AFF" />
+              <Ionicons name="analytics-outline" size={29} color={theme.colors.accentBlue} />
             }
             onPress={() => router.push("/settings/usage")}
           />
@@ -384,7 +384,7 @@ export const SettingsView = React.memo(function SettingsView() {
           <Item
             title={t("settings.developerTools")}
             icon={
-              <Ionicons name="construct-outline" size={29} color="#5856D6" />
+              <Ionicons name="construct-outline" size={29} color={theme.colors.accentPurple} />
             }
             onPress={() => router.push("/dev")}
           />
@@ -396,7 +396,7 @@ export const SettingsView = React.memo(function SettingsView() {
         <Item
           title={t("settings.whatsNew")}
           subtitle={t("settings.whatsNewSubtitle")}
-          icon={<Ionicons name="sparkles-outline" size={29} color="#FF9500" />}
+          icon={<Ionicons name="sparkles-outline" size={29} color={theme.colors.accentOrange} />}
           onPress={() => {
             trackWhatsNewClicked();
             router.push("/changelog");
@@ -409,7 +409,7 @@ export const SettingsView = React.memo(function SettingsView() {
               <Ionicons
                 name="document-text-outline"
                 size={29}
-                color="#007AFF"
+                color={theme.colors.accentBlue}
               />
             }
             onPress={async () => {
