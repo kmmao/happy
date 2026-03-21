@@ -13,6 +13,12 @@ import type { ElicitationRequest, ElicitationResult } from "./sdk/types";
 import type {
   SDKStatusMessage as SDKStatusMsg,
   SDKCompactBoundaryMessage as SDKCompactMsg,
+  SDKTaskStartedMessage,
+  SDKTaskProgressMessage,
+  SDKTaskNotificationMessage,
+  SDKAPIRetryMessage,
+  SDKToolProgressMessage,
+  SDKPromptSuggestionMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
@@ -293,7 +299,7 @@ export async function claudeRemoteLauncher(
               planModeToolCalls.add(c.id! as string);
 
               // Save plan content to file for persistence and App full-screen viewing
-              const planText = (c as any).input?.plan;
+              const planText = (c.input as Record<string, unknown> | undefined)?.plan as string | undefined;
               if (planText && session.sessionId) {
                 const plansDir = join(getProjectPath(session.path), "plans");
                 const planPath = join(plansDir, `${session.sessionId}.md`);
@@ -377,9 +383,9 @@ export async function claudeRemoteLauncher(
     // Forward Task messages to session protocol
     if (
       message.type === "system" &&
-      (message as any).subtype === "task_started"
+      (message as SDKTaskStartedMessage).subtype === "task_started"
     ) {
-      const m = message as any; // SDKTaskStartedMessage
+      const m = message as SDKTaskStartedMessage;
       const envelope = createEnvelope("agent", {
         t: "task-start",
         taskId: m.task_id,
@@ -393,9 +399,9 @@ export async function claudeRemoteLauncher(
     // Forward Task progress to session protocol
     if (
       message.type === "system" &&
-      (message as any).subtype === "task_progress"
+      (message as SDKTaskProgressMessage).subtype === "task_progress"
     ) {
-      const m = message as any; // SDKTaskProgressMessage
+      const m = message as SDKTaskProgressMessage;
       const envelope = createEnvelope("agent", {
         t: "task-progress",
         taskId: m.task_id,
@@ -413,9 +419,9 @@ export async function claudeRemoteLauncher(
     // Forward Task notification to session protocol
     if (
       message.type === "system" &&
-      (message as any).subtype === "task_notification"
+      (message as SDKTaskNotificationMessage).subtype === "task_notification"
     ) {
-      const m = message as any; // SDKTaskNotificationMessage
+      const m = message as SDKTaskNotificationMessage;
       const envelope = createEnvelope("agent", {
         t: "task-end",
         taskId: m.task_id,
@@ -435,9 +441,9 @@ export async function claudeRemoteLauncher(
     // Forward API retry status via keep-alive ephemeral channel
     if (
       message.type === "system" &&
-      (message as any).subtype === "api_retry"
+      (message as SDKAPIRetryMessage).subtype === "api_retry"
     ) {
-      const m = message as any;
+      const m = message as SDKAPIRetryMessage;
       session.client.keepAlive(true, "remote", true, {
         attempt: m.attempt,
         maxRetries: m.max_retries,
@@ -448,7 +454,7 @@ export async function claudeRemoteLauncher(
 
     // Forward Tool progress to session protocol
     if (message.type === "tool_progress") {
-      const m = message as any; // SDKToolProgressMessage
+      const m = message as SDKToolProgressMessage;
       const envelope = createEnvelope("agent", {
         t: "tool-progress",
         toolUseId: m.tool_use_id,
@@ -461,7 +467,7 @@ export async function claudeRemoteLauncher(
 
     // Forward prompt suggestion to session protocol
     if (message.type === "prompt_suggestion") {
-      const suggestion = (message as any).suggestion as string;
+      const suggestion = (message as SDKPromptSuggestionMessage).suggestion;
       if (suggestion) {
         const envelope = createEnvelope("agent", {
           t: "prompt-suggestion",
@@ -597,11 +603,11 @@ export async function claudeRemoteLauncher(
             c.type === "tool_use" &&
             (c.name === "Task" || c.name === "Agent") &&
             c.input &&
-            typeof (c.input as any).prompt === "string"
+            typeof (c.input as Record<string, unknown>).prompt === "string"
           ) {
             const logMessage2 = sdkToLogConverter.convertSidechainUserMessage(
               c.id!,
-              (c.input as any).prompt,
+              (c.input as Record<string, unknown>).prompt as string,
             );
             if (logMessage2) {
               messageQueue.enqueue(logMessage2);
