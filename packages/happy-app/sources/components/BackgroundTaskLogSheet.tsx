@@ -32,6 +32,7 @@ type Props = {
     readonly task: BackgroundTask | null;
     readonly onClose: () => void;
     readonly onStop?: (task: BackgroundTask) => void;
+    readonly onPreview?: (url: string) => void;
 };
 
 function statusColor(status: BackgroundTask["status"]): string {
@@ -45,7 +46,7 @@ function statusColor(status: BackgroundTask["status"]): string {
     }
 }
 
-function BackgroundTaskLogSheetInner({ sessionId, task, onClose, onStop }: Props) {
+function BackgroundTaskLogSheetInner({ sessionId, task, onClose, onStop, onPreview }: Props) {
     const { theme } = useUnistyles();
     const scrollRef = React.useRef<ScrollView>(null);
 
@@ -127,6 +128,21 @@ function BackgroundTaskLogSheetInner({ sessionId, task, onClose, onStop }: Props
                         </View>
                     </View>
                     <View style={styles.headerActions}>
+                        {onPreview && category === "server" && port && task.status === "running" && (
+                            <Pressable
+                                onPress={() => {
+                                    onClose();
+                                    onPreview(`http://localhost:${port}`);
+                                }}
+                                hitSlop={10}
+                            >
+                                <Ionicons
+                                    name="eye-outline"
+                                    size={20}
+                                    color={theme.colors.textLink}
+                                />
+                            </Pressable>
+                        )}
                         {task.status === "running" && onStop && (
                             <Pressable onPress={() => onStop(task)} hitSlop={10}>
                                 <Ionicons

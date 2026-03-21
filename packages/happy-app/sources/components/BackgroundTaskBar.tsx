@@ -18,13 +18,14 @@ import {
     categoryIcon,
     categoryColor,
     buildSmartLabel,
+    extractPort,
 } from "@/utils/commandAnalysis";
 
 type Props = {
     readonly tasks: readonly BackgroundTask[];
     readonly onViewLog: (task: BackgroundTask) => void;
-    readonly onStopTask?: (task: BackgroundTask) => void;
-    readonly onDismiss?: (taskId: string) => void;
+    readonly onClose: (task: BackgroundTask) => void;
+    readonly onPreview?: (url: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -63,13 +64,13 @@ function statusInfo(status: BackgroundTask["status"]): { color: string; label: s
 function TaskItem({
     task,
     onPress,
-    onLongPress,
-    onDismiss,
+    onClose,
+    onPreview,
 }: {
     readonly task: BackgroundTask;
     readonly onPress: () => void;
-    readonly onLongPress?: () => void;
-    readonly onDismiss?: () => void;
+    readonly onClose: () => void;
+    readonly onPreview?: () => void;
 }) {
     const { theme } = useUnistyles();
     const [elapsed, setElapsed] = React.useState(() => formatElapsed(task.startedAt));
@@ -86,14 +87,11 @@ function TaskItem({
     const label = buildSmartLabel(task.command);
     const icon = categoryIcon[category];
     const iconColor = categoryColor[category];
-    const showDismiss = task.status !== "running" && onDismiss;
     const status = statusInfo(task.status);
 
     return (
         <Pressable
             onPress={onPress}
-            onLongPress={onLongPress}
-            delayLongPress={500}
             style={[styles.taskItem, { backgroundColor: `${iconColor}15` }]}
         >
             <Ionicons name={icon} size={14} color={iconColor} />
@@ -109,23 +107,33 @@ function TaskItem({
             <Text style={[styles.taskElapsed, { color: theme.colors.textSecondary }]}>
                 {elapsed}
             </Text>
-            {showDismiss && (
+            {onPreview && (
                 <Pressable
                     onPress={(e) => {
                         e.stopPropagation();
-                        onDismiss();
+                        onPreview();
                     }}
                     hitSlop={8}
-                    style={styles.dismissButton}
+                    style={styles.previewButton}
                 >
-                    <Ionicons name="close" size={12} color={theme.colors.textSecondary} />
+                    <Ionicons name="eye-outline" size={14} color={theme.colors.textLink} />
                 </Pressable>
             )}
+            <Pressable
+                onPress={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                }}
+                hitSlop={8}
+                style={styles.dismissButton}
+            >
+                <Ionicons name="close" size={12} color={theme.colors.textSecondary} />
+            </Pressable>
         </Pressable>
     );
 }
 
-function BackgroundTaskBarInner({ tasks, onViewLog, onStopTask, onDismiss }: Props) {
+function BackgroundTaskBarInner({ tasks, onViewLog, onClose, onPreview }: Props) {
     if (tasks.length === 0) return null;
 
     return (
@@ -135,23 +143,23 @@ function BackgroundTaskBarInner({ tasks, onViewLog, onStopTask, onDismiss }: Pro
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-                {tasks.map((task) => (
-                    <TaskItem
-                        key={task.taskId}
-                        task={task}
-                        onPress={() => onViewLog(task)}
-                        onLongPress={
-                            onStopTask && task.status === "running"
-                                ? () => onStopTask(task)
-                                : undefined
-                        }
-                        onDismiss={
-                            onDismiss
-                                ? () => onDismiss(task.taskId)
-                                : undefined
-                        }
-                    />
-                ))}
+                {tasks.map((task) => {
+                    const port = extractPort(task.command);
+                    const isServer = detectCategory(task.command) === "server";
+                    return (
+                        <TaskItem
+                            key={task.taskId}
+                            task={task}
+                            onPress={() => onViewLog(task)}
+                            onClose={() => onClose(task)}
+                            onPreview={
+                                onPreview && isServer && port && task.status === "running"
+                                    ? () => onPreview(`http://localhost:${port}`)
+                                    : undefined
+                            }
+                        />
+                    );
+                })}
             </ScrollView>
         </View>
     );
@@ -188,6 +196,10 @@ const styles = StyleSheet.create(() => ({
     taskElapsed: {
         fontSize: 11,
         opacity: 0.6,
+    },
+    previewButton: {
+        marginLeft: 2,
+        padding: 2,
     },
     dismissButton: {
         marginLeft: 2,

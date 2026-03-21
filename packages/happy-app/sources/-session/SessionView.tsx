@@ -338,29 +338,41 @@ function SessionViewInner({
   const { tasks: backgroundTasks, dismissTask: dismissBackgroundTask } = useBackgroundTasks(messages);
   const [viewingTask, setViewingTask] = React.useState<BackgroundTask | null>(null);
 
-  const handleStopTask = React.useCallback(
+  const handleCloseTask = React.useCallback(
     async (task: BackgroundTask) => {
-      const confirmed = await Modal.confirm(
-        t("backgroundTasks.stopConfirmTitle"),
-        t("backgroundTasks.stopConfirmMessage"),
-        { destructive: true, confirmText: t("backgroundTasks.stop") },
-      );
-      if (!confirmed) return;
+      if (task.status === "running") {
+        const confirmed = await Modal.confirm(
+          t("backgroundTasks.stopConfirmTitle"),
+          t("backgroundTasks.stopConfirmMessage"),
+          { destructive: true, confirmText: t("backgroundTasks.stop") },
+        );
+        if (!confirmed) return;
 
-      try {
-        // Use the task output file to find the PID — the process writing to it
-        await sessionBash(sessionId, {
-          command: `PID=$(lsof -t "${task.outputFile}" 2>/dev/null | head -1) && [ -n "$PID" ] && kill "$PID" 2>/dev/null || true`,
-        });
-      } catch {
-        // Best effort — task may have already exited
+        try {
+          const portMatch = task.command.match(/(\d{2,5})/);
+          const port = portMatch?.[1];
+          const cmd = port
+            ? `lsof -ti :${port} | xargs kill 2>/dev/null || true`
+            : `pkill -f ${JSON.stringify(task.command.slice(0, 60))} 2>/dev/null || true`;
+          await sessionBash(sessionId, { command: cmd });
+        } catch {
+          // Best effort — task may have already exited
+        }
       }
+      dismissBackgroundTask(task.taskId);
       if (viewingTask?.taskId === task.taskId) {
         setViewingTask(null);
       }
     },
-    [sessionId, viewingTask],
+    [sessionId, viewingTask, dismissBackgroundTask],
   );
+  const handlePreview = React.useCallback(
+    (url: string) => {
+      router.push(`/session/${sessionId}/preview?url=${encodeURIComponent(url)}`);
+    },
+    [router, sessionId],
+  );
+
   const { issueLink, issueBody } = useSessionIssueInfo(sessionId);
   const acknowledgedCliVersions = useLocalSetting("acknowledgedCliVersions");
 
@@ -833,14 +845,15 @@ function SessionViewInner({
       <BackgroundTaskBar
         tasks={backgroundTasks}
         onViewLog={setViewingTask}
-        onStopTask={handleStopTask}
-        onDismiss={dismissBackgroundTask}
+        onClose={handleCloseTask}
+        onPreview={handlePreview}
       />
       <BackgroundTaskLogSheet
         sessionId={sessionId}
         task={viewingTask}
         onClose={() => setViewingTask(null)}
-        onStop={handleStopTask}
+        onStop={handleCloseTask}
+        onPreview={handlePreview}
       />
       <AgentInput
         placeholder={t("session.inputPlaceholder")}

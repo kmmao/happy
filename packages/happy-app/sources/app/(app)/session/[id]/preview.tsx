@@ -30,7 +30,10 @@ import { layout } from "@/components/layout";
 type DiffTab = "before" | "after" | "diff";
 
 export default React.memo(function PreviewPage() {
-  const { id: sessionId } = useLocalSearchParams<{ id: string }>();
+  const { id: sessionId, url: initialUrl } = useLocalSearchParams<{
+    id: string;
+    url?: string;
+  }>();
   const {
     state,
     baseline,
@@ -41,8 +44,9 @@ export default React.memo(function PreviewPage() {
     compareWithBaseline,
   } = usePreview(sessionId);
   const { theme } = useUnistyles();
-  const [customUrl, setCustomUrl] = React.useState("");
+  const [customUrl, setCustomUrl] = React.useState(initialUrl ?? "");
   const [diffTab, setDiffTab] = React.useState<DiffTab>("after");
+  const autoCapturedRef = React.useRef(false);
 
   // Auto-detect ports on mount
   React.useEffect(() => {
@@ -50,6 +54,18 @@ export default React.memo(function PreviewPage() {
       detectPorts();
     }
   }, [sessionId, detectPorts]);
+
+  // Auto-capture when URL param is provided and ports are detected
+  React.useEffect(() => {
+    if (
+      initialUrl &&
+      !autoCapturedRef.current &&
+      (state.status === "ports-detected" || state.status === "captured" || state.status === "error")
+    ) {
+      autoCapturedRef.current = true;
+      captureScreenshot(initialUrl);
+    }
+  }, [initialUrl, state.status, captureScreenshot]);
 
   const handlePortPress = React.useCallback(
     (port: DetectedPort) => {
