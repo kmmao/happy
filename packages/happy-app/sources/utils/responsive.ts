@@ -61,20 +61,26 @@ export function useDeviceType(): "phone" | "tablet" {
   const screenDimensions = Dimensions.get("screen");
 
   return useMemo(() => {
+    // On web, use max(width, height) for height to prevent keyboard-shrunk
+    // viewport from reducing diagonalInches below the tablet threshold.
+    const stableHeight =
+      Platform.OS === "web" ? Math.max(width, height) : height;
     const dimensions = calculateDeviceDimensions({
       widthPoints: width,
-      heightPoints: height,
+      heightPoints: stableHeight,
       pointsPerInch: Platform.OS === "ios" ? 163 : 160,
     });
 
-    // On web, use window dimensions for minWidth since screen dimensions
-    // represent the physical display and don't change on resize/split-screen.
+    // On web, use the viewport WIDTH for the foldable min-width check.
+    // Math.min(width, height) is wrong because virtual keyboards shrink height,
+    // making min fall below the foldable threshold and flipping tablet→phone.
+    // Width alone is stable — keyboards don't change viewport width.
     // On native Android, use screen dimensions to avoid keyboard-triggered flipping.
     const minWidthPoints =
       Platform.OS === "ios"
         ? undefined
         : Platform.OS === "web"
-          ? Math.min(width, height)
+          ? width
           : Math.min(screenDimensions.width, screenDimensions.height);
 
     return determineDeviceType({
