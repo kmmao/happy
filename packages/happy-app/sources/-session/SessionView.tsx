@@ -819,12 +819,14 @@ function SessionViewInner({
         }
         availableModels={availableModels}
         onModelModeChange={updateModelMode}
-        thinkingMode={session.thinkingMode}
-        effortLevel={session.effortLevel}
-        maxBudgetUsd={session.maxBudgetUsd}
-        onThinkingModeChange={updateThinkingMode}
-        onEffortLevelChange={updateEffortLevel}
-        onMaxBudgetUsdChange={updateMaxBudgetUsd}
+        reasoning={{
+          thinkingMode: session.thinkingMode,
+          effortLevel: session.effortLevel,
+          maxBudgetUsd: session.maxBudgetUsd,
+          onThinkingModeChange: updateThinkingMode,
+          onEffortLevelChange: updateEffortLevel,
+          onMaxBudgetUsdChange: updateMaxBudgetUsd,
+        }}
         metadata={session.metadata}
         connectionStatus={{
           text: sessionStatus.statusText,
@@ -887,9 +889,11 @@ function SessionViewInner({
         }}
         onMicPress={micButtonState.onMicPress}
         isMicActive={micButtonState.isMicActive}
-        onSttPress={onSttToggle}
-        isSttListening={stt.isListening}
-        isSttCorrecting={isSttCorrecting}
+        stt={{
+          onSttPress: onSttToggle,
+          isSttListening: stt.isListening,
+          isSttCorrecting: isSttCorrecting,
+        }}
         onAbort={() => sessionInterrupt(sessionId)}
         showAbortButton={
           sessionStatus.state === "thinking" ||
@@ -928,20 +932,24 @@ function SessionViewInner({
         }
         alwaysShowContextSize={alwaysShowContextSize}
         currentModelCode={effectiveModelCode}
-        onImagePaste={handleImagePaste}
-        onImagePickPress={doPickImage}
-        isPickingImage={isPickingImage || isProcessingImage}
-        imagePaths={pendingImagePaths}
-        imageUris={pendingImageUris}
-        onImageRemove={removeImageByPath}
+        images={{
+          onImagePaste: handleImagePaste,
+          onImagePickPress: doPickImage,
+          isPickingImage: isPickingImage || isProcessingImage,
+          imagePaths: pendingImagePaths,
+          imageUris: pendingImageUris,
+          onImageRemove: removeImageByPath,
+        }}
         onShellCommand={(command) => {
           sync.sendMessage(sessionId, `$ ${command}`);
         }}
         packageScripts={session.metadata?.packageScripts}
-        onSlashCommandPress={() => setShowCommandList(true)}
-        showCommandList={showCommandList}
-        onCommandSelect={handleCommandSelect}
-        onCommandListClose={() => setShowCommandList(false)}
+        commands={{
+          onSlashCommandPress: () => setShowCommandList(true),
+          showCommandList,
+          onCommandSelect: handleCommandSelect,
+          onCommandListClose: () => setShowCommandList(false),
+        }}
         promptSuggestion={promptSuggestion}
         onPromptSuggestionPress={(text) => {
           storage.getState().setPromptSuggestion(sessionId, null);

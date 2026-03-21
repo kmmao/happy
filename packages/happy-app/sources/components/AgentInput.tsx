@@ -57,6 +57,42 @@ import { SttWaveIndicator } from "./SttWaveIndicator";
 import { SttProgressLine } from "./SttProgressLine";
 import { GitBrowseTab } from "./git/GitBrowseTab";
 
+/** SDK reasoning & budget settings */
+interface ReasoningProps {
+  thinkingMode?: string | null;
+  effortLevel?: string | null;
+  maxBudgetUsd?: number | null;
+  onThinkingModeChange?: (mode: string) => void;
+  onEffortLevelChange?: (level: string) => void;
+  onMaxBudgetUsdChange?: (budget: number | null) => void;
+}
+
+/** Speech-to-text state */
+interface SttProps {
+  onSttPress?: () => void;
+  isSttListening?: boolean;
+  isSttCorrecting?: boolean;
+}
+
+/** Image attachment handling */
+interface ImageProps {
+  onImagePaste?: (blob: Blob) => void;
+  onImagePickPress?: () => void;
+  isPickingImage?: boolean;
+  imagePaths?: string[];
+  /** Displayable URIs parallel to imagePaths — used to render thumbnails */
+  imageUris?: string[];
+  onImageRemove?: (path: string) => void;
+}
+
+/** Slash command list state */
+interface CommandProps {
+  onSlashCommandPress?: () => void;
+  showCommandList?: boolean;
+  onCommandSelect?: (command: string) => void;
+  onCommandListClose?: () => void;
+}
+
 interface AgentInputProps {
   value: string;
   placeholder: string;
@@ -66,9 +102,7 @@ interface AgentInputProps {
   sendIcon?: React.ReactNode;
   onMicPress?: () => void;
   isMicActive?: boolean;
-  onSttPress?: () => void;
-  isSttListening?: boolean;
-  isSttCorrecting?: boolean;
+  stt?: SttProps;
   permissionMode?: PermissionMode | null;
   availableModes?: PermissionMode[];
   onPermissionModeChange?: (mode: PermissionMode) => void;
@@ -76,13 +110,7 @@ interface AgentInputProps {
   effectiveModelLabel?: string | null;
   availableModels?: ModelMode[];
   onModelModeChange?: (mode: ModelMode) => void;
-  // SDK reasoning & budget settings
-  thinkingMode?: string | null;
-  effortLevel?: string | null;
-  maxBudgetUsd?: number | null;
-  onThinkingModeChange?: (mode: string) => void;
-  onEffortLevelChange?: (level: string) => void;
-  onMaxBudgetUsdChange?: (budget: number | null) => void;
+  reasoning?: ReasoningProps;
   metadata?: Metadata | null;
   onAbort?: () => void | Promise<void>;
   showAbortButton?: boolean;
@@ -126,17 +154,8 @@ interface AgentInputProps {
   minHeight?: number;
   profileId?: string | null;
   onProfileClick?: () => void;
-  onSlashCommandPress?: () => void;
-  showCommandList?: boolean;
-  onCommandSelect?: (command: string) => void;
-  onCommandListClose?: () => void;
-  onImagePaste?: (blob: Blob) => void;
-  onImagePickPress?: () => void;
-  isPickingImage?: boolean;
-  imagePaths?: string[];
-  /** Displayable URIs parallel to imagePaths — used to render thumbnails */
-  imageUris?: string[];
-  onImageRemove?: (path: string) => void;
+  commands?: CommandProps;
+  images?: ImageProps;
   onShellCommand?: (command: string) => void;
   packageScripts?: Record<string, string>;
   promptSuggestion?: string | null;
@@ -506,7 +525,7 @@ export const AgentInput = React.memo(
     const screenWidth = useWindowDimensions().width;
 
     const hasText = props.value.trim().length > 0;
-    const hasImages = (props.imagePaths?.length ?? 0) > 0;
+    const hasImages = (props.images?.imagePaths?.length ?? 0) > 0;
     const canSend = hasText || hasImages;
 
     // Lightbox state for full-screen image preview
@@ -1124,7 +1143,7 @@ export const AgentInput = React.memo(
                   {/* Effort Level Section (only for Claude) */}
                   {!isCodex &&
                     !isGemini &&
-                    props.onEffortLevelChange &&
+                    props.reasoning?.onEffortLevelChange &&
                     (() => {
                       const currentModelInfo = props.metadata?.models?.find(
                         (m) => m.code === props.modelMode?.key,
@@ -1192,15 +1211,15 @@ export const AgentInput = React.memo(
                             return levels;
                           })().map((level) => {
                             const isSelected =
-                              props.effortLevel === level.key ||
-                              (!props.effortLevel && level.key === "medium");
+                              props.reasoning?.effortLevel === level.key ||
+                              (!props.reasoning?.effortLevel && level.key === "medium");
 
                             return (
                               <Pressable
                                 key={level.key}
                                 onPress={() => {
                                   hapticsLight();
-                                  props.onEffortLevelChange?.(level.key);
+                                  props.reasoning?.onEffortLevelChange?.(level.key);
                                 }}
                                 style={({ pressed }) => ({
                                   flexDirection: "row",
@@ -1269,7 +1288,7 @@ export const AgentInput = React.memo(
                     )}
 
                   {/* Thinking Mode Section (only for Claude) */}
-                  {!isCodex && !isGemini && props.onThinkingModeChange && (
+                  {!isCodex && !isGemini && props.reasoning?.onThinkingModeChange && (
                     <>
                       <View
                         style={{
@@ -1323,15 +1342,15 @@ export const AgentInput = React.memo(
                             : allModes;
                         })().map((mode) => {
                           const isSelected =
-                            props.thinkingMode === mode.key ||
-                            (!props.thinkingMode && mode.key === "adaptive");
+                            props.reasoning?.thinkingMode === mode.key ||
+                            (!props.reasoning?.thinkingMode && mode.key === "adaptive");
 
                           return (
                             <Pressable
                               key={mode.key}
                               onPress={() => {
                                 hapticsLight();
-                                props.onThinkingModeChange?.(mode.key);
+                                props.reasoning?.onThinkingModeChange?.(mode.key);
                               }}
                               style={({ pressed }) => ({
                                 flexDirection: "row",
@@ -1404,10 +1423,10 @@ export const AgentInput = React.memo(
           )}
 
           {/* Slash Command List - toggled by slash command button */}
-          {props.showCommandList && (
+          {props.commands?.showCommandList && (
             <>
               <TouchableWithoutFeedback
-                onPress={() => props.onCommandListClose?.()}
+                onPress={() => props.commands?.onCommandListClose?.()}
               >
                 <View style={styles.overlayBackdrop} />
               </TouchableWithoutFeedback>
@@ -1424,8 +1443,8 @@ export const AgentInput = React.memo(
                   <CommandListPopover
                     visible={true}
                     sessionId={props.sessionId ?? ""}
-                    onCommandSelect={(cmd) => props.onCommandSelect?.(cmd)}
-                    onClose={() => props.onCommandListClose?.()}
+                    onCommandSelect={(cmd) => props.commands?.onCommandSelect?.(cmd)}
+                    onClose={() => props.commands?.onCommandListClose?.()}
                     inline
                   />
                 </FloatingOverlay>
@@ -1712,16 +1731,16 @@ export const AgentInput = React.memo(
                       props.effectiveModelLabel ?? props.modelMode.name,
                       ...(!isCodex && !isGemini
                         ? [
-                            (props.effortLevel ?? "medium") === "low"
+                            (props.reasoning?.effortLevel ?? "medium") === "low"
                               ? t("agentInput.effort.low")
-                              : (props.effortLevel ?? "medium") === "high"
+                              : (props.reasoning?.effortLevel ?? "medium") === "high"
                                 ? t("agentInput.effort.high")
-                                : (props.effortLevel ?? "medium") === "max"
+                                : (props.reasoning?.effortLevel ?? "medium") === "max"
                                   ? t("agentInput.effort.max")
                                   : t("agentInput.effort.medium"),
-                            (props.thinkingMode ?? "adaptive") === "enabled"
+                            (props.reasoning?.thinkingMode ?? "adaptive") === "enabled"
                               ? t("agentInput.thinking.enabled")
-                              : (props.thinkingMode ?? "adaptive") ===
+                              : (props.reasoning?.thinkingMode ?? "adaptive") ===
                                   "disabled"
                                 ? t("agentInput.thinking.disabled")
                                 : t("agentInput.thinking.adaptive"),
@@ -1848,8 +1867,8 @@ export const AgentInput = React.memo(
                   gap: 8,
                 }}
               >
-                {(props.imagePaths ?? []).map((path, index) => {
-                  const uri = props.imageUris?.[index];
+                {(props.images?.imagePaths ?? []).map((path, index) => {
+                  const uri = props.images?.imageUris?.[index];
                   return (
                     <View
                       key={path}
@@ -1887,7 +1906,7 @@ export const AgentInput = React.memo(
                         <View
                           style={{
                             paddingLeft: 8,
-                            paddingRight: props.onImageRemove ? 2 : 8,
+                            paddingRight: props.images?.onImageRemove ? 2 : 8,
                             paddingVertical: 6,
                             flexDirection: "row",
                             alignItems: "center",
@@ -1918,17 +1937,17 @@ export const AgentInput = React.memo(
                             }}
                             numberOfLines={1}
                           >
-                            {(props.imagePaths ?? []).length === 1
+                            {(props.images?.imagePaths ?? []).length === 1
                               ? t("session.imageAttached")
                               : t("session.imageLabel", { index: index + 1 })}
                           </Text>
                         </View>
                       )}
-                      {props.onImageRemove && (
+                      {props.images?.onImageRemove && (
                         <Pressable
                           onPress={() => {
                             hapticsLight();
-                            props.onImageRemove?.(path);
+                            props.images?.onImageRemove?.(path);
                           }}
                           hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                           style={({ pressed }) => ({
@@ -1994,7 +2013,7 @@ export const AgentInput = React.memo(
                     key={cmd}
                     onPress={() => {
                       hapticsLight();
-                      props.onCommandSelect?.(cmd);
+                      props.commands?.onCommandSelect?.(cmd);
                     }}
                     style={({ pressed }) => ({
                       borderRadius: 16,
@@ -2147,7 +2166,7 @@ export const AgentInput = React.memo(
                 onKeyPress={handleKeyPress}
                 onStateChange={handleInputStateChange}
                 maxHeight={120}
-                onImagePaste={props.onImagePaste}
+                onImagePaste={props.images?.onImagePaste}
               />
             </View>
 
@@ -2355,11 +2374,11 @@ export const AgentInput = React.memo(
                     )}
 
                     {/* Slash command button */}
-                    {props.onSlashCommandPress && (
+                    {props.commands?.onSlashCommandPress && (
                       <Pressable
                         onPress={() => {
                           hapticsLight();
-                          props.onSlashCommandPress?.();
+                          props.commands?.onSlashCommandPress?.();
                         }}
                         hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                         style={(p) => ({
@@ -2465,20 +2484,20 @@ export const AgentInput = React.memo(
                     )}
 
                     {/* Image pick button */}
-                    {props.onImagePickPress && (
+                    {props.images?.onImagePickPress && (
                       <ImagePickButton
-                        onPress={props.onImagePickPress}
-                        isPickingImage={props.isPickingImage}
-                        imagePaths={props.imagePaths}
+                        onPress={props.images?.onImagePickPress}
+                        isPickingImage={props.images?.isPickingImage}
+                        imagePaths={props.images?.imagePaths}
                       />
                     )}
 
                     {/* STT (Speech-to-Text) button */}
-                    {props.onSttPress && (
+                    {props.stt?.onSttPress && (
                       <Pressable
                         onPress={() => {
                           hapticsLight();
-                          props.onSttPress?.();
+                          props.stt?.onSttPress?.();
                         }}
                         hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                         style={(p) => ({
@@ -2493,12 +2512,12 @@ export const AgentInput = React.memo(
                           justifyContent: "center",
                           height: 32,
                           opacity: p.pressed ? 0.7 : 1,
-                          backgroundColor: props.isSttListening
+                          backgroundColor: props.stt?.isSttListening
                             ? "#FF3B30"
                             : undefined,
                         })}
                       >
-                        {props.isSttListening ? (
+                        {props.stt?.isSttListening ? (
                           <SttWaveIndicator />
                         ) : (
                           <Ionicons
@@ -2593,7 +2612,7 @@ export const AgentInput = React.memo(
               </View>
             </View>
             {/* STT progress shimmer — absolutely pinned to bottom edge of panel */}
-            {(props.isSttListening || props.isSttCorrecting) && (
+            {(props.stt?.isSttListening || props.stt?.isSttCorrecting) && (
               <View
                 style={{
                   position: "absolute",
@@ -2603,9 +2622,9 @@ export const AgentInput = React.memo(
                 }}
               >
                 <SttProgressLine
-                  active={!!props.isSttListening || !!props.isSttCorrecting}
+                  active={!!props.stt?.isSttListening || !!props.stt?.isSttCorrecting}
                   value={props.value}
-                  correcting={!!props.isSttCorrecting}
+                  correcting={!!props.stt?.isSttCorrecting}
                 />
               </View>
             )}

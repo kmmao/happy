@@ -1777,10 +1777,12 @@ function NewSessionWizard() {
                 modelMode={modelMode}
                 availableModels={availableModels}
                 onModelModeChange={handleModelModeChange}
-                thinkingMode={thinkingMode}
-                onThinkingModeChange={handleThinkingModeChange}
-                effortLevel={effortLevel}
-                onEffortLevelChange={handleEffortLevelChange}
+                reasoning={{
+                  thinkingMode,
+                  onThinkingModeChange: handleThinkingModeChange,
+                  effortLevel,
+                  onEffortLevelChange: handleEffortLevelChange,
+                }}
                 connectionStatus={connectionStatus}
                 machineName={
                   selectedMachine?.metadata?.displayName ||
@@ -1789,25 +1791,30 @@ function NewSessionWizard() {
                 onMachineClick={handleMachineClick}
                 currentPath={selectedPath}
                 onPathClick={handlePathClick}
-                onSlashCommandPress={() => setShowCommandList(true)}
-                showCommandList={showCommandList}
-                onCommandSelect={handleCommandSelect}
-                onCommandListClose={() => setShowCommandList(false)}
-                onSttPress={onSttToggle}
-                isSttListening={stt.isListening}
-                isSttCorrecting={isSttCorrecting}
-                onImagePaste={handleNewSessionImagePaste}
-                onImagePickPress={doPickImage}
-                isPickingImage={isPickingImage}
-                imagePaths={pendingImages.map((img) => img.id)}
-                imageUris={pendingImages.map(
-                  (img) => `data:image/jpeg;base64,${img.base64}`,
-                )}
-                onImageRemove={(id) =>
-                  setPendingImages((prev) =>
-                    prev.filter((img) => img.id !== id),
-                  )
-                }
+                commands={{
+                  onSlashCommandPress: () => setShowCommandList(true),
+                  showCommandList,
+                  onCommandSelect: handleCommandSelect,
+                  onCommandListClose: () => setShowCommandList(false),
+                }}
+                stt={{
+                  onSttPress: onSttToggle,
+                  isSttListening: stt.isListening,
+                  isSttCorrecting: isSttCorrecting,
+                }}
+                images={{
+                  onImagePaste: handleNewSessionImagePaste,
+                  onImagePickPress: doPickImage,
+                  isPickingImage,
+                  imagePaths: pendingImages.map((img) => img.id),
+                  imageUris: pendingImages.map(
+                    (img) => `data:image/jpeg;base64,${img.base64}`,
+                  ),
+                  onImageRemove: (id) =>
+                    setPendingImages((prev) =>
+                      prev.filter((img) => img.id !== id),
+                    ),
+                }}
               />
             </View>
           </View>
@@ -3184,10 +3191,12 @@ function NewSessionWizard() {
               modelMode={modelMode}
               availableModels={availableModels}
               onModelModeChange={handleModelModeChange}
-              thinkingMode={thinkingMode}
-              onThinkingModeChange={handleThinkingModeChange}
-              effortLevel={effortLevel}
-              onEffortLevelChange={handleEffortLevelChange}
+              reasoning={{
+                thinkingMode,
+                onThinkingModeChange: handleThinkingModeChange,
+                effortLevel,
+                onEffortLevelChange: handleEffortLevelChange,
+              }}
               connectionStatus={connectionStatus}
               machineName={
                 selectedMachine?.metadata?.displayName ||
@@ -3198,22 +3207,27 @@ function NewSessionWizard() {
               onPathClick={handleAgentInputPathClick}
               profileId={selectedProfileId}
               onProfileClick={handleAgentInputProfileClick}
-              onSlashCommandPress={() => setShowCommandList(true)}
-              showCommandList={showCommandList}
-              onCommandSelect={handleCommandSelect}
-              onCommandListClose={() => setShowCommandList(false)}
-              onSttPress={onSttToggle}
-              isSttListening={stt.isListening}
-              onImagePaste={handleNewSessionImagePaste}
-              onImagePickPress={doPickImage}
-              isPickingImage={isPickingImage}
-              imagePaths={pendingImages.map((img) => img.id)}
-              imageUris={pendingImages.map(
-                (img) => `data:image/jpeg;base64,${img.base64}`,
-              )}
-              onImageRemove={(id) =>
-                setPendingImages((prev) => prev.filter((img) => img.id !== id))
-              }
+              commands={{
+                onSlashCommandPress: () => setShowCommandList(true),
+                showCommandList,
+                onCommandSelect: handleCommandSelect,
+                onCommandListClose: () => setShowCommandList(false),
+              }}
+              stt={{
+                onSttPress: onSttToggle,
+                isSttListening: stt.isListening,
+              }}
+              images={{
+                onImagePaste: handleNewSessionImagePaste,
+                onImagePickPress: doPickImage,
+                isPickingImage,
+                imagePaths: pendingImages.map((img) => img.id),
+                imageUris: pendingImages.map(
+                  (img) => `data:image/jpeg;base64,${img.base64}`,
+                ),
+                onImageRemove: (id) =>
+                  setPendingImages((prev) => prev.filter((img) => img.id !== id)),
+              }}
             />
           </View>
         </View>
