@@ -15,7 +15,7 @@ Yarn v1.22.22 workspaces with 5 packages:
 | **happy-cli** | `packages/happy-cli` | CLI wrapper for Claude Code/Codex with daemon | `@kmmao/happy-coder` on npm |
 | **happy-server** | `packages/happy-server` | Fastify backend with Prisma/PostgreSQL/Redis | Private |
 | **happy-app** | `packages/happy-app` | React Native + Expo mobile/web client | App stores |
-| **happy-agent** | `packages/happy-agent` | Remote-only CLI for controlling agents | `happy-agent` |
+| **happy-agent** | `packages/happy-agent` | Remote-only CLI for controlling agents | `@kmmao/happy-agent` on npm |
 | **happy-wire** | `packages/happy-wire` | Shared message wire types and Zod schemas | `@kmmao/happy-wire` on npm |
 
 ## Common Commands
