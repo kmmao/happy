@@ -820,22 +820,34 @@ function scheduleFixWatchdog(
 
             if (staleActions.length === 0) return;
 
-            for (const action of staleActions) {
-                // Verify session is no longer active
-                if (action.fixSessionId) {
-                    const session = await db.session.findUnique({
-                        where: { id: action.fixSessionId },
-                        select: { active: true },
-                    });
-                    if (session?.active) continue; // Session still running, skip
-                }
+            // Batch-fetch all related sessions in one query (avoids N+1)
+            const sessionIds = [
+                ...new Set(staleActions.map((a) => a.fixSessionId).filter(Boolean) as string[]),
+            ];
+            const activeSessions = sessionIds.length > 0
+                ? await db.session.findMany({
+                    where: { id: { in: sessionIds }, active: true },
+                    select: { id: true },
+                })
+                : [];
+            const activeSessionIds = new Set(activeSessions.map((s) => s.id));
 
-                // Force-complete the stale fix
-                await db.supervisorAction.update({
-                    where: { id: action.id },
-                    data: { fixStatus: "failed" },
-                });
+            // Determine which actions are truly stale
+            const trueStaleActions = staleActions.filter(
+                (a) => !a.fixSessionId || !activeSessionIds.has(a.fixSessionId),
+            );
 
+            if (trueStaleActions.length === 0) return;
+
+            // Batch-update all stale actions in one query
+            const staleActionIds = trueStaleActions.map((a) => a.id);
+            await db.supervisorAction.updateMany({
+                where: { id: { in: staleActionIds } },
+                data: { fixStatus: "failed" },
+            });
+
+            // Log and trigger loop progression for each stale action
+            for (const action of trueStaleActions) {
                 log(
                     { module: "supervisor", level: "warn" },
                     `Fix watchdog: force-failed stale action ${action.id} ("${action.title}") — session inactive but fixStatus was still "running"`,
