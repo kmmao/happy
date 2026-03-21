@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiClient } from './api';
 import axios from 'axios';
 import { connectionState } from '@/utils/serverConnectionErrors';
+import { logger } from '@/ui/logger';
 
 // Use vi.hoisted to ensure mock functions are available when vi.mock factory runs
 const { mockPost, mockIsAxiosError } = vi.hoisted(() => ({
@@ -19,7 +20,8 @@ vi.mock('axios', () => ({
 
 vi.mock('@/ui/logger', () => ({
     logger: {
-        debug: vi.fn()
+        debug: vi.fn(),
+        warn: vi.fn()
     }
 }));
 
@@ -83,7 +85,7 @@ describe('Api server error handling', () => {
 
     describe('getOrCreateSession', () => {
         it('should return null when Happy server is unreachable (ECONNREFUSED)', async () => {
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            vi.mocked(logger.warn).mockClear();
 
             // Mock axios to throw connection refused error
             mockPost.mockRejectedValue({ code: 'ECONNREFUSED' });
@@ -95,16 +97,14 @@ describe('Api server error handling', () => {
             });
 
             expect(result).toBeNull();
-            expect(consoleSpy).toHaveBeenCalledWith(
+            expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('⚠️  Happy server unreachable')
             );
-
-            consoleSpy.mockRestore();
         });
 
         it('should return null when Happy server cannot be found (ENOTFOUND)', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            vi.mocked(logger.warn).mockClear();
 
             // Mock axios to throw DNS resolution error
             mockPost.mockRejectedValue({ code: 'ENOTFOUND' });
@@ -116,16 +116,14 @@ describe('Api server error handling', () => {
             });
 
             expect(result).toBeNull();
-            expect(consoleSpy).toHaveBeenCalledWith(
+            expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('⚠️  Happy server unreachable')
             );
-
-            consoleSpy.mockRestore();
         });
 
         it('should return null when Happy server times out (ETIMEDOUT)', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            vi.mocked(logger.warn).mockClear();
 
             // Mock axios to throw timeout error
             mockPost.mockRejectedValue({ code: 'ETIMEDOUT' });
@@ -137,16 +135,14 @@ describe('Api server error handling', () => {
             });
 
             expect(result).toBeNull();
-            expect(consoleSpy).toHaveBeenCalledWith(
+            expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('⚠️  Happy server unreachable')
             );
-
-            consoleSpy.mockRestore();
         });
 
         it('should return null when session endpoint returns 404', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            vi.mocked(logger.warn).mockClear();
 
             // Mock axios to return 404
             mockPost.mockRejectedValue({
@@ -161,20 +157,18 @@ describe('Api server error handling', () => {
             });
 
             expect(result).toBeNull();
-            // New unified format via connectionState.fail()
-            expect(consoleSpy).toHaveBeenCalledWith(
+            // New unified format via connectionState.fail() → logger.warn
+            expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('⚠️  Happy server unreachable')
             );
-            expect(consoleSpy).toHaveBeenCalledWith(
+            expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('Session creation failed: 404')
             );
-
-            consoleSpy.mockRestore();
         });
 
         it('should return null when server returns 500 Internal Server Error', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            vi.mocked(logger.warn).mockClear();
 
             // Mock axios to return 500 error
             mockPost.mockRejectedValue({
@@ -189,15 +183,14 @@ describe('Api server error handling', () => {
             });
 
             expect(result).toBeNull();
-            expect(consoleSpy).toHaveBeenCalledWith(
+            expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('⚠️  Happy server unreachable')
             );
-            consoleSpy.mockRestore();
         });
 
         it('should return null when server returns 503 Service Unavailable', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            vi.mocked(logger.warn).mockClear();
 
             // Mock axios to return 503 error
             mockPost.mockRejectedValue({
@@ -212,13 +205,14 @@ describe('Api server error handling', () => {
             });
 
             expect(result).toBeNull();
-            expect(consoleSpy).toHaveBeenCalledWith(
+            expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('⚠️  Happy server unreachable')
             );
-            consoleSpy.mockRestore();
         });
 
         it('should re-throw non-connection errors', async () => {
+            vi.mocked(logger.warn).mockClear();
+
             // Mock axios to throw a different type of error (e.g., authentication error)
             const authError = new Error('Invalid API key');
             (authError as any).code = 'UNAUTHORIZED';
@@ -229,18 +223,16 @@ describe('Api server error handling', () => {
             ).rejects.toThrow('Failed to get or create session: Invalid API key');
 
             // Should not show the offline mode message
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-            expect(consoleSpy).not.toHaveBeenCalledWith(
+            expect(logger.warn).not.toHaveBeenCalledWith(
                 expect.stringContaining('⚠️  Happy server unreachable')
             );
-            consoleSpy.mockRestore();
         });
     });
 
     describe('getOrCreateMachine', () => {
         it('should return minimal machine object when server is unreachable (ECONNREFUSED)', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            vi.mocked(logger.warn).mockClear();
 
             // Mock axios to throw connection refused error
             mockPost.mockRejectedValue({ code: 'ECONNREFUSED' });
@@ -267,16 +259,14 @@ describe('Api server error handling', () => {
                 daemonStateVersion: 0,
             });
 
-            expect(consoleSpy).toHaveBeenCalledWith(
+            expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('⚠️  Happy server unreachable')
             );
-
-            consoleSpy.mockRestore();
         });
 
         it('should return minimal machine object when server endpoint returns 404', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            vi.mocked(logger.warn).mockClear();
 
             // Mock axios to return 404
             mockPost.mockRejectedValue({
@@ -299,15 +289,13 @@ describe('Api server error handling', () => {
                 daemonStateVersion: 0,
             });
 
-            // New unified format via connectionState.fail()
-            expect(consoleSpy).toHaveBeenCalledWith(
+            // New unified format via connectionState.fail() → logger.warn
+            expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('⚠️  Happy server unreachable')
             );
-            expect(consoleSpy).toHaveBeenCalledWith(
+            expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('Machine registration failed: 404')
             );
-
-            consoleSpy.mockRestore();
         });
     });
 });

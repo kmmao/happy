@@ -8,6 +8,7 @@
  */
 
 import type { ApiClient } from '@/api/api';
+import { logger } from '@/ui/logger';
 import type { ApiSessionClient } from '@/api/apiSession';
 import type { AgentState, Metadata, Session } from '@/api/types';
 import { configuration } from '@/configuration';
@@ -101,8 +102,7 @@ export function setupOfflineReconnection(opts: SetupOfflineReconnectionOptions):
                 return realSession;
             },
             onNotify: (msg) => {
-                // Log to console - this matches Claude's behavior
-                console.log(msg);
+                logger.debug(`[offline:notify] ${msg}`);
             }
         });
 

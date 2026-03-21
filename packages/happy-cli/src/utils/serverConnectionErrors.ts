@@ -322,12 +322,12 @@ class OfflineState {
                 return `${f.operation} failed: ${desc}${url}`;
             })
             .join('; ');
-        console.log(`⚠️  Happy server unreachable, offline mode with auto-reconnect enabled - error details: ${summary}`);
+        logger.warn(`⚠️  Happy server unreachable, offline mode with auto-reconnect enabled - error details: ${summary}`);
 
         // Print detail lines if present - consistent 3-space indent with arrow
         const allDetails = [...this.failures.values()]
             .flatMap(f => f.details || []);
-        allDetails.forEach(line => console.log(chalk.yellow(`   → ${line}`)));
+        allDetails.forEach(line => logger.warn(`   → ${line}`));
     }
 }
 

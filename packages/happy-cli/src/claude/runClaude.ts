@@ -118,7 +118,7 @@ export async function runClaude(
     sandboxEnabled ||
     Boolean(options.claudeArgs?.includes("--dangerously-skip-permissions"));
   if (!machineId) {
-    console.error(
+    logger.warn(
       `[START] No machine ID found in settings, which is unexpected since authAndSetupMachineIfNeeded should have created it. Please report this issue on https://github.com/slopus/happy-cli/issues`,
     );
     process.exit(1);
@@ -236,7 +236,7 @@ export async function runClaude(
         if (offlineSessionId) scanner.onNewSession(offlineSessionId);
         return { session, scanner };
       },
-      onNotify: console.log,
+      onNotify: (msg: string) => logger.debug(`[claude:notify] ${msg}`),
       onCleanup: () => {
         // Scanner cleanup handled automatically when process exits
       },

@@ -211,7 +211,7 @@ export class CodexMcpClient {
   private registerPermissionHandlers(): void {
     // Register handler for exec command approval requests
     this.client.setRequestHandler(ElicitRequestSchema, async (request) => {
-      console.log("[CodexMCP] Received elicitation request:", request.params);
+      logger.debug(`[CodexMCP] Received elicitation request: ${JSON.stringify(request.params)}`);
 
       // Load params
       const params = request.params as unknown as {

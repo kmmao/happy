@@ -17,6 +17,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { startOfflineReconnection, printOfflineWarning, connectionState, isNetworkError, NETWORK_ERROR_CODES } from './serverConnectionErrors';
+import { logger } from '@/ui/logger';
 
 // Mock axios - only isAxiosError needed for error type detection
 vi.mock('axios', () => ({
@@ -34,7 +35,8 @@ vi.mock('axios', () => ({
 // Mock logger to prevent console noise in tests
 vi.mock('@/ui/logger', () => ({
     logger: {
-        debug: vi.fn()
+        debug: vi.fn(),
+        warn: vi.fn()
     }
 }));
 
@@ -516,34 +518,30 @@ describe('printOfflineWarning', () => {
     });
 
     it('should print offline warning with unified format', () => {
-        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        vi.mocked(logger.warn).mockClear();
 
         printOfflineWarning();
 
-        // New unified format via connectionState.fail()
-        expect(consoleSpy).toHaveBeenCalledWith(
+        // New unified format via connectionState.fail() → logger.warn
+        expect(logger.warn).toHaveBeenCalledWith(
             expect.stringContaining('⚠️  Happy server unreachable, offline mode with auto-reconnect enabled')
         );
-        expect(consoleSpy).toHaveBeenCalledWith(
+        expect(logger.warn).toHaveBeenCalledWith(
             expect.stringContaining('Server connection failed')
         );
-
-        consoleSpy.mockRestore();
     });
 
     it('should deduplicate repeated calls', () => {
-        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        vi.mocked(logger.warn).mockClear();
 
         printOfflineWarning('Claude');
-        const callCountAfterFirst = consoleSpy.mock.calls.length;
+        const callCountAfterFirst = vi.mocked(logger.warn).mock.calls.length;
 
         printOfflineWarning('Claude'); // Second call should be deduplicated
-        const callCountAfterSecond = consoleSpy.mock.calls.length;
+        const callCountAfterSecond = vi.mocked(logger.warn).mock.calls.length;
 
         // Should not print again (same call count)
         expect(callCountAfterSecond).toBe(callCountAfterFirst);
-
-        consoleSpy.mockRestore();
     });
 });
 
