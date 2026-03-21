@@ -59,6 +59,7 @@ const defaultConfig = {
         maxAnalysisSessions: 3,
         maxFixSessions: 2,
     },
+    maxFindings: 0,
     notifications: {
         onAnalysisComplete: true,
         onIssueCreated: true,
@@ -624,6 +625,48 @@ function SupervisorSettingsScreen() {
                                     ]}
                                 >
                                     {n}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </View>
+                </View>
+            </ItemGroup>
+
+            {/* Analysis Limits */}
+            <ItemGroup title={t("supervisor.analysisLimitsSection")}>
+                <View style={styles.concurrencyRow}>
+                    <View style={styles.toggleRowContent}>
+                        <Text style={styles.toggleRowLabel}>
+                            {t("supervisor.maxFindings")}
+                        </Text>
+                        <Text style={styles.toggleRowSubtitle}>
+                            {t("supervisor.maxFindingsNote")}
+                        </Text>
+                    </View>
+                    <View style={styles.concurrencyPicker}>
+                        {([0, 10, 20, 30, 50] as const).map((n) => (
+                            <Pressable
+                                key={n}
+                                style={[
+                                    styles.concurrencyOption,
+                                    (config.maxFindings ?? 0) === n &&
+                                        styles.concurrencyOptionSelected,
+                                ]}
+                                onPress={() =>
+                                    updateConfig((prev) => ({
+                                        ...prev,
+                                        maxFindings: n,
+                                    }))
+                                }
+                            >
+                                <Text
+                                    style={[
+                                        styles.concurrencyOptionText,
+                                        (config.maxFindings ?? 0) === n &&
+                                            styles.concurrencyOptionTextSelected,
+                                    ]}
+                                >
+                                    {n === 0 ? "∞" : n}
                                 </Text>
                             </Pressable>
                         ))}
