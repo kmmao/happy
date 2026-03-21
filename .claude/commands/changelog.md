@@ -2,7 +2,7 @@
 
 ## 使用方式
 
-`/happy-changelog [包名] [版本号]`
+`/changelog [包名] [版本号]`
 
 - 包名：`app` | `cli` | `agent` | `wire`（不指定则交互式选择）
 - 版本号：semver 格式如 `2.4.0`（不指定则根据变更自动建议）
@@ -204,8 +204,8 @@ README：<已更新 / 无需更新>
 
 后续操作提示：
 - app: 运行 /happy-release-app 或 yarn ota 发布 OTA
-- cli: 运行 /happy-release-cli 发布到 npm
-- agent: 运行 /happy-release-agent 发布到 npm
+- cli: 运行 /release-cli 发布到 npm
+- agent: 运行 /release-agent 发布到 npm
 - wire: 运行 cd packages/happy-wire && npm publish --access public
 ```
 
