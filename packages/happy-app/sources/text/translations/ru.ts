@@ -2129,6 +2129,7 @@ export const ru: TranslationStructure = {
     tabDismissed: "Отклонено",
     noActions: "Нет действий",
     loadMore: "Загрузить ещё",
+    loadError: "Не удалось загрузить действия",
     viewSession: "Просмотр сессии",
     viewPR: "Открыть PR",
     retryFix: "Повторить",

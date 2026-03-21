@@ -19,6 +19,7 @@ import {
     type SupervisorActionStats,
 } from "@/sync/apiSupervisor";
 import { SupervisorActionCard } from "@/components/project/SupervisorActionCard";
+import { Modal } from "@/modal";
 import { sync } from "@/sync/sync";
 import { layout } from "@/components/layout";
 import { Project } from "@/sync/projectManager";
@@ -144,7 +145,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
                     }
                 }
             } catch {
-                // Silently fail — list stays empty
+                Modal.toast(t("supervisor.loadError"));
             } finally {
                 if (!cancelled) {
                     setLoading(false);
@@ -172,7 +173,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
             setActions((prev) => [...prev, ...data.actions]);
             setTotal(data.total);
         } catch {
-            // Silently fail
+            Modal.toast(t("supervisor.loadError"));
         } finally {
             setLoadingMore(false);
         }
@@ -199,7 +200,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
                 setStats(statsData);
             }
         } catch {
-            // Silently fail
+            Modal.toast(t("supervisor.loadError"));
         } finally {
             setRefreshing(false);
         }
@@ -225,7 +226,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
                 setStats(statsData);
             }
         } catch {
-            // Silently fail
+            Modal.toast(t("supervisor.loadError"));
         }
     }, [projectId, activeTab, actions.length]);
 

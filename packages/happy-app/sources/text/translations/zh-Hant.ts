@@ -2020,6 +2020,7 @@ export const zhHant: TranslationStructure = {
     tabDismissed: "已忽略",
     noActions: "沒有操作",
     loadMore: "載入更多",
+    loadError: "載入操作失敗",
     viewSession: "查看會話",
     viewPR: "查看 PR",
     retryFix: "重試",

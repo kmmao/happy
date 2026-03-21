@@ -2130,6 +2130,7 @@ export const pl: TranslationStructure = {
     tabDismissed: "Odrzucone",
     noActions: "Brak akcji",
     loadMore: "Załaduj więcej",
+    loadError: "Nie udało się załadować akcji",
     viewSession: "Zobacz sesję",
     viewPR: "Zobacz PR",
     retryFix: "Ponów",

@@ -2115,6 +2115,7 @@ export const ca: TranslationStructure = {
     tabDismissed: "Descartat",
     noActions: "Sense accions",
     loadMore: "Carregar més",
+    loadError: "Error en carregar les accions",
     viewSession: "Veure sessió",
     viewPR: "Veure PR",
     retryFix: "Reintentar",

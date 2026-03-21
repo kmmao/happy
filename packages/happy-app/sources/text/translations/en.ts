@@ -2100,6 +2100,7 @@ export const en: TranslationStructure = {
     tabDismissed: "Dismissed",
     noActions: "No actions",
     loadMore: "Load More",
+    loadError: "Failed to load actions",
 
     viewSession: "View Session",
     viewPR: "View PR",

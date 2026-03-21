@@ -2110,6 +2110,7 @@ export const es: TranslationStructure = {
     tabDismissed: "Descartado",
     noActions: "Sin acciones",
     loadMore: "Cargar más",
+    loadError: "Error al cargar acciones",
     viewSession: "Ver sesión",
     viewPR: "Ver PR",
     retryFix: "Reintentar",

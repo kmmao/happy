@@ -2085,6 +2085,7 @@ export const ja: TranslationStructure = {
     tabDismissed: "却下",
     noActions: "アクションなし",
     loadMore: "もっと読み込む",
+    loadError: "アクションの読み込みに失敗しました",
     viewSession: "セッションを表示",
     viewPR: "PRを見る",
     retryFix: "再試行",

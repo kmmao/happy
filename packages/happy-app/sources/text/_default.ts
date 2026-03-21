@@ -2138,6 +2138,7 @@ export const en = {
     tabDismissed: "Dismissed",
     noActions: "No actions",
     loadMore: "Load More",
+    loadError: "Failed to load actions",
 
     // Session link
     viewSession: "View Session",

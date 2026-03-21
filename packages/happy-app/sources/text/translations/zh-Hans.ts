@@ -2017,6 +2017,7 @@ export const zhHans: TranslationStructure = {
     tabDismissed: "已忽略",
     noActions: "暂无操作",
     loadMore: "加载更多",
+    loadError: "加载操作失败",
     viewSession: "查看会话",
     viewPR: "查看 PR",
     retryFix: "重试",
