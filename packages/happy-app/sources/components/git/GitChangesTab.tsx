@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { Theme } from "@/theme";
 import {
   View,
   ActivityIndicator,
@@ -46,7 +47,7 @@ const SectionButton = React.memo<{
   label: string;
   onPress: () => void;
   disabled?: boolean;
-  theme: any;
+  theme: Theme;
   primary?: boolean;
   destructive?: boolean;
 }>(({ label, onPress, disabled, theme, primary, destructive }) => {
@@ -85,7 +86,7 @@ const SectionButton = React.memo<{
 
 SectionButton.displayName = "SectionButton";
 
-function renderCheckbox(checked: boolean, theme: any) {
+function renderCheckbox(checked: boolean, theme: Theme) {
   return (
     <Ionicons
       name={checked ? "checkbox" : "square-outline"}

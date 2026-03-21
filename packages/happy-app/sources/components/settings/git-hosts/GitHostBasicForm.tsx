@@ -4,11 +4,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Switch } from "@/components/Switch";
+import type { Theme } from "@/theme";
 import type { Provider } from "./types";
 import { FieldLabel } from "./FieldLabel";
 
 interface Props {
-  readonly theme: any;
+  readonly theme: Theme;
   readonly formHost: string;
   readonly formProvider: Provider;
   readonly formToken: string;
@@ -118,7 +119,7 @@ const ProviderButton = React.memo<{
   icon: React.ComponentProps<typeof Ionicons>["name"];
   selected: boolean;
   onPress: () => void;
-  theme: any;
+  theme: Theme;
 }>(function ProviderButton({ label, icon, selected, onPress, theme }) {
   return (
     <Pressable

@@ -4,6 +4,7 @@ import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { t } from "@/text";
+import type { Theme } from "@/theme";
 
 export type GitTabId = "changes" | "history" | "branches" | "stash" | "issues" | "prs";
 
@@ -108,7 +109,7 @@ function CountBadge({
   theme,
 }: {
   readonly count: number;
-  readonly theme: any;
+  readonly theme: Theme;
 }) {
   return (
     <View

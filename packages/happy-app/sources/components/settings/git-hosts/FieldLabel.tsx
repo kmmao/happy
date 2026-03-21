@@ -1,9 +1,10 @@
 import React from "react";
 import { Text } from "react-native";
 import { Typography } from "@/constants/Typography";
+import type { Theme } from "@/theme";
 
 export const FieldLabel = React.memo<{
-    theme: any;
+    theme: Theme;
     children: string;
 }>(function FieldLabel({ theme, children }) {
     return (

@@ -3,10 +3,11 @@ import { View, Text, TextInput } from "react-native";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Switch } from "@/components/Switch";
+import type { Theme } from "@/theme";
 import { FieldLabel } from "./FieldLabel";
 
 interface Props {
-  readonly theme: any;
+  readonly theme: Theme;
   readonly formAutoEnabled: boolean;
   readonly formAutoLabel: string;
   readonly formAutoAuthors: string;

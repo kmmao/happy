@@ -25,6 +25,7 @@ import {
 } from "@/sync/ops";
 import type { WebhookRepoConfig } from "@/sync/issueTypes";
 import type { GitRepoEntry } from "@/sync/ops";
+import type { Theme } from "@/theme";
 import type { Provider } from "./types";
 import { FieldLabel } from "./FieldLabel";
 import { RepoScanner } from "./RepoScanner";
@@ -34,7 +35,7 @@ interface Props {
     readonly index: number;
     readonly provider: Provider;
     readonly machines: readonly { id: string; metadata?: any }[];
-    readonly theme: any;
+    readonly theme: Theme;
     readonly onUpdate: (
         index: number,
         updates: Partial<WebhookRepoConfig>,

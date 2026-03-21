@@ -5,11 +5,12 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { generateWebhookSecret } from "@/sync/webhookRouteSync";
 import type { WebhookRepoConfig } from "@/sync/issueTypes";
+import type { Theme } from "@/theme";
 import type { Provider } from "./types";
 import { WebhookRepoItem } from "./WebhookRepoItem";
 
 interface Props {
-    readonly theme: any;
+    readonly theme: Theme;
     readonly provider: Provider;
     readonly machines: readonly { id: string; metadata?: any }[];
     readonly formWebhookRepos: WebhookRepoConfig[];

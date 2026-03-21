@@ -5,6 +5,7 @@ import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { t } from "@/text";
+import type { Theme } from "@/theme";
 import { gitFetch, gitPull, gitPush } from "@/sync/gitRemoteOps";
 import { Modal } from "@/modal";
 import type { GitStatus } from "@/sync/storageTypes";
@@ -275,7 +276,7 @@ function OpButton({
   readonly loading: boolean;
   readonly disabled: boolean;
   readonly onPress: () => void;
-  readonly theme: any;
+  readonly theme: Theme;
 }) {
   return (
     <Pressable

@@ -12,10 +12,11 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { useGitRepoScanner } from "@/hooks/useGitRepoScanner";
 import type { GitRepoEntry } from "@/hooks/useGitRepoScanner";
+import type { Theme } from "@/theme";
 
 interface Props {
   readonly machineId: string;
-  readonly theme: any;
+  readonly theme: Theme;
   readonly onSelectRepo: (entry: GitRepoEntry) => void;
 }
 
