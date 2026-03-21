@@ -160,6 +160,7 @@ export function EnvironmentVariablesList({
                         }}
                         placeholder="Variable name (e.g., MY_CUSTOM_VAR)"
                         placeholderTextColor={theme.colors.input.placeholder}
+                        accessibilityLabel="Environment variable name"
                         value={newVarName}
                         onChangeText={setNewVarName}
                         autoCapitalize="characters"
@@ -178,6 +179,7 @@ export function EnvironmentVariablesList({
                         }}
                         placeholder="Value (e.g., my-value or ${MY_VAR})"
                         placeholderTextColor={theme.colors.input.placeholder}
+                        accessibilityLabel="Environment variable value"
                         value={newVarValue}
                         onChangeText={setNewVarValue}
                         autoCapitalize="none"
