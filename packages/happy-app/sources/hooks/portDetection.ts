@@ -17,6 +17,7 @@ export interface DetectedPort {
     readonly port: number;
     readonly process: string;
     readonly isCommonDevPort: boolean;
+    readonly isWeb: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,56 +276,85 @@ export async function detectAllPorts(
         mergeInto(parseDockerOutput(dockerResult.stdout));
     }
 
-    // Collect candidate ports for curl probing: package.json ports + common ports not yet confirmed
+    // Merge package.json ports into portMap (if not already present, mark for probe)
     const pkgPorts = pkgResult?.success && pkgResult.stdout
         ? parsePackageJsonPorts(pkgResult.stdout)
         : [];
 
-    const candidatesForProbe = new Set<number>();
     for (const p of pkgPorts) {
-        if (!portMap.has(p)) candidatesForProbe.add(p);
+        if (!portMap.has(p)) portMap.set(p, "package.json");
     }
+    // Also add common dev ports not yet in portMap for probing
     for (const p of COMMON_DEV_PORTS) {
-        if (!portMap.has(p)) candidatesForProbe.add(p);
+        if (!portMap.has(p)) portMap.set(p, "probe-candidate");
     }
 
-    // Phase 3: curl probe unconfirmed candidates (single shell command, parallel)
-    if (candidatesForProbe.size > 0) {
-        // Defense-in-depth: ensure all values are safe integers before shell interpolation
-        const portList = Array.from(candidatesForProbe)
-            .filter((p) => Number.isInteger(p) && p > 0 && p < 65536)
-            .join(" ");
+    // Phase 3: parallel curl probe ALL ports to determine which respond to HTTP.
+    // Uses bash background jobs for true parallelism — finishes in ~0.5s regardless of port count.
+    const allPorts = Array.from(portMap.keys())
+        .filter((p) => Number.isInteger(p) && p > 0 && p < 65536);
+
+    const webPorts = new Set<number>();
+    const webFrameworks = new Map<number, string>();
+
+    if (allPorts.length > 0) {
+        const portList = allPorts.join(" ");
         const probeResult = await bash(sessionId, {
-            command: `for p in ${portList}; do headers=$(curl -sI --max-time 1 http://localhost:$p 2>/dev/null | head -5) && echo "$p:$headers"; done`,
-            timeout: 15000,
+            command: `for p in ${portList}; do (curl -sI --connect-timeout 0.3 --max-time 1 http://localhost:$p 2>/dev/null | head -5 | while read -r line; do echo "$p:$line"; done) & done; wait`,
+            timeout: 20000,
         }).catch(() => null);
 
         if (probeResult?.success && probeResult.stdout) {
-            mergeInto(parseCurlProbeOutput(probeResult.stdout));
-        }
-    }
-
-    // Mark package.json ports that were confirmed by probe
-    for (const p of pkgPorts) {
-        if (portMap.has(p)) {
-            const current = portMap.get(p)!;
-            if (current === "http" || current === "unknown") {
-                portMap.set(p, "package.json");
+            for (const line of probeResult.stdout.trim().split("\n")) {
+                const m = line.match(/^(\d+):(.+)/);
+                if (!m) continue;
+                const port = parseInt(m[1], 10);
+                const header = m[2].trim();
+                // Any HTTP response means it's a web service
+                if (header.startsWith("HTTP/") || header.toLowerCase().startsWith("content-type:")) {
+                    webPorts.add(port);
+                }
+                // Extract framework info from headers
+                const powered = header.match(/x-powered-by:\s*(.+)/i);
+                const server = header.match(/^server:\s*(.+)/i);
+                if (powered && !webFrameworks.has(port)) {
+                    webFrameworks.set(port, powered[1].trim());
+                } else if (server && !webFrameworks.has(port)) {
+                    webFrameworks.set(port, server[1].trim());
+                }
             }
         }
     }
 
-    // Build sorted result: common dev ports first, then by port number
+    // Remove probe-candidates that didn't respond to HTTP
+    for (const [port, process] of portMap) {
+        if (process === "probe-candidate" && !webPorts.has(port)) {
+            portMap.delete(port);
+        }
+    }
+
+    // Enrich process name with framework info from curl headers
+    for (const [port, framework] of webFrameworks) {
+        const current = portMap.get(port);
+        if (current && (current === "unknown" || current === "package.json" || current === "probe-candidate" || current === "http")) {
+            portMap.set(port, framework);
+        }
+    }
+
+    // Build sorted result: web first, then common dev ports, then by port number
     return Array.from(portMap.entries())
         .map(([port, process]) => ({
             port,
             process,
             isCommonDevPort: COMMON_DEV_PORTS.includes(port),
+            isWeb: webPorts.has(port),
         }))
         .sort((a, b) => {
-            if (a.isCommonDevPort !== b.isCommonDevPort) {
-                return a.isCommonDevPort ? -1 : 1;
-            }
+            // Web ports first
+            if (a.isWeb !== b.isWeb) return a.isWeb ? -1 : 1;
+            // Then common dev ports
+            if (a.isCommonDevPort !== b.isCommonDevPort) return a.isCommonDevPort ? -1 : 1;
+            // Then by port number
             return a.port - b.port;
         });
 }

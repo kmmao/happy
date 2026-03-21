@@ -1919,6 +1919,8 @@ export const zhHant: TranslationStructure = {
     unavailableHint:
       "請在 CLI 機器上安裝 agent-browser 以使用預覽功能。執行：npm install -g @anthropic-ai/agent-browser",
     emptyHint: "選擇開發伺服器或輸入 URL 來擷取前端頁面截圖。",
+    otherPorts: ({ count }: { count: number }) =>
+      `其他 ${count} 個非 Web 連接埠`,
   },
 
   backgroundTasks: {

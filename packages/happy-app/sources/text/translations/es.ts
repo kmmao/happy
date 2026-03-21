@@ -2009,6 +2009,8 @@ export const es: TranslationStructure = {
       "Instala agent-browser en la máquina CLI para usar la función de vista previa. Ejecuta: npm install -g @anthropic-ai/agent-browser",
     emptyHint:
       "Selecciona un servidor de desarrollo o introduce una URL para capturar una vista previa.",
+    otherPorts: ({ count }: { count: number }) =>
+      `${count} otros puertos no web`,
   },
 
   backgroundTasks: {

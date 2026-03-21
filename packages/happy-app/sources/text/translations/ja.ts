@@ -1985,6 +1985,8 @@ export const ja: TranslationStructure = {
       "プレビュー機能を使用するには、CLIマシンに agent-browser をインストールしてください。実行：npm install -g @anthropic-ai/agent-browser",
     emptyHint:
       "開発サーバーを選択するか、URLを入力してフロントエンドのスクリーンショットを撮影します。",
+    otherPorts: ({ count }: { count: number }) =>
+      `その他 ${count} 個の非Webポート`,
   },
 
   backgroundTasks: {

@@ -2008,6 +2008,8 @@ export const it: TranslationStructure = {
       "Installa agent-browser sulla macchina CLI per utilizzare la funzione anteprima. Esegui: npm install -g @anthropic-ai/agent-browser",
     emptyHint:
       "Seleziona un server di sviluppo o inserisci un URL per catturare uno screenshot dell'interfaccia.",
+    otherPorts: ({ count }: { count: number }) =>
+      `${count} altre porte non web`,
   },
 
   backgroundTasks: {

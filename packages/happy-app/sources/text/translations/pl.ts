@@ -2029,6 +2029,8 @@ export const pl: TranslationStructure = {
       "Zainstaluj agent-browser na maszynie CLI, aby korzystać z podglądu. Uruchom: npm install -g @anthropic-ai/agent-browser",
     emptyHint:
       "Wybierz serwer deweloperski lub wprowadź URL, aby wykonać zrzut ekranu interfejsu.",
+    otherPorts: ({ count }: { count: number }) =>
+      `${count} innych portów nie-web`,
   },
 
   backgroundTasks: {
