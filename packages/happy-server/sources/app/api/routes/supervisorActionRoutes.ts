@@ -82,10 +82,15 @@ export function supervisorActionRoutes(app: Fastify) {
                 where.approval = approval;
             }
 
+            // Sort by updatedAt for done/fixing views (shows latest status change first)
+            const orderBy = (view === "done" || view === "fixing")
+                ? { updatedAt: "desc" as const }
+                : { createdAt: "desc" as const };
+
             const [actions, total] = await Promise.all([
                 db.supervisorAction.findMany({
                     where,
-                    orderBy: { createdAt: "desc" },
+                    orderBy,
                     take: limit,
                     skip: offset,
                 }),

@@ -276,6 +276,11 @@ export const SupervisorActionCard = React.memo(
                         <Text style={styles.fixProgressText}>
                             {t("supervisor.fixStatus")}: {action.fixStatus}
                         </Text>
+                        {action.updatedAt > 0 && (
+                            <Text style={styles.fixTimeText}>
+                                {new Date(action.updatedAt).toLocaleString()}
+                            </Text>
+                        )}
                     </View>
                 )}
 
@@ -552,6 +557,12 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 13,
         color: theme.colors.textSecondary,
+    },
+    fixTimeText: {
+        ...Typography.default(),
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        marginLeft: "auto",
     },
     issueRow: {
         flexDirection: "row",
