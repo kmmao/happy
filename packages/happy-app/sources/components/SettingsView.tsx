@@ -72,9 +72,6 @@ export const SettingsView = React.memo(function SettingsView() {
 
   // Connection status
   const isGitHubConnected = !!profile.github;
-  const isAnthropicConnected =
-    profile.connectedServices?.includes("anthropic") || false;
-
   // GitHub connection
   const [connectingGitHub, connectGitHub] = useHappyAction(async () => {
     const params = await getGitHubOAuthParams(auth.credentials!);
@@ -95,25 +92,6 @@ export const SettingsView = React.memo(function SettingsView() {
     },
   );
 
-  // Anthropic connection
-  const [connectingAnthropic, connectAnthropic] = useHappyAction(async () => {
-    router.push("/settings/connect/claude");
-  });
-
-  // Anthropic disconnection
-  const [disconnectingAnthropic, handleDisconnectAnthropic] = useHappyAction(
-    async () => {
-      const confirmed = await Modal.confirm(
-        t("modals.disconnectService", { service: "Claude" }),
-        t("modals.disconnectServiceConfirm", { service: "Claude" }),
-        { confirmText: t("modals.disconnect"), destructive: true },
-      );
-      if (confirmed) {
-        await disconnectService(auth.credentials!, "anthropic");
-        await sync.refreshProfile();
-      }
-    },
-  );
 
   return (
     <ItemList style={{ paddingTop: 0 }}>
@@ -203,26 +181,6 @@ export const SettingsView = React.memo(function SettingsView() {
       )}
 
       <ItemGroup title={t("settings.connectedAccounts")}>
-        <Item
-          title="Claude Code"
-          subtitle={
-            isAnthropicConnected
-              ? t("settingsAccount.statusActive")
-              : t("settings.connectAccount")
-          }
-          icon={
-            <Image
-              source={require("@/assets/images/icon-claude.png")}
-              style={{ width: 29, height: 29 }}
-              contentFit="contain"
-            />
-          }
-          onPress={
-            isAnthropicConnected ? handleDisconnectAnthropic : connectAnthropic
-          }
-          loading={connectingAnthropic || disconnectingAnthropic}
-          showChevron={false}
-        />
         <Item
           title={t("settings.github")}
           subtitle={
