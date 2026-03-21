@@ -50,10 +50,12 @@ export function getDeviceType(): "phone" | "tablet" {
 }
 
 // Hook to get device type (reactive to dimension changes)
-// Uses screen dimensions for foldable min-width check to prevent
+// Uses screen dimensions for foldable min-width check on native Android to prevent
 // keyboard open/close from flipping tablet↔phone mode on foldables.
 // Window dimensions shrink when keyboard opens (adjustResize mode),
 // but a foldable inner screen doesn't stop being one when keyboard is open.
+// On web, uses window dimensions instead — web has no keyboard resize issue,
+// and screen dimensions don't change on browser resize / split-screen.
 export function useDeviceType(): "phone" | "tablet" {
   const { width, height } = useWindowDimensions();
   const screenDimensions = Dimensions.get("screen");
@@ -65,15 +67,22 @@ export function useDeviceType(): "phone" | "tablet" {
       pointsPerInch: Platform.OS === "ios" ? 163 : 160,
     });
 
+    // On web, use window dimensions for minWidth since screen dimensions
+    // represent the physical display and don't change on resize/split-screen.
+    // On native Android, use screen dimensions to avoid keyboard-triggered flipping.
+    const minWidthPoints =
+      Platform.OS === "ios"
+        ? undefined
+        : Platform.OS === "web"
+          ? Math.min(width, height)
+          : Math.min(screenDimensions.width, screenDimensions.height);
+
     return determineDeviceType({
       diagonalInches: dimensions.diagonalInches,
       platform: Platform.OS,
       // @ts-ignore - isPad is not in the type definitions but exists at runtime on iOS
       isPad: Platform.OS === "ios" ? Platform.isPad : false,
-      minWidthPoints:
-        Platform.OS !== "ios"
-          ? Math.min(screenDimensions.width, screenDimensions.height)
-          : undefined,
+      minWidthPoints,
     });
   }, [width, height, screenDimensions.width, screenDimensions.height]);
 }
