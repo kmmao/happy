@@ -102,6 +102,70 @@ Auth flows:
 - `POST /v1/version`
 - `POST /v1/voice/token`
 
+### Projects
+- `GET /v1/projects` — list projects. Query: `archived?` (boolean).
+- `POST /v1/projects` — create project. Body: `{ machineId, path, repoUrl?, metadata? }`. Response: `{ project, created }`.
+- `GET /v1/projects/:id` — get project by ID.
+- `PATCH /v1/projects/:id` — update project. Body: `{ metadata?, repoUrl?, archived? }`.
+- `DELETE /v1/projects/:id`
+- `POST /v1/projects/resolve` — find-or-create by machine+path. Body: `{ machineId, path, repoUrl?, metadata? }`. Response: `{ project, created }`.
+- `POST /v1/projects/:id/link-sessions` — bulk-link sessions. Body: `{ sessionIds }` (1–500). Response: `{ linked }`.
+- `GET /v1/projects/:id/related` — list related projects (same repo across machines).
+
+### Supervisor — runs
+- `POST /v1/projects/:id/supervisor/run` — start a supervisor run. Body: `{ machineId?, repoPath?, trigger?, researchParams? }`. Trigger enum: `manual | research`.
+- `GET /v1/projects/:id/supervisor/runs` — list runs. Query: `limit` (1–100, default 20), `offset`, `trigger?`.
+- `GET /v1/projects/:id/supervisor/runs/:runId` — get single run.
+- `POST /v1/projects/:id/supervisor/cancel/:runId` — cancel a running run.
+- `POST /v1/projects/:id/supervisor/runs/:runId/status` — update run status (called by CLI agent). Body: `{ status, artifactId?, sessionId?, actionsCount?, issuesCreated?, errorMessage?, currentDimension?, dimensionIndex?, totalDimensions?, reportTitle?, reportContent?, actions? }`. Status enum: `running | completed | failed`.
+
+### Supervisor — config
+- `PATCH /v1/projects/:id/supervisor/config` — update supervisor settings. Body: `{ supervisorConfig?, supervisorMode?, supervisorScheduleEnabled?, supervisorScheduleIntervalHours?, supervisorEnabledDimensions?, supervisorPushTriggerEnabled?, supervisorNotifyPrefs?, supervisorCustomRules?, fixStrategy? }`. Response: `{ supervisorConfig, supervisorConfigVersion }`.
+
+### Supervisor — actions
+- `GET /v1/projects/:id/supervisor/actions` — list actions. Query: `approval?`, `view?`, `runId?`, `limit` (1–100, default 50), `offset`.
+- `PATCH /v1/projects/:id/supervisor/actions/:actionId` — set approval. Body: `{ approval }`. Approval enum: `approved | skipped | ignored | pending`.
+- `POST /v1/projects/:id/supervisor/actions/batch` — batch update approval. Body: `{ actionIds (1–50), approval }`.
+- `DELETE /v1/projects/:id/supervisor/actions` — delete all actions for project.
+- `DELETE /v1/projects/:id/supervisor/actions/:actionId` — delete single action.
+- `GET /v1/projects/:id/supervisor/actions/stats` — action counts by status. Response: `{ pending, approved, skipped, ignored, approvedNoFix, fixPending, fixRunning, fixCompleted, fixFailed }`.
+- `POST /v1/projects/:id/supervisor/actions/:actionId/fix` — trigger fix for action. Body: `{ machineId?, repoPath? }`.
+- `PATCH /v1/projects/:id/supervisor/actions/:actionId/fix-status` — update fix status. Body: `{ fixStatus, fixSessionId?, issueUrl? }`. Status enum: `running | completed | failed`.
+- `POST /v1/projects/:id/supervisor/actions/reprocess` — reprocess pending actions. Body: `{ mode }`. Mode enum: `semi-auto | auto`. Response: `{ approvedCount, remainingPending }`.
+
+### Supervisor — loop
+- `POST /v1/projects/:id/supervisor/loop` — start autonomous loop. Body: `{ maxIterations (1–20, default 5), costCapUsd? (0–100), healthScoreTarget?, autoApproveThreshold (50–100, default 80), maxConsecutiveFailures (1–10, default 2), maxDurationMinutes (10–480, default 240) }`.
+- `GET /v1/projects/:id/supervisor/loop` — get current active loop.
+- `GET /v1/projects/:id/supervisor/loops` — list loops. Query: `limit` (1–50, default 10), `offset`.
+- `GET /v1/projects/:id/supervisor/loops/:loopId` — get loop detail with runs and actions.
+- `POST /v1/projects/:id/supervisor/loop/:loopId/pause`
+- `POST /v1/projects/:id/supervisor/loop/:loopId/resume`
+- `POST /v1/projects/:id/supervisor/loop/:loopId/stop`
+
+### Supervisor — analytics
+- `GET /v1/projects/:id/supervisor/cost` — cost summary. Query: `days` (1–365, default 30). Response: `{ days, runsCount, totalTokens, totalCostUsd }`.
+- `GET /v1/projects/:id/supervisor/trend` — health trend. Query: `days` (1–90, default 30). Response: `{ days, points: [{ date, total, score, critical, high, medium, low }] }`.
+- `GET /v1/projects/:id/supervisor/summary` — project health grade. Response: `{ grade, score, openCounts, trendDirection, lastScanAt, totalRuns30d, nextRunAt }`.
+
+### Supervisor — reports
+- `GET /v1/projects/:id/supervisor/runs/:runId/compare` — diff current run vs previous. Response: `{ currentRun, previousRun, newActions, resolvedActions, persistentActions }`.
+- `GET /v1/projects/:id/supervisor/runs/:runId/export` — export run as markdown. Query: `format` (default `markdown`). Response: `{ content, filename }`.
+
+### Webhooks
+- `POST /v1/webhooks/:provider` — receive webhook (GitHub/Gitea/GitLab). Auth: webhook signature verification (no Bearer token). Response: `{ received: true }`.
+- `GET /v1/webhooks/routes` — list webhook routes. Response: array of `{ id, provider, repoUrl, labels, authors, machineId, repoPath, enabled, createdAt }`.
+- `POST /v1/webhooks/routes` — create webhook route. Body: `{ provider, repoUrl, webhookSecret, apiToken?, labels, authors, machineId, repoPath, enabled, callbackUrl? }`. Response: `{ id, repoUrl, remoteWebhookId }`.
+- `DELETE /v1/webhooks/routes/:id`
+- `GET /v1/webhooks/events` — list webhook events. Query: `projectId?`, `limit` (1–100, default 20), `offset`. Response: `{ events: [...], total }`.
+
+### Session usage
+- `GET /v1/sessions/:sessionId/usage/summary` — token usage for session. Response: `{ totalInputTokens, totalOutputTokens, totalCacheCreationTokens, totalCacheReadTokens, lastInputTokens, lastOutputTokens, lastCacheCreation, lastCacheRead, reportCount }`.
+- `PATCH /v1/sessions/:sessionId/restore` — restore a deleted session.
+
+### V3 sessions (batch message sync)
+- `GET /v3/sessions/:sessionId/messages` — paginated messages with sequence numbers. Query: `after_seq` (default 0), `before_seq?`, `limit` (1–500, default 100). Response: `{ messages: [{ id, seq, content, localId, createdAt, updatedAt }], hasMore }`.
+- `POST /v3/sessions/:sessionId/messages` — batch-insert messages. Body: `{ messages: [{ content, localId }] }` (1–100). Response: `{ messages: [{ id, seq, localId, createdAt, updatedAt }] }`.
+
 ### Dev-only
 - `POST /logs-combined-from-cli-and-mobile-for-simple-ai-debugging` (only if enabled)
 
