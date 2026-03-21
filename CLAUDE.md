@@ -35,7 +35,7 @@ yarn workspace happy-server dev         # Server: start with .env files
 yarn workspace happy-server generate    # Server: prisma generate
 
 yarn workspace happy-app typecheck      # App: tsc --noEmit
-yarn workspace happy-app test           # App: vitest watch mode
+yarn workspace happy-app test           # App: vitest run
 yarn workspace happy-app start          # App: Expo dev server
 yarn workspace happy-app ios            # App: iOS simulator
 yarn workspace happy-app android        # App: Android emulator
