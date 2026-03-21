@@ -1842,6 +1842,8 @@ export const ja: TranslationStructure = {
     deleteArchivedBranchSessions: "アーカイブ済みブランチセッションを削除",
     deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
       `アーカイブ済みブランチセッション ${count} 件を完全に削除しますか？この操作は取り消せません。`,
+    clearBranch: "ブランチを削除",
+    clearAll: "すべて削除",
   },
   project: {
     segments: {

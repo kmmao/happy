@@ -1888,6 +1888,8 @@ export const pl: TranslationStructure = {
     deleteArchivedBranchSessions: "Usuń zarchiwizowane sesje gałęzi",
     deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
       `Czy na pewno chcesz trwale usunąć ${count} zarchiwizowanych sesji gałęzi? Tej operacji nie można cofnąć.`,
+    clearBranch: "Wyczyść gałęzie",
+    clearAll: "Wyczyść wszystko",
   },
   project: {
     segments: {

@@ -1784,6 +1784,8 @@ export const zhHant: TranslationStructure = {
     deleteArchivedBranchSessions: "刪除歸檔分支會話",
     deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
       `確定要永久刪除 ${count} 個歸檔分支會話嗎？此操作無法撤銷。`,
+    clearBranch: "清除分支",
+    clearAll: "清除全部",
   },
   project: {
     segments: {

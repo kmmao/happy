@@ -1867,6 +1867,8 @@ export const ca: TranslationStructure = {
     deleteArchivedBranchSessions: "Elimina les sessions de branca arxivades",
     deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
       `Segur que vols eliminar permanentment ${count} sessió${count === 1 ? "" : "ns"} de branca arxivad${count === 1 ? "a" : "es"}? Aquesta acció no es pot desfer.`,
+    clearBranch: "Neteja branques",
+    clearAll: "Neteja tot",
   },
   project: {
     segments: {

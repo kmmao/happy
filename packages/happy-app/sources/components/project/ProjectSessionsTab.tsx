@@ -390,7 +390,7 @@ export const ProjectSessionsTab = React.memo(
                                         >
                                             <Ionicons name="git-branch-outline" size={14} color="#5856D6" />
                                             <Text style={styles.archivedHeaderButtonBranchText}>
-                                                {t("sessionInfo.tagBranch")}
+                                                {t("projects.clearBranch")}
                                             </Text>
                                         </Pressable>
                                     )}
@@ -404,6 +404,9 @@ export const ProjectSessionsTab = React.memo(
                                         ]}
                                     >
                                         <Ionicons name="trash-outline" size={14} color={theme.colors.deleteAction} />
+                                        <Text style={[styles.archivedHeaderButtonText, { color: theme.colors.deleteAction }]}>
+                                            {t("projects.clearAll")}
+                                        </Text>
                                     </Pressable>
                                 </View>
                             </View>

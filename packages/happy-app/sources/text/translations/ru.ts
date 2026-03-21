@@ -1885,6 +1885,8 @@ export const ru: TranslationStructure = {
     deleteArchivedBranchSessions: "Удалить архивные сессии веток",
     deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
       `Вы уверены, что хотите навсегда удалить ${count} архивных сессий веток? Это действие нельзя отменить.`,
+    clearBranch: "Очистить ветки",
+    clearAll: "Очистить все",
   },
   project: {
     segments: {

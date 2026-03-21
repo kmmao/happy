@@ -1864,6 +1864,8 @@ export const es: TranslationStructure = {
     deleteArchivedBranchSessions: "Eliminar sesiones de rama archivadas",
     deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
       `¿Seguro que quieres eliminar permanentemente ${count} sesión${count === 1 ? "" : "es"} de rama archivada${count === 1 ? "" : "s"}? Esta acción no se puede deshacer.`,
+    clearBranch: "Limpiar ramas",
+    clearAll: "Limpiar todo",
   },
   project: {
     segments: {

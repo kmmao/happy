@@ -1847,6 +1847,8 @@ export const en = {
     deleteArchivedBranchSessions: "Delete Archived Branch Sessions",
     deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
       `Are you sure you want to permanently delete ${count} archived branch session${count === 1 ? "" : "s"}? This cannot be undone.`,
+    clearBranch: "Clear Branch",
+    clearAll: "Clear All",
   },
 
   project: {
