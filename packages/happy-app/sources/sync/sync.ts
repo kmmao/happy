@@ -3,7 +3,7 @@ import { apiSocket } from "@/sync/apiSocket";
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { Encryption } from "@/sync/encryption/encryption";
 import { SessionEncryption } from "@/sync/encryption/sessionEncryption";
-import { decodeBase64, encodeBase64 } from "@/encryption/base64";
+import { decodeBase64 } from "@/encryption/base64";
 import { storage, registerPreferencesSyncCallback } from "./storage";
 import {
   ApiEphemeralUpdateSchema,
@@ -27,13 +27,44 @@ import {
   extractNeedsContinueFromRaw,
   RawRecord,
 } from "./typesRaw";
+import {
+  handleNewMessageUpdate,
+  handleDeleteSessionUpdate,
+  handleUpdateSessionUpdate,
+  handleUpdateAccountUpdate,
+  handleUpdateMachineUpdate,
+  handleRelationshipUpdate,
+  handleNewArtifactUpdate,
+  handleUpdateArtifactUpdate,
+  handleDeleteArtifactUpdate,
+  handleNewFeedPostUpdate,
+  handleKvBatchUpdate,
+  handleProjectUpdate,
+  type UpdateHandlerContext,
+} from "./syncUpdateHandlers";
+import {
+  fetchArtifactsList as fetchArtifactsListAction,
+  fetchArtifactWithBody as fetchArtifactWithBodyAction,
+  createArtifactAction,
+  updateArtifactAction,
+  type ArtifactContext,
+} from "./syncArtifacts";
+import {
+  hasPendingOutboxMessages as hasPendingOutboxMessagesHelper,
+  maybeStartBackgroundSendWatchdog as maybeStartBackgroundSendWatchdogHelper,
+  clearBackgroundSendWatchdog as clearBackgroundSendWatchdogHelper,
+  scheduleBackgroundSendTimeoutNotification as scheduleBackgroundSendTimeoutNotificationHelper,
+  cancelBackgroundSendTimeoutNotification as cancelBackgroundSendTimeoutNotificationHelper,
+  notifyMessageSendFailed as notifyMessageSendFailedHelper,
+  failPendingOutboxMessages as failPendingOutboxMessagesHelper,
+  handleBackgroundSendTimeout as handleBackgroundSendTimeoutHelper,
+  type BackgroundSendState,
+} from "./syncBackgroundSend";
 import { getCurrentLanguage, t } from "@/text";
 import { issueSessionStore } from "./issueSessionStore";
-import { isIssueSessionKey } from "./issueSessionTypes";
 import {
   handleWebhookIssueLinked as issueHandleWebhookIssueLinked,
   handleWebhookPRMerged as issueHandleWebhookPRMerged,
-  handleIssueSessionCompletion as issueHandleCompletion,
   markFailedIssueSessionsForEndedSessions as issueMarkFailed,
   checkProcessingPRs as issueCheckProcessingPRs,
   recoverMissingPRUrls as issueRecoverMissingPRUrls,
@@ -43,9 +74,8 @@ import {
   Settings,
   settingsDefaults,
   settingsParse,
-  SUPPORTED_SCHEMA_VERSION,
 } from "./settings";
-import { Profile, profileParse } from "./profile";
+import { profileParse } from "./profile";
 import {
   loadPendingSettings,
   savePendingSettings,
@@ -68,7 +98,6 @@ import { config } from "@/config";
 import { log } from "@/log";
 import { gitStatusSync } from "./gitStatusSync";
 import { projectManager } from "./projectManager";
-import { removeWorktree } from "./gitWorktreeOps";
 import { AsyncLock } from "@/utils/lock";
 import { NonRetryableError } from "@/utils/time";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
@@ -76,22 +105,10 @@ import { realtimeStore } from "@/realtime/realtimeStore";
 import { Message } from "./typesMessage";
 import { EncryptionCache } from "./encryption/encryptionCache";
 import { systemPrompt } from "./prompt/systemPrompt";
-import {
-  fetchArtifact,
-  fetchArtifacts,
-  createArtifact,
-  updateArtifact,
-} from "./apiArtifacts";
-import {
-  DecryptedArtifact,
-  Artifact,
-  ArtifactCreateRequest,
-  ArtifactUpdateRequest,
-} from "./artifactTypes";
-import { ArtifactEncryption } from "./encryption/artifactEncryption";
+import type { DecryptedArtifact } from "./artifactTypes";
 import { getFriendsList, getUserProfile } from "./apiFriends";
 import { fetchFeed } from "./apiFeed";
-import { FeedItem } from "./feedTypes";
+import type { FeedItem } from "./feedTypes";
 import { UserProfile } from "./friendTypes";
 import { resolveMessageModeMeta } from "./messageMeta";
 import { getSessionUsageSummary } from "./apiUsage";
@@ -101,18 +118,12 @@ import {
   saveMessageCache,
   deleteMessageCache,
 } from "./messageCache";
-import { getSessionName } from "@/utils/sessionUtils";
 import {
   fetchProjects,
   resolveProject,
   linkSessionsToProject,
   deleteProject as apiDeleteProject,
 } from "./apiProjects";
-import {
-  notifyTaskComplete,
-  notifyPermissionRequest,
-  clearNotifiedRequests,
-} from "@/utils/webNotification";
 
 type V3GetSessionMessagesResponse = {
   messages: ApiMessage[];
@@ -133,64 +144,6 @@ type OutboxMessage = {
   localId: string;
   content: string;
 };
-
-/**
- * Heuristically determine whether the user needs to respond after a turn ends.
- *
- * Checks (in order):
- * 1. promptSuggestions / needsContinue signals from CLI
- * 2. The just-received message (passed in to avoid timing race with async enqueue)
- * 3. The most recent agent-text already in storage (fallback)
- *
- * Returns true (conservative) when no signal can be found.
- */
-function detectNeedsAttention(
-  sessionId: string,
-  incomingMessage: NormalizedMessage | null,
-): boolean {
-  const state = storage.getState();
-
-  // CLI sent a prompt suggestion → user should respond
-  if (state.sessionPromptSuggestions[sessionId]) return true;
-
-  // CLI signalled needs-continue (max turns reached) → user should respond
-  if (state.sessionNeedsContinue[sessionId]) return true;
-
-  // Check the just-received message first (avoids timing race with enqueue)
-  if (incomingMessage?.role === "agent") {
-    for (let j = incomingMessage.content.length - 1; j >= 0; j--) {
-      const block = incomingMessage.content[j];
-      if (block.type === "text") {
-        return textNeedsAttention(block.text);
-      }
-    }
-  }
-
-  // Fall back to stored messages (sorted descending: index 0 = newest)
-  const sm = state.sessionMessages[sessionId];
-  if (!sm?.messages?.length) return true; // no messages loaded, conservative
-
-  for (let i = 0; i < sm.messages.length; i++) {
-    const msg = sm.messages[i];
-    // Skip thinking blocks — only inspect visible assistant text
-    if (msg.kind === "agent-text" && !msg.isThinking) {
-      return textNeedsAttention(msg.text);
-    }
-    // Stop at the previous user message
-    if (msg.kind === "user-text") break;
-  }
-
-  // No agent-text found, conservative
-  return true;
-}
-
-/** Returns true when the text indicates the AI is asking the user something. */
-function textNeedsAttention(text: string): boolean {
-  if (text.includes("<options>")) return true;
-  const lastLine = text.trimEnd().split("\n").pop()?.trim() ?? "";
-  if (lastLine.endsWith("?") || lastLine.endsWith("\uFF1F")) return true;
-  return false;
-}
 
 class Sync {
   private static readonly BACKGROUND_SEND_TIMEOUT_MS = 30_000;
@@ -594,151 +547,70 @@ class Sync {
       });
   }
 
+  private get bgSendState(): BackgroundSendState {
+    return {
+      backgroundSendTimeout: this.backgroundSendTimeout,
+      backgroundSendNotificationId: this.backgroundSendNotificationId,
+      backgroundSendStartedAt: this.backgroundSendStartedAt,
+      appState: this.appState,
+      sendAbortControllers: this.sendAbortControllers,
+      pendingOutbox: this.pendingOutbox,
+      BACKGROUND_SEND_TIMEOUT_MS: Sync.BACKGROUND_SEND_TIMEOUT_MS,
+    };
+  }
+
+  private syncBgSendState(state: BackgroundSendState) {
+    this.backgroundSendTimeout = state.backgroundSendTimeout;
+    this.backgroundSendNotificationId = state.backgroundSendNotificationId;
+    this.backgroundSendStartedAt = state.backgroundSendStartedAt;
+  }
+
   private hasPendingOutboxMessages() {
-    if (this.sendAbortControllers.size > 0) {
-      return true;
-    }
-    for (const messages of this.pendingOutbox.values()) {
-      if (messages.length > 0) {
-        return true;
-      }
-    }
-    return false;
+    return hasPendingOutboxMessagesHelper(this.bgSendState);
   }
 
   private maybeStartBackgroundSendWatchdog() {
-    if (Platform.OS === "web" || this.appState === "active") {
-      return;
-    }
-    if (!this.hasPendingOutboxMessages() || this.backgroundSendTimeout) {
-      return;
-    }
-
-    log.log(
-      "📨 Pending messages detected in background. Starting 30s send watchdog.",
+    const state = this.bgSendState;
+    maybeStartBackgroundSendWatchdogHelper(
+      state,
+      () => this.handleBackgroundSendTimeout(),
+      () => this.scheduleBackgroundSendTimeoutNotification(),
     );
-    this.backgroundSendStartedAt = Date.now();
-    this.backgroundSendTimeout = setTimeout(() => {
-      this.backgroundSendTimeout = null;
-      void this.handleBackgroundSendTimeout();
-    }, Sync.BACKGROUND_SEND_TIMEOUT_MS);
-    void this.scheduleBackgroundSendTimeoutNotification();
+    this.syncBgSendState(state);
   }
 
   private clearBackgroundSendWatchdog() {
-    if (this.backgroundSendTimeout) {
-      clearTimeout(this.backgroundSendTimeout);
-      this.backgroundSendTimeout = null;
-    }
-    this.backgroundSendStartedAt = null;
+    const state = this.bgSendState;
+    clearBackgroundSendWatchdogHelper(state);
+    this.syncBgSendState(state);
   }
 
   private async scheduleBackgroundSendTimeoutNotification() {
-    if (Platform.OS === "web" || this.backgroundSendNotificationId) {
-      return;
-    }
-    try {
-      this.backgroundSendNotificationId =
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "Message not sent",
-            body: "A message is still sending in the background. It will fail in 30 seconds if not delivered.",
-            sound: true,
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-            seconds: Math.ceil(Sync.BACKGROUND_SEND_TIMEOUT_MS / 1000),
-          },
-        });
-    } catch (error) {
-      log.log(
-        `Failed to schedule background send timeout notification: ${error}`,
-      );
-    }
+    const state = this.bgSendState;
+    await scheduleBackgroundSendTimeoutNotificationHelper(state);
+    this.syncBgSendState(state);
   }
 
   private async cancelBackgroundSendTimeoutNotification() {
-    if (!this.backgroundSendNotificationId) {
-      return;
-    }
-    try {
-      await Notifications.cancelScheduledNotificationAsync(
-        this.backgroundSendNotificationId,
-      );
-    } catch (error) {
-      log.log(
-        `Failed to cancel background send timeout notification: ${error}`,
-      );
-    } finally {
-      this.backgroundSendNotificationId = null;
-    }
+    const state = this.bgSendState;
+    await cancelBackgroundSendTimeoutNotificationHelper(state);
+    this.syncBgSendState(state);
   }
 
   private async notifyMessageSendFailed() {
-    if (Platform.OS === "web") {
-      return;
-    }
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "Message failed",
-          body: "A message failed to send while the app was in background. Open Happy and retry.",
-          sound: true,
-        },
-        trigger: null,
-      });
-    } catch (error) {
-      log.log(`Failed to schedule message failure notification: ${error}`);
-    }
+    await notifyMessageSendFailedHelper();
   }
 
   private failPendingOutboxMessages(reasonText: string) {
-    for (const controller of this.sendAbortControllers.values()) {
-      controller.abort();
-    }
-    this.sendAbortControllers.clear();
-
-    const now = Date.now();
-    const sessionIds: string[] = [];
-    for (const [sessionId, pending] of this.pendingOutbox) {
-      if (pending.length === 0) {
-        continue;
-      }
-      pending.length = 0;
-      this.pendingOutbox.delete(sessionId);
-      sessionIds.push(sessionId);
-    }
-
-    for (const sessionId of sessionIds) {
-      this.enqueueMessages(sessionId, [
-        {
-          id: randomUUID(),
-          localId: null,
-          createdAt: now,
-          role: "event",
-          isSidechain: false,
-          content: {
-            type: "message",
-            message: reasonText,
-          },
-        },
-      ]);
-    }
+    const state = this.bgSendState;
+    failPendingOutboxMessagesHelper(state, reasonText, this.enqueueMessages.bind(this));
+    this.syncBgSendState(state);
   }
 
   private async handleBackgroundSendTimeout() {
-    if (!this.hasPendingOutboxMessages()) {
-      await this.cancelBackgroundSendTimeoutNotification();
-      this.backgroundSendStartedAt = null;
-      return;
-    }
-
-    await this.cancelBackgroundSendTimeoutNotification();
-    await this.notifyMessageSendFailed();
-    this.failPendingOutboxMessages(
-      "Message failed to send in background after 30s. Please retry.",
-    );
-    this.backgroundSendStartedAt = null;
+    const state = this.bgSendState;
+    await handleBackgroundSendTimeoutHelper(state, this.enqueueMessages.bind(this));
+    this.syncBgSendState(state);
   }
 
   async sendMessage(
@@ -1419,131 +1291,28 @@ class Sync {
     return this.credentials;
   }
 
-  // Artifact methods
+  // Artifact methods - delegated to syncArtifacts.ts
+  private get artifactCtx(): ArtifactContext {
+    return {
+      credentials: this.credentials,
+      encryption: this.encryption,
+      artifactDataKeys: this.artifactDataKeys,
+    };
+  }
+
   public fetchArtifactsList = async (): Promise<void> => {
-    log.log("📦 fetchArtifactsList: Starting artifact sync");
     if (!this.credentials) {
       log.log("📦 fetchArtifactsList: No credentials, skipping");
       return;
     }
-
-    try {
-      log.log("📦 fetchArtifactsList: Fetching artifacts from server");
-      const artifacts = await fetchArtifacts(this.credentials);
-      log.log(
-        `📦 fetchArtifactsList: Received ${artifacts.length} artifacts from server`,
-      );
-      const decryptedArtifacts: DecryptedArtifact[] = [];
-
-      for (const artifact of artifacts) {
-        try {
-          // Decrypt the data encryption key
-          const decryptedKey = await this.encryption.decryptEncryptionKey(
-            artifact.dataEncryptionKey,
-          );
-          if (!decryptedKey) {
-            console.error(`Failed to decrypt key for artifact ${artifact.id}`);
-            continue;
-          }
-
-          // Store the decrypted key in memory
-          this.artifactDataKeys.set(artifact.id, decryptedKey);
-
-          // Create artifact encryption instance
-          const artifactEncryption = new ArtifactEncryption(decryptedKey);
-
-          // Decrypt header
-          const header = await artifactEncryption.decryptHeader(
-            artifact.header,
-          );
-
-          decryptedArtifacts.push({
-            id: artifact.id,
-            title: header?.title || null,
-            sessions: header?.sessions, // Include sessions from header
-            draft: header?.draft, // Include draft flag from header
-            body: undefined, // Body not loaded in list
-            headerVersion: artifact.headerVersion,
-            bodyVersion: artifact.bodyVersion,
-            seq: artifact.seq,
-            createdAt: artifact.createdAt,
-            updatedAt: artifact.updatedAt,
-            isDecrypted: !!header,
-          });
-        } catch (err) {
-          console.error(`Failed to decrypt artifact ${artifact.id}:`, err);
-          // Add with decryption failed flag
-          decryptedArtifacts.push({
-            id: artifact.id,
-            title: null,
-            body: undefined,
-            headerVersion: artifact.headerVersion,
-            seq: artifact.seq,
-            createdAt: artifact.createdAt,
-            updatedAt: artifact.updatedAt,
-            isDecrypted: false,
-          });
-        }
-      }
-
-      log.log(
-        `📦 fetchArtifactsList: Successfully decrypted ${decryptedArtifacts.length} artifacts`,
-      );
-      storage.getState().applyArtifacts(decryptedArtifacts, true);
-      log.log("📦 fetchArtifactsList: Artifacts applied to storage");
-    } catch (error) {
-      log.log(`📦 fetchArtifactsList: Error fetching artifacts: ${error}`);
-      console.error("Failed to fetch artifacts:", error);
-      throw error;
-    }
+    await fetchArtifactsListAction(this.artifactCtx);
   };
 
   public async fetchArtifactWithBody(
     artifactId: string,
   ): Promise<DecryptedArtifact | null> {
     if (!this.credentials) return null;
-
-    try {
-      const artifact = await fetchArtifact(this.credentials, artifactId);
-
-      // Decrypt the data encryption key
-      const decryptedKey = await this.encryption.decryptEncryptionKey(
-        artifact.dataEncryptionKey,
-      );
-      if (!decryptedKey) {
-        console.error(`Failed to decrypt key for artifact ${artifactId}`);
-        return null;
-      }
-
-      // Store the decrypted key in memory
-      this.artifactDataKeys.set(artifact.id, decryptedKey);
-
-      // Create artifact encryption instance
-      const artifactEncryption = new ArtifactEncryption(decryptedKey);
-
-      // Decrypt header and body
-      const header = await artifactEncryption.decryptHeader(artifact.header);
-      const body = artifact.body
-        ? await artifactEncryption.decryptBody(artifact.body)
-        : null;
-
-      return {
-        id: artifact.id,
-        title: header?.title || null,
-        sessions: header?.sessions, // Include sessions from header
-        draft: header?.draft, // Include draft flag from header
-        body: body?.body || null,
-        headerVersion: artifact.headerVersion,
-        bodyVersion: artifact.bodyVersion,
-        seq: artifact.seq,
-        createdAt: artifact.createdAt,
-        updatedAt: artifact.updatedAt,
-        isDecrypted: !!header,
-      };
-    } catch (error) {
-      console.error(`Failed to fetch artifact ${artifactId}:`, error);
-      return null;
-    }
+    return fetchArtifactWithBodyAction(this.artifactCtx, artifactId);
   }
 
   public async createArtifact(
@@ -1555,65 +1324,7 @@ class Sync {
     if (!this.credentials) {
       throw new Error("Not authenticated");
     }
-
-    try {
-      // Generate unique artifact ID
-      const artifactId = this.encryption.generateId();
-
-      // Generate data encryption key
-      const dataEncryptionKey = ArtifactEncryption.generateDataEncryptionKey();
-
-      // Store the decrypted key in memory
-      this.artifactDataKeys.set(artifactId, dataEncryptionKey);
-
-      // Encrypt the data encryption key with user's key
-      const encryptedKey =
-        await this.encryption.encryptEncryptionKey(dataEncryptionKey);
-
-      // Create artifact encryption instance
-      const artifactEncryption = new ArtifactEncryption(dataEncryptionKey);
-
-      // Encrypt header and body
-      const encryptedHeader = await artifactEncryption.encryptHeader({
-        title,
-        sessions,
-        draft,
-      });
-      const encryptedBody = await artifactEncryption.encryptBody({ body });
-
-      // Create the request
-      const request: ArtifactCreateRequest = {
-        id: artifactId,
-        header: encryptedHeader,
-        body: encryptedBody,
-        dataEncryptionKey: encodeBase64(encryptedKey, "base64"),
-      };
-
-      // Send to server
-      const artifact = await createArtifact(this.credentials, request);
-
-      // Add to local storage
-      const decryptedArtifact: DecryptedArtifact = {
-        id: artifact.id,
-        title,
-        sessions,
-        draft,
-        body,
-        headerVersion: artifact.headerVersion,
-        bodyVersion: artifact.bodyVersion,
-        seq: artifact.seq,
-        createdAt: artifact.createdAt,
-        updatedAt: artifact.updatedAt,
-        isDecrypted: true,
-      };
-
-      storage.getState().addArtifact(decryptedArtifact);
-
-      return artifactId;
-    } catch (error) {
-      console.error("Failed to create artifact:", error);
-      throw error;
-    }
+    return createArtifactAction(this.artifactCtx, title, body, sessions, draft);
   }
 
   public async updateArtifact(
@@ -1626,116 +1337,7 @@ class Sync {
     if (!this.credentials) {
       throw new Error("Not authenticated");
     }
-
-    try {
-      // Get current artifact to get versions and encryption key
-      const currentArtifact = storage.getState().artifacts[artifactId];
-      if (!currentArtifact) {
-        throw new Error("Artifact not found");
-      }
-
-      // Get the data encryption key from memory or fetch it
-      let dataEncryptionKey = this.artifactDataKeys.get(artifactId);
-
-      // Fetch full artifact if we don't have version info or encryption key
-      let headerVersion = currentArtifact.headerVersion;
-      let bodyVersion = currentArtifact.bodyVersion;
-
-      if (
-        headerVersion === undefined ||
-        bodyVersion === undefined ||
-        !dataEncryptionKey
-      ) {
-        const fullArtifact = await fetchArtifact(this.credentials, artifactId);
-        headerVersion = fullArtifact.headerVersion;
-        bodyVersion = fullArtifact.bodyVersion;
-
-        // Decrypt and store the data encryption key if we don't have it
-        if (!dataEncryptionKey) {
-          const decryptedKey = await this.encryption.decryptEncryptionKey(
-            fullArtifact.dataEncryptionKey,
-          );
-          if (!decryptedKey) {
-            throw new Error("Failed to decrypt encryption key");
-          }
-          this.artifactDataKeys.set(artifactId, decryptedKey);
-          dataEncryptionKey = decryptedKey;
-        }
-      }
-
-      // Create artifact encryption instance
-      const artifactEncryption = new ArtifactEncryption(dataEncryptionKey);
-
-      // Prepare update request
-      const updateRequest: ArtifactUpdateRequest = {};
-
-      // Check if header needs updating (title, sessions, or draft changed)
-      if (
-        title !== currentArtifact.title ||
-        JSON.stringify(sessions) !== JSON.stringify(currentArtifact.sessions) ||
-        draft !== currentArtifact.draft
-      ) {
-        const encryptedHeader = await artifactEncryption.encryptHeader({
-          title,
-          sessions,
-          draft,
-        });
-        updateRequest.header = encryptedHeader;
-        updateRequest.expectedHeaderVersion = headerVersion;
-      }
-
-      // Only update body if it changed
-      if (body !== currentArtifact.body) {
-        const encryptedBody = await artifactEncryption.encryptBody({ body });
-        updateRequest.body = encryptedBody;
-        updateRequest.expectedBodyVersion = bodyVersion;
-      }
-
-      // Skip if no changes
-      if (Object.keys(updateRequest).length === 0) {
-        return;
-      }
-
-      // Send update to server
-      const response = await updateArtifact(
-        this.credentials,
-        artifactId,
-        updateRequest,
-      );
-
-      if (!response.success) {
-        // Handle version mismatch
-        if (response.error === "version-mismatch") {
-          throw new Error(
-            "Artifact was modified by another client. Please refresh and try again.",
-          );
-        }
-        throw new Error("Failed to update artifact");
-      }
-
-      // Update local storage
-      const updatedArtifact: DecryptedArtifact = {
-        ...currentArtifact,
-        title,
-        sessions,
-        draft,
-        body,
-        headerVersion:
-          response.headerVersion !== undefined
-            ? response.headerVersion
-            : headerVersion,
-        bodyVersion:
-          response.bodyVersion !== undefined
-            ? response.bodyVersion
-            : bodyVersion,
-        updatedAt: Date.now(),
-      };
-
-      storage.getState().updateArtifact(updatedArtifact);
-    } catch (error) {
-      console.error("Failed to update artifact:", error);
-      throw error;
-    }
+    await updateArtifactAction(this.artifactCtx, artifactId, title, body, sessions, draft);
   }
 
   private fetchMachines = async () => {
@@ -2601,6 +2203,35 @@ class Sync {
     });
   };
 
+  private get updateHandlerCtx(): UpdateHandlerContext {
+    return {
+      encryption: this.encryption,
+      artifactDataKeys: this.artifactDataKeys,
+      applySessions: this.applySessions.bind(this),
+      enqueueMessages: this.enqueueMessages.bind(this),
+      getMessagesSync: this.getMessagesSync.bind(this),
+      fetchSessions: () => { this.fetchSessions(); },
+      onSessionVisible: this.onSessionVisible.bind(this),
+      sessionLastSeq: this.sessionLastSeq,
+      saveLastSeq: saveLastSeq,
+      deleted404Sessions: this.deleted404Sessions,
+      messagesSync: this.messagesSync as Map<string, { stop: () => void }>,
+      sendSync: this.sendSync as Map<string, { stop: () => void }>,
+      pendingOutbox: this.pendingOutbox as Map<string, unknown[]>,
+      deleteLastSeq: deleteLastSeq,
+      sessionMessageLocks: this.sessionMessageLocks as Map<string, unknown>,
+      sessionMessageQueue: this.sessionMessageQueue as Map<string, unknown[]>,
+      sessionQueueProcessing: this.sessionQueueProcessing,
+      artifactsSync: this.artifactsSync,
+      friendsSync: this.friendsSync,
+      friendRequestsSync: this.friendRequestsSync,
+      feedSync: this.feedSync,
+      projectsSync: this.projectsSync,
+      sessionsSync: this.sessionsSync,
+      assumeUsers: this.assumeUsers.bind(this),
+    };
+  }
+
   private handleUpdate = async (update: unknown) => {
     const validatedUpdate = ApiUpdateContainerSchema.safeParse(update);
     if (!validatedUpdate.success) {
@@ -2608,745 +2239,39 @@ class Sync {
       return;
     }
     const updateData = validatedUpdate.data;
+    const ctx = this.updateHandlerCtx;
 
     if (updateData.body.t === "new-message") {
-      // Get encryption
-      const encryption = this.encryption.getSessionEncryption(
-        updateData.body.sid,
-      );
-      if (!encryption) {
-        // Should never happen
-        console.error(`Session ${updateData.body.sid} not found`);
-        this.fetchSessions(); // Just fetch sessions again
-        return;
-      }
-
-      // Decrypt message
-      let lastMessage: NormalizedMessage | null = null;
-      if (updateData.body.message) {
-        const decrypted = await encryption.decryptMessage(
-          updateData.body.message,
-        );
-        if (decrypted) {
-          // Extract prompt suggestion before normalizing
-          const suggestion = extractPromptSuggestionFromRaw(decrypted.content);
-          if (suggestion !== null) {
-            storage
-              .getState()
-              .setPromptSuggestion(updateData.body.sid, suggestion);
-          }
-
-          // Extract needs-continue signal
-          if (extractNeedsContinueFromRaw(decrypted.content)) {
-            storage.getState().setNeedsContinue(updateData.body.sid, true);
-          }
-
-          lastMessage = normalizeRawMessage(
-            decrypted.id,
-            decrypted.localId,
-            decrypted.createdAt,
-            decrypted.content,
-          );
-
-          // Check for task lifecycle events to update thinking state
-          // This ensures UI updates even if volatile activity updates are lost
-          const rawContent = decrypted.content as {
-            role?: string;
-            content?: {
-              type?: string;
-              data?: {
-                type?: string;
-                ev?: { t?: string };
-              };
-              // Claude session protocol: envelope has ev directly (no data wrapper)
-              ev?: { t?: string };
-            };
-          } | null;
-          const contentType = rawContent?.content?.type;
-          const dataType = rawContent?.content?.data?.type;
-          const sessionEventType = rawContent?.content?.data?.ev?.t;
-          // Claude session protocol: role="session", envelope.ev.t at content.ev.t
-          const envelopeEventType = rawContent?.content?.ev?.t;
-
-          // Debug logging to trace lifecycle events
-          if (
-            dataType === "task_complete" ||
-            dataType === "turn_aborted" ||
-            dataType === "task_started" ||
-            sessionEventType === "turn-start" ||
-            sessionEventType === "turn-end" ||
-            envelopeEventType === "turn-start" ||
-            envelopeEventType === "turn-end"
-          ) {
-            log.log(
-              `🔄 [Sync] Lifecycle event detected: contentType=${contentType}, dataType=${dataType}, sessionEventType=${sessionEventType}, role=${rawContent?.role}, envelopeEventType=${envelopeEventType}`,
-            );
-          }
-
-          const isSessionProtocolEvent = rawContent?.role === "session";
-
-          const isTaskComplete =
-            ((contentType === "acp" || contentType === "codex") &&
-              (dataType === "task_complete" || dataType === "turn_aborted")) ||
-            (contentType === "session" && sessionEventType === "turn-end") ||
-            (isSessionProtocolEvent && envelopeEventType === "turn-end");
-
-          const isTaskStarted =
-            ((contentType === "acp" || contentType === "codex") &&
-              dataType === "task_started") ||
-            (contentType === "session" && sessionEventType === "turn-start") ||
-            (isSessionProtocolEvent && envelopeEventType === "turn-start");
-
-          if (isTaskComplete || isTaskStarted) {
-            log.log(
-              `🔄 [Sync] Updating thinking state: isTaskComplete=${isTaskComplete}, isTaskStarted=${isTaskStarted}`,
-            );
-          }
-
-          // Update session
-          const session = storage.getState().sessions[updateData.body.sid];
-          if (session) {
-            this.applySessions([
-              {
-                ...session,
-                updatedAt: updateData.createdAt,
-                seq: updateData.seq,
-                // Update thinking state and attention flag based on task lifecycle events
-                // Set thinkingAt to current time so ephemeral updates with older
-                // timestamps won't overwrite this more reliable lifecycle signal
-                ...(isTaskComplete
-                  ? {
-                      thinking: false,
-                      needsAttention: detectNeedsAttention(
-                        updateData.body.sid,
-                        lastMessage,
-                      ),
-                      thinkingAt: Date.now(),
-                      apiRetry: null,
-                    }
-                  : {}),
-                ...(isTaskStarted
-                  ? {
-                      thinking: true,
-                      needsAttention: false,
-                      thinkingAt: Date.now(),
-                    }
-                  : {}),
-              },
-            ]);
-
-            // Auto-detect issue session completion on turn-end.
-            // When a task completes, check PR status and update issue session link accordingly.
-            if (isTaskComplete) {
-              // Web browser notification for task completion
-              if (
-                Platform.OS === "web" &&
-                storage.getState().settings.webNotifications
-              ) {
-                const settings = storage.getState().settings;
-                const sessionName = getSessionName(session);
-                notifyTaskComplete(
-                  sessionName,
-                  updateData.body.sid,
-                  t("webNotification.taskComplete"),
-                  settings.webNotificationsPersistent,
-                );
-              }
-
-              const link = issueSessionStore
-                .getState()
-                .findBySessionId(updateData.body.sid);
-              log.log(
-                `🔄 [IssueSession] turn-end: sid=${updateData.body.sid}, link=${link ? `${link.issueKey}(${link.status})` : "NONE"}`,
-              );
-              if (link && link.status === "processing") {
-                // Check PR status and mark completed if appropriate
-                void issueHandleCompletion(link);
-              }
-            }
-          } else {
-            // Fetch sessions again if we don't have this session
-            this.fetchSessions();
-          }
-
-          // Always apply the current message immediately so the UI updates
-          // without waiting for a full fetchMessages round-trip.
-          const currentLastSeq = this.sessionLastSeq.get(updateData.body.sid);
-          const incomingSeq = updateData.body.message.seq;
-          const isConsecutive =
-            lastMessage &&
-            currentLastSeq !== undefined &&
-            incomingSeq === currentLastSeq + 1;
-
-          if (lastMessage) {
-            this.enqueueMessages(updateData.body.sid, [lastMessage]);
-
-            // Update seq tracker if this message advances it
-            if (currentLastSeq === undefined || incomingSeq > currentLastSeq) {
-              this.sessionLastSeq.set(updateData.body.sid, incomingSeq);
-              saveLastSeq(updateData.body.sid, incomingSeq);
-            }
-
-            // Check for mutable tool calls to refresh git status
-            let hasMutableTool = false;
-            if (
-              lastMessage.role === "agent" &&
-              lastMessage.content[0] &&
-              lastMessage.content[0].type === "tool-result"
-            ) {
-              hasMutableTool = storage
-                .getState()
-                .isMutableToolCall(
-                  updateData.body.sid,
-                  lastMessage.content[0].tool_use_id,
-                );
-            }
-            if (hasMutableTool) {
-              gitStatusSync.invalidate(updateData.body.sid);
-            }
-          }
-
-          // If seq is non-consecutive, also fetch missing messages from server
-          if (!isConsecutive) {
-            this.getMessagesSync(updateData.body.sid)?.invalidate();
-          }
-        }
-      }
-
-      // Note: We intentionally do NOT call onSessionVisible here.
-      // onSessionVisible triggers fetchMessages which competes with the
-      // message queue lock and causes unnecessary re-fetches on every
-      // incoming message. Session visibility is already handled by
-      // SessionView.useLayoutEffect when the user enters a session.
+      await handleNewMessageUpdate(updateData, updateData.body, ctx);
     } else if (updateData.body.t === "new-session") {
       log.log("🆕 New session update received");
       this.sessionsSync.invalidate();
     } else if (updateData.body.t === "delete-session") {
-      log.log("🗑️ Delete session update received");
-      const sessionId = updateData.body.sid;
-
-      // Update any issue-session link associated with this session
-      const issueLink = issueSessionStore.getState().findBySessionId(sessionId);
-      if (issueLink && issueLink.status === "processing") {
-        void issueSessionStore
-          .getState()
-          .updateStatus(issueLink.issueKey, "cancelled")
-          .catch(() => {
-            // Best-effort — don't block session deletion
-          });
-      }
-
-      // Clean up worktree if this was a worktree session
-      const sessionToDelete = storage.getState().sessions[sessionId];
-      const wt = sessionToDelete?.metadata?.worktree;
-      if (wt?.isWorktree && wt.name && sessionToDelete?.metadata?.machineId) {
-        const parentPath =
-          wt.parentRepoPath ?? sessionToDelete.metadata.path ?? "";
-
-        // Determine branch cleanup strategy:
-        // - PR exists → skip (remote branch needed for PR)
-        // - Already merged → safe delete (-d, will succeed)
-        // - Otherwise → force delete (-D, avoid orphaned branches)
-        const branchCleanup: "skip" | "safe" | "force" = wt.prUrl
-          ? "skip"
-          : wt.state === "merged"
-            ? "safe"
-            : "force";
-
-        void removeWorktree(
-          sessionToDelete.metadata.machineId,
-          wt.name,
-          parentPath,
-          branchCleanup,
-        ).catch((err) => {
-          log.log(`⚠️ Worktree cleanup failed for ${wt.name}: ${err}`);
-        });
-      }
-
-      // Remove session from storage
-      storage.getState().deleteSession(sessionId);
-
-      // Remove from 404 guard if present
-      this.deleted404Sessions.delete(sessionId);
-
-      // Remove encryption keys from memory
-      this.encryption.removeSessionEncryption(sessionId);
-
-      // Remove from project manager
-      projectManager.removeSession(sessionId);
-
-      // Stop and clean up syncs
-      const msgSync = this.messagesSync.get(sessionId);
-      if (msgSync) {
-        msgSync.stop();
-        this.messagesSync.delete(sessionId);
-      }
-      const sndSync = this.sendSync.get(sessionId);
-      if (sndSync) {
-        sndSync.stop();
-        this.sendSync.delete(sessionId);
-      }
-
-      // Clear any cached git status and remaining state
-      gitStatusSync.clearForSession(sessionId);
-      this.pendingOutbox.delete(sessionId);
-      this.sessionLastSeq.delete(sessionId);
-      deleteLastSeq(sessionId);
-      deleteMessageCache(sessionId);
-      this.sessionMessageLocks.delete(sessionId);
-      this.sessionMessageQueue.delete(sessionId);
-      this.sessionQueueProcessing.delete(sessionId);
-
-      log.log(`🗑️ Session ${sessionId} deleted from local storage`);
+      handleDeleteSessionUpdate(updateData.body, ctx);
     } else if (updateData.body.t === "update-session") {
-      const session = storage.getState().sessions[updateData.body.id];
-      if (session) {
-        // Get session encryption
-        const sessionEncryption = this.encryption.getSessionEncryption(
-          updateData.body.id,
-        );
-        if (!sessionEncryption) {
-          console.error(
-            `Session encryption not found for ${updateData.body.id} - this should never happen`,
-          );
-          return;
-        }
-
-        const agentState =
-          updateData.body.agentState && sessionEncryption
-            ? await sessionEncryption.decryptAgentState(
-                updateData.body.agentState.version,
-                updateData.body.agentState.value,
-              )
-            : session.agentState;
-        const metadata =
-          updateData.body.metadata && sessionEncryption
-            ? await sessionEncryption.decryptMetadata(
-                updateData.body.metadata.version,
-                updateData.body.metadata.value,
-              )
-            : session.metadata;
-
-        // Decrypt preferences if included in the update
-        const preferencesData = updateData.body.preferences;
-        const preferences = preferencesData?.value
-          ? await sessionEncryption.decryptPreferences(preferencesData.value)
-          : null;
-
-        this.applySessions([
-          {
-            ...session,
-            agentState,
-            agentStateVersion: updateData.body.agentState
-              ? updateData.body.agentState.version
-              : session.agentStateVersion,
-            metadata,
-            metadataVersion: updateData.body.metadata
-              ? updateData.body.metadata.version
-              : session.metadataVersion,
-            preferencesVersion: preferencesData
-              ? preferencesData.version
-              : session.preferencesVersion,
-            // Spread server preferences into session fields if available
-            ...(preferences
-              ? {
-                  permissionMode: preferences.permissionMode,
-                  modelMode: preferences.modelMode,
-                  customModels: preferences.customModels,
-                  modelMappings: preferences.modelMappings,
-                  profileId: preferences.profileId,
-                  profileName: preferences.profileName,
-                  thinkingMode: preferences.thinkingMode,
-                  thinkingBudget: preferences.thinkingBudget,
-                  effortLevel: preferences.effortLevel,
-                  maxBudgetUsd: preferences.maxBudgetUsd,
-                }
-              : {}),
-            updatedAt: updateData.createdAt,
-            seq: updateData.seq,
-          },
-        ]);
-
-        // Invalidate git status when agent state changes (files may have been modified)
-        if (updateData.body.agentState) {
-          gitStatusSync.invalidate(updateData.body.id);
-
-          // Check for new permission requests and notify voice assistant
-          if (
-            agentState?.requests &&
-            Object.keys(agentState.requests).length > 0
-          ) {
-            const requestIds = Object.keys(agentState.requests);
-            const firstRequest = agentState.requests[requestIds[0]];
-            const toolName = firstRequest?.tool;
-            voiceHooks.onPermissionRequested(
-              updateData.body.id,
-              requestIds[0],
-              toolName,
-              firstRequest?.arguments,
-            );
-
-            // Web browser notification for permission request
-            if (
-              Platform.OS === "web" &&
-              storage.getState().settings.webNotifications
-            ) {
-              const permSession =
-                storage.getState().sessions[updateData.body.id];
-              if (permSession) {
-                const sessionName = getSessionName(permSession);
-                notifyPermissionRequest(
-                  sessionName,
-                  updateData.body.id,
-                  requestIds[0],
-                  toolName,
-                  t("webNotification.permissionRequest"),
-                  storage.getState().settings.webNotificationsPersistent,
-                );
-              }
-            }
-          } else if (Platform.OS === "web") {
-            // Permissions resolved — clear notified request IDs to free memory
-            const prevRequests = session.agentState?.requests;
-            if (prevRequests && Object.keys(prevRequests).length > 0) {
-              clearNotifiedRequests(Object.keys(prevRequests));
-            }
-          }
-
-          // Re-fetch messages when control returns to mobile (local -> remote mode switch)
-          // This catches up on any messages that were exchanged while desktop had control
-          const wasControlledByUser = session.agentState?.controlledByUser;
-          const isNowControlledByUser = agentState?.controlledByUser;
-          if (!wasControlledByUser && isNowControlledByUser) {
-            log.log(
-              `🔄 Control returned to mobile for session ${updateData.body.id}, re-fetching messages`,
-            );
-            this.onSessionVisible(updateData.body.id);
-          }
-        }
-      }
+      await handleUpdateSessionUpdate(updateData, updateData.body, ctx);
     } else if (updateData.body.t === "update-account") {
-      const accountUpdate = updateData.body;
-      const currentProfile = storage.getState().profile;
-
-      // Build updated profile with new data
-      const updatedProfile: Profile = {
-        ...currentProfile,
-        firstName:
-          accountUpdate.firstName !== undefined
-            ? accountUpdate.firstName
-            : currentProfile.firstName,
-        lastName:
-          accountUpdate.lastName !== undefined
-            ? accountUpdate.lastName
-            : currentProfile.lastName,
-        avatar:
-          accountUpdate.avatar !== undefined
-            ? accountUpdate.avatar
-            : currentProfile.avatar,
-        github:
-          accountUpdate.github !== undefined
-            ? accountUpdate.github
-            : currentProfile.github,
-        timestamp: updateData.createdAt, // Update timestamp to latest
-      };
-
-      // Apply the updated profile to storage
-      storage.getState().applyProfile(updatedProfile);
-
-      // Handle settings updates (new for profile sync)
-      if (accountUpdate.settings?.value) {
-        try {
-          const decryptedSettings = await this.encryption.decryptRaw(
-            accountUpdate.settings.value,
-          );
-          const parsedSettings = settingsParse(decryptedSettings);
-
-          // Version compatibility check
-          const settingsSchemaVersion = parsedSettings.schemaVersion ?? 1;
-          if (settingsSchemaVersion > SUPPORTED_SCHEMA_VERSION) {
-            console.warn(
-              `⚠️ Received settings schema v${settingsSchemaVersion}, ` +
-                `we support v${SUPPORTED_SCHEMA_VERSION}. Update app for full functionality.`,
-            );
-          }
-
-          storage
-            .getState()
-            .applySettings(parsedSettings, accountUpdate.settings.version);
-          log.log(
-            `📋 Settings synced from server (schema v${settingsSchemaVersion}, version ${accountUpdate.settings.version})`,
-          );
-        } catch (error) {
-          console.error("❌ Failed to process settings update:", error);
-          // Don't crash on settings sync errors, just log
-        }
-      }
+      await handleUpdateAccountUpdate(updateData, updateData.body, ctx);
     } else if (updateData.body.t === "update-machine") {
-      const machineUpdate = updateData.body;
-      const machineId = machineUpdate.machineId; // Changed from .id to .machineId
-      const machine = storage.getState().machines[machineId];
-
-      // Create or update machine with all required fields
-      const updatedMachine: Machine = {
-        id: machineId,
-        seq: updateData.seq,
-        createdAt: machine?.createdAt ?? updateData.createdAt,
-        updatedAt: updateData.createdAt,
-        active: machineUpdate.active ?? true,
-        activeAt: machineUpdate.activeAt ?? updateData.createdAt,
-        metadata: machine?.metadata ?? null,
-        metadataVersion: machine?.metadataVersion ?? 0,
-        daemonState: machine?.daemonState ?? null,
-        daemonStateVersion: machine?.daemonStateVersion ?? 0,
-      };
-
-      // Get machine-specific encryption (might not exist if machine wasn't initialized)
-      const machineEncryption = this.encryption.getMachineEncryption(machineId);
-      if (!machineEncryption) {
-        console.error(
-          `Machine encryption not found for ${machineId} - cannot decrypt updates`,
-        );
-        return;
-      }
-
-      // If metadata is provided, decrypt and update it
-      const metadataUpdate = machineUpdate.metadata;
-      if (metadataUpdate) {
-        try {
-          const metadata = await machineEncryption.decryptMetadata(
-            metadataUpdate.version,
-            metadataUpdate.value,
-          );
-          updatedMachine.metadata = metadata;
-          updatedMachine.metadataVersion = metadataUpdate.version;
-        } catch (error) {
-          console.error(
-            `Failed to decrypt machine metadata for ${machineId}:`,
-            error,
-          );
-        }
-      }
-
-      // If daemonState is provided, decrypt and update it
-      const daemonStateUpdate = machineUpdate.daemonState;
-      if (daemonStateUpdate) {
-        try {
-          const daemonState = await machineEncryption.decryptDaemonState(
-            daemonStateUpdate.version,
-            daemonStateUpdate.value,
-          );
-          updatedMachine.daemonState = daemonState;
-          updatedMachine.daemonStateVersion = daemonStateUpdate.version;
-        } catch (error) {
-          console.error(
-            `Failed to decrypt machine daemonState for ${machineId}:`,
-            error,
-          );
-        }
-      }
-
-      // Update storage using applyMachines which rebuilds sessionListViewData
-      storage.getState().applyMachines([updatedMachine]);
+      await handleUpdateMachineUpdate(updateData, updateData.body, ctx);
     } else if (updateData.body.t === "relationship-updated") {
-      log.log("👥 Received relationship-updated update");
-      const relationshipUpdate = updateData.body;
-
-      // Apply the relationship update to storage
-      storage.getState().applyRelationshipUpdate({
-        fromUserId: relationshipUpdate.fromUserId,
-        toUserId: relationshipUpdate.toUserId,
-        status: relationshipUpdate.status,
-        action: relationshipUpdate.action,
-        fromUser: relationshipUpdate.fromUser,
-        toUser: relationshipUpdate.toUser,
-        timestamp: relationshipUpdate.timestamp,
-      });
-
-      // Invalidate friends data to refresh with latest changes
-      this.friendsSync.invalidate();
-      this.friendRequestsSync.invalidate();
-      this.feedSync.invalidate();
+      handleRelationshipUpdate(updateData.body, ctx);
     } else if (updateData.body.t === "new-artifact") {
-      log.log("📦 Received new-artifact update");
-      const artifactUpdate = updateData.body;
-      const artifactId = artifactUpdate.artifactId;
-
-      try {
-        // Decrypt the data encryption key
-        const decryptedKey = await this.encryption.decryptEncryptionKey(
-          artifactUpdate.dataEncryptionKey,
-        );
-        if (!decryptedKey) {
-          console.error(`Failed to decrypt key for new artifact ${artifactId}`);
-          return;
-        }
-
-        // Store the decrypted key in memory
-        this.artifactDataKeys.set(artifactId, decryptedKey);
-
-        // Create artifact encryption instance
-        const artifactEncryption = new ArtifactEncryption(decryptedKey);
-
-        // Decrypt header
-        const header = await artifactEncryption.decryptHeader(
-          artifactUpdate.header,
-        );
-
-        // Decrypt body if provided
-        let decryptedBody: string | null | undefined = undefined;
-        if (artifactUpdate.body && artifactUpdate.bodyVersion !== undefined) {
-          const body = await artifactEncryption.decryptBody(
-            artifactUpdate.body,
-          );
-          decryptedBody = body?.body || null;
-        }
-
-        // Add to storage
-        const decryptedArtifact: DecryptedArtifact = {
-          id: artifactId,
-          title: header?.title || null,
-          body: decryptedBody,
-          headerVersion: artifactUpdate.headerVersion,
-          bodyVersion: artifactUpdate.bodyVersion,
-          seq: artifactUpdate.seq,
-          createdAt: artifactUpdate.createdAt,
-          updatedAt: artifactUpdate.updatedAt,
-          isDecrypted: !!header,
-        };
-
-        storage.getState().addArtifact(decryptedArtifact);
-        log.log(`📦 Added new artifact ${artifactId} to storage`);
-      } catch (error) {
-        console.error(`Failed to process new artifact ${artifactId}:`, error);
-      }
+      await handleNewArtifactUpdate(updateData.body, ctx);
     } else if (updateData.body.t === "update-artifact") {
-      log.log("📦 Received update-artifact update");
-      const artifactUpdate = updateData.body;
-      const artifactId = artifactUpdate.artifactId;
-
-      // Get existing artifact
-      const existingArtifact = storage.getState().artifacts[artifactId];
-      if (!existingArtifact) {
-        console.error(`Artifact ${artifactId} not found in storage`);
-        // Fetch all artifacts to sync
-        this.artifactsSync.invalidate();
-        return;
-      }
-
-      try {
-        // Get the data encryption key from memory
-        let dataEncryptionKey = this.artifactDataKeys.get(artifactId);
-        if (!dataEncryptionKey) {
-          console.error(
-            `Encryption key not found for artifact ${artifactId}, fetching artifacts`,
-          );
-          this.artifactsSync.invalidate();
-          return;
-        }
-
-        // Create artifact encryption instance
-        const artifactEncryption = new ArtifactEncryption(dataEncryptionKey);
-
-        // Update artifact with new data
-        const updatedArtifact: DecryptedArtifact = {
-          ...existingArtifact,
-          seq: updateData.seq,
-          updatedAt: updateData.createdAt,
-        };
-
-        // Decrypt and update header if provided
-        if (artifactUpdate.header) {
-          const header = await artifactEncryption.decryptHeader(
-            artifactUpdate.header.value,
-          );
-          updatedArtifact.title = header?.title || null;
-          updatedArtifact.sessions = header?.sessions;
-          updatedArtifact.draft = header?.draft;
-          updatedArtifact.headerVersion = artifactUpdate.header.version;
-        }
-
-        // Decrypt and update body if provided
-        if (artifactUpdate.body) {
-          const body = await artifactEncryption.decryptBody(
-            artifactUpdate.body.value,
-          );
-          updatedArtifact.body = body?.body || null;
-          updatedArtifact.bodyVersion = artifactUpdate.body.version;
-        }
-
-        storage.getState().updateArtifact(updatedArtifact);
-        log.log(`📦 Updated artifact ${artifactId} in storage`);
-      } catch (error) {
-        console.error(
-          `Failed to process artifact update ${artifactId}:`,
-          error,
-        );
-      }
+      await handleUpdateArtifactUpdate(updateData, updateData.body, ctx);
     } else if (updateData.body.t === "delete-artifact") {
-      log.log("📦 Received delete-artifact update");
-      const artifactUpdate = updateData.body;
-      const artifactId = artifactUpdate.artifactId;
-
-      // Remove from storage
-      storage.getState().deleteArtifact(artifactId);
-
-      // Remove encryption key from memory
-      this.artifactDataKeys.delete(artifactId);
+      handleDeleteArtifactUpdate(updateData.body, ctx);
     } else if (updateData.body.t === "new-feed-post") {
-      log.log("📰 Received new-feed-post update");
-      const feedUpdate = updateData.body;
-
-      // Convert to FeedItem with counter from cursor
-      const feedItem: FeedItem = {
-        id: feedUpdate.id,
-        body: feedUpdate.body,
-        cursor: feedUpdate.cursor,
-        createdAt: feedUpdate.createdAt,
-        repeatKey: feedUpdate.repeatKey,
-        counter: parseInt(feedUpdate.cursor.substring(2), 10),
-      };
-
-      // Check if we need to fetch user for friend-related items
-      if (
-        feedItem.body &&
-        (feedItem.body.kind === "friend_request" ||
-          feedItem.body.kind === "friend_accepted")
-      ) {
-        await this.assumeUsers([feedItem.body.uid]);
-
-        // Check if user fetch failed (404) - don't store item if user not found
-        const users = storage.getState().users;
-        const userProfile = users[feedItem.body.uid];
-        if (userProfile === null || userProfile === undefined) {
-          // User was not found or 404, don't store this item
-          log.log(
-            `📰 Skipping feed item ${feedItem.id} - user ${feedItem.body.uid} not found`,
-          );
-          return;
-        }
-      }
-
-      // Apply to storage (will handle repeatKey replacement)
-      storage.getState().applyFeedItems([feedItem]);
+      await handleNewFeedPostUpdate(updateData.body, ctx);
     } else if (updateData.body.t === "kv-batch-update") {
-      log.log("📋 Received kv-batch-update");
-      const kvUpdate = updateData.body;
-
-      // Filter issue-session link changes and forward to issueSession store
-      const issueSessionChanges = kvUpdate.changes.filter(
-        (c: { key: string }) => isIssueSessionKey(c.key),
-      );
-      if (issueSessionChanges.length > 0) {
-        await issueSessionStore.getState().handleKvUpdate(issueSessionChanges);
-      }
+      await handleKvBatchUpdate(updateData.body);
     } else if (
       updateData.body.t === "new-project" ||
       updateData.body.t === "update-project" ||
       updateData.body.t === "delete-project"
     ) {
-      log.log(`📁 Received ${updateData.body.t} event`);
-      this.projectsSync.invalidate();
+      handleProjectUpdate(updateData.body, ctx);
     }
   };
 

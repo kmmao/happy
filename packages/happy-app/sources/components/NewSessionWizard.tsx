@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { View, Text, Pressable, ScrollView, TextInput } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,591 +27,15 @@ import { Modal } from "@/modal";
 import { sync } from "@/sync/sync";
 import { profileSyncService } from "@/sync/profileSync";
 
-const stylesheet = StyleSheet.create((theme) => ({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.divider,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: theme.colors.text,
-    ...Typography.default("semiBold"),
-  },
-  stepIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.divider,
-  },
-  stepDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
-  stepDotActive: {
-    backgroundColor: theme.colors.button.primary.background,
-  },
-  stepDotInactive: {
-    backgroundColor: theme.colors.divider,
-  },
-  stepContent: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 0, // No bottom padding since footer is separate
-  },
-  stepTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: theme.colors.text,
-    marginBottom: 8,
-    ...Typography.default("semiBold"),
-  },
-  stepDescription: {
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-    marginBottom: 24,
-    ...Typography.default(),
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.divider,
-    backgroundColor: theme.colors.surface, // Ensure footer has solid background
-  },
-  button: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonPrimary: {
-    backgroundColor: theme.colors.button.primary.background,
-  },
-  buttonSecondary: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: theme.colors.divider,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    ...Typography.default("semiBold"),
-  },
-  buttonTextPrimary: {
-    color: "#FFFFFF",
-  },
-  buttonTextSecondary: {
-    color: theme.colors.text,
-  },
-  textInput: {
-    backgroundColor: theme.colors.input.background,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: theme.colors.text,
-    borderWidth: 1,
-    borderColor: theme.colors.divider,
-    ...Typography.default(),
-  },
-  agentOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    marginBottom: 12,
-  },
-  agentOptionSelected: {
-    borderColor: theme.colors.button.primary.background,
-    backgroundColor: theme.colors.input.background,
-  },
-  agentOptionUnselected: {
-    borderColor: theme.colors.divider,
-    backgroundColor: theme.colors.input.background,
-  },
-  agentIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.button.primary.background,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 16,
-  },
-  agentInfo: {
-    flex: 1,
-  },
-  agentName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: theme.colors.text,
-    ...Typography.default("semiBold"),
-  },
-  agentDescription: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    marginTop: 4,
-    ...Typography.default(),
-  },
-}));
-
-type WizardStep =
-  | "profile"
-  | "profileConfig"
-  | "sessionType"
-  | "agent"
-  | "options"
-  | "machine"
-  | "path"
-  | "prompt";
-
-// Profile selection item component with management actions
-interface ProfileSelectionItemProps {
-  profile: AIBackendProfile;
-  isSelected: boolean;
-  onSelect: () => void;
-  onUseAsIs: () => void;
-  onEdit: () => void;
-  onDuplicate?: () => void;
-  onDelete?: () => void;
-  showManagementActions?: boolean;
-}
-
-function ProfileSelectionItem({
-  profile,
-  isSelected,
-  onSelect,
-  onUseAsIs,
-  onEdit,
-  onDuplicate,
-  onDelete,
-  showManagementActions = false,
-}: ProfileSelectionItemProps) {
-  const { theme } = useUnistyles();
-  const styles = stylesheet;
-
-  return (
-    <View
-      style={{
-        backgroundColor: isSelected
-          ? theme.colors.input.background
-          : "transparent",
-        borderRadius: 12,
-        borderWidth: isSelected ? 2 : 1,
-        borderColor: isSelected
-          ? theme.colors.button.primary.background
-          : theme.colors.divider,
-        marginBottom: 12,
-        padding: 4,
-      }}
-    >
-      {/* Profile Header */}
-      <Pressable onPress={onSelect} style={{ padding: 12 }}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: theme.colors.button.primary.background,
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: 12,
-            }}
-          >
-            <Ionicons name="person-outline" size={20} color="white" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "600",
-                color: theme.colors.text,
-                marginBottom: 4,
-                ...Typography.default("semiBold"),
-              }}
-            >
-              {profile.name}
-            </Text>
-            <Text
-              style={{
-                fontSize: 14,
-                color: theme.colors.textSecondary,
-                ...Typography.default(),
-              }}
-            >
-              {profile.description}
-            </Text>
-            {profile.isBuiltIn && (
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: theme.colors.textSecondary,
-                  marginTop: 2,
-                }}
-              >
-                {t('newSession.builtInProfile')}
-              </Text>
-            )}
-          </View>
-          {isSelected && (
-            <Ionicons
-              name="checkmark-circle"
-              size={20}
-              color={theme.colors.button.primary.background}
-            />
-          )}
-        </View>
-      </Pressable>
-
-      {/* Action Buttons - Only show when selected */}
-      {isSelected && (
-        <View
-          style={{
-            flexDirection: "column",
-            paddingHorizontal: 12,
-            paddingBottom: 12,
-            gap: 8,
-          }}
-        >
-          {/* Primary Actions */}
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 8,
-            }}
-          >
-            <Pressable
-              style={{
-                flex: 1,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-                borderRadius: 8,
-                backgroundColor: theme.colors.button.primary.background,
-              }}
-              onPress={onUseAsIs}
-            >
-              <Ionicons name="checkmark" size={16} color="white" />
-              <Text
-                style={{
-                  color: "white",
-                  fontSize: 14,
-                  fontWeight: "600",
-                  marginLeft: 6,
-                  ...Typography.default("semiBold"),
-                }}
-              >
-                Use As-Is
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={{
-                flex: 1,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-                borderRadius: 8,
-                backgroundColor: "transparent",
-                borderWidth: 1,
-                borderColor: theme.colors.divider,
-              }}
-              onPress={onEdit}
-            >
-              <Ionicons
-                name="create-outline"
-                size={16}
-                color={theme.colors.text}
-              />
-              <Text
-                style={{
-                  color: theme.colors.text,
-                  fontSize: 14,
-                  fontWeight: "600",
-                  marginLeft: 6,
-                  ...Typography.default("semiBold"),
-                }}
-              >
-                Edit
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Management Actions - Only show for custom profiles */}
-          {showManagementActions && !profile.isBuiltIn && (
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 8,
-              }}
-            >
-              <Pressable
-                style={{
-                  flex: 1,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingVertical: 6,
-                  paddingHorizontal: 8,
-                  borderRadius: 6,
-                  backgroundColor: "transparent",
-                  borderWidth: 1,
-                  borderColor: theme.colors.divider,
-                }}
-                onPress={onDuplicate}
-              >
-                <Ionicons
-                  name="copy-outline"
-                  size={14}
-                  color={theme.colors.textSecondary}
-                />
-                <Text
-                  style={{
-                    color: theme.colors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: "600",
-                    marginLeft: 4,
-                    ...Typography.default("semiBold"),
-                  }}
-                >
-                  Duplicate
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={{
-                  flex: 1,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingVertical: 6,
-                  paddingHorizontal: 8,
-                  borderRadius: 6,
-                  backgroundColor: "transparent",
-                  borderWidth: 1,
-                  borderColor: theme.colors.textDestructive,
-                }}
-                onPress={onDelete}
-              >
-                <Ionicons
-                  name="trash-outline"
-                  size={14}
-                  color={theme.colors.textDestructive}
-                />
-                <Text
-                  style={{
-                    color: theme.colors.textDestructive,
-                    fontSize: 12,
-                    fontWeight: "600",
-                    marginLeft: 4,
-                    ...Typography.default("semiBold"),
-                  }}
-                >
-                  Delete
-                </Text>
-              </Pressable>
-            </View>
-          )}
-        </View>
-      )}
-    </View>
-  );
-}
-
-// Manual configuration item component
-interface ManualConfigurationItemProps {
-  isSelected: boolean;
-  onSelect: () => void;
-  onUseCliVars: () => void;
-  onConfigureManually: () => void;
-}
-
-function ManualConfigurationItem({
-  isSelected,
-  onSelect,
-  onUseCliVars,
-  onConfigureManually,
-}: ManualConfigurationItemProps) {
-  const { theme } = useUnistyles();
-  const styles = stylesheet;
-
-  return (
-    <View
-      style={{
-        backgroundColor: isSelected
-          ? theme.colors.input.background
-          : "transparent",
-        borderRadius: 12,
-        borderWidth: isSelected ? 2 : 1,
-        borderColor: isSelected
-          ? theme.colors.button.primary.background
-          : theme.colors.divider,
-        marginBottom: 12,
-        padding: 4,
-      }}
-    >
-      {/* Profile Header */}
-      <Pressable onPress={onSelect} style={{ padding: 12 }}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: theme.colors.textSecondary,
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: 12,
-            }}
-          >
-            <Ionicons name="settings" size={20} color="white" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "600",
-                color: theme.colors.text,
-                marginBottom: 4,
-                ...Typography.default("semiBold"),
-              }}
-            >
-              Manual Configuration
-            </Text>
-            <Text
-              style={{
-                fontSize: 14,
-                color: theme.colors.textSecondary,
-                ...Typography.default(),
-              }}
-            >
-              Use CLI environment variables or configure manually
-            </Text>
-          </View>
-          {isSelected && (
-            <Ionicons
-              name="checkmark-circle"
-              size={20}
-              color={theme.colors.button.primary.background}
-            />
-          )}
-        </View>
-      </Pressable>
-
-      {/* Action Buttons - Only show when selected */}
-      {isSelected && (
-        <View
-          style={{
-            flexDirection: "row",
-            paddingHorizontal: 12,
-            paddingBottom: 12,
-            gap: 8,
-          }}
-        >
-          <Pressable
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-              borderRadius: 8,
-              backgroundColor: theme.colors.button.primary.background,
-            }}
-            onPress={onUseCliVars}
-          >
-            <Ionicons name="terminal-outline" size={16} color="white" />
-            <Text
-              style={{
-                color: "white",
-                fontSize: 14,
-                fontWeight: "600",
-                marginLeft: 6,
-                ...Typography.default("semiBold"),
-              }}
-            >
-              Use CLI Vars
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-              borderRadius: 8,
-              backgroundColor: "transparent",
-              borderWidth: 1,
-              borderColor: theme.colors.divider,
-            }}
-            onPress={onConfigureManually}
-          >
-            <Ionicons
-              name="create-outline"
-              size={16}
-              color={theme.colors.text}
-            />
-            <Text
-              style={{
-                color: theme.colors.text,
-                fontSize: 14,
-                fontWeight: "600",
-                marginLeft: 6,
-                ...Typography.default("semiBold"),
-              }}
-            >
-              Configure
-            </Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
-  );
-}
-
-interface NewSessionWizardProps {
-  onComplete: (config: {
-    sessionType: "simple" | "worktree";
-    profileId: string | null;
-    agentType: "claude" | "codex";
-    permissionMode: PermissionModeKey;
-    modelMode: ModelModeKey;
-    machineId: string;
-    path: string;
-    prompt: string;
-    environmentVariables?: Record<string, string>;
-  }) => void;
-  onCancel: () => void;
-  initialPrompt?: string;
-}
+import type { WizardStep, NewSessionWizardProps } from "./NewSessionWizardTypes";
+import { wizardStylesheet } from "./NewSessionWizardStyles";
+import { ProfileSelectionItem } from "./ProfileSelectionItem";
+import { ManualConfigurationItem } from "./ManualConfigurationItem";
+import {
+  profileNeedsConfiguration,
+  getProfileRequiredFields,
+  BUILT_IN_PROFILES,
+} from "./NewSessionWizardHelpers";
 
 export function NewSessionWizard({
   onComplete,
@@ -619,7 +43,7 @@ export function NewSessionWizard({
   initialPrompt = "",
 }: NewSessionWizardProps) {
   const { theme } = useUnistyles();
-  const styles = stylesheet;
+  const styles = wizardStylesheet;
   const router = useRouter();
   const machines = useAllMachines();
   const sessions = useSessions();
@@ -653,116 +77,7 @@ export function NewSessionWizard({
 
   // Built-in profiles
   const builtInProfiles: AIBackendProfile[] = useMemo(
-    () => [
-      {
-        id: "anthropic",
-        name: "Anthropic (Default)",
-        description: "Default Claude configuration",
-        anthropicConfig: {},
-        environmentVariables: [],
-        compatibility: { claude: true, codex: false, gemini: false },
-        isBuiltIn: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        version: "1.0.0",
-      },
-      {
-        id: "deepseek",
-        name: "DeepSeek (Reasoner)",
-        description: "DeepSeek reasoning model with proxy to Anthropic API",
-        anthropicConfig: {
-          baseUrl: "https://api.deepseek.com/anthropic",
-          model: "deepseek-reasoner",
-        },
-        environmentVariables: [
-          { name: "API_TIMEOUT_MS", value: "600000" },
-          { name: "ANTHROPIC_SMALL_FAST_MODEL", value: "deepseek-chat" },
-          { name: "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", value: "1" },
-        ],
-        compatibility: { claude: true, codex: false, gemini: false },
-        isBuiltIn: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        version: "1.0.0",
-      },
-      {
-        id: "openai",
-        name: "OpenAI (GPT-4/Codex)",
-        description: "OpenAI GPT-4 and Codex models",
-        openaiConfig: {
-          baseUrl: "https://api.openai.com/v1",
-          model: "gpt-4-turbo",
-        },
-        environmentVariables: [],
-        compatibility: { claude: false, codex: true, gemini: false },
-        isBuiltIn: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        version: "1.0.0",
-      },
-      {
-        id: "azure-openai-codex",
-        name: "Azure OpenAI (Codex)",
-        description: "Microsoft Azure OpenAI for Codex agents",
-        azureOpenAIConfig: {
-          endpoint: "https://your-resource.openai.azure.com/",
-          apiVersion: "2024-02-15-preview",
-          deploymentName: "gpt-4-turbo",
-        },
-        environmentVariables: [],
-        compatibility: { claude: false, codex: true, gemini: false },
-        isBuiltIn: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        version: "1.0.0",
-      },
-      {
-        id: "azure-openai",
-        name: "Azure OpenAI",
-        description: "Microsoft Azure OpenAI configuration",
-        azureOpenAIConfig: {
-          apiVersion: "2024-02-15-preview",
-        },
-        environmentVariables: [
-          { name: "AZURE_OPENAI_API_VERSION", value: "2024-02-15-preview" },
-        ],
-        compatibility: { claude: false, codex: true, gemini: false },
-        isBuiltIn: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        version: "1.0.0",
-      },
-      {
-        id: "zai",
-        name: "Z.ai (GLM-4.6)",
-        description: "Z.ai GLM-4.6 model with proxy to Anthropic API",
-        anthropicConfig: {
-          baseUrl: "https://api.z.ai/api/anthropic",
-          model: "glm-4.6",
-        },
-        environmentVariables: [],
-        compatibility: { claude: true, codex: false, gemini: false },
-        isBuiltIn: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        version: "1.0.0",
-      },
-      {
-        id: "microsoft",
-        name: "Microsoft Azure",
-        description: "Microsoft Azure AI services",
-        openaiConfig: {
-          baseUrl: "https://api.openai.azure.com",
-          model: "gpt-4-turbo",
-        },
-        environmentVariables: [],
-        compatibility: { claude: false, codex: true, gemini: false },
-        isBuiltIn: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        version: "1.0.0",
-      },
-    ],
+    () => BUILT_IN_PROFILES,
     [],
   );
 
@@ -820,7 +135,7 @@ export function NewSessionWizard({
       : ["profile", "agent", "options", "machine", "path", "prompt"];
 
     // Insert profileConfig step after profile if needed
-    if (profileNeedsConfiguration(selectedProfileId)) {
+    if (profileNeedsConfiguration(selectedProfileId, allProfiles)) {
       const profileIndex = baseSteps.indexOf("profile");
       const beforeProfile = baseSteps.slice(
         0,
@@ -835,128 +150,7 @@ export function NewSessionWizard({
     }
 
     return baseSteps;
-  }, [experimentsEnabled, selectedProfileId]);
-
-  // Helper function to check if profile needs API keys
-  const profileNeedsConfiguration = (profileId: string | null): boolean => {
-    if (!profileId) return false; // Manual configuration doesn't need API keys
-    const profile = allProfiles.find((p) => p.id === profileId);
-    if (!profile) return false;
-
-    // Check if profile is one that requires API keys
-    const profilesNeedingKeys = [
-      "openai",
-      "azure-openai",
-      "azure-openai-codex",
-      "zai",
-      "microsoft",
-      "deepseek",
-    ];
-    return profilesNeedingKeys.includes(profile.id);
-  };
-
-  // Get required fields for profile configuration
-  const getProfileRequiredFields = (
-    profileId: string | null,
-  ): Array<{
-    key: string;
-    label: string;
-    placeholder: string;
-    isPassword?: boolean;
-  }> => {
-    if (!profileId) return [];
-    const profile = allProfiles.find((p) => p.id === profileId);
-    if (!profile) return [];
-
-    switch (profile.id) {
-      case "deepseek":
-        return [
-          {
-            key: "ANTHROPIC_AUTH_TOKEN",
-            label: "DeepSeek API Key",
-            placeholder: "DEEPSEEK_API_KEY",
-            isPassword: true,
-          },
-        ];
-      case "openai":
-        return [
-          {
-            key: "OPENAI_API_KEY",
-            label: "OpenAI API Key",
-            placeholder: "sk-...",
-            isPassword: true,
-          },
-        ];
-      case "azure-openai":
-        return [
-          {
-            key: "AZURE_OPENAI_API_KEY",
-            label: "Azure OpenAI API Key",
-            placeholder: "Enter your Azure OpenAI API key",
-            isPassword: true,
-          },
-          {
-            key: "AZURE_OPENAI_ENDPOINT",
-            label: "Azure Endpoint",
-            placeholder: "https://your-resource.openai.azure.com/",
-          },
-          {
-            key: "AZURE_OPENAI_DEPLOYMENT_NAME",
-            label: "Deployment Name",
-            placeholder: "gpt-4-turbo",
-          },
-        ];
-      case "zai":
-        return [
-          {
-            key: "ANTHROPIC_AUTH_TOKEN",
-            label: "Z.ai API Key",
-            placeholder: "Z_AI_API_KEY",
-            isPassword: true,
-          },
-        ];
-      case "microsoft":
-        return [
-          {
-            key: "AZURE_OPENAI_API_KEY",
-            label: "Azure API Key",
-            placeholder: "Enter your Azure API key",
-            isPassword: true,
-          },
-          {
-            key: "AZURE_OPENAI_ENDPOINT",
-            label: "Azure Endpoint",
-            placeholder: "https://your-resource.openai.azure.com/",
-          },
-          {
-            key: "AZURE_OPENAI_DEPLOYMENT_NAME",
-            label: "Deployment Name",
-            placeholder: "gpt-4-turbo",
-          },
-        ];
-      case "azure-openai-codex":
-        return [
-          {
-            key: "AZURE_OPENAI_API_KEY",
-            label: "Azure OpenAI API Key",
-            placeholder: "Enter your Azure OpenAI API key",
-            isPassword: true,
-          },
-          {
-            key: "AZURE_OPENAI_ENDPOINT",
-            label: "Azure Endpoint",
-            placeholder: "https://your-resource.openai.azure.com/",
-          },
-          {
-            key: "AZURE_OPENAI_DEPLOYMENT_NAME",
-            label: "Deployment Name",
-            placeholder: "gpt-4-turbo",
-          },
-        ];
-      default:
-        return [];
-    }
-  };
+  }, [experimentsEnabled, selectedProfileId, allProfiles]);
 
   // Auto-load profile settings and sync with CLI
   React.useEffect(() => {
@@ -1123,7 +317,7 @@ export function NewSessionWizard({
     }
 
     // If profile needs configuration, go to profileConfig step
-    if (profileNeedsConfiguration(profile.id)) {
+    if (profileNeedsConfiguration(profile.id, allProfiles)) {
       setCurrentStep("profileConfig");
     } else {
       // If no configuration needed, proceed to next step in the normal flow
@@ -1283,7 +477,7 @@ export function NewSessionWizard({
     // Special handling for profileConfig step - skip if profile doesn't need configuration
     if (
       currentStep === "profileConfig" &&
-      (!selectedProfileId || !profileNeedsConfiguration(selectedProfileId))
+      (!selectedProfileId || !profileNeedsConfiguration(selectedProfileId, allProfiles))
     ) {
       setCurrentStep(steps[currentStepIndex + 1]);
       return;
@@ -1359,7 +553,7 @@ export function NewSessionWizard({
         return true; // Always valid (profile can be null for manual config)
       case "profileConfig":
         if (!selectedProfileId) return false;
-        const requiredFields = getProfileRequiredFields(selectedProfileId);
+        const requiredFields = getProfileRequiredFields(selectedProfileId, allProfiles);
         // Profile configuration step is always shown when needed
         // Users can leave fields empty to preserve CLI environment variables
         return true;
@@ -1391,7 +585,7 @@ export function NewSessionWizard({
     selectedProfileId,
     profileApiKeys,
     profileConfigs,
-    getProfileRequiredFields,
+    allProfiles,
   ]);
 
   const renderStepContent = () => {
@@ -1558,7 +752,7 @@ export function NewSessionWizard({
       case "profileConfig":
         if (
           !selectedProfileId ||
-          !profileNeedsConfiguration(selectedProfileId)
+          !profileNeedsConfiguration(selectedProfileId, allProfiles)
         ) {
           // Skip configuration if no profile selected or profile doesn't need configuration
           setCurrentStep(steps[currentStepIndex + 1]);
@@ -1577,7 +771,7 @@ export function NewSessionWizard({
             </Text>
 
             <ItemGroup title="Required Configuration">
-              {getProfileRequiredFields(selectedProfileId).map((field) => (
+              {getProfileRequiredFields(selectedProfileId, allProfiles).map((field) => (
                 <View key={field.key} style={{ marginBottom: 16 }}>
                   <Text
                     style={{
