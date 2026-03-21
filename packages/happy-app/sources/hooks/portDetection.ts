@@ -299,8 +299,11 @@ export async function detectAllPorts(
 
     if (allPorts.length > 0) {
         const portList = allPorts.join(" ");
+        // Strict HTTP check: only emit port if first response line starts with "HTTP/".
+        // This filters out non-HTTP services that accept TCP connections but don't speak HTTP.
+        // Output format: "PORT:header1\nPORT:header2\n..." (only for confirmed HTTP ports)
         const probeResult = await bash(sessionId, {
-            command: `for p in ${portList}; do (curl -sI --connect-timeout 0.3 --max-time 1 http://localhost:$p 2>/dev/null | head -5 | while read -r line; do echo "$p:$line"; done) & done; wait`,
+            command: `for p in ${portList}; do (resp=$(curl -sI --connect-timeout 0.3 --max-time 1 http://localhost:$p 2>/dev/null | head -5) && echo "$resp" | head -1 | grep -q "^HTTP/" && echo "$resp" | while read -r line; do echo "$p:$line"; done) & done; wait`,
             timeout: 20000,
         }).catch(() => null);
 
@@ -310,10 +313,8 @@ export async function detectAllPorts(
                 if (!m) continue;
                 const port = parseInt(m[1], 10);
                 const header = m[2].trim();
-                // Any HTTP response means it's a web service
-                if (header.startsWith("HTTP/") || header.toLowerCase().startsWith("content-type:")) {
-                    webPorts.add(port);
-                }
+                // All lines here are from confirmed HTTP responses
+                webPorts.add(port);
                 // Extract framework info from headers
                 const powered = header.match(/x-powered-by:\s*(.+)/i);
                 const server = header.match(/^server:\s*(.+)/i);
