@@ -773,6 +773,12 @@ export async function claudeRemoteLauncher(
           thinking: m.thinking,
           effort: m.effort,
           locale: m.locale,
+          betas: m.betas,
+          agent: m.agent,
+          agents: m.agents,
+          outputFormat: m.outputFormat,
+          plugins: m.plugins,
+          additionalDirectories: m.additionalDirectories,
         });
       };
       let currentColdHash: string | null = null;

@@ -269,6 +269,15 @@ export async function claudeRemote(opts: {
     effort: initial.mode.effort,
     promptSuggestions: true,
     onElicitation: opts.onElicitation,
+    // ── New SDK capabilities ──
+    agentProgressSummaries: true,
+    enableFileCheckpointing: true,
+    betas: initial.mode.betas,
+    agent: initial.mode.agent,
+    agents: initial.mode.agents,
+    outputFormat: initial.mode.outputFormat,
+    plugins: initial.mode.plugins,
+    additionalDirectories: initial.mode.additionalDirectories,
   };
 
   // Track thinking state

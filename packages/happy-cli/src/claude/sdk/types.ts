@@ -21,6 +21,10 @@ export type {
   OnElicitation,
   ForkSessionOptions,
   ForkSessionResult,
+  AgentDefinition,
+  OutputFormat,
+  SdkBeta,
+  SdkPluginConfig,
 } from "@anthropic-ai/claude-agent-sdk";
 
 export { AbortError, forkSession } from "@anthropic-ai/claude-agent-sdk";
@@ -91,6 +95,50 @@ export interface QueryOptions {
    * Set explicitly to override (e.g. ['project'] for project-only settings).
    */
   settingSources?: Array<"user" | "project" | "local">;
+  /**
+   * Enable beta features (e.g. 1M context window).
+   * @see https://docs.anthropic.com/en/api/beta-headers
+   */
+  betas?: import("@anthropic-ai/claude-agent-sdk").SdkBeta[];
+  /**
+   * Enable periodic AI-generated progress summaries for running subagents.
+   * Emitted on task_progress events via the summary field (~30s interval).
+   */
+  agentProgressSummaries?: boolean;
+  /**
+   * Enable file checkpointing to track file changes during the session.
+   * When enabled, files can be rewound to their state at any user message.
+   */
+  enableFileCheckpointing?: boolean;
+  /**
+   * When false, disables session persistence to disk. Useful for ephemeral workflows.
+   * @default true
+   */
+  persistSession?: boolean;
+  /**
+   * Agent name for the main thread. The agent must be defined in the `agents` option or in settings.
+   */
+  agent?: string;
+  /**
+   * Programmatically define custom subagents that can be invoked via the Agent tool.
+   */
+  agents?: Record<string, import("@anthropic-ai/claude-agent-sdk").AgentDefinition>;
+  /**
+   * Output format configuration for structured JSON responses.
+   */
+  outputFormat?: import("@anthropic-ai/claude-agent-sdk").OutputFormat;
+  /**
+   * Load plugins for this session. Plugins provide custom commands, agents, skills, and hooks.
+   */
+  plugins?: import("@anthropic-ai/claude-agent-sdk").SdkPluginConfig[];
+  /**
+   * Additional directories Claude can access beyond the current working directory.
+   */
+  additionalDirectories?: string[];
+  /**
+   * Include partial/streaming message events in the output.
+   */
+  includePartialMessages?: boolean;
 }
 
 /** Query prompt — string or async stream of user messages */

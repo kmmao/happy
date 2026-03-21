@@ -7,7 +7,7 @@ import { claudeRemoteLauncher } from "./claudeRemoteLauncher";
 import { ApiClient } from "@/lib";
 import type { JsRuntime } from "./runClaude";
 import type { SandboxConfig } from "@/persistence";
-import type { ThinkingConfig } from "./sdk/types";
+import type { ThinkingConfig, AgentDefinition, OutputFormat, SdkBeta, SdkPluginConfig } from "./sdk/types";
 
 // Re-export permission mode type from api/types
 // Single unified type with 7 modes - Codex modes mapped at SDK boundary
@@ -32,6 +32,18 @@ export interface EnhancedMode {
   continue?: boolean;
   /** User's preferred UI language (e.g. 'en', 'zh-Hans', 'ja') */
   locale?: string;
+  /** Enable beta features (e.g. 1M context window) */
+  betas?: SdkBeta[];
+  /** Agent name for the main thread */
+  agent?: string;
+  /** Custom subagent definitions */
+  agents?: Record<string, AgentDefinition>;
+  /** Structured output format (JSON schema) */
+  outputFormat?: OutputFormat;
+  /** Plugins to load for this session */
+  plugins?: SdkPluginConfig[];
+  /** Additional directories Claude can access */
+  additionalDirectories?: string[];
 }
 
 interface LoopOptions {

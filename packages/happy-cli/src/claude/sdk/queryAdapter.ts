@@ -100,6 +100,34 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // Allow callers to override via opts.settingSources; fall back to full set.
   result.settingSources = opts.settingSources ?? ["user", "project", "local"];
 
+  // ── Beta features (e.g. 1M context window) ──
+  if (opts.betas) result.betas = opts.betas;
+
+  // ── Agent progress summaries for subagent monitoring ──
+  if (opts.agentProgressSummaries) result.agentProgressSummaries = opts.agentProgressSummaries;
+
+  // ── File checkpointing for rewind support ──
+  if (opts.enableFileCheckpointing) result.enableFileCheckpointing = opts.enableFileCheckpointing;
+
+  // ── Session persistence control ──
+  if (opts.persistSession != null) result.persistSession = opts.persistSession;
+
+  // ── Agent configuration ──
+  if (opts.agent) result.agent = opts.agent;
+  if (opts.agents) result.agents = opts.agents;
+
+  // ── Structured output format ──
+  if (opts.outputFormat) result.outputFormat = opts.outputFormat;
+
+  // ── Plugins ──
+  if (opts.plugins) result.plugins = opts.plugins;
+
+  // ── Additional directories ──
+  if (opts.additionalDirectories) result.additionalDirectories = opts.additionalDirectories;
+
+  // ── Partial/streaming messages ──
+  if (opts.includePartialMessages) result.includePartialMessages = opts.includePartialMessages;
+
   // ── System prompt mapping ──
   if (opts.customSystemPrompt) {
     result.systemPrompt = opts.customSystemPrompt;
