@@ -371,35 +371,44 @@ export const ProjectSessionsTab = React.memo(
                     </ItemGroup>
                 )}
                 {archivedSessions.length > 0 && (
-                    <ItemGroup title={t("projects.archivedSessions")}>
-                        <Item
-                            title={t("projects.deleteArchivedSessions")}
-                            icon={
-                                <Ionicons
-                                    name="trash-outline"
-                                    size={20}
-                                    color={theme.colors.deleteAction}
-                                />
-                            }
-                            onPress={handleDeleteArchivedSessions}
-                            titleStyle={{ color: theme.colors.deleteAction }}
-                            disabled={deletingArchived || deletingArchivedBranch}
-                        />
-                        {archivedBranchSessions.length > 0 && (
-                            <Item
-                                title={t("projects.deleteArchivedBranchSessions")}
-                                icon={
-                                    <Ionicons
-                                        name="git-branch-outline"
-                                        size={20}
-                                        color="#5856D6"
-                                    />
-                                }
-                                onPress={handleDeleteArchivedBranchSessions}
-                                titleStyle={{ color: "#5856D6" }}
-                                disabled={deletingArchivedBranch || deletingArchived}
-                            />
-                        )}
+                    <ItemGroup
+                        title={
+                            <View style={styles.archivedHeader}>
+                                <Text style={styles.archivedHeaderTitle}>
+                                    {t("projects.archivedSessions")}
+                                </Text>
+                                <View style={styles.archivedHeaderActions}>
+                                    {archivedBranchSessions.length > 0 && (
+                                        <Pressable
+                                            onPress={handleDeleteArchivedBranchSessions}
+                                            disabled={deletingArchivedBranch || deletingArchived}
+                                            hitSlop={8}
+                                            style={({ pressed }) => [
+                                                styles.archivedHeaderButton,
+                                                pressed && { opacity: 0.5 },
+                                            ]}
+                                        >
+                                            <Ionicons name="git-branch-outline" size={14} color="#5856D6" />
+                                            <Text style={styles.archivedHeaderButtonBranchText}>
+                                                {t("sessionInfo.tagBranch")}
+                                            </Text>
+                                        </Pressable>
+                                    )}
+                                    <Pressable
+                                        onPress={handleDeleteArchivedSessions}
+                                        disabled={deletingArchived || deletingArchivedBranch}
+                                        hitSlop={8}
+                                        style={({ pressed }) => [
+                                            styles.archivedHeaderButton,
+                                            pressed && { opacity: 0.5 },
+                                        ]}
+                                    >
+                                        <Ionicons name="trash-outline" size={14} color={theme.colors.deleteAction} />
+                                    </Pressable>
+                                </View>
+                            </View>
+                        }
+                    >
                         {archivedSessions.map((session) => (
                             <SessionRow key={session.id} session={session} />
                         ))}
@@ -495,6 +504,37 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 11,
         color: "#FFFFFF",
         textAlign: "center",
+        ...Typography.default("semiBold"),
+    },
+    archivedHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    archivedHeaderTitle: {
+        fontSize: 13,
+        color: theme.colors.groupped.sectionTitle,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        ...Typography.default(),
+    },
+    archivedHeaderActions: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
+    archivedHeaderButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 3,
+    },
+    archivedHeaderButtonText: {
+        fontSize: 12,
+        ...Typography.default("semiBold"),
+    },
+    archivedHeaderButtonBranchText: {
+        fontSize: 12,
+        color: "#5856D6",
         ...Typography.default("semiBold"),
     },
 }));
