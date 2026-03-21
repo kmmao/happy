@@ -207,7 +207,7 @@ export class ApiSessionClient extends EventEmitter {
     startedSubagents: new Set<string>(),
     activeSubagents: new Set<string>(),
   };
-  private lastSeq = 0;
+  private lastSeq: number;
   private pendingOutbox: Array<{ content: string; localId: string }> = [];
   private currentTurnStartTime: number | null = null;
   private lastApiCallEndTime: number | null = null;
@@ -222,6 +222,9 @@ export class ApiSessionClient extends EventEmitter {
     super();
     this.token = token;
     this.sessionId = session.id;
+    // Initialize lastSeq from server state to avoid fetching entire message
+    // history on resume. Only new messages (seq > lastSeq) will be fetched.
+    this.lastSeq = session.seq ?? 0;
     this.metadata = session.metadata;
     this.metadataVersion = session.metadataVersion;
     this.agentState = session.agentState;
@@ -271,6 +274,9 @@ export class ApiSessionClient extends EventEmitter {
     this.socket.on("connect", () => {
       logger.debug("Socket connected successfully");
       this.rpcHandlerManager.onSocketConnect(this.socket);
+      // Send initial heartbeat immediately so server knows session is alive.
+      // Without this, lastActiveAt stays stale and the 10-minute timeout may fire.
+      this.keepAlive(false, "remote", true);
       this.receiveSync.invalidate();
     });
 
@@ -418,6 +424,7 @@ export class ApiSessionClient extends EventEmitter {
 
   private async fetchMessages() {
     let afterSeq = this.lastSeq;
+    let decryptFailures = 0;
     while (true) {
       const response = await axios.get<V3GetSessionMessagesResponse>(
         `${configuration.serverUrl}/v3/sessions/${encodeURIComponent(this.sessionId)}/messages`,
@@ -453,11 +460,11 @@ export class ApiSessionClient extends EventEmitter {
           );
           this.routeIncomingMessage(body);
         } catch (error) {
-          logger.debug("[API] Failed to decrypt fetched message", {
-            sessionId: this.sessionId,
-            seq: message.seq,
-            error,
-          });
+          decryptFailures++;
+          logger.debug(
+            `[API] Failed to decrypt message seq=${message.seq} (${decryptFailures} failures so far)`,
+            { sessionId: this.sessionId, error },
+          );
         }
       }
 
@@ -477,6 +484,12 @@ export class ApiSessionClient extends EventEmitter {
       if (!hasMore) {
         break;
       }
+    }
+    if (decryptFailures > 0) {
+      logger.debug(
+        `[API] fetchMessages completed with ${decryptFailures} decrypt failures (likely old encryption key messages)`,
+        { sessionId: this.sessionId },
+      );
     }
   }
 

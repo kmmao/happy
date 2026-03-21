@@ -517,6 +517,8 @@ export const ca: TranslationStructure = {
 
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
+    tagBranch: "Branca",
+    tagMain: "Principal",
     killSession: "Finalitza la sessió",
     killSessionConfirm: "Segur que vols finalitzar aquesta sessió?",
     archiveSession: "Arxiva la sessió",

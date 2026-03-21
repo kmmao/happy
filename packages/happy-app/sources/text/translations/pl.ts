@@ -527,6 +527,8 @@ export const pl: TranslationStructure = {
 
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
+    tagBranch: "Gałąź",
+    tagMain: "Główna",
     killSession: "Zakończ sesję",
     killSessionConfirm: "Czy na pewno chcesz zakończyć tę sesję?",
     archiveSession: "Zarchiwizuj sesję",

@@ -486,6 +486,8 @@ export const zhHans: TranslationStructure = {
 
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
+    tagBranch: "分支",
+    tagMain: "主线",
     killSession: "终止会话",
     killSessionConfirm: "您确定要终止此会话吗？",
     archiveSession: "归档会话",

@@ -567,6 +567,8 @@ export const ja: TranslationStructure = {
 
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
+    tagBranch: "ブランチ",
+    tagMain: "メイン",
     killSession: "セッションを終了",
     killSessionConfirm: "このセッションを終了してもよろしいですか？",
     archiveSession: "セッションをアーカイブ",

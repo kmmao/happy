@@ -460,6 +460,8 @@ export const ru: TranslationStructure = {
 
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
+    tagBranch: "Ветка",
+    tagMain: "Основная",
     killSession: "Завершить сессию",
     killSessionConfirm: "Вы уверены, что хотите завершить эту сессию?",
     archiveSession: "Архивировать сессию",

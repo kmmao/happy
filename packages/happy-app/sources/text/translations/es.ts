@@ -519,6 +519,8 @@ export const es: TranslationStructure = {
 
   sessionInfo: {
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
+    tagBranch: "Rama",
+    tagMain: "Principal",
     killSession: "Terminar sesión",
     killSessionConfirm: "¿Seguro que quieres terminar esta sesión?",
     archiveSession: "Archivar sesión",

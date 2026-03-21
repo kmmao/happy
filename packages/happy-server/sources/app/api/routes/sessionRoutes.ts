@@ -350,6 +350,9 @@ export function sessionRoutes(app: Fastify) {
           },
         });
 
+        // Evict stale cache so heartbeats are accepted immediately
+        activityCache.invalidateSession(sessionId);
+
         // Auto-resolve project if machineId + path provided and session has no project
         if (!existing.projectId) {
           await resolveAndLinkProject(userId, existing.id, machineId, path);

@@ -47,6 +47,7 @@ import { sessionDelete, machineSpawnNewSession } from "@/sync/ops";
 import { HappyError } from "@/utils/errors";
 import { Modal } from "@/modal";
 import { isMachineOnline } from "@/utils/machineUtils";
+import { sync } from "@/sync/sync";
 import { useIssueSessionBySessionId } from "@/sync/issueSessionStore";
 import {
   ISSUE_STATUS_COLORS,
@@ -181,6 +182,20 @@ const stylesheet = StyleSheet.create((theme) => ({
     fontSize: 10,
     color: theme.colors.textSecondary,
     ...Typography.default(),
+  },
+  tagBranch: {
+    backgroundColor: "rgba(88, 86, 214, 0.12)",
+  },
+  tagBranchText: {
+    color: "#5856D6",
+    ...Typography.default("semiBold"),
+  },
+  tagMain: {
+    backgroundColor: "rgba(52, 199, 89, 0.12)",
+  },
+  tagMainText: {
+    color: "#34C759",
+    ...Typography.default("semiBold"),
   },
   issueRow: {
     flexDirection: "row",
@@ -600,6 +615,8 @@ const SessionItem = React.memo(
         throw new HappyError(result.errorMessage, false);
       }
       if (result.type === "success") {
+        // Wait for sessions to refresh so the new encryption key is available
+        await sync.refreshSessions();
         navigateToSession(session.id);
       }
     });
@@ -679,22 +696,41 @@ const SessionItem = React.memo(
             </View>
 
             {/* Tags line */}
-            {(session.metadata?.host || session.metadata?.version) && (
-              <View style={styles.tagsRow}>
-                {session.metadata?.host && (
-                  <View style={styles.tag}>
-                    <Text style={styles.tagText}>{session.metadata.host}</Text>
-                  </View>
-                )}
-                {session.metadata?.version && (
-                  <View style={styles.tag}>
-                    <Text style={styles.tagText}>
-                      {session.metadata.version}
-                    </Text>
-                  </View>
-                )}
+            <View style={styles.tagsRow}>
+              <View
+                style={[
+                  styles.tag,
+                  session.metadata?.worktree?.isWorktree
+                    ? styles.tagBranch
+                    : styles.tagMain,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tagText,
+                    session.metadata?.worktree?.isWorktree
+                      ? styles.tagBranchText
+                      : styles.tagMainText,
+                  ]}
+                >
+                  {session.metadata?.worktree?.isWorktree
+                    ? t("sessionInfo.tagBranch")
+                    : t("sessionInfo.tagMain")}
+                </Text>
               </View>
-            )}
+              {session.metadata?.host && (
+                <View style={styles.tag}>
+                  <Text style={styles.tagText}>{session.metadata.host}</Text>
+                </View>
+              )}
+              {session.metadata?.version && (
+                <View style={styles.tag}>
+                  <Text style={styles.tagText}>
+                    {session.metadata.version}
+                  </Text>
+                </View>
+              )}
+            </View>
 
             {/* Issue info line */}
             {issueLink &&
