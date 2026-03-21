@@ -823,12 +823,21 @@ function normalizeSessionEnvelope(
       return null;
     }
     // Show AI-generated progress summary (~30s interval)
-    const durationStr = envelope.ev.usage.durationMs >= 60000
-      ? `${Math.floor(envelope.ev.usage.durationMs / 60000)}m ${Math.round((envelope.ev.usage.durationMs % 60000) / 1000)}s`
-      : `${Math.round(envelope.ev.usage.durationMs / 1000)}s`;
-    const tokenStr = envelope.ev.usage.totalTokens >= 1000
-      ? `${(envelope.ev.usage.totalTokens / 1000).toFixed(1)}K`
-      : String(envelope.ev.usage.totalTokens);
+    const usage = envelope.ev.usage;
+    const metricsParts: string[] = [];
+    if (usage) {
+      const durationStr = usage.durationMs >= 60000
+        ? `${Math.floor(usage.durationMs / 60000)}m ${Math.round((usage.durationMs % 60000) / 1000)}s`
+        : `${Math.round(usage.durationMs / 1000)}s`;
+      const tokenStr = usage.totalTokens >= 1000
+        ? `${(usage.totalTokens / 1000).toFixed(1)}K`
+        : String(usage.totalTokens);
+      metricsParts.push(durationStr, `${tokenStr} tokens`);
+      if (usage.toolUses > 0) {
+        metricsParts.push(`${usage.toolUses} tools`);
+      }
+    }
+    const metricsLine = metricsParts.length > 0 ? `\n_${metricsParts.join(" · ")}_` : "";
     return {
       id: messageId,
       localId,
@@ -838,7 +847,7 @@ function normalizeSessionEnvelope(
       content: [
         {
           type: "text",
-          text: `⏳ ${envelope.ev.summary}\n_${durationStr} · ${tokenStr} tokens · ${envelope.ev.usage.toolUses} tools_`,
+          text: `⏳ ${envelope.ev.summary}${metricsLine}`,
           uuid: contentUUID,
           parentUUID,
         },

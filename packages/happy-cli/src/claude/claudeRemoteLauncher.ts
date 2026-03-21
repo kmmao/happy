@@ -431,11 +431,13 @@ export async function claudeRemoteLauncher(
         t: "task-progress",
         taskId: m.task_id,
         description: m.description,
-        usage: {
-          totalTokens: m.usage.total_tokens,
-          toolUses: m.usage.tool_uses,
-          durationMs: m.usage.duration_ms,
-        },
+        usage: m.usage
+          ? {
+              totalTokens: m.usage.total_tokens,
+              toolUses: m.usage.tool_uses,
+              durationMs: m.usage.duration_ms,
+            }
+          : undefined,
         lastToolName: m.last_tool_name,
         summary: m.summary,
       });

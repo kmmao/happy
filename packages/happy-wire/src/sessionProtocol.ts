@@ -120,7 +120,7 @@ export const sessionTaskProgressEventSchema = z.object({
     totalTokens: z.number(),
     toolUses: z.number(),
     durationMs: z.number(),
-  }),
+  }).optional(),
   lastToolName: z.string().optional(),
   /** AI-generated progress summary (~30s interval, from agentProgressSummaries) */
   summary: z.string().optional(),
