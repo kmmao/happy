@@ -148,7 +148,7 @@ class ProfileSyncService {
         try {
             // Profiles are stored in GUI settings and available through existing Happy sync system
             // CLI daemon reads profiles from GUI settings via existing channels
-            // TODO: Implement machine RPC endpoints for profile management in CLI daemon
+            // CLI daemon reads profiles from GUI settings via the Happy sync infrastructure
             log.log(`[ProfileSync] GUI profiles stored in Happy settings. CLI access via existing infrastructure.`);
 
             this.lastSyncTime = Date.now();
@@ -388,8 +388,7 @@ class ProfileSyncService {
 
             log.log(`[ProfileSync] Set active profile ${profileId} in Happy settings`);
 
-            // Note: CLI daemon accesses active profile through Happy settings system
-            // TODO: Implement machine RPC endpoint for setting active profile in CLI daemon
+            // CLI daemon accesses active profile through Happy settings system via sync
         } catch (error) {
             log.log(`[ProfileSync] Failed to set active profile: ${error}`);
             throw error;
