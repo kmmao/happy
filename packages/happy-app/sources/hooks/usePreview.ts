@@ -2,7 +2,7 @@
  * Hook for frontend preview: port detection, screenshot capture, diff comparison.
  *
  * Uses sessionBash to run agent-browser for screenshots and lsof for port detection.
- * Screenshots are saved to /tmp and read back via sessionReadFile as base64.
+ * Screenshots are saved to .happy-preview/ under the working directory and read back via sessionReadFile as base64.
  *
  * Layer 1: Port detection + single screenshot capture
  * Layer 2: Baseline management + before/after diff comparison
@@ -139,6 +139,15 @@ function parseLsofOutput(stdout: string): readonly DetectedPort[] {
 }
 
 /**
+ * Build a temp file path under the working directory's .happy-preview/ folder.
+ * The working directory is always in the CLI's readFile allowed list.
+ * Files are cleaned up immediately after reading.
+ */
+function previewTempPath(filename: string): string {
+  return `happy-preview/${filename}`;
+}
+
+/**
  * Capture a screenshot via agent-browser and read it back as base64.
  * Returns the data URI or throws on failure.
  */
@@ -147,8 +156,9 @@ async function captureAndRead(
   safeUrl: string,
   screenshotPath: string,
 ): Promise<string> {
+  const absPath = `$PWD/${screenshotPath}`;
   const captureResult = await sessionBash(sessionId, {
-    command: `agent-browser open "${safeUrl}" && agent-browser wait --load networkidle && agent-browser screenshot "${screenshotPath}" && agent-browser close`,
+    command: `mkdir -p "$(dirname "${absPath}")" && agent-browser open "${safeUrl}" && agent-browser wait --load networkidle && agent-browser screenshot "${absPath}" && agent-browser close`,
     timeout: 30000,
   });
 
@@ -237,7 +247,7 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
       setState({ status: "capturing", url: safeUrl });
 
       const timestamp = Date.now();
-      const screenshotPath = `/tmp/happy-preview-${timestamp}.png`;
+      const screenshotPath = previewTempPath(`happy-preview-${timestamp}.png`);
 
       try {
         const uri = await captureAndRead(sessionId, safeUrl, screenshotPath);
@@ -270,10 +280,11 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
 
     // Capture reference before async operation
     const screenshot = s.screenshot;
-    const baselinePath = `/tmp/happy-baseline-${screenshot.timestamp}.png`;
+    const baselinePath = previewTempPath(`happy-baseline-${screenshot.timestamp}.png`);
 
+    const absBaselinePath = `$PWD/${baselinePath}`;
     const saveResult = await sessionBash(sessionId, {
-      command: `agent-browser open "${screenshot.url}" && agent-browser wait --load networkidle && agent-browser screenshot "${baselinePath}" && agent-browser close`,
+      command: `mkdir -p "$(dirname "${absBaselinePath}")" && agent-browser open "${screenshot.url}" && agent-browser wait --load networkidle && agent-browser screenshot "${absBaselinePath}" && agent-browser close`,
       timeout: 30000,
     });
 
@@ -334,8 +345,8 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
       setState({ status: "comparing", url: safeUrl });
 
       const timestamp = Date.now();
-      const currentPath = `/tmp/happy-current-${timestamp}.png`;
-      const diffPath = `/tmp/happy-diff-${timestamp}.png`;
+      const currentPath = previewTempPath(`happy-current-${timestamp}.png`);
+      const diffPath = previewTempPath(`happy-diff-${timestamp}.png`);
 
       try {
         let currentUri: string;
@@ -344,8 +355,11 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
         if (baselinePathRef.current) {
           // Single browser session: open → wait → screenshot → diff → close
           // This ensures diff is computed against the exact same page state
+          const absCurrentPath = `$PWD/${currentPath}`;
+          const absDiffPath = `$PWD/${diffPath}`;
+          const absBaselineRef = `$PWD/${baselinePathRef.current}`;
           const combinedResult = await sessionBash(sessionId, {
-            command: `agent-browser open "${safeUrl}" && agent-browser wait --load networkidle && agent-browser screenshot "${currentPath}" && agent-browser diff screenshot --baseline "${baselinePathRef.current}" -o "${diffPath}" && agent-browser close`,
+            command: `mkdir -p "$(dirname "${absCurrentPath}")" && agent-browser open "${safeUrl}" && agent-browser wait --load networkidle && agent-browser screenshot "${absCurrentPath}" && agent-browser diff screenshot --baseline "${absBaselineRef}" -o "${absDiffPath}" && agent-browser close`,
             timeout: 45000,
           });
 
