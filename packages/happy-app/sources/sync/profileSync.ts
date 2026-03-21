@@ -10,6 +10,7 @@ import { sync } from './sync';
 import { storage } from './storage';
 import { apiSocket } from './apiSocket';
 import { Modal } from '@/modal';
+import { log } from '@/log';
 
 // Profile sync status types
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
@@ -88,7 +89,7 @@ class ProfileSyncService {
             try {
                 listener(event);
             } catch (error) {
-                console.error('[ProfileSync] Event listener error:', error);
+                log.log(`[ProfileSync] Event listener error: ${error}`);
             }
         });
     }
@@ -148,7 +149,7 @@ class ProfileSyncService {
             // Profiles are stored in GUI settings and available through existing Happy sync system
             // CLI daemon reads profiles from GUI settings via existing channels
             // TODO: Implement machine RPC endpoints for profile management in CLI daemon
-            console.log(`[ProfileSync] GUI profiles stored in Happy settings. CLI access via existing infrastructure.`);
+            log.log(`[ProfileSync] GUI profiles stored in Happy settings. CLI access via existing infrastructure.`);
 
             this.lastSyncTime = Date.now();
             this.syncStatus = 'success';
@@ -194,7 +195,7 @@ class ProfileSyncService {
             // Return profiles from current GUI settings
             const currentProfiles = storage.getState().settings.profiles || [];
 
-            console.log(`[ProfileSync] Retrieved ${currentProfiles.length} profiles from Happy settings`);
+            log.log(`[ProfileSync] Retrieved ${currentProfiles.length} profiles from Happy settings`);
 
             this.lastSyncTime = Date.now();
             this.syncStatus = 'success';
@@ -385,12 +386,12 @@ class ProfileSyncService {
             // Store in GUI settings using Happy's settings system
             sync.applySettings({ lastUsedProfile: profileId });
 
-            console.log(`[ProfileSync] Set active profile ${profileId} in Happy settings`);
+            log.log(`[ProfileSync] Set active profile ${profileId} in Happy settings`);
 
             // Note: CLI daemon accesses active profile through Happy settings system
             // TODO: Implement machine RPC endpoint for setting active profile in CLI daemon
         } catch (error) {
-            console.error('[ProfileSync] Failed to set active profile:', error);
+            log.log(`[ProfileSync] Failed to set active profile: ${error}`);
             throw error;
         }
     }
@@ -412,13 +413,13 @@ class ProfileSyncService {
             const activeProfile = profiles.find((p: AIBackendProfile) => p.id === lastUsedProfileId);
 
             if (activeProfile) {
-                console.log(`[ProfileSync] Retrieved active profile ${activeProfile.name} from Happy settings`);
+                log.log(`[ProfileSync] Retrieved active profile ${activeProfile.name} from Happy settings`);
                 return activeProfile;
             }
 
             return null;
         } catch (error) {
-            console.error('[ProfileSync] Failed to get active profile:', error);
+            log.log(`[ProfileSync] Failed to get active profile: ${error}`);
             return null;
         }
     }
@@ -438,7 +439,7 @@ class ProfileSyncService {
             try {
                 await this.bidirectionalSync(guiProfiles);
             } catch (error) {
-                console.error('[ProfileSync] Auto-sync failed:', error);
+                log.log(`[ProfileSync] Auto-sync failed: ${error}`);
                 // Don't throw for auto-sync failures
             }
         }
