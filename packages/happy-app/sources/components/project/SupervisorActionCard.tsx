@@ -18,6 +18,7 @@ import {
     updateActionApproval,
     triggerActionFix,
     deleteAction,
+    forceResolveAction,
 } from "@/sync/apiSupervisor";
 import {
     SEVERITY_COLORS,
@@ -147,6 +148,48 @@ export const SupervisorActionCard = React.memo(
                 ],
             );
         }, [doDelete]);
+
+        const [forceCompleteLoading, doForceComplete] = useHappyAction(
+            React.useCallback(async () => {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                await forceResolveAction(credentials, projectId, action.id, "completed");
+                onUpdated();
+            }, [projectId, action.id, onUpdated]),
+        );
+
+        const [forceFailLoading, doForceFail] = useHappyAction(
+            React.useCallback(async () => {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                await forceResolveAction(credentials, projectId, action.id, "failed");
+                onUpdated();
+            }, [projectId, action.id, onUpdated]),
+        );
+
+        const handleForceComplete = React.useCallback(() => {
+            Modal.alert(
+                t("supervisor.forceCompleteConfirm"),
+                t("supervisor.forceCompleteConfirmBody"),
+                [
+                    { text: t("common.cancel"), style: "cancel" },
+                    { text: t("supervisor.forceComplete"), onPress: doForceComplete },
+                ],
+            );
+        }, [doForceComplete]);
+
+        const handleForceFail = React.useCallback(() => {
+            Modal.alert(
+                t("supervisor.forceFailConfirm"),
+                t("supervisor.forceFailConfirmBody"),
+                [
+                    { text: t("common.cancel"), style: "cancel" },
+                    { text: t("supervisor.forceFail"), style: "destructive", onPress: doForceFail },
+                ],
+            );
+        }, [doForceFail]);
+
+        const forceResolveBusy = forceCompleteLoading || forceFailLoading;
 
         const actionBusy = approveLoading || skipLoading || ignoreLoading || restoreLoading || deleteLoading;
 
@@ -281,6 +324,49 @@ export const SupervisorActionCard = React.memo(
                                 {new Date(action.updatedAt).toLocaleString()}
                             </Text>
                         )}
+                    </View>
+                )}
+
+                {/* Force resolve buttons for stuck fix sessions */}
+                {isFixing && (
+                    <View style={styles.forceResolveRow}>
+                        <Text style={styles.forceResolveHint}>
+                            {t("supervisor.forceResolveHint")}
+                        </Text>
+                        <View style={styles.forceResolveButtons}>
+                            <Pressable
+                                style={[styles.forceCompleteButton, forceResolveBusy && !forceCompleteLoading && styles.buttonDisabled]}
+                                onPress={handleForceComplete}
+                                disabled={forceResolveBusy}
+                            >
+                                {forceCompleteLoading ? (
+                                    <ActivityIndicator size="small" color="#34C759" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="checkmark-circle-outline" size={14} color="#34C759" />
+                                        <Text style={styles.forceCompleteText}>
+                                            {t("supervisor.forceComplete")}
+                                        </Text>
+                                    </>
+                                )}
+                            </Pressable>
+                            <Pressable
+                                style={[styles.forceFailButton, forceResolveBusy && !forceFailLoading && styles.buttonDisabled]}
+                                onPress={handleForceFail}
+                                disabled={forceResolveBusy}
+                            >
+                                {forceFailLoading ? (
+                                    <ActivityIndicator size="small" color="#FF3B30" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="close-circle-outline" size={14} color="#FF3B30" />
+                                        <Text style={styles.forceFailText}>
+                                            {t("supervisor.forceFail")}
+                                        </Text>
+                                    </>
+                                )}
+                            </Pressable>
+                        </View>
                     </View>
                 )}
 
@@ -666,6 +752,51 @@ const styles = StyleSheet.create((theme) => ({
     deleteButtonText: {
         ...Typography.default(),
         fontSize: 13,
+        color: "#FF3B30",
+    },
+    forceResolveRow: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 0.5,
+        borderTopColor: theme.colors.divider,
+    },
+    forceResolveHint: {
+        ...Typography.default(),
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        opacity: 0.7,
+        marginBottom: 6,
+    },
+    forceResolveButtons: {
+        flexDirection: "row",
+        gap: 8,
+    },
+    forceCompleteButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 6,
+        backgroundColor: "#34C75910",
+    },
+    forceCompleteText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: "#34C759",
+    },
+    forceFailButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 6,
+        backgroundColor: "#FF3B3010",
+    },
+    forceFailText: {
+        ...Typography.default(),
+        fontSize: 12,
         color: "#FF3B30",
     },
 }));

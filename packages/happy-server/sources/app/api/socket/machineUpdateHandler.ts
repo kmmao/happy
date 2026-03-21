@@ -7,6 +7,7 @@ import { Socket } from "socket.io";
 import { allocateUserSeq } from "@/storage/seq";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { checkAndTriggerScheduledRuns } from "@/modules/supervisorScheduler";
+import { cleanupStaleFixActions } from "@/modules/supervisorFixWatchdog";
 
 // Throttle schedule checks to once per 5 minutes per machine
 const SCHEDULE_CHECK_INTERVAL = 5 * 60 * 1000;
@@ -63,6 +64,11 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
             if (shouldCheckSchedule(data.machineId)) {
                 checkAndTriggerScheduledRuns(data.machineId, userId).catch(err =>
                     log({ module: 'supervisor', level: 'error' }, `Schedule check error: ${err}`)
+                );
+
+                // Also clean up stale fix actions whose sessions are no longer active
+                cleanupStaleFixActions(userId, data.machineId).catch(err =>
+                    log({ module: 'supervisor', level: 'error' }, `Stale fix cleanup error: ${err}`)
                 );
             }
         } catch (error) {

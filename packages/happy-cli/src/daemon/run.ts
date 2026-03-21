@@ -45,7 +45,8 @@ import {
 } from "@/utils/tmux";
 import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
 import { handleWebhookTrigger } from "@/webhook/handleWebhookTrigger";
-import { handleSupervisorTrigger, cleanupFixWorktree } from "@/supervisor/handleSupervisorTrigger";
+import { handleSupervisorTrigger, cleanupFixWorktree, getFixWorktreeInfo } from "@/supervisor/handleSupervisorTrigger";
+import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
 
 
 // Prepare initial metadata
@@ -930,11 +931,30 @@ export async function startDaemon(): Promise<void> {
       const session = pidToTrackedSession.get(pid);
       pidToTrackedSession.delete(pid);
 
-      // Clean up fix worktree if this was a supervisor fix session
-      if (session?.happySessionId) {
-        cleanupFixWorktree(session.happySessionId).catch(() => {
-          // best-effort, cleanupFixWorktree already handles errors
-        });
+      if (!session?.happySessionId) return;
+
+      // Check if this was a fix session — diagnose and auto-report if status was never updated
+      const fixInfo = getFixWorktreeInfo(session.happySessionId);
+      if (fixInfo) {
+        // Wait briefly for any in-flight curl from the session to reach the server
+        setTimeout(() => {
+          diagnoseAndReportFixStatus({
+            sessionId: session.happySessionId!,
+            repoPath: fixInfo.repoPath,
+            branchName: fixInfo.branchName,
+            parentBranch: fixInfo.parentBranch,
+            actionId: fixInfo.actionId,
+            projectId: fixInfo.projectId,
+            emitFixStatus: (data) => apiMachine.emitSupervisorFixStatus(data),
+          }).catch((err) => {
+            logger.debug(`[DAEMON RUN] Fix status diagnosis failed: ${err}`);
+          }).finally(() => {
+            cleanupFixWorktree(session.happySessionId!).catch(() => {});
+          });
+        }, 3_000);
+      } else {
+        // Not a fix session, just clean up
+        cleanupFixWorktree(session.happySessionId).catch(() => {});
       }
     };
 

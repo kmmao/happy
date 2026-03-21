@@ -2155,6 +2155,13 @@ export const es: TranslationStructure = {
     delete: "Eliminar",
     deleteConfirm: "Eliminar acción",
     deleteConfirmBody: "¿Eliminar esta acción permanentemente? Si el problema persiste, se detectará de nuevo en el próximo escaneo.",
+    forceComplete: "Marcar completado",
+    forceFail: "Marcar fallido",
+    forceCompleteConfirm: "¿Marcar como completado?",
+    forceCompleteConfirmBody: "Usa esto cuando la corrección se aplicó pero el estado no se actualizó automáticamente.",
+    forceFailConfirm: "¿Marcar como fallido?",
+    forceFailConfirmBody: "Usa esto cuando el fix session falló o necesita ser reiniciado.",
+    forceResolveHint: "¿Atascado? Resolver manualmente:",
 
     // Loop mode
     loopMode: "Bucle",

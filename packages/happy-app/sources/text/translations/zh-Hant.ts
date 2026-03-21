@@ -2066,6 +2066,15 @@ export const zhHant: TranslationStructure = {
     deleteConfirm: "刪除操作",
     deleteConfirmBody: "永久刪除此操作？如果問題仍然存在，下次掃描會重新檢測到。",
 
+    // Force resolve (stuck fix sessions)
+    forceComplete: "標記完成",
+    forceFail: "標記失敗",
+    forceCompleteConfirm: "標記為已完成？",
+    forceCompleteConfirmBody: "當修復已完成但狀態未自動更新時使用此選項。",
+    forceFailConfirm: "標記為失敗？",
+    forceFailConfirmBody: "當 fix session 崩潰或需要重置時使用此選項。",
+    forceResolveHint: "卡住了？手動處理：",
+
     // Loop mode
     loopMode: "循環",
     loopConfig: "循環配置",

@@ -2149,6 +2149,13 @@ export const en: TranslationStructure = {
     delete: "Delete",
     deleteConfirm: "Delete Action",
     deleteConfirmBody: "Permanently delete this action? If the issue still exists, it will be detected again on the next scan.",
+    forceComplete: "Mark Complete",
+    forceFail: "Mark Failed",
+    forceCompleteConfirm: "Mark as Completed?",
+    forceCompleteConfirmBody: "Use this when the fix was applied but the status was not updated automatically.",
+    forceFailConfirm: "Mark as Failed?",
+    forceFailConfirmBody: "Use this when the fix session crashed or needs to be reset.",
+    forceResolveHint: "Stuck? Manually resolve:",
 
     // Loop mode
     loopMode: "Loop",

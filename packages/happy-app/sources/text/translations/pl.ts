@@ -2175,6 +2175,13 @@ export const pl: TranslationStructure = {
     delete: "Usuń",
     deleteConfirm: "Usuń akcję",
     deleteConfirmBody: "Trwale usunąć tę akcję? Jeśli problem nadal istnieje, zostanie wykryty ponownie przy następnym skanowaniu.",
+    forceComplete: "Oznacz jako ukończone",
+    forceFail: "Oznacz jako nieudane",
+    forceCompleteConfirm: "Oznaczyć jako ukończone?",
+    forceCompleteConfirmBody: "Użyj, gdy poprawka została zastosowana, ale status nie zaktualizował się automatycznie.",
+    forceFailConfirm: "Oznaczyć jako nieudane?",
+    forceFailConfirmBody: "Użyj, gdy fix session uległa awarii lub wymaga zresetowania.",
+    forceResolveHint: "Utknąłeś? Rozwiąż ręcznie:",
 
     // Loop mode
     loopMode: "Pętla",

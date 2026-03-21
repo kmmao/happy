@@ -723,6 +723,39 @@ export async function triggerActionFix(
     });
 }
 
+/**
+ * Force-resolve a stuck fix action (manual override)
+ */
+export async function forceResolveAction(
+    credentials: AuthCredentials,
+    projectId: string,
+    actionId: string,
+    resolution: "completed" | "failed",
+): Promise<SupervisorAction | null> {
+    const API_ENDPOINT = getServerUrl();
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/actions/${actionId}/force-resolve`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+                body: JSON.stringify({ resolution }),
+            },
+        );
+
+        if (!response.ok) {
+            const text = await response.text().catch(() => "");
+            throw new NonRetryableError(
+                text || `Failed to force-resolve action: ${response.status}`,
+            );
+        }
+
+        const data = (await response.json()) as { action: SupervisorAction };
+        return data.action;
+    });
+}
+
 // --- Summary ---
 
 export interface SupervisorSummary {

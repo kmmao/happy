@@ -2130,6 +2130,13 @@ export const ja: TranslationStructure = {
     delete: "削除",
     deleteConfirm: "アクションを削除",
     deleteConfirmBody: "このアクションを完全に削除しますか？問題がまだ存在する場合、次回のスキャンで再検出されます。",
+    forceComplete: "完了にする",
+    forceFail: "失敗にする",
+    forceCompleteConfirm: "完了としてマークしますか？",
+    forceCompleteConfirmBody: "修正が適用されたがステータスが自動更新されなかった場合に使用します。",
+    forceFailConfirm: "失敗としてマークしますか？",
+    forceFailConfirmBody: "fix session がクラッシュしたか、リセットが必要な場合に使用します。",
+    forceResolveHint: "動かない？手動で解決：",
 
     // Loop mode
     loopMode: "ループ",

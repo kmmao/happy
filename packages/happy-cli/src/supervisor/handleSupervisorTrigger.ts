@@ -54,8 +54,22 @@ const processingRuns = new Set<string>();
 // Track fix session worktrees for cleanup on session exit
 const fixWorktrees = new Map<
   string,
-  { readonly repoPath: string; readonly branchName: string; readonly parentBranch: string }
+  {
+    readonly repoPath: string;
+    readonly branchName: string;
+    readonly parentBranch: string;
+    readonly actionId: string;
+    readonly projectId: string;
+  }
 >();
+
+/**
+ * Look up fix worktree info for a given session.
+ * Used by the daemon to detect orphaned fix sessions on exit.
+ */
+export function getFixWorktreeInfo(sessionId: string) {
+  return fixWorktrees.get(sessionId) ?? null;
+}
 
 /**
  * Clean up a fix session's worktree after the session exits.
@@ -590,6 +604,8 @@ async function handleFixTrigger(
     repoPath,
     branchName: worktreeResult.branchName,
     parentBranch: worktreeResult.parentBranch,
+    actionId,
+    projectId,
   });
 
   logger.debug(

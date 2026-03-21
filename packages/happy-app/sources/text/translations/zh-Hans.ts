@@ -2062,6 +2062,13 @@ export const zhHans: TranslationStructure = {
     delete: "删除",
     deleteConfirm: "删除操作",
     deleteConfirmBody: "永久删除此操作？如果问题仍然存在，下次扫描会重新检测到。",
+    forceComplete: "标记完成",
+    forceFail: "标记失败",
+    forceCompleteConfirm: "标记为已完成？",
+    forceCompleteConfirmBody: "当修复已应用但状态未自动更新时使用此操作。",
+    forceFailConfirm: "标记为失败？",
+    forceFailConfirmBody: "当 fix session 崩溃或需要重置时使用此操作。",
+    forceResolveHint: "卡住了？手动解决：",
 
     // Loop mode
     loopMode: "循环",

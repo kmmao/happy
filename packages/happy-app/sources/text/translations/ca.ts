@@ -2160,6 +2160,13 @@ export const ca: TranslationStructure = {
     delete: "Elimina",
     deleteConfirm: "Eliminar acció",
     deleteConfirmBody: "Voleu eliminar aquesta acció permanentment? Si el problema encara existeix, es detectarà de nou al proper escaneig.",
+    forceComplete: "Marcar completat",
+    forceFail: "Marcar fallat",
+    forceCompleteConfirm: "Marcar com a completat?",
+    forceCompleteConfirmBody: "Feu servir això quan la correcció s'ha aplicat però l'estat no s'ha actualitzat automàticament.",
+    forceFailConfirm: "Marcar com a fallat?",
+    forceFailConfirmBody: "Feu servir això quan el fix session ha fallat o necessita ser reiniciat.",
+    forceResolveHint: "Encallat? Resoleu manualment:",
 
     // Loop mode
     loopMode: "Bucle",

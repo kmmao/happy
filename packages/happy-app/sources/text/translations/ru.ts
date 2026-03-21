@@ -2174,6 +2174,13 @@ export const ru: TranslationStructure = {
     delete: "Удалить",
     deleteConfirm: "Удалить действие",
     deleteConfirmBody: "Удалить это действие навсегда? Если проблема ещё существует, она будет обнаружена при следующем сканировании.",
+    forceComplete: "Отметить выполненным",
+    forceFail: "Отметить неудачным",
+    forceCompleteConfirm: "Отметить как выполненное?",
+    forceCompleteConfirmBody: "Используйте, когда исправление было применено, но статус не обновился автоматически.",
+    forceFailConfirm: "Отметить как неудачное?",
+    forceFailConfirmBody: "Используйте, когда fix session завершился аварийно или требует сброса.",
+    forceResolveHint: "Застряли? Решите вручную:",
 
     // Loop mode
     loopMode: "Цикл",

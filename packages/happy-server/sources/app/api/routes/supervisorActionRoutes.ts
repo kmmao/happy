@@ -562,6 +562,127 @@ export function supervisorActionRoutes(app: Fastify) {
             });
         },
     );
+
+    // POST /v1/projects/:id/supervisor/actions/:actionId/force-resolve — Manual override for stuck fix status
+    app.post(
+        "/v1/projects/:id/supervisor/actions/:actionId/force-resolve",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({
+                    id: z.string(),
+                    actionId: z.string(),
+                }),
+                body: z.object({
+                    resolution: z.enum(["completed", "failed"]),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id, actionId } = request.params;
+            const { resolution } = request.body;
+
+            // Verify action exists and belongs to this user
+            const action = await db.supervisorAction.findFirst({
+                where: {
+                    id: actionId,
+                    projectId: id,
+                    accountId: userId,
+                    approval: "approved",
+                    fixStatus: { in: ["running", "pending"] },
+                },
+                select: { id: true, fixSessionId: true, runId: true, title: true },
+            });
+
+            if (!action) {
+                return reply.code(404).send({
+                    error: "Action not found or not in a fixable state",
+                });
+            }
+
+            // Update fix status
+            await db.supervisorAction.update({
+                where: { id: actionId },
+                data: { fixStatus: resolution },
+            });
+
+            // Archive fix session if present
+            if (action.fixSessionId) {
+                const now = Date.now();
+                await db.session.updateMany({
+                    where: { id: action.fixSessionId, active: true },
+                    data: { lastActiveAt: new Date(now), active: false },
+                });
+
+                // Tell CLI daemon to kill the session
+                const project = await db.project.findUnique({
+                    where: { id },
+                    select: { machineId: true },
+                });
+
+                if (project?.machineId) {
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: {
+                            type: "supervisor-fix-kill-session",
+                            fixSessionId: action.fixSessionId,
+                            projectId: id,
+                            fixStatus: resolution,
+                        },
+                        recipientFilter: {
+                            type: "machine-scoped-only",
+                            machineId: project.machineId,
+                        },
+                    });
+                }
+            }
+
+            // Notify App clients
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildSupervisorStatusEphemeral(
+                    action.runId,
+                    id,
+                    `fix-${resolution}`,
+                ),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+
+            // Send push notification
+            const title = resolution === "completed"
+                ? "Fix Manually Resolved"
+                : "Fix Manually Failed";
+            const body = resolution === "completed"
+                ? `Resolved: ${action.title}`
+                : `Marked failed: ${action.title}`;
+            await pushSupervisorNotification(userId, {
+                projectId: id,
+                runId: action.runId,
+                type: resolution === "completed" ? "fix_complete" : "error",
+                title,
+                body,
+            });
+
+            // Loop progression
+            try {
+                await loopOnFixCompleted(userId, actionId, id, resolution);
+            } catch (loopError) {
+                log(
+                    { module: "supervisor", level: "error" },
+                    `Force-resolve loop progression error for action ${actionId}: ${loopError}`,
+                );
+            }
+
+            const updated = await db.supervisorAction.findUnique({
+                where: { id: actionId },
+            });
+
+            return reply.send({
+                action: updated ? serializeSupervisorAction(updated) : null,
+            });
+        },
+    );
 }
 
 function serializeSupervisorAction(action: {
