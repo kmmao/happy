@@ -412,6 +412,7 @@ export async function claudeRemoteLauncher(
           durationMs: m.usage.duration_ms,
         },
         lastToolName: m.last_tool_name,
+        summary: m.summary,
       });
       session.client.sendSessionProtocolMessage(envelope);
     }

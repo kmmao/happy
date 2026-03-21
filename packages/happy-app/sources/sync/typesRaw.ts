@@ -194,6 +194,8 @@ const sessionTaskProgressEventSchema = z.object({
     durationMs: z.number(),
   }),
   lastToolName: z.string().optional(),
+  /** AI-generated progress summary (~30s interval, from agentProgressSummaries) */
+  summary: z.string().optional(),
 });
 
 const sessionTaskEndEventSchema = z.object({
@@ -816,8 +818,33 @@ function normalizeSessionEnvelope(
   }
 
   if (envelope.ev.t === "task-progress") {
-    // Task progress updates — skip to avoid flooding chat
-    return null;
+    if (!envelope.ev.summary) {
+      // Skip progress updates without AI summary to avoid flooding chat
+      return null;
+    }
+    // Show AI-generated progress summary (~30s interval)
+    const durationStr = envelope.ev.usage.durationMs >= 60000
+      ? `${Math.floor(envelope.ev.usage.durationMs / 60000)}m ${Math.round((envelope.ev.usage.durationMs % 60000) / 1000)}s`
+      : `${Math.round(envelope.ev.usage.durationMs / 1000)}s`;
+    const tokenStr = envelope.ev.usage.totalTokens >= 1000
+      ? `${(envelope.ev.usage.totalTokens / 1000).toFixed(1)}K`
+      : String(envelope.ev.usage.totalTokens);
+    return {
+      id: messageId,
+      localId,
+      createdAt: messageCreatedAt,
+      role: "agent",
+      isSidechain,
+      content: [
+        {
+          type: "text",
+          text: `⏳ ${envelope.ev.summary}\n_${durationStr} · ${tokenStr} tokens · ${envelope.ev.usage.toolUses} tools_`,
+          uuid: contentUUID,
+          parentUUID,
+        },
+      ],
+      meta,
+    } satisfies NormalizedMessage;
   }
 
   if (envelope.ev.t === "task-end") {

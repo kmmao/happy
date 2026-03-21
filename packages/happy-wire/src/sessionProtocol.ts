@@ -122,6 +122,8 @@ export const sessionTaskProgressEventSchema = z.object({
     durationMs: z.number(),
   }),
   lastToolName: z.string().optional(),
+  /** AI-generated progress summary (~30s interval, from agentProgressSummaries) */
+  summary: z.string().optional(),
 });
 
 export const sessionTaskEndEventSchema = z.object({
