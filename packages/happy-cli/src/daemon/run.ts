@@ -137,24 +137,24 @@ export async function startDaemon(): Promise<void> {
     };
   });
 
-  // Setup signal handlers
-  process.on("SIGINT", () => {
+  // Setup signal handlers (use once() to prevent accumulation on restart)
+  process.once("SIGINT", () => {
     logger.debug("[DAEMON RUN] Received SIGINT");
     requestShutdown("os-signal");
   });
 
-  process.on("SIGTERM", () => {
+  process.once("SIGTERM", () => {
     logger.debug("[DAEMON RUN] Received SIGTERM");
     requestShutdown("os-signal");
   });
 
-  process.on("uncaughtException", (error) => {
+  process.once("uncaughtException", (error) => {
     logger.debug("[DAEMON RUN] FATAL: Uncaught exception", error);
     logger.debug(`[DAEMON RUN] Stack trace: ${error.stack}`);
     requestShutdown("exception", error.message);
   });
 
-  process.on("unhandledRejection", (reason, promise) => {
+  process.once("unhandledRejection", (reason, promise) => {
     logger.debug("[DAEMON RUN] FATAL: Unhandled promise rejection", reason);
     logger.debug(`[DAEMON RUN] Rejected promise:`, promise);
     const error =
@@ -165,11 +165,11 @@ export async function startDaemon(): Promise<void> {
     requestShutdown("exception", error.message);
   });
 
-  process.on("exit", (code) => {
+  process.once("exit", (code) => {
     logger.debug(`[DAEMON RUN] Process exiting with code: ${code}`);
   });
 
-  process.on("beforeExit", (code) => {
+  process.once("beforeExit", (code) => {
     logger.debug(`[DAEMON RUN] Process about to exit with code: ${code}`);
   });
 
