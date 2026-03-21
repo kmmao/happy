@@ -202,6 +202,7 @@ export async function startLoop(
             customRules: project.supervisorCustomRules ?? undefined,
             maxConcurrentAnalysis: concurrency.maxAnalysis,
             maxConcurrentFix: concurrency.maxFix,
+            maxFindings: concurrency.maxFindings,
         }),
         recipientFilter: {
             type: "machine-scoped-only",
@@ -768,18 +769,21 @@ function emitLoopStatus(
 function parseConcurrencyConfig(configJson: string | null | undefined): {
     maxAnalysis: number | undefined;
     maxFix: number | undefined;
+    maxFindings: number | undefined;
 } {
-    if (!configJson) return { maxAnalysis: undefined, maxFix: undefined };
+    if (!configJson) return { maxAnalysis: undefined, maxFix: undefined, maxFindings: undefined };
     try {
         const config = JSON.parse(configJson);
         const c = config?.concurrency;
-        if (!c || typeof c !== "object") return { maxAnalysis: undefined, maxFix: undefined };
+        const maxFindings = typeof config?.maxFindings === "number" ? config.maxFindings : undefined;
+        if (!c || typeof c !== "object") return { maxAnalysis: undefined, maxFix: undefined, maxFindings };
         return {
             maxAnalysis: typeof c.maxAnalysisSessions === "number" ? c.maxAnalysisSessions : undefined,
             maxFix: typeof c.maxFixSessions === "number" ? c.maxFixSessions : undefined,
+            maxFindings,
         };
     } catch {
-        return { maxAnalysis: undefined, maxFix: undefined };
+        return { maxAnalysis: undefined, maxFix: undefined, maxFindings: undefined };
     }
 }
 

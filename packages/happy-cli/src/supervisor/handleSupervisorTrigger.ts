@@ -129,6 +129,7 @@ export async function handleSupervisorTrigger(
     existingActions,
     maxConcurrentAnalysis,
     maxConcurrentFix,
+    maxFindings,
     loopId,
     loopIteration,
   } = data;
@@ -295,6 +296,7 @@ export async function handleSupervisorTrigger(
           changedFiles,
           customRules,
           existingActions,
+          maxFindings,
           deps,
         );
       }
@@ -348,6 +350,7 @@ async function handleAnalysisTrigger(
   changedFiles: readonly string[] | undefined,
   customRules: string | undefined,
   existingActions: SupervisorTriggerData["existingActions"],
+  maxFindings: number | undefined,
   deps: SupervisorHandlerDeps,
 ): Promise<void> {
   logger.debug(
@@ -373,6 +376,7 @@ async function handleAnalysisTrigger(
     customRules,
     existingActions,
     serverUrl: deps.serverUrl,
+    maxFindings,
   });
 
   // 3. Write prompt to temp file in the project

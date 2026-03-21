@@ -151,6 +151,8 @@ export type SupervisorTriggerData = {
   maxConcurrentAnalysis?: number;
   /** Max concurrent fix worktree sessions (from project config). */
   maxConcurrentFix?: number;
+  /** Max findings per analysis run. 0 or negative = unlimited. */
+  maxFindings?: number;
   existingActions?: ReadonlyArray<{
     category: string;
     title: string;

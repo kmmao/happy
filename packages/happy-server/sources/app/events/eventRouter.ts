@@ -964,6 +964,7 @@ export interface SupervisorTriggerOptions {
   existingActions?: readonly { category: string; title: string; severity: string; approval: string; fixStatus: string | null }[];
   maxConcurrentAnalysis?: number;
   maxConcurrentFix?: number;
+  maxFindings?: number;
 }
 
 export function buildSupervisorTriggerEphemeral(opts: SupervisorTriggerOptions): EphemeralPayload {

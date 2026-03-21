@@ -36,6 +36,8 @@ export interface SupervisorPromptOptions {
   }>;
   /** Server URL for reporting results back. */
   readonly serverUrl: string;
+  /** Max findings per run. 0 or negative = unlimited. Default: 10. */
+  readonly maxFindings?: number;
 }
 
 export function buildSupervisorPrompt(
@@ -45,6 +47,11 @@ export function buildSupervisorPrompt(
     options.dimensions && options.dimensions.length > 0
       ? options.dimensions
       : defaultEnabledDimensions;
+
+  const maxFindings = options.maxFindings;
+  const maxFindingsLine = maxFindings != null && maxFindings > 0
+    ? `Focus on actionable findings. Do not report more than ${maxFindings} findings per run.`
+    : "Focus on actionable findings. Report all findings you discover.";
 
   const autoModeSection = options.mode === "auto"
     ? `
@@ -151,7 +158,7 @@ Rate how confident you are in the \`suggestedFix\` (0-100):
 - **medium**: Minor outdated packages, style inconsistencies, missing i18n
 - **low**: Cosmetic issues, minor naming preferences
 
-Focus on actionable findings. Do not report more than 10 findings per run.
+${maxFindingsLine}
 
 ## MANDATORY: Report Progress Per Dimension (CRITICAL)
 

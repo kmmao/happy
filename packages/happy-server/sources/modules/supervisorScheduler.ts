@@ -33,6 +33,7 @@ export async function checkAndTriggerScheduledRuns(
             supervisorScheduleIntervalHours: true,
             supervisorEnabledDimensions: true,
             supervisorCustomRules: true,
+            supervisorConfig: true,
         },
     });
 
@@ -115,6 +116,12 @@ export async function checkAndTriggerScheduledRuns(
                 ? project.supervisorEnabledDimensions.split(",").map((d) => d.trim()).filter(Boolean)
                 : undefined;
 
+            let maxFindings: number | undefined;
+            try {
+                const cfg = project.supervisorConfig ? JSON.parse(project.supervisorConfig) : null;
+                maxFindings = typeof cfg?.maxFindings === "number" ? cfg.maxFindings : undefined;
+            } catch { /* ignore */ }
+
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildSupervisorTriggerEphemeral({
@@ -126,6 +133,7 @@ export async function checkAndTriggerScheduledRuns(
                     mode: project.supervisorMode ?? undefined,
                     dimensions,
                     customRules: project.supervisorCustomRules ?? undefined,
+                    maxFindings,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",

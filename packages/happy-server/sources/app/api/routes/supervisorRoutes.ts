@@ -129,6 +129,7 @@ export function supervisorRoutes(app: Fastify) {
 
             // Extract concurrency limits from supervisorConfig JSON
             const concurrency = parseConcurrencyConfig(project.supervisorConfig);
+            const maxFindings = parseMaxFindings(project.supervisorConfig);
 
             eventRouter.emitEphemeral({
                 userId,
@@ -145,6 +146,7 @@ export function supervisorRoutes(app: Fastify) {
                     existingActions,
                     maxConcurrentAnalysis: concurrency.maxAnalysis,
                     maxConcurrentFix: concurrency.maxFix,
+                    maxFindings,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",
@@ -887,6 +889,16 @@ function parseConcurrencyConfig(configJson: string | null | undefined): {
         };
     } catch {
         return { maxAnalysis: undefined, maxFix: undefined };
+    }
+}
+
+function parseMaxFindings(configJson: string | null | undefined): number | undefined {
+    if (!configJson) return undefined;
+    try {
+        const config = JSON.parse(configJson);
+        return typeof config?.maxFindings === "number" ? config.maxFindings : undefined;
+    } catch {
+        return undefined;
     }
 }
 
