@@ -279,7 +279,7 @@ export const WebhookRepoItem = React.memo(function WebhookRepoItem({
                         <Ionicons
                             name="checkmark-circle"
                             size={16}
-                            color={theme.colors.box.success?.text ?? "#4CAF50"}
+                            color={theme.colors.success}
                         />
                     )}
                 </View>

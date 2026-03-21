@@ -116,7 +116,7 @@ export const RepoScanner = React.memo(function RepoScanner({
                     fontSize: 14,
                     color: theme.colors.text,
                     borderBottomWidth: 0.5,
-                    borderBottomColor: theme.colors.border,
+                    borderBottomColor: theme.colors.divider,
                     ...Typography.default(),
                   }}
                   value={searchQuery}
@@ -135,7 +135,7 @@ export const RepoScanner = React.memo(function RepoScanner({
                       paddingHorizontal: 12,
                       paddingVertical: 10,
                       borderBottomWidth: 0.5,
-                      borderBottomColor: theme.colors.border,
+                      borderBottomColor: theme.colors.divider,
                     }}
                     onPress={() => handleSelect(entry)}
                   >

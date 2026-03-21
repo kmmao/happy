@@ -290,7 +290,7 @@ function OpButton({
         paddingVertical: 6,
         borderRadius: 8,
         backgroundColor: p.pressed
-          ? theme.colors.surfaceHigher
+          ? theme.colors.surfaceHigh
           : theme.colors.surface,
         opacity: disabled && !loading ? 0.5 : 1,
       })}

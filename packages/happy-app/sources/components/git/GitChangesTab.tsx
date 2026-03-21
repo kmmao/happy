@@ -52,7 +52,7 @@ const SectionButton = React.memo<{
   destructive?: boolean;
 }>(({ label, onPress, disabled, theme, primary, destructive }) => {
   const bgColor = primary
-    ? theme.colors.accentPrimary
+    ? theme.colors.header.tint
     : destructive
       ? theme.colors.textDestructive
       : theme.colors.surfaceHigh;
@@ -91,7 +91,7 @@ function renderCheckbox(checked: boolean, theme: Theme) {
     <Ionicons
       name={checked ? "checkbox" : "square-outline"}
       size={22}
-      color={checked ? theme.colors.accentPrimary : theme.colors.textSecondary}
+      color={checked ? theme.colors.header.tint : theme.colors.textSecondary}
     />
   );
 }
