@@ -348,28 +348,39 @@ export const ProjectSessionsTab = React.memo(
 
         return (
             <ItemList>
-                <ItemGroup>
-                    <Item
-                        title={t("newSession.title")}
-                        icon={
-                            <Ionicons
-                                name="add-circle-outline"
-                                size={20}
-                                color={theme.colors.header.tint}
-                            />
-                        }
-                        onPress={handleNewSession}
-                        titleStyle={{ color: theme.colors.header.tint }}
-                        showChevron
-                    />
-                </ItemGroup>
-                {activeSessions.length > 0 && (
-                    <ItemGroup title={t("projects.activeSessions")}>
-                        {activeSessions.map((session) => (
+                <ItemGroup
+                    title={
+                        <View style={styles.archivedHeader}>
+                            <Text style={styles.archivedHeaderTitle}>
+                                {t("projects.activeSessions")}
+                            </Text>
+                            <Pressable
+                                onPress={handleNewSession}
+                                hitSlop={8}
+                                style={({ pressed }) => [
+                                    styles.archivedHeaderButton,
+                                    pressed && { opacity: 0.5 },
+                                ]}
+                            >
+                                <Ionicons name="add-circle-outline" size={14} color={theme.colors.header.tint} />
+                                <Text style={[styles.archivedHeaderButtonText, { color: theme.colors.header.tint }]}>
+                                    {t("newSession.title")}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    }
+                >
+                    {activeSessions.length > 0 ? (
+                        activeSessions.map((session) => (
                             <SessionRow key={session.id} session={session} />
-                        ))}
-                    </ItemGroup>
-                )}
+                        ))
+                    ) : (
+                        <Item
+                            title={t("projects.noSessions")}
+                            showChevron={false}
+                        />
+                    )}
+                </ItemGroup>
                 {archivedSessions.length > 0 && (
                     <ItemGroup
                         title={
