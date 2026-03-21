@@ -22,6 +22,12 @@ describe("session protocol schemas", () => {
         args: { command: "ls -la" },
       },
       { t: "tool-call-end", call: "call-1" },
+      {
+        t: "tool-call-end",
+        call: "call-2",
+        backgroundTaskId: "bn6l4zult",
+        outputFile: "/tmp/tasks/bn6l4zult.output",
+      },
       { t: "file", ref: "upload-1", name: "report.txt", size: 1024 },
       {
         t: "file",
@@ -194,5 +200,21 @@ describe("createEnvelope", () => {
     expect(() =>
       createEnvelope("user", { t: "service", text: "internal event" }),
     ).toThrow();
+  });
+
+  it("creates tool-call-end with background task fields", () => {
+    const envelope = createEnvelope("agent", {
+      t: "tool-call-end",
+      call: "call-bg",
+      backgroundTaskId: "btask123",
+      outputFile: "/tmp/tasks/btask123.output",
+    });
+
+    expect(envelope.ev).toEqual({
+      t: "tool-call-end",
+      call: "call-bg",
+      backgroundTaskId: "btask123",
+      outputFile: "/tmp/tasks/btask123.output",
+    });
   });
 });

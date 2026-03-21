@@ -737,13 +737,26 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
             );
           }
         }
+        const toolCallEnd: Record<string, unknown> = {
+          t: "tool-call-end",
+          call: block.tool_use_id,
+        };
+
+        // Extract background task metadata from Bash tool_result
+        const resultContent =
+          typeof block.content === "string" ? block.content : "";
+        const bgMatch = resultContent.match(
+          /Command running in background with ID: (\S+)\. Output is being written to: (\S+)/,
+        );
+        if (bgMatch) {
+          toolCallEnd.backgroundTaskId = bgMatch[1];
+          toolCallEnd.outputFile = bgMatch[2];
+        }
+
         envelopes.push(
           createEnvelope(
             "agent",
-            {
-              t: "tool-call-end",
-              call: block.tool_use_id,
-            },
+            toolCallEnd as any,
             { turn: turnId, subagent },
           ),
         );

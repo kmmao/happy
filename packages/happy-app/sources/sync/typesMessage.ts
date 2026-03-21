@@ -20,6 +20,10 @@ export type ToolCall = {
     date?: number;
     answers?: Record<string, string>;
   };
+  /** Background task ID when Bash command runs with run_in_background */
+  backgroundTaskId?: string;
+  /** Path to the task output file on the CLI machine */
+  outputFile?: string;
 };
 
 // Flattened message types - each message represents a single block

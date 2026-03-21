@@ -27,6 +27,10 @@ export const sessionToolCallStartEventSchema = z.object({
 export const sessionToolCallEndEventSchema = z.object({
   t: z.literal("tool-call-end"),
   call: z.string(),
+  /** Background task ID when Bash command runs with run_in_background */
+  backgroundTaskId: z.string().optional(),
+  /** Path to the task output file on the CLI machine */
+  outputFile: z.string().optional(),
 });
 
 export const sessionFileEventSchema = z.object({

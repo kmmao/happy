@@ -106,6 +106,10 @@ const sessionToolCallStartEventSchema = z.object({
 const sessionToolCallEndEventSchema = z.object({
   t: z.literal("tool-call-end"),
   call: z.string(),
+  /** Background task ID when Bash command runs with run_in_background */
+  backgroundTaskId: z.string().optional(),
+  /** Path to the task output file on the CLI machine */
+  outputFile: z.string().optional(),
 });
 
 const sessionFileEventSchema = z.object({
@@ -733,6 +737,8 @@ type NormalizedAgentContent =
         allowedTools?: string[];
         decision?: "approved" | "approved_for_session" | "denied" | "abort";
       };
+      backgroundTaskId?: string;
+      outputFile?: string;
     }
   | {
       type: "summary";
@@ -1043,6 +1049,8 @@ function normalizeSessionEnvelope(
           is_error: false,
           uuid: contentUUID,
           parentUUID,
+          backgroundTaskId: envelope.ev.backgroundTaskId,
+          outputFile: envelope.ev.outputFile,
         },
       ],
       meta,

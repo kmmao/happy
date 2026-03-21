@@ -1057,6 +1057,14 @@ export function reducer(
           message.tool.result = c.content;
           message.tool.completedAt = msg.createdAt;
 
+          // Propagate background task metadata
+          if (c.backgroundTaskId) {
+            message.tool.backgroundTaskId = c.backgroundTaskId;
+            message.tool.outputFile = c.outputFile;
+            // Background tasks stay "running" until explicitly checked
+            message.tool.state = "running";
+          }
+
           // Update permission data if provided by backend
           if (c.permissions) {
             // Merge with existing permission to preserve decision field from agentState

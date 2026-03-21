@@ -409,6 +409,99 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
   });
 });
 
+describe("background task metadata in tool-call-end", () => {
+  it("extracts backgroundTaskId and outputFile from Bash background tool_result", () => {
+    const started = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "assistant",
+        uuid: "a-bg-1",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              id: "tool-bg-1",
+              name: "Bash",
+              input: { command: "npm run dev", run_in_background: true },
+            },
+          ],
+        },
+      } as any,
+      { currentTurnId: null },
+    );
+
+    const ended = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "user",
+        uuid: "u-bg-1",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool-bg-1",
+              content:
+                "Command running in background with ID: bn6l4zult. Output is being written to: /private/tmp/claude-501/project/tasks/bn6l4zult.output",
+            },
+          ],
+        },
+      } as any,
+      { currentTurnId: started.currentTurnId },
+    );
+
+    const toolCallEnd = ended.envelopes.find((e) => e.ev.t === "tool-call-end");
+    expect(toolCallEnd).toBeDefined();
+    expect((toolCallEnd!.ev as any).backgroundTaskId).toBe("bn6l4zult");
+    expect((toolCallEnd!.ev as any).outputFile).toBe(
+      "/private/tmp/claude-501/project/tasks/bn6l4zult.output",
+    );
+  });
+
+  it("does not add background fields to normal tool_result", () => {
+    const started = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "assistant",
+        uuid: "a-normal-1",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              id: "tool-normal-1",
+              name: "Bash",
+              input: { command: "ls" },
+            },
+          ],
+        },
+      } as any,
+      { currentTurnId: null },
+    );
+
+    const ended = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "user",
+        uuid: "u-normal-1",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool-normal-1",
+              content: "file1.txt\nfile2.txt",
+            },
+          ],
+        },
+      } as any,
+      { currentTurnId: started.currentTurnId },
+    );
+
+    const toolCallEnd = ended.envelopes.find((e) => e.ev.t === "tool-call-end");
+    expect(toolCallEnd).toBeDefined();
+    expect((toolCallEnd!.ev as any).backgroundTaskId).toBeUndefined();
+    expect((toolCallEnd!.ev as any).outputFile).toBeUndefined();
+  });
+});
+
 describe("closeClaudeTurnWithStatus", () => {
   it("emits turn-end with provided status when turn is active", () => {
     const result = closeClaudeTurnWithStatus(

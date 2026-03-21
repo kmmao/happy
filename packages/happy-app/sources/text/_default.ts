@@ -1995,6 +1995,17 @@ export const en = {
       "Select a dev server or enter a URL to capture a screenshot of your frontend.",
   },
 
+  backgroundTasks: {
+    running: "Running",
+    completed: "Completed",
+    failed: "Failed",
+    viewLog: "View Log",
+    noOutput: "No output yet",
+    close: "Close",
+    refresh: "Refresh",
+    elapsed: ({ time }: { time: string }) => `${time}`,
+  },
+
   supervisor: {
     // General
     title: "Health Monitor",
