@@ -2010,6 +2010,20 @@ export const it: TranslationStructure = {
       "Seleziona un server di sviluppo o inserisci un URL per catturare uno screenshot dell'interfaccia.",
   },
 
+  backgroundTasks: {
+    running: "In esecuzione",
+    completed: "Completato",
+    failed: "Fallito",
+    viewLog: "Visualizza log",
+    noOutput: "Nessun output",
+    close: "Chiudi",
+    refresh: "Aggiorna",
+    elapsed: ({ time }: { time: string }) => `${time}`,
+    stop: "Ferma",
+    stopConfirmTitle: "Ferma attività",
+    stopConfirmMessage: "Sei sicuro di voler fermare questa attività in background?",
+  },
+
   supervisor: {
     title: "Monitor della salute",
     description: "Analisi del codice basata su AI che monitora la salute del progetto su più dimensioni.",

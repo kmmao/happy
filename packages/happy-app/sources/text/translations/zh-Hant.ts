@@ -1921,6 +1921,20 @@ export const zhHant: TranslationStructure = {
     emptyHint: "選擇開發伺服器或輸入 URL 來擷取前端頁面截圖。",
   },
 
+  backgroundTasks: {
+    running: "執行中",
+    completed: "已完成",
+    failed: "失敗",
+    viewLog: "查看日誌",
+    noOutput: "暫無輸出",
+    close: "關閉",
+    refresh: "重新整理",
+    elapsed: ({ time }: { time: string }) => `${time}`,
+    stop: "停止",
+    stopConfirmTitle: "停止任務",
+    stopConfirmMessage: "確定要停止這個背景任務嗎？",
+  },
+
   supervisor: {
     title: "健康監控",
     description: "AI 驅動的程式碼分析，多維度監控專案健康狀況。",

@@ -2016,6 +2016,20 @@ export const ca: TranslationStructure = {
       "Selecciona un servidor de desenvolupament o introdueix una URL per capturar una vista prèvia.",
   },
 
+  backgroundTasks: {
+    running: "En execució",
+    completed: "Completat",
+    failed: "Fallit",
+    viewLog: "Veure registre",
+    noOutput: "Sense sortida encara",
+    close: "Tancar",
+    refresh: "Actualitzar",
+    elapsed: ({ time }: { time: string }) => `${time}`,
+    stop: "Aturar",
+    stopConfirmTitle: "Aturar tasca",
+    stopConfirmMessage: "Esteu segur que voleu aturar aquesta tasca en segon pla?",
+  },
+
   supervisor: {
     title: "Monitor de salut",
     description: "Anàlisi de codi amb IA que monitoritza la salut del projecte en múltiples dimensions.",

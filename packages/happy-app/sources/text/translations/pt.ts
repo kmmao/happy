@@ -2014,6 +2014,20 @@ export const pt: TranslationStructure = {
       "Selecione um servidor de desenvolvimento ou insira uma URL para capturar uma prévia da interface.",
   },
 
+  backgroundTasks: {
+    running: "Em execução",
+    completed: "Concluído",
+    failed: "Falhou",
+    viewLog: "Ver registro",
+    noOutput: "Sem saída ainda",
+    close: "Fechar",
+    refresh: "Atualizar",
+    elapsed: ({ time }: { time: string }) => `${time}`,
+    stop: "Parar",
+    stopConfirmTitle: "Parar tarefa",
+    stopConfirmMessage: "Tem certeza de que deseja parar esta tarefa em segundo plano?",
+  },
+
   supervisor: {
     title: "Monitor de saúde",
     description: "Análise de código com IA que monitora a saúde do projeto em múltiplas dimensões.",

@@ -1999,6 +1999,21 @@ export const en: TranslationStructure = {
     emptyHint:
       "Select a dev server or enter a URL to capture a screenshot of your frontend.",
   },
+
+  backgroundTasks: {
+    running: "Running",
+    completed: "Completed",
+    failed: "Failed",
+    viewLog: "View Log",
+    noOutput: "No output yet",
+    close: "Close",
+    refresh: "Refresh",
+    elapsed: ({ time }: { time: string }) => `${time}`,
+    stop: "Stop",
+    stopConfirmTitle: "Stop Task",
+    stopConfirmMessage: "Are you sure you want to stop this background task?",
+  },
+
   supervisor: {
     title: "Health Monitor",
     description:

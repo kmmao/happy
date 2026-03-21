@@ -27,6 +27,9 @@ import { useLatestOptions } from "@/hooks/useLatestOptions";
 import { BookmarkProvider, useBookmarks } from "@/hooks/useBookmarks";
 import { InputContext } from "@/hooks/useInputContext";
 import { useSessionIssueInfo } from "@/hooks/useSessionIssueInfo";
+import { useBackgroundTasks, BackgroundTask } from "@/hooks/useBackgroundTasks";
+import { BackgroundTaskBar } from "@/components/BackgroundTaskBar";
+import { BackgroundTaskLogSheet } from "@/components/BackgroundTaskLogSheet";
 import { Modal } from "@/modal";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import {
@@ -34,7 +37,7 @@ import {
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
 import { gitStatusSync } from "@/sync/gitStatusSync";
-import { sessionAbort, sessionInterrupt } from "@/sync/ops";
+import { sessionAbort, sessionInterrupt, sessionBash } from "@/sync/ops";
 import {
   storage,
   useIsDataReady,
@@ -332,6 +335,32 @@ function SessionViewInner({
   const [message, setMessage] = React.useState("");
   const realtimeStatus = useRealtimeStatus();
   const { messages, isLoaded } = useSessionMessages(sessionId);
+  const { tasks: backgroundTasks, dismissTask: dismissBackgroundTask } = useBackgroundTasks(messages);
+  const [viewingTask, setViewingTask] = React.useState<BackgroundTask | null>(null);
+
+  const handleStopTask = React.useCallback(
+    async (task: BackgroundTask) => {
+      const confirmed = await Modal.confirm(
+        t("backgroundTasks.stopConfirmTitle"),
+        t("backgroundTasks.stopConfirmMessage"),
+        { destructive: true, confirmText: t("backgroundTasks.stop") },
+      );
+      if (!confirmed) return;
+
+      try {
+        // Use the task output file to find the PID — the process writing to it
+        await sessionBash(sessionId, {
+          command: `PID=$(lsof -t "${task.outputFile}" 2>/dev/null | head -1) && [ -n "$PID" ] && kill "$PID" 2>/dev/null || true`,
+        });
+      } catch {
+        // Best effort — task may have already exited
+      }
+      if (viewingTask?.taskId === task.taskId) {
+        setViewingTask(null);
+      }
+    },
+    [sessionId, viewingTask],
+  );
   const { issueLink, issueBody } = useSessionIssueInfo(sessionId);
   const acknowledgedCliVersions = useLocalSetting("acknowledgedCliVersions");
 
@@ -801,6 +830,18 @@ function SessionViewInner({
 
   const input = (
     <>
+      <BackgroundTaskBar
+        tasks={backgroundTasks}
+        onViewLog={setViewingTask}
+        onStopTask={handleStopTask}
+        onDismiss={dismissBackgroundTask}
+      />
+      <BackgroundTaskLogSheet
+        sessionId={sessionId}
+        task={viewingTask}
+        onClose={() => setViewingTask(null)}
+        onStop={handleStopTask}
+      />
       <AgentInput
         placeholder={t("session.inputPlaceholder")}
         value={displayMessage}

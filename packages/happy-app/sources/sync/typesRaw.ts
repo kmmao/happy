@@ -774,6 +774,11 @@ export type NormalizedMessage = (
   parentRef?: string | null; // Subagent/parent reference for sidechain linking (event messages)
   meta?: MessageMeta;
   usage?: UsageData;
+  /** Present on task-end messages to link back to background tasks */
+  taskEndInfo?: {
+    taskId: string;
+    status: "completed" | "failed" | "stopped";
+  };
 };
 
 function normalizeSessionEnvelope(
@@ -884,6 +889,10 @@ function normalizeSessionEnvelope(
         },
       ],
       meta,
+      taskEndInfo: {
+        taskId: envelope.ev.taskId,
+        status: envelope.ev.status,
+      },
     } satisfies NormalizedMessage;
   }
 

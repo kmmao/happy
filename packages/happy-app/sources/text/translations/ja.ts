@@ -1986,6 +1986,21 @@ export const ja: TranslationStructure = {
     emptyHint:
       "開発サーバーを選択するか、URLを入力してフロントエンドのスクリーンショットを撮影します。",
   },
+
+  backgroundTasks: {
+    running: "実行中",
+    completed: "完了",
+    failed: "失敗",
+    viewLog: "ログを表示",
+    noOutput: "出力なし",
+    close: "閉じる",
+    refresh: "更新",
+    elapsed: ({ time }: { time: string }) => `${time}`,
+    stop: "停止",
+    stopConfirmTitle: "タスクを停止",
+    stopConfirmMessage: "このバックグラウンドタスクを停止しますか？",
+  },
+
   supervisor: {
     title: "ヘルスモニター",
     description: "AIによるコード分析で、プロジェクトの健全性を多角的に監視します。",

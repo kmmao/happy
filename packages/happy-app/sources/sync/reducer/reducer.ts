@@ -188,6 +188,7 @@ export type ReducerState = {
   };
   latestAgentTextTime: number;
   resolvedModelId?: string; // Actual model ID from turn-end (e.g. "claude-opus-4-6")
+  backgroundTaskIdToMessageId: Map<string, string>; // backgroundTaskId -> messageId
 };
 
 export function createReducer(): ReducerState {
@@ -201,6 +202,7 @@ export function createReducer(): ReducerState {
     sidechains: new Map(),
     tracerState: createTracer(),
     latestAgentTextTime: 0,
+    backgroundTaskIdToMessageId: new Map(),
     turnHadUsageStats: false,
   };
 }
@@ -891,6 +893,7 @@ export function reducer(
           }
         }
       }
+
     }
   }
 
@@ -1061,8 +1064,9 @@ export function reducer(
           if (c.backgroundTaskId) {
             message.tool.backgroundTaskId = c.backgroundTaskId;
             message.tool.outputFile = c.outputFile;
-            // Background tasks stay "running" until explicitly checked
+            // Background tasks stay "running" until task-end event arrives
             message.tool.state = "running";
+            state.backgroundTaskIdToMessageId.set(c.backgroundTaskId, messageId);
           }
 
           // Update permission data if provided by backend
@@ -1098,6 +1102,25 @@ export function reducer(
         }
       }
     }
+  }
+
+  //
+  // Phase 3.5: Apply task-end status updates to background tasks
+  // (must run after Phase 3 which populates backgroundTaskIdToMessageId)
+  //
+
+  for (const msg of nonSidechainMessages) {
+    if (msg.role !== "agent" || !msg.taskEndInfo) continue;
+    const bgMsgId = state.backgroundTaskIdToMessageId.get(msg.taskEndInfo.taskId);
+    if (!bgMsgId) continue;
+    const bgMessage = state.messages.get(bgMsgId);
+    if (!bgMessage?.tool) continue;
+    bgMessage.tool.state =
+      msg.taskEndInfo.status === "failed" ? "error" :
+      msg.taskEndInfo.status === "stopped" ? "error" :
+      "completed";
+    bgMessage.tool.completedAt = msg.createdAt;
+    changed.add(bgMsgId);
   }
 
   //
@@ -1391,6 +1414,10 @@ export function reducer(
         }
         // Skip sidechain tools — they may still be running in nested conversations
         if (msg.tool.name === "Task" || msg.tool.name === "Agent") {
+          continue;
+        }
+        // Skip background tasks — they run independently of the conversation flow
+        if (msg.tool.backgroundTaskId) {
           continue;
         }
         msg.tool.state = "completed";

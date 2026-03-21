@@ -2004,6 +2004,9 @@ export const en = {
     close: "Close",
     refresh: "Refresh",
     elapsed: ({ time }: { time: string }) => `${time}`,
+    stop: "Stop",
+    stopConfirmTitle: "Stop Task",
+    stopConfirmMessage: "Are you sure you want to stop this background task?",
   },
 
   supervisor: {

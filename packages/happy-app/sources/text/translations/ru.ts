@@ -2030,6 +2030,20 @@ export const ru: TranslationStructure = {
       "Выберите сервер разработки или введите URL для создания скриншота фронтенда.",
   },
 
+  backgroundTasks: {
+    running: "Выполняется",
+    completed: "Завершено",
+    failed: "Ошибка",
+    viewLog: "Просмотр логов",
+    noOutput: "Нет вывода",
+    close: "Закрыть",
+    refresh: "Обновить",
+    elapsed: ({ time }: { time: string }) => `${time}`,
+    stop: "Остановить",
+    stopConfirmTitle: "Остановить задачу",
+    stopConfirmMessage: "Вы уверены, что хотите остановить эту фоновую задачу?",
+  },
+
   supervisor: {
     title: "Мониторинг здоровья",
     description: "AI-анализ кода, отслеживающий здоровье проекта по множеству измерений.",

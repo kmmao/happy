@@ -1918,6 +1918,21 @@ export const zhHans: TranslationStructure = {
       "请在 CLI 机器上安装 agent-browser 以使用预览功能。运行：npm install -g @anthropic-ai/agent-browser",
     emptyHint: "选择开发服务器或输入 URL 来截取前端页面截图。",
   },
+
+  backgroundTasks: {
+    running: "运行中",
+    completed: "已完成",
+    failed: "失败",
+    viewLog: "查看日志",
+    noOutput: "暂无输出",
+    close: "关闭",
+    refresh: "刷新",
+    elapsed: ({ time }: { time: string }) => `${time}`,
+    stop: "停止",
+    stopConfirmTitle: "停止任务",
+    stopConfirmMessage: "确定要停止这个后台任务吗？",
+  },
+
   supervisor: {
     title: "健康监控",
     description: "AI 驱动的代码分析，多维度监控项目健康状况。",

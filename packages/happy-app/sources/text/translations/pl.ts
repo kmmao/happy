@@ -2031,6 +2031,20 @@ export const pl: TranslationStructure = {
       "Wybierz serwer deweloperski lub wprowadź URL, aby wykonać zrzut ekranu interfejsu.",
   },
 
+  backgroundTasks: {
+    running: "Uruchomiony",
+    completed: "Zakończony",
+    failed: "Błąd",
+    viewLog: "Zobacz logi",
+    noOutput: "Brak danych wyjściowych",
+    close: "Zamknij",
+    refresh: "Odśwież",
+    elapsed: ({ time }: { time: string }) => `${time}`,
+    stop: "Zatrzymaj",
+    stopConfirmTitle: "Zatrzymaj zadanie",
+    stopConfirmMessage: "Czy na pewno chcesz zatrzymać to zadanie w tle?",
+  },
+
   supervisor: {
     title: "Monitor zdrowia",
     description: "Analiza kodu AI monitorująca kondycję projektu w wielu wymiarach.",
