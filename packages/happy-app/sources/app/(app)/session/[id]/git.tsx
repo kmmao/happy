@@ -1,6 +1,6 @@
 import * as React from "react";
 import { View, Pressable, Platform } from "react-native";
-import { useRoute } from "@react-navigation/native";
+import { useLocalSearchParams } from "expo-router";
 import { GitTabBar, GitTabId } from "@/components/git/GitTabBar";
 import { GitChangesTab } from "@/components/git/GitChangesTab";
 import { GitBrowseTab } from "@/components/git/GitBrowseTab";
@@ -26,8 +26,7 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 
 export default React.memo(function GitScreen() {
-  const route = useRoute();
-  const sessionId = (route.params! as any).id as string;
+  const { id: sessionId } = useLocalSearchParams<{ id: string }>();
   const [activeTab, setActiveTab] = React.useState<GitTabId>("changes");
   const [browseMode, setBrowseMode] = React.useState(false);
   const [selectedRepoPath, setSelectedRepoPath] = React.useState<string | null>(

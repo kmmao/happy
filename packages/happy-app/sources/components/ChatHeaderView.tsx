@@ -2,7 +2,7 @@ import * as React from "react";
 import { Animated, Easing, View, Text, StyleSheet, Platform, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { Avatar } from "@/components/Avatar";
 import { hapticsLight } from "@/components/haptics";
 import { Typography } from "@/constants/Typography";
@@ -38,7 +38,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   flavor,
 }) => {
   const { theme } = useUnistyles();
-  const navigation = useNavigation();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
 
@@ -89,7 +89,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
     if (onBackPress) {
       onBackPress();
     } else {
-      navigation.goBack();
+      router.back();
     }
   };
 

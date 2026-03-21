@@ -6,7 +6,6 @@ import {
   Platform,
   Pressable,
 } from "react-native";
-import { useRoute } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
 import { Text } from "@/components/StyledText";
 import { SimpleSyntaxHighlighter } from "@/components/SimpleSyntaxHighlighter";
@@ -93,7 +92,6 @@ const DiffDisplay: React.FC<{ diffContent: string }> = ({ diffContent }) => {
 };
 
 function FileScreen() {
-  const route = useRoute();
   const { theme } = useUnistyles();
   const { id: sessionId } = useLocalSearchParams<{ id: string }>();
   const searchParams = useLocalSearchParams();
