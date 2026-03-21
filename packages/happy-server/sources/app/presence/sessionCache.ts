@@ -265,7 +265,7 @@ class ActivityCache {
     // Batch update sessions
     if (sessionUpdates.length > 0) {
       try {
-        await Promise.all(
+        await db.$transaction(
           sessionUpdates.map((update) =>
             db.session.update({
               where: { id: update.id },
@@ -289,7 +289,7 @@ class ActivityCache {
     // Batch update machines
     if (machineUpdates.length > 0) {
       try {
-        await Promise.all(
+        await db.$transaction(
           machineUpdates.map((update) =>
             db.machine.update({
               where: {
