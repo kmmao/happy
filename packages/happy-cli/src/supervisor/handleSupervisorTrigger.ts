@@ -67,6 +67,13 @@ export async function cleanupFixWorktree(
   const info = fixWorktrees.get(sessionId);
   if (!info) return;
   fixWorktrees.delete(sessionId);
+
+  // Release the concurrency slot held since spawn
+  releaseSlot("fix");
+  const pool = getPoolStatus("fix");
+  logger.info(
+    `[SUPERVISOR-CONCURRENCY] RELEASED (session exit): type=fix sessionId=${sessionId} active=${pool.active}/${pool.max} queued=${pool.queued}`,
+  );
   try {
     await removeWorktreeForced(info.repoPath, info.branchName);
     logger.debug(
@@ -201,10 +208,11 @@ export async function handleSupervisorTrigger(
     return;
   }
 
+  let fixSpawnedSuccessfully = false;
   try {
     if (trigger === "fix" && fixAction) {
       // Fix trigger uses worktree — no preflight needed
-      await handleFixTrigger(
+      fixSpawnedSuccessfully = await handleFixTrigger(
         runId,
         projectId,
         repoPath,
@@ -312,11 +320,20 @@ export async function handleSupervisorTrigger(
       });
     }
   } finally {
-    releaseSlot(slotType);
-    const poolFinal = getPoolStatus(slotType);
-    logger.info(
-      `[SUPERVISOR-CONCURRENCY] RELEASED: type=${slotType} runId=${runId} active=${poolFinal.active}/${poolFinal.max} queued=${poolFinal.queued}`,
-    );
+    // Fix sessions that spawned successfully hold the slot until the session exits
+    // (released in cleanupFixWorktree). All other cases release immediately.
+    if (trigger === "fix" && fixSpawnedSuccessfully) {
+      const poolHeld = getPoolStatus(slotType);
+      logger.info(
+        `[SUPERVISOR-CONCURRENCY] HOLDING slot until session exit: type=${slotType} runId=${runId} active=${poolHeld.active}/${poolHeld.max} queued=${poolHeld.queued}`,
+      );
+    } else {
+      releaseSlot(slotType);
+      const poolFinal = getPoolStatus(slotType);
+      logger.info(
+        `[SUPERVISOR-CONCURRENCY] RELEASED: type=${slotType} runId=${runId} active=${poolFinal.active}/${poolFinal.max} queued=${poolFinal.queued}`,
+      );
+    }
     processingRuns.delete(runId);
   }
 }
@@ -480,7 +497,7 @@ async function handleFixTrigger(
   fixAction: NonNullable<SupervisorTriggerData["fixAction"]>,
   fixStrategy: "direct" | "pr",
   deps: SupervisorHandlerDeps,
-): Promise<void> {
+): Promise<boolean> {
   logger.debug(
     `[SUPERVISOR] Processing fix ${actionId} for project ${projectId}: "${fixAction.title}"`,
   );
@@ -495,7 +512,7 @@ async function handleFixTrigger(
       projectId,
       fixStatus: "failed",
     });
-    return;
+    return false;
   }
 
   logger.debug(
@@ -561,7 +578,7 @@ async function handleFixTrigger(
     // Clean up prompt file and worktree on failure
     try { await unlink(promptFilePath); } catch { /* best-effort */ }
     try { await removeWorktreeForced(repoPath, worktreeResult.branchName); } catch { /* best-effort */ }
-    return;
+    return false;
   }
 
   // 6. Track worktree for cleanup on session exit
@@ -580,6 +597,7 @@ async function handleFixTrigger(
     fixStatus: "running",
     fixSessionId: spawnResult.sessionId,
   });
+  return true;
 }
 
 async function writePromptFile(
