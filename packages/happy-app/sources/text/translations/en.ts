@@ -396,6 +396,7 @@ export const en: TranslationStructure = {
       showingCount: ({ showing, total }: { showing: number; total: number }) =>
         `Showing ${showing} of ${total} repos`,
     },
+    builtInProfile: "Built-in profile",
   },
 
   pickPath: {
@@ -604,6 +605,11 @@ export const en: TranslationStructure = {
       scanQrCode: "Scan the QR code",
       openCamera: "Open Camera",
     },
+  },
+
+  chatFooter: {
+    permissionWarning:
+      "Permissions shown in terminal only. Reset or send a message to control from app.",
   },
 
   agentInput: {

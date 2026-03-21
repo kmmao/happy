@@ -364,6 +364,7 @@ export const zhHans: TranslationStructure = {
       failed: ({ error }: { error: string }) => `创建 worktree 失败：${error}`,
       success: "Worktree 创建成功",
     },
+    builtInProfile: "内置配置",
     gitRepos: {
       title: "Git 仓库",
       showingCount: ({ showing, total }: { showing: number; total: number }) =>
@@ -573,6 +574,10 @@ export const zhHans: TranslationStructure = {
       scanQrCode: "扫描二维码",
       openCamera: "打开相机",
     },
+  },
+
+  chatFooter: {
+    permissionWarning: "权限仅在终端中显示。重置或发送消息以从应用控制。",
   },
 
   agentInput: {

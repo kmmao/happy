@@ -363,6 +363,7 @@ export const ru: TranslationStructure = {
         `Не удалось создать worktree: ${error}`,
       success: "Worktree успешно создан",
     },
+    builtInProfile: "Встроенный профиль",
     gitRepos: {
       title: "Git репозитории",
       showingCount: ({ showing, total }: { showing: number; total: number }) =>
@@ -618,6 +619,10 @@ export const ru: TranslationStructure = {
 
   commandPalette: {
     placeholder: "Введите команду или поиск...",
+  },
+
+  chatFooter: {
+    permissionWarning: "Разрешения отображаются только в терминале. Сбросьте или отправьте сообщение для управления из приложения.",
   },
 
   agentInput: {

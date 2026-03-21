@@ -441,6 +441,7 @@ export const ja: TranslationStructure = {
         `ワークツリーの作成に失敗しました: ${error}`,
       success: "ワークツリーが正常に作成されました",
     },
+    builtInProfile: "組み込みプロファイル",
     gitRepos: {
       title: "Git リポジトリ",
       showingCount: ({ showing, total }: { showing: number; total: number }) =>
@@ -658,6 +659,10 @@ export const ja: TranslationStructure = {
       scanQrCode: "QRコードをスキャン",
       openCamera: "カメラを開く",
     },
+  },
+
+  chatFooter: {
+    permissionWarning: "権限はターミナルにのみ表示されます。リセットまたはメッセージを送信してアプリから制御してください。",
   },
 
   agentInput: {

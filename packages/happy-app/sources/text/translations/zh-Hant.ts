@@ -364,6 +364,7 @@ export const zhHant: TranslationStructure = {
       failed: ({ error }: { error: string }) => `建立 worktree 失敗：${error}`,
       success: "Worktree 建立成功",
     },
+    builtInProfile: "內建設定檔",
     gitRepos: {
       title: "Git 倉庫",
       showingCount: ({ showing, total }: { showing: number; total: number }) =>
@@ -573,6 +574,10 @@ export const zhHant: TranslationStructure = {
       scanQrCode: "掃描 QR Code",
       openCamera: "開啟相機",
     },
+  },
+
+  chatFooter: {
+    permissionWarning: "權限僅在終端中顯示。重置或傳送訊息以從應用程式控制。",
   },
 
   agentInput: {

@@ -394,6 +394,7 @@ export const es: TranslationStructure = {
         `Error al crear worktree: ${error}`,
       success: "Worktree creado exitosamente",
     },
+    builtInProfile: "Perfil integrado",
     gitRepos: {
       title: "Repositorios Git",
       showingCount: ({ showing, total }: { showing: number; total: number }) =>
@@ -610,6 +611,10 @@ export const es: TranslationStructure = {
       scanQrCode: "Escanee el código QR",
       openCamera: "Abrir cámara",
     },
+  },
+
+  chatFooter: {
+    permissionWarning: "Los permisos solo se muestran en la terminal. Reinicia o envía un mensaje para controlar desde la app.",
   },
 
   agentInput: {

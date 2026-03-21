@@ -269,7 +269,7 @@ function ProfileSelectionItem({
                   marginTop: 2,
                 }}
               >
-                Built-in profile
+                {t('newSession.builtInProfile')}
               </Text>
             )}
           </View>
