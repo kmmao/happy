@@ -1,5 +1,43 @@
 # Changelog
 
+## 2.6.0 - 2026-03-22
+
+Plugin management, file revert, sub-agent progress, fix session auto-recovery, foldable keyboard fix, and extensive code quality improvements.
+
+### Plugins
+- Added Plugins settings page — manually add or auto-discover MCP plugins from CLI
+- CLI auto-loads configured plugins into the SDK at session start
+
+### File Revert
+- Added per-message file revert button to undo file changes at message level
+
+### Sub-Agent Progress
+- Added sub-agent progress summaries with duration, token count, and tool usage metrics
+- Fixed crash when task-progress event has no usage data
+
+### Fix Session Recovery
+- Added automatic fix status detection when fix sessions exit abnormally
+- Added server-side stale fix watchdog (5-minute heartbeat check)
+- Added manual "Mark Complete" / "Mark Failed" buttons for stuck fix actions
+
+### Supervisor
+- Added time-sorted action list with status change timestamps
+- Added real-time sync between Actions tab and Health tab
+- Added max findings per run configuration UI
+- Moved fixStatus filtering logic from server to app side
+
+### Foldable & Responsive
+- Fixed keyboard flash-dismiss on foldable devices in web browser
+- Fixed web split-screen / foldable not switching layout in real-time
+
+### Code Quality
+- Fixed 50+ hardcoded colors to use theme tokens
+- Added React.memo wrappers to 54 page components
+- Fixed 20+ hardcoded strings with i18n translations
+- Fixed memory leak from uncleared AppState event listeners
+- Removed console.log statements from production code
+- Improved error handling and accessibility labels across components
+
 ## 2.5.0 - 2026-03-20
 
 Improved session management with active/archived grouping and restore, added file browser with @reference in input bar, branch switching in Git tab, health analytics day range selector, and multi-locale changelog support.

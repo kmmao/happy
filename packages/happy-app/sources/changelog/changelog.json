@@ -2,6 +2,34 @@
   "entries": {
     "en": [
       {
+        "version": "2.6.0",
+        "date": "2026-03-22",
+        "summary": "Plugin management, file revert, sub-agent progress, fix session auto-recovery, foldable keyboard fix, and extensive code quality improvements.",
+        "changes": [
+          "Added Plugins settings page — manually add or auto-discover MCP plugins from CLI",
+          "CLI auto-loads configured plugins into the SDK at session start",
+          "Added per-message file revert button to undo file changes at message level",
+          "Added sub-agent progress summaries with duration, token count, and tool usage metrics",
+          "Fixed crash when task-progress event has no usage data",
+          "Added automatic fix status detection when fix sessions exit abnormally",
+          "Added server-side stale fix watchdog (5-minute heartbeat check)",
+          "Added manual \"Mark Complete\" / \"Mark Failed\" buttons for stuck fix actions",
+          "Added time-sorted action list with status change timestamps",
+          "Added real-time sync between Actions tab and Health tab",
+          "Added max findings per run configuration UI",
+          "Moved fixStatus filtering logic from server to app side",
+          "Fixed keyboard flash-dismiss on foldable devices in web browser",
+          "Fixed web split-screen / foldable not switching layout in real-time",
+          "Fixed 50+ hardcoded colors to use theme tokens",
+          "Added React.memo wrappers to 54 page components",
+          "Fixed 20+ hardcoded strings with i18n translations",
+          "Fixed memory leak from uncleared AppState event listeners",
+          "Removed console.log statements from production code",
+          "Improved error handling and accessibility labels across components"
+        ],
+        "rawMarkdown": "## 2.6.0 - 2026-03-22\n\n\nPlugin management, file revert, sub-agent progress, fix session auto-recovery, foldable keyboard fix, and extensive code quality improvements.\n\n### Plugins\n- Added Plugins settings page — manually add or auto-discover MCP plugins from CLI\n- CLI auto-loads configured plugins into the SDK at session start\n\n### File Revert\n- Added per-message file revert button to undo file changes at message level\n\n### Sub-Agent Progress\n- Added sub-agent progress summaries with duration, token count, and tool usage metrics\n- Fixed crash when task-progress event has no usage data\n\n### Fix Session Recovery\n- Added automatic fix status detection when fix sessions exit abnormally\n- Added server-side stale fix watchdog (5-minute heartbeat check)\n- Added manual \"Mark Complete\" / \"Mark Failed\" buttons for stuck fix actions\n\n### Supervisor\n- Added time-sorted action list with status change timestamps\n- Added real-time sync between Actions tab and Health tab\n- Added max findings per run configuration UI\n- Moved fixStatus filtering logic from server to app side\n\n### Foldable & Responsive\n- Fixed keyboard flash-dismiss on foldable devices in web browser\n- Fixed web split-screen / foldable not switching layout in real-time\n\n### Code Quality\n- Fixed 50+ hardcoded colors to use theme tokens\n- Added React.memo wrappers to 54 page components\n- Fixed 20+ hardcoded strings with i18n translations\n- Fixed memory leak from uncleared AppState event listeners\n- Removed console.log statements from production code\n- Improved error handling and accessibility labels across components"
+      },
+      {
         "version": "2.5.0",
         "date": "2026-03-20",
         "summary": "Improved session management with active/archived grouping and restore, added file browser with @reference in input bar, branch switching in Git tab, health analytics day range selector, and multi-locale changelog support.",
@@ -263,6 +291,34 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.6.0",
+        "date": "2026-03-22",
+        "summary": "新增 Plugins 管理、文件回退、子 Agent 进度展示、fix session 自动恢复、折叠屏键盘修复，以及大量代码质量改进。",
+        "changes": [
+          "新增 Plugins 设置页 — 手动添加或从 CLI 自动发现 MCP 插件",
+          "CLI 启动会话时自动加载已配置的 Plugins 到 SDK",
+          "新增消息级别的文件回退按钮，支持撤销单条消息的文件变更",
+          "新增子 Agent 进度摘要展示，包含耗时、Token 数和工具使用指标",
+          "修复 task-progress 事件无 usage 数据时的崩溃",
+          "新增 fix session 异常退出后的自动状态检测",
+          "新增 Server 端 stale fix watchdog（5 分钟心跳检查）",
+          "新增修复中操作的手动「标记完成/失败」按钮",
+          "新增操作列表按时间排序并显示状态变更时间",
+          "新增操作 Tab 与健康 Tab 数据实时同步",
+          "新增每次分析最大发现数配置 UI",
+          "改进 fixStatus 判断从 Server 移到 App 端",
+          "修复 Web 端折叠屏展开后键盘弹出立即消失",
+          "修复 Web 分屏/折叠屏时响应式布局不实时切换",
+          "修复 50+ 处硬编码颜色为主题令牌",
+          "为 54 个页面组件添加 React.memo 包装",
+          "修复 20+ 处硬编码字符串为 i18n 翻译",
+          "修复 AppState 事件监听器未清理的内存泄漏",
+          "移除生产代码中的 console.log 语句",
+          "改进多处组件的错误处理和无障碍标签"
+        ],
+        "rawMarkdown": "## 2.6.0 - 2026-03-22\n\n\n新增 Plugins 管理、文件回退、子 Agent 进度展示、fix session 自动恢复、折叠屏键盘修复，以及大量代码质量改进。\n\n### Plugins\n- 新增 Plugins 设置页 — 手动添加或从 CLI 自动发现 MCP 插件\n- CLI 启动会话时自动加载已配置的 Plugins 到 SDK\n\n### 文件回退\n- 新增消息级别的文件回退按钮，支持撤销单条消息的文件变更\n\n### 子 Agent 进度\n- 新增子 Agent 进度摘要展示，包含耗时、Token 数和工具使用指标\n- 修复 task-progress 事件无 usage 数据时的崩溃\n\n### Fix Session 恢复\n- 新增 fix session 异常退出后的自动状态检测\n- 新增 Server 端 stale fix watchdog（5 分钟心跳检查）\n- 新增修复中操作的手动「标记完成/失败」按钮\n\n### Supervisor\n- 新增操作列表按时间排序并显示状态变更时间\n- 新增操作 Tab 与健康 Tab 数据实时同步\n- 新增每次分析最大发现数配置 UI\n- 改进 fixStatus 判断从 Server 移到 App 端\n\n### 折叠屏与响应式\n- 修复 Web 端折叠屏展开后键盘弹出立即消失\n- 修复 Web 分屏/折叠屏时响应式布局不实时切换\n\n### 代码质量\n- 修复 50+ 处硬编码颜色为主题令牌\n- 为 54 个页面组件添加 React.memo 包装\n- 修复 20+ 处硬编码字符串为 i18n 翻译\n- 修复 AppState 事件监听器未清理的内存泄漏\n- 移除生产代码中的 console.log 语句\n- 改进多处组件的错误处理和无障碍标签"
+      },
+      {
         "version": "2.5.0",
         "date": "2026-03-20",
         "summary": "改进会话管理（活跃/归档分组和恢复功能）、输入栏新增文件浏览器及 @reference、Git 标签页分支切换、健康分析日期范围选择器，以及多语言 Changelog 支持。",
@@ -523,7 +579,7 @@
       }
     ]
   },
-  "latestVersion": "2.5.0",
+  "latestVersion": "2.6.0",
   "availableLocales": [
     "en",
     "zh-Hans"
