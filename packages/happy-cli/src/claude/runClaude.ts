@@ -139,6 +139,13 @@ export async function runClaude(
   // Read package.json scripts from working directory (including monorepo sub-packages)
   const packageScripts = await readPackageScripts(workingDirectory);
 
+  // Extract --resume session ID from claudeArgs so initial metadata preserves it.
+  // Without this, the initial metadata overwrites the server's existing claudeSessionId
+  // before the SessionStart hook has a chance to set the new one.
+  const resumeIndex = options.claudeArgs?.indexOf("--resume") ?? -1;
+  const resumeSessionId =
+    resumeIndex >= 0 ? options.claudeArgs?.[resumeIndex + 1] : undefined;
+
   let metadata: Metadata = {
     path: workingDirectory,
     host: os.hostname(),
@@ -159,6 +166,8 @@ export async function runClaude(
     sandbox: sandboxConfig?.enabled ? sandboxConfig : null,
     dangerouslySkipPermissions,
     packageScripts,
+    // Preserve claudeSessionId during resume so it's not lost before SessionStart hook fires
+    ...(resumeSessionId ? { claudeSessionId: resumeSessionId } : {}),
   };
 
   // Detect if running inside a Happy-managed worktree
