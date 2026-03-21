@@ -7,6 +7,7 @@ import { apiSocket } from "./apiSocket";
 import { sync } from "./sync";
 import { storage } from "./storage";
 import type { MachineMetadata } from "./storageTypes";
+import { getErrorMessage } from "@/utils/errors";
 
 // Strict type definitions for all operations
 
@@ -207,7 +208,7 @@ export async function machineSpawnNewSession(
     return {
       type: "error",
       errorMessage:
-        error instanceof Error ? error.message : "Failed to spawn session",
+        getErrorMessage(error, "Failed to spawn session"),
     };
   }
 }
@@ -330,9 +331,9 @@ export async function machineBash(
     return {
       success: false,
       stdout: "",
-      stderr: error instanceof Error ? error.message : "Unknown error",
+      stderr: getErrorMessage(error),
       exitCode: -1,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
     };
   }
 }
@@ -521,9 +522,9 @@ export async function sessionBash(
     return {
       success: false,
       stdout: "",
-      stderr: error instanceof Error ? error.message : "Unknown error",
+      stderr: getErrorMessage(error),
       exitCode: -1,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
     };
   }
 }
@@ -545,7 +546,7 @@ export async function sessionReadFile(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
     };
   }
 }
@@ -569,7 +570,7 @@ export async function sessionWriteFile(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
     };
   }
 }
@@ -591,7 +592,7 @@ export async function sessionListDirectory(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
     };
   }
 }
@@ -614,7 +615,7 @@ export async function sessionGetDirectoryTree(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
     };
   }
 }
@@ -637,7 +638,7 @@ export async function sessionRipgrep(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
     };
   }
 }
@@ -658,7 +659,7 @@ export async function sessionKill(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Unknown error",
+      message: getErrorMessage(error),
     };
   }
 }
@@ -689,7 +690,7 @@ export async function sessionDelete(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Unknown error",
+      message: getErrorMessage(error),
     };
   }
 }
@@ -717,7 +718,7 @@ export async function sessionRestore(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Unknown error",
+      message: getErrorMessage(error),
     };
   }
 }

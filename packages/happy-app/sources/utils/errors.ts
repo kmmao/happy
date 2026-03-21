@@ -1,3 +1,7 @@
+export function getErrorMessage(error: unknown, fallback = "Unknown error"): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
 export class HappyError extends Error {
     readonly canTryAgain: boolean;
 
