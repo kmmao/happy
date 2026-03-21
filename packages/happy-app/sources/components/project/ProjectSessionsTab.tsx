@@ -15,9 +15,13 @@ import { useSessionStatus, getSessionName } from "@/utils/sessionUtils";
 import { useRouter } from "expo-router";
 import { t } from "@/text";
 import { Modal } from "@/modal";
-import { sessionDelete, sessionKill, sessionRestore } from "@/sync/ops";
+import { sessionDelete, sessionKill, sessionRestore, machineSpawnNewSession } from "@/sync/ops";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
+import { useMachine } from "@/sync/storage";
+import { isMachineOnline } from "@/utils/machineUtils";
+import { sync } from "@/sync/sync";
+import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 
 interface ProjectSessionsTabProps {
     project: Project;
@@ -29,6 +33,17 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
     const { theme } = useUnistyles();
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const isSwipeOpen = React.useRef(false);
+    const navigateToSession = useNavigateToSession();
+
+    const machine = useMachine(session.metadata?.machineId ?? "");
+    const canResume =
+        !session.active &&
+        !!session.metadata?.claudeSessionId &&
+        !!session.metadata?.machineId &&
+        !!session.metadata?.path &&
+        (!session.metadata?.flavor || session.metadata.flavor === "claude") &&
+        !!machine &&
+        isMachineOnline(machine);
 
     const [archiving, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
@@ -82,22 +97,41 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
         );
     }, [performDelete]);
 
-    const [restoring, performRestore] = useHappyAction(async () => {
-        const result = await sessionRestore(session.id);
-        if (!result.success) {
-            throw new HappyError(
-                result.message || t("sessionInfo.failedToRestoreSession"),
-                false,
-            );
+    const [resumingOrRestoring, performResumeOrRestore] = useHappyAction(async () => {
+        if (canResume) {
+            // Full resume: spawn Claude process via daemon
+            const result = await machineSpawnNewSession({
+                machineId: session.metadata!.machineId!,
+                directory: session.metadata!.path!,
+                claudeSessionId: session.metadata!.claudeSessionId!,
+                happySessionId: session.id,
+                agent: "claude",
+            });
+            if (result.type === "error") {
+                throw new HappyError(result.errorMessage, false);
+            }
+            if (result.type === "success") {
+                await sync.refreshSessions();
+                navigateToSession(session.id);
+            }
+        } else {
+            // Simple restore: just mark as active (no Claude process)
+            const result = await sessionRestore(session.id);
+            if (!result.success) {
+                throw new HappyError(
+                    result.message || t("sessionInfo.failedToRestoreSession"),
+                    false,
+                );
+            }
         }
     });
 
     const handleRestore = React.useCallback(() => {
         swipeableRef.current?.close();
-        performRestore();
-    }, [performRestore]);
+        performResumeOrRestore();
+    }, [performResumeOrRestore]);
 
-    const isBusy = archiving || deleting || restoring;
+    const isBusy = archiving || deleting || resumingOrRestoring;
 
     const renderRightActions = React.useCallback(
         () => (
@@ -119,17 +153,17 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
                     </Pressable>
                 ) : (
                     <Pressable
-                        style={styles.swipeActionRestore}
+                        style={canResume ? styles.swipeActionResume : styles.swipeActionRestore}
                         onPress={handleRestore}
                         disabled={isBusy}
                     >
                         <Ionicons
-                            name="arrow-undo-outline"
+                            name={canResume ? "play-outline" : "arrow-undo-outline"}
                             size={20}
                             color="#FFFFFF"
                         />
                         <Text style={styles.swipeActionText} numberOfLines={1}>
-                            {t("sessionInfo.restoreSession")}
+                            {canResume ? t("sessionInfo.resumeSession") : t("sessionInfo.restoreSession")}
                         </Text>
                     </Pressable>
                 )}
@@ -398,6 +432,13 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: theme.colors.header.tint,
+    },
+    swipeActionResume: {
+        width: 80,
+        height: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#34C759",
     },
     swipeActionText: {
         marginTop: 4,
