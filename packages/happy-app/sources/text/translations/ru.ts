@@ -1437,6 +1437,8 @@ export const ru: TranslationStructure = {
     tabIssues: "Issues",
     tabPRs: "PR",
     historyEmpty: "Коммитов пока нет",
+    historyLoadError: "Не удалось загрузить историю коммитов",
+    historyRetry: "Повторить",
     historyLoading: "Загрузка коммитов...",
     historyLoadMore: "Загрузка...",
     historyNoMore: "Все коммиты загружены",

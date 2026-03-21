@@ -1412,6 +1412,8 @@ export const it: TranslationStructure = {
     tabIssues: "Issues",
     tabPRs: "PR",
     historyEmpty: "Nessun commit ancora",
+    historyLoadError: "Impossibile caricare la cronologia dei commit",
+    historyRetry: "Riprova",
     historyLoading: "Caricamento commit...",
     historyLoadMore: "Caricamento...",
     historyNoMore: "Tutti i commit caricati",

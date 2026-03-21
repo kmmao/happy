@@ -1392,6 +1392,8 @@ export const en = {
     tabPRs: "PRs",
     // History
     historyEmpty: "No commits yet",
+    historyLoadError: "Failed to load commit history",
+    historyRetry: "Retry",
     historyLoading: "Loading commits...",
     historyLoadMore: "Loading more...",
     historyNoMore: "All commits loaded",

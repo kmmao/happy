@@ -345,19 +345,20 @@ export const GitHistoryTab = React.memo<{
   const [hasMore, setHasMore] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [expandedCommitHash, setExpandedCommitHash] = React.useState<
     string | null
   >(null);
 
   const loadInitial = React.useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const page = await fetchGitHistory(sessionId, 0, repoPath);
       setCommits(page.commits);
       setHasMore(page.hasMore);
     } catch {
-      setCommits([]);
-      setHasMore(false);
+      setError(t("git.historyLoadError"));
     } finally {
       setIsLoading(false);
     }
@@ -476,6 +477,46 @@ export const GitHistoryTab = React.memo<{
         >
           {t("git.historyLoading")}
         </Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Octicons name="alert" size={48} color={theme.colors.textSecondary} />
+        <Text
+          style={{
+            fontSize: 16,
+            color: theme.colors.textSecondary,
+            marginTop: 16,
+            textAlign: "center",
+            ...Typography.default(),
+          }}
+        >
+          {error}
+        </Text>
+        <Pressable
+          onPress={loadInitial}
+          style={{
+            marginTop: 16,
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderRadius: 8,
+            backgroundColor: theme.colors.surfaceHigh,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: "600",
+              color: theme.colors.textLink,
+              ...Typography.default(),
+            }}
+          >
+            {t("git.historyRetry")}
+          </Text>
+        </Pressable>
       </View>
     );
   }

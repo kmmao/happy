@@ -1346,6 +1346,8 @@ export const zhHans: TranslationStructure = {
     tabIssues: "工单",
     tabPRs: "PR",
     historyEmpty: "暂无提交记录",
+    historyLoadError: "加载提交历史失败",
+    historyRetry: "重试",
     historyLoading: "正在加载提交...",
     historyLoadMore: "加载更多...",
     historyNoMore: "已加载全部提交",

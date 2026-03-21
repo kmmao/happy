@@ -1436,6 +1436,8 @@ export const pl: TranslationStructure = {
     tabIssues: "Issues",
     tabPRs: "PR",
     historyEmpty: "Brak commitów",
+    historyLoadError: "Nie udało się załadować historii commitów",
+    historyRetry: "Ponów",
     historyLoading: "Ładowanie commitów...",
     historyLoadMore: "Ładowanie...",
     historyNoMore: "Załadowano wszystkie commity",

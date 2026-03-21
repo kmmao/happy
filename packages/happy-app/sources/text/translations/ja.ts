@@ -1394,6 +1394,8 @@ export const ja: TranslationStructure = {
     tabIssues: "Issues",
     tabPRs: "PR",
     historyEmpty: "コミットはまだありません",
+    historyLoadError: "コミット履歴の読み込みに失敗しました",
+    historyRetry: "再試行",
     historyLoading: "コミットを読み込み中...",
     historyLoadMore: "さらに読み込み中...",
     historyNoMore: "すべてのコミットを読み込みました",

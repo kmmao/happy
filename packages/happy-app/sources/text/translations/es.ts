@@ -1416,6 +1416,8 @@ export const es: TranslationStructure = {
     tabIssues: "Issues",
     tabPRs: "PR",
     historyEmpty: "Sin commits aún",
+    historyLoadError: "Error al cargar el historial de commits",
+    historyRetry: "Reintentar",
     historyLoading: "Cargando commits...",
     historyLoadMore: "Cargando más...",
     historyNoMore: "Todos los commits cargados",

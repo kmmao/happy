@@ -1348,6 +1348,8 @@ export const zhHant: TranslationStructure = {
     tabIssues: "工單",
     tabPRs: "PR",
     historyEmpty: "尚無提交記錄",
+    historyLoadError: "載入提交歷史失敗",
+    historyRetry: "重試",
     historyLoading: "正在載入提交...",
     historyLoadMore: "載入更多...",
     historyNoMore: "已載入全部提交",
