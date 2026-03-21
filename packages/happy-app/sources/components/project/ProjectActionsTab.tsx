@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
+import { emitProjectEvent, onProjectEvent } from "@/utils/projectEvents";
 import {
     fetchSupervisorActions,
     fetchActionStats,
@@ -206,6 +207,13 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
         }
     }, [projectId, activeTab]);
 
+    // Listen for health tab changes to refresh actions
+    React.useEffect(() => {
+        return onProjectEvent("health-changed", () => {
+            handleRefresh();
+        });
+    }, [handleRefresh]);
+
     const handleUpdated = React.useCallback(async () => {
         try {
             const credentials = await TokenStorage.getCredentials();
@@ -225,6 +233,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
             if (statsData) {
                 setStats(statsData);
             }
+            emitProjectEvent("actions-changed");
         } catch {
             Modal.toast(t("supervisor.loadError"));
         }

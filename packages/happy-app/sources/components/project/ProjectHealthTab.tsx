@@ -13,6 +13,7 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Project } from "@/sync/projectManager";
 import { TokenStorage } from "@/auth/tokenStorage";
+import { onProjectEvent } from "@/utils/projectEvents";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import {
     type RelatedProject,
@@ -148,6 +149,13 @@ export const ProjectHealthTab = React.memo(
 
         React.useEffect(() => {
             loadData();
+        }, [loadData]);
+
+        // Listen for actions tab changes to refresh pending actions count
+        React.useEffect(() => {
+            return onProjectEvent("actions-changed", () => {
+                loadData();
+            });
         }, [loadData]);
 
         // Track known non-research runIds via ref to avoid effect dependency on runs
