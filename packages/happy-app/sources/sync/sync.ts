@@ -3725,6 +3725,11 @@ class Sync {
     return () => { this.supervisorLoopStatusListeners.delete(listener); };
   }
 
+  destroy() {
+    this.appStateSubscription?.remove();
+    this.appStateSubscription = null;
+  }
+
 }
 export const sync = new Sync();
 
