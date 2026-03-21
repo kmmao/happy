@@ -35,6 +35,9 @@ export async function aggregateSessionUsage(
 /**
  * Schedule delayed re-aggregation attempts to capture turn-end cost reports
  * that arrive after the supervisor run is marked as completed.
+ *
+ * The turn-end cost report (with actual SDK cost data) typically arrives
+ * 11-15 seconds after the completion event. A single 10s retry often misses it.
  * Uses a chained approach: each attempt only schedules the next one if cost
  * was not yet captured, avoiding unnecessary DB queries.
  */
@@ -60,6 +63,7 @@ function scheduleNextAttempt(
                 where: { id: runId },
                 select: { costUsd: true },
             });
+            // Stop if cost already captured (by CLI socket payload or earlier attempt)
             if (run?.costUsd && run.costUsd > 0) return;
 
             const usage = await aggregateSessionUsage(sessionId);
@@ -75,11 +79,13 @@ function scheduleNextAttempt(
                     { module: "supervisor" },
                     `Delayed cost aggregation (${current}ms): run ${runId} → $${usage.totalCostUsd}`,
                 );
-                return;
+                return; // Success — no need for further attempts
             }
 
+            // Cost not yet available — chain next attempt
             scheduleNextAttempt(runId, sessionId, rest);
         } catch {
+            // best-effort — still try next round
             scheduleNextAttempt(runId, sessionId, rest);
         }
     }, current);

@@ -2182,6 +2182,7 @@ export const en = {
     loopConfig: "Loop Configuration",
     loopConfigIterations: "Max Iterations",
     loopConfigIterationsHint: "How many analyze→fix cycles to run before stopping",
+    loopConfigIterationsHintUnlimited: "Run until all eligible actions are processed (0 = unlimited)",
     loopConfigThreshold: "Auto-Approve Confidence",
     loopConfigThresholdHint: "Only auto-fix actions with AI confidence above this level",
     loopConfigCostCap: "Cost Limit",
@@ -2190,6 +2191,7 @@ export const en = {
     loopConfigStart: "Start Loop",
     loopHistory: "Loop History",
     loopIteration: ({ current, max }: { current: number; max: number }) => `Iteration ${current}/${max}`,
+    loopIterationUnlimited: ({ current }: { current: number }) => `Iteration ${current} (unlimited)`,
     loopFound: "Found",
     loopFixed: "Fixed",
     loopCost: "Cost",
@@ -2220,6 +2222,7 @@ export const en = {
     loopDetailActions: ({ count }: { count: number }) => `Actions (${count})`,
     loopDetailNoRuns: "No iterations yet",
     loopDetailNoActions: "No actions yet",
+    loadRunError: "Failed to load run details",
     loadLoopError: "Failed to load loop details",
 
     // Preflight sync dimensions

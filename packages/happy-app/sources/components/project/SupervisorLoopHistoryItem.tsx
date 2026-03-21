@@ -97,10 +97,14 @@ export const SupervisorLoopHistoryItem = React.memo(
                 <View style={styles.content}>
                     <View style={styles.headerRow}>
                         <Text style={styles.iterationText}>
-                            {t("supervisor.loopIteration", {
-                                current: loop.currentIteration,
-                                max: loop.maxIterations,
-                            })}
+                            {loop.maxIterations > 0
+                                ? t("supervisor.loopIteration", {
+                                      current: loop.currentIteration,
+                                      max: loop.maxIterations,
+                                  })
+                                : t("supervisor.loopIterationUnlimited", {
+                                      current: loop.currentIteration,
+                                  })}
                         </Text>
                         <Text style={styles.dateText}>{formattedDate}</Text>
                     </View>

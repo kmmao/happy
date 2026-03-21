@@ -15,12 +15,9 @@ import { useSessionStatus, getSessionName } from "@/utils/sessionUtils";
 import { useRouter } from "expo-router";
 import { t } from "@/text";
 import { Modal } from "@/modal";
-import { sessionDelete, sessionKill, sessionRestore, machineSpawnNewSession } from "@/sync/ops";
+import { sessionDelete, sessionKill } from "@/sync/ops";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
-import { useMachine } from "@/sync/storage";
-import { isMachineOnline } from "@/utils/machineUtils";
-import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 
 interface ProjectSessionsTabProps {
     project: Project;
@@ -32,18 +29,6 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
     const { theme } = useUnistyles();
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const isSwipeOpen = React.useRef(false);
-    const navigateToSession = useNavigateToSession();
-
-    const machine = useMachine(session.metadata?.machineId ?? "");
-    const canResume =
-        !session.active &&
-        !!session.metadata?.claudeSessionId &&
-        !!session.metadata?.machineId &&
-        !!session.metadata?.path &&
-        (!session.metadata?.flavor || session.metadata.flavor === "claude") &&
-        !!machine &&
-        isMachineOnline(machine);
-
     const [archiving, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
         if (!result.success) {
@@ -96,45 +81,12 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
         );
     }, [performDelete]);
 
-    const [resumingOrRestoring, performResumeOrRestore] = useHappyAction(async () => {
-        if (canResume) {
-            // Full resume: spawn Claude process via daemon
-            const result = await machineSpawnNewSession({
-                machineId: session.metadata!.machineId!,
-                directory: session.metadata!.path!,
-                claudeSessionId: session.metadata!.claudeSessionId!,
-                happySessionId: session.id,
-                agent: "claude",
-            });
-            if (result.type === "error") {
-                throw new HappyError(result.errorMessage, false);
-            }
-            if (result.type === "success") {
-                navigateToSession(session.id);
-            }
-        } else {
-            // Simple restore: just mark as active (no Claude process)
-            const result = await sessionRestore(session.id);
-            if (!result.success) {
-                throw new HappyError(
-                    result.message || t("sessionInfo.failedToRestoreSession"),
-                    false,
-                );
-            }
-        }
-    });
-
-    const handleRestore = React.useCallback(() => {
-        swipeableRef.current?.close();
-        performResumeOrRestore();
-    }, [performResumeOrRestore]);
-
-    const isBusy = archiving || deleting || resumingOrRestoring;
+    const isBusy = archiving || deleting;
 
     const renderRightActions = React.useCallback(
         () => (
             <View style={{ flexDirection: "row" }}>
-                {session.active ? (
+                {session.active && (
                     <Pressable
                         style={styles.swipeActionArchive}
                         onPress={handleArchive}
@@ -147,21 +99,6 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
                         />
                         <Text style={styles.swipeActionText} numberOfLines={1}>
                             {t("sessionInfo.archiveSession")}
-                        </Text>
-                    </Pressable>
-                ) : (
-                    <Pressable
-                        style={canResume ? styles.swipeActionResume : styles.swipeActionRestore}
-                        onPress={handleRestore}
-                        disabled={isBusy}
-                    >
-                        <Ionicons
-                            name={canResume ? "play-outline" : "arrow-undo-outline"}
-                            size={20}
-                            color="#FFFFFF"
-                        />
-                        <Text style={styles.swipeActionText} numberOfLines={1}>
-                            {canResume ? t("sessionInfo.resumeSession") : t("sessionInfo.restoreSession")}
                         </Text>
                     </Pressable>
                 )}
@@ -181,7 +118,7 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
                 </Pressable>
             </View>
         ),
-        [session.active, handleArchive, handleRestore, handleDelete, isBusy],
+        [session.active, handleArchive, handleDelete, isBusy],
     );
 
     const handlePress = React.useCallback(() => {
@@ -213,6 +150,45 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
                                 { backgroundColor: status.statusDotColor },
                             ]}
                         />
+                    }
+                    rightElement={
+                        <View style={styles.tagsRow}>
+                            <View
+                                style={[
+                                    styles.sessionTag,
+                                    session.metadata?.worktree?.isWorktree
+                                        ? styles.sessionTagBranch
+                                        : styles.sessionTagMain,
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.sessionTagText,
+                                        session.metadata?.worktree?.isWorktree
+                                            ? styles.sessionTagBranchText
+                                            : styles.sessionTagMainText,
+                                    ]}
+                                >
+                                    {session.metadata?.worktree?.isWorktree
+                                        ? t("sessionInfo.tagBranch")
+                                        : t("sessionInfo.tagMain")}
+                                </Text>
+                            </View>
+                            {session.metadata?.host && (
+                                <View style={styles.sessionTag}>
+                                    <Text style={styles.sessionTagMetaText}>
+                                        {session.metadata.host}
+                                    </Text>
+                                </View>
+                            )}
+                            {session.metadata?.version && (
+                                <View style={styles.sessionTag}>
+                                    <Text style={styles.sessionTagMetaText}>
+                                        {session.metadata.version}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     }
                     showChevron={session.active}
                     showDivider={showDivider}
@@ -410,6 +386,38 @@ const styles = StyleSheet.create((theme) => ({
         height: 8,
         borderRadius: 4,
     },
+    sessionTag: {
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 4,
+        marginRight: 4,
+    },
+    sessionTagBranch: {
+        backgroundColor: "rgba(88, 86, 214, 0.12)",
+    },
+    sessionTagMain: {
+        backgroundColor: "rgba(52, 199, 89, 0.12)",
+    },
+    sessionTagText: {
+        fontSize: 10,
+        ...Typography.default("semiBold"),
+    },
+    sessionTagBranchText: {
+        color: "#5856D6",
+    },
+    sessionTagMainText: {
+        color: "#34C759",
+    },
+    sessionTagMetaText: {
+        fontSize: 10,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+    },
+    tagsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+    },
     swipeActionDelete: {
         width: 80,
         height: "100%",
@@ -423,20 +431,6 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: theme.colors.warning,
-    },
-    swipeActionRestore: {
-        width: 80,
-        height: "100%",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.colors.header.tint,
-    },
-    swipeActionResume: {
-        width: 80,
-        height: "100%",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#34C759",
     },
     swipeActionText: {
         marginTop: 4,

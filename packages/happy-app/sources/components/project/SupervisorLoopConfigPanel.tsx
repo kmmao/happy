@@ -138,14 +138,16 @@ export const SupervisorLoopConfigPanel = React.memo(
                         </Text>
                         <Stepper
                             value={maxIterations}
-                            min={1}
+                            min={0}
                             max={20}
                             step={1}
                             onChange={setMaxIterations}
                         />
                     </View>
                     <Text style={styles.configHint}>
-                        {t("supervisor.loopConfigIterationsHint")}
+                        {maxIterations === 0
+                            ? t("supervisor.loopConfigIterationsHintUnlimited")
+                            : t("supervisor.loopConfigIterationsHint")}
                     </Text>
                 </View>
 

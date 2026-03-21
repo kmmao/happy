@@ -103,9 +103,9 @@ export const SupervisorLoopStatusCard = React.memo(
             ? (exitReasonLabels[loop.exitReason] ?? loop.exitReason)
             : null;
 
-        const progressPercent = Math.round(
-            (loop.currentIteration / loop.maxIterations) * 100,
-        );
+        const progressPercent = loop.maxIterations > 0
+            ? Math.round((loop.currentIteration / loop.maxIterations) * 100)
+            : null;
 
         const healthDelta =
             loop.initialHealthScore != null && loop.currentHealthScore != null
@@ -142,22 +142,28 @@ export const SupervisorLoopStatusCard = React.memo(
                 {/* Iteration progress bar */}
                 <View style={styles.progressSection}>
                     <Text style={styles.metricLabel}>
-                        {t("supervisor.loopIteration", {
-                            current: loop.currentIteration,
-                            max: loop.maxIterations,
-                        })}
+                        {loop.maxIterations > 0
+                            ? t("supervisor.loopIteration", {
+                                  current: loop.currentIteration,
+                                  max: loop.maxIterations,
+                              })
+                            : t("supervisor.loopIterationUnlimited", {
+                                  current: loop.currentIteration,
+                              })}
                     </Text>
-                    <View style={styles.progressBarBg}>
-                        <View
-                            style={[
-                                styles.progressBarFill,
-                                {
-                                    width: `${progressPercent}%`,
-                                    backgroundColor: theme.colors.header.tint,
-                                },
-                            ]}
-                        />
-                    </View>
+                    {progressPercent !== null && (
+                        <View style={styles.progressBarBg}>
+                            <View
+                                style={[
+                                    styles.progressBarFill,
+                                    {
+                                        width: `${progressPercent}%`,
+                                        backgroundColor: theme.colors.header.tint,
+                                    },
+                                ]}
+                            />
+                        </View>
+                    )}
                 </View>
 
                 {/* Metrics row */}

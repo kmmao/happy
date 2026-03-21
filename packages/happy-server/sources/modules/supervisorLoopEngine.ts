@@ -56,7 +56,7 @@ export function checkExitConditions(loop: {
     createdAt: Date;
     maxDurationMinutes: number;
 }): ExitCheck {
-    if (loop.currentIteration >= loop.maxIterations) {
+    if (loop.maxIterations > 0 && loop.currentIteration >= loop.maxIterations) {
         return { shouldExit: true, reason: "max_iterations" };
     }
     if (loop.costCapUsd !== null && loop.totalCostUsd >= loop.costCapUsd) {

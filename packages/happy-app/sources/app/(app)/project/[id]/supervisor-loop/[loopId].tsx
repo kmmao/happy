@@ -389,7 +389,9 @@ function SupervisorLoopDetailScreen() {
             <ItemGroup title={statusText}>
                 <View style={styles.metadataCard}>
                     <MetadataRow
-                        label={t("supervisor.loopIteration", { current: loop.currentIteration, max: loop.maxIterations })}
+                        label={loop.maxIterations > 0
+                            ? t("supervisor.loopIteration", { current: loop.currentIteration, max: loop.maxIterations })
+                            : t("supervisor.loopIterationUnlimited", { current: loop.currentIteration })}
                         value={formatDuration(loop.createdAt, loop.completedAt)}
                     />
                     <MetadataRow

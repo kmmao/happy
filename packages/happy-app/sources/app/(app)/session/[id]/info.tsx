@@ -369,6 +369,31 @@ function SessionInfoContent({ session }: { session: Session }) {
             </Text>
             <View
               style={{
+                marginTop: 8,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 6,
+                backgroundColor: session.metadata?.worktree?.isWorktree
+                  ? "rgba(88, 86, 214, 0.12)"
+                  : "rgba(52, 199, 89, 0.12)",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: session.metadata?.worktree?.isWorktree
+                    ? "#5856D6"
+                    : "#34C759",
+                  ...Typography.default("semiBold"),
+                }}
+              >
+                {session.metadata?.worktree?.isWorktree
+                  ? t("sessionInfo.tagBranch")
+                  : t("sessionInfo.tagMain")}
+              </Text>
+            </View>
+            <View
+              style={{
                 flexDirection: "row",
                 alignItems: "center",
                 marginTop: 8,
