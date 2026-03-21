@@ -222,38 +222,11 @@ function extractLinkedIssueNumbers(
 }
 
 /**
- * Parse a GitHub pull_request merge webhook payload.
- * Event: x-github-event = "pull_request", action = "closed", merged = true
+ * Parse a GitHub/Gitea pull_request merge webhook payload.
+ * Event: x-github-event / x-gitea-event = "pull_request", action = "closed", merged = true
+ * GitHub and Gitea share identical PR merge payload structure.
  */
-function parseGitHubPRMerge(
-  body: any,
-  eventType: string,
-): ParsedWebhookPRMerge | null {
-  if (eventType !== "pull_request") return null;
-  if (body?.action !== "closed") return null;
-
-  const pr = body?.pull_request;
-  if (!pr?.merged) return null;
-
-  const prBody = pr.body ?? "";
-  const headBranch = pr.head?.ref ?? "";
-
-  return {
-    prNumber: pr.number,
-    prTitle: pr.title ?? "",
-    prUrl: pr.html_url ?? "",
-    mergedBy: pr.merged_by?.login ?? body.sender?.login ?? "",
-    headBranch,
-    repoUrl: body.repository?.html_url ?? "",
-    linkedIssueNumbers: extractLinkedIssueNumbers(prBody, headBranch),
-  };
-}
-
-/**
- * Parse a Gitea pull_request merge webhook payload.
- * Event: x-gitea-event = "pull_request", action = "closed", merged = true
- */
-function parseGiteaPRMerge(
+function parseGitHubOrGiteaPRMerge(
   body: any,
   eventType: string,
 ): ParsedWebhookPRMerge | null {
@@ -316,9 +289,8 @@ export function parseWebhookPRMerge(
 ): ParsedWebhookPRMerge | null {
   switch (provider) {
     case "github":
-      return parseGitHubPRMerge(body, eventType);
     case "gitea":
-      return parseGiteaPRMerge(body, eventType);
+      return parseGitHubOrGiteaPRMerge(body, eventType);
     case "gitlab":
       return parseGitLabPRMerge(body, eventType);
     default:
@@ -385,9 +357,9 @@ export function parseWebhookPush(
 ): ParsedWebhookPush | null {
   switch (provider) {
     case "github":
-      return parseGitHubPush(body, eventType);
+      return parseGitHubOrGiteaPush(body, eventType, "github");
     case "gitea":
-      return parseGiteaPush(body, eventType);
+      return parseGitHubOrGiteaPush(body, eventType, "gitea");
     case "gitlab":
       return parseGitLabPush(body, eventType);
     default:
@@ -395,9 +367,14 @@ export function parseWebhookPush(
   }
 }
 
-function parseGitHubPush(
+/**
+ * Parse a GitHub/Gitea push webhook payload.
+ * GitHub uses pusher.name, Gitea uses pusher.login as the primary pusher field.
+ */
+function parseGitHubOrGiteaPush(
   body: any,
   eventType: string,
+  provider: "github" | "gitea",
 ): ParsedWebhookPush | null {
   if (eventType !== "push") return null;
   const ref = body?.ref ?? "";
@@ -406,32 +383,17 @@ function parseGitHubPush(
   const changedFiles = extractChangedFilesFromCommits(body?.commits);
   if (changedFiles.length === 0) return null;
 
-  return {
-    ref,
-    branch: ref.replace("refs/heads/", ""),
-    repoUrl: body?.repository?.html_url ?? "",
-    changedFiles,
-    pusher: body?.pusher?.name ?? body?.sender?.login ?? "",
-  };
-}
-
-function parseGiteaPush(
-  body: any,
-  eventType: string,
-): ParsedWebhookPush | null {
-  if (eventType !== "push") return null;
-  const ref = body?.ref ?? "";
-  if (!ref.startsWith("refs/heads/")) return null;
-
-  const changedFiles = extractChangedFilesFromCommits(body?.commits);
-  if (changedFiles.length === 0) return null;
+  const pusher =
+    provider === "github"
+      ? (body?.pusher?.name ?? body?.sender?.login ?? "")
+      : (body?.pusher?.login ?? body?.sender?.login ?? "");
 
   return {
     ref,
     branch: ref.replace("refs/heads/", ""),
     repoUrl: body?.repository?.html_url ?? "",
     changedFiles,
-    pusher: body?.pusher?.login ?? body?.sender?.login ?? "",
+    pusher,
   };
 }
 
