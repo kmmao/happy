@@ -81,13 +81,14 @@ const COMMAND_DESCRIPTIONS: Record<string, string> = {
 function mergeSlashCommands(
   commands: CommandItem[],
   slashCommands: string[],
+  descriptions?: Record<string, string>,
 ): void {
   for (const cmd of slashCommands) {
     if (IGNORED_COMMANDS.includes(cmd)) continue;
     if (!commands.find((c) => c.command === cmd)) {
       commands.push({
         command: cmd,
-        description: COMMAND_DESCRIPTIONS[cmd],
+        description: descriptions?.[cmd] ?? COMMAND_DESCRIPTIONS[cmd],
       });
     }
   }
@@ -103,7 +104,7 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
     const commands: CommandItem[] = [...DEFAULT_COMMANDS];
     for (const session of Object.values(state.sessions)) {
       if (session?.metadata?.slashCommands) {
-        mergeSlashCommands(commands, session.metadata.slashCommands);
+        mergeSlashCommands(commands, session.metadata.slashCommands, session.metadata.slashCommandDescriptions);
       }
     }
     return commands;
@@ -116,7 +117,7 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
 
   const commands: CommandItem[] = [...DEFAULT_COMMANDS];
   if (session.metadata.slashCommands) {
-    mergeSlashCommands(commands, session.metadata.slashCommands);
+    mergeSlashCommands(commands, session.metadata.slashCommands, session.metadata.slashCommandDescriptions);
   }
 
   return commands;

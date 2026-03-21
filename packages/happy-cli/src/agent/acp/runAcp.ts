@@ -825,9 +825,18 @@ export async function runAcp(opts: {
           );
         }
       }
+      const commandDescriptions: Record<string, string> = {};
+      for (const command of commands) {
+        if (command.description) {
+          commandDescriptions[command.name] = command.description;
+        }
+      }
       session.updateMetadata((currentMetadata) => ({
         ...currentMetadata,
         slashCommands: commandNames,
+        slashCommandDescriptions: Object.keys(commandDescriptions).length > 0
+          ? commandDescriptions
+          : undefined,
       }));
     }
 

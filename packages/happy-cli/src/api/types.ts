@@ -383,6 +383,7 @@ export type Metadata = {
   claudeSessionId?: string; // Claude Code session ID
   tools?: string[];
   slashCommands?: string[];
+  slashCommandDescriptions?: Record<string, string>;
   homeDir: string;
   happyHomeDir: string;
   happyLibDir: string;

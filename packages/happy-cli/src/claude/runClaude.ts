@@ -307,6 +307,7 @@ export async function runClaude(
         ...currentMetadata,
         tools: sdkMetadata.tools,
         slashCommands: sdkMetadata.slashCommands,
+        slashCommandDescriptions: sdkMetadata.slashCommandDescriptions,
       }));
       logger.debug("[start] Session metadata updated with SDK capabilities");
     } catch (error) {

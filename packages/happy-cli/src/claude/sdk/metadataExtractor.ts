@@ -3,13 +3,16 @@
  * Captures available tools and slash commands from Claude SDK initialization
  */
 
+import { homedir } from "os";
 import { query } from "./index";
+import { extractCommandDescriptions } from "./commandDescriptionExtractor";
 import type { SDKSystemMessage } from "./types";
 import { logger } from "@/ui/logger";
 
 export interface SDKMetadata {
   tools?: string[];
   slashCommands?: string[];
+  slashCommandDescriptions?: Record<string, string>;
 }
 
 /**
@@ -37,15 +40,27 @@ export async function extractSDKMetadata(): Promise<SDKMetadata> {
       if (message.type === "system" && message.subtype === "init") {
         const systemMessage = message as SDKSystemMessage;
 
+        // Abort the query since we got what we need
+        abortController.abort();
+
+        // Extract command descriptions from filesystem
+        const slashCommandDescriptions =
+          systemMessage.slash_commands?.length
+            ? await extractCommandDescriptions(
+                systemMessage.slash_commands,
+                systemMessage.cwd,
+                homedir(),
+                systemMessage.plugins,
+              )
+            : undefined;
+
         const metadata: SDKMetadata = {
           tools: systemMessage.tools,
           slashCommands: systemMessage.slash_commands,
+          slashCommandDescriptions,
         };
 
         logger.debug("[metadataExtractor] Captured SDK metadata:", metadata);
-
-        // Abort the query since we got what we need
-        abortController.abort();
 
         return metadata;
       }

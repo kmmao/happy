@@ -2043,7 +2043,7 @@ export const AgentInput = React.memo(
                         }}
                         numberOfLines={1}
                       >
-                        /{cmd}
+                        /{cmd.includes(":") ? cmd.split(":").pop() : cmd}
                       </Text>
                     </LinearGradient>
                   </Pressable>
