@@ -84,6 +84,7 @@ class ActivityCache {
         );
       });
     }, this.BATCH_INTERVAL);
+    this.batchTimer.unref();
   }
 
   async isSessionValid(sessionId: string, userId: string): Promise<boolean> {
@@ -368,6 +369,7 @@ const cleanupTimer = setInterval(
   },
   5 * 60 * 1000,
 );
+cleanupTimer.unref();
 
 // Register cleanup timer for shutdown
 activityCache.registerCleanupTimer(cleanupTimer);
