@@ -1780,6 +1780,9 @@ export const zhHans: TranslationStructure = {
     deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
       `已删除 ${count} 个归档会话`,
     failedToDeleteArchivedSessions: "部分归档会话删除失败",
+    deleteArchivedBranchSessions: "删除归档分支会话",
+    deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
+      `确定要永久删除 ${count} 个归档分支会话吗？此操作无法撤销。`,
   },
   project: {
     segments: {

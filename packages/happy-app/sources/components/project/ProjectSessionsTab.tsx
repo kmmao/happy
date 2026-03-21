@@ -279,6 +279,49 @@ export const ProjectSessionsTab = React.memo(
             );
         }, [archivedSessions.length, performDeleteArchived]);
 
+        const archivedBranchSessions = React.useMemo(
+            () => archivedSessions.filter((s) => s.metadata?.worktree?.isWorktree),
+            [archivedSessions],
+        );
+
+        const [deletingArchivedBranch, performDeleteArchivedBranch] = useHappyAction(
+            async () => {
+                const ids = archivedBranchSessions.map((s) => s.id);
+                const results = await Promise.all(
+                    ids.map((id) => sessionDelete(id)),
+                );
+                const failed = results.filter((r) => !r.success);
+                if (failed.length > 0 && failed.length === ids.length) {
+                    throw new HappyError(
+                        t("projects.failedToDeleteArchivedSessions"),
+                        false,
+                    );
+                }
+                const deletedCount = ids.length - failed.length;
+                Modal.toast(
+                    t("projects.deleteArchivedSessionsSuccess", {
+                        count: deletedCount,
+                    }),
+                );
+            },
+        );
+
+        const handleDeleteArchivedBranchSessions = React.useCallback(() => {
+            const count = archivedBranchSessions.length;
+            Modal.alert(
+                t("projects.deleteArchivedBranchSessions"),
+                t("projects.deleteArchivedBranchSessionsConfirm", { count }),
+                [
+                    { text: t("common.cancel"), style: "cancel" },
+                    {
+                        text: t("projects.deleteArchivedBranchSessions"),
+                        style: "destructive",
+                        onPress: performDeleteArchivedBranch,
+                    },
+                ],
+            );
+        }, [archivedBranchSessions.length, performDeleteArchivedBranch]);
+
         if (sessions.length === 0) {
             return (
                 <View style={styles.emptyContainer}>
@@ -340,8 +383,23 @@ export const ProjectSessionsTab = React.memo(
                             }
                             onPress={handleDeleteArchivedSessions}
                             titleStyle={{ color: theme.colors.deleteAction }}
-                            disabled={deletingArchived}
+                            disabled={deletingArchived || deletingArchivedBranch}
                         />
+                        {archivedBranchSessions.length > 0 && (
+                            <Item
+                                title={t("projects.deleteArchivedBranchSessions")}
+                                icon={
+                                    <Ionicons
+                                        name="git-branch-outline"
+                                        size={20}
+                                        color="#5856D6"
+                                    />
+                                }
+                                onPress={handleDeleteArchivedBranchSessions}
+                                titleStyle={{ color: "#5856D6" }}
+                                disabled={deletingArchivedBranch || deletingArchived}
+                            />
+                        )}
                         {archivedSessions.map((session) => (
                             <SessionRow key={session.id} session={session} />
                         ))}

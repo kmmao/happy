@@ -1864,6 +1864,9 @@ export const pt: TranslationStructure = {
     deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
       `${count} sessão${count === 1 ? "" : "ões"} arquivada${count === 1 ? "" : "s"} excluída${count === 1 ? "" : "s"}`,
     failedToDeleteArchivedSessions: "Falha ao excluir algumas sessões arquivadas",
+    deleteArchivedBranchSessions: "Excluir sessões de ramo arquivadas",
+    deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
+      `Tem certeza de que deseja excluir permanentemente ${count} sessão${count === 1 ? "" : "ões"} de ramo arquivada${count === 1 ? "" : "s"}? Esta ação não pode ser desfeita.`,
   },
   project: {
     segments: {

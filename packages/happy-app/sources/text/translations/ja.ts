@@ -1839,6 +1839,9 @@ export const ja: TranslationStructure = {
     deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
       `アーカイブ済みセッション ${count} 件を削除しました`,
     failedToDeleteArchivedSessions: "一部のアーカイブ済みセッションの削除に失敗しました",
+    deleteArchivedBranchSessions: "アーカイブ済みブランチセッションを削除",
+    deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
+      `アーカイブ済みブランチセッション ${count} 件を完全に削除しますか？この操作は取り消せません。`,
   },
   project: {
     segments: {

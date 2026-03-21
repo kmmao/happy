@@ -1882,6 +1882,9 @@ export const ru: TranslationStructure = {
     deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
       `${count} архивных сессий удалено`,
     failedToDeleteArchivedSessions: "Не удалось удалить некоторые архивные сессии",
+    deleteArchivedBranchSessions: "Удалить архивные сессии веток",
+    deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
+      `Вы уверены, что хотите навсегда удалить ${count} архивных сессий веток? Это действие нельзя отменить.`,
   },
   project: {
     segments: {

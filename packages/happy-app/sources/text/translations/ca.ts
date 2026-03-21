@@ -1864,6 +1864,9 @@ export const ca: TranslationStructure = {
     deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
       `${count} sessió${count === 1 ? "" : "ns"} arxivad${count === 1 ? "a" : "es"} eliminad${count === 1 ? "a" : "es"}`,
     failedToDeleteArchivedSessions: "Error en eliminar algunes sessions arxivades",
+    deleteArchivedBranchSessions: "Elimina les sessions de branca arxivades",
+    deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
+      `Segur que vols eliminar permanentment ${count} sessió${count === 1 ? "" : "ns"} de branca arxivad${count === 1 ? "a" : "es"}? Aquesta acció no es pot desfer.`,
   },
   project: {
     segments: {

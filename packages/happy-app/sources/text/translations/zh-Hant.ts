@@ -1781,6 +1781,9 @@ export const zhHant: TranslationStructure = {
     deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
       `已刪除 ${count} 個歸檔會話`,
     failedToDeleteArchivedSessions: "部分歸檔會話刪除失敗",
+    deleteArchivedBranchSessions: "刪除歸檔分支會話",
+    deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
+      `確定要永久刪除 ${count} 個歸檔分支會話嗎？此操作無法撤銷。`,
   },
   project: {
     segments: {

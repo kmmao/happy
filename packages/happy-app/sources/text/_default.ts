@@ -1844,6 +1844,9 @@ export const en = {
     deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
       `${count} archived session${count === 1 ? "" : "s"} deleted`,
     failedToDeleteArchivedSessions: "Failed to delete some archived sessions",
+    deleteArchivedBranchSessions: "Delete Archived Branch Sessions",
+    deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
+      `Are you sure you want to permanently delete ${count} archived branch session${count === 1 ? "" : "s"}? This cannot be undone.`,
   },
 
   project: {

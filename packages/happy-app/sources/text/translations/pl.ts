@@ -1885,6 +1885,9 @@ export const pl: TranslationStructure = {
     deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
       `Usunięto ${count} zarchiwizowanych sesji`,
     failedToDeleteArchivedSessions: "Nie udało się usunąć niektórych zarchiwizowanych sesji",
+    deleteArchivedBranchSessions: "Usuń zarchiwizowane sesje gałęzi",
+    deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
+      `Czy na pewno chcesz trwale usunąć ${count} zarchiwizowanych sesji gałęzi? Tej operacji nie można cofnąć.`,
   },
   project: {
     segments: {

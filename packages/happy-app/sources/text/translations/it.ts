@@ -1860,6 +1860,9 @@ export const it: TranslationStructure = {
     deleteArchivedSessionsSuccess: ({ count }: { count: number }) =>
       `${count} session${count === 1 ? "e" : "i"} archiviat${count === 1 ? "a" : "e"} eliminat${count === 1 ? "a" : "e"}`,
     failedToDeleteArchivedSessions: "Impossibile eliminare alcune sessioni archiviate",
+    deleteArchivedBranchSessions: "Elimina sessioni di ramo archiviate",
+    deleteArchivedBranchSessionsConfirm: ({ count }: { count: number }) =>
+      `Sei sicuro di voler eliminare definitivamente ${count} session${count === 1 ? "e" : "i"} di ramo archiviat${count === 1 ? "a" : "e"}? Questa azione non può essere annullata.`,
   },
   project: {
     segments: {
