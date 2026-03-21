@@ -165,6 +165,8 @@ export const ca: TranslationStructure = {
     profilesSubtitle: "Gestiona els perfils d'entorn i variables",
     gitHosts: "Hosts Git",
     gitHostsSubtitle: "Configura els proveïdors de hosts Git",
+    plugins: "Connectors",
+    pluginsSubtitle: "Gestionar connectors de Claude Code",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1604,6 +1606,26 @@ export const ca: TranslationStructure = {
     loadFailed: "Error en carregar les dades",
     mergeHint: "Fusionar el codi a la branca base ara",
     approveHint: "Només revisió, no fusiona",
+  },
+
+  settingsPlugins: {
+    installed: "Connectors instal·lats",
+    installedDescription: "Mantingueu premut per eliminar",
+    noPlugins: "No hi ha connectors configurats",
+    actions: "Accions",
+    addManual: "Afegir connector",
+    addManualDescription: "Introduïu la ruta del connector a la màquina objectiu",
+    addTitle: "Afegir connector",
+    addDescription: "Introduïu la ruta absoluta del directori del connector",
+    discover: "Descobrir connectors",
+    discoverDescription: "Escanejar la màquina per trobar connectors",
+    discoverTitle: "Descobrir connectors",
+    discoverNoSession: "Cal una sessió activa per descobrir connectors",
+    discoverEmpty: "No s'han trobat connectors",
+    discoverAllAdded: "Tots els connectors descoberts ja estan afegits",
+    discoverFound: ({ count }: { count: number }) => `${count} nous connectors trobats`,
+    removeTitle: "Eliminar connector",
+    removeConfirm: "Eliminar aquest connector de la llista?",
   },
 
   gitHosts: {

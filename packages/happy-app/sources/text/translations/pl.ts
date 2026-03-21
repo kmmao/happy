@@ -177,6 +177,8 @@ export const pl: TranslationStructure = {
     profilesSubtitle: "Zarządzaj profilami zmiennych środowiskowych dla sesji",
     gitHosts: "Hosty Git",
     gitHostsSubtitle: "Konfiguracja dostawców hostów Git",
+    plugins: "Wtyczki",
+    pluginsSubtitle: "Zarządzaj wtyczkami Claude Code",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1625,6 +1627,26 @@ export const pl: TranslationStructure = {
     loadFailed: "Nie udało się załadować danych",
     mergeHint: "Scal kod do gałęzi bazowej teraz",
     approveHint: "Tylko recenzja, nie scala",
+  },
+
+  settingsPlugins: {
+    installed: "Zainstalowane wtyczki",
+    installedDescription: "Przytrzymaj aby usunąć",
+    noPlugins: "Brak skonfigurowanych wtyczek",
+    actions: "Akcje",
+    addManual: "Dodaj wtyczkę",
+    addManualDescription: "Wprowadź ścieżkę wtyczki na docelowej maszynie",
+    addTitle: "Dodaj wtyczkę",
+    addDescription: "Wprowadź bezwzględną ścieżkę katalogu wtyczki",
+    discover: "Wykryj wtyczki",
+    discoverDescription: "Skanuj maszynę w poszukiwaniu wtyczek",
+    discoverTitle: "Wykryj wtyczki",
+    discoverNoSession: "Do wykrycia wtyczek potrzebna jest aktywna sesja",
+    discoverEmpty: "Nie znaleziono wtyczek",
+    discoverAllAdded: "Wszystkie wykryte wtyczki są już dodane",
+    discoverFound: ({ count }: { count: number }) => `Znaleziono ${count} nowych wtyczek`,
+    removeTitle: "Usuń wtyczkę",
+    removeConfirm: "Usunąć tę wtyczkę z listy?",
   },
 
   gitHosts: {

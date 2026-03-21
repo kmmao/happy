@@ -483,6 +483,18 @@ export const SettingsSchema = z.object({
   favoriteCommands: z
     .array(z.string())
     .describe("User-defined favorite shell commands for quick access"),
+  // Claude Code plugins configuration
+  plugins: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        path: z.string(),
+        enabled: z.boolean(),
+        source: z.enum(["manual", "discovered"]),
+      }),
+    )
+    .describe("Claude Code plugins — managed locally on each machine"),
   // Dismissed CLI warning banners (supports both per-machine and global dismissal)
   showProjectTab: z
     .boolean()
@@ -662,6 +674,8 @@ export const settingsDefaults: Settings = {
   favoriteMachines: [],
   // Favorite commands (empty by default)
   favoriteCommands: [],
+  // Plugins (empty by default, populated via discovery or manual add)
+  plugins: [],
   // Git host provider mappings (empty by default, uses built-in detection as fallback)
   gitHosts: [],
   // Project tab visibility (hidden by default)

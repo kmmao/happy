@@ -7,15 +7,9 @@ CLI 侧已完成 SDK 选项映射（commit aff7302c），以下三个功能需�
 ### ~~1. 子 Agent 进度摘要展示~~ ✅ 已完成 (eb15b249)
 - wire/cli/app 三层打通，task-progress 带 summary 时显示为聊天消息
 
-### 2. 文件回退按钮
-- **优先级**: P1
-- **现状**: CLI 已启用 `enableFileCheckpointing: true`，SDK Query 有 `rewindFiles(messageId)` 方法
-- **要做**:
-  - CLI: 新增 `rewindFiles` RPC handler（先 dryRun 获取影响范围，确认后执行，执行前 git stash）
-  - Wire: 新增 rewind RPC 类型
-  - App: 用户消息旁加 [⏪] 按钮，点击后显示确认弹窗（影响文件数、行数变化）
-- **安全**: 多会话同目录时需警告，执行前自动 git stash
-- **涉及**: `claudeRemoteLauncher.ts`, wire RPC 类型, `MessageView.tsx`
+### ~~2. 文件回退按钮~~ ✅ 已完成 (f7656779)
+- 用户消息旁 [⏪] 按钮 → dryRun 预览 → 确认弹窗 → 执行回退
+- TODO: 多会话同目录时的 git stash 安全保护（后续优化）
 
 ### 3. Plugins 设置管理
 - **优先级**: P2

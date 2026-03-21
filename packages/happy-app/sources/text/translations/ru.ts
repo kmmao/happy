@@ -139,6 +139,8 @@ export const ru: TranslationStructure = {
     profilesSubtitle: "Управление профилями переменных окружения для сессий",
     gitHosts: "Git-хосты",
     gitHostsSubtitle: "Настройка провайдеров Git-хостов",
+    plugins: "Плагины",
+    pluginsSubtitle: "Управление плагинами Claude Code",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1626,6 +1628,26 @@ export const ru: TranslationStructure = {
     loadFailed: "Не удалось загрузить данные",
     mergeHint: "Объединить код в базовую ветку сейчас",
     approveHint: "Только проверка, без слияния",
+  },
+
+  settingsPlugins: {
+    installed: "Установленные плагины",
+    installedDescription: "Долгое нажатие для удаления",
+    noPlugins: "Плагины не настроены",
+    actions: "Действия",
+    addManual: "Добавить плагин",
+    addManualDescription: "Введите путь к плагину на целевой машине",
+    addTitle: "Добавить плагин",
+    addDescription: "Введите абсолютный путь к каталогу плагина",
+    discover: "Обнаружить плагины",
+    discoverDescription: "Сканировать машину на наличие плагинов",
+    discoverTitle: "Обнаружить плагины",
+    discoverNoSession: "Для обнаружения плагинов необходима активная сессия",
+    discoverEmpty: "Плагины не найдены",
+    discoverAllAdded: "Все обнаруженные плагины уже добавлены",
+    discoverFound: ({ count }: { count: number }) => `Найдено ${count} новых плагинов`,
+    removeTitle: "Удалить плагин",
+    removeConfirm: "Удалить этот плагин из списка?",
   },
 
   gitHosts: {

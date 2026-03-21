@@ -163,6 +163,8 @@ export const zhHant: TranslationStructure = {
     profilesSubtitle: "管理工作階段的環境變數設定檔",
     gitHosts: "Git 主機",
     gitHostsSubtitle: "設定 Git 主機供應商",
+    plugins: "外掛",
+    pluginsSubtitle: "管理 Claude Code 外掛",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1530,6 +1532,26 @@ export const zhHant: TranslationStructure = {
     loadFailed: "載入資料失敗",
     mergeHint: "立即將程式碼合併到基礎分支",
     approveHint: "僅審批，不會合併程式碼",
+  },
+
+  settingsPlugins: {
+    installed: "已安裝外掛",
+    installedDescription: "長按可移除外掛",
+    noPlugins: "暫無已設定的外掛",
+    actions: "操作",
+    addManual: "新增外掛",
+    addManualDescription: "輸入目標機器上的外掛路徑",
+    addTitle: "新增外掛",
+    addDescription: "輸入外掛目錄的絕對路徑",
+    discover: "探索外掛",
+    discoverDescription: "掃描目標機器上已安裝的外掛",
+    discoverTitle: "探索外掛",
+    discoverNoSession: "需要一個活躍的工作階段來探索外掛",
+    discoverEmpty: "未發現任何外掛",
+    discoverAllAdded: "所有發現的外掛都已新增",
+    discoverFound: ({ count }: { count: number }) => `發現 ${count} 個新外掛`,
+    removeTitle: "移除外掛",
+    removeConfirm: "從列表中移除此外掛？",
   },
 
   gitHosts: {

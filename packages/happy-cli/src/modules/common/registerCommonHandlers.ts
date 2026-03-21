@@ -1088,4 +1088,43 @@ export function registerCommonHandlers(
       };
     }
   });
+
+  // ── Discover installed Claude Code plugins ──
+  rpcHandlerManager.registerHandler("discoverPlugins", async () => {
+    const results: Array<{ name: string; path: string }> = [];
+
+    // Scan ~/.claude/plugins/ for marketplace/installed plugins
+    const globalPluginsDir = join(homedir(), ".claude", "plugins", "marketplaces");
+    try {
+      const entries = await readdir(globalPluginsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          results.push({
+            name: entry.name,
+            path: join(globalPluginsDir, entry.name),
+          });
+        }
+      }
+    } catch {
+      // ~/.claude/plugins/marketplaces/ may not exist
+    }
+
+    // Also scan project-level .claude/plugins/ if present
+    const projectPluginsDir = join(workingDirectory, ".claude", "plugins");
+    try {
+      const entries = await readdir(projectPluginsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          results.push({
+            name: `${entry.name} (project)`,
+            path: join(projectPluginsDir, entry.name),
+          });
+        }
+      }
+    } catch {
+      // .claude/plugins/ may not exist in project
+    }
+
+    return { plugins: results };
+  });
 }

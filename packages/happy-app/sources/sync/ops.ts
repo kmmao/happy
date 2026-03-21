@@ -418,6 +418,22 @@ export async function sessionAbort(sessionId: string): Promise<void> {
 }
 
 /**
+ * Discover installed Claude Code plugins on the target machine
+ */
+export async function sessionDiscoverPlugins(
+    sessionId: string,
+): Promise<{ plugins: Array<{ name: string; path: string }> }> {
+    try {
+        return await apiSocket.sessionRPC<
+            { plugins: Array<{ name: string; path: string }> },
+            Record<string, never>
+        >(sessionId, "discoverPlugins", {});
+    } catch {
+        return { plugins: [] };
+    }
+}
+
+/**
  * Interrupt the current session operation (graceful, keeps process alive)
  */
 export async function sessionInterrupt(sessionId: string): Promise<void> {

@@ -227,6 +227,8 @@ export const ja: TranslationStructure = {
     profilesSubtitle: "セッション用の環境変数プロファイルを管理",
     gitHosts: "Git ホスト",
     gitHostsSubtitle: "Git ホストプロバイダーの設定",
+    plugins: "プラグイン",
+    pluginsSubtitle: "Claude Code プラグインを管理",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1581,6 +1583,26 @@ export const ja: TranslationStructure = {
     loadFailed: "データの読み込みに失敗しました",
     mergeHint: "今すぐコードをベースブランチにマージ",
     approveHint: "レビューのみ、マージしません",
+  },
+
+  settingsPlugins: {
+    installed: "インストール済みプラグイン",
+    installedDescription: "長押しでプラグインを削除",
+    noPlugins: "プラグインが設定されていません",
+    actions: "アクション",
+    addManual: "プラグインを追加",
+    addManualDescription: "ターゲットマシン上のプラグインパスを入力",
+    addTitle: "プラグインを追加",
+    addDescription: "プラグインディレクトリの絶対パスを入力",
+    discover: "プラグインを検出",
+    discoverDescription: "マシン上のインストール済みプラグインをスキャン",
+    discoverTitle: "プラグインを検出",
+    discoverNoSession: "プラグインを検出するにはアクティブなセッションが必要です",
+    discoverEmpty: "プラグインが見つかりませんでした",
+    discoverAllAdded: "検出されたプラグインはすべて追加済みです",
+    discoverFound: ({ count }: { count: number }) => `${count} 個の新しいプラグインが見つかりました`,
+    removeTitle: "プラグインを削除",
+    removeConfirm: "このプラグインをリストから削除しますか？",
   },
 
   gitHosts: {

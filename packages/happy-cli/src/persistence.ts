@@ -285,6 +285,14 @@ interface Settings {
   activeProfileId?: string;
   profiles: AIBackendProfile[];
   sandboxConfig?: SandboxConfig;
+  // Claude Code plugins (synced with happy app)
+  plugins?: Array<{
+    id: string;
+    name: string;
+    path: string;
+    enabled: boolean;
+    source: "manual" | "discovered";
+  }>;
   // CLI-local environment variable cache (not synced)
   localEnvironmentVariables: Record<string, Record<string, string>>; // profileId -> env vars
 }

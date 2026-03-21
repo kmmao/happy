@@ -178,6 +178,8 @@ export const en: TranslationStructure = {
     profilesSubtitle: "Manage environment variable profiles for sessions",
     gitHosts: "Git Hosts",
     gitHostsSubtitle: "Configure Git host provider mappings",
+    plugins: "Plugins",
+    pluginsSubtitle: "Manage Claude Code plugins",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1593,6 +1595,27 @@ export const en: TranslationStructure = {
     loadFailed: "Failed to load data",
     mergeHint: "Merge code into base branch now",
     approveHint: "Review only, does not merge",
+  },
+
+  settingsPlugins: {
+    installed: "Installed Plugins",
+    installedDescription: "Long press to remove a plugin",
+    noPlugins: "No plugins configured",
+    actions: "Actions",
+    addManual: "Add Plugin",
+    addManualDescription: "Enter the plugin path on the target machine",
+    addTitle: "Add Plugin",
+    addDescription: "Enter the absolute path to the plugin directory",
+    discover: "Discover Plugins",
+    discoverDescription: "Scan the machine for installed plugins",
+    discoverTitle: "Discover Plugins",
+    discoverNoSession: "An active session is needed to discover plugins",
+    discoverEmpty: "No plugins found on this machine",
+    discoverAllAdded: "All discovered plugins are already added",
+    discoverFound: ({ count }: { count: number }) =>
+      `Found ${count} new plugin${count === 1 ? "" : "s"}`,
+    removeTitle: "Remove Plugin",
+    removeConfirm: "Remove this plugin from the list?",
   },
 
   gitHosts: {

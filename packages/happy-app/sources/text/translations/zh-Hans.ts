@@ -163,6 +163,8 @@ export const zhHans: TranslationStructure = {
     profilesSubtitle: "管理环境配置文件和变量",
     gitHosts: "Git 主机",
     gitHostsSubtitle: "配置 Git 主机提供商",
+    plugins: "插件",
+    pluginsSubtitle: "管理 Claude Code 插件",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1528,6 +1530,26 @@ export const zhHans: TranslationStructure = {
     loadFailed: "加载数据失败",
     mergeHint: "立即将代码合并到基础分支",
     approveHint: "仅审批，不会合并代码",
+  },
+
+  settingsPlugins: {
+    installed: "已安装插件",
+    installedDescription: "长按可移除插件",
+    noPlugins: "暂无已配置的插件",
+    actions: "操作",
+    addManual: "添加插件",
+    addManualDescription: "输入目标机器上的插件路径",
+    addTitle: "添加插件",
+    addDescription: "输入插件目录的绝对路径",
+    discover: "发现插件",
+    discoverDescription: "扫描目标机器上已安装的插件",
+    discoverTitle: "发现插件",
+    discoverNoSession: "需要一个活跃的会话来发现插件",
+    discoverEmpty: "未发现任何插件",
+    discoverAllAdded: "所有发现的插件都已添加",
+    discoverFound: ({ count }: { count: number }) => `发现 ${count} 个新插件`,
+    removeTitle: "移除插件",
+    removeConfirm: "从列表中移除此插件？",
   },
 
   gitHosts: {

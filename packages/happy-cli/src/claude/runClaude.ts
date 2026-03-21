@@ -104,6 +104,11 @@ export async function runClaude(
   const settings = await readSettings();
   let machineId = settings?.machineId;
   const sandboxConfig = options.noSandbox ? undefined : settings?.sandboxConfig;
+
+  // Build SDK plugin configs from enabled plugins in settings
+  const sdkPlugins = (settings?.plugins ?? [])
+    .filter((p) => p.enabled)
+    .map((p) => ({ type: "local" as const, path: p.path }));
   const sandboxEnabled = Boolean(sandboxConfig?.enabled);
   const initialPermissionMode = applySandboxPermissionPolicy(
     resolveInitialClaudePermissionMode(
@@ -668,6 +673,7 @@ export async function runClaude(
       effort: messageEffort,
       locale: messageLocale,
       ...(messageContinue && { continue: true }),
+      ...(sdkPlugins.length > 0 && { plugins: sdkPlugins }),
     };
     messageQueue.push(message.content.text, enhancedMode, message.localKey);
     logger.debugLargeJson("User message pushed to queue:", message);

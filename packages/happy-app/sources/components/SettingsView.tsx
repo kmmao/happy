@@ -350,6 +350,14 @@ export const SettingsView = React.memo(function SettingsView() {
           }
           onPress={() => router.push("/settings/git-hosts")}
         />
+        <Item
+          title={t("settings.plugins")}
+          subtitle={t("settings.pluginsSubtitle")}
+          icon={
+            <Ionicons name="extension-puzzle-outline" size={29} color="#10B981" />
+          }
+          onPress={() => router.push("/settings/plugins")}
+        />
         {experiments && (
           <Item
             title={t("settings.usage")}

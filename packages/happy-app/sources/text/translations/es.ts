@@ -165,6 +165,8 @@ export const es: TranslationStructure = {
       "Gestionar perfiles de variables de entorno para sesiones",
     gitHosts: "Hosts Git",
     gitHostsSubtitle: "Configurar proveedores de hosts Git",
+    plugins: "Plugins",
+    pluginsSubtitle: "Gestionar plugins de Claude Code",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1604,6 +1606,26 @@ export const es: TranslationStructure = {
     loadFailed: "Error al cargar datos",
     mergeHint: "Fusionar código en la rama base ahora",
     approveHint: "Solo revisión, no fusiona",
+  },
+
+  settingsPlugins: {
+    installed: "Plugins instalados",
+    installedDescription: "Mantén presionado para eliminar",
+    noPlugins: "No hay plugins configurados",
+    actions: "Acciones",
+    addManual: "Añadir plugin",
+    addManualDescription: "Introduce la ruta del plugin en la máquina objetivo",
+    addTitle: "Añadir plugin",
+    addDescription: "Introduce la ruta absoluta del directorio del plugin",
+    discover: "Descubrir plugins",
+    discoverDescription: "Escanear la máquina en busca de plugins",
+    discoverTitle: "Descubrir plugins",
+    discoverNoSession: "Se necesita una sesión activa para descubrir plugins",
+    discoverEmpty: "No se encontraron plugins",
+    discoverAllAdded: "Todos los plugins descubiertos ya están añadidos",
+    discoverFound: ({ count }: { count: number }) => `${count} nuevos plugins encontrados`,
+    removeTitle: "Eliminar plugin",
+    removeConfirm: "¿Eliminar este plugin de la lista?",
   },
 
   gitHosts: {
