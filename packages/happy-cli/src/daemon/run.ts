@@ -35,7 +35,6 @@ import {
   stopDaemon,
 } from "./controlClient";
 import { startDaemonControlServer } from "./controlServer";
-import { readFileSync } from "fs";
 import { join } from "path";
 import { projectPath } from "@/projectPath";
 import {
@@ -1089,7 +1088,7 @@ export async function startDaemon(): Promise<void> {
       // If version on disk is different from the one in package.json - we need to restart
       // BIG if - does this get updated from underneath us on npm upgrade?
       const projectVersion = JSON.parse(
-        readFileSync(join(projectPath(), "package.json"), "utf-8"),
+        await fs.readFile(join(projectPath(), "package.json"), "utf-8"),
       ).version;
       if (projectVersion !== configuration.currentCliVersion) {
         logger.debug(
