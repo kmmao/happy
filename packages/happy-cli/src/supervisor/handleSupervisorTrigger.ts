@@ -20,6 +20,7 @@ import {
   acquireSlot,
   releaseSlot,
   setMaxConcurrency,
+  getPoolStatus,
   ConcurrencyAbortedError,
   type SlotType,
 } from "./concurrencyLimiter";
@@ -168,7 +169,15 @@ export async function handleSupervisorTrigger(
 
   try {
     // Wait for a concurrency slot (queues if pool is full)
+    const poolBefore = getPoolStatus(slotType);
+    logger.info(
+      `[SUPERVISOR-CONCURRENCY] BEFORE acquireSlot: type=${slotType} runId=${runId} active=${poolBefore.active}/${poolBefore.max} queued=${poolBefore.queued}`,
+    );
     await acquireSlot(slotType);
+    const poolAfter = getPoolStatus(slotType);
+    logger.info(
+      `[SUPERVISOR-CONCURRENCY] AFTER acquireSlot: type=${slotType} runId=${runId} active=${poolAfter.active}/${poolAfter.max} queued=${poolAfter.queued}`,
+    );
   } catch (error) {
     processingRuns.delete(runId);
     if (error instanceof ConcurrencyAbortedError) {
@@ -304,6 +313,10 @@ export async function handleSupervisorTrigger(
     }
   } finally {
     releaseSlot(slotType);
+    const poolFinal = getPoolStatus(slotType);
+    logger.info(
+      `[SUPERVISOR-CONCURRENCY] RELEASED: type=${slotType} runId=${runId} active=${poolFinal.active}/${poolFinal.max} queued=${poolFinal.queued}`,
+    );
     processingRuns.delete(runId);
   }
 }

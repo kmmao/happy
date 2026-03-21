@@ -507,6 +507,7 @@ export async function handleAutoApproval(
         }
 
         // Trigger fix for each approved action
+        log({ module: "supervisor" }, `handleAutoApproval: triggering ${actions.length} fix events for project ${projectId}`);
         for (const action of actions) {
             // Create Issue on provider for tracking (best-effort)
             let issueNumber: number | undefined;
