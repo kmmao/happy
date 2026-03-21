@@ -24,7 +24,6 @@ import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
 import { usePreview, type DetectedPort } from "@/hooks/usePreview";
 import { ItemGroup } from "@/components/ItemGroup";
-import { Item } from "@/components/Item";
 import { layout } from "@/components/layout";
 
 type DiffTab = "before" | "after" | "diff";
@@ -301,43 +300,65 @@ export default React.memo(function PreviewPage() {
           </View>
         ) : null}
 
-        {/* Dev servers list */}
-        <ItemGroup title={t("preview.devServers")}>
-          {ports.length === 0 ? (
-            <Item
-              title={t("preview.noPorts")}
-              subtitle={t("preview.noPortsHint")}
-            />
-          ) : (
-            ports.map((p) => (
-              <Item
+        {/* Dev servers — chip/tag layout */}
+        <Text style={styles.sectionTitle}>{t("preview.devServers")}</Text>
+        {ports.length === 0 ? (
+          <View style={styles.emptyPortsRow}>
+            <Text style={styles.emptyPortsText}>{t("preview.noPorts")}</Text>
+          </View>
+        ) : (
+          <View style={styles.chipContainer}>
+            {ports.map((p) => (
+              <Pressable
                 key={p.port}
-                title={t("preview.portItem", {
-                  port: p.port,
-                  process: p.process,
-                })}
-                subtitle={
-                  baseline ? t("preview.compare") : t("preview.capture")
-                }
-                icon={
-                  <Ionicons
-                    name={
-                      p.isCommonDevPort ? "globe-outline" : "server-outline"
-                    }
-                    size={20}
-                    color={
-                      p.isCommonDevPort
-                        ? theme.colors.textLink
-                        : theme.colors.textSecondary
-                    }
-                  />
-                }
                 onPress={() => handlePortPress(p)}
-                showChevron
-              />
-            ))
-          )}
-        </ItemGroup>
+                style={({ pressed }) => [
+                  styles.chip,
+                  {
+                    backgroundColor: p.isCommonDevPort
+                      ? theme.colors.textLink + "18"
+                      : theme.colors.surfaceHighest,
+                    borderColor: p.isCommonDevPort
+                      ? theme.colors.textLink + "40"
+                      : theme.colors.divider,
+                    opacity: pressed ? 0.6 : 1,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={
+                    p.process.startsWith("docker:")
+                      ? "cube-outline"
+                      : p.isCommonDevPort
+                        ? "globe-outline"
+                        : "server-outline"
+                  }
+                  size={14}
+                  color={
+                    p.isCommonDevPort
+                      ? theme.colors.textLink
+                      : theme.colors.textSecondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.chipPort,
+                    {
+                      color: p.isCommonDevPort
+                        ? theme.colors.textLink
+                        : theme.colors.text,
+                    },
+                  ]}
+                >
+                  {p.port}
+                </Text>
+                <Text style={styles.chipProcess} numberOfLines={1}>
+                  {p.process}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         {/* Custom URL input */}
         <ItemGroup title={t("preview.customUrl")}>
@@ -544,5 +565,48 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textSecondary,
     textAlign: "center",
     paddingHorizontal: 24,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 20,
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  chipContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 20,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  chipPort: {
+    fontSize: 15,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  chipProcess: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    maxWidth: 80,
+  },
+  emptyPortsRow: {
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  emptyPortsText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
   },
 }));
