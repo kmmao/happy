@@ -122,6 +122,7 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
                     },
                 },
                 orderBy: { completedAt: "asc" },
+                take: 1000,
             });
 
             const points = runs.map((run) => {

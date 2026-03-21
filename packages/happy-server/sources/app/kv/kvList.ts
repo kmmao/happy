@@ -41,7 +41,7 @@ export async function kvList(
         orderBy: {
             key: 'asc'
         },
-        take: options?.limit
+        take: options?.limit ?? 1000
     });
 
     return {

@@ -82,6 +82,7 @@ export function webhookRoutes(app: Fastify) {
       const routes = await db.webhookRoute.findMany({
         where: { accountId: userId },
         orderBy: { createdAt: "desc" },
+        take: 1000,
       });
 
       reply.send(

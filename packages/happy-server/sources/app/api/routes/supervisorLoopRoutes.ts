@@ -151,6 +151,7 @@ export function supervisorLoopRoutes(app: Fastify) {
                     accountId: userId,
                 },
                 orderBy: { createdAt: "asc" },
+                take: 1000,
             });
 
             // Fetch actions that were approved/fixed during this loop
