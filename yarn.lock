@@ -2497,14 +2497,6 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@kmmao/happy-wire@^0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@kmmao/happy-wire/-/happy-wire-0.1.0.tgz#cba4a544054b7ef1a7e30092ef44e072380494dd"
-  integrity sha512-/HBDQV+5FRuJpMXK9eOgaAAvOjO7j/NB2cmVxC6qHvTez3bOF7Kghzw6B3r2bLtxWTGOPQKJ2/iyuFOp8S/jqw==
-  dependencies:
-    "@paralleldrive/cuid2" "^2.2.2"
-    zod "3.25.76"
-
 "@legendapp/list@2.0.0-beta.3":
   version "2.0.0-beta.3"
   resolved "https://registry.yarnpkg.com/@legendapp/list/-/list-2.0.0-beta.3.tgz#7802a185b04d40ffd1f727047ff634a7628bb3c5"
@@ -6824,10 +6816,10 @@ ee-first@1.1.1:
   resolved "https://registry.yarnpkg.com/ee-first/-/ee-first-1.1.1.tgz#590c61156b0ae2f4f0255732a158b266bc56b21d"
   integrity sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==
 
-effect@3.18.4:
-  version "3.18.4"
-  resolved "https://registry.yarnpkg.com/effect/-/effect-3.18.4.tgz#e241fde5cc090608c51c5e29e2da357bb5d0e815"
-  integrity sha512-b1LXQJLe9D11wfnOKAk3PKxuqYshQ0Heez+y5pnkd3jLj1yx9QhM72zZ9uUrOQyNvrs2GZZd/3maL0ZV18YuDA==
+effect@3.18.4, effect@>=3.20.0:
+  version "3.21.0"
+  resolved "https://registry.yarnpkg.com/effect/-/effect-3.21.0.tgz#ce222ce8f785b9e63f104b9a4ead985e7965f2c0"
+  integrity sha512-PPN80qRokCd1f015IANNhrwOnLO7GrrMQfk4/lnZRE/8j7UPWrNNjPV0uBrZutI/nHzernbW+J0hdqQysHiSnQ==
   dependencies:
     "@standard-schema/spec" "^1.0.0"
     fast-check "^3.23.1"
