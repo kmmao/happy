@@ -681,7 +681,9 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
       } else {
         closeTurn(state, "completed", envelopes);
         envelopes.push(
-          createEnvelope("user", { t: "text", text: message.message.content }),
+          createEnvelope("user", { t: "text", text: message.message.content }, {
+            id: pickUuid(message),
+          }),
         );
       }
 

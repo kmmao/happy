@@ -236,6 +236,31 @@ export async function claudeRemoteLauncher(
     },
   );
 
+  // Register RPC handler for rewinding files to a specific user message state
+  session.client.rpcHandlerManager.registerHandler(
+    "rewindFiles",
+    async (args: { userMessageId: string; dryRun?: boolean }) => {
+      if (!currentQuery) {
+        return { canRewind: false, error: "No active query" };
+      }
+      if (!args.userMessageId) {
+        return { canRewind: false, error: "Missing userMessageId" };
+      }
+      try {
+        const result = await currentQuery.rewindFiles(args.userMessageId, {
+          dryRun: args.dryRun ?? false,
+        });
+        return result;
+      } catch (err) {
+        logger.debug(`[remote]: rewindFiles failed: ${err}`);
+        return {
+          canRewind: false,
+          error: err instanceof Error ? err.message : "Rewind failed",
+        };
+      }
+    },
+  );
+
   // Create permission handler
   const permissionHandler = new PermissionHandler(session);
 
