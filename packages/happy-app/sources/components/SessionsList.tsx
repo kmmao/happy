@@ -631,7 +631,7 @@ const SessionItem = React.memo(
     const itemContent = (
       <View>
         <Pressable
-          style={[
+          style={({ pressed }) => [
             styles.sessionItem,
             selected && styles.sessionItemSelected,
             isSingle
@@ -641,6 +641,7 @@ const SessionItem = React.memo(
                 : isLast
                   ? styles.sessionItemLast
                   : {},
+            { opacity: pressed ? 0.7 : 1 },
           ]}
           onPressIn={() => {
             if (isTablet) {
