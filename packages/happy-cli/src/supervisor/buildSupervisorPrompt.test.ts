@@ -120,9 +120,20 @@ describe('buildSupervisorPrompt', () => {
         expect(prompt).toContain('DO NOT create commits');
     });
 
-    it('should limit findings to 10', () => {
+    it('should not limit findings by default', () => {
         const prompt = buildSupervisorPrompt(baseOptions);
-        expect(prompt).toContain('not report more than 10 findings');
+        expect(prompt).toContain('Report all findings you discover');
+        expect(prompt).not.toContain('not report more than');
+    });
+
+    it('should limit findings when maxFindings is set', () => {
+        const prompt = buildSupervisorPrompt({ ...baseOptions, maxFindings: 20 });
+        expect(prompt).toContain('not report more than 20 findings');
+    });
+
+    it('should not limit findings when maxFindings is 0', () => {
+        const prompt = buildSupervisorPrompt({ ...baseOptions, maxFindings: 0 });
+        expect(prompt).toContain('Report all findings you discover');
     });
 
     // === Existing Actions Dedup ===
