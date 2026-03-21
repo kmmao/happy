@@ -93,29 +93,42 @@ export function supervisorReportRoutes(app: Fastify) {
             });
 
             // Compute diff by category+title exact match
+            // Actions with fixStatus "completed" are treated as resolved
             const currentKeys = new Set(
-                targetRun.actions.map(
-                    (a) => `${a.category}::${a.title}`,
-                ),
+                targetRun.actions
+                    .filter((a) => a.fixStatus !== "completed")
+                    .map((a) => `${a.category}::${a.title}`),
             );
             const previousKeys = new Set(
-                (previousRun?.actions ?? []).map(
-                    (a) => `${a.category}::${a.title}`,
-                ),
+                (previousRun?.actions ?? [])
+                    .filter((a) => a.fixStatus !== "completed")
+                    .map((a) => `${a.category}::${a.title}`),
+            );
+
+            // Actions fixed in this run count as resolved
+            const fixedInCurrentRun = targetRun.actions.filter(
+                (a) => a.fixStatus === "completed",
             );
 
             const newActions = targetRun.actions.filter(
                 (a) =>
+                    a.fixStatus !== "completed" &&
                     !previousKeys.has(`${a.category}::${a.title}`),
             );
-            const resolvedActions = (
+            const resolvedFromPrevious = (
                 previousRun?.actions ?? []
             ).filter(
                 (a) =>
+                    a.fixStatus !== "completed" &&
                     !currentKeys.has(`${a.category}::${a.title}`),
             );
+            const resolvedActions = [
+                ...fixedInCurrentRun,
+                ...resolvedFromPrevious,
+            ];
             const persistentActions = targetRun.actions.filter(
                 (a) =>
+                    a.fixStatus !== "completed" &&
                     previousKeys.has(`${a.category}::${a.title}`),
             );
 
