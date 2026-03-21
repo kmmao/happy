@@ -164,9 +164,17 @@ function SupervisorRunDetailScreen() {
         );
     }
 
-    const { currentRun, previousRun, newActions, resolvedActions, persistentActions } =
+    const { currentRun, previousRun, newActions: rawNewActions, resolvedActions: rawResolvedActions, persistentActions: rawPersistentActions } =
         comparison;
     const hasPreviousRun = previousRun != null;
+
+    // Reclassify: fixStatus=completed actions are resolved, not new/persistent
+    const fixedFromNew = rawNewActions.filter((a) => a.fixStatus === "completed");
+    const fixedFromPersistent = rawPersistentActions.filter((a) => a.fixStatus === "completed");
+    const newActions = rawNewActions.filter((a) => a.fixStatus !== "completed");
+    const resolvedActions = [...rawResolvedActions, ...fixedFromNew, ...fixedFromPersistent];
+    const persistentActions = rawPersistentActions.filter((a) => a.fixStatus !== "completed");
+
     const allActions = [...newActions, ...resolvedActions, ...persistentActions];
 
     return (
