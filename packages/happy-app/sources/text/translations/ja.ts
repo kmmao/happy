@@ -1587,7 +1587,7 @@ export const ja: TranslationStructure = {
 
   settingsPlugins: {
     installed: "インストール済みプラグイン",
-    installedDescription: "長押しでプラグインを削除",
+    installedDescription: "タップで詳細、長押しで削除",
     noPlugins: "プラグインが設定されていません",
     actions: "アクション",
     addManual: "プラグインを追加",
@@ -1597,12 +1597,41 @@ export const ja: TranslationStructure = {
     discover: "プラグインを検出",
     discoverDescription: "マシン上のインストール済みプラグインをスキャン",
     discoverTitle: "プラグインを検出",
-    discoverNoSession: "プラグインを検出するにはアクティブなセッションが必要です",
+    discoverNoSession: "プラグインを検出できるオンラインのマシンがありません",
     discoverEmpty: "プラグインが見つかりませんでした",
     discoverAllAdded: "検出されたプラグインはすべて追加済みです",
     discoverFound: ({ count }: { count: number }) => `${count} 個の新しいプラグインが見つかりました`,
     removeTitle: "プラグインを削除",
     removeConfirm: "このプラグインをリストから削除しますか？",
+    pluginDetail: "プラグイン詳細",
+    basicInfo: "基本情報",
+    version: "バージョン",
+    author: "作者",
+    description: "説明",
+    path: "パス",
+    license: "ライセンス",
+    homepage: "ホームページ",
+    contents: "コンテンツ",
+    commands: ({ count }: { count: number }) =>
+      `コマンド (${count})`,
+    skills: ({ count }: { count: number }) =>
+      `スキル (${count})`,
+    agents: ({ count }: { count: number }) =>
+      `エージェント (${count})`,
+    subPlugins: "含まれるプラグイン",
+    marketplacesTitle: "マーケットプレイス",
+    refreshMetadata: "メタデータを更新",
+    refreshSuccess: "メタデータを更新しました",
+    noDescription: "説明なし",
+    unknown: "不明",
+    noMachineOnline: "オンラインのマシンがありません",
+    pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {
+      const parts: string[] = [];
+      if (commands > 0) parts.push(`${commands} cmd`);
+      if (skills > 0) parts.push(`${skills} skill`);
+      if (agents > 0) parts.push(`${agents} agent`);
+      return parts.join(" · ");
+    },
   },
 
   gitHosts: {

@@ -418,7 +418,7 @@ export async function sessionAbort(sessionId: string): Promise<void> {
 }
 
 /**
- * Discover installed Claude Code plugins on the target machine
+ * Discover installed Claude Code plugins on the target machine (legacy session-based)
  */
 export async function sessionDiscoverPlugins(
     sessionId: string,
@@ -430,6 +430,123 @@ export async function sessionDiscoverPlugins(
         >(sessionId, "discoverPlugins", {});
     } catch {
         return { plugins: [] };
+    }
+}
+
+/** Plugin metadata returned by the enriched discoverPlugins RPC. */
+export interface PluginMeta {
+    readonly name: string;
+    readonly path: string;
+    readonly version?: string;
+    readonly description?: string;
+    readonly author?: string;
+    readonly homepage?: string;
+    readonly license?: string;
+    readonly keywords?: readonly string[];
+    readonly counts: { readonly commands: number; readonly skills: number; readonly agents: number };
+    readonly subPlugins?: ReadonlyArray<{
+        readonly name: string;
+        readonly description?: string;
+        readonly category?: string;
+    }>;
+}
+
+/** Extended detail returned by inspectPlugin RPC. */
+export interface PluginDetail extends PluginMeta {
+    readonly commandList?: readonly string[];
+    readonly skillList?: readonly string[];
+    readonly agentList?: readonly string[];
+}
+
+/**
+ * Discover installed Claude Code plugins via machine RPC (no active session required).
+ */
+export async function machineDiscoverPlugins(
+    machineId: string,
+): Promise<{ plugins: readonly PluginMeta[] }> {
+    try {
+        return await apiSocket.machineRPC<
+            { plugins: readonly PluginMeta[] },
+            Record<string, never>
+        >(machineId, "discoverPlugins", {});
+    } catch {
+        return { plugins: [] };
+    }
+}
+
+/**
+ * Inspect a single plugin for full detail (commands/skills/agents lists).
+ */
+export async function machineInspectPlugin(
+    machineId: string,
+    pluginPath: string,
+): Promise<PluginDetail | null> {
+    try {
+        return await apiSocket.machineRPC<PluginDetail, { path: string }>(
+            machineId,
+            "inspectPlugin",
+            { path: pluginPath },
+        );
+    } catch {
+        return null;
+    }
+}
+
+/** An individual installed plugin (from installed_plugins.json + enabledPlugins). */
+export interface InstalledPlugin {
+    readonly key: string; // e.g. "frontend-design@claude-plugins-official"
+    readonly name: string;
+    readonly marketplace: string;
+    readonly version: string;
+    readonly enabled: boolean;
+    readonly scope: string;
+    readonly installPath: string;
+    readonly installedAt: string;
+    readonly lastUpdated: string;
+    readonly installs?: number;
+    readonly description?: string;
+}
+
+/** A marketplace source (from known_marketplaces.json). */
+export interface MarketplaceInfo {
+    readonly name: string;
+    readonly repo: string;
+    readonly installLocation: string;
+    readonly lastUpdated: string;
+    readonly autoUpdate: boolean;
+    readonly availableCount: number;
+    readonly installedCount: number;
+}
+
+/**
+ * List truly installed plugins with enabled state and descriptions.
+ */
+export async function machineListInstalledPlugins(
+    machineId: string,
+): Promise<{ plugins: readonly InstalledPlugin[] }> {
+    try {
+        return await apiSocket.machineRPC<
+            { plugins: readonly InstalledPlugin[] },
+            Record<string, never>
+        >(machineId, "listInstalledPlugins", {});
+    } catch {
+        return { plugins: [] };
+    }
+}
+
+/**
+ * List marketplace sources with available/installed counts.
+ */
+export async function machineListMarketplaces(
+    machineId: string,
+): Promise<{ marketplaces: readonly MarketplaceInfo[] }> {
+    try {
+        return await apiSocket.machineRPC<
+            { marketplaces: readonly MarketplaceInfo[] },
+            Record<string, never>
+        >(machineId, "listMarketplaces", {});
+    } catch {
+        return { marketplaces: [] };
     }
 }
 

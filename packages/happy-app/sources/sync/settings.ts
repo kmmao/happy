@@ -492,6 +492,18 @@ export const SettingsSchema = z.object({
         path: z.string(),
         enabled: z.boolean(),
         source: z.enum(["manual", "discovered"]),
+        // Cached metadata (optional, populated on discover/inspect)
+        version: z.string().optional(),
+        description: z.string().optional(),
+        author: z.string().optional(),
+        homepage: z.string().optional(),
+        counts: z
+          .object({
+            commands: z.number(),
+            skills: z.number(),
+            agents: z.number(),
+          })
+          .optional(),
       }),
     )
     .describe("Claude Code plugins — managed locally on each machine"),

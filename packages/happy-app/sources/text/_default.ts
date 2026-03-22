@@ -1591,7 +1591,7 @@ export const en = {
 
   settingsPlugins: {
     installed: "Installed Plugins",
-    installedDescription: "Long press to remove a plugin",
+    installedDescription: "Tap for details, long press to remove",
     noPlugins: "No plugins configured",
     actions: "Actions",
     addManual: "Add Plugin",
@@ -1601,13 +1601,42 @@ export const en = {
     discover: "Discover Plugins",
     discoverDescription: "Scan the machine for installed plugins",
     discoverTitle: "Discover Plugins",
-    discoverNoSession: "An active session is needed to discover plugins",
+    discoverNoSession: "No online machine found to discover plugins",
     discoverEmpty: "No plugins found on this machine",
     discoverAllAdded: "All discovered plugins are already added",
     discoverFound: ({ count }: { count: number }) =>
       `Found ${count} new plugin${count === 1 ? "" : "s"}`,
     removeTitle: "Remove Plugin",
     removeConfirm: "Remove this plugin from the list?",
+    pluginDetail: "Plugin Details",
+    basicInfo: "Info",
+    version: "Version",
+    author: "Author",
+    description: "Description",
+    path: "Path",
+    license: "License",
+    homepage: "Homepage",
+    contents: "Contents",
+    commands: ({ count }: { count: number }) =>
+      `Commands (${count})`,
+    skills: ({ count }: { count: number }) =>
+      `Skills (${count})`,
+    agents: ({ count }: { count: number }) =>
+      `Agents (${count})`,
+    subPlugins: "Included Plugins",
+    marketplacesTitle: "Marketplace",
+    refreshMetadata: "Refresh Metadata",
+    refreshSuccess: "Metadata refreshed",
+    noDescription: "No description",
+    unknown: "Unknown",
+    noMachineOnline: "No machine online",
+    pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {
+      const parts: string[] = [];
+      if (commands > 0) parts.push(`${commands} cmd`);
+      if (skills > 0) parts.push(`${skills} skill`);
+      if (agents > 0) parts.push(`${agents} agent`);
+      return parts.join(" · ");
+    },
   },
 
   gitHosts: {

@@ -134,6 +134,13 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="settings/plugin-detail"
+        options={{
+          headerTitle: t("settingsPlugins.pluginDetail"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="terminal/connect"
         options={{
           headerTitle: t("navigation.connectTerminal"),

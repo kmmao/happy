@@ -1536,7 +1536,7 @@ export const zhHant: TranslationStructure = {
 
   settingsPlugins: {
     installed: "已安裝外掛",
-    installedDescription: "長按可移除外掛",
+    installedDescription: "點擊查看詳情，長按移除",
     noPlugins: "暫無已設定的外掛",
     actions: "操作",
     addManual: "新增外掛",
@@ -1546,12 +1546,41 @@ export const zhHant: TranslationStructure = {
     discover: "探索外掛",
     discoverDescription: "掃描目標機器上已安裝的外掛",
     discoverTitle: "探索外掛",
-    discoverNoSession: "需要一個活躍的工作階段來探索外掛",
+    discoverNoSession: "沒有線上的機器來探索外掛",
     discoverEmpty: "未發現任何外掛",
     discoverAllAdded: "所有發現的外掛都已新增",
     discoverFound: ({ count }: { count: number }) => `發現 ${count} 個新外掛`,
     removeTitle: "移除外掛",
     removeConfirm: "從列表中移除此外掛？",
+    pluginDetail: "外掛詳情",
+    basicInfo: "基本資訊",
+    version: "版本",
+    author: "作者",
+    description: "描述",
+    path: "路徑",
+    license: "授權條款",
+    homepage: "首頁",
+    contents: "內容",
+    commands: ({ count }: { count: number }) =>
+      `命令 (${count})`,
+    skills: ({ count }: { count: number }) =>
+      `技能 (${count})`,
+    agents: ({ count }: { count: number }) =>
+      `代理 (${count})`,
+    subPlugins: "包含的外掛",
+    marketplacesTitle: "市場",
+    refreshMetadata: "重新整理中繼資料",
+    refreshSuccess: "中繼資料已重新整理",
+    noDescription: "暫無描述",
+    unknown: "未知",
+    noMachineOnline: "沒有線上的機器",
+    pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {
+      const parts: string[] = [];
+      if (commands > 0) parts.push(`${commands} cmd`);
+      if (skills > 0) parts.push(`${skills} skill`);
+      if (agents > 0) parts.push(`${agents} agent`);
+      return parts.join(" · ");
+    },
   },
 
   gitHosts: {

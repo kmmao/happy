@@ -1534,7 +1534,7 @@ export const zhHans: TranslationStructure = {
 
   settingsPlugins: {
     installed: "已安装插件",
-    installedDescription: "长按可移除插件",
+    installedDescription: "点击查看详情，长按移除",
     noPlugins: "暂无已配置的插件",
     actions: "操作",
     addManual: "添加插件",
@@ -1544,12 +1544,41 @@ export const zhHans: TranslationStructure = {
     discover: "发现插件",
     discoverDescription: "扫描目标机器上已安装的插件",
     discoverTitle: "发现插件",
-    discoverNoSession: "需要一个活跃的会话来发现插件",
+    discoverNoSession: "没有在线的机器来发现插件",
     discoverEmpty: "未发现任何插件",
     discoverAllAdded: "所有发现的插件都已添加",
     discoverFound: ({ count }: { count: number }) => `发现 ${count} 个新插件`,
     removeTitle: "移除插件",
     removeConfirm: "从列表中移除此插件？",
+    pluginDetail: "插件详情",
+    basicInfo: "基本信息",
+    version: "版本",
+    author: "作者",
+    description: "描述",
+    path: "路径",
+    license: "许可证",
+    homepage: "主页",
+    contents: "内容",
+    commands: ({ count }: { count: number }) =>
+      `命令 (${count})`,
+    skills: ({ count }: { count: number }) =>
+      `技能 (${count})`,
+    agents: ({ count }: { count: number }) =>
+      `代理 (${count})`,
+    subPlugins: "包含的插件",
+    marketplacesTitle: "市场",
+    refreshMetadata: "刷新元数据",
+    refreshSuccess: "元数据已刷新",
+    noDescription: "暂无描述",
+    unknown: "未知",
+    noMachineOnline: "没有在线的机器",
+    pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {
+      const parts: string[] = [];
+      if (commands > 0) parts.push(`${commands} cmd`);
+      if (skills > 0) parts.push(`${skills} skill`);
+      if (agents > 0) parts.push(`${agents} agent`);
+      return parts.join(" · ");
+    },
   },
 
   gitHosts: {

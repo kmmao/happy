@@ -1631,7 +1631,7 @@ export const pl: TranslationStructure = {
 
   settingsPlugins: {
     installed: "Zainstalowane wtyczki",
-    installedDescription: "Przytrzymaj aby usunąć",
+    installedDescription: "Dotknij, aby zobaczyć szczegóły, przytrzymaj aby usunąć",
     noPlugins: "Brak skonfigurowanych wtyczek",
     actions: "Akcje",
     addManual: "Dodaj wtyczkę",
@@ -1641,12 +1641,41 @@ export const pl: TranslationStructure = {
     discover: "Wykryj wtyczki",
     discoverDescription: "Skanuj maszynę w poszukiwaniu wtyczek",
     discoverTitle: "Wykryj wtyczki",
-    discoverNoSession: "Do wykrycia wtyczek potrzebna jest aktywna sesja",
+    discoverNoSession: "Brak maszyny online do wykrycia wtyczek",
     discoverEmpty: "Nie znaleziono wtyczek",
     discoverAllAdded: "Wszystkie wykryte wtyczki są już dodane",
     discoverFound: ({ count }: { count: number }) => `Znaleziono ${count} nowych wtyczek`,
     removeTitle: "Usuń wtyczkę",
     removeConfirm: "Usunąć tę wtyczkę z listy?",
+    pluginDetail: "Szczegóły wtyczki",
+    basicInfo: "Informacje",
+    version: "Wersja",
+    author: "Autor",
+    description: "Opis",
+    path: "Ścieżka",
+    license: "Licencja",
+    homepage: "Strona główna",
+    contents: "Zawartość",
+    commands: ({ count }: { count: number }) =>
+      `Polecenia (${count})`,
+    skills: ({ count }: { count: number }) =>
+      `Umiejętności (${count})`,
+    agents: ({ count }: { count: number }) =>
+      `Agenci (${count})`,
+    subPlugins: "Zawarte wtyczki",
+    marketplacesTitle: "Marketplace",
+    refreshMetadata: "Odśwież metadane",
+    refreshSuccess: "Metadane odświeżone",
+    noDescription: "Brak opisu",
+    unknown: "Nieznany",
+    noMachineOnline: "Brak maszyny online",
+    pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {
+      const parts: string[] = [];
+      if (commands > 0) parts.push(`${commands} cmd`);
+      if (skills > 0) parts.push(`${skills} skill`);
+      if (agents > 0) parts.push(`${agents} agent`);
+      return parts.join(" · ");
+    },
   },
 
   gitHosts: {

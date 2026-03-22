@@ -1632,7 +1632,7 @@ export const ru: TranslationStructure = {
 
   settingsPlugins: {
     installed: "Установленные плагины",
-    installedDescription: "Долгое нажатие для удаления",
+    installedDescription: "Нажмите для деталей, долгое нажатие для удаления",
     noPlugins: "Плагины не настроены",
     actions: "Действия",
     addManual: "Добавить плагин",
@@ -1642,12 +1642,41 @@ export const ru: TranslationStructure = {
     discover: "Обнаружить плагины",
     discoverDescription: "Сканировать машину на наличие плагинов",
     discoverTitle: "Обнаружить плагины",
-    discoverNoSession: "Для обнаружения плагинов необходима активная сессия",
+    discoverNoSession: "Нет онлайн-машины для обнаружения плагинов",
     discoverEmpty: "Плагины не найдены",
     discoverAllAdded: "Все обнаруженные плагины уже добавлены",
     discoverFound: ({ count }: { count: number }) => `Найдено ${count} новых плагинов`,
     removeTitle: "Удалить плагин",
     removeConfirm: "Удалить этот плагин из списка?",
+    pluginDetail: "Детали плагина",
+    basicInfo: "Информация",
+    version: "Версия",
+    author: "Автор",
+    description: "Описание",
+    path: "Путь",
+    license: "Лицензия",
+    homepage: "Домашняя страница",
+    contents: "Содержимое",
+    commands: ({ count }: { count: number }) =>
+      `Команды (${count})`,
+    skills: ({ count }: { count: number }) =>
+      `Навыки (${count})`,
+    agents: ({ count }: { count: number }) =>
+      `Агенты (${count})`,
+    subPlugins: "Включённые плагины",
+    marketplacesTitle: "Маркетплейс",
+    refreshMetadata: "Обновить метаданные",
+    refreshSuccess: "Метаданные обновлены",
+    noDescription: "Нет описания",
+    unknown: "Неизвестно",
+    noMachineOnline: "Нет онлайн-машин",
+    pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {
+      const parts: string[] = [];
+      if (commands > 0) parts.push(`${commands} cmd`);
+      if (skills > 0) parts.push(`${skills} skill`);
+      if (agents > 0) parts.push(`${agents} agent`);
+      return parts.join(" · ");
+    },
   },
 
   gitHosts: {

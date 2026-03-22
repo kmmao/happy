@@ -145,6 +145,9 @@ export async function runClaude(
   const resumeIndex = options.claudeArgs?.indexOf("--resume") ?? -1;
   const resumeSessionId =
     resumeIndex >= 0 ? options.claudeArgs?.[resumeIndex + 1] : undefined;
+  logger.debug(
+    `[START] Resume extraction: claudeArgs=${JSON.stringify(options.claudeArgs)}, resumeIndex=${resumeIndex}, resumeSessionId=${resumeSessionId}`,
+  );
 
   let metadata: Metadata = {
     path: workingDirectory,
@@ -193,7 +196,7 @@ export async function runClaude(
   let response;
   if (options.happySessionId) {
     logger.debug(
-      `[CLAUDE] Reconnecting to existing session: ${options.happySessionId}`,
+      `[CLAUDE] Reconnecting to existing session: ${options.happySessionId}, metadata.claudeSessionId=${metadata.claudeSessionId}`,
     );
     response = await api.reconnectSession({
       sessionId: options.happySessionId,

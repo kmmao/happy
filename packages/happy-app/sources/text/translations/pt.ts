@@ -1608,7 +1608,7 @@ export const pt: TranslationStructure = {
 
   settingsPlugins: {
     installed: "Plugins instalados",
-    installedDescription: "Pressione longo para remover",
+    installedDescription: "Toque para detalhes, pressione longo para remover",
     noPlugins: "Nenhum plugin configurado",
     actions: "Ações",
     addManual: "Adicionar plugin",
@@ -1618,12 +1618,41 @@ export const pt: TranslationStructure = {
     discover: "Descobrir plugins",
     discoverDescription: "Verificar plugins instalados na máquina",
     discoverTitle: "Descobrir plugins",
-    discoverNoSession: "Uma sessão ativa é necessária para descobrir plugins",
+    discoverNoSession: "Nenhuma máquina online para descobrir plugins",
     discoverEmpty: "Nenhum plugin encontrado",
     discoverAllAdded: "Todos os plugins descobertos já foram adicionados",
     discoverFound: ({ count }: { count: number }) => `${count} novos plugins encontrados`,
     removeTitle: "Remover plugin",
     removeConfirm: "Remover este plugin da lista?",
+    pluginDetail: "Detalhes do plugin",
+    basicInfo: "Informações",
+    version: "Versão",
+    author: "Autor",
+    description: "Descrição",
+    path: "Caminho",
+    license: "Licença",
+    homepage: "Página inicial",
+    contents: "Conteúdo",
+    commands: ({ count }: { count: number }) =>
+      `Comandos (${count})`,
+    skills: ({ count }: { count: number }) =>
+      `Habilidades (${count})`,
+    agents: ({ count }: { count: number }) =>
+      `Agentes (${count})`,
+    subPlugins: "Plugins incluídos",
+    marketplacesTitle: "Marketplace",
+    refreshMetadata: "Atualizar metadados",
+    refreshSuccess: "Metadados atualizados",
+    noDescription: "Sem descrição",
+    unknown: "Desconhecido",
+    noMachineOnline: "Nenhuma máquina online",
+    pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {
+      const parts: string[] = [];
+      if (commands > 0) parts.push(`${commands} cmd`);
+      if (skills > 0) parts.push(`${skills} skill`);
+      if (agents > 0) parts.push(`${agents} agent`);
+      return parts.join(" · ");
+    },
   },
 
   gitHosts: {

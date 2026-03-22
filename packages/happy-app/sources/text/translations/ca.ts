@@ -1610,7 +1610,7 @@ export const ca: TranslationStructure = {
 
   settingsPlugins: {
     installed: "Connectors instal·lats",
-    installedDescription: "Mantingueu premut per eliminar",
+    installedDescription: "Toqueu per veure detalls, mantingueu premut per eliminar",
     noPlugins: "No hi ha connectors configurats",
     actions: "Accions",
     addManual: "Afegir connector",
@@ -1620,12 +1620,41 @@ export const ca: TranslationStructure = {
     discover: "Descobrir connectors",
     discoverDescription: "Escanejar la màquina per trobar connectors",
     discoverTitle: "Descobrir connectors",
-    discoverNoSession: "Cal una sessió activa per descobrir connectors",
+    discoverNoSession: "No hi ha cap màquina en línia per descobrir connectors",
     discoverEmpty: "No s'han trobat connectors",
     discoverAllAdded: "Tots els connectors descoberts ja estan afegits",
     discoverFound: ({ count }: { count: number }) => `${count} nous connectors trobats`,
     removeTitle: "Eliminar connector",
     removeConfirm: "Eliminar aquest connector de la llista?",
+    pluginDetail: "Detalls del connector",
+    basicInfo: "Informació",
+    version: "Versió",
+    author: "Autor",
+    description: "Descripció",
+    path: "Ruta",
+    license: "Llicència",
+    homepage: "Pàgina web",
+    contents: "Contingut",
+    commands: ({ count }: { count: number }) =>
+      `Comandes (${count})`,
+    skills: ({ count }: { count: number }) =>
+      `Habilitats (${count})`,
+    agents: ({ count }: { count: number }) =>
+      `Agents (${count})`,
+    subPlugins: "Connectors inclosos",
+    marketplacesTitle: "Marketplace",
+    refreshMetadata: "Actualitzar metadades",
+    refreshSuccess: "Metadades actualitzades",
+    noDescription: "Sense descripció",
+    unknown: "Desconegut",
+    noMachineOnline: "No hi ha cap màquina en línia",
+    pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {
+      const parts: string[] = [];
+      if (commands > 0) parts.push(`${commands} cmd`);
+      if (skills > 0) parts.push(`${skills} skill`);
+      if (agents > 0) parts.push(`${agents} agent`);
+      return parts.join(" · ");
+    },
   },
 
   gitHosts: {
