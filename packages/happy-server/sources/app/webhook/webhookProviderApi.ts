@@ -120,7 +120,7 @@ async function createGitHubWebhook(
     );
 
     if (!response.ok) {
-        const text = await response.text().catch(() => "");
+        const text = await response.text().catch((err) => { log({ module: "webhook", level: "warn" }, "Failed to read response body", err); return ""; });
         throw new Error(`GitHub create webhook failed: ${response.status} ${text}`);
     }
 
@@ -158,7 +158,7 @@ async function updateGitHubWebhook(
     );
 
     if (!response.ok) {
-        const text = await response.text().catch(() => "");
+        const text = await response.text().catch((err) => { log({ module: "webhook", level: "warn" }, "Failed to read response body", err); return ""; });
         throw new Error(`GitHub update webhook failed: ${response.status} ${text}`);
     }
 }
@@ -258,7 +258,7 @@ async function createGiteaWebhook(
         }),
     });
 
-    const createText = await createResponse.text().catch(() => "");
+    const createText = await createResponse.text().catch((err) => { log({ module: "webhook", level: "warn" }, "Failed to read response body", err); return ""; });
     if (!createResponse.ok) {
         throw new Error(`Gitea create webhook failed: ${createResponse.status} ${createText}`);
     }
@@ -311,7 +311,7 @@ async function createGiteaWebhook(
                     );
                 }
             } else {
-                const patchText = await patchResponse.text().catch(() => "");
+                const patchText = await patchResponse.text().catch((err) => { log({ module: "webhook", level: "warn" }, "Failed to read response body", err); return ""; });
                 log(
                     { module: "webhook", level: "warn" },
                     `Gitea PATCH events failed: ${patchResponse.status} ${patchText}`,
@@ -397,7 +397,7 @@ async function createGitLabWebhook(
     );
 
     if (!response.ok) {
-        const text = await response.text().catch(() => "");
+        const text = await response.text().catch((err) => { log({ module: "webhook", level: "warn" }, "Failed to read response body", err); return ""; });
         throw new Error(`GitLab create webhook failed: ${response.status} ${text}`);
     }
 
@@ -433,7 +433,7 @@ async function updateGitLabWebhook(
     );
 
     if (!response.ok) {
-        const text = await response.text().catch(() => "");
+        const text = await response.text().catch((err) => { log({ module: "webhook", level: "warn" }, "Failed to read response body", err); return ""; });
         throw new Error(`GitLab update webhook failed: ${response.status} ${text}`);
     }
 }
@@ -533,7 +533,7 @@ async function createGitHubIssue(
     );
 
     if (!response.ok) {
-        const text = await response.text().catch(() => "");
+        const text = await response.text().catch((err) => { log({ module: "webhook", level: "warn" }, "Failed to read response body", err); return ""; });
         throw new Error(`GitHub create issue failed: ${response.status} ${text}`);
     }
 
@@ -572,7 +572,7 @@ async function createGiteaIssue(
     );
 
     if (!response.ok) {
-        const text = await response.text().catch(() => "");
+        const text = await response.text().catch((err) => { log({ module: "webhook", level: "warn" }, "Failed to read response body", err); return ""; });
         throw new Error(`Gitea create issue failed: ${response.status} ${text}`);
     }
 
