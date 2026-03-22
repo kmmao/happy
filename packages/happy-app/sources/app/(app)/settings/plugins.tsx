@@ -216,7 +216,7 @@ function PluginsSettingsScreen() {
             backgroundColor: theme.colors.primary,
         },
         installButtonText: {
-            color: "#FFFFFF",
+            color: theme.colors.onPrimary,
             fontSize: 13,
             fontWeight: "600",
         },
