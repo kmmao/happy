@@ -141,6 +141,13 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="settings/mcp"
+        options={{
+          headerTitle: t("settingsMcp.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="terminal/connect"
         options={{
           headerTitle: t("navigation.connectTerminal"),

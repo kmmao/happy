@@ -180,6 +180,8 @@ export const en: TranslationStructure = {
     gitHostsSubtitle: "Configure Git host provider mappings",
     plugins: "Plugins",
     pluginsSubtitle: "Manage Claude Code plugins",
+    mcp: "MCP Servers",
+    mcpSubtitle: "Manage Model Context Protocol servers",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1669,6 +1671,32 @@ export const en: TranslationStructure = {
     marketplaceFooter: "Tap to update marketplace",
     noResults: "No matching plugins found",
     restartHint: "Plugin changes take effect on new sessions. Existing sessions need to be restarted.",
+  },
+
+  settingsMcp: {
+    title: "MCP Servers",
+    subtitle: "Manage Model Context Protocol servers",
+    servers: "Servers",
+    noServers: "No MCP servers configured",
+    connected: "Connected",
+    disconnected: "Disconnected",
+    error: "Error",
+    addServer: "Add MCP Server",
+    addServerName: "Server Name",
+    addServerNamePlaceholder: "my-server",
+    addServerCommand: "Command",
+    addServerCommandPlaceholder: "npx -y @my/mcp-server",
+    removeServer: "Remove Server",
+    confirmRemove: ({ name }: { name: string }) =>
+      `Remove MCP server "${name}"?`,
+    removeSuccess: ({ name }: { name: string }) => `${name} removed`,
+    addSuccess: ({ name }: { name: string }) => `${name} added`,
+    actionFailed: ({ error }: { error: string }) => `Failed: ${error}`,
+    refresh: "Refresh",
+    refreshSuccess: "MCP servers refreshed",
+    noMachineOnline: "No machine online",
+    serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
+      `Command: ${command}\nStatus: ${status}`,
   },
 
   gitHosts: {

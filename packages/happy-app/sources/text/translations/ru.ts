@@ -141,6 +141,8 @@ export const ru: TranslationStructure = {
     gitHostsSubtitle: "Настройка провайдеров Git-хостов",
     plugins: "Плагины",
     pluginsSubtitle: "Управление плагинами Claude Code",
+    mcp: "MCP-серверы",
+    mcpSubtitle: "Управление серверами Model Context Protocol",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1701,6 +1703,32 @@ export const ru: TranslationStructure = {
     marketplaceFooter: "Нажмите для обновления маркетплейса",
     noResults: "Подходящие плагины не найдены",
     restartHint: "Изменения плагинов вступают в силу в новых сессиях. Существующие сессии необходимо перезапустить.",
+  },
+
+  settingsMcp: {
+    title: "MCP-серверы",
+    subtitle: "Управление серверами Model Context Protocol",
+    servers: "Серверы",
+    noServers: "MCP-серверы не настроены",
+    connected: "Подключён",
+    disconnected: "Отключён",
+    error: "Ошибка",
+    addServer: "Добавить MCP-сервер",
+    addServerName: "Имя сервера",
+    addServerNamePlaceholder: "my-server",
+    addServerCommand: "Команда",
+    addServerCommandPlaceholder: "npx -y @my/mcp-server",
+    removeServer: "Удалить сервер",
+    confirmRemove: ({ name }: { name: string }) =>
+      `Удалить MCP-сервер «${name}»?`,
+    removeSuccess: ({ name }: { name: string }) => `${name} удалён`,
+    addSuccess: ({ name }: { name: string }) => `${name} добавлен`,
+    actionFailed: ({ error }: { error: string }) => `Ошибка: ${error}`,
+    refresh: "Обновить",
+    refreshSuccess: "MCP-серверы обновлены",
+    noMachineOnline: "Нет онлайн-машин",
+    serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
+      `Команда: ${command}\nСтатус: ${status}`,
   },
 
   gitHosts: {

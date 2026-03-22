@@ -167,6 +167,8 @@ export const ca: TranslationStructure = {
     gitHostsSubtitle: "Configura els proveïdors de hosts Git",
     plugins: "Connectors",
     pluginsSubtitle: "Gestionar connectors de Claude Code",
+    mcp: "Servidors MCP",
+    mcpSubtitle: "Gestionar servidors Model Context Protocol",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1679,6 +1681,32 @@ export const ca: TranslationStructure = {
     marketplaceFooter: "Toca per actualitzar el marketplace",
     noResults: "No s'han trobat connectors coincidents",
     restartHint: "Els canvis de plugins s'apliquen a noves sessions. Les sessions existents s'han de reiniciar.",
+  },
+
+  settingsMcp: {
+    title: "Servidors MCP",
+    subtitle: "Gestionar servidors Model Context Protocol",
+    servers: "Servidors",
+    noServers: "No hi ha servidors MCP configurats",
+    connected: "Connectat",
+    disconnected: "Desconnectat",
+    error: "Error",
+    addServer: "Afegir servidor MCP",
+    addServerName: "Nom del servidor",
+    addServerNamePlaceholder: "my-server",
+    addServerCommand: "Comanda",
+    addServerCommandPlaceholder: "npx -y @my/mcp-server",
+    removeServer: "Eliminar servidor",
+    confirmRemove: ({ name }: { name: string }) =>
+      `Eliminar el servidor MCP "${name}"?`,
+    removeSuccess: ({ name }: { name: string }) => `${name} eliminat`,
+    addSuccess: ({ name }: { name: string }) => `${name} afegit`,
+    actionFailed: ({ error }: { error: string }) => `Error: ${error}`,
+    refresh: "Actualitzar",
+    refreshSuccess: "Servidors MCP actualitzats",
+    noMachineOnline: "Cap màquina en línia",
+    serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
+      `Comanda: ${command}\nEstat: ${status}`,
   },
 
   gitHosts: {

@@ -229,6 +229,8 @@ export const ja: TranslationStructure = {
     gitHostsSubtitle: "Git ホストプロバイダーの設定",
     plugins: "プラグイン",
     pluginsSubtitle: "Claude Code プラグインを管理",
+    mcp: "MCP サーバー",
+    mcpSubtitle: "Model Context Protocol サーバーを管理",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1656,6 +1658,32 @@ export const ja: TranslationStructure = {
     marketplaceFooter: "タップしてマーケットプレイスを更新",
     noResults: "一致するプラグインが見つかりません",
     restartHint: "プラグインの変更は新しいセッションで有効になります。既存のセッションは再起動が必要です。",
+  },
+
+  settingsMcp: {
+    title: "MCP サーバー",
+    subtitle: "Model Context Protocol サーバーを管理",
+    servers: "サーバー",
+    noServers: "MCP サーバーが設定されていません",
+    connected: "接続済み",
+    disconnected: "切断",
+    error: "エラー",
+    addServer: "MCP サーバーを追加",
+    addServerName: "サーバー名",
+    addServerNamePlaceholder: "my-server",
+    addServerCommand: "コマンド",
+    addServerCommandPlaceholder: "npx -y @my/mcp-server",
+    removeServer: "サーバーを削除",
+    confirmRemove: ({ name }: { name: string }) =>
+      `MCP サーバー「${name}」を削除しますか？`,
+    removeSuccess: ({ name }: { name: string }) => `${name} を削除しました`,
+    addSuccess: ({ name }: { name: string }) => `${name} を追加しました`,
+    actionFailed: ({ error }: { error: string }) => `失敗：${error}`,
+    refresh: "更新",
+    refreshSuccess: "MCP サーバーを更新しました",
+    noMachineOnline: "オンラインのマシンがありません",
+    serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
+      `コマンド：${command}\nステータス：${status}`,
   },
 
   gitHosts: {

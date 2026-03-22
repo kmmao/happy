@@ -594,6 +594,52 @@ export async function machinePluginAction(
     return machineBash(machineId, `claude plugin ${action} "${pluginKey}"`, "/");
 }
 
+// ── MCP Server Management ──
+
+/** A configured MCP server. */
+export interface McpServerInfo {
+    readonly name: string;
+    readonly command: string;
+    readonly status: "connected" | "disconnected" | "error";
+}
+
+/**
+ * List all configured MCP servers with connection status.
+ */
+export async function machineListMcpServers(
+    machineId: string,
+): Promise<{ servers: readonly McpServerInfo[] }> {
+    try {
+        return await apiSocket.machineRPC<
+            { servers: readonly McpServerInfo[] },
+            Record<string, never>
+        >(machineId, "listMcpServers", {});
+    } catch {
+        return { servers: [] };
+    }
+}
+
+/**
+ * Add an MCP server via `claude mcp add`.
+ */
+export async function machineMcpAdd(
+    machineId: string,
+    name: string,
+    command: string,
+): Promise<MachineBashResult> {
+    return machineBash(machineId, `claude mcp add -s user ${name} -- ${command}`, "/");
+}
+
+/**
+ * Remove an MCP server via `claude mcp remove`.
+ */
+export async function machineMcpRemove(
+    machineId: string,
+    name: string,
+): Promise<MachineBashResult> {
+    return machineBash(machineId, `claude mcp remove "${name}" -s user`, "/");
+}
+
 /**
  * Interrupt the current session operation (graceful, keeps process alive)
  */

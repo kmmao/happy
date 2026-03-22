@@ -165,6 +165,8 @@ export const zhHans: TranslationStructure = {
     gitHostsSubtitle: "配置 Git 主机提供商",
     plugins: "插件",
     pluginsSubtitle: "管理 Claude Code 插件",
+    mcp: "MCP 服务器",
+    mcpSubtitle: "管理 Model Context Protocol 服务器",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1603,6 +1605,32 @@ export const zhHans: TranslationStructure = {
     marketplaceFooter: "点击更新市场源",
     noResults: "未找到匹配的插件",
     restartHint: "插件变更在新会话中生效。已有会话需要重启。",
+  },
+
+  settingsMcp: {
+    title: "MCP 服务器",
+    subtitle: "管理 Model Context Protocol 服务器",
+    servers: "服务器",
+    noServers: "暂无已配置的 MCP 服务器",
+    connected: "已连接",
+    disconnected: "未连接",
+    error: "错误",
+    addServer: "添加 MCP 服务器",
+    addServerName: "服务器名称",
+    addServerNamePlaceholder: "my-server",
+    addServerCommand: "命令",
+    addServerCommandPlaceholder: "npx -y @my/mcp-server",
+    removeServer: "移除服务器",
+    confirmRemove: ({ name }: { name: string }) =>
+      `移除 MCP 服务器"${name}"？`,
+    removeSuccess: ({ name }: { name: string }) => `${name} 已移除`,
+    addSuccess: ({ name }: { name: string }) => `${name} 已添加`,
+    actionFailed: ({ error }: { error: string }) => `失败：${error}`,
+    refresh: "刷新",
+    refreshSuccess: "MCP 服务器已刷新",
+    noMachineOnline: "没有在线的机器",
+    serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
+      `命令：${command}\n状态：${status}`,
   },
 
   gitHosts: {

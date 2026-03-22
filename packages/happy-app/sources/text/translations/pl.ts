@@ -179,6 +179,8 @@ export const pl: TranslationStructure = {
     gitHostsSubtitle: "Konfiguracja dostawców hostów Git",
     plugins: "Wtyczki",
     pluginsSubtitle: "Zarządzaj wtyczkami Claude Code",
+    mcp: "Serwery MCP",
+    mcpSubtitle: "Zarządzaj serwerami Model Context Protocol",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1700,6 +1702,32 @@ export const pl: TranslationStructure = {
     marketplaceFooter: "Dotknij aby zaktualizować marketplace",
     noResults: "Nie znaleziono pasujących wtyczek",
     restartHint: "Zmiany wtyczek obowiązują w nowych sesjach. Istniejące sesje wymagają ponownego uruchomienia.",
+  },
+
+  settingsMcp: {
+    title: "Serwery MCP",
+    subtitle: "Zarządzaj serwerami Model Context Protocol",
+    servers: "Serwery",
+    noServers: "Brak skonfigurowanych serwerów MCP",
+    connected: "Połączony",
+    disconnected: "Rozłączony",
+    error: "Błąd",
+    addServer: "Dodaj serwer MCP",
+    addServerName: "Nazwa serwera",
+    addServerNamePlaceholder: "my-server",
+    addServerCommand: "Polecenie",
+    addServerCommandPlaceholder: "npx -y @my/mcp-server",
+    removeServer: "Usuń serwer",
+    confirmRemove: ({ name }: { name: string }) =>
+      `Usunąć serwer MCP „${name}"?`,
+    removeSuccess: ({ name }: { name: string }) => `${name} usunięty`,
+    addSuccess: ({ name }: { name: string }) => `${name} dodany`,
+    actionFailed: ({ error }: { error: string }) => `Błąd: ${error}`,
+    refresh: "Odśwież",
+    refreshSuccess: "Serwery MCP odświeżone",
+    noMachineOnline: "Brak maszyn online",
+    serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
+      `Polecenie: ${command}\nStatus: ${status}`,
   },
 
   gitHosts: {

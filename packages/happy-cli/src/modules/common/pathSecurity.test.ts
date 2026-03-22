@@ -33,21 +33,43 @@ describe("validatePath", () => {
   });
 
   it("should allow paths in additional allowed directories", () => {
-    const tmpDir = "/tmp/happy/uploads";
-    expect(
-      validatePath("/tmp/happy/uploads/session/file.jpg", workingDir, [tmpDir])
-        .valid,
-    ).toBe(true);
-    expect(
-      validatePath("/tmp/happy/uploads/abc/img.png", workingDir, [tmpDir])
-        .valid,
-    ).toBe(true);
+    // Create real temp dirs so realpathSync resolves symlinks consistently
+    const { mkdtempSync, mkdirSync, rmSync } = require("fs");
+    const { tmpdir } = require("os");
+    const { join } = require("path");
+    const base = mkdtempSync(join(tmpdir(), "happy-test-"));
+    const uploadsDir = join(base, "uploads");
+    const sessionDir = join(uploadsDir, "session");
+    mkdirSync(sessionDir, { recursive: true });
+    try {
+      expect(
+        validatePath(join(sessionDir, "file.jpg"), workingDir, [uploadsDir])
+          .valid,
+      ).toBe(true);
+      expect(
+        validatePath(join(uploadsDir, "img.png"), workingDir, [uploadsDir])
+          .valid,
+      ).toBe(true);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
   });
 
   it("should reject paths outside all allowed directories", () => {
-    const tmpDir = "/tmp/happy/uploads";
-    const result = validatePath("/tmp/evil/file.txt", workingDir, [tmpDir]);
-    expect(result.valid).toBe(false);
+    const { mkdtempSync, mkdirSync, rmSync } = require("fs");
+    const { tmpdir } = require("os");
+    const { join } = require("path");
+    const base = mkdtempSync(join(tmpdir(), "happy-test-"));
+    const uploadsDir = join(base, "uploads");
+    const evilDir = join(base, "evil");
+    mkdirSync(uploadsDir, { recursive: true });
+    mkdirSync(evilDir, { recursive: true });
+    try {
+      const result = validatePath(join(evilDir, "file.txt"), workingDir, [uploadsDir]);
+      expect(result.valid).toBe(false);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
   });
 
   it("should prevent traversal out of additional allowed directory", () => {

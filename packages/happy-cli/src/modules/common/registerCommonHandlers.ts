@@ -1515,4 +1515,57 @@ export function registerCommonHandlers(
       return { ...meta, commandList, skillList, agentList };
     },
   );
+
+  // ── List MCP servers ──
+  rpcHandlerManager.registerHandler("listMcpServers", async () => {
+    try {
+      const { stdout } = await execAsync("claude mcp list", {
+        timeout: 15000,
+        env: { ...process.env, NO_COLOR: "1" },
+      });
+
+      // Parse output like:
+      //   context7: npx -y @upstash/context7-mcp - ✓ Connected
+      //   github: npx -y @modelcontextprotocol/server-github - ✓ Connected
+      interface McpServerInfo {
+        name: string;
+        command: string;
+        status: "connected" | "disconnected" | "error";
+      }
+
+      const servers: McpServerInfo[] = [];
+      const lines = stdout.split("\n");
+      for (const line of lines) {
+        // Match: name: command - status
+        const match = line.match(
+          /^\s*(\S+):\s+(.+?)\s+-\s+(?:✓|✔)\s+Connected\s*$/,
+        );
+        if (match) {
+          servers.push({
+            name: match[1],
+            command: match[2].trim(),
+            status: "connected",
+          });
+          continue;
+        }
+        // Disconnected or error
+        const matchDisc = line.match(
+          /^\s*(\S+):\s+(.+?)\s+-\s+(?:✗|✘|⚠)\s+(.+)$/,
+        );
+        if (matchDisc) {
+          servers.push({
+            name: matchDisc[1],
+            command: matchDisc[2].trim(),
+            status: matchDisc[3].toLowerCase().includes("error")
+              ? "error"
+              : "disconnected",
+          });
+        }
+      }
+
+      return { servers };
+    } catch {
+      return { servers: [] };
+    }
+  });
 }

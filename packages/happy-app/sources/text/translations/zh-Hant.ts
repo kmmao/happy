@@ -165,6 +165,8 @@ export const zhHant: TranslationStructure = {
     gitHostsSubtitle: "設定 Git 主機供應商",
     plugins: "外掛",
     pluginsSubtitle: "管理 Claude Code 外掛",
+    mcp: "MCP 伺服器",
+    mcpSubtitle: "管理 Model Context Protocol 伺服器",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1605,6 +1607,32 @@ export const zhHant: TranslationStructure = {
     marketplaceFooter: "點擊更新市場來源",
     noResults: "未找到符合的外掛",
     restartHint: "外掛變更在新工作階段中生效。現有工作階段需要重新啟動。",
+  },
+
+  settingsMcp: {
+    title: "MCP 伺服器",
+    subtitle: "管理 Model Context Protocol 伺服器",
+    servers: "伺服器",
+    noServers: "暫無已設定的 MCP 伺服器",
+    connected: "已連線",
+    disconnected: "未連線",
+    error: "錯誤",
+    addServer: "新增 MCP 伺服器",
+    addServerName: "伺服器名稱",
+    addServerNamePlaceholder: "my-server",
+    addServerCommand: "命令",
+    addServerCommandPlaceholder: "npx -y @my/mcp-server",
+    removeServer: "移除伺服器",
+    confirmRemove: ({ name }: { name: string }) =>
+      `移除 MCP 伺服器「${name}」？`,
+    removeSuccess: ({ name }: { name: string }) => `${name} 已移除`,
+    addSuccess: ({ name }: { name: string }) => `${name} 已新增`,
+    actionFailed: ({ error }: { error: string }) => `失敗：${error}`,
+    refresh: "重新整理",
+    refreshSuccess: "MCP 伺服器已重新整理",
+    noMachineOnline: "沒有線上的機器",
+    serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
+      `命令：${command}\n狀態：${status}`,
   },
 
   gitHosts: {
