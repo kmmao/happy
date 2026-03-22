@@ -23,7 +23,6 @@ import { Text } from "@/components/StyledText";
 import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
 import { usePreview, type DetectedPort } from "@/hooks/usePreview";
-import { ItemGroup } from "@/components/ItemGroup";
 import { layout } from "@/components/layout";
 
 type DiffTab = "before" | "after" | "diff";
@@ -173,6 +172,52 @@ export default React.memo(function PreviewPage() {
       contentContainerStyle={styles.contentContainer}
     >
       <View style={styles.innerContainer}>
+        {/* Custom URL input + Refresh — always at top */}
+        <View style={styles.topBar}>
+          <TextInput
+            style={[styles.topUrlInput, { color: theme.colors.text }]}
+            placeholder={t("preview.urlPlaceholder")}
+            placeholderTextColor={theme.colors.textSecondary}
+            value={customUrl}
+            onChangeText={setCustomUrl}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            returnKeyType="go"
+            onSubmitEditing={handleCustomCapture}
+          />
+          <Pressable
+            onPress={handleCustomCapture}
+            style={({ pressed }) => [
+              styles.topButton,
+              {
+                backgroundColor: theme.colors.button.primary.background,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Text style={styles.captureButtonText}>
+              {baseline ? t("preview.compare") : t("preview.capture")}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={detectPorts}
+            style={({ pressed }) => [
+              styles.topButton,
+              {
+                backgroundColor: theme.colors.surfaceHighest,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Ionicons
+              name="refresh-outline"
+              size={16}
+              color={theme.colors.text}
+            />
+          </Pressable>
+        </View>
+
         {/* Empty state hint — only when no screenshot/comparison yet */}
         {state.status === "ports-detected" && (
           <View style={styles.emptyHint}>
@@ -362,63 +407,6 @@ export default React.memo(function PreviewPage() {
         )}
 
         {/* Non-web ports are hidden — only web services are relevant for preview */}
-
-        {/* Custom URL input */}
-        <ItemGroup title={t("preview.customUrl")}>
-          <View style={styles.customUrlRow}>
-            <TextInput
-              style={[styles.urlInput, { color: theme.colors.text }]}
-              placeholder={t("preview.urlPlaceholder")}
-              placeholderTextColor={theme.colors.textSecondary}
-              value={customUrl}
-              onChangeText={setCustomUrl}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              returnKeyType="go"
-              onSubmitEditing={handleCustomCapture}
-            />
-            <Pressable
-              onPress={handleCustomCapture}
-              style={({ pressed }) => [
-                styles.captureButton,
-                {
-                  backgroundColor: theme.colors.button.primary.background,
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
-            >
-              <Text style={styles.captureButtonText}>
-                {baseline ? t("preview.compare") : t("preview.capture")}
-              </Text>
-            </Pressable>
-          </View>
-        </ItemGroup>
-
-        {/* Bottom action: Refresh ports */}
-        <View style={styles.actionsRow}>
-          <Pressable
-            onPress={detectPorts}
-            style={({ pressed }) => [
-              styles.actionButton,
-              {
-                backgroundColor: theme.colors.surfaceHighest,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Ionicons
-              name="refresh-outline"
-              size={18}
-              color={theme.colors.text}
-            />
-            <Text
-              style={[styles.actionButtonText, { color: theme.colors.text }]}
-            >
-              {t("preview.refresh")}
-            </Text>
-          </Pressable>
-        </View>
       </View>
     </ScrollView>
   );
@@ -523,33 +511,32 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  customUrlRow: {
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: Platform.select({ ios: 8, default: 12 }),
     gap: 8,
+    marginBottom: 16,
   },
-  urlInput: {
+  topUrlInput: {
     flex: 1,
-    fontSize: 15,
-    paddingVertical: Platform.select({ ios: 8, default: 6 }),
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.select({ ios: 8, default: 8 }),
+    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceHighest,
   },
-  captureButton: {
-    paddingHorizontal: 16,
+  topButton: {
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   captureButtonText: {
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
-  },
-  actionsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 16,
-    gap: 12,
   },
   actionButton: {
     flexDirection: "row",
@@ -558,10 +545,6 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 10,
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
   },
   emptyHint: {
     alignItems: "center",

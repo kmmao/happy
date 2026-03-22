@@ -66,13 +66,18 @@ export function parseLsofOutput(stdout: string): {
  * Turns: "python3 -m http.server 8000"
  * Into:  "python http.server"
  */
+/** Generic entry point filenames — use parent directory name instead. */
+const GENERIC_ENTRY_FILES = new Set([
+    "index", "main", "app", "server", "start", "dev", "cli", "bin", "entry",
+]);
+
 export function extractProcessLabel(cmdline: string): string {
     const trimmed = cmdline.trim();
-    // Known CLI tool patterns — match the tool name from the path
-    const binMatch = trimmed.match(/(?:node_modules\/\.bin\/|\/bin\/)(\S+)/);
+
+    // Known CLI tool in node_modules/.bin/ (next, vite, webpack, tsx, etc.)
+    const binMatch = trimmed.match(/node_modules\/\.bin\/(\S+)/);
     if (binMatch) {
         const tool = binMatch[1];
-        // Grab first arg if it's not a flag
         const afterTool = trimmed.substring(trimmed.indexOf(tool) + tool.length).trim();
         const firstArg = afterTool.split(/\s+/)[0];
         if (firstArg && !firstArg.startsWith("-")) {
@@ -85,22 +90,38 @@ export function extractProcessLabel(cmdline: string): string {
     const pyMatch = trimmed.match(/python\d?\s+-m\s+(\S+)/);
     if (pyMatch) return `python ${pyMatch[1]}`;
 
-    // Generic: take basename of first token + first non-flag arg
+    // Generic runtime wrapper (node, python, ruby, etc.)
     const tokens = trimmed.split(/\s+/);
     const basename = tokens[0].split("/").pop() ?? tokens[0];
-    // Skip common wrappers
     const isWrapper = /^(node|python\d?|ruby|java|deno|bun)$/.test(basename);
+
     if (isWrapper && tokens.length > 1) {
-        // Find first meaningful arg (not a flag, not a long path)
-        for (let i = 1; i < Math.min(tokens.length, 4); i++) {
+        for (let i = 1; i < Math.min(tokens.length, 5); i++) {
             const t = tokens[i];
             if (t.startsWith("-")) continue;
-            const argBase = t.split("/").pop() ?? t;
-            // Skip .js/.ts extensions for cleaner display
-            const clean = argBase.replace(/\.(js|ts|mjs|cjs)$/, "");
-            return `${basename} ${clean}`;
+
+            // Extract meaningful name from the script path
+            const parts = t.split("/");
+            const fileBase = (parts.pop() ?? t).replace(/\.(js|ts|mjs|cjs|jsx|tsx)$/, "");
+
+            if (GENERIC_ENTRY_FILES.has(fileBase)) {
+                // "node /app/my-api/index.js" → use parent dir "my-api"
+                const parent = parts.pop();
+                if (parent && parent !== "." && parent !== "src" && parent !== "dist" && parent !== "build") {
+                    return parent;
+                }
+                // Try grandparent: node ./src/index.js → parent of src
+                const grandparent = parts.pop();
+                if (grandparent && grandparent !== ".") {
+                    return grandparent;
+                }
+            }
+
+            // Non-generic filename: "node server.js" → "server"
+            return fileBase;
         }
     }
+
     return basename;
 }
 
