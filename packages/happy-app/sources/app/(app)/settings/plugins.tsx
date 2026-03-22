@@ -407,7 +407,10 @@ function PluginsSettingsScreen() {
                                     />
                                 ) : (
                                     <Pressable
-                                        style={styles.installButton}
+                                        style={({ pressed }) => [
+                                            styles.installButton,
+                                            pressed && { opacity: 0.7 },
+                                        ]}
                                         onPress={() =>
                                             doPluginAction(
                                                 "install",
