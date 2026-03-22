@@ -84,12 +84,10 @@ export const CommandListPopover = React.memo(
       const commandMap = new Map(
         filteredCommands.map((cmd) => [cmd.command, cmd]),
       );
-      // Always show favorites, even if not in current session's command list
+      // Only show favorites that exist in the current session's command list
       const favItems: CommandItem[] = favorites
-        .map(
-          (fav) =>
-            commandMap.get(fav) ?? { command: fav, description: undefined },
-        )
+        .filter((fav) => commandMap.has(fav))
+        .map((fav) => commandMap.get(fav)!)
         .filter((cmd) =>
           query.trim()
             ? cmd.command.toLowerCase().includes(query.trim().toLowerCase())
