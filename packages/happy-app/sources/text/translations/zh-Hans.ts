@@ -1601,6 +1601,7 @@ export const zhHans: TranslationStructure = {
     updateMarketplace: "更新市场源",
     updateMarketplaceSuccess: "市场源已更新",
     marketplaceFooter: "点击更新市场源",
+    noResults: "未找到匹配的插件",
   },
 
   gitHosts: {

@@ -1699,6 +1699,7 @@ export const ru: TranslationStructure = {
     updateMarketplace: "Обновить маркетплейс",
     updateMarketplaceSuccess: "Маркетплейс обновлён",
     marketplaceFooter: "Нажмите для обновления маркетплейса",
+    noResults: "Подходящие плагины не найдены",
   },
 
   gitHosts: {

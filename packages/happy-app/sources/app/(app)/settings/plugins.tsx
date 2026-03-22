@@ -336,6 +336,13 @@ function PluginsSettingsScreen() {
                             autoCorrect={false}
                         />
                     </View>
+                    {searchQuery && filteredAvailable.length === 0 && (
+                        <View>
+                            <Text style={styles.emptyText}>
+                                {t("settingsPlugins.noResults")}
+                            </Text>
+                        </View>
+                    )}
                     {filteredAvailable.slice(0, 50).map((plugin) => (
                         <Item
                             key={plugin.key}

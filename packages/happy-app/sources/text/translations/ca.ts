@@ -1677,6 +1677,7 @@ export const ca: TranslationStructure = {
     updateMarketplace: "Actualitzar marketplace",
     updateMarketplaceSuccess: "Marketplace actualitzat",
     marketplaceFooter: "Toca per actualitzar el marketplace",
+    noResults: "No s'han trobat connectors coincidents",
   },
 
   gitHosts: {

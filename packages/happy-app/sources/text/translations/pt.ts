@@ -1675,6 +1675,7 @@ export const pt: TranslationStructure = {
     updateMarketplace: "Atualizar marketplace",
     updateMarketplaceSuccess: "Marketplace atualizado",
     marketplaceFooter: "Toque para atualizar o marketplace",
+    noResults: "Nenhum plugin correspondente encontrado",
   },
 
   gitHosts: {

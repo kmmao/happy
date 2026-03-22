@@ -1654,6 +1654,7 @@ export const ja: TranslationStructure = {
     updateMarketplace: "マーケットプレイスを更新",
     updateMarketplaceSuccess: "マーケットプレイスを更新しました",
     marketplaceFooter: "タップしてマーケットプレイスを更新",
+    noResults: "一致するプラグインが見つかりません",
   },
 
   gitHosts: {

@@ -1603,6 +1603,7 @@ export const zhHant: TranslationStructure = {
     updateMarketplace: "更新市場來源",
     updateMarketplaceSuccess: "市場來源已更新",
     marketplaceFooter: "點擊更新市場來源",
+    noResults: "未找到符合的外掛",
   },
 
   gitHosts: {
