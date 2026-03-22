@@ -791,12 +791,19 @@ export async function startDaemon(): Promise<void> {
             ),
           );
 
+          // Explicitly unset profile-specific vars so spawnHappyCLI's
+          // process.env spread doesn't re-add them
+          const unsetProfileVars = Object.fromEntries(
+            [...PROFILE_SPECIFIC_ENV_VARS].map((key) => [key, undefined]),
+          );
+
           const happyProcess = spawnHappyCLI(args, {
             cwd: directory,
             detached: true, // Sessions stay alive when daemon stops
             stdio: ["ignore", "pipe", "pipe"], // Capture stdout/stderr for debugging
             env: {
               ...filteredDaemonEnv,
+              ...unsetProfileVars,
               ...extraEnv,
             },
           });
