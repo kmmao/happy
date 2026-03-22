@@ -1,4 +1,5 @@
 import { MMKV } from "react-native-mmkv";
+import { z } from "zod";
 import {
   Settings,
   settingsDefaults,
@@ -489,41 +490,26 @@ export function clearPersistence() {
  */
 const RESEARCH_PREFS_PREFIX = "research-prefs-";
 
-export interface ResearchPrefs {
-  dimensions: Record<string, boolean>;
-  knownCompetitors: string;
-  additionalNotes: string;
-  /**
-   * Research-specific custom rules (e.g. "focus on pricing comparison").
-   * Different from supervisorCustomRules in the Project table which applies
-   * to health analysis only.
-   */
-  customRules: string;
-}
+export const ResearchPrefsSchema = z.object({
+  dimensions: z.record(z.string(), z.boolean()),
+  knownCompetitors: z.string(),
+  additionalNotes: z.string(),
+  customRules: z.string(),
+});
+
+export type ResearchPrefs = z.infer<typeof ResearchPrefsSchema>;
 
 export function loadResearchPrefs(projectId: string): ResearchPrefs | null {
   const raw = mmkv.getString(`${RESEARCH_PREFS_PREFIX}${projectId}`);
   if (raw) {
     try {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const parsed = ResearchPrefsSchema.partial().safeParse(JSON.parse(raw));
+      if (parsed.success) {
         return {
-          dimensions:
-            parsed.dimensions && typeof parsed.dimensions === "object"
-              ? (parsed.dimensions as Record<string, boolean>)
-              : {},
-          knownCompetitors:
-            typeof parsed.knownCompetitors === "string"
-              ? parsed.knownCompetitors
-              : "",
-          additionalNotes:
-            typeof parsed.additionalNotes === "string"
-              ? parsed.additionalNotes
-              : "",
-          customRules:
-            typeof parsed.customRules === "string"
-              ? parsed.customRules
-              : "",
+          dimensions: parsed.data.dimensions ?? {},
+          knownCompetitors: parsed.data.knownCompetitors ?? "",
+          additionalNotes: parsed.data.additionalNotes ?? "",
+          customRules: parsed.data.customRules ?? "",
         };
       }
     } catch (e) {

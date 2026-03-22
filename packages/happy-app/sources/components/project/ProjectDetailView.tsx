@@ -6,7 +6,7 @@ import { Project } from "@/sync/projectManager";
 import { ProjectSessionsTab } from "./ProjectSessionsTab";
 import { ProjectGitTab } from "./ProjectGitTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
-import { ProjectResearchTab } from "./ProjectResearchTab";
+import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTab";
 import { ProjectActionsTab } from "./ProjectActionsTab";
 import { ProjectConfigTab } from "./ProjectConfigTab";
 import { layout } from "@/components/layout";
@@ -27,6 +27,8 @@ export const ProjectDetailView = React.memo(
         const [activeTab, setActiveTab] = React.useState<TabKey>(
             initialTab ?? "sessions",
         );
+        const [researchSyncStatus, setResearchSyncStatus] =
+            React.useState<ResearchSyncStatus>("idle");
 
         // Proactively trigger git status refresh on mount if project has active sessions
         React.useEffect(() => {
@@ -62,6 +64,15 @@ export const ProjectDetailView = React.memo(
                     <View style={styles.segmentContainer}>
                         {tabs.map((tab) => {
                             const isActive = activeTab === tab.key;
+                            const showSyncDot =
+                                tab.key === "research" &&
+                                researchSyncStatus !== "idle";
+                            const dotColor =
+                                researchSyncStatus === "failed"
+                                    ? theme.colors.deleteAction
+                                    : researchSyncStatus === "saved"
+                                        ? theme.colors.header.tint
+                                        : theme.colors.textSecondary;
                             return (
                                 <Pressable
                                     key={tab.key}
@@ -71,14 +82,24 @@ export const ProjectDetailView = React.memo(
                                     ]}
                                     onPress={() => setActiveTab(tab.key)}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.segmentText,
-                                            isActive && styles.segmentTextActive,
-                                        ]}
-                                    >
-                                        {tab.label}
-                                    </Text>
+                                    <View style={styles.segmentLabelRow}>
+                                        <Text
+                                            style={[
+                                                styles.segmentText,
+                                                isActive && styles.segmentTextActive,
+                                            ]}
+                                        >
+                                            {tab.label}
+                                        </Text>
+                                        {showSyncDot && (
+                                            <View
+                                                style={[
+                                                    styles.syncDot,
+                                                    { backgroundColor: dotColor },
+                                                ]}
+                                            />
+                                        )}
+                                    </View>
                                 </Pressable>
                             );
                         })}
@@ -128,7 +149,10 @@ export const ProjectDetailView = React.memo(
                                 : styles.tabHidden
                         }
                     >
-                        <ProjectResearchTab project={project} />
+                        <ProjectResearchTab
+                            project={project}
+                            onSyncStatusChange={setResearchSyncStatus}
+                        />
                     </View>
                     <View
                         style={
@@ -178,6 +202,11 @@ const styles = StyleSheet.create((theme) => ({
     segmentButtonActive: {
         backgroundColor: theme.colors.header.tint,
     },
+    segmentLabelRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+    },
     segmentText: {
         ...Typography.default(),
         fontSize: 12,
@@ -186,6 +215,11 @@ const styles = StyleSheet.create((theme) => ({
     segmentTextActive: {
         ...Typography.default("semiBold"),
         color: "#FFFFFF",
+    },
+    syncDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
     },
     content: {
         flex: 1,

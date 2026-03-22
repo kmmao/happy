@@ -41,6 +41,7 @@ import {
   handleKvBatchUpdate,
   handleProjectUpdate,
   type UpdateHandlerContext,
+  type ResearchConfigChange,
 } from "./syncUpdateHandlers";
 import {
   fetchArtifactsList as fetchArtifactsListAction,
@@ -186,6 +187,7 @@ class Sync {
     dimensionIndex?: number;
     totalDimensions?: number;
   }) => void>();
+  private researchConfigListeners = new Set<(event: ResearchConfigChange) => void>();
   private supervisorLoopStatusListeners = new Set<(event: {
     loopId: string;
     projectId: string;
@@ -2265,7 +2267,12 @@ class Sync {
     } else if (updateData.body.t === "new-feed-post") {
       await handleNewFeedPostUpdate(updateData.body, ctx);
     } else if (updateData.body.t === "kv-batch-update") {
-      await handleKvBatchUpdate(updateData.body);
+      const { researchConfigChanges } = await handleKvBatchUpdate(updateData.body);
+      for (const change of researchConfigChanges) {
+        for (const listener of this.researchConfigListeners) {
+          listener(change);
+        }
+      }
     } else if (
       updateData.body.t === "new-project" ||
       updateData.body.t === "update-project" ||
@@ -2627,6 +2634,13 @@ class Sync {
   }) => void): () => void {
     this.supervisorStatusListeners.add(listener);
     return () => { this.supervisorStatusListeners.delete(listener); };
+  }
+
+  // --- Research config update subscription ---
+
+  onResearchConfigUpdate(listener: (event: ResearchConfigChange) => void): () => void {
+    this.researchConfigListeners.add(listener);
+    return () => { this.researchConfigListeners.delete(listener); };
   }
 
   // --- Supervisor Loop status event subscription ---

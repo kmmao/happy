@@ -31,12 +31,24 @@ import { layout } from "@/components/layout";
 import {
     loadResearchPrefs,
     saveResearchPrefs,
-    type ResearchPrefs,
+    ResearchPrefsSchema,
 } from "@/sync/persistence";
-import { kvGet, kvSet } from "@/sync/apiKv";
+import { kvGet } from "@/sync/apiKv";
+import { kvSetWithRetry } from "@/sync/kvConflictRetry";
+import { encodeBase64, decodeBase64 } from "@/encryption/base64";
 import { useElapsedSeconds, type DimensionProgress } from "./supervisorUtils";
 import { resolveDimensionLabel } from "./supervisorDimensionLabels";
 import { SupervisorProgressView } from "./SupervisorProgressView";
+
+/** Encode a UTF-8 string to standard base64 (server KV stores Bytes). */
+function toBase64(str: string): string {
+    return encodeBase64(new TextEncoder().encode(str), "base64");
+}
+
+/** Decode a standard base64 string to UTF-8 (server KV stores Bytes). */
+function fromBase64(b64: string): string {
+    return new TextDecoder().decode(decodeBase64(b64, "base64"));
+}
 
 const RESEARCH_DIMENSIONS = [
     "pricing",
@@ -73,12 +85,15 @@ const defaultDimensions: Record<ResearchDimension, boolean> = {
     userFeedback: false,
 };
 
+export type ResearchSyncStatus = "idle" | "saving" | "saved" | "failed";
+
 interface ProjectResearchTabProps {
     project: Project;
+    onSyncStatusChange?: (status: ResearchSyncStatus) => void;
 }
 
 export const ProjectResearchTab = React.memo(
-    ({ project }: ProjectResearchTabProps) => {
+    ({ project, onSyncStatusChange }: ProjectResearchTabProps) => {
         const { theme } = useUnistyles();
         const serverId = project.serverId;
 
@@ -111,6 +126,16 @@ export const ProjectResearchTab = React.memo(
         // KV Store version tracking for optimistic concurrency
         const kvVersionRef = React.useRef(-1);
 
+        // Sync status indicator: idle → saving → saved / failed
+        const [syncStatus, setSyncStatusRaw] = React.useState<ResearchSyncStatus>("idle");
+        const onSyncStatusChangeRef = React.useRef(onSyncStatusChange);
+        onSyncStatusChangeRef.current = onSyncStatusChange;
+        const setSyncStatus = React.useCallback((status: ResearchSyncStatus) => {
+            setSyncStatusRaw(status);
+            onSyncStatusChangeRef.current?.(status);
+        }, []);
+        const syncFadeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
         // Persist prefs: local MMKV (instant) + KV Store (multi-device sync)
         const prefsRef = React.useRef({ dimensions, knownCompetitors, additionalNotes, customRules });
         prefsRef.current = { dimensions, knownCompetitors, additionalNotes, customRules };
@@ -119,16 +144,27 @@ export const ProjectResearchTab = React.memo(
 
         const persistToServer = React.useCallback(async () => {
             if (!serverId) return;
+            setSyncStatus("saving");
             try {
                 const credentials = await TokenStorage.getCredentials();
-                if (!credentials) return;
+                if (!credentials) {
+                    setSyncStatus("idle");
+                    return;
+                }
                 const kvKey = `researchConfig/${serverId}`;
-                const value = JSON.stringify(prefsRef.current);
-                const newVersion = await kvSet(credentials, kvKey, value, kvVersionRef.current);
-                kvVersionRef.current = newVersion;
+                const value = toBase64(JSON.stringify(prefsRef.current));
+                const result = await kvSetWithRetry(
+                    credentials, kvKey, value, kvVersionRef.current,
+                );
+                kvVersionRef.current = result.version;
+                setSyncStatus("saved");
             } catch {
-                // Best-effort sync — local cache is authoritative
+                // Network errors or exhausted retries — local cache is authoritative
+                setSyncStatus("failed");
             }
+            // Auto-fade after 2 seconds
+            if (syncFadeTimerRef.current) clearTimeout(syncFadeTimerRef.current);
+            syncFadeTimerRef.current = setTimeout(() => setSyncStatus("idle"), 2000);
         }, [serverId]);
 
         const debouncedPersist = React.useCallback(() => {
@@ -155,8 +191,10 @@ export const ProjectResearchTab = React.memo(
                     const kvKey = `researchConfig/${serverId}`;
                     const item = await kvGet(credentials, kvKey);
                     if (item && !cancelled) {
+                        const parsed = ResearchPrefsSchema.safeParse(JSON.parse(fromBase64(item.value)));
+                        if (!parsed.success) return;
                         kvVersionRef.current = item.version;
-                        const remote = JSON.parse(item.value) as ResearchPrefs;
+                        const remote = parsed.data;
                         // Update state from remote
                         setKnownCompetitors(remote.knownCompetitors ?? "");
                         setDimensions({ ...defaultDimensions, ...remote.dimensions });
@@ -174,9 +212,35 @@ export const ProjectResearchTab = React.memo(
             return () => { cancelled = true; };
         }, [serverId]);
 
+        // Listen for real-time KV updates from other devices
+        React.useEffect(() => {
+            if (!serverId) return;
+            const unsubscribe = sync.onResearchConfigUpdate((event) => {
+                if (event.projectId !== serverId) return;
+                // Skip stale updates and echoes from our own writes.
+                // Versions are server-managed and monotonically increasing per key,
+                // so <= safely covers both cases.
+                if (event.version <= kvVersionRef.current) return;
+                if (event.value === null) return;
+                const parsed = ResearchPrefsSchema.safeParse(
+                    (() => { try { return JSON.parse(fromBase64(event.value)); } catch { return null; } })(),
+                );
+                if (!parsed.success) return;
+                const remote = parsed.data;
+                kvVersionRef.current = event.version;
+                setKnownCompetitors(remote.knownCompetitors);
+                setDimensions({ ...defaultDimensions, ...remote.dimensions });
+                setAdditionalNotes(remote.additionalNotes);
+                setCustomRules(remote.customRules);
+                saveResearchPrefs(serverId!, remote);
+            });
+            return unsubscribe;
+        }, [serverId]);
+
         // Flush on unmount
         React.useEffect(() => {
             return () => {
+                if (syncFadeTimerRef.current) clearTimeout(syncFadeTimerRef.current);
                 if (persistTimerRef.current) {
                     clearTimeout(persistTimerRef.current);
                     if (serverId) {
@@ -262,13 +326,11 @@ export const ProjectResearchTab = React.memo(
                 setDimensions((prev) => {
                     const next = { ...prev, [key]: !prev[key] };
                     prefsRef.current = { ...prefsRef.current, dimensions: next };
-                    if (serverId) {
-                        saveResearchPrefs(serverId, prefsRef.current);
-                    }
                     return next;
                 });
+                debouncedPersist();
             },
-            [serverId],
+            [debouncedPersist],
         );
 
         const handleTextChange = React.useCallback(
@@ -354,7 +416,12 @@ export const ProjectResearchTab = React.memo(
                 >
                     <View style={styles.innerContainer}>
                         {/* Single config group: inputs + dimensions + button */}
-                        <ItemGroup title={t("competitorResearch.title")}>
+                        <ItemGroup title={
+                            <SyncStatusHeader
+                                title={t("competitorResearch.title")}
+                                syncStatus={syncStatus}
+                            />
+                        }>
                             {/* Dimension toggles first */}
                             <View style={styles.dimensionHeader}>
                                 <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
@@ -595,6 +662,52 @@ export const ProjectResearchTab = React.memo(
     },
 );
 
+// --- Sync Status Header ---
+
+const SyncStatusHeader = React.memo(
+    ({ title, syncStatus }: { title: string; syncStatus: ResearchSyncStatus }) => {
+        const { theme } = useUnistyles();
+
+        const statusLabel = syncStatus === "saving"
+            ? t("competitorResearch.syncSaving")
+            : syncStatus === "saved"
+                ? t("competitorResearch.syncSaved")
+                : syncStatus === "failed"
+                    ? t("competitorResearch.syncFailed")
+                    : null;
+
+        const statusColor = syncStatus === "failed"
+            ? theme.colors.deleteAction
+            : syncStatus === "saved"
+                ? theme.colors.header.tint
+                : theme.colors.textSecondary;
+
+        return (
+            <View style={styles.syncHeaderRow}>
+                <Text style={[styles.syncHeaderTitle, { color: theme.colors.groupped.sectionTitle }]}>
+                    {title}
+                </Text>
+                {statusLabel && (
+                    <View style={styles.syncStatusContainer}>
+                        {syncStatus === "saving" && (
+                            <ActivityIndicator size={10} color={statusColor} />
+                        )}
+                        {syncStatus === "saved" && (
+                            <Ionicons name="checkmark-circle" size={12} color={statusColor} />
+                        )}
+                        {syncStatus === "failed" && (
+                            <Ionicons name="alert-circle" size={12} color={statusColor} />
+                        )}
+                        <Text style={[styles.syncStatusText, { color: statusColor }]}>
+                            {statusLabel}
+                        </Text>
+                    </View>
+                )}
+            </View>
+        );
+    },
+);
+
 // --- Dimension Toggle ---
 
 interface DimensionToggleProps {
@@ -800,5 +913,25 @@ const styles = StyleSheet.create((theme) => ({
         paddingHorizontal: 16,
         paddingVertical: 16,
         paddingBottom: 48,
+    },
+    syncHeaderRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    syncHeaderTitle: {
+        ...Typography.default("regular"),
+        fontSize: 13,
+        textTransform: "uppercase",
+        letterSpacing: -0.08,
+    },
+    syncStatusContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 3,
+    },
+    syncStatusText: {
+        ...Typography.default(),
+        fontSize: 11,
     },
 }));

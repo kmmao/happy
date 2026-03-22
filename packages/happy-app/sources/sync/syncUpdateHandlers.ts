@@ -787,9 +787,18 @@ export async function handleNewFeedPostUpdate(
 // ---------------------------------------------------------------------------
 // kv-batch-update
 // ---------------------------------------------------------------------------
+
+const RESEARCH_CONFIG_PREFIX = "researchConfig/";
+
+export interface ResearchConfigChange {
+    projectId: string;
+    value: string | null;
+    version: number;
+}
+
 export async function handleKvBatchUpdate(
     body: Extract<UpdateData["body"], { t: "kv-batch-update" }>,
-): Promise<void> {
+): Promise<{ researchConfigChanges: ResearchConfigChange[] }> {
     log.log("📋 Received kv-batch-update");
 
     const issueSessionChanges = body.changes.filter(
@@ -798,6 +807,16 @@ export async function handleKvBatchUpdate(
     if (issueSessionChanges.length > 0) {
         await issueSessionStore.getState().handleKvUpdate(issueSessionChanges);
     }
+
+    const researchConfigChanges: ResearchConfigChange[] = body.changes
+        .filter((c: { key: string }) => c.key.startsWith(RESEARCH_CONFIG_PREFIX))
+        .map((c: { key: string; value: string | null; version: number }) => ({
+            projectId: c.key.slice(RESEARCH_CONFIG_PREFIX.length),
+            value: c.value,
+            version: c.version,
+        }));
+
+    return { researchConfigChanges };
 }
 
 // ---------------------------------------------------------------------------
