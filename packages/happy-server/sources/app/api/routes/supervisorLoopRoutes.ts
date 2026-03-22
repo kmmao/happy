@@ -143,28 +143,28 @@ export function supervisorLoopRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Loop not found" });
             }
 
-            // Fetch all runs belonging to this loop
-            const runs = await db.supervisorRun.findMany({
-                where: {
-                    loopId,
-                    projectId: id,
-                    accountId: userId,
-                },
-                orderBy: { createdAt: "asc" },
-                take: 1000,
-            });
-
-            // Fetch actions that were approved/fixed during this loop
-            const actions = await db.supervisorAction.findMany({
-                where: {
-                    projectId: id,
-                    accountId: userId,
-                    run: { loopId },
-                    approval: { in: ["approved", "pending"] },
-                },
-                orderBy: { createdAt: "desc" },
-                take: 50,
-            });
+            // Fetch runs and actions in parallel (no data dependency between them)
+            const [runs, actions] = await Promise.all([
+                db.supervisorRun.findMany({
+                    where: {
+                        loopId,
+                        projectId: id,
+                        accountId: userId,
+                    },
+                    orderBy: { createdAt: "asc" },
+                    take: 1000,
+                }),
+                db.supervisorAction.findMany({
+                    where: {
+                        projectId: id,
+                        accountId: userId,
+                        run: { loopId },
+                        approval: { in: ["approved", "pending"] },
+                    },
+                    orderBy: { createdAt: "desc" },
+                    take: 50,
+                }),
+            ]);
 
             return reply.send({
                 loop: serializeLoop(loop),
