@@ -123,15 +123,43 @@ export async function checkDaemonStatus(): Promise<DaemonCheckResult> {
     return { status: 'not-running' };
   }
 
-  // Check if the daemon is running
+  // Check if the PID is alive
   try {
     process.kill(state.pid, 0);
-    return { status: 'running', state };
   } catch {
     logger.debug('[DAEMON RUN] Daemon PID not running, cleaning up state');
     await cleanupDaemonState();
     return { status: 'stale-cleaned' };
   }
+
+  // PID exists, but it might be a different process (PID reuse after reboot/crash).
+  // Verify the daemon's HTTP control server is actually responding.
+  if (state.httpPort) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${state.httpPort}/ping`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(2_000)
+      });
+      if (response.ok) {
+        const body = await response.json() as { pong?: boolean; pid?: number };
+        // Extra safety: verify the responding daemon's PID matches what we expect
+        if (body.pid !== undefined && body.pid !== state.pid) {
+          logger.debug(`[DAEMON RUN] Daemon PID mismatch: state=${state.pid}, response=${body.pid}, cleaning up`);
+          await cleanupDaemonState();
+          return { status: 'stale-cleaned' };
+        }
+        return { status: 'running', state };
+      }
+      logger.debug(`[DAEMON RUN] Daemon HTTP ping failed with status ${response.status}, treating as stale`);
+    } catch (error) {
+      logger.debug(`[DAEMON RUN] Daemon HTTP ping failed (PID ${state.pid} exists but HTTP unresponsive), cleaning up stale state`);
+    }
+    await cleanupDaemonState();
+    return { status: 'stale-cleaned' };
+  }
+
+  // No httpPort in state (shouldn't happen, but fall back to PID-only check)
+  return { status: 'running', state };
 }
 
 /**

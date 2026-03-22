@@ -34,6 +34,20 @@ export function startDaemonControlServer({
     app.setSerializerCompiler(serializerCompiler);
     const typed = app.withTypeProvider<ZodTypeProvider>();
 
+    // Health check endpoint - used to verify daemon HTTP server is actually responsive
+    typed.get('/ping', {
+      schema: {
+        response: {
+          200: z.object({
+            pong: z.literal(true),
+            pid: z.number()
+          })
+        }
+      }
+    }, async () => {
+      return { pong: true as const, pid: process.pid };
+    });
+
     // Session reports itself after creation
     typed.post('/session-started', {
       schema: {
