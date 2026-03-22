@@ -52,6 +52,11 @@ function extractDisplayName(path: string): string {
   return basename;
 }
 
+/** Resolve a file path and extract its display name in one step. */
+function resolveAndDisplay(filePath: string, metadata: Metadata | null): string {
+    return extractDisplayName(resolvePath(filePath, metadata));
+}
+
 // Shared definition for Task/Agent tool (SDK renamed Task → Agent)
 const taskToolDef = {
   title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
@@ -281,8 +286,7 @@ export const knownTools = {
   Read: {
     title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
       if (typeof opts.tool.input.file_path === "string") {
-        const path = resolvePath(opts.tool.input.file_path, opts.metadata);
-        return extractDisplayName(path);
+        return resolveAndDisplay(opts.tool.input.file_path, opts.metadata);
       }
       // Gemini uses 'locations' array with 'path' field
       if (
@@ -290,11 +294,7 @@ export const knownTools = {
         Array.isArray(opts.tool.input.locations) &&
         opts.tool.input.locations[0]?.path
       ) {
-        const path = resolvePath(
-          opts.tool.input.locations[0].path,
-          opts.metadata,
-        );
-        return extractDisplayName(path);
+        return resolveAndDisplay(opts.tool.input.locations[0].path, opts.metadata);
       }
       return t("tools.names.readFile");
     },
@@ -362,15 +362,10 @@ export const knownTools = {
         Array.isArray(opts.tool.input.locations) &&
         opts.tool.input.locations[0]?.path
       ) {
-        const path = resolvePath(
-          opts.tool.input.locations[0].path,
-          opts.metadata,
-        );
-        return extractDisplayName(path);
+        return resolveAndDisplay(opts.tool.input.locations[0].path, opts.metadata);
       }
       if (typeof opts.tool.input.file_path === "string") {
-        const path = resolvePath(opts.tool.input.file_path, opts.metadata);
-        return extractDisplayName(path);
+        return resolveAndDisplay(opts.tool.input.file_path, opts.metadata);
       }
       return t("tools.names.readFile");
     },
