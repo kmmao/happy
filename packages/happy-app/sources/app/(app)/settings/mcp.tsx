@@ -1,6 +1,7 @@
 import * as React from "react";
 import { View, Text, TextInput, ActivityIndicator, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
@@ -37,6 +38,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 function McpSettingsScreen() {
     const { theme } = useUnistyles();
+    const { machineId: paramMachineId } = useLocalSearchParams<{
+        machineId?: string;
+    }>();
+
+    /** Resolve machineId: prefer route param, fallback to first online. */
+    const resolveMachineId = React.useCallback(
+        (): string | null => paramMachineId || findOnlineMachineId(),
+        [paramMachineId],
+    );
 
     const [servers, setServers] = React.useState<readonly McpServerInfo[]>([]);
     const [availableServers, setAvailableServers] = React.useState<
@@ -53,7 +63,7 @@ function McpSettingsScreen() {
 
     // Load on mount and on focus
     const loadAll = React.useCallback(async () => {
-        const machineId = findOnlineMachineId();
+        const machineId = resolveMachineId();
         if (!machineId) return;
         machineIdRef.current = machineId;
 
@@ -79,7 +89,7 @@ function McpSettingsScreen() {
 
     // Refresh
     const [, doRefresh] = useHappyAction(async () => {
-        const machineId = findOnlineMachineId();
+        const machineId = resolveMachineId();
         if (!machineId) {
             Modal.toast(t("settingsMcp.noMachineOnline"));
             return;
@@ -103,7 +113,7 @@ function McpSettingsScreen() {
     // Install from catalog
     const doInstall = React.useCallback(
         async (server: AvailableMcpServer) => {
-            const machineId = machineIdRef.current ?? findOnlineMachineId();
+            const machineId = machineIdRef.current ?? resolveMachineId();
             if (!machineId) {
                 Modal.toast(t("settingsMcp.noMachineOnline"));
                 return;
@@ -155,7 +165,7 @@ function McpSettingsScreen() {
 
     // Add custom server
     const doAddCustom = React.useCallback(async () => {
-        const machineId = machineIdRef.current ?? findOnlineMachineId();
+        const machineId = machineIdRef.current ?? resolveMachineId();
         if (!machineId) {
             Modal.toast(t("settingsMcp.noMachineOnline"));
             return;
@@ -209,7 +219,7 @@ function McpSettingsScreen() {
     // Remove server
     const doRemove = React.useCallback(
         async (name: string) => {
-            const machineId = machineIdRef.current ?? findOnlineMachineId();
+            const machineId = machineIdRef.current ?? resolveMachineId();
             if (!machineId) {
                 Modal.toast(t("settingsMcp.noMachineOnline"));
                 return;

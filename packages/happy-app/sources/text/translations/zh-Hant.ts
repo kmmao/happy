@@ -1096,6 +1096,7 @@ export const zhHant: TranslationStructure = {
     cliVersion: "CLI 版本",
     daemonStateVersion: "守護程序狀態版本",
     activeSessions: ({ count }: { count: number }) => `活躍工作階段 (${count})`,
+    extensions: "擴充功能",
     machineGroup: "裝置",
     host: "主機",
     machineId: "裝置 ID",

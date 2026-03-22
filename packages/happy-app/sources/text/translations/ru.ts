@@ -1146,6 +1146,7 @@ export const ru: TranslationStructure = {
     daemonStateVersion: "Версия состояния daemon",
     activeSessions: ({ count }: { count: number }) =>
       `Активные сессии (${count})`,
+    extensions: "Расширения",
     machineGroup: "Машина",
     host: "Хост",
     machineId: "ID машины",

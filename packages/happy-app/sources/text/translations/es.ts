@@ -1151,6 +1151,7 @@ export const es: TranslationStructure = {
     daemonStateVersion: "Versión del estado del daemon",
     activeSessions: ({ count }: { count: number }) =>
       `Sesiones activas (${count})`,
+    extensions: "Extensiones",
     machineGroup: "Máquina",
     host: "Host",
     machineId: "ID de máquina",

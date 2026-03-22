@@ -1196,6 +1196,7 @@ export const ja: TranslationStructure = {
     daemonStateVersion: "デーモン状態バージョン",
     activeSessions: ({ count }: { count: number }) =>
       `アクティブセッション (${count})`,
+    extensions: "拡張機能",
     machineGroup: "マシン",
     host: "ホスト",
     machineId: "マシンID",

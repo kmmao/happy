@@ -1,7 +1,7 @@
 import * as React from "react";
 import { View, Text, TextInput, ActivityIndicator, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
@@ -36,6 +36,15 @@ function formatInstalls(n: number): string {
 function PluginsSettingsScreen() {
     const { theme } = useUnistyles();
     const router = useRouter();
+    const { machineId: paramMachineId } = useLocalSearchParams<{
+        machineId?: string;
+    }>();
+
+    /** Resolve machineId: prefer route param, fallback to first online. */
+    const resolveMachineId = React.useCallback(
+        (): string | null => paramMachineId || findOnlineMachineId(),
+        [paramMachineId],
+    );
 
     // Remote data loaded from machine
     const [installedPlugins, setInstalledPlugins] = React.useState<
@@ -62,7 +71,7 @@ function PluginsSettingsScreen() {
 
     // Load all data on mount
     const loadAll = React.useCallback(async () => {
-        const machineId = findOnlineMachineId();
+        const machineId = resolveMachineId();
         if (!machineId) return;
         machineIdRef.current = machineId;
 
@@ -91,7 +100,7 @@ function PluginsSettingsScreen() {
 
     // Refresh
     const [, doRefresh] = useHappyAction(async () => {
-        const machineId = findOnlineMachineId();
+        const machineId = resolveMachineId();
         if (!machineId) {
             Modal.alert(
                 t("settingsPlugins.discoverTitle"),
@@ -124,7 +133,7 @@ function PluginsSettingsScreen() {
             pluginKey: string,
             pluginName: string,
         ) => {
-            const machineId = machineIdRef.current ?? findOnlineMachineId();
+            const machineId = machineIdRef.current ?? resolveMachineId();
             if (!machineId) {
                 Modal.toast(t("settingsPlugins.noMachineOnline"));
                 return;
@@ -473,7 +482,7 @@ function PluginsSettingsScreen() {
                             onPress={async () => {
                                 const machineId =
                                     machineIdRef.current ??
-                                    findOnlineMachineId();
+                                    resolveMachineId();
                                 if (!machineId) {
                                     Modal.toast(
                                         t("settingsPlugins.noMachineOnline"),
@@ -569,7 +578,7 @@ function PluginsSettingsScreen() {
                         );
                         if (!path) return;
                         const machineId =
-                            machineIdRef.current ?? findOnlineMachineId();
+                            machineIdRef.current ?? resolveMachineId();
                         if (!machineId) {
                             Modal.toast(t("settingsPlugins.noMachineOnline"));
                             return;

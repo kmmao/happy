@@ -1095,6 +1095,7 @@ export const zhHans: TranslationStructure = {
     cliVersion: "CLI 版本",
     daemonStateVersion: "守护进程状态版本",
     activeSessions: ({ count }: { count: number }) => `活跃会话 (${count})`,
+    extensions: "扩展",
     machineGroup: "设备",
     host: "主机",
     machineId: "设备 ID",

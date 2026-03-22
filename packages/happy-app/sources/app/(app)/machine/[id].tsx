@@ -601,6 +601,44 @@ function MachineDetailScreen() {
           />
         </ItemGroup>
 
+        {/* Extensions (per-machine) */}
+        <ItemGroup title={t("machine.extensions")}>
+          <Item
+            title={t("settings.plugins")}
+            subtitle={t("settings.pluginsSubtitle")}
+            icon={
+              <Ionicons
+                name="extension-puzzle-outline"
+                size={20}
+                color="#10B981"
+              />
+            }
+            onPress={() =>
+              router.push(
+                `/settings/plugins?machineId=${machineId}` as any,
+              )
+            }
+            showChevron
+          />
+          <Item
+            title={t("settings.mcp")}
+            subtitle={t("settings.mcpSubtitle")}
+            icon={
+              <Ionicons
+                name="server-outline"
+                size={20}
+                color="#8B5CF6"
+              />
+            }
+            onPress={() =>
+              router.push(
+                `/settings/mcp?machineId=${machineId}` as any,
+              )
+            }
+            showChevron
+          />
+        </ItemGroup>
+
         {/* Previous Sessions (debug view) */}
         {previousSessions.length > 0 && (
           <ItemGroup title={"Previous Sessions (up to 5 most recent)"}>
