@@ -89,10 +89,20 @@ export default React.memo(function PreviewPage() {
 
   // Loading states
   if (state.status === "idle" || state.status === "detecting-ports") {
+    const phaseKey = state.status === "detecting-ports" && state.phase
+      ? `preview.phase.${state.phase}` as const
+      : null;
+    const portsFound = state.status === "detecting-ports" ? state.portsFound ?? 0 : 0;
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={theme.colors.text} />
         <Text style={styles.statusText}>{t("preview.detectingPorts")}</Text>
+        {phaseKey && (
+          <Text style={styles.phaseText}>
+            {t(phaseKey)}
+            {portsFound > 0 ? ` · ${t("preview.portsFoundCount", { count: portsFound })}` : ""}
+          </Text>
+        )}
       </View>
     );
   }
@@ -439,6 +449,11 @@ const styles = StyleSheet.create((theme) => ({
   statusText: {
     fontSize: 16,
     color: theme.colors.textSecondary,
+  },
+  phaseText: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    opacity: 0.7,
   },
   urlText: {
     fontSize: 13,

@@ -1921,6 +1921,14 @@ export const zhHant: TranslationStructure = {
     emptyHint: "選擇開發伺服器或輸入 URL 來擷取前端頁面截圖。",
     otherPorts: ({ count }: { count: number }) =>
       `其他 ${count} 個非 Web 連接埠`,
+    portsFoundCount: ({ count }: { count: number }) => `已發現 ${count} 個連接埠`,
+    phase: {
+      "scanning-ports": "正在掃描監聽連接埠...",
+      "fallback-detection": "正在嘗試備用偵測...",
+      "checking-docker": "正在檢查 Docker 容器...",
+      "probing-http": "正在探測 HTTP 服務...",
+      done: "完成",
+    },
   },
 
   backgroundTasks: {

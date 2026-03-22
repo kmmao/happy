@@ -2000,6 +2000,15 @@ export const en: TranslationStructure = {
       "Select a dev server or enter a URL to capture a screenshot of your frontend.",
     otherPorts: ({ count }: { count: number }) =>
       `${count} other non-web ports`,
+    portsFoundCount: ({ count }: { count: number }) =>
+      `${count} ports found`,
+    phase: {
+      "scanning-ports": "Scanning listening ports...",
+      "fallback-detection": "Trying alternative detection...",
+      "checking-docker": "Checking Docker containers...",
+      "probing-http": "Probing HTTP services...",
+      done: "Done",
+    },
   },
 
   backgroundTasks: {

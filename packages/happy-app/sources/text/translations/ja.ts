@@ -1987,6 +1987,14 @@ export const ja: TranslationStructure = {
       "開発サーバーを選択するか、URLを入力してフロントエンドのスクリーンショットを撮影します。",
     otherPorts: ({ count }: { count: number }) =>
       `その他 ${count} 個の非Webポート`,
+    portsFoundCount: ({ count }: { count: number }) => `${count} 個のポートを検出`,
+    phase: {
+      "scanning-ports": "リスニングポートをスキャン中...",
+      "fallback-detection": "代替検出を試行中...",
+      "checking-docker": "Dockerコンテナを確認中...",
+      "probing-http": "HTTPサービスを探査中...",
+      done: "完了",
+    },
   },
 
   backgroundTasks: {

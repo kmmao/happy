@@ -2030,6 +2030,14 @@ export const ru: TranslationStructure = {
       "Выберите сервер разработки или введите URL для создания скриншота фронтенда.",
     otherPorts: ({ count }: { count: number }) =>
       `Ещё ${count} не-веб портов`,
+    portsFoundCount: ({ count }: { count: number }) => `Найдено портов: ${count}`,
+    phase: {
+      "scanning-ports": "Сканирование портов...",
+      "fallback-detection": "Альтернативное обнаружение...",
+      "checking-docker": "Проверка Docker контейнеров...",
+      "probing-http": "Проверка HTTP сервисов...",
+      done: "Готово",
+    },
   },
 
   backgroundTasks: {

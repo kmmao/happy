@@ -1919,6 +1919,14 @@ export const zhHans: TranslationStructure = {
     emptyHint: "选择开发服务器或输入 URL 来截取前端页面截图。",
     otherPorts: ({ count }: { count: number }) =>
       `其他 ${count} 个非 Web 端口`,
+    portsFoundCount: ({ count }: { count: number }) => `已发现 ${count} 个端口`,
+    phase: {
+      "scanning-ports": "正在扫描监听端口...",
+      "fallback-detection": "正在尝试备用检测...",
+      "checking-docker": "正在检查 Docker 容器...",
+      "probing-http": "正在探测 HTTP 服务...",
+      done: "完成",
+    },
   },
 
   backgroundTasks: {

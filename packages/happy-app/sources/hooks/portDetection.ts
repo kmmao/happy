@@ -200,15 +200,27 @@ type BashFn = (
     request: { command: string; timeout?: number },
 ) => Promise<{ success: boolean; stdout?: string; exitCode?: number }>;
 
+export type DetectionPhase =
+    | "scanning-ports"
+    | "fallback-detection"
+    | "checking-docker"
+    | "probing-http"
+    | "done";
+
 /**
  * Run the full detection pipeline and return merged, deduplicated ports.
  * Each strategy is isolated — failure in one does not block others.
+ * Calls onProgress at each phase transition for UI feedback.
  */
 export async function detectAllPorts(
     sessionId: string,
     bash: BashFn = sessionBash,
+    onProgress?: (phase: DetectionPhase, portsFound: number) => void,
 ): Promise<readonly DetectedPort[]> {
+    const report = (phase: DetectionPhase, count: number) => onProgress?.(phase, count);
+
     // Phase 1: run lsof + package.json + docker in parallel
+    report("scanning-ports", 0);
     const [lsofResult, pkgResult, dockerResult] = await Promise.all([
         bash(sessionId, {
             command: "lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null",
@@ -245,8 +257,11 @@ export async function detectAllPorts(
         }
     }
 
+    report("scanning-ports", portMap.size);
+
     // Phase 2: if lsof found nothing, try ss then netstat as fallback
     if (!lsofWorked) {
+        report("fallback-detection", portMap.size);
         // Try ss (Linux only)
         const ssResult = await bash(sessionId, {
             command: "ss -tlnp 2>/dev/null",
@@ -272,6 +287,7 @@ export async function detectAllPorts(
     }
 
     // Merge Docker ports
+    report("checking-docker", portMap.size);
     if (dockerResult?.success && dockerResult.exitCode === 0 && dockerResult.stdout) {
         mergeInto(parseDockerOutput(dockerResult.stdout));
     }
@@ -290,6 +306,7 @@ export async function detectAllPorts(
     }
 
     // Phase 3: parallel curl probe ALL ports to determine which respond to HTTP.
+    report("probing-http", portMap.size);
     // Uses bash background jobs for true parallelism — finishes in ~0.5s regardless of port count.
     const allPorts = Array.from(portMap.keys())
         .filter((p) => Number.isInteger(p) && p > 0 && p < 65536);
@@ -343,6 +360,7 @@ export async function detectAllPorts(
     }
 
     // Build sorted result: web first, then common dev ports, then by port number
+    report("done", webPorts.size);
     return Array.from(portMap.entries())
         .map(([port, process]) => ({
             port,

@@ -2031,6 +2031,14 @@ export const pl: TranslationStructure = {
       "Wybierz serwer deweloperski lub wprowadź URL, aby wykonać zrzut ekranu interfejsu.",
     otherPorts: ({ count }: { count: number }) =>
       `${count} innych portów nie-web`,
+    portsFoundCount: ({ count }: { count: number }) => `Znaleziono portów: ${count}`,
+    phase: {
+      "scanning-ports": "Skanowanie portów...",
+      "fallback-detection": "Alternatywne wykrywanie...",
+      "checking-docker": "Sprawdzanie kontenerów Docker...",
+      "probing-http": "Testowanie usług HTTP...",
+      done: "Gotowe",
+    },
   },
 
   backgroundTasks: {

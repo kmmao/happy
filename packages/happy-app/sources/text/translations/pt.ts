@@ -2014,6 +2014,14 @@ export const pt: TranslationStructure = {
       "Selecione um servidor de desenvolvimento ou insira uma URL para capturar uma prévia da interface.",
     otherPorts: ({ count }: { count: number }) =>
       `${count} outras portas não web`,
+    portsFoundCount: ({ count }: { count: number }) => `${count} portas encontradas`,
+    phase: {
+      "scanning-ports": "Escaneando portas...",
+      "fallback-detection": "Detecção alternativa...",
+      "checking-docker": "Verificando contêineres Docker...",
+      "probing-http": "Testando serviços HTTP...",
+      done: "Concluído",
+    },
   },
 
   backgroundTasks: {

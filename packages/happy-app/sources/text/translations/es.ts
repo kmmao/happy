@@ -2011,6 +2011,14 @@ export const es: TranslationStructure = {
       "Selecciona un servidor de desarrollo o introduce una URL para capturar una vista previa.",
     otherPorts: ({ count }: { count: number }) =>
       `${count} otros puertos no web`,
+    portsFoundCount: ({ count }: { count: number }) => `${count} puertos encontrados`,
+    phase: {
+      "scanning-ports": "Escaneando puertos...",
+      "fallback-detection": "Detección alternativa...",
+      "checking-docker": "Verificando contenedores Docker...",
+      "probing-http": "Probando servicios HTTP...",
+      done: "Listo",
+    },
   },
 
   backgroundTasks: {

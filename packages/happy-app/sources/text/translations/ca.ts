@@ -2016,6 +2016,14 @@ export const ca: TranslationStructure = {
       "Selecciona un servidor de desenvolupament o introdueix una URL per capturar una vista prèvia.",
     otherPorts: ({ count }: { count: number }) =>
       `${count} altres ports no web`,
+    portsFoundCount: ({ count }: { count: number }) => `${count} ports trobats`,
+    phase: {
+      "scanning-ports": "Escanejant ports...",
+      "fallback-detection": "Detecció alternativa...",
+      "checking-docker": "Verificant contenidors Docker...",
+      "probing-http": "Provant serveis HTTP...",
+      done: "Fet",
+    },
   },
 
   backgroundTasks: {

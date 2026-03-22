@@ -11,7 +11,7 @@
 
 import * as React from "react";
 import { sessionBash, sessionReadFile } from "@/sync/ops";
-import { detectAllPorts, type DetectedPort } from "@/hooks/portDetection";
+import { detectAllPorts, type DetectedPort, type DetectionPhase } from "@/hooks/portDetection";
 
 export type { DetectedPort } from "@/hooks/portDetection";
 
@@ -33,7 +33,7 @@ export interface DiffResult {
 
 export type PreviewState =
   | { readonly status: "idle" }
-  | { readonly status: "detecting-ports" }
+  | { readonly status: "detecting-ports"; readonly phase?: DetectionPhase; readonly portsFound?: number }
   | { readonly status: "unavailable"; readonly reason: string }
   | {
       readonly status: "ports-detected";
@@ -168,7 +168,13 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
       return;
     }
 
-    const ports = await detectAllPorts(sessionId);
+    const ports = await detectAllPorts(
+      sessionId,
+      sessionBash,
+      (phase, portsFound) => {
+        setState({ status: "detecting-ports", phase, portsFound });
+      },
+    );
     setState({ status: "ports-detected", ports });
   }, [sessionId]);
 
