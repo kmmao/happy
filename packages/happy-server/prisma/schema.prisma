@@ -519,6 +519,7 @@ model SupervisorRun {
     actions         SupervisorAction[]
 
     @@index([projectId])
+    @@index([projectId, status])
     @@index([accountId, status])
     @@index([projectId, createdAt(sort: Desc)])
     @@index([loopId])
