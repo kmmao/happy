@@ -1105,7 +1105,8 @@ export async function claudeRemoteLauncher(
         session.consumeOneTimeFlags();
 
         if (!exitReason && abortController.signal.aborted) {
-          session.client.closeClaudeSessionTurn("cancelled");
+          session.client.closeClaudeSessionTurn("cancelled", lastResultData ?? undefined);
+          lastResultData = null;
           session.client.sendSessionEvent({
             type: "message",
             message: "Aborted by user",
@@ -1115,7 +1116,8 @@ export async function claudeRemoteLauncher(
         const err = e instanceof Error ? e : new Error(String(e));
         logger.debug("[remote]: launch error", err.message, err.stack, e);
         if (!exitReason) {
-          session.client.closeClaudeSessionTurn("failed");
+          session.client.closeClaudeSessionTurn("failed", lastResultData ?? undefined);
+          lastResultData = null;
           session.client.sendSessionEvent({
             type: "message",
             message: `Process exited unexpectedly: ${err.message}`,
@@ -1124,6 +1126,7 @@ export async function claudeRemoteLauncher(
         }
       } finally {
         logger.debug("[remote]: launch finally");
+        lastResultData = null;
 
         // Stop mid-turn drain and clear push function to prevent stale pushes
         stopMidTurnDrain();

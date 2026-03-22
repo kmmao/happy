@@ -677,16 +677,15 @@ export class ApiSessionClient extends EventEmitter {
         : {}),
     };
 
-    // Send turn-end cost report using SDK-provided cost data
-    if (
-      resultData?.totalCostUsd !== undefined &&
-      resultData.totalCostUsd > 0 &&
-      resultData.modelUsage
-    ) {
+    // Send turn-end cost report using SDK-provided cost data.
+    // Always send when totalCostUsd is present (even if 0) — the SDK explicitly
+    // reported a value. Previously required > 0 && modelUsage, which silently
+    // dropped reports when total_cost_usd defaulted to 0 or modelUsage was empty.
+    if (resultData?.totalCostUsd !== undefined) {
       try {
         this.sendTurnCostReport({
           totalCostUsd: resultData.totalCostUsd,
-          modelUsage: resultData.modelUsage,
+          modelUsage: resultData.modelUsage ?? {},
         });
       } catch (error) {
         logger.debug("[SOCKET] Failed to send turn cost report:", error);

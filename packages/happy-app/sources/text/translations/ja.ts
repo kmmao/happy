@@ -1684,6 +1684,10 @@ export const ja: TranslationStructure = {
     noMachineOnline: "オンラインのマシンがありません",
     serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
       `コマンド：${command}\nステータス：${status}`,
+    availableServers: "利用可能なサーバー",
+    searchServers: "サーバーを検索...",
+    install: "インストール",
+    addServerCustom: "名前とコマンドを手動で入力",
   },
 
   gitHosts: {

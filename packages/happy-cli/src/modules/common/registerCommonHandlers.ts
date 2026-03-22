@@ -1568,4 +1568,56 @@ export function registerCommonHandlers(
       return { servers: [] };
     }
   });
+
+  // ── Curated MCP server catalog ──
+  const MCP_CATALOG = [
+    // Development tools
+    { name: "github", pkg: "@modelcontextprotocol/server-github", description: "GitHub API — issues, PRs, repos, code search", category: "dev" },
+    { name: "playwright", pkg: "@playwright/mcp", description: "Browser automation and E2E testing by Microsoft", category: "dev" },
+    { name: "filesystem", pkg: "@modelcontextprotocol/server-filesystem", description: "Read/write/search local files securely", category: "dev" },
+    { name: "chrome-devtools", pkg: "chrome-devtools-mcp", description: "Control and inspect a live Chrome browser", category: "dev" },
+    // Knowledge & search
+    { name: "context7", pkg: "@upstash/context7-mcp", description: "Up-to-date library documentation lookup", category: "knowledge" },
+    { name: "brave-search", pkg: "@anthropic-ai/mcp-server-brave-search", description: "Web search via Brave Search API", category: "search", envHint: "BRAVE_API_KEY" },
+    { name: "fetch", pkg: "@anthropic-ai/mcp-server-fetch", description: "Fetch and extract content from URLs", category: "knowledge" },
+    // Database
+    { name: "postgres", pkg: "@anthropic-ai/mcp-server-postgres", description: "Query and manage PostgreSQL databases", category: "database", envHint: "DATABASE_URL" },
+    { name: "supabase", pkg: "@supabase/mcp-server-supabase", description: "Supabase database, auth, and storage", category: "database", envHint: "SUPABASE_ACCESS_TOKEN" },
+    { name: "sqlite", pkg: "@anthropic-ai/mcp-server-sqlite", description: "Query and manage SQLite databases", category: "database" },
+    // Memory & thinking
+    { name: "memory", pkg: "@anthropic-ai/mcp-server-memory", description: "Persistent memory using knowledge graphs", category: "utility" },
+    { name: "sequential-thinking", pkg: "@anthropic-ai/mcp-server-sequential-thinking", description: "Step-by-step reasoning and problem solving", category: "utility" },
+    // Platforms
+    { name: "notion", pkg: "@notionhq/notion-mcp-server", description: "Official Notion API — pages, databases, blocks", category: "platform", envHint: "NOTION_API_KEY" },
+    { name: "slack", pkg: "@anthropic-ai/mcp-server-slack", description: "Slack channels, messages, and threads", category: "platform", envHint: "SLACK_BOT_TOKEN" },
+    { name: "sentry", pkg: "@sentry/mcp-server", description: "Sentry error tracking and monitoring", category: "platform" },
+    { name: "railway", pkg: "@railway/mcp-server", description: "Railway deployment and infrastructure", category: "platform" },
+    { name: "heroku", pkg: "@heroku/mcp-server", description: "Heroku platform management", category: "platform" },
+  ];
+
+  rpcHandlerManager.registerHandler("listAvailableMcpServers", async () => {
+    // Get currently installed server names
+    let installedNames: Set<string>;
+    try {
+      const { stdout } = await execAsync("claude mcp list", {
+        timeout: 15000,
+        env: { ...process.env, NO_COLOR: "1" },
+      });
+      installedNames = new Set(
+        stdout
+          .split("\n")
+          .map((line) => line.match(/^\s*(\S+):/)?.[1])
+          .filter((name): name is string => !!name),
+      );
+    } catch {
+      installedNames = new Set();
+    }
+
+    return {
+      servers: MCP_CATALOG.map((s) => ({
+        ...s,
+        installed: installedNames.has(s.name),
+      })),
+    };
+  });
 }

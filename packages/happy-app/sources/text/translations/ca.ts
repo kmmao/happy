@@ -1707,6 +1707,10 @@ export const ca: TranslationStructure = {
     noMachineOnline: "Cap màquina en línia",
     serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
       `Comanda: ${command}\nEstat: ${status}`,
+    availableServers: "Servidors disponibles",
+    searchServers: "Cercar servidors...",
+    install: "Instal·lar",
+    addServerCustom: "Introduir nom i comanda manualment",
   },
 
   gitHosts: {

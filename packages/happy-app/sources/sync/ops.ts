@@ -640,6 +640,32 @@ export async function machineMcpRemove(
     return machineBash(machineId, `claude mcp remove "${name}" -s user`, "/");
 }
 
+/** A curated MCP server from the catalog. */
+export interface AvailableMcpServer {
+    readonly name: string;
+    readonly pkg: string;
+    readonly description: string;
+    readonly category: string;
+    readonly envHint?: string;
+    readonly installed: boolean;
+}
+
+/**
+ * List curated MCP servers with install status.
+ */
+export async function machineListAvailableMcpServers(
+    machineId: string,
+): Promise<{ servers: readonly AvailableMcpServer[] }> {
+    try {
+        return await apiSocket.machineRPC<
+            { servers: readonly AvailableMcpServer[] },
+            Record<string, never>
+        >(machineId, "listAvailableMcpServers", {});
+    } catch {
+        return { servers: [] };
+    }
+}
+
 /**
  * Interrupt the current session operation (graceful, keeps process alive)
  */

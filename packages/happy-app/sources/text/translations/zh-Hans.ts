@@ -1631,6 +1631,10 @@ export const zhHans: TranslationStructure = {
     noMachineOnline: "没有在线的机器",
     serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
       `命令：${command}\n状态：${status}`,
+    availableServers: "可用服务器",
+    searchServers: "搜索服务器...",
+    install: "安装",
+    addServerCustom: "手动输入名称和命令",
   },
 
   gitHosts: {

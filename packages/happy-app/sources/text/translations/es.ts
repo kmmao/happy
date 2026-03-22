@@ -1707,6 +1707,10 @@ export const es: TranslationStructure = {
     noMachineOnline: "No hay máquina en línea",
     serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
       `Comando: ${command}\nEstado: ${status}`,
+    availableServers: "Servidores disponibles",
+    searchServers: "Buscar servidores...",
+    install: "Instalar",
+    addServerCustom: "Introducir nombre y comando manualmente",
   },
 
   gitHosts: {

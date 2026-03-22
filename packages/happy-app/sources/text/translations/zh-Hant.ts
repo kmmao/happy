@@ -1633,6 +1633,10 @@ export const zhHant: TranslationStructure = {
     noMachineOnline: "沒有線上的機器",
     serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
       `命令：${command}\n狀態：${status}`,
+    availableServers: "可用伺服器",
+    searchServers: "搜尋伺服器...",
+    install: "安裝",
+    addServerCustom: "手動輸入名稱和命令",
   },
 
   gitHosts: {

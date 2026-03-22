@@ -1729,6 +1729,10 @@ export const ru: TranslationStructure = {
     noMachineOnline: "Нет онлайн-машин",
     serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
       `Команда: ${command}\nСтатус: ${status}`,
+    availableServers: "Доступные серверы",
+    searchServers: "Поиск серверов...",
+    install: "Установить",
+    addServerCustom: "Ввести имя и команду вручную",
   },
 
   gitHosts: {

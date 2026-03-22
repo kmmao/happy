@@ -1,16 +1,18 @@
 import * as React from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, ActivityIndicator, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
 import {
     machineListMcpServers,
+    machineListAvailableMcpServers,
     machineMcpAdd,
     machineMcpRemove,
 } from "@/sync/ops";
-import type { McpServerInfo } from "@/sync/ops";
+import type { McpServerInfo, AvailableMcpServer } from "@/sync/ops";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 import { useHappyAction } from "@/hooks/useHappyAction";
@@ -23,37 +25,57 @@ function findOnlineMachineId(): string | null {
     return online?.id ?? null;
 }
 
+/** Category labels */
+const CATEGORY_LABELS: Record<string, string> = {
+    dev: "Development",
+    knowledge: "Knowledge",
+    search: "Search",
+    database: "Database",
+    utility: "Utility",
+    platform: "Platform",
+};
+
 function McpSettingsScreen() {
     const { theme } = useUnistyles();
 
     const [servers, setServers] = React.useState<readonly McpServerInfo[]>([]);
+    const [availableServers, setAvailableServers] = React.useState<
+        readonly AvailableMcpServer[]
+    >([]);
     const [loading, setLoading] = React.useState(false);
     const [loaded, setLoaded] = React.useState(false);
     const [actionInProgress, setActionInProgress] = React.useState<
         Set<string>
     >(new Set());
+    const [searchQuery, setSearchQuery] = React.useState("");
 
     const machineIdRef = React.useRef<string | null>(null);
 
-    // Load on mount
-    const loadServers = React.useCallback(async () => {
+    // Load on mount and on focus
+    const loadAll = React.useCallback(async () => {
         const machineId = findOnlineMachineId();
         if (!machineId) return;
         machineIdRef.current = machineId;
 
         setLoading(true);
         try {
-            const result = await machineListMcpServers(machineId);
-            setServers(result.servers);
+            const [installed, available] = await Promise.all([
+                machineListMcpServers(machineId),
+                machineListAvailableMcpServers(machineId),
+            ]);
+            setServers(installed.servers);
+            setAvailableServers(available.servers);
             setLoaded(true);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    React.useEffect(() => {
-        loadServers();
-    }, [loadServers]);
+    useFocusEffect(
+        React.useCallback(() => {
+            loadAll();
+        }, [loadAll]),
+    );
 
     // Refresh
     const [, doRefresh] = useHappyAction(async () => {
@@ -65,8 +87,12 @@ function McpSettingsScreen() {
         machineIdRef.current = machineId;
         setLoading(true);
         try {
-            const result = await machineListMcpServers(machineId);
-            setServers(result.servers);
+            const [installed, available] = await Promise.all([
+                machineListMcpServers(machineId),
+                machineListAvailableMcpServers(machineId),
+            ]);
+            setServers(installed.servers);
+            setAvailableServers(available.servers);
             setLoaded(true);
             Modal.toast(t("settingsMcp.refreshSuccess"));
         } finally {
@@ -74,8 +100,61 @@ function McpSettingsScreen() {
         }
     });
 
-    // Add server
-    const doAdd = React.useCallback(async () => {
+    // Install from catalog
+    const doInstall = React.useCallback(
+        async (server: AvailableMcpServer) => {
+            const machineId = machineIdRef.current ?? findOnlineMachineId();
+            if (!machineId) {
+                Modal.toast(t("settingsMcp.noMachineOnline"));
+                return;
+            }
+
+            const command = `npx -y ${server.pkg}`;
+
+            setActionInProgress((prev) => new Set([...prev, server.name]));
+            try {
+                const result = await machineMcpAdd(
+                    machineId,
+                    server.name,
+                    command,
+                );
+                if (result.success) {
+                    Modal.toast(t("settingsMcp.addSuccess", { name: server.name }));
+                    // Optimistic: add to installed list immediately
+                    setServers((prev) => [
+                        ...prev,
+                        { name: server.name, command, status: "connected" as const },
+                    ]);
+                    setAvailableServers((prev) =>
+                        prev.map((s) =>
+                            s.name === server.name ? { ...s, installed: true } : s,
+                        ),
+                    );
+                    // Background refresh for accurate status
+                    loadAll();
+                } else {
+                    Modal.toast(
+                        t("settingsMcp.actionFailed", {
+                            error:
+                                result.stderr?.slice(0, 100) ||
+                                result.error ||
+                                "Unknown error",
+                        }),
+                    );
+                }
+            } finally {
+                setActionInProgress((prev) => {
+                    const next = new Set(prev);
+                    next.delete(server.name);
+                    return next;
+                });
+            }
+        },
+        [loadAll],
+    );
+
+    // Add custom server
+    const doAddCustom = React.useCallback(async () => {
         const machineId = machineIdRef.current ?? findOnlineMachineId();
         if (!machineId) {
             Modal.toast(t("settingsMcp.noMachineOnline"));
@@ -85,18 +164,14 @@ function McpSettingsScreen() {
         const name = await Modal.prompt(
             t("settingsMcp.addServer"),
             t("settingsMcp.addServerName"),
-            {
-                placeholder: t("settingsMcp.addServerNamePlaceholder"),
-            },
+            { placeholder: t("settingsMcp.addServerNamePlaceholder") },
         );
         if (!name) return;
 
         const command = await Modal.prompt(
             t("settingsMcp.addServer"),
             t("settingsMcp.addServerCommand"),
-            {
-                placeholder: t("settingsMcp.addServerCommandPlaceholder"),
-            },
+            { placeholder: t("settingsMcp.addServerCommandPlaceholder") },
         );
         if (!command) return;
 
@@ -105,7 +180,13 @@ function McpSettingsScreen() {
             const result = await machineMcpAdd(machineId, name, command);
             if (result.success) {
                 Modal.toast(t("settingsMcp.addSuccess", { name }));
-                await loadServers();
+                // Optimistic: add to installed list immediately
+                setServers((prev) => [
+                    ...prev,
+                    { name, command, status: "connected" as const },
+                ]);
+                // Background refresh
+                loadAll();
             } else {
                 Modal.toast(
                     t("settingsMcp.actionFailed", {
@@ -123,7 +204,7 @@ function McpSettingsScreen() {
                 return next;
             });
         }
-    }, [loadServers]);
+    }, [loadAll]);
 
     // Remove server
     const doRemove = React.useCallback(
@@ -146,7 +227,15 @@ function McpSettingsScreen() {
                 const result = await machineMcpRemove(machineId, name);
                 if (result.success) {
                     Modal.toast(t("settingsMcp.removeSuccess", { name }));
-                    await loadServers();
+                    // Optimistic: remove from installed list immediately
+                    setServers((prev) => prev.filter((s) => s.name !== name));
+                    setAvailableServers((prev) =>
+                        prev.map((s) =>
+                            s.name === name ? { ...s, installed: false } : s,
+                        ),
+                    );
+                    // Background refresh
+                    loadAll();
                 } else {
                     Modal.toast(
                         t("settingsMcp.actionFailed", {
@@ -165,7 +254,7 @@ function McpSettingsScreen() {
                 });
             }
         },
-        [loadServers],
+        [loadAll],
     );
 
     // Server tap → detail popup with remove option
@@ -199,6 +288,19 @@ function McpSettingsScreen() {
         [doRemove],
     );
 
+    // Filter catalog by search (exclude installed)
+    const filteredCatalog = React.useMemo(() => {
+        const notInstalled = availableServers.filter((s) => !s.installed);
+        if (!searchQuery) return notInstalled;
+        const q = searchQuery.toLowerCase();
+        return notInstalled.filter(
+            (s) =>
+                s.name.toLowerCase().includes(q) ||
+                s.description.toLowerCase().includes(q) ||
+                s.category.toLowerCase().includes(q),
+        );
+    }, [availableServers, searchQuery]);
+
     const styles = StyleSheet.create({
         loadingContainer: {
             flexDirection: "row",
@@ -218,11 +320,39 @@ function McpSettingsScreen() {
             fontSize: 12,
             fontWeight: "500",
         },
+        searchContainer: {
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+        },
+        searchInput: {
+            backgroundColor: theme.colors.groupped.background,
+            color: theme.colors.text,
+            borderRadius: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            fontSize: 15,
+        },
+        installButton: {
+            paddingHorizontal: 14,
+            paddingVertical: 4,
+            borderRadius: 12,
+            backgroundColor: theme.colors.groupped.background,
+        },
+        installButtonText: {
+            color: theme.colors.primary,
+            fontSize: 13,
+            fontWeight: "600",
+        },
+        envHint: {
+            fontSize: 11,
+            color: theme.colors.warning,
+            marginTop: 2,
+        },
     });
 
     return (
         <ItemList>
-            {/* ── MCP Servers ── */}
+            {/* ── Installed MCP Servers ── */}
             <ItemGroup title={t("settingsMcp.servers")}>
                 {loading && !loaded && (
                     <View style={styles.loadingContainer}>
@@ -294,10 +424,95 @@ function McpSettingsScreen() {
                 ))}
             </ItemGroup>
 
+            {/* ── Available MCP Servers (Catalog) ── */}
+            {loaded && availableServers.length > 0 && (
+                <ItemGroup
+                    title={`${t("settingsMcp.availableServers")} (${filteredCatalog.length})`}
+                >
+                    <View style={styles.searchContainer}>
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder={t("settingsMcp.searchServers")}
+                            placeholderTextColor={theme.colors.textSecondary}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
+                    </View>
+                    {filteredCatalog.map((server) => (
+                        <Item
+                            key={server.name}
+                            title={server.name}
+                            subtitle={server.description}
+                            detail={
+                                CATEGORY_LABELS[server.category] ??
+                                server.category
+                            }
+                            icon={
+                                <Ionicons
+                                    name="server-outline"
+                                    size={20}
+                                    color={theme.colors.textSecondary}
+                                />
+                            }
+                            onPress={async () => {
+                                const info = [
+                                    server.description,
+                                    "",
+                                    `Package: ${server.pkg}`,
+                                    `Category: ${CATEGORY_LABELS[server.category] ?? server.category}`,
+                                    server.envHint
+                                        ? `\n⚠️ Requires: ${server.envHint}`
+                                        : "",
+                                ]
+                                    .filter(Boolean)
+                                    .join("\n");
+
+                                const shouldInstall = await Modal.confirm(
+                                    server.name,
+                                    info,
+                                    {
+                                        confirmText: t(
+                                            "settingsMcp.install",
+                                        ),
+                                    },
+                                );
+                                if (shouldInstall) {
+                                    doInstall(server);
+                                }
+                            }}
+                            rightElement={
+                                actionInProgress.has(server.name) ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={theme.colors.primary}
+                                    />
+                                ) : (
+                                    <Pressable
+                                        style={({ pressed }) => [
+                                            styles.installButton,
+                                            pressed && { opacity: 0.7 },
+                                        ]}
+                                        onPress={() => doInstall(server)}
+                                    >
+                                        <Text style={styles.installButtonText}>
+                                            {t("settingsMcp.install")}
+                                        </Text>
+                                    </Pressable>
+                                )
+                            }
+                            showChevron={false}
+                        />
+                    ))}
+                </ItemGroup>
+            )}
+
             {/* ── Actions ── */}
             <ItemGroup>
                 <Item
                     title={t("settingsMcp.addServer")}
+                    subtitle={t("settingsMcp.addServerCustom")}
                     icon={
                         <Ionicons
                             name="add-circle-outline"
@@ -305,7 +520,7 @@ function McpSettingsScreen() {
                             color={theme.colors.accentBlue}
                         />
                     }
-                    onPress={doAdd}
+                    onPress={doAddCustom}
                 />
                 <Item
                     title={t("settingsMcp.refresh")}

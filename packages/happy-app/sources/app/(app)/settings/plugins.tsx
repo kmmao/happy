@@ -2,6 +2,7 @@ import * as React from "react";
 import { View, Text, TextInput, ActivityIndicator, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
@@ -81,9 +82,12 @@ function PluginsSettingsScreen() {
         }
     }, []);
 
-    React.useEffect(() => {
-        loadAll();
-    }, [loadAll]);
+    // Reload when screen gains focus (e.g. after uninstall/enable in detail page)
+    useFocusEffect(
+        React.useCallback(() => {
+            loadAll();
+        }, [loadAll]),
+    );
 
     // Refresh
     const [, doRefresh] = useHappyAction(async () => {

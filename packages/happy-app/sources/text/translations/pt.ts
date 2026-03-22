@@ -1705,6 +1705,10 @@ export const pt: TranslationStructure = {
     noMachineOnline: "Nenhuma máquina online",
     serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
       `Comando: ${command}\nStatus: ${status}`,
+    availableServers: "Servidores disponíveis",
+    searchServers: "Pesquisar servidores...",
+    install: "Instalar",
+    addServerCustom: "Inserir nome e comando manualmente",
   },
 
   gitHosts: {

@@ -1728,6 +1728,10 @@ export const pl: TranslationStructure = {
     noMachineOnline: "Brak maszyn online",
     serverDetail: ({ name, command, status }: { name: string; command: string; status: string }) =>
       `Polecenie: ${command}\nStatus: ${status}`,
+    availableServers: "Dostępne serwery",
+    searchServers: "Szukaj serwerów...",
+    install: "Zainstaluj",
+    addServerCustom: "Wprowadź nazwę i polecenie ręcznie",
   },
 
   gitHosts: {
