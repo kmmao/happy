@@ -190,6 +190,13 @@ function PluginsSettingsScreen() {
     }, [availablePlugins, searchQuery]);
 
     const styles = StyleSheet.create({
+        loadingContainer: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingVertical: 12,
+            gap: 8,
+        },
         emptyText: {
             fontSize: 14,
             color: theme.colors.textSecondary,
@@ -240,12 +247,7 @@ function PluginsSettingsScreen() {
                 footer={t("settingsPlugins.installedDescription")}
             >
                 {loading && !loaded && (
-                    <View
-                        style={{
-                            alignItems: "center",
-                            paddingVertical: 16,
-                        }}
-                    >
+                    <View style={styles.loadingContainer}>
                         <ActivityIndicator
                             size="small"
                             color={theme.colors.primary}
