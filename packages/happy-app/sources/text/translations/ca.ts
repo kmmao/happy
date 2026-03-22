@@ -1617,6 +1617,7 @@ export const ca: TranslationStructure = {
     addManualDescription: "Introduïu la ruta del connector a la màquina objectiu",
     addTitle: "Afegir connector",
     addDescription: "Introduïu la ruta absoluta del directori del connector",
+    addPlaceholder: "~/.claude/plugins/my-plugin",
     discover: "Descobrir connectors",
     discoverDescription: "Escanejar la màquina per trobar connectors",
     discoverTitle: "Descobrir connectors",
@@ -1671,6 +1672,11 @@ export const ca: TranslationStructure = {
     actionFailed: ({ error }: { error: string }) => `Error: ${error}`,
     confirmUninstall: "Esteu segur que voleu desinstal·lar aquest plugin?",
     installs: ({ count }: { count: string }) => `${count} instal·lacions`,
+    update: "Actualitzar plugin",
+    updateSuccess: ({ name }: { name: string }) => `${name} actualitzat`,
+    updateMarketplace: "Actualitzar marketplace",
+    updateMarketplaceSuccess: "Marketplace actualitzat",
+    marketplaceFooter: "Toca per actualitzar el marketplace",
   },
 
   gitHosts: {

@@ -1594,6 +1594,7 @@ export const ja: TranslationStructure = {
     addManualDescription: "ターゲットマシン上のプラグインパスを入力",
     addTitle: "プラグインを追加",
     addDescription: "プラグインディレクトリの絶対パスを入力",
+    addPlaceholder: "~/.claude/plugins/my-plugin",
     discover: "プラグインを検出",
     discoverDescription: "マシン上のインストール済みプラグインをスキャン",
     discoverTitle: "プラグインを検出",
@@ -1648,6 +1649,11 @@ export const ja: TranslationStructure = {
     actionFailed: ({ error }: { error: string }) => `失敗：${error}`,
     confirmUninstall: "このプラグインをアンインストールしてもよろしいですか？",
     installs: ({ count }: { count: string }) => `${count} 回インストール`,
+    update: "プラグインを更新",
+    updateSuccess: ({ name }: { name: string }) => `${name} を更新しました`,
+    updateMarketplace: "マーケットプレイスを更新",
+    updateMarketplaceSuccess: "マーケットプレイスを更新しました",
+    marketplaceFooter: "タップしてマーケットプレイスを更新",
   },
 
   gitHosts: {

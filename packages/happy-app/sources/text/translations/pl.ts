@@ -1638,6 +1638,7 @@ export const pl: TranslationStructure = {
     addManualDescription: "Wprowadź ścieżkę wtyczki na docelowej maszynie",
     addTitle: "Dodaj wtyczkę",
     addDescription: "Wprowadź bezwzględną ścieżkę katalogu wtyczki",
+    addPlaceholder: "~/.claude/plugins/my-plugin",
     discover: "Wykryj wtyczki",
     discoverDescription: "Skanuj maszynę w poszukiwaniu wtyczek",
     discoverTitle: "Wykryj wtyczki",
@@ -1692,6 +1693,11 @@ export const pl: TranslationStructure = {
     actionFailed: ({ error }: { error: string }) => `Błąd: ${error}`,
     confirmUninstall: "Czy na pewno chcesz odinstalować ten plugin?",
     installs: ({ count }: { count: string }) => `${count} instalacji`,
+    update: "Zaktualizuj plugin",
+    updateSuccess: ({ name }: { name: string }) => `${name} zaktualizowano`,
+    updateMarketplace: "Zaktualizuj marketplace",
+    updateMarketplaceSuccess: "Marketplace zaktualizowany",
+    marketplaceFooter: "Dotknij aby zaktualizować marketplace",
   },
 
   gitHosts: {

@@ -1541,6 +1541,7 @@ export const zhHans: TranslationStructure = {
     addManualDescription: "输入目标机器上的插件路径",
     addTitle: "添加插件",
     addDescription: "输入插件目录的绝对路径",
+    addPlaceholder: "~/.claude/plugins/my-plugin",
     discover: "发现插件",
     discoverDescription: "扫描目标机器上已安装的插件",
     discoverTitle: "发现插件",
@@ -1595,6 +1596,11 @@ export const zhHans: TranslationStructure = {
     actionFailed: ({ error }: { error: string }) => `失败：${error}`,
     confirmUninstall: "确定要卸载此插件吗？",
     installs: ({ count }: { count: string }) => `${count} 次安装`,
+    update: "更新插件",
+    updateSuccess: ({ name }: { name: string }) => `${name} 已更新`,
+    updateMarketplace: "更新市场源",
+    updateMarketplaceSuccess: "市场源已更新",
+    marketplaceFooter: "点击更新市场源",
   },
 
   gitHosts: {

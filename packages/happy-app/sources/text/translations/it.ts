@@ -1613,6 +1613,7 @@ export const it: TranslationStructure = {
     addManualDescription: "Inserisci il percorso del plugin sulla macchina di destinazione",
     addTitle: "Aggiungi plugin",
     addDescription: "Inserisci il percorso assoluto della directory del plugin",
+    addPlaceholder: "~/.claude/plugins/my-plugin",
     discover: "Scopri plugin",
     discoverDescription: "Scansiona la macchina alla ricerca di plugin",
     discoverTitle: "Scopri plugin",
@@ -1667,6 +1668,11 @@ export const it: TranslationStructure = {
     actionFailed: ({ error }: { error: string }) => `Errore: ${error}`,
     confirmUninstall: "Sei sicuro di voler disinstallare questo plugin?",
     installs: ({ count }: { count: string }) => `${count} installazioni`,
+    update: "Aggiorna plugin",
+    updateSuccess: ({ name }: { name: string }) => `${name} aggiornato`,
+    updateMarketplace: "Aggiorna marketplace",
+    updateMarketplaceSuccess: "Marketplace aggiornato",
+    marketplaceFooter: "Tocca per aggiornare il marketplace",
   },
 
   gitHosts: {

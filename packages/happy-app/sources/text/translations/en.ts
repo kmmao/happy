@@ -1606,6 +1606,7 @@ export const en: TranslationStructure = {
     addManualDescription: "Enter the plugin path on the target machine",
     addTitle: "Add Plugin",
     addDescription: "Enter the absolute path to the plugin directory",
+    addPlaceholder: "~/.claude/plugins/my-plugin",
     discover: "Discover Plugins",
     discoverDescription: "Scan the machine for installed plugins",
     discoverTitle: "Discover Plugins",
@@ -1661,6 +1662,11 @@ export const en: TranslationStructure = {
     actionFailed: ({ error }: { error: string }) => `Failed: ${error}`,
     confirmUninstall: "Are you sure you want to uninstall this plugin?",
     installs: ({ count }: { count: string }) => `${count} installs`,
+    update: "Update Plugin",
+    updateSuccess: ({ name }: { name: string }) => `${name} updated`,
+    updateMarketplace: "Update Marketplace",
+    updateMarketplaceSuccess: "Marketplace updated",
+    marketplaceFooter: "Tap to update marketplace",
   },
 
   gitHosts: {

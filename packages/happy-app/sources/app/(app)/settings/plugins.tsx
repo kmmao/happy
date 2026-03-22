@@ -1,18 +1,16 @@
 import * as React from "react";
-import { View, Text, TextInput, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, ActivityIndicator, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
-import { useSettingMutable } from "@/sync/storage";
 import {
     machineListInstalledPlugins,
     machineListMarketplaces,
     machineListAvailablePlugins,
     machinePluginAction,
-    machineDiscoverPlugins,
 } from "@/sync/ops";
 import type { InstalledPlugin, MarketplaceInfo, AvailablePlugin } from "@/sync/ops";
 import { Modal } from "@/modal";
@@ -37,7 +35,6 @@ function formatInstalls(n: number): string {
 function PluginsSettingsScreen() {
     const { theme } = useUnistyles();
     const router = useRouter();
-    const [plugins, setPlugins] = useSettingMutable("plugins");
 
     // Remote data loaded from machine
     const [installedPlugins, setInstalledPlugins] = React.useState<
@@ -179,85 +176,6 @@ function PluginsSettingsScreen() {
         [loadAll],
     );
 
-    // Legacy: discover marketplace-level plugins for settings sync
-    const [discovering, setDiscovering] = React.useState(false);
-    const [, doDiscover] = useHappyAction(async () => {
-        const machineId = findOnlineMachineId();
-        if (!machineId) {
-            Modal.alert(
-                t("settingsPlugins.discoverTitle"),
-                t("settingsPlugins.discoverNoSession"),
-            );
-            return;
-        }
-
-        setDiscovering(true);
-        try {
-            const result = await machineDiscoverPlugins(machineId);
-            if (result.plugins.length === 0) {
-                Modal.alert(
-                    t("settingsPlugins.discoverTitle"),
-                    t("settingsPlugins.discoverEmpty"),
-                );
-                return;
-            }
-
-            const existingPaths = new Set(plugins.map((p) => p.path));
-            const newPlugins = result.plugins
-                .filter((p) => !existingPaths.has(p.path))
-                .map((p) => ({
-                    id: `discovered-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                    name: p.name,
-                    path: p.path,
-                    enabled: true,
-                    source: "discovered" as const,
-                    version: p.version,
-                    description: p.description,
-                    author: p.author,
-                    homepage: p.homepage,
-                    counts: p.counts,
-                }));
-
-            if (newPlugins.length === 0) {
-                Modal.toast(t("settingsPlugins.discoverAllAdded"));
-                return;
-            }
-
-            setPlugins([...plugins, ...newPlugins]);
-            Modal.toast(
-                t("settingsPlugins.discoverFound", {
-                    count: newPlugins.length,
-                }),
-            );
-        } finally {
-            setDiscovering(false);
-        }
-    });
-
-    const addManualPlugin = React.useCallback(async () => {
-        const path = await Modal.prompt(
-            t("settingsPlugins.addTitle"),
-            t("settingsPlugins.addDescription"),
-            {
-                placeholder: "~/.claude/plugins/my-plugin",
-                confirmText: t("settingsPlugins.addManual"),
-            },
-        );
-        if (!path) return;
-
-        const name = path.split("/").pop() || path;
-        setPlugins([
-            ...plugins,
-            {
-                id: `manual-${Date.now()}`,
-                name,
-                path,
-                enabled: true,
-                source: "manual" as const,
-            },
-        ]);
-    }, [plugins, setPlugins]);
-
     // Filter available plugins by search query (exclude installed)
     const filteredAvailable = React.useMemo(() => {
         const notInstalled = availablePlugins.filter((p) => !p.installed);
@@ -293,7 +211,7 @@ function PluginsSettingsScreen() {
         },
         installButton: {
             paddingHorizontal: 12,
-            paddingVertical: 4,
+            paddingVertical: 5,
             borderRadius: 14,
             backgroundColor: theme.colors.primary,
         },
@@ -301,6 +219,16 @@ function PluginsSettingsScreen() {
             color: "#FFFFFF",
             fontSize: 13,
             fontWeight: "600",
+        },
+        enabledBadge: {
+            fontSize: 12,
+            color: theme.colors.success,
+            fontWeight: "500",
+        },
+        disabledBadge: {
+            fontSize: 12,
+            color: theme.colors.textSecondary,
+            fontWeight: "500",
         },
     });
 
@@ -370,9 +298,22 @@ function PluginsSettingsScreen() {
                                 />
                             )
                         }
+                        rightElement={
+                            <Text
+                                style={
+                                    plugin.enabled
+                                        ? styles.enabledBadge
+                                        : styles.disabledBadge
+                                }
+                            >
+                                {plugin.enabled
+                                    ? t("settingsPlugins.enable")
+                                    : t("settingsPlugins.disable")}
+                            </Text>
+                        }
                         onPress={() =>
                             router.push(
-                                `/settings/plugin-detail?key=${encodeURIComponent(plugin.key)}&installPath=${encodeURIComponent(plugin.installPath)}` as any,
+                                `/settings/plugin-detail?key=${encodeURIComponent(plugin.key)}&installPath=${encodeURIComponent(plugin.installPath)}&enabled=${plugin.enabled ? "1" : "0"}` as any,
                             )
                         }
                     />
@@ -381,7 +322,9 @@ function PluginsSettingsScreen() {
 
             {/* ── Available Plugins (Discover) ── */}
             {loaded && availablePlugins.length > 0 && (
-                <ItemGroup title={t("settingsPlugins.availablePlugins")}>
+                <ItemGroup
+                    title={`${t("settingsPlugins.availablePlugins")} (${filteredAvailable.length})`}
+                >
                     <View style={styles.searchContainer}>
                         <TextInput
                             style={styles.searchInput}
@@ -414,6 +357,48 @@ function PluginsSettingsScreen() {
                                     color={theme.colors.textSecondary}
                                 />
                             }
+                            onPress={async () => {
+                                const desc =
+                                    plugin.description ||
+                                    t("settingsPlugins.noDescription");
+                                const info = [
+                                    desc,
+                                    "",
+                                    `${t("settingsPlugins.marketplacesTitle")}: ${plugin.marketplace}`,
+                                    plugin.category
+                                        ? `Category: ${plugin.category}`
+                                        : "",
+                                    plugin.installs
+                                        ? t("settingsPlugins.installs", {
+                                              count: formatInstalls(
+                                                  plugin.installs,
+                                              ),
+                                          })
+                                        : "",
+                                    plugin.homepage
+                                        ? `${t("settingsPlugins.homepage")}: ${plugin.homepage}`
+                                        : "",
+                                ]
+                                    .filter(Boolean)
+                                    .join("\n");
+
+                                const shouldInstall = await Modal.confirm(
+                                    plugin.name,
+                                    info,
+                                    {
+                                        confirmText: t(
+                                            "settingsPlugins.install",
+                                        ),
+                                    },
+                                );
+                                if (shouldInstall) {
+                                    doPluginAction(
+                                        "install",
+                                        plugin.key,
+                                        plugin.name,
+                                    );
+                                }
+                            }}
                             rightElement={
                                 actionInProgress.has(plugin.key) ? (
                                     <ActivityIndicator
@@ -421,8 +406,8 @@ function PluginsSettingsScreen() {
                                         color={theme.colors.primary}
                                     />
                                 ) : (
-                                    <Text
-                                        style={styles.installButtonText}
+                                    <Pressable
+                                        style={styles.installButton}
                                         onPress={() =>
                                             doPluginAction(
                                                 "install",
@@ -431,18 +416,10 @@ function PluginsSettingsScreen() {
                                             )
                                         }
                                     >
-                                        <View style={styles.installButton}>
-                                            <Text
-                                                style={
-                                                    styles.installButtonText
-                                                }
-                                            >
-                                                {t(
-                                                    "settingsPlugins.install",
-                                                )}
-                                            </Text>
-                                        </View>
-                                    </Text>
+                                        <Text style={styles.installButtonText}>
+                                            {t("settingsPlugins.install")}
+                                        </Text>
+                                    </Pressable>
                                 )
                             }
                             showChevron={false}
@@ -453,21 +430,79 @@ function PluginsSettingsScreen() {
 
             {/* ── Marketplaces ── */}
             {marketplaces.length > 0 && (
-                <ItemGroup title={t("settingsPlugins.marketplacesTitle")}>
+                <ItemGroup
+                    title={t("settingsPlugins.marketplacesTitle")}
+                    footer={t("settingsPlugins.marketplaceFooter")}
+                >
                     {marketplaces.map((mp) => (
                         <Item
                             key={mp.name}
                             title={mp.name}
-                            subtitle={mp.repo}
-                            detail={`${mp.installedCount}/${mp.availableCount}`}
+                            subtitle={`${mp.repo} · ${mp.installedCount}/${mp.availableCount}`}
+                            detail={mp.lastUpdated.split("T")[0]}
                             icon={
-                                <Ionicons
-                                    name="storefront-outline"
-                                    size={22}
-                                    color={theme.colors.accentBlue}
-                                />
+                                actionInProgress.has(`mp:${mp.name}`) ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={theme.colors.primary}
+                                    />
+                                ) : (
+                                    <Ionicons
+                                        name="storefront-outline"
+                                        size={22}
+                                        color={theme.colors.accentBlue}
+                                    />
+                                )
                             }
-                            showChevron={false}
+                            onPress={async () => {
+                                const machineId =
+                                    machineIdRef.current ??
+                                    findOnlineMachineId();
+                                if (!machineId) {
+                                    Modal.toast(
+                                        t("settingsPlugins.noMachineOnline"),
+                                    );
+                                    return;
+                                }
+                                const mpKey = `mp:${mp.name}`;
+                                setActionInProgress(
+                                    (prev) => new Set([...prev, mpKey]),
+                                );
+                                try {
+                                    const result = await machinePluginAction(
+                                        machineId,
+                                        "marketplace-update" as any,
+                                        mp.name,
+                                    );
+                                    if (result.success) {
+                                        Modal.toast(
+                                            t(
+                                                "settingsPlugins.updateMarketplaceSuccess",
+                                            ),
+                                        );
+                                        await loadAll();
+                                    } else {
+                                        Modal.toast(
+                                            t(
+                                                "settingsPlugins.actionFailed",
+                                                {
+                                                    error:
+                                                        result.stderr?.slice(
+                                                            0,
+                                                            100,
+                                                        ) || "Update failed",
+                                                },
+                                            ),
+                                        );
+                                    }
+                                } finally {
+                                    setActionInProgress((prev) => {
+                                        const next = new Set(prev);
+                                        next.delete(mpKey);
+                                        return next;
+                                    });
+                                }
+                            }}
                         />
                     ))}
                 </ItemGroup>
@@ -495,26 +530,6 @@ function PluginsSettingsScreen() {
                     disabled={loading}
                 />
                 <Item
-                    title={t("settingsPlugins.discover")}
-                    subtitle={t("settingsPlugins.discoverDescription")}
-                    icon={
-                        discovering ? (
-                            <ActivityIndicator
-                                size="small"
-                                color={theme.colors.primary}
-                            />
-                        ) : (
-                            <Ionicons
-                                name="search-outline"
-                                size={24}
-                                color={theme.colors.success}
-                            />
-                        )
-                    }
-                    onPress={doDiscover}
-                    disabled={discovering}
-                />
-                <Item
                     title={t("settingsPlugins.addManual")}
                     subtitle={t("settingsPlugins.addManualDescription")}
                     icon={
@@ -524,7 +539,43 @@ function PluginsSettingsScreen() {
                             color={theme.colors.accentBlue}
                         />
                     }
-                    onPress={addManualPlugin}
+                    onPress={async () => {
+                        const path = await Modal.prompt(
+                            t("settingsPlugins.addTitle"),
+                            t("settingsPlugins.addDescription"),
+                            {
+                                placeholder: t("settingsPlugins.addPlaceholder"),
+                                confirmText: t("settingsPlugins.addManual"),
+                            },
+                        );
+                        if (!path) return;
+                        const machineId =
+                            machineIdRef.current ?? findOnlineMachineId();
+                        if (!machineId) {
+                            Modal.toast(t("settingsPlugins.noMachineOnline"));
+                            return;
+                        }
+                        const name = path.split("/").pop() || path;
+                        const result = await machinePluginAction(
+                            machineId,
+                            "install",
+                            path,
+                        );
+                        if (result.success) {
+                            Modal.toast(
+                                t("settingsPlugins.installSuccess", { name }),
+                            );
+                            await loadAll();
+                        } else {
+                            Modal.toast(
+                                t("settingsPlugins.actionFailed", {
+                                    error:
+                                        result.stderr?.slice(0, 100) ||
+                                        "Install failed",
+                                }),
+                            );
+                        }
+                    }}
                 />
             </ItemGroup>
         </ItemList>

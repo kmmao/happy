@@ -1543,6 +1543,7 @@ export const zhHant: TranslationStructure = {
     addManualDescription: "輸入目標機器上的外掛路徑",
     addTitle: "新增外掛",
     addDescription: "輸入外掛目錄的絕對路徑",
+    addPlaceholder: "~/.claude/plugins/my-plugin",
     discover: "探索外掛",
     discoverDescription: "掃描目標機器上已安裝的外掛",
     discoverTitle: "探索外掛",
@@ -1597,6 +1598,11 @@ export const zhHant: TranslationStructure = {
     actionFailed: ({ error }: { error: string }) => `失敗：${error}`,
     confirmUninstall: "確定要解除安裝此插件嗎？",
     installs: ({ count }: { count: string }) => `${count} 次安裝`,
+    update: "更新外掛",
+    updateSuccess: ({ name }: { name: string }) => `${name} 已更新`,
+    updateMarketplace: "更新市場來源",
+    updateMarketplaceSuccess: "市場來源已更新",
+    marketplaceFooter: "點擊更新市場來源",
   },
 
   gitHosts: {

@@ -584,10 +584,14 @@ export async function machineListAvailablePlugins(
  */
 export async function machinePluginAction(
     machineId: string,
-    action: "install" | "uninstall" | "enable" | "disable",
+    action: "install" | "uninstall" | "enable" | "disable" | "update" | "marketplace-update",
     pluginKey: string,
 ): Promise<MachineBashResult> {
-    return machineBash(machineId, `claude plugin ${action} "${pluginKey}"`, "~");
+    // Use "/" as cwd — bash handler treats it as "use shell default" (respects user's PATH)
+    if (action === "marketplace-update") {
+        return machineBash(machineId, `claude plugin marketplace update "${pluginKey}"`, "/");
+    }
+    return machineBash(machineId, `claude plugin ${action} "${pluginKey}"`, "/");
 }
 
 /**

@@ -1639,6 +1639,7 @@ export const ru: TranslationStructure = {
     addManualDescription: "Введите путь к плагину на целевой машине",
     addTitle: "Добавить плагин",
     addDescription: "Введите абсолютный путь к каталогу плагина",
+    addPlaceholder: "~/.claude/plugins/my-plugin",
     discover: "Обнаружить плагины",
     discoverDescription: "Сканировать машину на наличие плагинов",
     discoverTitle: "Обнаружить плагины",
@@ -1693,6 +1694,11 @@ export const ru: TranslationStructure = {
     actionFailed: ({ error }: { error: string }) => `Ошибка: ${error}`,
     confirmUninstall: "Вы уверены, что хотите удалить этот плагин?",
     installs: ({ count }: { count: string }) => `${count} установок`,
+    update: "Обновить плагин",
+    updateSuccess: ({ name }: { name: string }) => `${name} обновлён`,
+    updateMarketplace: "Обновить маркетплейс",
+    updateMarketplaceSuccess: "Маркетплейс обновлён",
+    marketplaceFooter: "Нажмите для обновления маркетплейса",
   },
 
   gitHosts: {
