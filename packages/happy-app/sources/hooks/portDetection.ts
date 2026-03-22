@@ -26,17 +26,23 @@ export interface DetectedPort {
 
 /**
  * Parse `lsof -iTCP -sTCP:LISTEN -P -n` output.
+ * Returns port → command map AND port → PID map for later enrichment.
  *
  * Example line:
  *   node    1234 user   23u  IPv4 0x1234  0t0  TCP *:3000 (LISTEN)
  */
-export function parseLsofOutput(stdout: string): ReadonlyMap<number, string> {
+export function parseLsofOutput(stdout: string): {
+    readonly ports: ReadonlyMap<number, string>;
+    readonly pids: ReadonlyMap<number, number>;
+} {
     const ports = new Map<number, string>();
+    const pids = new Map<number, number>();
     for (const line of stdout.trim().split("\n")) {
         if (line.startsWith("COMMAND")) continue;
         const parts = line.split(/\s+/);
         if (parts.length < 9) continue;
         const command = parts[0];
+        const pid = parseInt(parts[1], 10);
         // NAME column is "address:port (LISTEN)" — port is in second-to-last token
         const addressToken = parts[parts.length - 2];
         const m = addressToken.match(/:(\d+)$/);
@@ -44,10 +50,74 @@ export function parseLsofOutput(stdout: string): ReadonlyMap<number, string> {
             const port = parseInt(m[1], 10);
             if (port > 0 && port < 65536 && !ports.has(port)) {
                 ports.set(port, command);
+                if (!isNaN(pid)) pids.set(port, pid);
             }
         }
     }
-    return ports;
+    return { ports, pids };
+}
+
+/**
+ * Extract a human-readable label from a full process command line.
+ *
+ * Turns: "/usr/bin/node /app/node_modules/.bin/next dev -p 3005"
+ * Into:  "next dev"
+ *
+ * Turns: "python3 -m http.server 8000"
+ * Into:  "python http.server"
+ */
+export function extractProcessLabel(cmdline: string): string {
+    const trimmed = cmdline.trim();
+    // Known CLI tool patterns — match the tool name from the path
+    const binMatch = trimmed.match(/(?:node_modules\/\.bin\/|\/bin\/)(\S+)/);
+    if (binMatch) {
+        const tool = binMatch[1];
+        // Grab first arg if it's not a flag
+        const afterTool = trimmed.substring(trimmed.indexOf(tool) + tool.length).trim();
+        const firstArg = afterTool.split(/\s+/)[0];
+        if (firstArg && !firstArg.startsWith("-")) {
+            return `${tool} ${firstArg}`;
+        }
+        return tool;
+    }
+
+    // Python module: python3 -m http.server → "python http.server"
+    const pyMatch = trimmed.match(/python\d?\s+-m\s+(\S+)/);
+    if (pyMatch) return `python ${pyMatch[1]}`;
+
+    // Generic: take basename of first token + first non-flag arg
+    const tokens = trimmed.split(/\s+/);
+    const basename = tokens[0].split("/").pop() ?? tokens[0];
+    // Skip common wrappers
+    const isWrapper = /^(node|python\d?|ruby|java|deno|bun)$/.test(basename);
+    if (isWrapper && tokens.length > 1) {
+        // Find first meaningful arg (not a flag, not a long path)
+        for (let i = 1; i < Math.min(tokens.length, 4); i++) {
+            const t = tokens[i];
+            if (t.startsWith("-")) continue;
+            const argBase = t.split("/").pop() ?? t;
+            // Skip .js/.ts extensions for cleaner display
+            const clean = argBase.replace(/\.(js|ts|mjs|cjs)$/, "");
+            return `${basename} ${clean}`;
+        }
+    }
+    return basename;
+}
+
+/**
+ * Parse `ps` output to build PID → command label map.
+ * Input format: one line per process, "PID FULL_COMMAND_LINE"
+ */
+export function parsePsOutput(stdout: string): ReadonlyMap<number, string> {
+    const result = new Map<number, string>();
+    for (const line of stdout.trim().split("\n")) {
+        const m = line.trim().match(/^(\d+)\s+(.+)/);
+        if (!m) continue;
+        const pid = parseInt(m[1], 10);
+        const label = extractProcessLabel(m[2]);
+        result.set(pid, label);
+    }
+    return result;
 }
 
 /**
@@ -238,6 +308,8 @@ export async function detectAllPorts(
 
     // Collect ports from all sources
     const portMap = new Map<number, string>();
+    // PID map for enriching process names via `ps`
+    const pidMap = new Map<number, number>();
 
     const mergeInto = (source: ReadonlyMap<number, string>) => {
         for (const [port, process] of source) {
@@ -251,8 +323,11 @@ export async function detectAllPorts(
     let lsofWorked = false;
     if (lsofResult?.success && lsofResult.exitCode === 0 && lsofResult.stdout) {
         const parsed = parseLsofOutput(lsofResult.stdout);
-        if (parsed.size > 0) {
-            mergeInto(parsed);
+        if (parsed.ports.size > 0) {
+            mergeInto(parsed.ports);
+            for (const [port, pid] of parsed.pids) {
+                pidMap.set(port, pid);
+            }
             lsofWorked = true;
         }
     }
@@ -290,6 +365,32 @@ export async function detectAllPorts(
     report("checking-docker", portMap.size);
     if (dockerResult?.success && dockerResult.exitCode === 0 && dockerResult.stdout) {
         mergeInto(parseDockerOutput(dockerResult.stdout));
+    }
+
+    // Enrich generic process names (e.g., "node") with full command line via ps.
+    // Only query PIDs whose current label is generic.
+    const genericNames = new Set(["node", "python", "python3", "ruby", "java", "deno", "bun", "unknown"]);
+    const pidsToQuery = Array.from(pidMap.entries())
+        .filter(([port]) => genericNames.has(portMap.get(port) ?? ""))
+        .map(([, pid]) => pid);
+
+    if (pidsToQuery.length > 0) {
+        const pidList = [...new Set(pidsToQuery)].join(",");
+        const psResult = await bash(sessionId, {
+            command: `ps -p ${pidList} -o pid=,args= 2>/dev/null`,
+            timeout: 5000,
+        }).catch(() => null);
+
+        if (psResult?.success && psResult.stdout) {
+            const labels = parsePsOutput(psResult.stdout);
+            // Map labels back to ports via pidMap
+            for (const [port, pid] of pidMap) {
+                const label = labels.get(pid);
+                if (label && genericNames.has(portMap.get(port) ?? "")) {
+                    portMap.set(port, label);
+                }
+            }
+        }
     }
 
     // Merge package.json ports into portMap (if not already present, mark for probe)
