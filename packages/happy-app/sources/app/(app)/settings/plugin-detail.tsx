@@ -126,8 +126,16 @@ function PluginDetailScreen() {
                         }),
                     );
                 }
-            } catch {
+            } catch (error) {
                 setEnabled(!newValue); // Revert on error
+                Modal.toast(
+                    t("settingsPlugins.actionFailed", {
+                        error:
+                            error instanceof Error
+                                ? error.message.slice(0, 100)
+                                : "Unknown error",
+                    }),
+                );
             } finally {
                 setActionLoading(false);
             }
