@@ -391,8 +391,9 @@ export async function detectAllPorts(
     // Enrich generic process names (e.g., "node") with full command line via ps.
     // Only query PIDs whose current label is generic.
     const genericNames = new Set(["node", "python", "python3", "ruby", "java", "deno", "bun", "unknown"]);
+    const isGenericName = (name: string) => genericNames.has(name.toLowerCase());
     const pidsToQuery = Array.from(pidMap.entries())
-        .filter(([port]) => genericNames.has(portMap.get(port) ?? ""))
+        .filter(([port]) => isGenericName(portMap.get(port) ?? ""))
         .map(([, pid]) => pid);
 
     if (pidsToQuery.length > 0) {
@@ -407,7 +408,7 @@ export async function detectAllPorts(
             // Map labels back to ports via pidMap
             for (const [port, pid] of pidMap) {
                 const label = labels.get(pid);
-                if (label && genericNames.has(portMap.get(port) ?? "")) {
+                if (label && isGenericName(portMap.get(port) ?? "")) {
                     portMap.set(port, label);
                 }
             }
@@ -482,21 +483,23 @@ export async function detectAllPorts(
         }
     }
 
-    // Build sorted result: web first, then common dev ports, then by port number
+    // Build sorted result — defensive dedup via seen set
     report("done", webPorts.size);
-    return Array.from(portMap.entries())
-        .map(([port, process]) => ({
+    const seen = new Set<number>();
+    const results: DetectedPort[] = [];
+    for (const [port, process] of portMap) {
+        if (seen.has(port)) continue;
+        seen.add(port);
+        results.push({
             port,
             process,
             isCommonDevPort: COMMON_DEV_PORTS.includes(port),
             isWeb: webPorts.has(port),
-        }))
-        .sort((a, b) => {
-            // Web ports first
-            if (a.isWeb !== b.isWeb) return a.isWeb ? -1 : 1;
-            // Then common dev ports
-            if (a.isCommonDevPort !== b.isCommonDevPort) return a.isCommonDevPort ? -1 : 1;
-            // Then by port number
-            return a.port - b.port;
         });
+    }
+    return results.sort((a, b) => {
+        if (a.isWeb !== b.isWeb) return a.isWeb ? -1 : 1;
+        if (a.isCommonDevPort !== b.isCommonDevPort) return a.isCommonDevPort ? -1 : 1;
+        return a.port - b.port;
+    });
 }
