@@ -152,9 +152,11 @@ export async function checkDaemonStatus(): Promise<DaemonCheckResult> {
       }
       logger.debug(`[DAEMON RUN] Daemon HTTP ping failed with status ${response.status}, treating as stale`);
     } catch (error) {
-      logger.debug(`[DAEMON RUN] Daemon HTTP ping failed (PID ${state.pid} exists but HTTP unresponsive), cleaning up stale state`);
+      logger.debug(`[DAEMON RUN] Daemon HTTP ping failed (PID ${state.pid} exists but HTTP unresponsive), treating as stale`);
     }
-    await cleanupDaemonState();
+    // DON'T clean up state here — stopDaemon() needs the state file to find the PID
+    // and properly kill the old daemon process. State will be cleaned up when the
+    // new daemon starts and overwrites it.
     return { status: 'stale-cleaned' };
   }
 
@@ -236,6 +238,7 @@ export async function stopDaemon() {
       // Wait for daemon to die
       await waitForProcessDeath(state.pid, 2000);
       logger.debug('Daemon stopped gracefully via HTTP');
+      await cleanupDaemonState();
       return;
     } catch (error) {
       logger.debug('HTTP stop failed, will force kill', error);
@@ -248,6 +251,9 @@ export async function stopDaemon() {
     } catch (error) {
       logger.debug('Daemon already dead');
     }
+
+    // Always clean up state after force kill or if daemon was already dead
+    await cleanupDaemonState();
   } catch (error) {
     logger.debug('Error stopping daemon', error);
   }
