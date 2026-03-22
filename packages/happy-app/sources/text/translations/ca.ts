@@ -2106,6 +2106,7 @@ export const ca: TranslationStructure = {
       "scanning-ports": "Escanejant ports...",
       "fallback-detection": "Detecció alternativa...",
       "checking-docker": "Verificant contenidors Docker...",
+      "filtering-cwd": "Filtrant per projecte...",
       "probing-http": "Provant serveis HTTP...",
       done: "Fet",
     },

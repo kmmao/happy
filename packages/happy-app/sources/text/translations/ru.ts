@@ -2120,6 +2120,7 @@ export const ru: TranslationStructure = {
       "scanning-ports": "Сканирование портов...",
       "fallback-detection": "Альтернативное обнаружение...",
       "checking-docker": "Проверка Docker контейнеров...",
+      "filtering-cwd": "Фильтрация по проекту...",
       "probing-http": "Проверка HTTP сервисов...",
       done: "Готово",
     },

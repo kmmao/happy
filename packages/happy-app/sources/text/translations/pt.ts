@@ -2104,6 +2104,7 @@ export const pt: TranslationStructure = {
       "scanning-ports": "Escaneando portas...",
       "fallback-detection": "Detecção alternativa...",
       "checking-docker": "Verificando contêineres Docker...",
+      "filtering-cwd": "Filtrando por projeto...",
       "probing-http": "Testando serviços HTTP...",
       done: "Concluído",
     },

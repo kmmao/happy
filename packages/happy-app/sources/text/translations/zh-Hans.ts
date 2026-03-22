@@ -2009,6 +2009,7 @@ export const zhHans: TranslationStructure = {
       "scanning-ports": "正在扫描监听端口...",
       "fallback-detection": "正在尝试备用检测...",
       "checking-docker": "正在检查 Docker 容器...",
+      "filtering-cwd": "按项目过滤...",
       "probing-http": "正在探测 HTTP 服务...",
       done: "完成",
     },

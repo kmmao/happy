@@ -295,8 +295,27 @@ export type DetectionPhase =
     | "scanning-ports"
     | "fallback-detection"
     | "checking-docker"
+    | "filtering-cwd"
     | "probing-http"
     | "done";
+
+/**
+ * Parse `lsof -p PIDs -a -d cwd -Fn` output to build PID → CWD map.
+ *
+ * Format: p{PID}\nfcwd\nn{PATH}\n...
+ */
+export function parseLsofCwdOutput(stdout: string): ReadonlyMap<number, string> {
+    const result = new Map<number, string>();
+    let currentPid = 0;
+    for (const line of stdout.trim().split("\n")) {
+        if (line.startsWith("p")) {
+            currentPid = parseInt(line.substring(1), 10);
+        } else if (line.startsWith("n") && currentPid > 0) {
+            result.set(currentPid, line.substring(1));
+        }
+    }
+    return result;
+}
 
 /**
  * Run the full detection pipeline and return merged, deduplicated ports.
@@ -310,9 +329,9 @@ export async function detectAllPorts(
 ): Promise<readonly DetectedPort[]> {
     const report = (phase: DetectionPhase, count: number) => onProgress?.(phase, count);
 
-    // Phase 1: run lsof + package.json + docker in parallel
+    // Phase 1: run lsof + package.json + docker + pwd in parallel
     report("scanning-ports", 0);
-    const [lsofResult, pkgResult, dockerResult] = await Promise.all([
+    const [lsofResult, pkgResult, dockerResult, pwdResult] = await Promise.all([
         bash(sessionId, {
             command: "lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null",
             timeout: 10000,
@@ -325,7 +344,14 @@ export async function detectAllPorts(
             command: 'docker ps --format "{{.Ports}}\t{{.Names}}" 2>/dev/null',
             timeout: 5000,
         }).catch(() => null),
+        bash(sessionId, {
+            command: "pwd",
+            timeout: 3000,
+        }).catch(() => null),
     ]);
+
+    // Session's working directory — used to filter ports to only this project
+    const sessionCwd = pwdResult?.success ? pwdResult.stdout?.trim() ?? "" : "";
 
     // Collect ports from all sources
     const portMap = new Map<number, string>();
@@ -410,6 +436,31 @@ export async function detectAllPorts(
                 const label = labels.get(pid);
                 if (label && isGenericName(portMap.get(port) ?? "")) {
                     portMap.set(port, label);
+                }
+            }
+        }
+    }
+
+    // Filter ports by CWD: only keep processes whose working directory is under the session's CWD.
+    // This ensures only services related to the current project are shown.
+    if (sessionCwd && pidMap.size > 0) {
+        report("filtering-cwd", portMap.size);
+        const allPids = [...new Set(pidMap.values())];
+        const pidList = allPids.filter((p) => Number.isInteger(p) && p > 0).join(",");
+        if (pidList) {
+            const cwdResult = await bash(sessionId, {
+                command: `lsof -p ${pidList} -a -d cwd -Fn 2>/dev/null`,
+                timeout: 5000,
+            }).catch(() => null);
+
+            if (cwdResult?.success && cwdResult.stdout) {
+                const cwdMap = parseLsofCwdOutput(cwdResult.stdout);
+                // Remove ports whose process CWD is not under session CWD
+                for (const [port, pid] of pidMap) {
+                    const processCwd = cwdMap.get(pid);
+                    if (processCwd && !processCwd.startsWith(sessionCwd)) {
+                        portMap.delete(port);
+                    }
                 }
             }
         }

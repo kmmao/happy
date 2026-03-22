@@ -2011,6 +2011,7 @@ export const zhHant: TranslationStructure = {
       "scanning-ports": "正在掃描監聽連接埠...",
       "fallback-detection": "正在嘗試備用偵測...",
       "checking-docker": "正在檢查 Docker 容器...",
+      "filtering-cwd": "按專案過濾...",
       "probing-http": "正在探測 HTTP 服務...",
       done: "完成",
     },

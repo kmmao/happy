@@ -2100,6 +2100,7 @@ export const it: TranslationStructure = {
       "scanning-ports": "Scansione porte...",
       "fallback-detection": "Rilevamento alternativo...",
       "checking-docker": "Controllo contenitori Docker...",
+      "filtering-cwd": "Filtraggio per progetto...",
       "probing-http": "Test servizi HTTP...",
       done: "Fatto",
     },

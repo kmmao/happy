@@ -2077,6 +2077,7 @@ export const ja: TranslationStructure = {
       "scanning-ports": "リスニングポートをスキャン中...",
       "fallback-detection": "代替検出を試行中...",
       "checking-docker": "Dockerコンテナを確認中...",
+      "filtering-cwd": "プロジェクトでフィルタ中...",
       "probing-http": "HTTPサービスを探査中...",
       done: "完了",
     },

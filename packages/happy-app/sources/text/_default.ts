@@ -2086,6 +2086,7 @@ export const en = {
       "scanning-ports": "Scanning listening ports...",
       "fallback-detection": "Trying alternative detection...",
       "checking-docker": "Checking Docker containers...",
+      "filtering-cwd": "Filtering by project...",
       "probing-http": "Probing HTTP services...",
       done: "Done",
     },
