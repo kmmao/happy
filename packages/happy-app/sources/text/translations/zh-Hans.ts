@@ -1602,6 +1602,7 @@ export const zhHans: TranslationStructure = {
     updateMarketplaceSuccess: "市场源已更新",
     marketplaceFooter: "点击更新市场源",
     noResults: "未找到匹配的插件",
+    restartHint: "插件变更在新会话中生效。已有会话需要重启。",
   },
 
   gitHosts: {

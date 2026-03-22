@@ -210,13 +210,13 @@ function PluginsSettingsScreen() {
             fontSize: 15,
         },
         installButton: {
-            paddingHorizontal: 12,
-            paddingVertical: 5,
-            borderRadius: 14,
-            backgroundColor: theme.colors.primary,
+            paddingHorizontal: 14,
+            paddingVertical: 4,
+            borderRadius: 12,
+            backgroundColor: theme.colors.groupped.background,
         },
         installButtonText: {
-            color: theme.colors.onPrimary,
+            color: theme.colors.primary,
             fontSize: 13,
             fontWeight: "600",
         },
@@ -519,7 +519,10 @@ function PluginsSettingsScreen() {
             )}
 
             {/* ── Actions ── */}
-            <ItemGroup title={t("settingsPlugins.actions")}>
+            <ItemGroup
+                title={t("settingsPlugins.actions")}
+                footer={t("settingsPlugins.restartHint")}
+            >
                 <Item
                     title={t("settingsPlugins.refreshMetadata")}
                     icon={

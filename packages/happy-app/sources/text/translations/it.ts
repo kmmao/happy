@@ -1674,6 +1674,7 @@ export const it: TranslationStructure = {
     updateMarketplaceSuccess: "Marketplace aggiornato",
     marketplaceFooter: "Tocca per aggiornare il marketplace",
     noResults: "Nessun plugin corrispondente trovato",
+    restartHint: "Le modifiche ai plugin hanno effetto sulle nuove sessioni. Le sessioni esistenti devono essere riavviate.",
   },
 
   gitHosts: {

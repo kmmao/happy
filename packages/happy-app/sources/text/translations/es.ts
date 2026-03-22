@@ -1678,6 +1678,7 @@ export const es: TranslationStructure = {
     updateMarketplaceSuccess: "Marketplace actualizado",
     marketplaceFooter: "Toca para actualizar el marketplace",
     noResults: "No se encontraron plugins coincidentes",
+    restartHint: "Los cambios de plugins se aplican en nuevas sesiones. Las sesiones existentes deben reiniciarse.",
   },
 
   gitHosts: {

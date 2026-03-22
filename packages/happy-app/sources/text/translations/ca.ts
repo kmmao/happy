@@ -1678,6 +1678,7 @@ export const ca: TranslationStructure = {
     updateMarketplaceSuccess: "Marketplace actualitzat",
     marketplaceFooter: "Toca per actualitzar el marketplace",
     noResults: "No s'han trobat connectors coincidents",
+    restartHint: "Els canvis de plugins s'apliquen a noves sessions. Les sessions existents s'han de reiniciar.",
   },
 
   gitHosts: {

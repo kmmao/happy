@@ -1660,6 +1660,7 @@ export const en = {
     updateMarketplaceSuccess: "Marketplace updated",
     marketplaceFooter: "Tap to update marketplace",
     noResults: "No matching plugins found",
+    restartHint: "Plugin changes take effect on new sessions. Existing sessions need to be restarted.",
   },
 
   gitHosts: {

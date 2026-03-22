@@ -1699,6 +1699,7 @@ export const pl: TranslationStructure = {
     updateMarketplaceSuccess: "Marketplace zaktualizowany",
     marketplaceFooter: "Dotknij aby zaktualizować marketplace",
     noResults: "Nie znaleziono pasujących wtyczek",
+    restartHint: "Zmiany wtyczek obowiązują w nowych sesjach. Istniejące sesje wymagają ponownego uruchomienia.",
   },
 
   gitHosts: {

@@ -1700,6 +1700,7 @@ export const ru: TranslationStructure = {
     updateMarketplaceSuccess: "Маркетплейс обновлён",
     marketplaceFooter: "Нажмите для обновления маркетплейса",
     noResults: "Подходящие плагины не найдены",
+    restartHint: "Изменения плагинов вступают в силу в новых сессиях. Существующие сессии необходимо перезапустить.",
   },
 
   gitHosts: {
