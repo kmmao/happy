@@ -26,6 +26,26 @@ function findOnlineMachineId(): string | null {
     return online?.id ?? null;
 }
 
+/** Recommended marketplace sources. */
+const RECOMMENDED_MARKETPLACES = [
+    {
+        repo: "anthropics/claude-plugins-official",
+        description: "Official Claude Code plugins — 117+ plugins by Anthropic and community",
+    },
+    {
+        repo: "kmmao/everything-claude-code",
+        description: "Battle-tested agents, skills, hooks, and commands for Claude Code",
+    },
+    {
+        repo: "affaan-m/everything-claude-code",
+        description: "Original ECC — 14+ agents, 56+ skills, 50+ commands from hackathon winner",
+    },
+    {
+        repo: "thedotmack/claude-mem",
+        description: "Persistent memory system — seamlessly preserve context across sessions",
+    },
+];
+
 /** Format install count: 233901 → "233.9K" */
 function formatInstalls(n: number): string {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -454,7 +474,7 @@ function PluginsSettingsScreen() {
             )}
 
             {/* ── Marketplaces ── */}
-            {marketplaces.length > 0 && (
+            {loaded && (
                 <ItemGroup
                     title={t("settingsPlugins.marketplacesTitle")}
                     footer={t("settingsPlugins.marketplaceFooter")}
@@ -530,6 +550,150 @@ function PluginsSettingsScreen() {
                             }}
                         />
                     ))}
+                    {/* Recommended marketplaces not yet installed */}
+                    {RECOMMENDED_MARKETPLACES
+                        .filter(
+                            (rec) =>
+                                !marketplaces.some((mp) => mp.repo === rec.repo),
+                        )
+                        .map((rec) => {
+                            const recKey = `mp-add:${rec.repo}`;
+                            return (
+                                <Item
+                                    key={rec.repo}
+                                    title={rec.repo}
+                                    subtitle={rec.description}
+                                    icon={
+                                        actionInProgress.has(recKey) ? (
+                                            <ActivityIndicator
+                                                size="small"
+                                                color={theme.colors.primary}
+                                            />
+                                        ) : (
+                                            <Ionicons
+                                                name="storefront-outline"
+                                                size={22}
+                                                color={theme.colors.textSecondary}
+                                            />
+                                        )
+                                    }
+                                    rightElement={
+                                        actionInProgress.has(recKey) ? undefined : (
+                                            <Pressable
+                                                style={({ pressed }) => [
+                                                    styles.installButton,
+                                                    pressed && { opacity: 0.7 },
+                                                ]}
+                                                onPress={async () => {
+                                                    const machineId =
+                                                        machineIdRef.current ??
+                                                        resolveMachineId();
+                                                    if (!machineId) {
+                                                        Modal.toast(
+                                                            t("settingsPlugins.noMachineOnline"),
+                                                        );
+                                                        return;
+                                                    }
+                                                    setActionInProgress(
+                                                        (prev) => new Set([...prev, recKey]),
+                                                    );
+                                                    try {
+                                                        const result =
+                                                            await machinePluginAction(
+                                                                machineId,
+                                                                "marketplace-add" as any,
+                                                                rec.repo,
+                                                            );
+                                                        if (result.success) {
+                                                            Modal.toast(
+                                                                t("settingsPlugins.addMarketplaceSuccess"),
+                                                            );
+                                                            await loadAll();
+                                                        } else {
+                                                            Modal.toast(
+                                                                t("settingsPlugins.actionFailed", {
+                                                                    error:
+                                                                        result.stderr?.slice(0, 100) ||
+                                                                        "Add failed",
+                                                                }),
+                                                            );
+                                                        }
+                                                    } finally {
+                                                        setActionInProgress((prev) => {
+                                                            const next = new Set(prev);
+                                                            next.delete(recKey);
+                                                            return next;
+                                                        });
+                                                    }
+                                                }}
+                                            >
+                                                <Text style={styles.installButtonText}>
+                                                    {t("settingsPlugins.addMarketplace")}
+                                                </Text>
+                                            </Pressable>
+                                        )
+                                    }
+                                    showChevron={false}
+                                />
+                            );
+                        })}
+                    <Item
+                        title={t("settingsPlugins.addMarketplace")}
+                        subtitle={t("settingsPlugins.addMarketplaceHint")}
+                        icon={
+                            <Ionicons
+                                name="add-circle-outline"
+                                size={22}
+                                color={theme.colors.accentBlue}
+                            />
+                        }
+                        onPress={async () => {
+                            const source = await Modal.prompt(
+                                t("settingsPlugins.addMarketplace"),
+                                t("settingsPlugins.addMarketplaceDescription"),
+                                {
+                                    placeholder: "owner/repo",
+                                    confirmText: t("settingsPlugins.addMarketplace"),
+                                },
+                            );
+                            if (!source) return;
+                            const machineId =
+                                machineIdRef.current ?? resolveMachineId();
+                            if (!machineId) {
+                                Modal.toast(t("settingsPlugins.noMachineOnline"));
+                                return;
+                            }
+                            const mpKey = `mp-add:${source}`;
+                            setActionInProgress(
+                                (prev) => new Set([...prev, mpKey]),
+                            );
+                            try {
+                                const result = await machinePluginAction(
+                                    machineId,
+                                    "marketplace-add" as any,
+                                    source,
+                                );
+                                if (result.success) {
+                                    Modal.toast(t("settingsPlugins.addMarketplaceSuccess"));
+                                    await loadAll();
+                                } else {
+                                    Modal.toast(
+                                        t("settingsPlugins.actionFailed", {
+                                            error:
+                                                result.stderr?.slice(0, 100) ||
+                                                "Add failed",
+                                        }),
+                                    );
+                                }
+                            } finally {
+                                setActionInProgress((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(mpKey);
+                                    return next;
+                                });
+                            }
+                        }}
+                    />
                 </ItemGroup>
             )}
 

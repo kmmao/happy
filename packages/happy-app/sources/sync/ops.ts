@@ -605,12 +605,15 @@ export async function machineListAvailablePlugins(
  */
 export async function machinePluginAction(
     machineId: string,
-    action: "install" | "uninstall" | "enable" | "disable" | "update" | "marketplace-update",
+    action: "install" | "uninstall" | "enable" | "disable" | "update" | "marketplace-update" | "marketplace-add",
     pluginKey: string,
 ): Promise<MachineBashResult> {
     // Use "/" as cwd — bash handler treats it as "use shell default" (respects user's PATH)
     if (action === "marketplace-update") {
         return machineBash(machineId, `claude plugin marketplace update "${pluginKey}"`, "/");
+    }
+    if (action === "marketplace-add") {
+        return machineBash(machineId, `claude plugin marketplace add "${pluginKey}"`, "/");
     }
     return machineBash(machineId, `claude plugin ${action} "${pluginKey}"`, "/");
 }
