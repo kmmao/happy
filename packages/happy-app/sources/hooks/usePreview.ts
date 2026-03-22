@@ -150,32 +150,61 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
     return "ports" in s ? s.ports : [];
   };
 
-  const detectPorts = React.useCallback(async () => {
-    if (!sessionId) return;
-    setState({ status: "detecting-ports" });
+  // Track whether agent-browser is available (checked once on first detect)
+  const browserAvailableRef = React.useRef<boolean | null>(null);
+  // Prevent concurrent detections
+  const detectingRef = React.useRef(false);
 
-    // Check if agent-browser is available
-    const browserCheck = await sessionBash(sessionId, {
-      command: "which agent-browser 2>/dev/null",
-      timeout: 5000,
-    });
+  const detectPorts = React.useCallback(async (silent = false) => {
+    if (!sessionId || detectingRef.current) return;
+    detectingRef.current = true;
 
-    if (!browserCheck.success || browserCheck.exitCode !== 0) {
-      setState({
-        status: "unavailable",
-        reason: "agent-browser",
-      });
-      return;
+    try {
+      if (!silent) {
+        setState({ status: "detecting-ports" });
+      }
+
+      // Check agent-browser availability (only on first call)
+      if (browserAvailableRef.current === null) {
+        const browserCheck = await sessionBash(sessionId, {
+          command: "which agent-browser 2>/dev/null",
+          timeout: 5000,
+        });
+        browserAvailableRef.current = browserCheck.success && browserCheck.exitCode === 0;
+      }
+
+      if (!browserAvailableRef.current) {
+        setState({
+          status: "unavailable",
+          reason: "agent-browser",
+        });
+        return;
+      }
+
+      const ports = await detectAllPorts(
+        sessionId,
+        sessionBash,
+        silent
+          ? undefined
+          : (phase, portsFound) => {
+              setState({ status: "detecting-ports", phase, portsFound });
+            },
+      );
+
+      // For silent refresh: preserve current state type, just update ports
+      if (silent) {
+        setState((prev) => {
+          if ("ports" in prev) {
+            return { ...prev, ports };
+          }
+          return { status: "ports-detected", ports };
+        });
+      } else {
+        setState({ status: "ports-detected", ports });
+      }
+    } finally {
+      detectingRef.current = false;
     }
-
-    const ports = await detectAllPorts(
-      sessionId,
-      sessionBash,
-      (phase, portsFound) => {
-        setState({ status: "detecting-ports", phase, portsFound });
-      },
-    );
-    setState({ status: "ports-detected", ports });
   }, [sessionId]);
 
   const captureScreenshot = React.useCallback(
@@ -372,6 +401,15 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
   const reset = React.useCallback(() => {
     setState({ status: "idle" });
   }, []);
+
+  // Auto-refresh ports every 10 seconds (silent — no loading indicator)
+  React.useEffect(() => {
+    if (!sessionId) return;
+    const interval = setInterval(() => {
+      detectPorts(true);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [sessionId, detectPorts]);
 
   return {
     state,
