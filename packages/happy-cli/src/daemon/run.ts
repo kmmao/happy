@@ -949,12 +949,16 @@ export async function startDaemon(): Promise<void> {
           }).catch((err) => {
             logger.debug(`[DAEMON RUN] Fix status diagnosis failed: ${err}`);
           }).finally(() => {
-            cleanupFixWorktree(session.happySessionId!).catch(() => {});
+            cleanupFixWorktree(session.happySessionId!).catch((err) => {
+              logger.warn(`[DAEMON RUN] Fix worktree cleanup failed for session ${session.happySessionId}: ${err.message}`);
+            });
           });
         }, 3_000);
       } else {
         // Not a fix session, just clean up
-        cleanupFixWorktree(session.happySessionId).catch(() => {});
+        cleanupFixWorktree(session.happySessionId).catch((err) => {
+          logger.warn(`[DAEMON RUN] Fix worktree cleanup failed for session ${session.happySessionId}: ${err.message}`);
+        });
       }
     };
 

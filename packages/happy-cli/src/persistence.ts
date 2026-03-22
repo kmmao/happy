@@ -465,7 +465,9 @@ export async function updateSettings(
         try {
           const stats = await stat(lockFile);
           if (Date.now() - stats.mtimeMs > STALE_LOCK_TIMEOUT_MS) {
-            await unlink(lockFile).catch(() => {});
+            await unlink(lockFile).catch((unlinkErr) => {
+              logger.warn(`[PERSISTENCE] Failed to remove stale lock file ${lockFile}: ${unlinkErr.message}`);
+            });
           }
         } catch {}
       } else {
@@ -500,7 +502,9 @@ export async function updateSettings(
   } finally {
     // Release lock
     await fileHandle.close();
-    await unlink(lockFile).catch(() => {}); // Remove lock file
+    await unlink(lockFile).catch((unlinkErr) => {
+      logger.warn(`[PERSISTENCE] Failed to remove lock file ${lockFile}: ${unlinkErr.message}`);
+    });
   }
 }
 
