@@ -45,7 +45,6 @@ export default React.memo(function PreviewPage() {
   const { theme } = useUnistyles();
   const [customUrl, setCustomUrl] = React.useState(initialUrl ?? "");
   const [diffTab, setDiffTab] = React.useState<DiffTab>("after");
-  const [showNonWeb, setShowNonWeb] = React.useState(false);
   const autoCapturedRef = React.useRef(false);
 
   // Auto-detect ports on mount
@@ -144,7 +143,6 @@ export default React.memo(function PreviewPage() {
 
   const ports = "ports" in state ? state.ports : [];
   const webPorts = ports.filter((p) => p.isWeb);
-  const nonWebPorts = ports.filter((p) => !p.isWeb);
 
   // Determine which diff image to show
   const getDiffImageUri = (): string | null => {
@@ -353,59 +351,7 @@ export default React.memo(function PreviewPage() {
           </View>
         )}
 
-        {/* Non-web ports — collapsible */}
-        {nonWebPorts.length > 0 && (
-          <>
-            <Pressable
-              onPress={() => setShowNonWeb((v) => !v)}
-              style={styles.nonWebToggle}
-            >
-              <Ionicons
-                name={showNonWeb ? "chevron-down" : "chevron-forward"}
-                size={16}
-                color={theme.colors.textSecondary}
-              />
-              <Text style={styles.nonWebToggleText}>
-                {t("preview.otherPorts", { count: nonWebPorts.length })}
-              </Text>
-            </Pressable>
-            {showNonWeb && (
-              <View style={styles.chipContainer}>
-                {nonWebPorts.map((p) => (
-                  <Pressable
-                    key={p.port}
-                    onPress={() => handlePortPress(p)}
-                    style={({ pressed }) => [
-                      styles.chip,
-                      {
-                        backgroundColor: theme.colors.surfaceHighest,
-                        borderColor: theme.colors.divider,
-                        opacity: pressed ? 0.6 : 1,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name="server-outline"
-                      size={14}
-                      color={theme.colors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.chipPort,
-                        { color: theme.colors.text },
-                      ]}
-                    >
-                      {p.port}
-                    </Text>
-                    <Text style={styles.chipProcess} numberOfLines={1}>
-                      {p.process}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </>
-        )}
+        {/* Non-web ports are hidden — only web services are relevant for preview */}
 
         {/* Custom URL input */}
         <ItemGroup title={t("preview.customUrl")}>
@@ -646,7 +592,7 @@ const styles = StyleSheet.create((theme) => ({
   chipProcess: {
     fontSize: 12,
     color: theme.colors.textSecondary,
-    maxWidth: 80,
+    maxWidth: 120,
   },
   emptyPortsRow: {
     paddingVertical: 12,
@@ -654,17 +600,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   emptyPortsText: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  nonWebToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingVertical: 8,
-    marginBottom: 8,
-  },
-  nonWebToggleText: {
-    fontSize: 13,
     color: theme.colors.textSecondary,
   },
 }));
