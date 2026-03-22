@@ -15,6 +15,24 @@ import type {
 import type { RawJSONLines } from "@/claude/types";
 
 /**
+ * Type guard: checks if an SDK message has parent_tool_use_id.
+ * Many SDK message subtypes carry this field, but not all union members.
+ */
+function hasParentToolUseId(
+  msg: SDKMessage,
+): msg is SDKMessage & { parent_tool_use_id: string | null } {
+  return "parent_tool_use_id" in msg;
+}
+
+/**
+ * Extended assistant message with runtime-only `requestId` field
+ * that the SDK type doesn't declare but Claude Code emits at runtime.
+ */
+type ExtendedSDKAssistantMessage = SDKAssistantMessage & {
+  requestId?: string;
+};
+
+/**
  * Context for converting SDK messages to log format
  */
 export interface ConversionContext {
@@ -111,12 +129,11 @@ export class SDKToLogConverter {
     const timestamp = new Date().toISOString();
     let parentUuid = this.lastUuid;
     let isSidechain = false;
-    if ((sdkMessage as any).parent_tool_use_id) {
+    if (hasParentToolUseId(sdkMessage) && sdkMessage.parent_tool_use_id) {
       isSidechain = true;
       parentUuid =
-        this.sidechainLastUUID.get((sdkMessage as any).parent_tool_use_id) ??
-        null;
-      this.sidechainLastUUID.set((sdkMessage as any).parent_tool_use_id!, uuid);
+        this.sidechainLastUUID.get(sdkMessage.parent_tool_use_id) ?? null;
+      this.sidechainLastUUID.set(sdkMessage.parent_tool_use_id, uuid);
     }
     const baseFields = {
       parentUuid: parentUuid,
@@ -154,7 +171,8 @@ export class SDKToLogConverter {
             ) {
               const response = this.responses.get(content.tool_use_id);
               if (response?.mode) {
-                (logMessage as any).mode = response.mode;
+                (logMessage as RawJSONLines & { mode?: string }).mode =
+                  response.mode;
               }
             }
           }
@@ -165,13 +183,13 @@ export class SDKToLogConverter {
       }
 
       case "assistant": {
-        const assistantMsg = sdkMessage as SDKAssistantMessage;
+        const assistantMsg = sdkMessage as ExtendedSDKAssistantMessage;
         logMessage = {
           ...baseFields,
           type: "assistant",
           message: assistantMsg.message,
-          // Assistant messages often have additional fields
-          requestId: (assistantMsg as any).requestId,
+          // requestId is emitted at runtime but not in SDK type definitions
+          requestId: assistantMsg.requestId,
           ...(assistantMsg.parent_tool_use_id
             ? { parent_tool_use_id: assistantMsg.parent_tool_use_id }
             : {}),
@@ -202,8 +220,8 @@ export class SDKToLogConverter {
           subtype: systemMsg.subtype,
           model: systemMsg.model,
           tools: systemMsg.tools,
-          // Include all other fields
-          ...(systemMsg as any),
+          // Include all other fields from the system message
+          ...(systemMsg as Record<string, unknown>),
         };
         break;
       }
@@ -222,9 +240,9 @@ export class SDKToLogConverter {
         // Unknown message type - pass through with all fields
         logMessage = {
           ...baseFields,
-          ...sdkMessage,
-          type: (sdkMessage as any).type, // Override type last to ensure it's set
-        } as any;
+          ...(sdkMessage as Record<string, unknown>),
+          type: (sdkMessage as SDKMessage & { type: string }).type,
+        } as RawJSONLines;
     }
 
     // Update last UUID for parent tracking
@@ -300,16 +318,16 @@ export class SDKToLogConverter {
       this.sidechainLastUUID.set(parentToolUseId, uuid);
     }
 
-    const logMessage: RawJSONLines = {
-      type: "user",
+    const logMessage = {
+      type: "user" as const,
       isSidechain: isSidechain,
       ...(parentToolUseId ? { parent_tool_use_id: parentToolUseId } : {}),
       uuid,
       message: {
-        role: "user",
+        role: "user" as const,
         content: [
           {
-            type: "tool_result",
+            type: "tool_result" as const,
             content: errorMessage,
             is_error: true,
             tool_use_id: toolUseId,
@@ -324,7 +342,7 @@ export class SDKToLogConverter {
       gitBranch: this.context.gitBranch,
       timestamp,
       toolUseResult: `Error: ${errorMessage}`,
-    } as any;
+    } satisfies Record<string, unknown> as unknown as RawJSONLines;
 
     // Update last UUID for tracking
     this.lastUuid = uuid;
