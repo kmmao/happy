@@ -1,5 +1,50 @@
 # Changelog
 
+## 2.7.0 - 2026-03-22
+
+Plugin marketplace, port detection & web preview, background task manager, favorite command reordering, and environment variable i18n.
+
+### Plugin Marketplace
+- Added plugin install/uninstall/enable/disable with available plugin browsing
+- Added plugin detail page with installed plugins and marketplace source display
+- Added marketplace source recommendations and "Add Market" feature
+- Fixed plugin update errors, detail modal, and enable Switch
+- Fixed hardcoded i18n strings and color values in plugin UI
+- Added empty state hint when search returns no results
+
+### Port Detection & Web Preview
+- Added multi-strategy port detection — lsof/ss/netstat fallback + Docker + curl probing
+- Added Web/non-Web port differentiation with parallel curl detection
+- Added process name enrichment via ps — turns "node" into "next dev", "vite", etc.
+- Added dev server linked preview with unified task close interaction
+- Added port list auto-refresh every 10 seconds
+- Added custom URL and refresh moved to top with smart process name extraction
+- Added port list chip layout
+- Added step-by-step progress hints during port detection
+- Fixed duplicate port display and case-insensitive process name matching
+- Fixed preview screenshot path permission denied issue
+- Fixed strict HTTP detection — only mark as Web when first line matches HTTP/
+
+### Background Task Manager
+- Added background process manager — globally view/kill/preview web services
+- Added background task panel UI with smart labels, log viewer, stop and status sync
+- Added background task metadata passing and hooks
+- Added per-project CWD port filtering — only show services from current working directory
+
+### Favorite Commands
+- Added favorite command reordering with up/down arrows in command list
+- Fixed favorite commands to only show commands supported by current session
+- Added command descriptions and favorite button short names in command list
+
+### Other Improvements
+- Added environment variable card i18n with Chinese display support
+- Fixed session list device name to update in real-time with displayName
+- Updated MiniMax profile model version M2.5 → M2.7 and timeout to 50 minutes
+- Fixed project Git info not displaying and theme type errors
+- Hidden Claude Code connection item in settings page
+- Removed console.log debug logs from production code
+- Fixed loading indicator style inconsistency
+
 ## 2.6.0 - 2026-03-22
 
 Plugin management, file revert, sub-agent progress, fix session auto-recovery, foldable keyboard fix, and extensive code quality improvements.

@@ -2,6 +2,45 @@
   "entries": {
     "en": [
       {
+        "version": "2.7.0",
+        "date": "2026-03-22",
+        "summary": "Plugin marketplace, port detection & web preview, background task manager, favorite command reordering, and environment variable i18n.",
+        "changes": [
+          "Added plugin install/uninstall/enable/disable with available plugin browsing",
+          "Added plugin detail page with installed plugins and marketplace source display",
+          "Added marketplace source recommendations and \"Add Market\" feature",
+          "Fixed plugin update errors, detail modal, and enable Switch",
+          "Fixed hardcoded i18n strings and color values in plugin UI",
+          "Added empty state hint when search returns no results",
+          "Added multi-strategy port detection — lsof/ss/netstat fallback + Docker + curl probing",
+          "Added Web/non-Web port differentiation with parallel curl detection",
+          "Added process name enrichment via ps — turns \"node\" into \"next dev\", \"vite\", etc.",
+          "Added dev server linked preview with unified task close interaction",
+          "Added port list auto-refresh every 10 seconds",
+          "Added custom URL and refresh moved to top with smart process name extraction",
+          "Added port list chip layout",
+          "Added step-by-step progress hints during port detection",
+          "Fixed duplicate port display and case-insensitive process name matching",
+          "Fixed preview screenshot path permission denied issue",
+          "Fixed strict HTTP detection — only mark as Web when first line matches HTTP/",
+          "Added background process manager — globally view/kill/preview web services",
+          "Added background task panel UI with smart labels, log viewer, stop and status sync",
+          "Added background task metadata passing and hooks",
+          "Added per-project CWD port filtering — only show services from current working directory",
+          "Added favorite command reordering with up/down arrows in command list",
+          "Fixed favorite commands to only show commands supported by current session",
+          "Added command descriptions and favorite button short names in command list",
+          "Added environment variable card i18n with Chinese display support",
+          "Fixed session list device name to update in real-time with displayName",
+          "Updated MiniMax profile model version M2.5 → M2.7 and timeout to 50 minutes",
+          "Fixed project Git info not displaying and theme type errors",
+          "Hidden Claude Code connection item in settings page",
+          "Removed console.log debug logs from production code",
+          "Fixed loading indicator style inconsistency"
+        ],
+        "rawMarkdown": "## 2.7.0 - 2026-03-22\n\n\nPlugin marketplace, port detection & web preview, background task manager, favorite command reordering, and environment variable i18n.\n\n### Plugin Marketplace\n- Added plugin install/uninstall/enable/disable with available plugin browsing\n- Added plugin detail page with installed plugins and marketplace source display\n- Added marketplace source recommendations and \"Add Market\" feature\n- Fixed plugin update errors, detail modal, and enable Switch\n- Fixed hardcoded i18n strings and color values in plugin UI\n- Added empty state hint when search returns no results\n\n### Port Detection & Web Preview\n- Added multi-strategy port detection — lsof/ss/netstat fallback + Docker + curl probing\n- Added Web/non-Web port differentiation with parallel curl detection\n- Added process name enrichment via ps — turns \"node\" into \"next dev\", \"vite\", etc.\n- Added dev server linked preview with unified task close interaction\n- Added port list auto-refresh every 10 seconds\n- Added custom URL and refresh moved to top with smart process name extraction\n- Added port list chip layout\n- Added step-by-step progress hints during port detection\n- Fixed duplicate port display and case-insensitive process name matching\n- Fixed preview screenshot path permission denied issue\n- Fixed strict HTTP detection — only mark as Web when first line matches HTTP/\n\n### Background Task Manager\n- Added background process manager — globally view/kill/preview web services\n- Added background task panel UI with smart labels, log viewer, stop and status sync\n- Added background task metadata passing and hooks\n- Added per-project CWD port filtering — only show services from current working directory\n\n### Favorite Commands\n- Added favorite command reordering with up/down arrows in command list\n- Fixed favorite commands to only show commands supported by current session\n- Added command descriptions and favorite button short names in command list\n\n### Other Improvements\n- Added environment variable card i18n with Chinese display support\n- Fixed session list device name to update in real-time with displayName\n- Updated MiniMax profile model version M2.5 → M2.7 and timeout to 50 minutes\n- Fixed project Git info not displaying and theme type errors\n- Hidden Claude Code connection item in settings page\n- Removed console.log debug logs from production code\n- Fixed loading indicator style inconsistency"
+      },
+      {
         "version": "2.6.0",
         "date": "2026-03-22",
         "summary": "Plugin management, file revert, sub-agent progress, fix session auto-recovery, foldable keyboard fix, and extensive code quality improvements.",
@@ -291,6 +330,45 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.7.0",
+        "date": "2026-03-22",
+        "summary": "新增插件市场、端口检测与 Web 预览、后台任务管理器、收藏命令排序，以及环境变量国际化。",
+        "changes": [
+          "新增插件安装/卸载/启用/禁用及可用插件浏览",
+          "新增插件详情页，展示已安装插件和市场源",
+          "新增市场源推荐列表和\"添加市场\"功能",
+          "修复插件更新报错、详情弹窗和启用 Switch",
+          "修复插件 UI 中的硬编码 i18n 字符串和颜色值",
+          "新增搜索无结果时的空状态提示",
+          "新增多策略端口检测 — lsof/ss/netstat fallback + Docker + curl 探测",
+          "新增 Web/非 Web 端口区分，支持并行 curl 检测",
+          "新增通过 ps 命令丰富进程名 — 把 node 变成 next dev、vite 等",
+          "新增 Dev Server 关联预览与统一任务关闭交互",
+          "新增端口列表每 10 秒自动静默刷新",
+          "新增自定义 URL 和刷新移至顶部 + 进程名智能提取",
+          "新增端口列表标签块(chip)布局",
+          "新增端口检测分步进度提示",
+          "修复端口重复显示 + 大小写不敏感进程名匹配",
+          "修复预览截图路径权限被拒绝问题",
+          "修复严格 HTTP 检测 — 只有首行匹配 HTTP/ 才标记为 Web",
+          "新增后台进程管理器 — 全局查看/kill/预览 Web 服务",
+          "新增后台任务面板 UI，智能标签、日志查看、停止与状态同步",
+          "新增后台任务元数据传递与 Hooks",
+          "新增按项目 CWD 过滤端口 — 只显示当前工作目录的服务",
+          "新增收藏命令排序，在命令列表中使用上下箭头调整顺序",
+          "修复收藏命令只显示当前会话支持的命令",
+          "新增命令列表显示描述和收藏按钮短名称",
+          "新增环境变量卡片国际化，支持中文显示",
+          "修复会话列表设备名称跟随 displayName 实时更新",
+          "更新 MiniMax profile 模型版本 M2.5 → M2.7，超时改为 50 分钟",
+          "修复项目 Git 信息不显示和 theme 类型错误",
+          "隐藏设置页 Claude Code 连接项",
+          "移除生产代码中的 console.log 调试日志",
+          "修复 Loading indicator 样式不一致"
+        ],
+        "rawMarkdown": "## 2.7.0 - 2026-03-22\n\n\n新增插件市场、端口检测与 Web 预览、后台任务管理器、收藏命令排序，以及环境变量国际化。\n\n### 插件市场\n- 新增插件安装/卸载/启用/禁用及可用插件浏览\n- 新增插件详情页，展示已安装插件和市场源\n- 新增市场源推荐列表和\"添加市场\"功能\n- 修复插件更新报错、详情弹窗和启用 Switch\n- 修复插件 UI 中的硬编码 i18n 字符串和颜色值\n- 新增搜索无结果时的空状态提示\n\n### 端口检测与 Web 预览\n- 新增多策略端口检测 — lsof/ss/netstat fallback + Docker + curl 探测\n- 新增 Web/非 Web 端口区分，支持并行 curl 检测\n- 新增通过 ps 命令丰富进程名 — 把 node 变成 next dev、vite 等\n- 新增 Dev Server 关联预览与统一任务关闭交互\n- 新增端口列表每 10 秒自动静默刷新\n- 新增自定义 URL 和刷新移至顶部 + 进程名智能提取\n- 新增端口列表标签块(chip)布局\n- 新增端口检测分步进度提示\n- 修复端口重复显示 + 大小写不敏感进程名匹配\n- 修复预览截图路径权限被拒绝问题\n- 修复严格 HTTP 检测 — 只有首行匹配 HTTP/ 才标记为 Web\n\n### 后台任务管理\n- 新增后台进程管理器 — 全局查看/kill/预览 Web 服务\n- 新增后台任务面板 UI，智能标签、日志查看、停止与状态同步\n- 新增后台任务元数据传递与 Hooks\n- 新增按项目 CWD 过滤端口 — 只显示当前工作目录的服务\n\n### 收藏命令\n- 新增收藏命令排序，在命令列表中使用上下箭头调整顺序\n- 修复收藏命令只显示当前会话支持的命令\n- 新增命令列表显示描述和收藏按钮短名称\n\n### 其他改进\n- 新增环境变量卡片国际化，支持中文显示\n- 修复会话列表设备名称跟随 displayName 实时更新\n- 更新 MiniMax profile 模型版本 M2.5 → M2.7，超时改为 50 分钟\n- 修复项目 Git 信息不显示和 theme 类型错误\n- 隐藏设置页 Claude Code 连接项\n- 移除生产代码中的 console.log 调试日志\n- 修复 Loading indicator 样式不一致"
+      },
+      {
         "version": "2.6.0",
         "date": "2026-03-22",
         "summary": "新增 Plugins 管理、文件回退、子 Agent 进度展示、fix session 自动恢复、折叠屏键盘修复，以及大量代码质量改进。",
@@ -579,7 +657,7 @@
       }
     ]
   },
-  "latestVersion": "2.6.0",
+  "latestVersion": "2.7.0",
   "availableLocales": [
     "en",
     "zh-Hans"
