@@ -262,7 +262,7 @@ export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-5.3-codex"`,
         shellConfigExample: `# Add to ~/.zshrc or ~/.bashrc:
 export MINIMAX_BASE_URL="https://api.minimaxi.com/anthropic"
 export MINIMAX_AUTH_TOKEN="YOUR_MINIMAX_API_KEY"
-export MINIMAX_API_TIMEOUT_MS="600000"
+export MINIMAX_API_TIMEOUT_MS="3000000"
 export MINIMAX_MODEL="MiniMax-M2.7"
 export MINIMAX_SMALL_FAST_MODEL="MiniMax-M2.7-highspeed"
 
@@ -447,7 +447,7 @@ export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
           },
           {
             name: "API_TIMEOUT_MS",
-            value: "${MINIMAX_API_TIMEOUT_MS:-600000}",
+            value: "${MINIMAX_API_TIMEOUT_MS:-3000000}",
           },
           {
             name: "ANTHROPIC_MODEL",
