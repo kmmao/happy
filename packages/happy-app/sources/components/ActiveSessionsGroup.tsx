@@ -24,6 +24,7 @@ import { StatusDot } from "./StatusDot";
 import {
   useAllMachines,
   useHasUnreadMessages,
+  useMachine,
   useSetting,
 } from "@/sync/storage";
 import { StyleSheet } from "react-native-unistyles";
@@ -497,6 +498,7 @@ const CompactSessionRow = React.memo(
     const sessionName = getSessionName(session);
     const navigateToSession = useNavigateToSession();
     const issueLink = useIssueSessionBySessionId(session.id);
+    const machine = useMachine(session.metadata?.machineId ?? "");
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
 
@@ -644,9 +646,11 @@ const CompactSessionRow = React.memo(
                     : t("sessionInfo.tagMain")}
                 </Text>
               </View>
-              {session.metadata?.host && (
+              {(machine?.metadata?.displayName || session.metadata?.host) && (
                 <View style={styles.tag}>
-                  <Text style={styles.tagText}>{session.metadata.host}</Text>
+                  <Text style={styles.tagText}>
+                    {machine?.metadata?.displayName || session.metadata?.host}
+                  </Text>
                 </View>
               )}
               {session.metadata?.version && (

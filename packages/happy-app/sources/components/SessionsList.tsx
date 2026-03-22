@@ -717,9 +717,11 @@ const SessionItem = React.memo(
                     : t("sessionInfo.tagMain")}
                 </Text>
               </View>
-              {session.metadata?.host && (
+              {(machine?.metadata?.displayName || session.metadata?.host) && (
                 <View style={styles.tag}>
-                  <Text style={styles.tagText}>{session.metadata.host}</Text>
+                  <Text style={styles.tagText}>
+                    {machine?.metadata?.displayName || session.metadata?.host}
+                  </Text>
                 </View>
               )}
               {session.metadata?.version && (

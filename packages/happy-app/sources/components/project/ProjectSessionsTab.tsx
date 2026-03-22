@@ -8,7 +8,7 @@ import { ItemList } from "@/components/ItemList";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { Project } from "@/sync/projectManager";
-import { storage } from "@/sync/storage";
+import { storage, useMachine } from "@/sync/storage";
 import { useShallow } from "zustand/react/shallow";
 import { Session } from "@/sync/storageTypes";
 import { useSessionStatus, getSessionName } from "@/utils/sessionUtils";
@@ -26,6 +26,7 @@ interface ProjectSessionsTabProps {
 const SessionRow = React.memo(({ session, showDivider }: { session: Session; showDivider?: boolean }) => {
     const router = useRouter();
     const status = useSessionStatus(session);
+    const machine = useMachine(session.metadata?.machineId ?? "");
     const { theme } = useUnistyles();
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const isSwipeOpen = React.useRef(false);
@@ -174,10 +175,10 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
                                         : t("sessionInfo.tagMain")}
                                 </Text>
                             </View>
-                            {session.metadata?.host && (
+                            {(machine?.metadata?.displayName || session.metadata?.host) && (
                                 <View style={styles.sessionTag}>
                                     <Text style={styles.sessionTagMetaText}>
-                                        {session.metadata.host}
+                                        {machine?.metadata?.displayName || session.metadata?.host}
                                     </Text>
                                 </View>
                             )}
