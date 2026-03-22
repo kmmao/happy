@@ -226,7 +226,7 @@ export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-5.3-codex"`,
         setupGuideUrl:
           "https://platform.minimaxi.com/docs/api-reference/text-anthropic-api",
         description:
-          "MiniMax M2.5 API proxied through Anthropic-compatible interface",
+          "MiniMax M2.7 API proxied through Anthropic-compatible interface",
         environmentVariables: [
           {
             name: "MINIMAX_BASE_URL",
@@ -248,13 +248,13 @@ export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-5.3-codex"`,
           },
           {
             name: "MINIMAX_MODEL",
-            expectedValue: "MiniMax-M2.5",
+            expectedValue: "MiniMax-M2.7",
             description: "Default model (most capable, 204K context)",
             isSecret: false,
           },
           {
             name: "MINIMAX_SMALL_FAST_MODEL",
-            expectedValue: "MiniMax-M2.5-highspeed",
+            expectedValue: "MiniMax-M2.7-highspeed",
             description: "Fast model for quick responses (~100 TPS)",
             isSecret: false,
           },
@@ -263,15 +263,15 @@ export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-5.3-codex"`,
 export MINIMAX_BASE_URL="https://api.minimaxi.com/anthropic"
 export MINIMAX_AUTH_TOKEN="YOUR_MINIMAX_API_KEY"
 export MINIMAX_API_TIMEOUT_MS="600000"
-export MINIMAX_MODEL="MiniMax-M2.5"
-export MINIMAX_SMALL_FAST_MODEL="MiniMax-M2.5-highspeed"
+export MINIMAX_MODEL="MiniMax-M2.7"
+export MINIMAX_SMALL_FAST_MODEL="MiniMax-M2.7-highspeed"
 
 # Model tier mappings (Opus/Sonnet/Haiku → MiniMax models):
 # These are set automatically by the profile via ANTHROPIC_DEFAULT_*_MODEL env vars.
 # Override if needed:
-# export MINIMAX_OPUS_MODEL="MiniMax-M2.5"
-# export MINIMAX_SONNET_MODEL="MiniMax-M2.5"
-# export MINIMAX_HAIKU_MODEL="MiniMax-M2.5-highspeed"`,
+# export MINIMAX_OPUS_MODEL="MiniMax-M2.7"
+# export MINIMAX_SONNET_MODEL="MiniMax-M2.7"
+# export MINIMAX_HAIKU_MODEL="MiniMax-M2.7-highspeed"`,
       };
     default:
       return null;
@@ -431,10 +431,10 @@ export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
       // MiniMax profile: Uses Z.AI-style ANTHROPIC_DEFAULT_*_MODEL env vars
       // so Claude Code internally maps Opus/Sonnet/Haiku → MiniMax models.
       // Do NOT use App-side modelMappings — Claude Code rejects unknown model
-      // names passed via --model (e.g., "MiniMax-M2.5" causes 502 error).
+      // names passed via --model (e.g., "MiniMax-M2.7" causes 502 error).
       return {
         id: "minimax",
-        name: "MiniMax (M2.5)",
+        name: "MiniMax (M2.7)",
         anthropicConfig: {},
         environmentVariables: [
           {
@@ -451,23 +451,23 @@ export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
           },
           {
             name: "ANTHROPIC_MODEL",
-            value: "${MINIMAX_MODEL:-MiniMax-M2.5}",
+            value: "${MINIMAX_MODEL:-MiniMax-M2.7}",
           },
           {
             name: "ANTHROPIC_SMALL_FAST_MODEL",
-            value: "${MINIMAX_SMALL_FAST_MODEL:-MiniMax-M2.5-highspeed}",
+            value: "${MINIMAX_SMALL_FAST_MODEL:-MiniMax-M2.7-highspeed}",
           },
           {
             name: "ANTHROPIC_DEFAULT_OPUS_MODEL",
-            value: "${MINIMAX_OPUS_MODEL:-MiniMax-M2.5}",
+            value: "${MINIMAX_OPUS_MODEL:-MiniMax-M2.7}",
           },
           {
             name: "ANTHROPIC_DEFAULT_SONNET_MODEL",
-            value: "${MINIMAX_SONNET_MODEL:-MiniMax-M2.5}",
+            value: "${MINIMAX_SONNET_MODEL:-MiniMax-M2.7}",
           },
           {
             name: "ANTHROPIC_DEFAULT_HAIKU_MODEL",
-            value: "${MINIMAX_HAIKU_MODEL:-MiniMax-M2.5-highspeed}",
+            value: "${MINIMAX_HAIKU_MODEL:-MiniMax-M2.7-highspeed}",
           },
           {
             name: "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
@@ -518,7 +518,7 @@ export const DEFAULT_PROFILES = [
   },
   {
     id: "minimax",
-    name: "MiniMax (M2.5)",
+    name: "MiniMax (M2.7)",
     isBuiltIn: true,
   },
 ];

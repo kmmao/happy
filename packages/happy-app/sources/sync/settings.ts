@@ -137,8 +137,8 @@ export const AIBackendProfileSchema = z.object({
   customModels: z
     .array(
       z.object({
-        id: z.string().min(1), // Actual model ID sent to API (e.g., "MiniMax-M2.5")
-        name: z.string().min(1).max(100), // Display name (e.g., "MiniMax M2.5")
+        id: z.string().min(1), // Actual model ID sent to API (e.g., "MiniMax-M2.7")
+        name: z.string().min(1).max(100), // Display name (e.g., "MiniMax M2.7")
         description: z.string().nullish(), // Optional description
       }),
     )
@@ -146,7 +146,7 @@ export const AIBackendProfileSchema = z.object({
 
   // Model mappings: maps UI model keys (opus, sonnet, haiku) to provider-specific model IDs
   // When defined, UI keeps showing Opus/Sonnet/Haiku but sends the mapped model ID to API
-  // Example: { "opus": "MiniMax-M2.5", "sonnet": "MiniMax-M2.5", "haiku": "MiniMax-M2.5-highspeed" }
+  // Example: { "opus": "MiniMax-M2.7", "sonnet": "MiniMax-M2.7", "haiku": "MiniMax-M2.7-highspeed" }
   modelMappings: z.record(z.string(), z.string()).optional(),
 
   // Default session type for this profile

@@ -45,7 +45,7 @@ export function resolveMessageModeMeta(
         : "default";
 
   const modelMode = session.modelMode || "default";
-  // Apply model mappings: e.g., "opus" → "MiniMax-M2.5" if profile has modelMappings
+  // Apply model mappings: e.g., "opus" → "MiniMax-M2.7" if profile has modelMappings
   const rawModel = modelMode !== "default" ? modelMode : null;
   const model =
     rawModel && session.modelMappings?.[rawModel]

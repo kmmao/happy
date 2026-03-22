@@ -1306,7 +1306,7 @@ function NewSessionWizard() {
               resolvedProfile.customModels,
             );
         }
-        // Save profile model mappings (e.g., opus → MiniMax-M2.5)
+        // Save profile model mappings (e.g., opus → MiniMax-M2.7)
         if (resolvedProfile?.modelMappings) {
           storage
             .getState()
