@@ -550,6 +550,46 @@ export async function machineListMarketplaces(
     }
 }
 
+/** An available plugin from a marketplace (for Discover UI). */
+export interface AvailablePlugin {
+    readonly name: string;
+    readonly key: string; // "plugin-name@marketplace"
+    readonly marketplace: string;
+    readonly description?: string;
+    readonly category?: string;
+    readonly homepage?: string;
+    readonly installed: boolean;
+    readonly enabled: boolean;
+    readonly installs?: number;
+}
+
+/**
+ * List all available plugins from all marketplaces (for Discover UI).
+ */
+export async function machineListAvailablePlugins(
+    machineId: string,
+): Promise<{ plugins: readonly AvailablePlugin[] }> {
+    try {
+        return await apiSocket.machineRPC<
+            { plugins: readonly AvailablePlugin[] },
+            Record<string, never>
+        >(machineId, "listAvailablePlugins", {});
+    } catch {
+        return { plugins: [] };
+    }
+}
+
+/**
+ * Execute a plugin action via `claude plugin <action> <key>`.
+ */
+export async function machinePluginAction(
+    machineId: string,
+    action: "install" | "uninstall" | "enable" | "disable",
+    pluginKey: string,
+): Promise<MachineBashResult> {
+    return machineBash(machineId, `claude plugin ${action} "${pluginKey}"`, "~");
+}
+
 /**
  * Interrupt the current session operation (graceful, keeps process alive)
  */

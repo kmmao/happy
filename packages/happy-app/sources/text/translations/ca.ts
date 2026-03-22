@@ -1655,6 +1655,21 @@ export const ca: TranslationStructure = {
       if (agents > 0) parts.push(`${agents} agent`);
       return parts.join(" · ");
     },
+    availablePlugins: "Plugins disponibles",
+    searchPlugins: "Cercar plugins...",
+    install: "Instal·lar",
+    uninstall: "Desinstal·lar",
+    enable: "Activar",
+    disable: "Desactivar",
+    installing: "Instal·lant...",
+    uninstalling: "Desinstal·lant...",
+    installSuccess: ({ name }: { name: string }) => `${name} instal·lat`,
+    uninstallSuccess: ({ name }: { name: string }) => `${name} desinstal·lat`,
+    enableSuccess: ({ name }: { name: string }) => `${name} activat`,
+    disableSuccess: ({ name }: { name: string }) => `${name} desactivat`,
+    actionFailed: ({ error }: { error: string }) => `Error: ${error}`,
+    confirmUninstall: "Esteu segur que voleu desinstal·lar aquest plugin?",
+    installs: ({ count }: { count: string }) => `${count} instal·lacions`,
   },
 
   gitHosts: {

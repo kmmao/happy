@@ -1399,6 +1399,91 @@ export function registerCommonHandlers(
     return { marketplaces: results };
   });
 
+  // ── List all available plugins from all marketplaces (for Discover UI) ──
+  rpcHandlerManager.registerHandler("listAvailablePlugins", async () => {
+    const pluginsDir = join(homedir(), ".claude", "plugins");
+
+    // Read installed_plugins.json
+    const installedFile = await readJsonFile<{
+      plugins: Record<string, unknown[]>;
+    }>(join(pluginsDir, "installed_plugins.json"));
+    const installedKeys = new Set(
+      Object.keys(installedFile?.plugins ?? {}),
+    );
+
+    // Read enabledPlugins
+    const claudeSettings = await readJsonFile<{
+      enabledPlugins?: Record<string, boolean>;
+    }>(join(homedir(), ".claude", "settings.json"));
+    const enabledMap = claudeSettings?.enabledPlugins ?? {};
+
+    // Read install-counts-cache.json
+    const countsCache = await readJsonFile<{
+      counts: Array<{ plugin: string; unique_installs: number }>;
+    }>(join(pluginsDir, "install-counts-cache.json"));
+    const installCounts = new Map(
+      (countsCache?.counts ?? []).map((c) => [c.plugin, c.unique_installs]),
+    );
+
+    // Read known_marketplaces.json
+    interface KnownMarketplaceEntry {
+      source: { source: string; repo: string };
+      installLocation: string;
+    }
+    const known = await readJsonFile<Record<string, KnownMarketplaceEntry>>(
+      join(pluginsDir, "known_marketplaces.json"),
+    );
+
+    interface AvailablePlugin {
+      name: string;
+      key: string; // "plugin-name@marketplace"
+      marketplace: string;
+      description?: string;
+      category?: string;
+      homepage?: string;
+      installed: boolean;
+      enabled: boolean;
+      installs?: number;
+    }
+
+    const results: AvailablePlugin[] = [];
+
+    if (known) {
+      for (const [mpName, mp] of Object.entries(known)) {
+        const mpJson = await readJsonFile<MarketplaceJson>(
+          join(mp.installLocation, ".claude-plugin", "marketplace.json"),
+        );
+        if (!mpJson?.plugins) continue;
+
+        for (const p of mpJson.plugins) {
+          if (!p.name) continue;
+          const key = `${p.name}@${mpName}`;
+          results.push({
+            name: p.name,
+            key,
+            marketplace: mpName,
+            description: p.description,
+            category: p.category,
+            homepage: (p as Record<string, unknown>).homepage as string | undefined,
+            installed: installedKeys.has(key),
+            enabled: enabledMap[key] !== false && installedKeys.has(key),
+            installs: installCounts.get(key),
+          });
+        }
+      }
+    }
+
+    // Sort by install count (descending), then name
+    results.sort((a, b) => {
+      const ai = a.installs ?? 0;
+      const bi = b.installs ?? 0;
+      if (bi !== ai) return bi - ai;
+      return a.name.localeCompare(b.name);
+    });
+
+    return { plugins: results };
+  });
+
   // ── Inspect a single plugin (detailed) ──
   rpcHandlerManager.registerHandler(
     "inspectPlugin",

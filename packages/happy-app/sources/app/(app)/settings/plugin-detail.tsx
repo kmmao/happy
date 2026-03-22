@@ -1,12 +1,12 @@
 import * as React from "react";
 import { View, Text, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
-import { machineInspectPlugin } from "@/sync/ops";
+import { machineInspectPlugin, machinePluginAction } from "@/sync/ops";
 import type { PluginDetail } from "@/sync/ops";
 import { t } from "@/text";
 import { useHappyAction } from "@/hooks/useHappyAction";
@@ -29,6 +29,7 @@ function findOnlineMachineId(): string | null {
  */
 function PluginDetailScreen() {
     const { theme } = useUnistyles();
+    const router = useRouter();
     const params = useLocalSearchParams<{
         key: string;
         installPath: string;
@@ -44,6 +45,7 @@ function PluginDetailScreen() {
 
     const [detail, setDetail] = React.useState<PluginDetail | null>(null);
     const [loading, setLoading] = React.useState(false);
+    const [actionLoading, setActionLoading] = React.useState(false);
     const [expandedSection, setExpandedSection] = React.useState<
         "commands" | "skills" | "agents" | null
     >(null);
@@ -80,6 +82,61 @@ function PluginDetailScreen() {
             setLoading(false);
         }
     });
+
+    // Plugin action handler
+    const doAction = React.useCallback(
+        async (action: "enable" | "disable" | "uninstall") => {
+            const machineId = findOnlineMachineId();
+            if (!machineId) {
+                Modal.toast(t("settingsPlugins.noMachineOnline"));
+                return;
+            }
+
+            if (action === "uninstall") {
+                const confirmed = await Modal.confirm(
+                    t("settingsPlugins.uninstall"),
+                    t("settingsPlugins.confirmUninstall"),
+                    { destructive: true },
+                );
+                if (!confirmed) return;
+            }
+
+            setActionLoading(true);
+            try {
+                const result = await machinePluginAction(
+                    machineId,
+                    action,
+                    pluginKey,
+                );
+                if (result.success) {
+                    const successKey = `${action}Success` as
+                        | "enableSuccess"
+                        | "disableSuccess"
+                        | "uninstallSuccess";
+                    Modal.toast(
+                        t(`settingsPlugins.${successKey}`, {
+                            name: pluginName,
+                        }),
+                    );
+                    if (action === "uninstall") {
+                        router.back();
+                    }
+                } else {
+                    Modal.toast(
+                        t("settingsPlugins.actionFailed", {
+                            error:
+                                result.stderr?.slice(0, 100) ||
+                                result.error ||
+                                "Unknown error",
+                        }),
+                    );
+                }
+            } finally {
+                setActionLoading(false);
+            }
+        },
+        [pluginKey, pluginName, router],
+    );
 
     const toggleSection = React.useCallback(
         (section: "commands" | "skills" | "agents") => {
@@ -343,7 +400,38 @@ function PluginDetailScreen() {
             )}
 
             {/* Actions */}
-            <ItemGroup>
+            <ItemGroup title={t("settingsPlugins.actions")}>
+                <Item
+                    title={t("settingsPlugins.enable")}
+                    icon={
+                        actionLoading ? (
+                            <ActivityIndicator
+                                size="small"
+                                color={theme.colors.primary}
+                            />
+                        ) : (
+                            <Ionicons
+                                name="checkmark-circle-outline"
+                                size={24}
+                                color={theme.colors.success}
+                            />
+                        )
+                    }
+                    onPress={() => doAction("enable")}
+                    disabled={actionLoading}
+                />
+                <Item
+                    title={t("settingsPlugins.disable")}
+                    icon={
+                        <Ionicons
+                            name="close-circle-outline"
+                            size={24}
+                            color={theme.colors.warning}
+                        />
+                    }
+                    onPress={() => doAction("disable")}
+                    disabled={actionLoading}
+                />
                 <Item
                     title={t("settingsPlugins.refreshMetadata")}
                     icon={
@@ -362,6 +450,18 @@ function PluginDetailScreen() {
                     }
                     onPress={doRefresh}
                     disabled={loading}
+                />
+                <Item
+                    title={t("settingsPlugins.uninstall")}
+                    icon={
+                        <Ionicons
+                            name="trash-outline"
+                            size={24}
+                            color={theme.colors.deleteAction}
+                        />
+                    }
+                    onPress={() => doAction("uninstall")}
+                    disabled={actionLoading}
                 />
             </ItemGroup>
         </ItemList>

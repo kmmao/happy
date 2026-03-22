@@ -1651,6 +1651,21 @@ export const it: TranslationStructure = {
       if (agents > 0) parts.push(`${agents} agent`);
       return parts.join(" · ");
     },
+    availablePlugins: "Plugin disponibili",
+    searchPlugins: "Cerca plugin...",
+    install: "Installa",
+    uninstall: "Disinstalla",
+    enable: "Attiva",
+    disable: "Disattiva",
+    installing: "Installazione...",
+    uninstalling: "Disinstallazione...",
+    installSuccess: ({ name }: { name: string }) => `${name} installato`,
+    uninstallSuccess: ({ name }: { name: string }) => `${name} disinstallato`,
+    enableSuccess: ({ name }: { name: string }) => `${name} attivato`,
+    disableSuccess: ({ name }: { name: string }) => `${name} disattivato`,
+    actionFailed: ({ error }: { error: string }) => `Errore: ${error}`,
+    confirmUninstall: "Sei sicuro di voler disinstallare questo plugin?",
+    installs: ({ count }: { count: string }) => `${count} installazioni`,
   },
 
   gitHosts: {

@@ -1579,6 +1579,21 @@ export const zhHans: TranslationStructure = {
       if (agents > 0) parts.push(`${agents} agent`);
       return parts.join(" · ");
     },
+    availablePlugins: "可用插件",
+    searchPlugins: "搜索插件...",
+    install: "安装",
+    uninstall: "卸载",
+    enable: "启用",
+    disable: "禁用",
+    installing: "安装中...",
+    uninstalling: "卸载中...",
+    installSuccess: ({ name }: { name: string }) => `${name} 已安装`,
+    uninstallSuccess: ({ name }: { name: string }) => `${name} 已卸载`,
+    enableSuccess: ({ name }: { name: string }) => `${name} 已启用`,
+    disableSuccess: ({ name }: { name: string }) => `${name} 已禁用`,
+    actionFailed: ({ error }: { error: string }) => `失败：${error}`,
+    confirmUninstall: "确定要卸载此插件吗？",
+    installs: ({ count }: { count: string }) => `${count} 次安装`,
   },
 
   gitHosts: {

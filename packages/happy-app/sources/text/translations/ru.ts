@@ -1677,6 +1677,21 @@ export const ru: TranslationStructure = {
       if (agents > 0) parts.push(`${agents} agent`);
       return parts.join(" · ");
     },
+    availablePlugins: "Доступные плагины",
+    searchPlugins: "Поиск плагинов...",
+    install: "Установить",
+    uninstall: "Удалить",
+    enable: "Включить",
+    disable: "Отключить",
+    installing: "Установка...",
+    uninstalling: "Удаление...",
+    installSuccess: ({ name }: { name: string }) => `${name} установлен`,
+    uninstallSuccess: ({ name }: { name: string }) => `${name} удалён`,
+    enableSuccess: ({ name }: { name: string }) => `${name} включён`,
+    disableSuccess: ({ name }: { name: string }) => `${name} отключён`,
+    actionFailed: ({ error }: { error: string }) => `Ошибка: ${error}`,
+    confirmUninstall: "Вы уверены, что хотите удалить этот плагин?",
+    installs: ({ count }: { count: string }) => `${count} установок`,
   },
 
   gitHosts: {

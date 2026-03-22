@@ -1637,6 +1637,21 @@ export const en = {
       if (agents > 0) parts.push(`${agents} agent`);
       return parts.join(" · ");
     },
+    availablePlugins: "Available Plugins",
+    searchPlugins: "Search plugins...",
+    install: "Install",
+    uninstall: "Uninstall",
+    enable: "Enable",
+    disable: "Disable",
+    installing: "Installing...",
+    uninstalling: "Uninstalling...",
+    installSuccess: ({ name }: { name: string }) => `${name} installed`,
+    uninstallSuccess: ({ name }: { name: string }) => `${name} uninstalled`,
+    enableSuccess: ({ name }: { name: string }) => `${name} enabled`,
+    disableSuccess: ({ name }: { name: string }) => `${name} disabled`,
+    actionFailed: ({ error }: { error: string }) => `Failed: ${error}`,
+    confirmUninstall: "Are you sure you want to uninstall this plugin?",
+    installs: ({ count }: { count: string }) => `${count} installs`,
   },
 
   gitHosts: {

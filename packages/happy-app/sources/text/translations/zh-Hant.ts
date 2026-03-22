@@ -1581,6 +1581,21 @@ export const zhHant: TranslationStructure = {
       if (agents > 0) parts.push(`${agents} agent`);
       return parts.join(" · ");
     },
+    availablePlugins: "可用插件",
+    searchPlugins: "搜尋插件...",
+    install: "安裝",
+    uninstall: "解除安裝",
+    enable: "啟用",
+    disable: "停用",
+    installing: "安裝中...",
+    uninstalling: "解除安裝中...",
+    installSuccess: ({ name }: { name: string }) => `${name} 已安裝`,
+    uninstallSuccess: ({ name }: { name: string }) => `${name} 已解除安裝`,
+    enableSuccess: ({ name }: { name: string }) => `${name} 已啟用`,
+    disableSuccess: ({ name }: { name: string }) => `${name} 已停用`,
+    actionFailed: ({ error }: { error: string }) => `失敗：${error}`,
+    confirmUninstall: "確定要解除安裝此插件嗎？",
+    installs: ({ count }: { count: string }) => `${count} 次安裝`,
   },
 
   gitHosts: {

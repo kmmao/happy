@@ -1632,6 +1632,21 @@ export const ja: TranslationStructure = {
       if (agents > 0) parts.push(`${agents} agent`);
       return parts.join(" · ");
     },
+    availablePlugins: "利用可能なプラグイン",
+    searchPlugins: "プラグインを検索...",
+    install: "インストール",
+    uninstall: "アンインストール",
+    enable: "有効化",
+    disable: "無効化",
+    installing: "インストール中...",
+    uninstalling: "アンインストール中...",
+    installSuccess: ({ name }: { name: string }) => `${name} をインストールしました`,
+    uninstallSuccess: ({ name }: { name: string }) => `${name} をアンインストールしました`,
+    enableSuccess: ({ name }: { name: string }) => `${name} を有効にしました`,
+    disableSuccess: ({ name }: { name: string }) => `${name} を無効にしました`,
+    actionFailed: ({ error }: { error: string }) => `失敗：${error}`,
+    confirmUninstall: "このプラグインをアンインストールしてもよろしいですか？",
+    installs: ({ count }: { count: string }) => `${count} 回インストール`,
   },
 
   gitHosts: {
