@@ -1,0 +1,105 @@
+# Happy CLI Client Container
+# Ubuntu with Claude Code + happy-coder, single-user instance
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV SHELL=/usr/bin/zsh
+
+# Happy configuration (override at runtime with -e)
+ENV HAPPY_SERVER_URL="https://code.zm1.zmddg.com"
+ENV HAPPY_WEBAPP_URL="https://webcode.zm1.zmddg.com"
+ENV HAPPY_HOME_DIR="/root/.happy"
+ENV EXPO_PACKAGER_PROXY_URL="https://webcode.zm1.zmddg.com"
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    zsh \
+    tmux \
+    sudo \
+    ca-certificates \
+    gnupg \
+    vim \
+    ripgrep \
+    fd-find \
+    jq \
+    htop \
+    unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s $(which fdfind) /usr/local/bin/fd
+
+# Install Node.js 20 via NodeSource
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Oh My Zsh (non-interactive)
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+
+# Zsh plugins
+RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions \
+    && git clone https://github.com/zsh-users/zsh-syntax-highlighting ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting \
+    && git clone https://github.com/zsh-users/zsh-completions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-completions \
+    && sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-completions node npm)/' ~/.zshrc
+
+# Install happy-coder globally
+RUN npm install -g @kmmao/happy-coder
+
+# Install Claude Code CLI
+RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# Configure PATH for Claude CLI
+RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+
+# Happy environment variables are set via Docker ENV (see above)
+# No need to hardcode in .zshrc — docker passes ENV to all shells
+
+# Set zsh as default shell
+RUN chsh -s /usr/bin/zsh
+
+# Persist happy data
+VOLUME /root/.happy
+
+CMD ["zsh"]
+
+# ============================================================
+# Usage
+# ============================================================
+#
+# 1. 构建镜像
+#
+#    docker build -f Dockerfile.client -t happy-client .
+#
+# 2. 启动容器（使用默认配置）
+#
+#    docker run -it --name happy-user \
+#      -v happy-data:/root/.happy \
+#      happy-client
+#
+# 2b. 自定义 Server URL 启动
+#
+#    docker run -it --name happy-user \
+#      -e HAPPY_SERVER_URL="https://my-server.example.com" \
+#      -e HAPPY_WEBAPP_URL="https://my-webapp.example.com" \
+#      -v happy-data:/root/.happy \
+#      happy-client
+#
+# 3. 进入已运行的容器
+#
+#    docker exec -it happy-user zsh
+#
+# 4. 容器内使用
+#
+#    happy             # 启动 happy-coder
+#    claude            # 启动 Claude Code
+#    tmux              # 使用 tmux 管理多会话
+#
+# 5. 停止 / 重启
+#
+#    docker stop happy-user
+#    docker start -i happy-user
+#
+# ============================================================
