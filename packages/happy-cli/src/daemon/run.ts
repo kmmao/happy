@@ -541,6 +541,29 @@ export async function startDaemon(): Promise<void> {
           };
         }
 
+        // When GUI explicitly provides a profile (even empty {}), strip daemon's
+        // API-provider env vars so they don't leak to the child process.
+        // Otherwise the daemon's own API config (e.g. ANTHROPIC_MODEL=MiniMax-M2.7)
+        // would contaminate sessions that should use the default/profile config.
+        // The correct env vars for this session are already in extraEnv (from profile).
+        const PROFILE_SPECIFIC_ENV_VARS = guiProfileProvided
+          ? new Set([
+              "ANTHROPIC_MODEL",
+              "ANTHROPIC_BASE_URL",
+              "ANTHROPIC_AUTH_TOKEN",
+              "ANTHROPIC_API_KEY",
+              "CLAUDE_CODE_OAUTH_TOKEN",
+              "OPENAI_API_KEY",
+              "OPENAI_BASE_URL",
+              "AZURE_OPENAI_API_KEY",
+              "AZURE_OPENAI_ENDPOINT",
+              "GOOGLE_API_KEY",
+              "GEMINI_API_KEY",
+              "TOGETHER_API_KEY",
+              "CODEX_HOME",
+            ])
+          : new Set<string>();
+
         // Check if tmux is available and should be used
         const tmuxAvailable = await isTmuxAvailable();
         let useTmux = tmuxAvailable;
@@ -612,7 +635,11 @@ export async function startDaemon(): Promise<void> {
             "S3_ACCESS_KEY", "S3_SECRET_KEY",
           ]);
           for (const [key, value] of Object.entries(process.env)) {
-            if (value !== undefined && !TMUX_SERVER_ONLY_ENV_VARS.has(key)) {
+            if (
+              value !== undefined &&
+              !TMUX_SERVER_ONLY_ENV_VARS.has(key) &&
+              !PROFILE_SPECIFIC_ENV_VARS.has(key)
+            ) {
               tmuxEnv[key] = value;
             }
           }
@@ -755,9 +782,12 @@ export async function startDaemon(): Promise<void> {
             "AWS_SESSION_TOKEN", "STRIPE_SECRET_KEY", "SENDGRID_API_KEY",
             "S3_ACCESS_KEY", "S3_SECRET_KEY",
           ]);
+
           const filteredDaemonEnv = Object.fromEntries(
             Object.entries(process.env).filter(
-              ([key]) => !SERVER_ONLY_ENV_VARS.has(key),
+              ([key]) =>
+                !SERVER_ONLY_ENV_VARS.has(key) &&
+                !PROFILE_SPECIFIC_ENV_VARS.has(key),
             ),
           );
 
