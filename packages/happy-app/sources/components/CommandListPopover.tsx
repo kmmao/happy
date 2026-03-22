@@ -108,9 +108,28 @@ export const CommandListPopover = React.memo(
       [favorites, setFavorites],
     );
 
+    const moveFavorite = React.useCallback(
+      (command: string, direction: "up" | "down") => {
+        const idx = favorites.indexOf(command);
+        if (idx < 0) return;
+        const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= favorites.length) return;
+        const next = [...favorites];
+        next[idx] = favorites[targetIdx];
+        next[targetIdx] = favorites[idx];
+        setFavorites(next);
+      },
+      [favorites, setFavorites],
+    );
+
     if (!shouldRender) return null;
 
-    const renderItem = (cmd: CommandItem, isFav: boolean) => (
+    const renderItem = (
+      cmd: CommandItem,
+      isFav: boolean,
+      favIndex?: number,
+      favTotal?: number,
+    ) => (
       <View key={cmd.command} style={styles.commandRow}>
         <Pressable
           style={({ pressed }) => [
@@ -132,6 +151,48 @@ export const CommandListPopover = React.memo(
             </Text>
           ) : null}
         </Pressable>
+        {isFav && favIndex !== undefined && favTotal !== undefined && (
+          <View style={styles.reorderButtons}>
+            <Pressable
+              onPress={() => moveFavorite(cmd.command, "up")}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              style={[
+                styles.reorderButton,
+                favIndex === 0 && styles.reorderButtonDisabled,
+              ]}
+              disabled={favIndex === 0}
+            >
+              <Ionicons
+                name="chevron-up"
+                size={14}
+                color={
+                  favIndex === 0
+                    ? theme.colors.textSecondary
+                    : theme.colors.textSecondary
+                }
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => moveFavorite(cmd.command, "down")}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              style={[
+                styles.reorderButton,
+                favIndex === favTotal - 1 && styles.reorderButtonDisabled,
+              ]}
+              disabled={favIndex === favTotal - 1}
+            >
+              <Ionicons
+                name="chevron-down"
+                size={14}
+                color={
+                  favIndex === favTotal - 1
+                    ? theme.colors.textSecondary
+                    : theme.colors.textSecondary
+                }
+              />
+            </Pressable>
+          </View>
+        )}
         <Pressable
           onPress={() => toggleFavorite(cmd.command)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -195,7 +256,9 @@ export const CommandListPopover = React.memo(
                   {t("quickCommands.favorites")}
                 </Text>
               </View>
-              {favoriteItems.map((cmd) => renderItem(cmd, true))}
+              {favoriteItems.map((cmd, idx) =>
+                renderItem(cmd, true, idx, favoriteItems.length),
+              )}
             </>
           )}
           {otherItems.length > 0 && (
@@ -350,6 +413,18 @@ const styles = StyleSheet.create((theme) => ({
     ...Typography.default(),
     fontSize: 13,
     flex: 1,
+  },
+  reorderButtons: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 0,
+  },
+  reorderButton: {
+    padding: 2,
+  },
+  reorderButtonDisabled: {
+    opacity: 0.3,
   },
   starButton: {
     paddingHorizontal: 12,
