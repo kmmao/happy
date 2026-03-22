@@ -1668,6 +1668,7 @@ export const ru: TranslationStructure = {
     refreshMetadata: "Обновить метаданные",
     refreshSuccess: "Метаданные обновлены",
     noDescription: "Нет описания",
+    pluginNotFound: "Плагин не найден",
     unknown: "Неизвестно",
     noMachineOnline: "Нет онлайн-машин",
     pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {

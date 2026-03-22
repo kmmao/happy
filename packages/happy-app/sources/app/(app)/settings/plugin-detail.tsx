@@ -174,7 +174,7 @@ function PluginDetailScreen() {
         return (
             <ItemList>
                 <View>
-                    <Text style={styles.notFound}>Plugin not found</Text>
+                    <Text style={styles.notFound}>{t("settingsPlugins.pluginNotFound")}</Text>
                 </View>
             </ItemList>
         );

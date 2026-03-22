@@ -1646,6 +1646,7 @@ export const ca: TranslationStructure = {
     refreshMetadata: "Actualitzar metadades",
     refreshSuccess: "Metadades actualitzades",
     noDescription: "Sense descripció",
+    pluginNotFound: "No s'ha trobat el connector",
     unknown: "Desconegut",
     noMachineOnline: "No hi ha cap màquina en línia",
     pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {

@@ -1644,6 +1644,7 @@ export const pt: TranslationStructure = {
     refreshMetadata: "Atualizar metadados",
     refreshSuccess: "Metadados atualizados",
     noDescription: "Sem descrição",
+    pluginNotFound: "Plugin não encontrado",
     unknown: "Desconhecido",
     noMachineOnline: "Nenhuma máquina online",
     pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {

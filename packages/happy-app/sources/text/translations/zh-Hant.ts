@@ -1572,6 +1572,7 @@ export const zhHant: TranslationStructure = {
     refreshMetadata: "重新整理中繼資料",
     refreshSuccess: "中繼資料已重新整理",
     noDescription: "暫無描述",
+    pluginNotFound: "未找到外掛",
     unknown: "未知",
     noMachineOnline: "沒有線上的機器",
     pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {

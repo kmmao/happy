@@ -1623,6 +1623,7 @@ export const ja: TranslationStructure = {
     refreshMetadata: "メタデータを更新",
     refreshSuccess: "メタデータを更新しました",
     noDescription: "説明なし",
+    pluginNotFound: "プラグインが見つかりません",
     unknown: "不明",
     noMachineOnline: "オンラインのマシンがありません",
     pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {

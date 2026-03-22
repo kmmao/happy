@@ -1570,6 +1570,7 @@ export const zhHans: TranslationStructure = {
     refreshMetadata: "刷新元数据",
     refreshSuccess: "元数据已刷新",
     noDescription: "暂无描述",
+    pluginNotFound: "未找到插件",
     unknown: "未知",
     noMachineOnline: "没有在线的机器",
     pluginStats: ({ commands, skills, agents }: { commands: number; skills: number; agents: number }) => {
