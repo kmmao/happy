@@ -466,9 +466,10 @@ export async function detectAllPorts(
         }
     }
 
-    // Remove probe-candidates that didn't respond to HTTP
-    for (const [port, process] of portMap) {
-        if (process === "probe-candidate" && !webPorts.has(port)) {
+    // Remove ALL ports that didn't respond to HTTP — only show confirmed web services.
+    // This ensures dead/stale services are never displayed.
+    for (const port of portMap.keys()) {
+        if (!webPorts.has(port)) {
             portMap.delete(port);
         }
     }
