@@ -18,7 +18,8 @@ export async function friendList(ctx: Context): Promise<UserProfile[]> {
                     githubUser: true
                 }
             }
-        }
+        },
+        take: 1000,
     });
 
     // Build UserProfile objects

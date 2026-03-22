@@ -118,6 +118,7 @@ export async function dispatchWebhook(
       provider,
       enabled: true,
     },
+    take: 1000,
   });
 
   if (routes.length === 0) {
@@ -454,6 +455,7 @@ async function processRoutePRMerge(
       status: { in: ["completed", "dispatched"] },
       sessionId: { not: null },
     },
+    take: 1000,
   });
 
   if (webhookEvents.length === 0) {
@@ -571,6 +573,7 @@ async function handlePushSupervisorTrigger(
       supervisorEnabledDimensions: true,
       supervisorCustomRules: true,
     },
+    take: 1000,
   });
 
   if (projects.length === 0) {

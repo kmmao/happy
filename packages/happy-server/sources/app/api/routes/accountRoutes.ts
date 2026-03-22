@@ -23,7 +23,7 @@ export function accountRoutes(app: Fastify) {
                 githubUser: true
             }
         });
-        const connectedVendors = new Set((await db.serviceAccountToken.findMany({ where: { accountId: userId } })).map(t => t.vendor));
+        const connectedVendors = new Set((await db.serviceAccountToken.findMany({ where: { accountId: userId }, take: 100 })).map(t => t.vendor));
         return reply.send({
             id: userId,
             timestamp: Date.now(),
