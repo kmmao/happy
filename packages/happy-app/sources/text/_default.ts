@@ -1386,6 +1386,21 @@ export const en = {
     deleteConfirm: 'Are you sure you want to delete the profile "{name}"?',
     editProfile: "Edit Profile",
     addProfileTitle: "Add New Profile",
+    envCard: {
+      copyFromRemote: "First try copying variable from remote machine:",
+      selectMachine: "Select a machine to check if variable exists",
+      defaultValue: "Default value:",
+      sessionWillReceive: "Session will receive:",
+      checkingRemote: "Checking remote machine...",
+      valueNotFound: "Value not found",
+      valueFound: "Value found:",
+      secretHidden: "Secret value - not retrieved for security",
+      differsFromDefault: "Overriding documented default:",
+      differsFromDocumented: "Differs from documented value:",
+      variablePlaceholder: "Variable name (e.g., Z_AI_MODEL)",
+      hiddenForSecurity: "hidden for security",
+      empty: "(empty)",
+    },
     delete: {
       title: "Delete Profile",
       message: ({ name }: { name: string }) =>

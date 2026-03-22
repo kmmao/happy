@@ -138,6 +138,21 @@ export const ja: TranslationStructure = {
     deleteConfirm: "プロファイル「{name}」を削除してもよろしいですか？",
     editProfile: "プロファイルを編集",
     addProfileTitle: "新しいプロファイルを追加",
+    envCard: {
+      copyFromRemote: "First try copying variable from remote machine:",
+      selectMachine: "Select a machine to check if variable exists",
+      defaultValue: "Default value:",
+      sessionWillReceive: "Session will receive:",
+      checkingRemote: "Checking remote machine...",
+      valueNotFound: "Value not found",
+      valueFound: "Value found:",
+      secretHidden: "Secret value - not retrieved for security",
+      differsFromDefault: "Overriding documented default:",
+      differsFromDocumented: "Differs from documented value:",
+      variablePlaceholder: "Variable name (e.g., Z_AI_MODEL)",
+      hiddenForSecurity: "hidden for security",
+      empty: "(empty)",
+    },
     delete: {
       title: "プロファイルを削除",
       message: ({ name }: { name: string }) =>

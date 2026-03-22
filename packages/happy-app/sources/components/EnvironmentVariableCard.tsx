@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useUnistyles } from 'react-native-unistyles';
 import { Typography } from '@/constants/Typography';
 import { useEnvironmentVariables } from '@/hooks/useEnvironmentVariables';
+import { t } from '@/text';
 
 export interface EnvironmentVariableCardProps {
     variable: { name: string; value: string };
@@ -176,7 +177,7 @@ export function EnvironmentVariableCard({
                     color: theme.colors.textSecondary,
                     ...Typography.default()
                 }}>
-                    First try copying variable from remote machine:
+                    {t('profiles.envCard.copyFromRemote')}
                 </Text>
             </Pressable>
 
@@ -193,7 +194,7 @@ export function EnvironmentVariableCard({
                     borderColor: theme.colors.textSecondary,
                     opacity: useRemoteVariable ? 1 : 0.5,
                 }}
-                placeholder="Variable name (e.g., Z_AI_MODEL)"
+                placeholder={t('profiles.envCard.variablePlaceholder')}
                 placeholderTextColor={theme.colors.input.placeholder}
                 value={remoteVariableName}
                 onChangeText={setRemoteVariableName}
@@ -212,7 +213,7 @@ export function EnvironmentVariableCard({
                             fontStyle: 'italic',
                             ...Typography.default()
                         }}>
-                            ⏳ Checking remote machine...
+                            ⏳ {t('profiles.envCard.checkingRemote')}
                         </Text>
                     ) : remoteValue === null ? (
                         <Text style={{
@@ -220,7 +221,7 @@ export function EnvironmentVariableCard({
                             color: theme.colors.warning,
                             ...Typography.default()
                         }}>
-                            ✗ Value not found
+                            ✗ {t('profiles.envCard.valueNotFound')}
                         </Text>
                     ) : (
                         <>
@@ -229,7 +230,7 @@ export function EnvironmentVariableCard({
                                 color: theme.colors.success,
                                 ...Typography.default()
                             }}>
-                                ✓ Value found: {remoteValue}
+                                ✓ {t('profiles.envCard.valueFound')} {remoteValue}
                             </Text>
                             {showRemoteDiffersWarning && (
                                 <Text style={{
@@ -238,7 +239,7 @@ export function EnvironmentVariableCard({
                                     marginTop: 2,
                                     ...Typography.default()
                                 }}>
-                                    ⚠️ Differs from documented value: {expectedValue}
+                                    ⚠️ {t('profiles.envCard.differsFromDocumented')} {expectedValue}
                                 </Text>
                             )}
                         </>
@@ -254,7 +255,7 @@ export function EnvironmentVariableCard({
                     fontStyle: 'italic',
                     ...Typography.default()
                 }}>
-                    ℹ️ Select a machine to check if variable exists
+                    ℹ️ {t('profiles.envCard.selectMachine')}
                 </Text>
             )}
 
@@ -267,7 +268,7 @@ export function EnvironmentVariableCard({
                     fontStyle: 'italic',
                     ...Typography.default()
                 }}>
-                    🔒 Secret value - not retrieved for security
+                    🔒 {t('profiles.envCard.secretHidden')}
                 </Text>
             )}
 
@@ -278,7 +279,7 @@ export function EnvironmentVariableCard({
                 marginBottom: 4,
                 ...Typography.default()
             }}>
-                Default value:
+                {t('profiles.envCard.defaultValue')}
             </Text>
 
             {/* Default value input */}
@@ -310,7 +311,7 @@ export function EnvironmentVariableCard({
                     marginBottom: 8,
                     ...Typography.default()
                 }}>
-                    ⚠️ Overriding documented default: {expectedValue}
+                    ⚠️ {t('profiles.envCard.differsFromDefault')} {expectedValue}
                 </Text>
             )}
 
@@ -321,14 +322,14 @@ export function EnvironmentVariableCard({
                 marginTop: 4,
                 ...Typography.default()
             }}>
-                Session will receive: {variable.name} = {
+                {t('profiles.envCard.sessionWillReceive')} {variable.name} = {
                     isSecret
                         ? (useRemoteVariable && remoteVariableName
-                            ? `\${${remoteVariableName}${defaultValue ? `:-***` : ''}} - hidden for security`
-                            : (defaultValue ? '***hidden***' : '(empty)'))
+                            ? `\${${remoteVariableName}${defaultValue ? `:-***` : ''}} - ${t('profiles.envCard.hiddenForSecurity')}`
+                            : (defaultValue ? '***hidden***' : t('profiles.envCard.empty')))
                         : (useRemoteVariable && remoteValue !== undefined && remoteValue !== null
                             ? remoteValue
-                            : defaultValue || '(empty)')
+                            : defaultValue || t('profiles.envCard.empty'))
                 }
             </Text>
         </View>

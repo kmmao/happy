@@ -1411,6 +1411,21 @@ export const es: TranslationStructure = {
     deleteConfirm: '¿Estás seguro de que quieres eliminar el perfil "{name}"?',
     editProfile: "Editar Perfil",
     addProfileTitle: "Agregar Nuevo Perfil",
+    envCard: {
+      copyFromRemote: "First try copying variable from remote machine:",
+      selectMachine: "Select a machine to check if variable exists",
+      defaultValue: "Default value:",
+      sessionWillReceive: "Session will receive:",
+      checkingRemote: "Checking remote machine...",
+      valueNotFound: "Value not found",
+      valueFound: "Value found:",
+      secretHidden: "Secret value - not retrieved for security",
+      differsFromDefault: "Overriding documented default:",
+      differsFromDocumented: "Differs from documented value:",
+      variablePlaceholder: "Variable name (e.g., Z_AI_MODEL)",
+      hiddenForSecurity: "hidden for security",
+      empty: "(empty)",
+    },
     delete: {
       title: "Eliminar Perfil",
       message: ({ name }: { name: string }) =>

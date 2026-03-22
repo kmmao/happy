@@ -1343,6 +1343,21 @@ export const zhHant: TranslationStructure = {
     deleteConfirm: "確定要刪除設定檔「{name}」嗎？",
     editProfile: "編輯設定檔",
     addProfileTitle: "新增設定檔",
+    envCard: {
+      copyFromRemote: "優先從遠端機器複製變數：",
+      selectMachine: "選擇一台機器以檢查變數是否存在",
+      defaultValue: "預設值：",
+      sessionWillReceive: "工作階段將接收：",
+      checkingRemote: "正在檢查遠端機器...",
+      valueNotFound: "未找到值",
+      valueFound: "已找到值：",
+      secretHidden: "密鑰值 - 基於安全考量不擷取",
+      differsFromDefault: "覆蓋了文件預設值：",
+      differsFromDocumented: "與文件值不同：",
+      variablePlaceholder: "變數名稱（例如 Z_AI_MODEL）",
+      hiddenForSecurity: "基於安全已隱藏",
+      empty: "（空）",
+    },
     delete: {
       title: "刪除設定檔",
       message: ({ name }: { name: string }) =>
