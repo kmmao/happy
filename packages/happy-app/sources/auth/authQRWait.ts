@@ -29,18 +29,15 @@ export async function authQRWait(keypair: QRAuthKeyPair, onProgress?: (dots: num
                 
                 const decrypted = decryptBox(encryptedResponse, keypair.secretKey);
                 if (decrypted) {
-                    console.log('\n\n✓ Authentication successful\n');
                     return {
                         secret: decrypted,
                         token: token
                     };
                 } else {
-                    console.log('\n\nFailed to decrypt response. Please try again.');
                     return null;
                 }
             }
         } catch (error) {
-            console.log('\n\nFailed to check authentication status. Please try again.');
             return null;
         }
 
