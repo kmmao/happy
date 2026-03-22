@@ -341,7 +341,11 @@ function PluginsSettingsScreen() {
                         }
                         detail={
                             plugin.installs
-                                ? `${formatInstalls(plugin.installs)} installs`
+                                ? t("settingsPlugins.installs", {
+                                      count: formatInstalls(
+                                          plugin.installs,
+                                      ),
+                                  })
                                 : plugin.marketplace
                         }
                         icon={
