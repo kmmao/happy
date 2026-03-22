@@ -2120,6 +2120,23 @@ export const it: TranslationStructure = {
     stopConfirmMessage: "Sei sicuro di voler fermare questa attività in background?",
   },
 
+  processManager: {
+    title: "Processi in background",
+    viewAll: "Gestisci processi",
+    viewAllHint: "Visualizza e gestisci i servizi in background",
+    scanning: "Scansione processi...",
+    count: ({ count }: { count: number }) => `${count} servizi${count === 1 ? "o" : ""} attiv${count === 1 ? "o" : "i"}`,
+    noProcesses: "Nessun servizio in background",
+    noProcessesHint: "Nessun servizio web in esecuzione su questa macchina.",
+    killAll: "Ferma tutti",
+    killConfirmTitle: "Ferma servizio",
+    killConfirmMessage: ({ port, process }: { port: number; process: string }) =>
+      `Fermare ${process} sulla porta ${port}?`,
+    killAllConfirmTitle: "Ferma tutti i servizi",
+    killAllConfirmMessage: ({ count }: { count: number }) =>
+      `Fermare tutti i ${count} servizi in esecuzione?`,
+  },
+
   supervisor: {
     title: "Monitor della salute",
     description: "Analisi del codice basata su AI che monitora la salute del progetto su più dimensioni.",

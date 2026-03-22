@@ -2124,6 +2124,23 @@ export const pt: TranslationStructure = {
     stopConfirmMessage: "Tem certeza de que deseja parar esta tarefa em segundo plano?",
   },
 
+  processManager: {
+    title: "Processos em segundo plano",
+    viewAll: "Gerenciar processos",
+    viewAllHint: "Ver e gerenciar serviços em segundo plano",
+    scanning: "Escaneando processos...",
+    count: ({ count }: { count: number }) => `${count} serviço${count !== 1 ? "s" : ""} ativo${count !== 1 ? "s" : ""}`,
+    noProcesses: "Sem serviços em segundo plano",
+    noProcessesHint: "Nenhum serviço web está sendo executado nesta máquina.",
+    killAll: "Parar todos",
+    killConfirmTitle: "Parar serviço",
+    killConfirmMessage: ({ port, process }: { port: number; process: string }) =>
+      `Parar ${process} na porta ${port}?`,
+    killAllConfirmTitle: "Parar todos os serviços",
+    killAllConfirmMessage: ({ count }: { count: number }) =>
+      `Parar todos os ${count} serviços em execução?`,
+  },
+
   supervisor: {
     title: "Monitor de saúde",
     description: "Análise de código com IA que monitora a saúde do projeto em múltiplas dimensões.",

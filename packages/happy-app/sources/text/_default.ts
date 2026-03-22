@@ -2106,6 +2106,24 @@ export const en = {
     stopConfirmMessage: "Are you sure you want to stop this background task?",
   },
 
+  processManager: {
+    title: "Background Processes",
+    viewAll: "Manage Processes",
+    viewAllHint: "View and manage background services",
+    scanning: "Scanning processes...",
+    count: ({ count }: { count: number }) =>
+      `${count} active service${count !== 1 ? "s" : ""}`,
+    noProcesses: "No Background Services",
+    noProcessesHint: "No web services are currently running on this machine.",
+    killAll: "Stop All",
+    killConfirmTitle: "Stop Service",
+    killConfirmMessage: ({ port, process }: { port: number; process: string }) =>
+      `Stop ${process} on port ${port}?`,
+    killAllConfirmTitle: "Stop All Services",
+    killAllConfirmMessage: ({ count }: { count: number }) =>
+      `Stop all ${count} running service${count !== 1 ? "s" : ""}?`,
+  },
+
   supervisor: {
     // General
     title: "Health Monitor",

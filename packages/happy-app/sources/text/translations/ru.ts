@@ -2140,6 +2140,23 @@ export const ru: TranslationStructure = {
     stopConfirmMessage: "Вы уверены, что хотите остановить эту фоновую задачу?",
   },
 
+  processManager: {
+    title: "Фоновые процессы",
+    viewAll: "Управление процессами",
+    viewAllHint: "Просмотр и управление фоновыми сервисами",
+    scanning: "Сканирование процессов...",
+    count: ({ count }: { count: number }) => `${count} активных сервисов`,
+    noProcesses: "Нет фоновых сервисов",
+    noProcessesHint: "На этой машине нет запущенных веб-сервисов.",
+    killAll: "Остановить все",
+    killConfirmTitle: "Остановить сервис",
+    killConfirmMessage: ({ port, process }: { port: number; process: string }) =>
+      `Остановить ${process} на порту ${port}?`,
+    killAllConfirmTitle: "Остановить все сервисы",
+    killAllConfirmMessage: ({ count }: { count: number }) =>
+      `Остановить все ${count} запущенных сервисов?`,
+  },
+
   supervisor: {
     title: "Мониторинг здоровья",
     description: "AI-анализ кода, отслеживающий здоровье проекта по множеству измерений.",

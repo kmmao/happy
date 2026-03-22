@@ -584,6 +584,23 @@ function MachineDetailScreen() {
           />
         </ItemGroup>
 
+        {/* Background processes */}
+        <ItemGroup title={t("processManager.title")}>
+          <Item
+            title={t("processManager.viewAll")}
+            subtitle={t("processManager.viewAllHint")}
+            icon={
+              <Ionicons
+                name="terminal-outline"
+                size={20}
+                color={theme.colors.textLink}
+              />
+            }
+            onPress={() => router.push(`/machine/${machineId}/processes`)}
+            showChevron
+          />
+        </ItemGroup>
+
         {/* Previous Sessions (debug view) */}
         {previousSessions.length > 0 && (
           <ItemGroup title={"Previous Sessions (up to 5 most recent)"}>

@@ -6,7 +6,7 @@
  * Results are merged, deduplicated, and sorted (common dev ports first).
  */
 
-import { sessionBash } from "@/sync/ops";
+
 
 /** Common dev server ports to highlight in detection results. */
 export const COMMON_DEV_PORTS = [
@@ -18,6 +18,7 @@ export interface DetectedPort {
     readonly process: string;
     readonly isCommonDevPort: boolean;
     readonly isWeb: boolean;
+    readonly pid?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -286,10 +287,17 @@ export function parseCurlProbeOutput(stdout: string): ReadonlyMap<number, string
 // Orchestrator — runs strategies and merges results
 // ---------------------------------------------------------------------------
 
-type BashFn = (
-    sessionId: string,
+/** Generic command executor — caller binds sessionId or machineId via closure. */
+export type BashFn = (
     request: { command: string; timeout?: number },
 ) => Promise<{ success: boolean; stdout?: string; exitCode?: number }>;
+
+export interface DetectPortsOptions {
+    /** Filter ports to only processes whose CWD is under the session's working directory. Default: true */
+    readonly filterByCwd?: boolean;
+    /** Progress callback for UI feedback */
+    readonly onProgress?: (phase: DetectionPhase, portsFound: number) => void;
+}
 
 export type DetectionPhase =
     | "scanning-ports"
@@ -320,34 +328,35 @@ export function parseLsofCwdOutput(stdout: string): ReadonlyMap<number, string> 
 /**
  * Run the full detection pipeline and return merged, deduplicated ports.
  * Each strategy is isolated — failure in one does not block others.
- * Calls onProgress at each phase transition for UI feedback.
+ *
+ * @param bash - Command executor (bind sessionId or machineId via closure)
+ * @param options - filterByCwd (default true), onProgress callback
  */
 export async function detectAllPorts(
-    sessionId: string,
-    bash: BashFn = sessionBash,
-    onProgress?: (phase: DetectionPhase, portsFound: number) => void,
+    bash: BashFn,
+    options: DetectPortsOptions = {},
 ): Promise<readonly DetectedPort[]> {
+    const { filterByCwd = true, onProgress } = options;
     const report = (phase: DetectionPhase, count: number) => onProgress?.(phase, count);
 
     // Phase 1: run lsof + package.json + docker + pwd in parallel
     report("scanning-ports", 0);
     const [lsofResult, pkgResult, dockerResult, pwdResult] = await Promise.all([
-        bash(sessionId, {
+        bash({
             command: "lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null",
             timeout: 10000,
         }).catch(() => null),
-        bash(sessionId, {
+        bash({
             command: "cat package.json 2>/dev/null",
             timeout: 5000,
         }).catch(() => null),
-        bash(sessionId, {
+        bash({
             command: 'docker ps --format "{{.Ports}}\t{{.Names}}" 2>/dev/null',
             timeout: 5000,
         }).catch(() => null),
-        bash(sessionId, {
-            command: "pwd",
-            timeout: 3000,
-        }).catch(() => null),
+        filterByCwd
+            ? bash({ command: "pwd", timeout: 3000 }).catch(() => null)
+            : Promise.resolve(null),
     ]);
 
     // Session's working directory — used to filter ports to only this project
@@ -385,7 +394,7 @@ export async function detectAllPorts(
     if (!lsofWorked) {
         report("fallback-detection", portMap.size);
         // Try ss (Linux only)
-        const ssResult = await bash(sessionId, {
+        const ssResult = await bash({
             command: "ss -tlnp 2>/dev/null",
             timeout: 5000,
         }).catch(() => null);
@@ -396,7 +405,7 @@ export async function detectAllPorts(
                 mergeInto(parsed);
             } else {
                 // Try netstat as last resort
-                const netstatResult = await bash(sessionId, {
+                const netstatResult = await bash({
                     command: "netstat -tlnp 2>/dev/null || netstat -an -p tcp 2>/dev/null",
                     timeout: 5000,
                 }).catch(() => null);
@@ -424,7 +433,7 @@ export async function detectAllPorts(
 
     if (pidsToQuery.length > 0) {
         const pidList = [...new Set(pidsToQuery)].join(",");
-        const psResult = await bash(sessionId, {
+        const psResult = await bash({
             command: `ps -p ${pidList} -o pid=,args= 2>/dev/null`,
             timeout: 5000,
         }).catch(() => null);
@@ -443,12 +452,13 @@ export async function detectAllPorts(
 
     // Filter ports by CWD: only keep processes whose working directory is under the session's CWD.
     // This ensures only services related to the current project are shown.
-    if (sessionCwd && pidMap.size > 0) {
+    // Skipped in global mode (filterByCwd=false) to show all processes.
+    if (filterByCwd && sessionCwd && pidMap.size > 0) {
         report("filtering-cwd", portMap.size);
         const allPids = [...new Set(pidMap.values())];
         const pidList = allPids.filter((p) => Number.isInteger(p) && p > 0).join(",");
         if (pidList) {
-            const cwdResult = await bash(sessionId, {
+            const cwdResult = await bash({
                 command: `lsof -p ${pidList} -a -d cwd -Fn 2>/dev/null`,
                 timeout: 5000,
             }).catch(() => null);
@@ -493,7 +503,7 @@ export async function detectAllPorts(
         // Strict HTTP check: only emit port if first response line starts with "HTTP/".
         // This filters out non-HTTP services that accept TCP connections but don't speak HTTP.
         // Output format: "PORT:header1\nPORT:header2\n..." (only for confirmed HTTP ports)
-        const probeResult = await bash(sessionId, {
+        const probeResult = await bash({
             command: `for p in ${portList}; do (resp=$(curl -sI --connect-timeout 0.3 --max-time 1 http://localhost:$p 2>/dev/null | head -5) && echo "$resp" | head -1 | grep -q "^HTTP/" && echo "$resp" | while read -r line; do echo "$p:$line"; done) & done; wait`,
             timeout: 20000,
         }).catch(() => null);
@@ -546,6 +556,7 @@ export async function detectAllPorts(
             process,
             isCommonDevPort: COMMON_DEV_PORTS.includes(port),
             isWeb: webPorts.has(port),
+            pid: pidMap.get(port),
         });
     }
     return results.sort((a, b) => {

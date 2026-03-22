@@ -2126,6 +2126,23 @@ export const ca: TranslationStructure = {
     stopConfirmMessage: "Esteu segur que voleu aturar aquesta tasca en segon pla?",
   },
 
+  processManager: {
+    title: "Processos en segon pla",
+    viewAll: "Gestionar processos",
+    viewAllHint: "Veure i gestionar serveis en segon pla",
+    scanning: "Escanejant processos...",
+    count: ({ count }: { count: number }) => `${count} servei${count !== 1 ? "s" : ""} actiu${count !== 1 ? "s" : ""}`,
+    noProcesses: "Sense serveis en segon pla",
+    noProcessesHint: "No hi ha serveis web executant-se en aquesta màquina.",
+    killAll: "Aturar tots",
+    killConfirmTitle: "Aturar servei",
+    killConfirmMessage: ({ port, process }: { port: number; process: string }) =>
+      `Aturar ${process} al port ${port}?`,
+    killAllConfirmTitle: "Aturar tots els serveis",
+    killAllConfirmMessage: ({ count }: { count: number }) =>
+      `Aturar els ${count} serveis en execució?`,
+  },
+
   supervisor: {
     title: "Monitor de salut",
     description: "Anàlisi de codi amb IA que monitoritza la salut del projecte en múltiples dimensions.",

@@ -2141,6 +2141,23 @@ export const pl: TranslationStructure = {
     stopConfirmMessage: "Czy na pewno chcesz zatrzymać to zadanie w tle?",
   },
 
+  processManager: {
+    title: "Procesy w tle",
+    viewAll: "Zarządzaj procesami",
+    viewAllHint: "Wyświetl i zarządzaj usługami w tle",
+    scanning: "Skanowanie procesów...",
+    count: ({ count }: { count: number }) => `${count} aktywnych usług`,
+    noProcesses: "Brak usług w tle",
+    noProcessesHint: "Na tej maszynie nie działają żadne usługi webowe.",
+    killAll: "Zatrzymaj wszystkie",
+    killConfirmTitle: "Zatrzymaj usługę",
+    killConfirmMessage: ({ port, process }: { port: number; process: string }) =>
+      `Zatrzymać ${process} na porcie ${port}?`,
+    killAllConfirmTitle: "Zatrzymaj wszystkie usługi",
+    killAllConfirmMessage: ({ count }: { count: number }) =>
+      `Zatrzymać wszystkie ${count} uruchomionych usług?`,
+  },
+
   supervisor: {
     title: "Monitor zdrowia",
     description: "Analiza kodu AI monitorująca kondycję projektu w wielu wymiarach.",

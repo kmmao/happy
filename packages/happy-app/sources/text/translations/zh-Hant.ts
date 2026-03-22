@@ -2031,6 +2031,23 @@ export const zhHant: TranslationStructure = {
     stopConfirmMessage: "確定要停止這個背景任務嗎？",
   },
 
+  processManager: {
+    title: "背景程序",
+    viewAll: "管理程序",
+    viewAllHint: "檢視和管理背景服務",
+    scanning: "正在掃描程序...",
+    count: ({ count }: { count: number }) => `${count} 個活躍服務`,
+    noProcesses: "無背景服務",
+    noProcessesHint: "當前機器上沒有執行中的 Web 服務。",
+    killAll: "全部停止",
+    killConfirmTitle: "停止服務",
+    killConfirmMessage: ({ port, process }: { port: number; process: string }) =>
+      `停止連接埠 ${port} 上的 ${process}？`,
+    killAllConfirmTitle: "停止所有服務",
+    killAllConfirmMessage: ({ count }: { count: number }) =>
+      `停止所有 ${count} 個執行中的服務？`,
+  },
+
   supervisor: {
     title: "健康監控",
     description: "AI 驅動的程式碼分析，多維度監控專案健康狀況。",

@@ -181,15 +181,18 @@ export function usePreview(sessionId: string | undefined): UsePreviewResult {
         return;
       }
 
-      const ports = await detectAllPorts(
-        sessionId,
-        sessionBash,
-        silent
+      // Bind sessionBash to this session for the detection pipeline
+      const bash = (req: { command: string; timeout?: number }) =>
+        sessionBash(sessionId, req);
+
+      const ports = await detectAllPorts(bash, {
+        filterByCwd: true,
+        onProgress: silent
           ? undefined
           : (phase, portsFound) => {
               setState({ status: "detecting-ports", phase, portsFound });
             },
-      );
+      });
 
       // For silent refresh: preserve current state type, just update ports
       if (silent) {

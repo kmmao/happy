@@ -2029,6 +2029,23 @@ export const zhHans: TranslationStructure = {
     stopConfirmMessage: "确定要停止这个后台任务吗？",
   },
 
+  processManager: {
+    title: "后台进程",
+    viewAll: "管理进程",
+    viewAllHint: "查看和管理后台服务",
+    scanning: "正在扫描进程...",
+    count: ({ count }: { count: number }) => `${count} 个活跃服务`,
+    noProcesses: "无后台服务",
+    noProcessesHint: "当前机器上没有运行中的 Web 服务。",
+    killAll: "全部停止",
+    killConfirmTitle: "停止服务",
+    killConfirmMessage: ({ port, process }: { port: number; process: string }) =>
+      `停止端口 ${port} 上的 ${process}？`,
+    killAllConfirmTitle: "停止所有服务",
+    killAllConfirmMessage: ({ count }: { count: number }) =>
+      `停止所有 ${count} 个运行中的服务？`,
+  },
+
   supervisor: {
     title: "健康监控",
     description: "AI 驱动的代码分析，多维度监控项目健康状况。",

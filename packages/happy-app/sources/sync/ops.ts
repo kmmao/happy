@@ -338,6 +338,27 @@ export async function machineBash(
   }
 }
 
+/** Allowed signals for machineKillProcess — whitelist to prevent abuse. */
+const KILL_SIGNALS = new Set(["SIGTERM", "SIGKILL", "SIGINT"]);
+
+/**
+ * Kill a process on a machine by PID.
+ * Safety: PID must be > 1, signal must be in whitelist.
+ */
+export async function machineKillProcess(
+    machineId: string,
+    pid: number,
+    signal: string = "SIGTERM",
+): Promise<MachineBashResult> {
+    if (!Number.isInteger(pid) || pid <= 1) {
+        return { success: false, error: `Invalid PID: ${pid}` };
+    }
+    if (!KILL_SIGNALS.has(signal)) {
+        return { success: false, error: `Invalid signal: ${signal}` };
+    }
+    return machineBash(machineId, `kill -s ${signal} ${pid}`, "/");
+}
+
 /**
  * Update machine metadata with optimistic concurrency control and automatic retry
  */

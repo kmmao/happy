@@ -2097,6 +2097,23 @@ export const ja: TranslationStructure = {
     stopConfirmMessage: "このバックグラウンドタスクを停止しますか？",
   },
 
+  processManager: {
+    title: "バックグラウンドプロセス",
+    viewAll: "プロセス管理",
+    viewAllHint: "バックグラウンドサービスの表示と管理",
+    scanning: "プロセスをスキャン中...",
+    count: ({ count }: { count: number }) => `${count} 個のアクティブなサービス`,
+    noProcesses: "バックグラウンドサービスなし",
+    noProcessesHint: "このマシンで実行中のWebサービスはありません。",
+    killAll: "すべて停止",
+    killConfirmTitle: "サービスを停止",
+    killConfirmMessage: ({ port, process }: { port: number; process: string }) =>
+      `ポート ${port} の ${process} を停止しますか？`,
+    killAllConfirmTitle: "すべてのサービスを停止",
+    killAllConfirmMessage: ({ count }: { count: number }) =>
+      `実行中の ${count} 個のサービスをすべて停止しますか？`,
+  },
+
   supervisor: {
     title: "ヘルスモニター",
     description: "AIによるコード分析で、プロジェクトの健全性を多角的に監視します。",
