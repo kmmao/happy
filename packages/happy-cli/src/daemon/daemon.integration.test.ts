@@ -465,9 +465,68 @@ describe.skipIf(!await isServerHealthy())('Daemon Integration Tests', { timeout:
     }
   });
 
-  // TODO: Add a test to see if a corrupted file will work
-  
-  // TODO: Test npm uninstall scenario - daemon should gracefully handle when happy-coder is uninstalled
-  // Current behavior: daemon tries to spawn new daemon on version mismatch but dist/index.mjs is gone
-  // Expected: daemon should detect missing entrypoint and either exit cleanly or at minimum not respawn infinitely
+  it('should handle corrupted daemon state file gracefully', async () => {
+    // Stop daemon first so we can safely corrupt the file
+    await stopDaemon();
+
+    // Write corrupted JSON to the state file
+    const stateFile = configuration.daemonStateFile;
+    writeFileSync(stateFile, '{{{{not valid json!!!!');
+
+    // readDaemonState should return null for corrupted files (not throw)
+    const state = await readDaemonState();
+    expect(state).toBeNull();
+
+    // Clean up the corrupted file
+    if (existsSync(stateFile)) {
+      unlinkSync(stateFile);
+    }
+  });
+
+  it('should handle missing entrypoint gracefully (npm uninstall scenario)', async () => {
+    // Stop daemon before modifying files
+    await stopDaemon();
+
+    const distDir = join(path.resolve(__dirname, '../../'), 'dist');
+    const entrypoint = join(distDir, 'index.mjs');
+    const backupPath = join(distDir, 'index.mjs.bak');
+
+    // Skip if entrypoint doesn't exist (shouldn't happen after build)
+    if (!existsSync(entrypoint)) {
+      console.log('[TEST] Skipping: entrypoint not found at', entrypoint);
+      return;
+    }
+
+    try {
+      // Simulate npm uninstall by temporarily renaming the entrypoint
+      execSync(`mv "${entrypoint}" "${backupPath}"`, { stdio: 'ignore' });
+
+      // Attempt to start daemon - it should fail without infinite respawning
+      const result = spawnHappyCLI(['daemon', 'start'], {
+        stdio: 'pipe',
+        timeout: 10_000,
+      });
+
+      // Wait for process to exit (it should fail, not hang)
+      const exitCode = await new Promise<number | null>((resolve) => {
+        const timer = setTimeout(() => {
+          result.kill();
+          resolve(null);
+        }, 8_000);
+        result.on('exit', (code) => {
+          clearTimeout(timer);
+          resolve(code);
+        });
+      });
+
+      // The daemon should exit (not hang indefinitely)
+      expect(exitCode).not.toBeNull();
+      console.log(`[TEST] Daemon exited with code ${exitCode} when entrypoint missing`);
+    } finally {
+      // Restore the entrypoint
+      if (existsSync(backupPath)) {
+        execSync(`mv "${backupPath}" "${entrypoint}"`, { stdio: 'ignore' });
+      }
+    }
+  });
 });

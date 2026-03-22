@@ -15,7 +15,7 @@ import packageJson from "../package.json";
 import { z } from "zod";
 import { startDaemon } from "./daemon/run";
 import {
-  checkIfDaemonRunningAndCleanupStaleState,
+  checkDaemonStatus,
   isDaemonRunningCurrentlyInstalledHappyVersion,
   stopDaemon,
 } from "./daemon/controlClient";
@@ -526,7 +526,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
       // Wait for daemon to write state file (up to 5 seconds)
       let started = false;
       for (let i = 0; i < 50; i++) {
-        if (await checkIfDaemonRunningAndCleanupStaleState()) {
+        if ((await checkDaemonStatus()).status === 'running') {
           started = true;
           break;
         }

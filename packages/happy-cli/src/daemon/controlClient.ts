@@ -4,12 +4,17 @@
  */
 
 import { logger } from '@/ui/logger';
-import { clearDaemonState, readDaemonState } from '@/persistence';
+import { clearDaemonState, readDaemonState, DaemonLocallyPersistedState } from '@/persistence';
 import { Metadata } from '@/api/types';
 import { projectPath } from '@/projectPath';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { configuration } from '@/configuration';
+
+export type DaemonCheckResult =
+  | { status: 'running'; state: DaemonLocallyPersistedState }
+  | { status: 'not-running' }
+  | { status: 'stale-cleaned' };
 
 async function daemonPost(path: string, body?: any): Promise<{ error?: string } | any> {
   const state = await readDaemonState();
@@ -108,27 +113,24 @@ export async function stopDaemonHttp(): Promise<void> {
  * 
  * That seems like an overkill and yet another process to manage - lets not do this :D
  * 
- * TODO: This function should return a state object with
- * clear state - if it is running / or errored out or something else.
- * Not just a boolean.
- * 
- * We can destructure the response on the caller for richer output.
- * For instance when running `happy daemon status` we can show more information.
+ * Returns a state object describing whether the daemon is running,
+ * not running, or was stale (cleaned up). When running, includes
+ * the full daemon state for richer output (e.g. `happy daemon status`).
  */
-export async function checkIfDaemonRunningAndCleanupStaleState(): Promise<boolean> {
+export async function checkDaemonStatus(): Promise<DaemonCheckResult> {
   const state = await readDaemonState();
   if (!state) {
-    return false;
+    return { status: 'not-running' };
   }
 
   // Check if the daemon is running
   try {
     process.kill(state.pid, 0);
-    return true;
+    return { status: 'running', state };
   } catch {
     logger.debug('[DAEMON RUN] Daemon PID not running, cleaning up state');
     await cleanupDaemonState();
-    return false;
+    return { status: 'stale-cleaned' };
   }
 }
 
@@ -141,17 +143,13 @@ export async function checkIfDaemonRunningAndCleanupStaleState(): Promise<boolea
  */
 export async function isDaemonRunningCurrentlyInstalledHappyVersion(): Promise<boolean> {
   logger.debug('[DAEMON CONTROL] Checking if daemon is running same version');
-  const runningDaemon = await checkIfDaemonRunningAndCleanupStaleState();
-  if (!runningDaemon) {
+  const result = await checkDaemonStatus();
+  if (result.status !== 'running') {
     logger.debug('[DAEMON CONTROL] No daemon running, returning false');
     return false;
   }
 
-  const state = await readDaemonState();
-  if (!state) {
-    logger.debug('[DAEMON CONTROL] No daemon state found, returning false');
-    return false;
-  }
+  const state = result.state;
   
   try {
     // Read package.json on demand from disk - so we are guaranteed to get the latest version

@@ -4,7 +4,7 @@ import { authAndSetupMachineIfNeeded } from '@/ui/auth';
 import { configuration } from '@/configuration';
 import { existsSync, rmSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { stopDaemon, checkIfDaemonRunningAndCleanupStaleState } from '@/daemon/controlClient';
+import { stopDaemon, checkDaemonStatus } from '@/daemon/controlClient';
 import { logger } from '@/ui/logger';
 import os from 'node:os';
 
@@ -196,7 +196,7 @@ async function handleAuthStatus(): Promise<void> {
 
   // Daemon status
   try {
-    const running = await checkIfDaemonRunningAndCleanupStaleState();
+    const running = (await checkDaemonStatus()).status === 'running';
     if (running) {
       console.log(chalk.green('✓ Daemon running'));
     } else {
