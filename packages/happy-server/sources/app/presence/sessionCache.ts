@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import {
@@ -266,14 +267,17 @@ class ActivityCache {
     // Batch update sessions
     if (sessionUpdates.length > 0) {
       try {
-        await db.$transaction(
-          sessionUpdates.map((update) =>
-            db.session.update({
-              where: { id: update.id },
-              data: { lastActiveAt: new Date(update.timestamp) },
-            }),
+        const sessionValues = Prisma.join(
+          sessionUpdates.map(
+            (u) => Prisma.sql`(${u.id}::text, ${new Date(u.timestamp)}::timestamp)`,
           ),
         );
+        await db.$executeRaw`
+          UPDATE "Session" AS s
+          SET "lastActiveAt" = v."lastActiveAt"
+          FROM (VALUES ${sessionValues}) AS v(id, "lastActiveAt")
+          WHERE s.id = v.id
+        `;
 
         log(
           { module: "session-cache" },
@@ -290,19 +294,17 @@ class ActivityCache {
     // Batch update machines
     if (machineUpdates.length > 0) {
       try {
-        await db.$transaction(
-          machineUpdates.map((update) =>
-            db.machine.update({
-              where: {
-                accountId_id: {
-                  accountId: update.userId,
-                  id: update.id,
-                },
-              },
-              data: { lastActiveAt: new Date(update.timestamp) },
-            }),
+        const machineValues = Prisma.join(
+          machineUpdates.map(
+            (u) => Prisma.sql`(${u.id}::text, ${u.userId}::text, ${new Date(u.timestamp)}::timestamp)`,
           ),
         );
+        await db.$executeRaw`
+          UPDATE "Machine" AS m
+          SET "lastActiveAt" = v."lastActiveAt"
+          FROM (VALUES ${machineValues}) AS v(id, "accountId", "lastActiveAt")
+          WHERE m.id = v.id AND m."accountId" = v."accountId"
+        `;
 
         log(
           { module: "session-cache" },
