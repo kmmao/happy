@@ -266,6 +266,7 @@ vi.mock("@/app/events/eventRouter", () => ({
 }));
 
 import { supervisorRoutes } from "./supervisorRoutes";
+import { supervisorRunRoutes } from "./supervisorRunRoutes";
 
 async function createApp() {
     const app = fastify();
@@ -282,6 +283,7 @@ async function createApp() {
     });
 
     supervisorRoutes(typed);
+    supervisorRunRoutes(typed);
     await typed.ready();
     return typed;
 }
