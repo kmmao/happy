@@ -15,6 +15,7 @@ import { AgentEvent } from "@/sync/typesRaw";
 import { useUnistyles } from "react-native-unistyles";
 import { useSetting } from "@/sync/storage";
 import { t } from "@/text";
+import { MarkdownView } from "@/components/markdown/MarkdownView";
 
 function formatTokenCount(count: number): string {
   if (count >= 1000) {
@@ -131,8 +132,7 @@ export const TaskView = React.memo<ToolViewProps>(
     // When showAgentActivity is enabled, extract prompt summary and subagent type
     const promptSummary =
       showAgentActivity && tool.input?.prompt
-        ? (tool.input.prompt as string).slice(0, 100) +
-          ((tool.input.prompt as string).length > 100 ? "..." : "")
+        ? (tool.input.prompt as string)
         : null;
     const subagentType =
       showAgentActivity && tool.input?.subagent_type
@@ -144,12 +144,24 @@ export const TaskView = React.memo<ToolViewProps>(
         paddingVertical: 4,
         paddingBottom: 12,
       },
+      promptSummaryOuter: {
+        marginHorizontal: 4,
+        marginBottom: 8,
+        overflow: "hidden" as const,
+      },
       promptSummary: {
-        fontSize: 13,
-        color: theme.colors.textSecondary,
-        opacity: 0.7,
-        paddingHorizontal: 4,
-        paddingBottom: 6,
+        borderLeftWidth: 2,
+        borderLeftColor: theme.colors.textSecondary + "40",
+        borderRadius: 6,
+        paddingLeft: 10,
+        paddingRight: 8,
+        ...(Platform.OS === "web"
+          ? { zoom: 0.8 } as any
+          : {
+              transform: [{ scale: 0.85 }],
+              transformOrigin: "top left" as any,
+              width: "117.6%", // 1/0.85 to compensate scale
+            }),
       },
       subagentType: {
         fontSize: 12,
@@ -160,18 +172,37 @@ export const TaskView = React.memo<ToolViewProps>(
         paddingBottom: 4,
       },
       toolItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 3,
-        paddingLeft: 4,
-        paddingRight: 2,
+        position: "relative" as const,
       },
-      treeLine: {
-        fontSize: 14,
-        fontFamily: "monospace",
-        color: theme.colors.textSecondary,
-        opacity: 0.3,
-        width: 24,
+      treeContainer: {
+        marginLeft: 4,
+        borderLeftWidth: 1,
+        borderLeftColor: theme.colors.textSecondary + "4D", // ~30% opacity
+      },
+      treeContainerLast: {
+        marginLeft: 4,
+        borderLeftWidth: 1,
+        borderLeftColor: "transparent",
+      },
+      treeConnector: {
+        width: 16,
+        height: 12, // align with center of first line (paddingVertical 3 + ~half line height)
+        position: "absolute" as const,
+        left: -1,
+        top: 0,
+        borderLeftWidth: 1,
+        borderBottomWidth: 1,
+        borderLeftColor: theme.colors.textSecondary + "4D",
+        borderBottomColor: theme.colors.textSecondary + "4D",
+        borderBottomLeftRadius: 4,
+      },
+      treeItemContent: {
+        flexDirection: "row" as const,
+        alignItems: "flex-start" as const,
+        flex: 1,
+        paddingLeft: 20,
+        paddingVertical: 3,
+        paddingRight: 2,
       },
       toolTitle: {
         fontSize: 14,
@@ -179,6 +210,9 @@ export const TaskView = React.memo<ToolViewProps>(
         color: theme.colors.textSecondary,
         fontFamily: "monospace",
         flex: 1,
+        ...(Platform.OS === "web"
+          ? { wordBreak: "break-all" } as any
+          : {}),
       },
       statusContainer: {
         marginLeft: "auto",
@@ -196,8 +230,6 @@ export const TaskView = React.memo<ToolViewProps>(
         color: theme.colors.textSecondary,
       },
       moreToolsItem: {
-        flexDirection: "row",
-        alignItems: "center",
         paddingVertical: 3,
         paddingLeft: 4,
       },
@@ -282,63 +314,82 @@ export const TaskView = React.memo<ToolViewProps>(
           </Text>
         )}
         {promptSummary && (
-          <Text style={styles.promptSummary} numberOfLines={2}>
-            {promptSummary}
-          </Text>
+          <View style={styles.promptSummaryOuter}>
+            <View style={styles.promptSummary}>
+              <MarkdownView markdown={promptSummary} />
+            </View>
+          </View>
         )}
         {displayTools.map((item, index) => {
-          const isLast =
+          const isLastItem =
             index === displayTools.length - 1 && remainingCount <= 0;
+          const hasMoreBelow =
+            remainingCount > 0 ||
+            (showAllTools && filtered.length > maxVisible);
+          const isLast = isLastItem && !hasMoreBelow;
           return (
-            <View key={`${item.tool.name}-${index}`} style={styles.toolItem}>
-              <Text style={styles.treeLine}>{isLast ? "└─" : "├─"}</Text>
-              <Text style={styles.toolTitle}>{item.title}</Text>
-              <View style={styles.statusContainer}>
-                {item.state === "running" && (
-                  <ActivityIndicator
-                    size={Platform.OS === "ios" ? "small" : (14 as any)}
-                    color={theme.colors.warning}
-                  />
-                )}
-                {item.state === "completed" && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={16}
-                    color={theme.colors.success}
-                  />
-                )}
-                {item.state === "error" && (
-                  <Ionicons
-                    name="close-circle"
-                    size={16}
-                    color={theme.colors.textDestructive}
-                  />
-                )}
+            <View
+              key={`${item.tool.name}-${index}`}
+              style={
+                isLast ? styles.treeContainerLast : styles.treeContainer
+              }
+            >
+              <View style={styles.toolItem}>
+                <View style={styles.treeConnector} />
+                <View style={styles.treeItemContent}>
+                  <Text style={styles.toolTitle}>{item.title}</Text>
+                  <View style={styles.statusContainer}>
+                    {item.state === "running" && (
+                      <ActivityIndicator
+                        size={
+                          Platform.OS === "ios" ? "small" : (14 as any)
+                        }
+                        color={theme.colors.warning}
+                      />
+                    )}
+                    {item.state === "completed" && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={16}
+                        color={theme.colors.success}
+                      />
+                    )}
+                    {item.state === "error" && (
+                      <Ionicons
+                        name="close-circle"
+                        size={16}
+                        color={theme.colors.textDestructive}
+                      />
+                    )}
+                  </View>
+                </View>
               </View>
             </View>
           );
         })}
         {remainingCount > 0 && (
-          <Pressable
-            style={styles.moreToolsItem}
-            onPress={() => setShowAllTools(true)}
-          >
-            <Text style={styles.treeLine}>└─</Text>
-            <Text style={styles.moreToolsText}>
-              {t("tools.taskView.moreTools", { count: remainingCount })}
-            </Text>
-          </Pressable>
+          <View style={styles.treeContainerLast}>
+            <Pressable style={styles.toolItem} onPress={() => setShowAllTools(true)}>
+              <View style={styles.treeConnector} />
+              <View style={styles.treeItemContent}>
+                <Text style={styles.moreToolsText}>
+                  {t("tools.taskView.moreTools", { count: remainingCount })}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
         )}
         {showAllTools && filtered.length > maxVisible && (
-          <Pressable
-            style={styles.moreToolsItem}
-            onPress={() => setShowAllTools(false)}
-          >
-            <Text style={styles.treeLine}>└─</Text>
-            <Text style={styles.moreToolsText}>
-              {t("tools.taskView.collapseTools")}
-            </Text>
-          </Pressable>
+          <View style={styles.treeContainerLast}>
+            <Pressable style={styles.toolItem} onPress={() => setShowAllTools(false)}>
+              <View style={styles.treeConnector} />
+              <View style={styles.treeItemContent}>
+                <Text style={styles.moreToolsText}>
+                  {t("tools.taskView.collapseTools")}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
         )}
       </View>
     );

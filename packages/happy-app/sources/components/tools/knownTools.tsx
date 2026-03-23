@@ -223,11 +223,7 @@ export const knownTools = {
       tool: ToolCall;
     }) => {
       if (typeof opts.tool.input.pattern === "string") {
-        const pattern =
-          opts.tool.input.pattern.length > 20
-            ? opts.tool.input.pattern.substring(0, 20) + "..."
-            : opts.tool.input.pattern;
-        return `Search(pattern: ${pattern})`;
+        return `Search(pattern: ${opts.tool.input.pattern})`;
       }
       return "Search";
     },
@@ -762,11 +758,7 @@ export const knownTools = {
       tool: ToolCall;
     }) => {
       if (typeof opts.tool.input.query === "string") {
-        const query =
-          opts.tool.input.query.length > 30
-            ? opts.tool.input.query.substring(0, 30) + "..."
-            : opts.tool.input.query;
-        return t("tools.desc.webSearchQuery", { query });
+        return t("tools.desc.webSearchQuery", { query: opts.tool.input.query });
       }
       return t("tools.names.webSearch");
     },
@@ -831,7 +823,7 @@ export const knownTools = {
         if (parsedCmd.cmd) {
           // Show the command but truncate if too long
           const cmd = parsedCmd.cmd;
-          return cmd.length > 50 ? cmd.substring(0, 50) + "..." : cmd;
+          return cmd;
         }
       }
       // Show the actual command being executed for other cases

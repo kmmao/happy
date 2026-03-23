@@ -434,7 +434,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
           <View style={styles.headerLeft}>
             <View style={styles.iconContainer}>{icon}</View>
             <View style={styles.titleContainer}>
-              <Text style={styles.toolName} numberOfLines={1}>
+              <Text style={styles.toolName}>
                 {toolTitle}
                 {status ? (
                   <Text style={styles.status}>{` ${status}`}</Text>
@@ -465,7 +465,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
           <View style={styles.headerLeft}>
             <View style={styles.iconContainer}>{icon}</View>
             <View style={styles.titleContainer}>
-              <Text style={styles.toolName} numberOfLines={1}>
+              <Text style={styles.toolName}>
                 {toolTitle}
                 {status ? (
                   <Text style={styles.status}>{` ${status}`}</Text>
