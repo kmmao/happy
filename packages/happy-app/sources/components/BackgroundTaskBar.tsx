@@ -251,9 +251,8 @@ function BackgroundTaskBarInner({ sessionId, tasks, onViewLog, onClose, onPrevie
                             key={task.taskId}
                             sessionId={sessionId}
                             task={task}
-                            // Foreground commands: no log sheet, no close button
                             onPress={task.isBackground ? () => onViewLog(task) : undefined}
-                            onClose={task.isBackground ? () => onClose(task) : undefined}
+                            onClose={() => onClose(task)}
                             onPreview={
                                 onPreview && task.isBackground && isServer && port && task.status === "running"
                                     ? () => onPreview(`http://localhost:${port}`)

@@ -341,7 +341,8 @@ function SessionViewInner({
 
   const handleCloseTask = React.useCallback(
     async (task: BackgroundTask) => {
-      if (task.status === "running") {
+      // Only attempt to stop background tasks; foreground tasks just get dismissed
+      if (task.isBackground && task.status === "running") {
         const label = buildSmartLabel(task.command);
         const port = extractPort(task.command);
         const detail = port
