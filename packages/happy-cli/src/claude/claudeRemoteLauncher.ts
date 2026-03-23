@@ -508,7 +508,11 @@ export async function claudeRemoteLauncher(
     // Convert SDK message to log format and send to client
     let msg = message;
 
-    // Hack plan mode exit
+    // When the user approves a plan, the SDK lacks a direct "exit plan mode" API,
+    // so permissionHandler sends a fake "deny" (PLAN_FAKE_REJECT) to force Claude
+    // to stop planning. Here we intercept that fake rejection in the outgoing message
+    // stream and rewrite it to "Plan approved" — so the client sees the correct status
+    // instead of a confusing denial message.
     if (message.type === "user") {
       let umessage = message as SDKUserMessage;
       if (umessage.message.content && Array.isArray(umessage.message.content)) {
