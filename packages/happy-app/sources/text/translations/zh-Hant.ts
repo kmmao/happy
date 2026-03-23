@@ -72,6 +72,10 @@ export const zhHant: TranslationStructure = {
     loading: "載入中...",
     retry: "重試",
     delete: "刪除",
+    remove: "移除",
+    removeFavorite: "移除收藏",
+    removeFavoriteConfirm: ({ name, section }: { name: string; section: string }) =>
+      `從${section}中移除「${name}」？`,
     optional: "選填",
   },
 

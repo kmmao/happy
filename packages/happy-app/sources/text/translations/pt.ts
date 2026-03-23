@@ -71,6 +71,10 @@ export const pt: TranslationStructure = {
     loading: "Carregando...",
     retry: "Tentar novamente",
     delete: "Excluir",
+    remove: "Remover",
+    removeFavorite: "Remover favorito",
+    removeFavoriteConfirm: ({ name, section }: { name: string; section: string }) =>
+      `Remover "${name}" de ${section}?`,
     optional: "Opcional",
   },
 

@@ -83,6 +83,10 @@ export const ru: TranslationStructure = {
     loading: "Загрузка...",
     retry: "Повторить",
     delete: "Удалить",
+    remove: "Удалить",
+    removeFavorite: "Удалить из избранного",
+    removeFavoriteConfirm: ({ name, section }: { name: string; section: string }) =>
+      `Удалить «${name}» из ${section}?`,
     optional: "необязательно",
   },
 

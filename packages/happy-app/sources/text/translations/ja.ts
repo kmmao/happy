@@ -72,6 +72,10 @@ export const ja: TranslationStructure = {
     loading: "読み込み中...",
     retry: "再試行",
     delete: "削除",
+    remove: "削除",
+    removeFavorite: "お気に入りを削除",
+    removeFavoriteConfirm: ({ name, section }: { name: string; section: string }) =>
+      `${section}から「${name}」を削除しますか？`,
     optional: "任意",
     saveAs: "名前を付けて保存",
   },

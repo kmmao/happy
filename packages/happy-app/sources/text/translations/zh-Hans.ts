@@ -72,6 +72,10 @@ export const zhHans: TranslationStructure = {
     loading: "加载中...",
     retry: "重试",
     delete: "删除",
+    remove: "移除",
+    removeFavorite: "移除收藏",
+    removeFavoriteConfirm: ({ name, section }: { name: string; section: string }) =>
+      `从${section}中移除"${name}"？`,
     optional: "可选的",
   },
 

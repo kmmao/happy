@@ -70,6 +70,10 @@ export const it: TranslationStructure = {
     loading: "Caricamento...",
     retry: "Riprova",
     delete: "Elimina",
+    remove: "Rimuovi",
+    removeFavorite: "Rimuovi preferito",
+    removeFavoriteConfirm: ({ name, section }: { name: string; section: string }) =>
+      `Rimuovere "${name}" da ${section}?`,
     optional: "opzionale",
     saveAs: "Salva con nome",
   },
