@@ -109,7 +109,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
     const [stats, setStats] = React.useState<SupervisorActionStats | null>(
         null,
     );
-    const [loading, setLoading] = React.useState(!projectId);
+    const [loading, setLoading] = React.useState(!!projectId);
     const [loadingMore, setLoadingMore] = React.useState(false);
     const [refreshing, setRefreshing] = React.useState(false);
     const [total, setTotal] = React.useState(0);

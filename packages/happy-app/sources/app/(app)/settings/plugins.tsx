@@ -76,7 +76,7 @@ function PluginsSettingsScreen() {
     const [availablePlugins, setAvailablePlugins] = React.useState<
         readonly AvailablePlugin[]
     >([]);
-    const [loading, setLoading] = React.useState(false);
+    const [loading, setLoading] = React.useState(true);
     const [loaded, setLoaded] = React.useState(false);
 
     // Search state
