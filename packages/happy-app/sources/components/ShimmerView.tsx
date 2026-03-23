@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { View, ViewStyle } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,

@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Animated, Easing, View, Text, StyleSheet, Platform, Pressable } from "react-native";
+import { Animated, Easing, View, Text, Platform, Pressable } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
