@@ -84,7 +84,7 @@ export const MessageImage = React.memo((props: {
     }
 
     return (
-        <Pressable onPress={handlePress} style={({ pressed }) => [pressed && styles.pressed]}>
+        <Pressable onPress={handlePress} style={({ pressed }) => [pressed && styles.pressed]} accessibilityLabel="View image" accessibilityRole="image">
             <Image
                 source={{ uri: state.uri }}
                 style={{ width: MAX_IMAGE_WIDTH, height: MAX_IMAGE_HEIGHT }}

@@ -76,6 +76,8 @@ export const ProjectListView = React.memo(() => {
                 <Pressable
                     style={({ pressed }) => [styles.addButton, { opacity: pressed ? 0.7 : 1 }]}
                     onPress={handleAddProject}
+                    accessibilityLabel={t("projects.addProject")}
+                    accessibilityRole="button"
                 >
                     <Ionicons
                         name="add-circle-outline"
@@ -96,7 +98,7 @@ export const ProjectListView = React.memo(() => {
                 <Text style={styles.groupHeaderTitle}>
                     {t("projects.allProjects")}
                 </Text>
-                <Pressable onPress={handleAddProject} hitSlop={10} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+                <Pressable onPress={handleAddProject} hitSlop={10} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })} accessibilityLabel={t("projects.addProject")} accessibilityRole="button">
                     <Ionicons
                         name="add-circle-outline"
                         size={22}

@@ -92,7 +92,7 @@ interface ExtendedNavigationOptions extends Partial<NativeStackHeaderProps['opti
 // Default back button component
 const DefaultBackButton: React.FC<{ tintColor?: string; onPress: () => void }> = ({ tintColor = '#000', onPress }) => {
     return (
-        <Pressable onPress={onPress} hitSlop={15}>
+        <Pressable onPress={onPress} hitSlop={15} accessibilityLabel="Go back" accessibilityRole="button">
             <Ionicons
                 name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'}
                 size={24}
