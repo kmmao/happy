@@ -860,6 +860,7 @@ function SessionViewInner({
         tasks={backgroundTasks}
         onViewLog={setViewingTask}
         onClose={handleCloseTask}
+        onDismiss={dismissBackgroundTask}
         onPreview={handlePreview}
       />
       <BackgroundTaskLogSheet

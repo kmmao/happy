@@ -32,6 +32,7 @@ type Props = {
     readonly tasks: readonly BackgroundTask[];
     readonly onViewLog: (task: BackgroundTask) => void;
     readonly onClose: (task: BackgroundTask) => void;
+    readonly onDismiss: (taskId: string) => void;
     readonly onPreview?: (url: string) => void;
 };
 
@@ -129,12 +130,14 @@ function TaskItem({
     task,
     onPress,
     onClose,
+    onDismiss,
     onPreview,
 }: {
     readonly sessionId: string;
     readonly task: BackgroundTask;
     readonly onPress?: () => void;
     readonly onClose?: () => void;
+    readonly onDismiss: () => void;
     readonly onPreview?: () => void;
 }) {
     const { theme } = useUnistyles();
@@ -150,10 +153,10 @@ function TaskItem({
 
     // Auto-dismiss when process exit is detected from log output
     React.useEffect(() => {
-        if (isDead && onClose) {
-            onClose();
+        if (isDead) {
+            onDismiss();
         }
-    }, [isDead, onClose]);
+    }, [isDead, onDismiss]);
 
     React.useEffect(() => {
         if (task.status !== "running") return;
@@ -240,7 +243,7 @@ function TaskItem({
     );
 }
 
-function BackgroundTaskBarInner({ sessionId, tasks, onViewLog, onClose, onPreview }: Props) {
+function BackgroundTaskBarInner({ sessionId, tasks, onViewLog, onClose, onDismiss, onPreview }: Props) {
     const { width: windowWidth } = useWindowDimensions();
     const containerWidth = Math.min(windowWidth, layout.maxWidth);
 
@@ -263,6 +266,7 @@ function BackgroundTaskBarInner({ sessionId, tasks, onViewLog, onClose, onPrevie
                             task={task}
                             onPress={task.isBackground ? () => onViewLog(task) : undefined}
                             onClose={() => onClose(task)}
+                            onDismiss={() => onDismiss(task.taskId)}
                             onPreview={
                                 onPreview && task.isBackground && isServer && port && task.status === "running"
                                     ? () => onPreview(`http://localhost:${port}`)
