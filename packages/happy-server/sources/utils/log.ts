@@ -114,11 +114,3 @@ export function log(src: any, ...args: any[]) {
 export function warn(src: any, ...args: any[]) {
     logger.warn(src, ...args);
 }
-
-export function error(src: any, ...args: any[]) {
-    logger.error(src, ...args);
-}
-
-export function debug(src: any, ...args: any[]) {
-    logger.debug(src, ...args);
-}
