@@ -35,6 +35,8 @@ export async function checkAndTriggerScheduledRuns(
             supervisorCustomRules: true,
             supervisorConfig: true,
         },
+        orderBy: { supervisorNextRunAt: "asc" },
+        take: 50,
     });
 
     if (dueProjects.length === 0) return;
