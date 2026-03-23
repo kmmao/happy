@@ -180,9 +180,9 @@ export const SessionView = React.memo((props: { id: string }) => {
       onAvatarPress: () => router.push(`/session/${sessionId}/info`),
       isConnected: isConnected,
       flavor: session.metadata?.flavor || null,
-      tintColor: isConnected ? "#000" : "#8E8E93",
+      tintColor: isConnected ? theme.colors.text : theme.colors.textSecondary,
     };
-  }, [session, isDataReady, sessionId, router, showAgentActivity]);
+  }, [session, isDataReady, sessionId, router, showAgentActivity, theme]);
 
   return (
     <>
@@ -1047,14 +1047,14 @@ function SessionViewInner({
             position: "absolute",
             top: 8, // Position at top of content area (padding handled by parent)
             alignSelf: "center",
-            backgroundColor: "#FFF3CD",
+            backgroundColor: theme.colors.box.warning.background,
             borderRadius: 100, // Fully rounded pill
             paddingHorizontal: 14,
             paddingVertical: 7,
             flexDirection: "row",
             alignItems: "center",
             zIndex: 998, // Below voice bar but above content
-            shadowColor: "#000",
+            shadowColor: theme.colors.shadow.color,
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.15,
             shadowRadius: 4,
@@ -1065,13 +1065,13 @@ function SessionViewInner({
           <Ionicons
             name="warning-outline"
             size={14}
-            color="#FF9500"
+            color={theme.colors.accentOrange}
             style={{ marginRight: 6 }}
           />
           <Text
             style={{
               fontSize: 12,
-              color: "#856404",
+              color: theme.colors.box.warning.text,
               fontWeight: "600",
             }}
           >
@@ -1080,7 +1080,7 @@ function SessionViewInner({
           <Ionicons
             name="close"
             size={14}
-            color="#856404"
+            color={theme.colors.box.warning.text}
             style={{ marginLeft: 8 }}
           />
         </Pressable>
@@ -1175,9 +1175,9 @@ function SessionViewInner({
             opacity: pressed ? 0.7 : 1,
             ...Platform.select({
               ios: {
-                shadowColor: "#000",
+                shadowColor: theme.colors.shadow.color,
                 shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
+                shadowOpacity: theme.colors.shadow.opacity,
                 shadowRadius: 4,
               },
               android: {
@@ -1190,7 +1190,7 @@ function SessionViewInner({
           <Ionicons
             name={Platform.OS === "ios" ? "chevron-back" : "arrow-back"}
             size={Platform.select({ ios: 28, default: 24 })}
-            color="#000"
+            color={theme.colors.text}
           />
         </Pressable>
       )}
