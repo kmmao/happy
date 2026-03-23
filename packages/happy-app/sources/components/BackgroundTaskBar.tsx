@@ -46,14 +46,17 @@ function formatElapsed(startedAt: number): string {
 // Status helpers
 // ---------------------------------------------------------------------------
 
-function statusInfo(status: BackgroundTask["status"]): { color: string; label: string } {
+function statusInfo(
+    status: BackgroundTask["status"],
+    colors: { success: string; accentBlue: string; deleteAction: string },
+): { color: string; label: string } {
     switch (status) {
         case "running":
-            return { color: "#4CAF50", label: t("backgroundTasks.running") };
+            return { color: colors.success, label: t("backgroundTasks.running") };
         case "completed":
-            return { color: "#2196F3", label: t("backgroundTasks.completed") };
+            return { color: colors.accentBlue, label: t("backgroundTasks.completed") };
         case "failed":
-            return { color: "#F44336", label: t("backgroundTasks.failed") };
+            return { color: colors.deleteAction, label: t("backgroundTasks.failed") };
     }
 }
 
@@ -87,7 +90,7 @@ function TaskItem({
     const label = buildSmartLabel(task.command);
     const icon = categoryIcon[category];
     const iconColor = categoryColor[category];
-    const status = statusInfo(task.status);
+    const status = statusInfo(task.status, theme.colors);
 
     return (
         <Pressable
