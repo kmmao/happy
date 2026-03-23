@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, Platform, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
+import { t } from "@/text";
 import { useUnistyles } from "react-native-unistyles";
 
 type CLIType = "claude" | "codex" | "gemini";
@@ -12,28 +13,28 @@ interface CLIWarningBannerProps {
 }
 
 const CLI_CONFIG: Record<CLIType, {
-    title: string;
-    installText: string;
+    titleKey: "components.cliWarningBanner.claudeNotDetected" | "components.cliWarningBanner.codexNotDetected" | "components.cliWarningBanner.geminiNotDetected";
+    installTextKey: "components.cliWarningBanner.claudeInstallText" | "components.cliWarningBanner.codexInstallText" | "components.cliWarningBanner.geminiInstallText";
     docsUrl: string;
-    docsLabel: string;
+    docsLabelKey: "components.cliWarningBanner.claudeDocsLabel" | "components.cliWarningBanner.codexDocsLabel" | "components.cliWarningBanner.geminiDocsLabel";
 }> = {
     claude: {
-        title: "Claude CLI Not Detected",
-        installText: "Install: npm install -g @anthropic-ai/claude-code \u2022",
+        titleKey: "components.cliWarningBanner.claudeNotDetected",
+        installTextKey: "components.cliWarningBanner.claudeInstallText",
         docsUrl: "https://docs.anthropic.com/en/docs/claude-code/installation",
-        docsLabel: "View Installation Guide \u2192",
+        docsLabelKey: "components.cliWarningBanner.claudeDocsLabel",
     },
     codex: {
-        title: "Codex CLI Not Detected",
-        installText: "Install: npm install -g codex-cli \u2022",
+        titleKey: "components.cliWarningBanner.codexNotDetected",
+        installTextKey: "components.cliWarningBanner.codexInstallText",
         docsUrl: "https://github.com/openai/openai-codex",
-        docsLabel: "View Installation Guide \u2192",
+        docsLabelKey: "components.cliWarningBanner.codexDocsLabel",
     },
     gemini: {
-        title: "Gemini CLI Not Detected",
-        installText: "Install gemini CLI if available \u2022",
+        titleKey: "components.cliWarningBanner.geminiNotDetected",
+        installTextKey: "components.cliWarningBanner.geminiInstallText",
         docsUrl: "https://ai.google.dev/gemini-api/docs/get-started",
-        docsLabel: "View Gemini Docs \u2192",
+        docsLabelKey: "components.cliWarningBanner.geminiDocsLabel",
     },
 };
 
@@ -86,7 +87,7 @@ export const CLIWarningBanner = React.memo(function CLIWarningBanner({
                             ...Typography.default("semiBold"),
                         }}
                     >
-                        {config.title}
+                        {t(config.titleKey)}
                     </Text>
                     <View style={{ flex: 1, minWidth: 20 }} />
                     <Text
@@ -96,7 +97,7 @@ export const CLIWarningBanner = React.memo(function CLIWarningBanner({
                             ...Typography.default(),
                         }}
                     >
-                        Don't show this popup for
+                        {t("components.cliWarningBanner.dontShowPopupFor")}
                     </Text>
                     <Pressable
                         onPress={() => onDismiss(cli, "machine")}
@@ -115,7 +116,7 @@ export const CLIWarningBanner = React.memo(function CLIWarningBanner({
                                 ...Typography.default(),
                             }}
                         >
-                            this machine
+                            {t("components.cliWarningBanner.thisMachine")}
                         </Text>
                     </Pressable>
                     <Pressable
@@ -135,7 +136,7 @@ export const CLIWarningBanner = React.memo(function CLIWarningBanner({
                                 ...Typography.default(),
                             }}
                         >
-                            any machine
+                            {t("components.cliWarningBanner.anyMachine")}
                         </Text>
                     </Pressable>
                 </View>
@@ -165,7 +166,7 @@ export const CLIWarningBanner = React.memo(function CLIWarningBanner({
                         ...Typography.default(),
                     }}
                 >
-                    {config.installText}
+                    {t(config.installTextKey)}
                 </Text>
                 <Pressable
                     onPress={() => {
@@ -181,7 +182,7 @@ export const CLIWarningBanner = React.memo(function CLIWarningBanner({
                             ...Typography.default(),
                         }}
                     >
-                        {config.docsLabel}
+                        {t(config.docsLabelKey)}
                     </Text>
                 </Pressable>
             </View>

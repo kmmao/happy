@@ -714,6 +714,20 @@ export const ja: TranslationStructure = {
       scanQrCode: "QRコードをスキャン",
       openCamera: "カメラを開く",
     },
+    cliWarningBanner: {
+      claudeNotDetected: "Claude CLI が検出されません",
+      codexNotDetected: "Codex CLI が検出されません",
+      geminiNotDetected: "Gemini CLI が検出されません",
+      dontShowPopupFor: "このポップアップを表示しない：",
+      thisMachine: "このデバイス",
+      anyMachine: "すべてのデバイス",
+      claudeInstallText: "インストール: npm install -g @anthropic-ai/claude-code •",
+      claudeDocsLabel: "インストールガイドを見る →",
+      codexInstallText: "インストール: npm install -g codex-cli •",
+      codexDocsLabel: "インストールガイドを見る →",
+      geminiInstallText: "gemini CLI をインストール（利用可能な場合）•",
+      geminiDocsLabel: "Gemini ドキュメントを見る →",
+    },
   },
 
   chatFooter: {

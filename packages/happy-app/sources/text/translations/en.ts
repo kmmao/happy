@@ -645,6 +645,20 @@ export const en: TranslationStructure = {
       scanQrCode: "Scan the QR code",
       openCamera: "Open Camera",
     },
+    cliWarningBanner: {
+      claudeNotDetected: "Claude CLI Not Detected",
+      codexNotDetected: "Codex CLI Not Detected",
+      geminiNotDetected: "Gemini CLI Not Detected",
+      dontShowPopupFor: "Don't show this popup for",
+      thisMachine: "this machine",
+      anyMachine: "any machine",
+      claudeInstallText: "Install: npm install -g @anthropic-ai/claude-code •",
+      claudeDocsLabel: "View Installation Guide →",
+      codexInstallText: "Install: npm install -g codex-cli •",
+      codexDocsLabel: "View Installation Guide →",
+      geminiInstallText: "Install gemini CLI if available •",
+      geminiDocsLabel: "View Gemini Docs →",
+    },
   },
 
   chatFooter: {

@@ -564,6 +564,20 @@ export const ru: TranslationStructure = {
       scanQrCode: "Отсканируйте QR-код",
       openCamera: "Открыть камеру",
     },
+    cliWarningBanner: {
+      claudeNotDetected: "Claude CLI не обнаружен",
+      codexNotDetected: "Codex CLI не обнаружен",
+      geminiNotDetected: "Gemini CLI не обнаружен",
+      dontShowPopupFor: "Не показывать это окно для",
+      thisMachine: "этого устройства",
+      anyMachine: "всех устройств",
+      claudeInstallText: "Установка: npm install -g @anthropic-ai/claude-code •",
+      claudeDocsLabel: "Руководство по установке →",
+      codexInstallText: "Установка: npm install -g codex-cli •",
+      codexDocsLabel: "Руководство по установке →",
+      geminiInstallText: "Установите gemini CLI, если доступен •",
+      geminiDocsLabel: "Документация Gemini →",
+    },
   },
 
   profile: {

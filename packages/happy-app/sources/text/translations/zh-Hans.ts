@@ -614,6 +614,20 @@ export const zhHans: TranslationStructure = {
       scanQrCode: "扫描二维码",
       openCamera: "打开相机",
     },
+    cliWarningBanner: {
+      claudeNotDetected: "未检测到 Claude CLI",
+      codexNotDetected: "未检测到 Codex CLI",
+      geminiNotDetected: "未检测到 Gemini CLI",
+      dontShowPopupFor: "不再显示此弹窗：",
+      thisMachine: "此设备",
+      anyMachine: "所有设备",
+      claudeInstallText: "安装：npm install -g @anthropic-ai/claude-code •",
+      claudeDocsLabel: "查看安装指南 →",
+      codexInstallText: "安装：npm install -g codex-cli •",
+      codexDocsLabel: "查看安装指南 →",
+      geminiInstallText: "安装 gemini CLI（如可用）•",
+      geminiDocsLabel: "查看 Gemini 文档 →",
+    },
   },
 
   chatFooter: {
