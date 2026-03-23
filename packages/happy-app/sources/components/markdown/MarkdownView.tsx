@@ -497,38 +497,53 @@ function RenderTableBlock(props: {
       >
         <View style={style.tableContent}>
           {/* Render each column as a vertical container */}
-          {props.headers.map((header, colIndex) => (
-            <View
-              key={`column-${colIndex}`}
-              style={[
-                style.tableColumn,
-                colIndex === columnCount - 1 && style.tableColumnLast,
-              ]}
-            >
-              {/* Header cell for this column */}
+          {props.headers.map((header, colIndex) => {
+            const isFirstCol = colIndex === 0;
+            return (
               <View
+                key={`column-${colIndex}`}
                 style={[
-                  style.tableCell,
-                  style.tableHeaderCell,
-                  style.tableCellFirst,
+                  style.tableColumn,
+                  colIndex === columnCount - 1 && style.tableColumnLast,
                 ]}
               >
-                <Text style={style.tableHeaderText}>{header}</Text>
-              </View>
-              {/* Data cells for this column */}
-              {props.rows.map((row, rowIndex) => (
+                {/* Header cell for this column */}
                 <View
-                  key={`cell-${rowIndex}-${colIndex}`}
                   style={[
                     style.tableCell,
-                    isLastRow(rowIndex) && style.tableCellLast,
+                    style.tableHeaderCell,
+                    style.tableCellFirst,
                   ]}
                 >
-                  <Text style={style.tableCellText}>{row[colIndex] ?? ""}</Text>
+                  <Text style={style.tableHeaderText}>{header || '#'}</Text>
                 </View>
-              ))}
-            </View>
-          ))}
+                {/* Data cells for this column */}
+                {props.rows.map((row, rowIndex) => {
+                  const cellValue = row[colIndex] ?? "";
+                  return (
+                    <View
+                      key={`cell-${rowIndex}-${colIndex}`}
+                      style={[
+                        style.tableCell,
+                        isLastRow(rowIndex) && style.tableCellLast,
+                        rowIndex % 2 === 1 && style.tableRowEven,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          style.tableCellText,
+                          isFirstCol && style.tableFirstColText,
+                          !cellValue && style.tableCellEmpty,
+                        ]}
+                      >
+                        {cellValue || '—'}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
     </View>
@@ -846,6 +861,15 @@ const style = StyleSheet.create((theme) => ({
     color: theme.colors.text,
     fontSize: 16,
     lineHeight: 24,
+  },
+  tableFirstColText: {
+    ...Typography.default("semiBold"),
+  },
+  tableRowEven: {
+    backgroundColor: theme.colors.surfaceHigh,
+  },
+  tableCellEmpty: {
+    color: theme.colors.textSecondary,
   },
 
   // Add global style for Web platform (Unistyles supports this via compiler plugin)

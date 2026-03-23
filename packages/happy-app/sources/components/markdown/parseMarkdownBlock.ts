@@ -23,12 +23,13 @@ function parseTable(lines: string[], startIndex: number): { table: MarkdownBlock
         return { table: null, nextIndex: startIndex };
     }
 
-    // Extract header cells from the first line, filtering out empty cells that may result from leading/trailing pipes
+    // Extract header cells from the first line, removing only leading/trailing empty segments from pipe splitting
     const headerLine = tableLines[0].trim();
-    const headers = headerLine
-        .split('|')
-        .map(cell => cell.trim())
-        .filter(cell => cell.length > 0);
+    const rawHeaders = headerLine.split('|').map(cell => cell.trim());
+    // Remove first/last empty strings caused by leading/trailing pipes (e.g. "| A | B |" → ['', 'A', 'B', ''])
+    if (rawHeaders.length > 0 && rawHeaders[0] === '') rawHeaders.shift();
+    if (rawHeaders.length > 0 && rawHeaders[rawHeaders.length - 1] === '') rawHeaders.pop();
+    const headers = rawHeaders;
 
     if (headers.length === 0) {
         return { table: null, nextIndex: startIndex };
@@ -39,10 +40,11 @@ function parseTable(lines: string[], startIndex: number): { table: MarkdownBlock
     for (let i = 2; i < tableLines.length; i++) {
         const rowLine = tableLines[i].trim();
         if (rowLine.startsWith('|')) {
-            const rowCells = rowLine
-                .split('|')
-                .map(cell => cell.trim())
-                .filter(cell => cell.length > 0);
+            const rawCells = rowLine.split('|').map(cell => cell.trim());
+            // Remove first/last empty strings caused by leading/trailing pipes
+            if (rawCells.length > 0 && rawCells[0] === '') rawCells.shift();
+            if (rawCells.length > 0 && rawCells[rawCells.length - 1] === '') rawCells.pop();
+            const rowCells = rawCells;
 
             // Include rows that contain actual content, filtering out empty rows
             if (rowCells.length > 0) {
