@@ -2078,6 +2078,17 @@ export const zhHant: TranslationStructure = {
     killAllConfirmTitle: "停止所有服務",
     killAllConfirmMessage: ({ count }: { count: number }) =>
       `停止所有 ${count} 個執行中的服務？`,
+    hide: "隱藏",
+    unhide: "恢復",
+    showHidden: "顯示已隱藏",
+    showActive: "顯示活躍",
+    hiddenCount: ({ count }: { count: number }) =>
+      `${count} 個已隱藏服務`,
+    hideConfirmTitle: "隱藏程序",
+    hideConfirmMessage: ({ process }: { process: string }) =>
+      `從程序列表中隱藏「${process}」？之後可以恢復顯示。`,
+    noHiddenProcesses: "無隱藏程序",
+    noHiddenProcessesHint: "你還沒有隱藏任何程序。",
   },
 
   supervisor: {

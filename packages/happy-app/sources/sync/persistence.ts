@@ -473,6 +473,31 @@ export function deleteLastSeq(sessionId: string): void {
   mmkv.delete(`${LAST_SEQ_PREFIX}${sessionId}`);
 }
 
+// Hidden processes per machine — user-configurable process name filter
+const HIDDEN_PROCESSES_PREFIX = "hidden-processes-";
+const HiddenProcessesSchema = z.array(z.string());
+
+export function loadHiddenProcesses(machineId: string): readonly string[] {
+  const raw = mmkv.getString(`${HIDDEN_PROCESSES_PREFIX}${machineId}`);
+  if (raw) {
+    try {
+      const parsed = HiddenProcessesSchema.safeParse(JSON.parse(raw));
+      if (parsed.success) return parsed.data;
+    } catch (e) {
+      log.error("Failed to parse hidden processes", e);
+    }
+  }
+  return [];
+}
+
+export function saveHiddenProcesses(machineId: string, names: readonly string[]) {
+  if (names.length === 0) {
+    mmkv.delete(`${HIDDEN_PROCESSES_PREFIX}${machineId}`);
+  } else {
+    mmkv.set(`${HIDDEN_PROCESSES_PREFIX}${machineId}`, JSON.stringify(names));
+  }
+}
+
 export function clearPersistence() {
   mmkv.clearAll();
   clearAllMessageCaches();

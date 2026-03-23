@@ -2173,6 +2173,17 @@ export const ca: TranslationStructure = {
     killAllConfirmTitle: "Aturar tots els serveis",
     killAllConfirmMessage: ({ count }: { count: number }) =>
       `Aturar els ${count} serveis en execució?`,
+    hide: "Amagar",
+    unhide: "Mostrar",
+    showHidden: "Mostrar amagats",
+    showActive: "Mostrar actius",
+    hiddenCount: ({ count }: { count: number }) =>
+      `${count} servei${count !== 1 ? "s" : ""} amagat${count !== 1 ? "s" : ""}`,
+    hideConfirmTitle: "Amagar procés",
+    hideConfirmMessage: ({ process }: { process: string }) =>
+      `Amagar "${process}" de la llista de processos? Pots restaurar-lo més tard.`,
+    noHiddenProcesses: "Sense processos amagats",
+    noHiddenProcessesHint: "Encara no has amagat cap procés.",
   },
 
   supervisor: {

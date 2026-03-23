@@ -2144,6 +2144,17 @@ export const ja: TranslationStructure = {
     killAllConfirmTitle: "すべてのサービスを停止",
     killAllConfirmMessage: ({ count }: { count: number }) =>
       `実行中の ${count} 個のサービスをすべて停止しますか？`,
+    hide: "非表示",
+    unhide: "表示に戻す",
+    showHidden: "非表示を表示",
+    showActive: "アクティブを表示",
+    hiddenCount: ({ count }: { count: number }) =>
+      `${count} 個の非表示サービス`,
+    hideConfirmTitle: "プロセスを非表示",
+    hideConfirmMessage: ({ process }: { process: string }) =>
+      `「${process}」をプロセスリストから非表示にしますか？後で復元できます。`,
+    noHiddenProcesses: "非表示のプロセスなし",
+    noHiddenProcessesHint: "まだプロセスを非表示にしていません。",
   },
 
   supervisor: {

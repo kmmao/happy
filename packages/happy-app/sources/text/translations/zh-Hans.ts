@@ -2076,6 +2076,17 @@ export const zhHans: TranslationStructure = {
     killAllConfirmTitle: "停止所有服务",
     killAllConfirmMessage: ({ count }: { count: number }) =>
       `停止所有 ${count} 个运行中的服务？`,
+    hide: "隐藏",
+    unhide: "恢复",
+    showHidden: "显示已隐藏",
+    showActive: "显示活跃",
+    hiddenCount: ({ count }: { count: number }) =>
+      `${count} 个已隐藏服务`,
+    hideConfirmTitle: "隐藏进程",
+    hideConfirmMessage: ({ process }: { process: string }) =>
+      `从进程列表中隐藏"${process}"？之后可以恢复显示。`,
+    noHiddenProcesses: "无隐藏进程",
+    noHiddenProcessesHint: "你还没有隐藏任何进程。",
   },
 
   supervisor: {

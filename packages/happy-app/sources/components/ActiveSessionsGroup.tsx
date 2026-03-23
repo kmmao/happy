@@ -98,11 +98,14 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   sessionRow: {
     minHeight: 88,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "column",
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: theme.colors.surface,
+  },
+  sessionTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   sessionRowWithBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -113,7 +116,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   sessionContent: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: 12,
     justifyContent: "center",
   },
   sessionTitleRow: {
@@ -152,8 +155,9 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   avatarContainer: {
     position: "relative",
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
+    marginTop: 2,
   },
   newSessionButton: {
     flexDirection: "row",
@@ -229,8 +233,9 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   tagsRow: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 6,
-    marginBottom: 4,
+    marginTop: 8,
   },
   tag: {
     flexDirection: "row",
@@ -671,222 +676,224 @@ const CompactSessionRow = React.memo(
             }
           }}
         >
-          <View style={styles.avatarContainer}>
-            <Avatar
-              id={avatarId}
-              size={48}
-              monochrome={!sessionStatus.isConnected}
-              flavor={session.metadata?.flavor}
-              hasUnreadMessages={hasUnreadMessages}
-            />
+          <View style={styles.sessionTopRow}>
+            <View style={styles.avatarContainer}>
+              <Avatar
+                id={avatarId}
+                size={44}
+                monochrome={!sessionStatus.isConnected}
+                flavor={session.metadata?.flavor}
+                hasUnreadMessages={hasUnreadMessages}
+              />
+            </View>
+            <View style={styles.sessionContent}>
+              {/* Title line */}
+              <View style={styles.sessionTitleRow}>
+                <Text
+                  style={[
+                    styles.sessionTitle,
+                    sessionStatus.isConnected
+                      ? styles.sessionTitleConnected
+                      : styles.sessionTitleDisconnected,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {sessionName}
+                </Text>
+              </View>
+
+              {/* Issue info line */}
+              {issueLink &&
+                (() => {
+                  const statusColor = ISSUE_STATUS_COLORS[issueLink.status].text;
+                  const prUrl =
+                    issueLink.prUrl ?? session.metadata?.worktree?.prUrl;
+                  return (
+                    <View style={styles.issueRow}>
+                      <Ionicons
+                        name="pricetag-outline"
+                        size={11}
+                        color={statusColor}
+                      />
+                      <Text style={[styles.issueNumber, { color: statusColor }]}>
+                        #{issueLink.issueNumber}
+                      </Text>
+                      <Text
+                        style={[styles.issueTitle, { color: statusColor }]}
+                        numberOfLines={1}
+                      >
+                        {issueLink.issueTitle}
+                      </Text>
+                      <View
+                        style={[
+                          styles.issueStatusDot,
+                          { backgroundColor: statusColor },
+                        ]}
+                      />
+                      <Text
+                        style={[styles.issueStatusText, { color: statusColor }]}
+                      >
+                        {ISSUE_STATUS_LABELS[issueLink.status]()}
+                      </Text>
+                      {prUrl ? (
+                        <Pressable
+                          style={styles.issuePrIcon}
+                          onPress={() => Linking.openURL(prUrl)}
+                          hitSlop={8}
+                        >
+                          <Ionicons
+                            name="git-pull-request-outline"
+                            size={12}
+                            color={styles.issuePrIcon.color}
+                          />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  );
+                })()}
+
+              {/* Status line with dot */}
+              <View style={styles.statusRow}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={styles.statusDotContainer}>
+                    <StatusDot
+                      color={sessionStatus.statusDotColor}
+                      isPulsing={sessionStatus.isPulsing}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: sessionStatus.statusColor },
+                    ]}
+                  >
+                    {sessionStatus.statusText}
+                  </Text>
+                </View>
+
+                {/* Status indicators on the right side */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    transform: [{ translateY: 1 }],
+                  }}
+                >
+                  {/* Worktree badge */}
+                  {session.metadata?.worktree?.isWorktree && (
+                    <View style={styles.worktreeBadge}>
+                      <Ionicons
+                        name="git-branch-outline"
+                        size={10}
+                        color={styles.worktreeBadgeText.color}
+                      />
+                      <Text style={styles.worktreeBadgeText} numberOfLines={1}>
+                        {session.metadata.worktree.branchName}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Draft status indicator */}
+                  {session.draft && (
+                    <View style={styles.taskStatusContainer}>
+                      <Ionicons
+                        name="create-outline"
+                        size={10}
+                        color={styles.taskStatusText.color}
+                      />
+                    </View>
+                  )}
+
+                  {/* Usage indicator */}
+                  {session.latestUsage ? (
+                    <View style={styles.taskStatusContainer}>
+                      <Text style={styles.taskStatusText}>
+                        {formatTokenCountShort(
+                          session.latestUsage.totalInputTokens +
+                            session.latestUsage.totalOutputTokens,
+                        )}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* Task status indicator */}
+                  {Array.isArray(session.todos) &&
+                    session.todos.length > 0 &&
+                    (() => {
+                      const totalTasks = session.todos.length;
+                      const completedTasks = session.todos.filter(
+                        (t) => t.status === "completed",
+                      ).length;
+
+                      // Don't show if all tasks are completed
+                      if (completedTasks === totalTasks) {
+                        return null;
+                      }
+
+                      return (
+                        <View style={styles.taskStatusContainer}>
+                          <Ionicons
+                            name="bulb-outline"
+                            size={10}
+                            color={styles.taskStatusText.color}
+                            style={{ marginRight: 2 }}
+                          />
+                          <Text style={styles.taskStatusText}>
+                            {completedTasks}/{totalTasks}
+                          </Text>
+                        </View>
+                      );
+                    })()}
+                </View>
+              </View>
+            </View>
           </View>
-          <View style={styles.sessionContent}>
-            {/* Title line */}
-            <View style={styles.sessionTitleRow}>
+
+          {/* Tags line - full width at bottom */}
+          <View style={styles.tagsRow}>
+            <View
+              style={[
+                styles.tag,
+                session.metadata?.worktree?.isWorktree
+                  ? styles.tagBranch
+                  : styles.tagMain,
+              ]}
+            >
               <Text
                 style={[
-                  styles.sessionTitle,
-                  sessionStatus.isConnected
-                    ? styles.sessionTitleConnected
-                    : styles.sessionTitleDisconnected,
+                  styles.tagText,
+                  session.metadata?.worktree?.isWorktree
+                    ? styles.tagBranchText
+                    : styles.tagMainText,
                 ]}
-                numberOfLines={2}
               >
-                {sessionName}
+                {session.metadata?.worktree?.isWorktree
+                  ? t("sessionInfo.tagBranch")
+                  : t("sessionInfo.tagMain")}
               </Text>
             </View>
-
-            {/* Tags line */}
-            <View style={styles.tagsRow}>
-              <View
-                style={[
-                  styles.tag,
-                  session.metadata?.worktree?.isWorktree
-                    ? styles.tagBranch
-                    : styles.tagMain,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tagText,
-                    session.metadata?.worktree?.isWorktree
-                      ? styles.tagBranchText
-                      : styles.tagMainText,
-                  ]}
-                >
-                  {session.metadata?.worktree?.isWorktree
-                    ? t("sessionInfo.tagBranch")
-                    : t("sessionInfo.tagMain")}
+            {(machine?.metadata?.displayName || session.metadata?.host) && (
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>
+                  {machine?.metadata?.displayName || session.metadata?.host}
                 </Text>
               </View>
-              {(machine?.metadata?.displayName || session.metadata?.host) && (
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>
-                    {machine?.metadata?.displayName || session.metadata?.host}
-                  </Text>
-                </View>
-              )}
-              {session.metadata?.version && (
-                <View style={[styles.tag, needsUpgrade && styles.upgradeBadge]}>
-                  <Text style={[styles.tagText, needsUpgrade && styles.upgradeBadgeText]}>
-                    {session.metadata.version}
-                  </Text>
-                  {needsUpgrade && (
-                    <Ionicons
-                      name="arrow-up-circle-outline"
-                      size={10}
-                      color={styles.upgradeBadgeText.color}
-                    />
-                  )}
-                </View>
-              )}
-            </View>
-
-            {/* Issue info line */}
-            {issueLink &&
-              (() => {
-                const statusColor = ISSUE_STATUS_COLORS[issueLink.status].text;
-                const prUrl =
-                  issueLink.prUrl ?? session.metadata?.worktree?.prUrl;
-                return (
-                  <View style={styles.issueRow}>
-                    <Ionicons
-                      name="pricetag-outline"
-                      size={11}
-                      color={statusColor}
-                    />
-                    <Text style={[styles.issueNumber, { color: statusColor }]}>
-                      #{issueLink.issueNumber}
-                    </Text>
-                    <Text
-                      style={[styles.issueTitle, { color: statusColor }]}
-                      numberOfLines={1}
-                    >
-                      {issueLink.issueTitle}
-                    </Text>
-                    <View
-                      style={[
-                        styles.issueStatusDot,
-                        { backgroundColor: statusColor },
-                      ]}
-                    />
-                    <Text
-                      style={[styles.issueStatusText, { color: statusColor }]}
-                    >
-                      {ISSUE_STATUS_LABELS[issueLink.status]()}
-                    </Text>
-                    {prUrl ? (
-                      <Pressable
-                        style={styles.issuePrIcon}
-                        onPress={() => Linking.openURL(prUrl)}
-                        hitSlop={8}
-                      >
-                        <Ionicons
-                          name="git-pull-request-outline"
-                          size={12}
-                          color={styles.issuePrIcon.color}
-                        />
-                      </Pressable>
-                    ) : null}
-                  </View>
-                );
-              })()}
-
-            {/* Status line with dot */}
-            <View style={styles.statusRow}>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <View style={styles.statusDotContainer}>
-                  <StatusDot
-                    color={sessionStatus.statusDotColor}
-                    isPulsing={sessionStatus.isPulsing}
+            )}
+            {session.metadata?.version && (
+              <View style={[styles.tag, needsUpgrade && styles.upgradeBadge]}>
+                <Text style={[styles.tagText, needsUpgrade && styles.upgradeBadgeText]}>
+                  {session.metadata.version}
+                </Text>
+                {needsUpgrade && (
+                  <Ionicons
+                    name="arrow-up-circle-outline"
+                    size={10}
+                    color={styles.upgradeBadgeText.color}
                   />
-                </View>
-                <Text
-                  style={[
-                    styles.statusText,
-                    { color: sessionStatus.statusColor },
-                  ]}
-                >
-                  {sessionStatus.statusText}
-                </Text>
-              </View>
-
-              {/* Status indicators on the right side */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  transform: [{ translateY: 1 }],
-                }}
-              >
-                {/* Worktree badge */}
-                {session.metadata?.worktree?.isWorktree && (
-                  <View style={styles.worktreeBadge}>
-                    <Ionicons
-                      name="git-branch-outline"
-                      size={10}
-                      color={styles.worktreeBadgeText.color}
-                    />
-                    <Text style={styles.worktreeBadgeText} numberOfLines={1}>
-                      {session.metadata.worktree.branchName}
-                    </Text>
-                  </View>
                 )}
-
-                {/* Draft status indicator */}
-                {session.draft && (
-                  <View style={styles.taskStatusContainer}>
-                    <Ionicons
-                      name="create-outline"
-                      size={10}
-                      color={styles.taskStatusText.color}
-                    />
-                  </View>
-                )}
-
-                {/* Usage indicator */}
-                {session.latestUsage ? (
-                  <View style={styles.taskStatusContainer}>
-                    <Text style={styles.taskStatusText}>
-                      {formatTokenCountShort(
-                        session.latestUsage.totalInputTokens +
-                          session.latestUsage.totalOutputTokens,
-                      )}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {/* Task status indicator */}
-                {Array.isArray(session.todos) &&
-                  session.todos.length > 0 &&
-                  (() => {
-                    const totalTasks = session.todos.length;
-                    const completedTasks = session.todos.filter(
-                      (t) => t.status === "completed",
-                    ).length;
-
-                    // Don't show if all tasks are completed
-                    if (completedTasks === totalTasks) {
-                      return null;
-                    }
-
-                    return (
-                      <View style={styles.taskStatusContainer}>
-                        <Ionicons
-                          name="bulb-outline"
-                          size={10}
-                          color={styles.taskStatusText.color}
-                          style={{ marginRight: 2 }}
-                        />
-                        <Text style={styles.taskStatusText}>
-                          {completedTasks}/{totalTasks}
-                        </Text>
-                      </View>
-                    );
-                  })()}
               </View>
-            </View>
+            )}
           </View>
         </Pressable>
       </View>

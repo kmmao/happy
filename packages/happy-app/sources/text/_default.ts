@@ -2152,6 +2152,17 @@ export const en = {
     killAllConfirmTitle: "Stop All Services",
     killAllConfirmMessage: ({ count }: { count: number }) =>
       `Stop all ${count} running service${count !== 1 ? "s" : ""}?`,
+    hide: "Hide",
+    unhide: "Unhide",
+    showHidden: "Show Hidden",
+    showActive: "Show Active",
+    hiddenCount: ({ count }: { count: number }) =>
+      `${count} hidden service${count !== 1 ? "s" : ""}`,
+    hideConfirmTitle: "Hide Process",
+    hideConfirmMessage: ({ process }: { process: string }) =>
+      `Hide "${process}" from the process list? You can restore it later.`,
+    noHiddenProcesses: "No Hidden Processes",
+    noHiddenProcessesHint: "You haven't hidden any processes yet.",
   },
 
   supervisor: {

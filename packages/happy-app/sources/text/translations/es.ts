@@ -2168,6 +2168,17 @@ export const es: TranslationStructure = {
     killAllConfirmTitle: "Detener todos los servicios",
     killAllConfirmMessage: ({ count }: { count: number }) =>
       `¿Detener los ${count} servicios en ejecución?`,
+    hide: "Ocultar",
+    unhide: "Mostrar",
+    showHidden: "Mostrar ocultos",
+    showActive: "Mostrar activos",
+    hiddenCount: ({ count }: { count: number }) =>
+      `${count} servicio${count !== 1 ? "s" : ""} oculto${count !== 1 ? "s" : ""}`,
+    hideConfirmTitle: "Ocultar proceso",
+    hideConfirmMessage: ({ process }: { process: string }) =>
+      `¿Ocultar "${process}" de la lista de procesos? Puedes restaurarlo después.`,
+    noHiddenProcesses: "Sin procesos ocultos",
+    noHiddenProcessesHint: "Aún no has ocultado ningún proceso.",
   },
 
   supervisor: {

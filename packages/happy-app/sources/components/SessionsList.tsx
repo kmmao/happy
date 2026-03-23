@@ -97,11 +97,14 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   sessionItem: {
     minHeight: 88,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "column",
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: theme.colors.surface,
+  },
+  sessionTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   sessionItemContainer: {
     marginHorizontal: 16,
@@ -137,7 +140,7 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   sessionContent: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: 12,
     justifyContent: "center",
   },
   sessionTitleRow: {
@@ -166,8 +169,9 @@ const stylesheet = StyleSheet.create((theme) => ({
   tagsRow: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 6,
-    marginBottom: 4,
+    marginTop: 6,
   },
   tag: {
     flexDirection: "row",
@@ -259,8 +263,8 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   avatarContainer: {
     position: "relative",
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
   },
   draftIconContainer: {
     position: "absolute",
@@ -656,173 +660,173 @@ const SessionItem = React.memo(
             }
           }}
         >
-          <View style={styles.avatarContainer}>
-            <Avatar
-              id={avatarId}
-              size={48}
-              monochrome={!sessionStatus.isConnected}
-              flavor={session.metadata?.flavor}
-              hasUnreadMessages={hasUnreadMessages}
-            />
-            {session.draft && (
-              <View style={styles.draftIconContainer}>
-                <Ionicons
-                  name="create-outline"
-                  size={12}
-                  style={styles.draftIconOverlay}
-                />
-              </View>
-            )}
-          </View>
-          <View style={styles.sessionContent}>
-            {/* Title line */}
-            <View style={styles.sessionTitleRow}>
-              <Text
-                style={[
-                  styles.sessionTitle,
-                  sessionStatus.isConnected
-                    ? styles.sessionTitleConnected
-                    : styles.sessionTitleDisconnected,
-                ]}
-                numberOfLines={1}
-              >
-                {" "}
-                {/* {variant !== 'no-path' ? 1 : 2} - issue is we don't have anything to take this space yet and it looks strange - if summaries were more reliably generated, we can add this. While no summary - add something like "New session" or "Empty session", and extend summary to 2 lines once we have it */}
-                {sessionName}
-              </Text>
-              <Text style={styles.sessionTimestamp}>
-                {formatLastSeen(session.updatedAt, false)}
-              </Text>
-            </View>
-
-            {/* Tags line */}
-            <View style={styles.tagsRow}>
-              <View
-                style={[
-                  styles.tag,
-                  session.metadata?.worktree?.isWorktree
-                    ? styles.tagBranch
-                    : styles.tagMain,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tagText,
-                    session.metadata?.worktree?.isWorktree
-                      ? styles.tagBranchText
-                      : styles.tagMainText,
-                  ]}
-                >
-                  {session.metadata?.worktree?.isWorktree
-                    ? t("sessionInfo.tagBranch")
-                    : t("sessionInfo.tagMain")}
-                </Text>
-              </View>
-              {(machine?.metadata?.displayName || session.metadata?.host) && (
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>
-                    {machine?.metadata?.displayName || session.metadata?.host}
-                  </Text>
-                </View>
-              )}
-              {session.metadata?.version && (
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>
-                    {session.metadata.version}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Issue info line */}
-            {issueLink &&
-              (() => {
-                const statusColor = ISSUE_STATUS_COLORS[issueLink.status].text;
-                const prUrl =
-                  issueLink.prUrl ?? session.metadata?.worktree?.prUrl;
-                return (
-                  <View style={styles.issueRow}>
-                    <Ionicons
-                      name="pricetag-outline"
-                      size={11}
-                      color={statusColor}
-                    />
-                    <Text style={[styles.issueNumber, { color: statusColor }]}>
-                      #{issueLink.issueNumber}
-                    </Text>
-                    <Text
-                      style={[styles.issueTitle, { color: statusColor }]}
-                      numberOfLines={1}
-                    >
-                      {issueLink.issueTitle}
-                    </Text>
-                    <View
-                      style={[
-                        styles.issueStatusDot,
-                        { backgroundColor: statusColor },
-                      ]}
-                    />
-                    <Text
-                      style={[styles.issueStatusText, { color: statusColor }]}
-                    >
-                      {ISSUE_STATUS_LABELS[issueLink.status]()}
-                    </Text>
-                    {prUrl ? (
-                      <Pressable
-                        style={styles.issuePrIcon}
-                        onPress={() => Linking.openURL(prUrl)}
-                        hitSlop={8}
-                      >
-                        <Ionicons
-                          name="git-pull-request-outline"
-                          size={12}
-                          color={styles.issuePrIcon.color}
-                        />
-                      </Pressable>
-                    ) : null}
-                  </View>
-                );
-              })()}
-
-            {/* Subtitle line */}
-            <Text style={styles.sessionSubtitle} numberOfLines={1}>
-              {[
-                sessionSubtitle,
-                session.metadata?.currentModelCode
-                  ?.replace(/-\d{8}$/, "")
-                  .replace(/^claude-/, ""),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </Text>
-
-            {/* Status line with dot and usage */}
-            <View style={styles.statusRow}>
-              <View style={styles.statusLeft}>
-                <View style={styles.statusDotContainer}>
-                  <StatusDot
-                    color={sessionStatus.statusDotColor}
-                    isPulsing={sessionStatus.isPulsing}
+          <View style={styles.sessionTopRow}>
+            <View style={styles.avatarContainer}>
+              <Avatar
+                id={avatarId}
+                size={44}
+                monochrome={!sessionStatus.isConnected}
+                flavor={session.metadata?.flavor}
+                hasUnreadMessages={hasUnreadMessages}
+              />
+              {session.draft && (
+                <View style={styles.draftIconContainer}>
+                  <Ionicons
+                    name="create-outline"
+                    size={12}
+                    style={styles.draftIconOverlay}
                   />
                 </View>
+              )}
+            </View>
+            <View style={styles.sessionContent}>
+              {/* Title line */}
+              <View style={styles.sessionTitleRow}>
                 <Text
                   style={[
-                    styles.statusText,
-                    { color: sessionStatus.statusColor },
+                    styles.sessionTitle,
+                    sessionStatus.isConnected
+                      ? styles.sessionTitleConnected
+                      : styles.sessionTitleDisconnected,
                   ]}
+                  numberOfLines={2}
                 >
-                  {sessionStatus.statusText}
+                  {sessionName}
+                </Text>
+                <Text style={styles.sessionTimestamp}>
+                  {formatLastSeen(session.updatedAt, false)}
                 </Text>
               </View>
-              {session.latestUsage ? (
-                <Text style={styles.usageText}>
-                  {formatTokenCountShort(
-                    session.latestUsage.totalInputTokens +
-                      session.latestUsage.totalOutputTokens,
-                  )}
-                </Text>
-              ) : null}
+
+              {/* Issue info line */}
+              {issueLink &&
+                (() => {
+                  const statusColor = ISSUE_STATUS_COLORS[issueLink.status].text;
+                  const prUrl =
+                    issueLink.prUrl ?? session.metadata?.worktree?.prUrl;
+                  return (
+                    <View style={styles.issueRow}>
+                      <Ionicons
+                        name="pricetag-outline"
+                        size={11}
+                        color={statusColor}
+                      />
+                      <Text style={[styles.issueNumber, { color: statusColor }]}>
+                        #{issueLink.issueNumber}
+                      </Text>
+                      <Text
+                        style={[styles.issueTitle, { color: statusColor }]}
+                        numberOfLines={1}
+                      >
+                        {issueLink.issueTitle}
+                      </Text>
+                      <View
+                        style={[
+                          styles.issueStatusDot,
+                          { backgroundColor: statusColor },
+                        ]}
+                      />
+                      <Text
+                        style={[styles.issueStatusText, { color: statusColor }]}
+                      >
+                        {ISSUE_STATUS_LABELS[issueLink.status]()}
+                      </Text>
+                      {prUrl ? (
+                        <Pressable
+                          style={styles.issuePrIcon}
+                          onPress={() => Linking.openURL(prUrl)}
+                          hitSlop={8}
+                        >
+                          <Ionicons
+                            name="git-pull-request-outline"
+                            size={12}
+                            color={styles.issuePrIcon.color}
+                          />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  );
+                })()}
+
+              {/* Subtitle line */}
+              <Text style={styles.sessionSubtitle} numberOfLines={1}>
+                {[
+                  sessionSubtitle,
+                  session.metadata?.currentModelCode
+                    ?.replace(/-\d{8}$/, "")
+                    .replace(/^claude-/, ""),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+
+              {/* Status line with dot and usage */}
+              <View style={styles.statusRow}>
+                <View style={styles.statusLeft}>
+                  <View style={styles.statusDotContainer}>
+                    <StatusDot
+                      color={sessionStatus.statusDotColor}
+                      isPulsing={sessionStatus.isPulsing}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: sessionStatus.statusColor },
+                    ]}
+                  >
+                    {sessionStatus.statusText}
+                  </Text>
+                </View>
+                {session.latestUsage ? (
+                  <Text style={styles.usageText}>
+                    {formatTokenCountShort(
+                      session.latestUsage.totalInputTokens +
+                        session.latestUsage.totalOutputTokens,
+                    )}
+                  </Text>
+                ) : null}
+              </View>
             </View>
+          </View>
+
+          {/* Tags line - full width at bottom */}
+          <View style={styles.tagsRow}>
+            <View
+              style={[
+                styles.tag,
+                session.metadata?.worktree?.isWorktree
+                  ? styles.tagBranch
+                  : styles.tagMain,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.tagText,
+                  session.metadata?.worktree?.isWorktree
+                    ? styles.tagBranchText
+                    : styles.tagMainText,
+                ]}
+              >
+                {session.metadata?.worktree?.isWorktree
+                  ? t("sessionInfo.tagBranch")
+                  : t("sessionInfo.tagMain")}
+              </Text>
+            </View>
+            {(machine?.metadata?.displayName || session.metadata?.host) && (
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>
+                  {machine?.metadata?.displayName || session.metadata?.host}
+                </Text>
+              </View>
+            )}
+            {session.metadata?.version && (
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>
+                  {session.metadata.version}
+                </Text>
+              </View>
+            )}
           </View>
         </Pressable>
       </View>

@@ -2187,6 +2187,17 @@ export const ru: TranslationStructure = {
     killAllConfirmTitle: "Остановить все сервисы",
     killAllConfirmMessage: ({ count }: { count: number }) =>
       `Остановить все ${count} запущенных сервисов?`,
+    hide: "Скрыть",
+    unhide: "Показать",
+    showHidden: "Показать скрытые",
+    showActive: "Показать активные",
+    hiddenCount: ({ count }: { count: number }) =>
+      `${count} скрытых сервисов`,
+    hideConfirmTitle: "Скрыть процесс",
+    hideConfirmMessage: ({ process }: { process: string }) =>
+      `Скрыть "${process}" из списка процессов? Вы сможете восстановить его позже.`,
+    noHiddenProcesses: "Нет скрытых процессов",
+    noHiddenProcessesHint: "Вы ещё не скрыли ни одного процесса.",
   },
 
   supervisor: {

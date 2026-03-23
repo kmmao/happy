@@ -2,7 +2,8 @@
  * Background process manager page for a machine.
  *
  * Shows all listening web services detected on the machine,
- * with options to kill individual processes, kill all, or preview web services.
+ * with options to kill individual processes, kill all, preview web services,
+ * and hide/unhide specific processes by name.
  *
  * Route: /machine/{id}/processes
  */
@@ -14,6 +15,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
 import { Ionicons } from "@expo/vector-icons";
 import { useProcessManager } from "@/hooks/useProcessManager";
+import { useHiddenProcesses } from "@/hooks/useHiddenProcesses";
 import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
@@ -22,10 +24,25 @@ import type { DetectedPort } from "@/hooks/portDetection";
 export default React.memo(function ProcessesPage() {
     const { id: machineId } = useLocalSearchParams<{ id: string }>();
     const { processes, isScanning, scan, killProcess, killAll } = useProcessManager(machineId);
+    const {
+        showHidden, filterProcesses, isHidden,
+        toggleShowHidden, hideProcess, unhideProcess,
+    } = useHiddenProcesses(machineId);
     const { theme } = useUnistyles();
     const router = useRouter();
 
-    const webProcesses = processes.filter((p) => p.isWeb);
+    const allWebProcesses = React.useMemo(
+        () => processes.filter((p) => p.isWeb),
+        [processes],
+    );
+    const visibleProcesses = React.useMemo(
+        () => filterProcesses(allWebProcesses),
+        [filterProcesses, allWebProcesses],
+    );
+    const hiddenCount = React.useMemo(
+        () => allWebProcesses.filter((p) => isHidden(p.process)).length,
+        [allWebProcesses, isHidden],
+    );
 
     const handleKill = React.useCallback(async (p: DetectedPort) => {
         if (!p.pid) return;
@@ -42,16 +59,20 @@ export default React.memo(function ProcessesPage() {
     }, [killProcess]);
 
     const handleKillAll = React.useCallback(async () => {
-        const count = webProcesses.filter((p) => p.pid).length;
-        if (count === 0) return;
+        const pids = visibleProcesses
+            .filter((p) => p.pid && p.pid > 1)
+            .map((p) => p.pid!);
+        if (pids.length === 0) return;
         const confirmed = await Modal.confirm(
             t("processManager.killAllConfirmTitle"),
-            t("processManager.killAllConfirmMessage", { count }),
+            t("processManager.killAllConfirmMessage", { count: pids.length }),
         );
         if (confirmed) {
-            await killAll();
+            for (const pid of pids) {
+                await killProcess(pid);
+            }
         }
-    }, [webProcesses, killAll]);
+    }, [visibleProcesses, killProcess]);
 
     const handlePreview = React.useCallback((port: number) => {
         router.push({
@@ -60,7 +81,21 @@ export default React.memo(function ProcessesPage() {
         });
     }, [router]);
 
-    if (isScanning && webProcesses.length === 0) {
+    const handleHide = React.useCallback(async (p: DetectedPort) => {
+        const confirmed = await Modal.confirm(
+            t("processManager.hideConfirmTitle"),
+            t("processManager.hideConfirmMessage", { process: p.process }),
+        );
+        if (confirmed) {
+            hideProcess(p.process);
+        }
+    }, [hideProcess]);
+
+    const handleUnhide = React.useCallback((p: DetectedPort) => {
+        unhideProcess(p.process);
+    }, [unhideProcess]);
+
+    if (isScanning && allWebProcesses.length === 0) {
         return (
             <View style={styles.centered}>
                 <ActivityIndicator size="large" color={theme.colors.text} />
@@ -80,9 +115,49 @@ export default React.memo(function ProcessesPage() {
                 {/* Header actions */}
                 <View style={styles.headerRow}>
                     <Text style={styles.countText}>
-                        {t("processManager.count", { count: webProcesses.length })}
+                        {showHidden
+                            ? t("processManager.hiddenCount", { count: visibleProcesses.length })
+                            : t("processManager.count", { count: visibleProcesses.length })}
                     </Text>
                     <View style={styles.headerActions}>
+                        {/* Toggle hidden view */}
+                        {hiddenCount > 0 && (
+                            <Pressable
+                                onPress={toggleShowHidden}
+                                accessibilityLabel={showHidden
+                                    ? t("processManager.showActive")
+                                    : t("processManager.showHidden")}
+                                style={({ pressed }) => [
+                                    styles.headerButton,
+                                    {
+                                        backgroundColor: showHidden
+                                            ? theme.colors.textLink + "24"
+                                            : theme.colors.surfaceHighest,
+                                        opacity: pressed ? 0.7 : 1,
+                                    },
+                                ]}
+                            >
+                                <Ionicons
+                                    name={showHidden ? "eye-outline" : "eye-off-outline"}
+                                    size={16}
+                                    color={showHidden ? theme.colors.textLink : theme.colors.text}
+                                />
+                                <View style={styles.badge}>
+                                    <Text
+                                        style={[
+                                            styles.badgeText,
+                                            {
+                                                color: showHidden
+                                                    ? theme.colors.textLink
+                                                    : theme.colors.textSecondary,
+                                            },
+                                        ]}
+                                    >
+                                        {hiddenCount}
+                                    </Text>
+                                </View>
+                            </Pressable>
+                        )}
                         <Pressable
                             onPress={scan}
                             style={({ pressed }) => [
@@ -99,7 +174,7 @@ export default React.memo(function ProcessesPage() {
                                 color={theme.colors.text}
                             />
                         </Pressable>
-                        {webProcesses.length > 0 && (
+                        {!showHidden && visibleProcesses.length > 0 && (
                             <Pressable
                                 onPress={handleKillAll}
                                 style={({ pressed }) => [
@@ -130,24 +205,28 @@ export default React.memo(function ProcessesPage() {
                 </View>
 
                 {/* Empty state */}
-                {webProcesses.length === 0 && (
+                {visibleProcesses.length === 0 && (
                     <View style={styles.emptyState}>
                         <Ionicons
-                            name="checkmark-circle-outline"
+                            name={showHidden ? "eye-off-outline" : "checkmark-circle-outline"}
                             size={48}
                             color={theme.colors.textSecondary}
                         />
                         <Text style={styles.emptyTitle}>
-                            {t("processManager.noProcesses")}
+                            {showHidden
+                                ? t("processManager.noHiddenProcesses")
+                                : t("processManager.noProcesses")}
                         </Text>
                         <Text style={styles.emptySubtitle}>
-                            {t("processManager.noProcessesHint")}
+                            {showHidden
+                                ? t("processManager.noHiddenProcessesHint")
+                                : t("processManager.noProcessesHint")}
                         </Text>
                     </View>
                 )}
 
                 {/* Process list */}
-                {webProcesses.map((p) => (
+                {visibleProcesses.map((p) => (
                     <View
                         key={p.port}
                         style={[
@@ -183,9 +262,11 @@ export default React.memo(function ProcessesPage() {
                             )}
                         </View>
                         <View style={styles.processActions}>
-                            {p.isWeb && (
+                            {showHidden ? (
+                                /* Unhide button in hidden view */
                                 <Pressable
-                                    onPress={() => handlePreview(p.port)}
+                                    onPress={() => handleUnhide(p)}
+                                    accessibilityLabel={t("processManager.unhide")}
                                     style={({ pressed }) => [
                                         styles.actionBtn,
                                         {
@@ -200,24 +281,63 @@ export default React.memo(function ProcessesPage() {
                                         color={theme.colors.textLink}
                                     />
                                 </Pressable>
-                            )}
-                            {p.pid && (
-                                <Pressable
-                                    onPress={() => handleKill(p)}
-                                    style={({ pressed }) => [
-                                        styles.actionBtn,
-                                        {
-                                            backgroundColor: theme.colors.textDestructive + "18",
-                                            opacity: pressed ? 0.7 : 1,
-                                        },
-                                    ]}
-                                >
-                                    <Ionicons
-                                        name="close-outline"
-                                        size={14}
-                                        color={theme.colors.textDestructive}
-                                    />
-                                </Pressable>
+                            ) : (
+                                <>
+                                    {p.isWeb && (
+                                        <Pressable
+                                            onPress={() => handlePreview(p.port)}
+                                            style={({ pressed }) => [
+                                                styles.actionBtn,
+                                                {
+                                                    backgroundColor: theme.colors.textLink + "18",
+                                                    opacity: pressed ? 0.7 : 1,
+                                                },
+                                            ]}
+                                        >
+                                            <Ionicons
+                                                name="eye-outline"
+                                                size={14}
+                                                color={theme.colors.textLink}
+                                            />
+                                        </Pressable>
+                                    )}
+                                    {/* Hide button */}
+                                    <Pressable
+                                        onPress={() => handleHide(p)}
+                                        accessibilityLabel={t("processManager.hide")}
+                                        style={({ pressed }) => [
+                                            styles.actionBtn,
+                                            {
+                                                backgroundColor: theme.colors.textSecondary + "18",
+                                                opacity: pressed ? 0.7 : 1,
+                                            },
+                                        ]}
+                                    >
+                                        <Ionicons
+                                            name="eye-off-outline"
+                                            size={14}
+                                            color={theme.colors.textSecondary}
+                                        />
+                                    </Pressable>
+                                    {p.pid && (
+                                        <Pressable
+                                            onPress={() => handleKill(p)}
+                                            style={({ pressed }) => [
+                                                styles.actionBtn,
+                                                {
+                                                    backgroundColor: theme.colors.textDestructive + "18",
+                                                    opacity: pressed ? 0.7 : 1,
+                                                },
+                                            ]}
+                                        >
+                                            <Ionicons
+                                                name="close-outline"
+                                                size={14}
+                                                color={theme.colors.textDestructive}
+                                            />
+                                        </Pressable>
+                                    )}
+                                </>
                             )}
                         </View>
                     </View>
@@ -275,6 +395,15 @@ const styles = StyleSheet.create((theme) => ({
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 8,
+    },
+    badge: {
+        minWidth: 16,
+        alignItems: "center",
+    },
+    badgeText: {
+        fontSize: 12,
+        fontWeight: "700",
+        fontVariant: ["tabular-nums"],
     },
     emptyState: {
         alignItems: "center",
