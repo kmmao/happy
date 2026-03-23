@@ -108,14 +108,14 @@ const stylesheet = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.fab.background,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
+        shadowColor: theme.colors.shadow.color,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,
         elevation: 4,
     },
     fabIcon: {
-        color: '#FFFFFF',
+        color: theme.colors.fab.icon,
     },
 }));
 

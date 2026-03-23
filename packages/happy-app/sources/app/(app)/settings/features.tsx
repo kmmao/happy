@@ -11,8 +11,10 @@ import {
   requestNotificationPermission,
   getNotificationPermission,
 } from "@/utils/webNotification";
+import { useUnistyles } from "react-native-unistyles";
 
 function FeaturesSettingsScreen() {
+  const { theme } = useUnistyles();
   const [experiments, setExperiments] = useSettingMutable("experiments");
   const [agentInputEnterToSend, setAgentInputEnterToSend] = useSettingMutable(
     "agentInputEnterToSend",
@@ -51,7 +53,7 @@ function FeaturesSettingsScreen() {
               ? t("settingsFeatures.experimentalFeaturesEnabled")
               : t("settingsFeatures.experimentalFeaturesDisabled")
           }
-          icon={<Ionicons name="flask-outline" size={29} color="#5856D6" />}
+          icon={<Ionicons name="flask-outline" size={29} color={theme.colors.accentPurple} />}
           rightElement={
             <Switch value={experiments} onValueChange={setExperiments} />
           }
@@ -60,7 +62,7 @@ function FeaturesSettingsScreen() {
         <Item
           title={t("settingsFeatures.markdownCopyV2")}
           subtitle={t("settingsFeatures.markdownCopyV2Subtitle")}
-          icon={<Ionicons name="text-outline" size={29} color="#34C759" />}
+          icon={<Ionicons name="text-outline" size={29} color={theme.colors.success} />}
           rightElement={
             <Switch value={markdownCopyV2} onValueChange={setMarkdownCopyV2} />
           }
@@ -69,7 +71,7 @@ function FeaturesSettingsScreen() {
         <Item
           title={t("settingsFeatures.hideInactiveSessions")}
           subtitle={t("settingsFeatures.hideInactiveSessionsSubtitle")}
-          icon={<Ionicons name="eye-off-outline" size={29} color="#FF9500" />}
+          icon={<Ionicons name="eye-off-outline" size={29} color={theme.colors.accentOrange} />}
           rightElement={
             <Switch
               value={hideInactiveSessions}
@@ -85,7 +87,7 @@ function FeaturesSettingsScreen() {
               ? t("settingsFeatures.enhancedSessionWizardEnabled")
               : t("settingsFeatures.enhancedSessionWizardDisabled")
           }
-          icon={<Ionicons name="sparkles-outline" size={29} color="#AF52DE" />}
+          icon={<Ionicons name="sparkles-outline" size={29} color={theme.colors.accentMagenta} />}
           rightElement={
             <Switch
               value={useEnhancedSessionWizard}
@@ -101,7 +103,7 @@ function FeaturesSettingsScreen() {
               ? t("settingsFeatures.sttCorrectionEnabled")
               : t("settingsFeatures.sttCorrectionDisabled")
           }
-          icon={<Ionicons name="mic-outline" size={29} color="#30B0C7" />}
+          icon={<Ionicons name="mic-outline" size={29} color={theme.colors.accentTeal} />}
           rightElement={
             <Switch value={sttCorrection} onValueChange={setSttCorrection} />
           }
@@ -126,7 +128,7 @@ function FeaturesSettingsScreen() {
               <Ionicons
                 name="return-down-forward-outline"
                 size={29}
-                color="#007AFF"
+                color={theme.colors.accentBlue}
               />
             }
             rightElement={
@@ -144,7 +146,7 @@ function FeaturesSettingsScreen() {
                 ? t("settingsFeatures.commandPaletteEnabled")
                 : t("settingsFeatures.commandPaletteDisabled")
             }
-            icon={<Ionicons name="keypad-outline" size={29} color="#007AFF" />}
+            icon={<Ionicons name="keypad-outline" size={29} color={theme.colors.accentBlue} />}
             rightElement={
               <Switch
                 value={commandPaletteEnabled}
@@ -166,7 +168,7 @@ function FeaturesSettingsScreen() {
               <Ionicons
                 name="notifications-outline"
                 size={29}
-                color="#FF9500"
+                color={theme.colors.accentOrange}
               />
             }
             rightElement={
@@ -199,7 +201,7 @@ function FeaturesSettingsScreen() {
                   ? t("settingsFeatures.webNotificationsPersistentEnabled")
                   : t("settingsFeatures.webNotificationsPersistentDisabled")
               }
-              icon={<Ionicons name="pin-outline" size={29} color="#FF9500" />}
+              icon={<Ionicons name="pin-outline" size={29} color={theme.colors.accentOrange} />}
               rightElement={
                 <Switch
                   value={webNotificationsPersistent}

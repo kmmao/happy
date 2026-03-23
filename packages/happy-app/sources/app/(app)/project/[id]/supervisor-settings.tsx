@@ -749,7 +749,7 @@ function SupervisorSettingsScreen() {
                     disabled={!isDirty || saving}
                 >
                     {saving ? (
-                        <ActivityIndicator size="small" color="#fff" />
+                        <ActivityIndicator size="small" color={theme.colors.header.background} />
                     ) : (
                         <Text style={styles.saveButtonText}>
                             {t("common.save")}
@@ -1079,7 +1079,7 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.text,
     },
     concurrencyOptionTextSelected: {
-        color: "#FFFFFF",
+        color: theme.colors.header.background,
     },
     saveButtonContainer: {
         paddingHorizontal: 16,
@@ -1100,7 +1100,7 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 16,
         fontWeight: "600",
-        color: "#fff",
+        color: theme.colors.header.background,
     },
     severityChipsContainer: {
         paddingBottom: 12,
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 13,
     },
     severityChipTextSelected: {
-        color: "#FFFFFF",
+        color: theme.colors.button.primary.tint,
     },
     severityTagsContainer: {
         flexDirection: "row",

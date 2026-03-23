@@ -148,7 +148,7 @@ export default React.memo(() => {
                   : t("settingsAccount.linkNewDeviceSubtitle")
               }
               icon={
-                <Ionicons name="qr-code-outline" size={29} color="#007AFF" />
+                <Ionicons name="qr-code-outline" size={29} color={theme.colors.accentBlue} />
               }
               onPress={connectAccount}
               disabled={isConnecting}
@@ -277,7 +277,7 @@ export default React.memo(() => {
               <Ionicons
                 name={showSecret ? "eye-off-outline" : "eye-outline"}
                 size={29}
-                color="#FF9500"
+                color={theme.colors.accentOrange}
               />
             }
             onPress={handleShowSecret}
@@ -322,7 +322,7 @@ export default React.memo(() => {
                     name={copiedRecently ? "checkmark-circle" : "copy-outline"}
                     size={18}
                     color={
-                      copiedRecently ? "#34C759" : theme.colors.textSecondary
+                      copiedRecently ? theme.colors.success : theme.colors.textSecondary
                     }
                   />
                 </View>
@@ -361,8 +361,8 @@ export default React.memo(() => {
                   const optOut = !value;
                   setAnalyticsOptOut(optOut);
                 }}
-                trackColor={{ false: "#767577", true: "#34C759" }}
-                thumbColor="#FFFFFF"
+                trackColor={{ false: theme.colors.switch.track.inactive, true: theme.colors.switch.track.active }}
+                thumbColor={theme.colors.switch.thumb.active}
               />
             }
             showChevron={false}
@@ -374,7 +374,7 @@ export default React.memo(() => {
           <Item
             title={t("settingsAccount.logout")}
             subtitle={t("settingsAccount.logoutSubtitle")}
-            icon={<Ionicons name="log-out-outline" size={29} color="#FF3B30" />}
+            icon={<Ionicons name="log-out-outline" size={29} color={theme.colors.warningCritical} />}
             destructive
             onPress={handleLogout}
           />
