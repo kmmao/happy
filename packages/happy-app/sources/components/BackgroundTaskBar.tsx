@@ -11,7 +11,7 @@
  */
 
 import * as React from "react";
-import { Pressable, ScrollView, View, Text, useWindowDimensions } from "react-native";
+import { Animated, Pressable, ScrollView, View, Text, useWindowDimensions } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { Ionicons } from "@expo/vector-icons";
@@ -65,6 +65,64 @@ function statusInfo(
         case "failed":
             return { color: colors.deleteAction, label: t("backgroundTasks.failed") };
     }
+}
+
+// ---------------------------------------------------------------------------
+// Marquee text — scrolls horizontally when text overflows container
+// ---------------------------------------------------------------------------
+
+function MarqueeText({
+    text,
+    style,
+}: {
+    readonly text: string;
+    readonly style: any;
+}) {
+    const translateX = React.useRef(new Animated.Value(0)).current;
+    const [containerWidth, setContainerWidth] = React.useState(0);
+    const [textWidth, setTextWidth] = React.useState(0);
+    const animRef = React.useRef<Animated.CompositeAnimation | null>(null);
+
+    const overflow = textWidth - containerWidth;
+    const shouldScroll = overflow > 0;
+
+    React.useEffect(() => {
+        if (!shouldScroll) {
+            translateX.setValue(0);
+            return;
+        }
+        // Scroll left → pause → scroll right → pause → repeat
+        const duration = Math.max(3000, overflow * 20);
+        const anim = Animated.loop(
+            Animated.sequence([
+                Animated.delay(1000),
+                Animated.timing(translateX, { toValue: -overflow, duration, useNativeDriver: true }),
+                Animated.delay(1000),
+                Animated.timing(translateX, { toValue: 0, duration, useNativeDriver: true }),
+            ]),
+        );
+        animRef.current = anim;
+        anim.start();
+        return () => anim.stop();
+    }, [shouldScroll, overflow, translateX]);
+
+    return (
+        <View
+            style={styles.marqueeContainer}
+            onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+        >
+            <Animated.Text
+                style={[style, { transform: [{ translateX }] }]}
+                numberOfLines={1}
+                onTextLayout={(e) => {
+                    const w = e.nativeEvent.lines[0]?.width ?? 0;
+                    if (w > 0) setTextWidth(w);
+                }}
+            >
+                {text}
+            </Animated.Text>
+        </View>
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -163,12 +221,10 @@ function TaskItem({
                 )}
             </View>
             {lastLine.length > 0 && (
-                <Text
+                <MarqueeText
+                    text={lastLine}
                     style={[styles.logLine, { color: theme.colors.textSecondary }]}
-                    numberOfLines={1}
-                >
-                    {lastLine}
-                </Text>
+                />
             )}
         </Pressable>
     );
@@ -255,6 +311,10 @@ const styles = StyleSheet.create(() => ({
     taskElapsed: {
         fontSize: 11,
         opacity: 0.6,
+    },
+    marqueeContainer: {
+        overflow: "hidden",
+        alignSelf: "stretch",
     },
     logLine: {
         fontSize: 11,
