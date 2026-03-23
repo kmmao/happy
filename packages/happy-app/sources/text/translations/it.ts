@@ -675,6 +675,10 @@ export const it: TranslationStructure = {
     forkSessionSubtitle: "Crea una nuova sessione ramificata da questo punto con contesto completo",
     forkSessionSuccess: "Sessione biforcata con successo",
     forkSessionFailed: "Impossibile biforcare la sessione",
+    upgradeRestart: "Aggiorna",
+    upgradeRestartConfirm:
+      "La sessione verrà riavviata con l'ultima versione del CLI. Il contesto attuale verrà preservato.",
+    failedToUpgradeSession: "Impossibile aggiornare la sessione",
     deleteSession: "Elimina sessione",
     deleteSessionSubtitle: "Rimuovi definitivamente questa sessione",
     deleteSessionConfirm: "Eliminare definitivamente la sessione?",

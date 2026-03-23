@@ -563,6 +563,10 @@ export const zhHans: TranslationStructure = {
     forkSessionSubtitle: "从此处创建一个包含完整上下文的新会话分支",
     forkSessionSuccess: "会话分叉成功",
     forkSessionFailed: "会话分叉失败",
+    upgradeRestart: "升级",
+    upgradeRestartConfirm:
+      "将使用最新 CLI 版本重启此会话，当前上下文将被保留。",
+    failedToUpgradeSession: "会话升级失败",
     deleteSession: "删除会话",
     deleteSessionSubtitle: "永久删除此会话",
     deleteSessionConfirm: "永久删除会话？",

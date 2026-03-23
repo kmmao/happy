@@ -533,6 +533,10 @@ export const ru: TranslationStructure = {
     forkSessionSubtitle: "Создать новую сессию, ответвлённую от этой точки с полным контекстом",
     forkSessionSuccess: "Сессия успешно разветвлена",
     forkSessionFailed: "Не удалось разветвить сессию",
+    upgradeRestart: "Обновить",
+    upgradeRestartConfirm:
+      "Сессия будет перезапущена с последней версией CLI. Текущий контекст будет сохранён.",
+    failedToUpgradeSession: "Не удалось обновить сессию",
     deleteSession: "Удалить сессию",
     deleteSessionSubtitle: "Удалить эту сессию навсегда",
     deleteSessionConfirm: "Удалить сессию навсегда?",

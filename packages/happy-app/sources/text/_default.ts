@@ -580,6 +580,10 @@ export const en = {
       "Create a new session branching from this point with full context",
     forkSessionSuccess: "Session forked successfully",
     forkSessionFailed: "Failed to fork session",
+    upgradeRestart: "Upgrade",
+    upgradeRestartConfirm:
+      "This will restart the session with the latest CLI version. Current context will be preserved.",
+    failedToUpgradeSession: "Failed to upgrade session",
     deleteSession: "Delete Session",
     deleteSessionSubtitle: "Permanently remove this session",
     deleteSessionConfirm: "Delete Session Permanently?",

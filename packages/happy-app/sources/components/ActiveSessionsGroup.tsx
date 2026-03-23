@@ -29,6 +29,7 @@ import {
 } from "@/sync/storage";
 import { StyleSheet } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
+import { compareVersions } from "@/utils/versionUtils";
 import { machineSpawnNewSession, sessionKill, sessionDelete } from "@/sync/ops";
 import { storage } from "@/sync/storage";
 import { Modal } from "@/modal";
@@ -273,6 +274,28 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     color: theme.colors.textSecondary,
     ...Typography.default(),
     maxWidth: 80,
+  },
+  upgradeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 159, 10, 0.15)",
+    paddingHorizontal: 4,
+    height: 16,
+    borderRadius: 4,
+    gap: 2,
+  },
+  upgradeBadgeText: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: theme.colors.warning,
+    ...Typography.default("semiBold"),
+  },
+  swipeActionUpgrade: {
+    width: 80,
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.accentBlue,
   },
   issueRow: {
     flexDirection: "row",
@@ -574,6 +597,56 @@ const CompactSessionRow = React.memo(
       ]);
     }, [performDelete, issueLink, session.metadata?.worktree]);
 
+    const machineCliVersion = machine?.daemonState?.startedWithCliVersion as string | undefined;
+
+    const needsUpgrade =
+      session.active &&
+      !!session.metadata?.version &&
+      !!session.metadata?.claudeSessionId &&
+      !!session.metadata?.machineId &&
+      !!session.metadata?.path &&
+      !!machine &&
+      isMachineOnline(machine) &&
+      !!machineCliVersion &&
+      compareVersions(session.metadata.version, machineCliVersion) < 0;
+
+    const [upgradingSession, performUpgrade] = useHappyAction(async () => {
+      // Step 1: Kill the old session
+      const killResult = await sessionKill(session.id);
+      if (!killResult.success) {
+        throw new HappyError(
+          killResult.message || t("sessionInfo.failedToUpgradeSession"),
+          false,
+        );
+      }
+      // Step 2: Resume with new CLI version
+      const spawnResult = await machineSpawnNewSession({
+        machineId: session.metadata!.machineId!,
+        directory: session.metadata!.path!,
+        claudeSessionId: session.metadata!.claudeSessionId!,
+        happySessionId: session.id,
+        agent: (session.metadata?.flavor as "claude" | "codex" | "gemini") ?? "claude",
+      });
+      if (spawnResult.type === "error") {
+        throw new HappyError(spawnResult.errorMessage, false);
+      }
+    });
+
+    const handleUpgrade = React.useCallback(() => {
+      swipeableRef.current?.close();
+      Modal.alert(
+        t("sessionInfo.upgradeRestart"),
+        t("sessionInfo.upgradeRestartConfirm"),
+        [
+          { text: t("common.cancel"), style: "cancel" },
+          {
+            text: t("sessionInfo.upgradeRestart"),
+            onPress: performUpgrade,
+          },
+        ],
+      );
+    }, [performUpgrade]);
+
     const avatarId = React.useMemo(() => {
       return getSessionAvatarId(session);
     }, [session]);
@@ -654,10 +727,17 @@ const CompactSessionRow = React.memo(
                 </View>
               )}
               {session.metadata?.version && (
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>
+                <View style={[styles.tag, needsUpgrade && styles.upgradeBadge]}>
+                  <Text style={[styles.tagText, needsUpgrade && styles.upgradeBadgeText]}>
                     {session.metadata.version}
                   </Text>
+                  {needsUpgrade && (
+                    <Ionicons
+                      name="arrow-up-circle-outline"
+                      size={10}
+                      color={styles.upgradeBadgeText.color}
+                    />
+                  )}
                 </View>
               )}
             </View>
@@ -812,10 +892,22 @@ const CompactSessionRow = React.memo(
       </View>
     );
 
-    const isBusy = archivingSession || deletingSession;
+    const isBusy = archivingSession || deletingSession || upgradingSession;
 
     const renderRightActions = () => (
       <View style={styles.swipeActionsContainer}>
+        {needsUpgrade && (
+          <Pressable
+            style={styles.swipeActionUpgrade}
+            onPress={handleUpgrade}
+            disabled={isBusy}
+          >
+            <Ionicons name="arrow-up-circle-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.swipeActionText} numberOfLines={1}>
+              {t("sessionInfo.upgradeRestart")}
+            </Text>
+          </Pressable>
+        )}
         <Pressable
           style={styles.swipeActionArchive}
           onPress={handleArchive}

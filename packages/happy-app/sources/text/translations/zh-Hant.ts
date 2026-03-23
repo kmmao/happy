@@ -563,6 +563,10 @@ export const zhHant: TranslationStructure = {
     forkSessionSubtitle: "從此處建立一個包含完整上下文的新工作階段分支",
     forkSessionSuccess: "工作階段分叉成功",
     forkSessionFailed: "工作階段分叉失敗",
+    upgradeRestart: "升級",
+    upgradeRestartConfirm:
+      "將使用最新 CLI 版本重新啟動此工作階段，目前的上下文將會保留。",
+    failedToUpgradeSession: "工作階段升級失敗",
     deleteSession: "刪除工作階段",
     deleteSessionSubtitle: "永久刪除此工作階段",
     deleteSessionConfirm: "永久刪除工作階段？",

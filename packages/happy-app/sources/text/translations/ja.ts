@@ -663,6 +663,10 @@ export const ja: TranslationStructure = {
     forkSessionSubtitle: "この時点からフルコンテキストで新しいセッションを分岐",
     forkSessionSuccess: "セッションのフォークに成功しました",
     forkSessionFailed: "セッションのフォークに失敗しました",
+    upgradeRestart: "アップグレード",
+    upgradeRestartConfirm:
+      "最新の CLI バージョンでセッションを再起動します。現在のコンテキストは保持されます。",
+    failedToUpgradeSession: "セッションのアップグレードに失敗しました",
     deleteSession: "セッションを削除",
     deleteSessionSubtitle: "このセッションを完全に削除",
     deleteSessionConfirm: "セッションを完全に削除しますか？",

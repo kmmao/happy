@@ -606,6 +606,10 @@ export const pl: TranslationStructure = {
     forkSessionSubtitle: "Utwórz nową sesję rozgałęzioną od tego punktu z pełnym kontekstem",
     forkSessionSuccess: "Sesja rozwidlona pomyślnie",
     forkSessionFailed: "Nie udało się rozwidlić sesji",
+    upgradeRestart: "Aktualizuj",
+    upgradeRestartConfirm:
+      "Sesja zostanie uruchomiona ponownie z najnowszą wersją CLI. Bieżący kontekst zostanie zachowany.",
+    failedToUpgradeSession: "Nie udało się zaktualizować sesji",
     deleteSession: "Usuń sesję",
     deleteSessionSubtitle: "Trwale usuń tę sesję",
     deleteSessionConfirm: "Usunąć sesję na stałe?",

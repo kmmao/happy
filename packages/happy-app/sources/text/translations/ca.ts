@@ -598,6 +598,10 @@ export const ca: TranslationStructure = {
     forkSessionSubtitle: "Crear una nova sessió bifurcada des d'aquest punt amb context complet",
     forkSessionSuccess: "Sessió bifurcada correctament",
     forkSessionFailed: "Error en bifurcar la sessió",
+    upgradeRestart: "Actualitza",
+    upgradeRestartConfirm:
+      "La sessió es reiniciarà amb l'última versió del CLI. El context actual es conservarà.",
+    failedToUpgradeSession: "Error en actualitzar la sessió",
     deleteSession: "Elimina la sessió",
     deleteSessionSubtitle: "Elimina permanentment aquesta sessió",
     deleteSessionConfirm: "Eliminar la sessió permanentment?",

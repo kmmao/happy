@@ -596,6 +596,10 @@ export const pt: TranslationStructure = {
     forkSessionSubtitle: "Criar uma nova sessão bifurcada a partir deste ponto com contexto completo",
     forkSessionSuccess: "Sessão bifurcada com sucesso",
     forkSessionFailed: "Falha ao bifurcar a sessão",
+    upgradeRestart: "Atualizar",
+    upgradeRestartConfirm:
+      "A sessão será reiniciada com a versão mais recente do CLI. O contexto atual será preservado.",
+    failedToUpgradeSession: "Falha ao atualizar a sessão",
     deleteSession: "Excluir sessão",
     deleteSessionSubtitle: "Remover permanentemente esta sessão",
     deleteSessionConfirm: "Excluir sessão permanentemente?",
