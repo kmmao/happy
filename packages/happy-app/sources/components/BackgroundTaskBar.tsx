@@ -95,7 +95,7 @@ function TaskItem({
     return (
         <Pressable
             onPress={onPress}
-            style={[styles.taskItem, { backgroundColor: `${iconColor}15` }]}
+            style={({ pressed }) => [styles.taskItem, { backgroundColor: `${iconColor}15`, opacity: pressed ? 0.7 : 1 }]}
         >
             <Ionicons name={icon} size={14} color={iconColor} />
             <Text
@@ -117,7 +117,7 @@ function TaskItem({
                         onPreview();
                     }}
                     hitSlop={8}
-                    style={styles.previewButton}
+                    style={({ pressed }) => [styles.previewButton, pressed && { opacity: 0.7 }]}
                 >
                     <Ionicons name="eye-outline" size={14} color={theme.colors.textLink} />
                 </Pressable>
@@ -128,7 +128,7 @@ function TaskItem({
                     onClose();
                 }}
                 hitSlop={8}
-                style={styles.dismissButton}
+                style={({ pressed }) => [styles.dismissButton, pressed && { opacity: 0.7 }]}
             >
                 <Ionicons name="close" size={12} color={theme.colors.textSecondary} />
             </Pressable>

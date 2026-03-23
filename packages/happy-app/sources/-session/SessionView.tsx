@@ -1027,7 +1027,7 @@ function SessionViewInner({
       {shouldShowCliWarning && !(isLandscape && deviceType === "phone") && (
         <Pressable
           onPress={handleDismissCliWarning}
-          style={{
+          style={({ pressed }) => ({
             position: "absolute",
             top: 8, // Position at top of content area (padding handled by parent)
             alignSelf: "center",
@@ -1043,7 +1043,8 @@ function SessionViewInner({
             shadowOpacity: 0.15,
             shadowRadius: 4,
             elevation: 4,
-          }}
+            opacity: pressed ? 0.7 : 1,
+          })}
         >
           <Ionicons
             name="warning-outline"
@@ -1145,7 +1146,7 @@ function SessionViewInner({
       {isLandscape && deviceType === "phone" && (
         <Pressable
           onPress={() => router.back()}
-          style={{
+          style={({ pressed }) => ({
             position: "absolute",
             top: safeArea.top + 8,
             left: 16,
@@ -1155,6 +1156,7 @@ function SessionViewInner({
             backgroundColor: `rgba(${theme.dark ? "28, 23, 28" : "255, 255, 255"}, 0.9)`,
             alignItems: "center",
             justifyContent: "center",
+            opacity: pressed ? 0.7 : 1,
             ...Platform.select({
               ios: {
                 shadowColor: "#000",
@@ -1166,7 +1168,7 @@ function SessionViewInner({
                 elevation: 2,
               },
             }),
-          }}
+          })}
           hitSlop={15}
         >
           <Ionicons
