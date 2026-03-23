@@ -36,13 +36,14 @@ import { checkDailyRunLimit } from "@/modules/supervisorLimits";
  * Extract the repository URL from a webhook body.
  * Each provider puts it in a slightly different place.
  */
-export function extractRepoUrl(provider: string, body: any): string | null {
+export function extractRepoUrl(provider: string, body: unknown): string | null {
+  const b = body as Record<string, Record<string, unknown>> | null | undefined;
   switch (provider) {
     case "github":
     case "gitea":
-      return body?.repository?.html_url ?? null;
+      return (b?.repository?.html_url as string) ?? null;
     case "gitlab":
-      return body?.project?.web_url ?? null;
+      return (b?.project?.web_url as string) ?? null;
     default:
       return null;
   }
@@ -101,7 +102,7 @@ export async function dispatchWebhook(
   provider: string,
   rawBody: string,
   headers: Record<string, string | undefined>,
-  body: any,
+  body: unknown,
 ): Promise<DispatchResult> {
   // 1. Extract repo URL
   const repoUrl = extractRepoUrl(provider, body);

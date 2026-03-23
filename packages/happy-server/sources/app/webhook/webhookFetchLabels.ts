@@ -126,9 +126,10 @@ export async function fetchIssueLabelsFromProvider(
         // GitHub/Gitea: array of { name: "label-name", ... }
         // GitLab: array of strings (label names)
         if (Array.isArray(data)) {
-            return data.map((item: any) => {
+            return data.map((item: unknown) => {
                 if (typeof item === "string") return item.toLowerCase();
-                return (item.name ?? "").toLowerCase();
+                const record = item as Record<string, unknown>;
+                return (typeof record.name === "string" ? record.name : "").toLowerCase();
             });
         }
 
