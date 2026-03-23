@@ -91,7 +91,7 @@ describe('buildFixPrompt', () => {
 
     it('should run tests again after rebase in direct mode', () => {
         const prompt = buildFixPrompt(baseOptions);
-        expect(prompt).toContain('Run tests AGAIN after rebase');
+        expect(prompt).toContain('Run tests again to verify the fix still works after rebase');
     });
 
     it('should include fallback to PR instructions in direct mode', () => {
