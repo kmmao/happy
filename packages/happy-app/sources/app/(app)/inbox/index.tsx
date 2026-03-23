@@ -102,6 +102,8 @@ function InboxPage() {
                             onPress={() => router.back()}
                             style={styles.backButton}
                             hitSlop={15}
+                            accessibilityLabel={t('common.back')}
+                            accessibilityRole="button"
                         >
                             <Ionicons
                                 name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'}

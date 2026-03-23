@@ -202,6 +202,8 @@ function ProfileManager({
               borderColor: theme.colors.text,
             }}
             onPress={() => handleSelectProfile(null)}
+            accessibilityLabel={t("profiles.noProfile")}
+            accessibilityRole="button"
           >
             <View
               style={{
