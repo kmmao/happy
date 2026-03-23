@@ -254,12 +254,12 @@ export async function listDaemonLogFiles(limit: number = 50): Promise<LogFileInf
       return [];
     }
 
-    const logs = readdirSync(logsDir)
-      .filter(file => file.endsWith('-daemon.log'))
-      .map(file => {
-        const fullPath = join(logsDir, file);
+    const logs = readdirSync(logsDir, { withFileTypes: true })
+      .filter(entry => entry.isFile() && entry.name.endsWith('-daemon.log'))
+      .map(entry => {
+        const fullPath = join(logsDir, entry.name);
         const stats = statSync(fullPath);
-        return { file, path: fullPath, modified: stats.mtime } as LogFileInfo;
+        return { file: entry.name, path: fullPath, modified: stats.mtime } as LogFileInfo;
       })
       .sort((a, b) => b.modified.getTime() - a.modified.getTime());
 

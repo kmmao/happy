@@ -478,19 +478,18 @@ export async function runCodex(opts: {
 
       const candidates = collectFilesRecursive(rootDir)
         .filter((full) => full.endsWith(`-${sessionId}.jsonl`))
-        .filter((full) => {
+        .map((full) => {
           try {
-            return fs.statSync(full).isFile();
+            return { path: full, mtimeMs: fs.statSync(full).mtimeMs };
           } catch {
-            return false;
+            return null;
           }
         })
-        .sort((a, b) => {
-          const sa = fs.statSync(a).mtimeMs;
-          const sb = fs.statSync(b).mtimeMs;
-          return sb - sa; // newest first
-        });
-      return candidates[0] || null;
+        .filter(
+          (entry): entry is { path: string; mtimeMs: number } => entry !== null,
+        )
+        .sort((a, b) => b.mtimeMs - a.mtimeMs);
+      return candidates[0]?.path || null;
     } catch {
       return null;
     }

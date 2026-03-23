@@ -51,12 +51,12 @@ function getLogFiles(logDir: string): { file: string, path: string, modified: Da
     }
 
     try {
-        return readdirSync(logDir)
-            .filter(file => file.endsWith('.log'))
-            .map(file => {
-                const path = join(logDir, file);
-                const stats = statSync(path);
-                return { file, path, modified: stats.mtime };
+        return readdirSync(logDir, { withFileTypes: true })
+            .filter(entry => entry.isFile() && entry.name.endsWith('.log'))
+            .map(entry => {
+                const fullPath = join(logDir, entry.name);
+                const stats = statSync(fullPath);
+                return { file: entry.name, path: fullPath, modified: stats.mtime };
             })
             .sort((a, b) => b.modified.getTime() - a.modified.getTime());
     } catch {
