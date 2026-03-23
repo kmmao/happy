@@ -372,9 +372,17 @@ function SessionViewInner({
         if (!confirmed) return;
 
         try {
-          const killCmd = port
-            ? `lsof -ti :${port} | xargs kill 2>/dev/null || true`
-            : `pkill -f ${JSON.stringify(task.command.slice(0, 60))} 2>/dev/null || true`;
+          // Docker containers: extract --name and use docker stop (killing the port proxy crashes Docker Desktop)
+          const dockerNameMatch = task.command.match(/--name\s+(\S+)/);
+          const isDocker = /\bdocker\s+run\b/i.test(task.command);
+          let killCmd: string;
+          if (isDocker && dockerNameMatch) {
+            killCmd = `docker stop ${dockerNameMatch[1]} 2>/dev/null || true`;
+          } else if (port) {
+            killCmd = `lsof -ti :${port} | xargs kill 2>/dev/null || true`;
+          } else {
+            killCmd = `pkill -f ${JSON.stringify(task.command.slice(0, 60))} 2>/dev/null || true`;
+          }
           await sessionBash(sessionId, { command: killCmd });
         } catch {
           // Best effort — task may have already exited
