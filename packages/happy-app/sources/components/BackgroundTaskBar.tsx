@@ -74,49 +74,44 @@ function statusInfo(
 function MarqueeText({
     text,
     style,
+    maxWidth,
 }: {
     readonly text: string;
     readonly style: any;
+    readonly maxWidth: number;
 }) {
     const translateX = React.useRef(new Animated.Value(0)).current;
-    const [containerWidth, setContainerWidth] = React.useState(0);
     const [textWidth, setTextWidth] = React.useState(0);
-    const animRef = React.useRef<Animated.CompositeAnimation | null>(null);
 
-    const overflow = textWidth - containerWidth;
-    const shouldScroll = overflow > 0;
+    const overflow = textWidth - maxWidth;
+    const shouldScroll = overflow > 0 && maxWidth > 0;
 
     React.useEffect(() => {
-        if (!shouldScroll) {
-            translateX.setValue(0);
-            return;
-        }
-        // Scroll left → pause → scroll right → pause → repeat
+        translateX.setValue(0);
+        if (!shouldScroll) return;
         const duration = Math.max(3000, overflow * 20);
         const anim = Animated.loop(
             Animated.sequence([
-                Animated.delay(1000),
+                Animated.delay(1500),
                 Animated.timing(translateX, { toValue: -overflow, duration, useNativeDriver: true }),
-                Animated.delay(1000),
+                Animated.delay(1500),
                 Animated.timing(translateX, { toValue: 0, duration, useNativeDriver: true }),
             ]),
         );
-        animRef.current = anim;
         anim.start();
         return () => anim.stop();
     }, [shouldScroll, overflow, translateX]);
 
+    if (maxWidth <= 0) return null;
+
     return (
-        <View
-            style={styles.marqueeContainer}
-            onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
-        >
+        <View style={[styles.marqueeContainer, { width: maxWidth }]}>
             <Animated.Text
                 style={[style, { transform: [{ translateX }] }]}
                 numberOfLines={1}
                 onTextLayout={(e) => {
                     const w = e.nativeEvent.lines[0]?.width ?? 0;
-                    if (w > 0) setTextWidth(w);
+                    if (w > 0 && w !== textWidth) setTextWidth(w);
                 }}
             >
                 {text}
@@ -144,6 +139,7 @@ function TaskItem({
 }) {
     const { theme } = useUnistyles();
     const [elapsed, setElapsed] = React.useState(() => formatElapsed(task.startedAt));
+    const [topRowWidth, setTopRowWidth] = React.useState(0);
 
     // Only poll logs for background tasks that have an output file
     const lastLine = useBackgroundTaskLastLine(
@@ -176,7 +172,10 @@ function TaskItem({
                 { backgroundColor: `${iconColor}15`, opacity: pressed && onPress ? 0.7 : 1 },
             ]}
         >
-            <View style={styles.taskTopRow}>
+            <View
+                style={styles.taskTopRow}
+                onLayout={(e) => setTopRowWidth(e.nativeEvent.layout.width)}
+            >
                 <Ionicons name={icon} size={14} color={iconColor} />
                 <View style={[styles.toolTagBadge, { backgroundColor: `${iconColor}20` }]}>
                     <Text style={[styles.toolTagText, { color: iconColor }]}>
@@ -220,10 +219,11 @@ function TaskItem({
                     </Pressable>
                 )}
             </View>
-            {lastLine.length > 0 && (
+            {lastLine.length > 0 && topRowWidth > 0 && (
                 <MarqueeText
                     text={lastLine}
                     style={[styles.logLine, { color: theme.colors.textSecondary }]}
+                    maxWidth={topRowWidth}
                 />
             )}
         </Pressable>
