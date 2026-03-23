@@ -97,7 +97,6 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     textAlign: "right",
   },
   sessionRow: {
-    minHeight: 88,
     flexDirection: "column",
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -116,17 +115,17 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   sessionContent: {
     flex: 1,
-    marginLeft: 12,
-    justifyContent: "center",
+    marginLeft: 10,
   },
   sessionTitleRow: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
+    alignItems: "flex-start",
+    height: 38,
   },
   sessionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "500",
+    lineHeight: 19,
     ...Typography.default("semiBold"),
   },
   sessionTitleConnected: {
@@ -135,28 +134,30 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   sessionTitleDisconnected: {
     color: theme.colors.textSecondary,
   },
-  statusRow: {
+  statusMiddleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 2,
+  },
+  statusLeft: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   statusDotContainer: {
     alignItems: "center",
     justifyContent: "center",
-    height: 16,
-    marginTop: 2,
     marginRight: 4,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "500",
-    lineHeight: 16,
+    lineHeight: 14,
     ...Typography.default(),
   },
-  avatarContainer: {
-    position: "relative",
-    width: 44,
-    height: 44,
+  avatarColumn: {
+    alignItems: "center",
+    width: 36,
     marginTop: 2,
   },
   newSessionButton: {
@@ -233,9 +234,8 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   tagsRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
     gap: 6,
-    marginTop: 8,
+    marginTop: 4,
   },
   tag: {
     flexDirection: "row",
@@ -676,18 +676,18 @@ const CompactSessionRow = React.memo(
             }
           }}
         >
+          {/* Top row: avatar + title */}
           <View style={styles.sessionTopRow}>
-            <View style={styles.avatarContainer}>
+            <View style={styles.avatarColumn}>
               <Avatar
                 id={avatarId}
-                size={44}
+                size={36}
                 monochrome={!sessionStatus.isConnected}
                 flavor={session.metadata?.flavor}
                 hasUnreadMessages={hasUnreadMessages}
               />
             </View>
             <View style={styles.sessionContent}>
-              {/* Title line */}
               <View style={styles.sessionTitleRow}>
                 <Text
                   style={[
@@ -751,106 +751,39 @@ const CompactSessionRow = React.memo(
                     </View>
                   );
                 })()}
-
-              {/* Status line with dot */}
-              <View style={styles.statusRow}>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <View style={styles.statusDotContainer}>
-                    <StatusDot
-                      color={sessionStatus.statusDotColor}
-                      isPulsing={sessionStatus.isPulsing}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.statusText,
-                      { color: sessionStatus.statusColor },
-                    ]}
-                  >
-                    {sessionStatus.statusText}
-                  </Text>
-                </View>
-
-                {/* Status indicators on the right side */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                    transform: [{ translateY: 1 }],
-                  }}
-                >
-                  {/* Worktree badge */}
-                  {session.metadata?.worktree?.isWorktree && (
-                    <View style={styles.worktreeBadge}>
-                      <Ionicons
-                        name="git-branch-outline"
-                        size={10}
-                        color={styles.worktreeBadgeText.color}
-                      />
-                      <Text style={styles.worktreeBadgeText} numberOfLines={1}>
-                        {session.metadata.worktree.branchName}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Draft status indicator */}
-                  {session.draft && (
-                    <View style={styles.taskStatusContainer}>
-                      <Ionicons
-                        name="create-outline"
-                        size={10}
-                        color={styles.taskStatusText.color}
-                      />
-                    </View>
-                  )}
-
-                  {/* Usage indicator */}
-                  {session.latestUsage ? (
-                    <View style={styles.taskStatusContainer}>
-                      <Text style={styles.taskStatusText}>
-                        {formatTokenCountShort(
-                          session.latestUsage.totalInputTokens +
-                            session.latestUsage.totalOutputTokens,
-                        )}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {/* Task status indicator */}
-                  {Array.isArray(session.todos) &&
-                    session.todos.length > 0 &&
-                    (() => {
-                      const totalTasks = session.todos.length;
-                      const completedTasks = session.todos.filter(
-                        (t) => t.status === "completed",
-                      ).length;
-
-                      // Don't show if all tasks are completed
-                      if (completedTasks === totalTasks) {
-                        return null;
-                      }
-
-                      return (
-                        <View style={styles.taskStatusContainer}>
-                          <Ionicons
-                            name="bulb-outline"
-                            size={10}
-                            color={styles.taskStatusText.color}
-                            style={{ marginRight: 2 }}
-                          />
-                          <Text style={styles.taskStatusText}>
-                            {completedTasks}/{totalTasks}
-                          </Text>
-                        </View>
-                      );
-                    })()}
-                </View>
-              </View>
             </View>
           </View>
 
-          {/* Tags line - full width at bottom */}
+          {/* Middle row: status + usage (full width) */}
+          <View style={styles.statusMiddleRow}>
+            <View style={styles.statusLeft}>
+              <View style={styles.statusDotContainer}>
+                <StatusDot
+                  color={sessionStatus.statusDotColor}
+                  isPulsing={sessionStatus.isPulsing}
+                  size={6}
+                />
+              </View>
+              <Text
+                style={[
+                  styles.statusText,
+                  { color: sessionStatus.statusColor },
+                ]}
+              >
+                {sessionStatus.statusText}
+              </Text>
+            </View>
+            {session.latestUsage ? (
+              <Text style={styles.taskStatusText}>
+                {formatTokenCountShort(
+                  session.latestUsage.totalInputTokens +
+                    session.latestUsage.totalOutputTokens,
+                )}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Bottom row - tags + indicators */}
           <View style={styles.tagsRow}>
             <View
               style={[
@@ -894,6 +827,52 @@ const CompactSessionRow = React.memo(
                 )}
               </View>
             )}
+            {/* Worktree badge */}
+            {session.metadata?.worktree?.isWorktree && (
+              <View style={styles.worktreeBadge}>
+                <Ionicons
+                  name="git-branch-outline"
+                  size={10}
+                  color={styles.worktreeBadgeText.color}
+                />
+                <Text style={styles.worktreeBadgeText} numberOfLines={1}>
+                  {session.metadata.worktree.branchName}
+                </Text>
+              </View>
+            )}
+            {/* Draft indicator */}
+            {session.draft && (
+              <View style={styles.taskStatusContainer}>
+                <Ionicons
+                  name="create-outline"
+                  size={10}
+                  color={styles.taskStatusText.color}
+                />
+              </View>
+            )}
+            {/* Task status indicator */}
+            {Array.isArray(session.todos) &&
+              session.todos.length > 0 &&
+              (() => {
+                const totalTasks = session.todos.length;
+                const completedTasks = session.todos.filter(
+                  (t) => t.status === "completed",
+                ).length;
+                if (completedTasks === totalTasks) return null;
+                return (
+                  <View style={styles.taskStatusContainer}>
+                    <Ionicons
+                      name="bulb-outline"
+                      size={10}
+                      color={styles.taskStatusText.color}
+                      style={{ marginRight: 2 }}
+                    />
+                    <Text style={styles.taskStatusText}>
+                      {completedTasks}/{totalTasks}
+                    </Text>
+                  </View>
+                );
+              })()}
           </View>
         </Pressable>
       </View>

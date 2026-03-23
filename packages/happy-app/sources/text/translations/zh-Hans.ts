@@ -97,7 +97,7 @@ export const zhHans: TranslationStructure = {
     offline: "离线",
     lastSeen: ({ time }: { time: string }) => `最后活跃时间 ${time}`,
     permissionRequired: "需要权限",
-    needsAttention: "等待你的回复",
+    needsAttention: "等你回复",
     apiRetry: ({
       attempt,
       maxRetries,
