@@ -26,7 +26,12 @@ notFoundCacheCleanupTimer.unref();
 
 function cacheNotFound(key: string): void {
     if (notFoundCache.size >= NOT_FOUND_CACHE_MAX_SIZE) {
-        notFoundCache.clear();
+        // Evict oldest half by timestamp instead of clearing everything
+        const entries = [...notFoundCache.entries()].sort((a, b) => a[1] - b[1]);
+        const evictCount = Math.floor(entries.length / 2);
+        for (let i = 0; i < evictCount; i++) {
+            notFoundCache.delete(entries[i][0]);
+        }
     }
     notFoundCache.set(key, Date.now());
 }
