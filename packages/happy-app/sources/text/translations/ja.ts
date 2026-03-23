@@ -526,6 +526,26 @@ export const ja: TranslationStructure = {
 
   commandPalette: {
     placeholder: "コマンドを入力または検索...",
+    newSession: "新規セッション",
+    newSessionSubtitle: "新しいチャットセッションを開始",
+    viewAllSessions: "すべてのセッションを表示",
+    viewAllSessionsSubtitle: "チャット履歴を閲覧",
+    settings: "設定",
+    settingsSubtitle: "環境設定を変更",
+    account: "アカウント",
+    accountSubtitle: "アカウントを管理",
+    connectDevice: "デバイスを接続",
+    connectDeviceSubtitle: "ウェブ経由で新しいデバイスを接続",
+    switchToSession: "セッションに切り替え",
+    signOut: "サインアウト",
+    signOutSubtitle: "アカウントからサインアウト",
+    developerMenu: "開発者メニュー",
+    developerMenuSubtitle: "開発者ツールにアクセス",
+    categorySessions: "セッション",
+    categoryNavigation: "ナビゲーション",
+    categoryRecentSessions: "最近のセッション",
+    categorySystem: "システム",
+    categoryDeveloper: "開発者",
   },
 
   server: {

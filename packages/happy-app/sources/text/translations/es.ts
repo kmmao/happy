@@ -464,6 +464,26 @@ export const es: TranslationStructure = {
 
   commandPalette: {
     placeholder: "Escriba un comando o busque...",
+    newSession: "Nueva sesión",
+    newSessionSubtitle: "Iniciar una nueva conversación",
+    viewAllSessions: "Ver todas las sesiones",
+    viewAllSessionsSubtitle: "Explorar tu historial de chat",
+    settings: "Ajustes",
+    settingsSubtitle: "Configurar tus preferencias",
+    account: "Cuenta",
+    accountSubtitle: "Gestionar tu cuenta",
+    connectDevice: "Conectar dispositivo",
+    connectDeviceSubtitle: "Conectar un nuevo dispositivo por web",
+    switchToSession: "Cambiar a sesión",
+    signOut: "Cerrar sesión",
+    signOutSubtitle: "Cerrar sesión de tu cuenta",
+    developerMenu: "Menú de desarrollador",
+    developerMenuSubtitle: "Acceder a herramientas de desarrollo",
+    categorySessions: "Sesiones",
+    categoryNavigation: "Navegación",
+    categoryRecentSessions: "Sesiones recientes",
+    categorySystem: "Sistema",
+    categoryDeveloper: "Desarrollador",
   },
 
   server: {

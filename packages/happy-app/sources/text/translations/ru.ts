@@ -639,6 +639,26 @@ export const ru: TranslationStructure = {
 
   commandPalette: {
     placeholder: "Введите команду или поиск...",
+    newSession: "Новая сессия",
+    newSessionSubtitle: "Начать новый чат",
+    viewAllSessions: "Все сессии",
+    viewAllSessionsSubtitle: "Просмотр истории чатов",
+    settings: "Настройки",
+    settingsSubtitle: "Настроить параметры",
+    account: "Аккаунт",
+    accountSubtitle: "Управление аккаунтом",
+    connectDevice: "Подключить устройство",
+    connectDeviceSubtitle: "Подключить новое устройство через веб",
+    switchToSession: "Перейти к сессии",
+    signOut: "Выйти",
+    signOutSubtitle: "Выйти из аккаунта",
+    developerMenu: "Меню разработчика",
+    developerMenuSubtitle: "Доступ к инструментам разработчика",
+    categorySessions: "Сессии",
+    categoryNavigation: "Навигация",
+    categoryRecentSessions: "Недавние сессии",
+    categorySystem: "Система",
+    categoryDeveloper: "Разработчик",
   },
 
   chatFooter: {

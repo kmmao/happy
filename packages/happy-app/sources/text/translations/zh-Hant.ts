@@ -433,6 +433,26 @@ export const zhHant: TranslationStructure = {
 
   commandPalette: {
     placeholder: "輸入命令或搜尋...",
+    newSession: "新建對話",
+    newSessionSubtitle: "開始一個新的聊天對話",
+    viewAllSessions: "查看所有對話",
+    viewAllSessionsSubtitle: "瀏覽你的聊天記錄",
+    settings: "設定",
+    settingsSubtitle: "配置你的偏好",
+    account: "帳戶",
+    accountSubtitle: "管理你的帳戶",
+    connectDevice: "連接裝置",
+    connectDeviceSubtitle: "透過網頁連接新裝置",
+    switchToSession: "切換到對話",
+    signOut: "登出",
+    signOutSubtitle: "登出你的帳戶",
+    developerMenu: "開發者選單",
+    developerMenuSubtitle: "存取開發者工具",
+    categorySessions: "對話",
+    categoryNavigation: "導覽",
+    categoryRecentSessions: "最近的對話",
+    categorySystem: "系統",
+    categoryDeveloper: "開發者",
   },
 
   server: {

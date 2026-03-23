@@ -460,7 +460,27 @@ export const ca: TranslationStructure = {
   },
 
   commandPalette: {
-    placeholder: "Escriu una comanda o cerca...",
+    placeholder: "Escriu una comada o cerca...",
+    newSession: "Nova sessió",
+    newSessionSubtitle: "Inicia una nova conversa",
+    viewAllSessions: "Veure totes les sessions",
+    viewAllSessionsSubtitle: "Explora el teu historial de xat",
+    settings: "Configuració",
+    settingsSubtitle: "Configura les teves preferències",
+    account: "Compte",
+    accountSubtitle: "Gestiona el teu compte",
+    connectDevice: "Connectar dispositiu",
+    connectDeviceSubtitle: "Connecta un nou dispositiu per web",
+    switchToSession: "Canviar a sessió",
+    signOut: "Tancar sessió",
+    signOutSubtitle: "Tancar la sessió del teu compte",
+    developerMenu: "Menú de desenvolupador",
+    developerMenuSubtitle: "Accedir a eines de desenvolupament",
+    categorySessions: "Sessions",
+    categoryNavigation: "Navegació",
+    categoryRecentSessions: "Sessions recents",
+    categorySystem: "Sistema",
+    categoryDeveloper: "Desenvolupador",
   },
 
   server: {
