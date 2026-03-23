@@ -2342,10 +2342,10 @@ function NewSessionWizard() {
                           displayName.includes(search) || host.includes(search)
                         );
                       },
-                      searchPlaceholder: "Type to filter machines...",
-                      recentSectionTitle: "Recent Machines",
-                      favoritesSectionTitle: "Favorite Machines",
-                      noItemsMessage: "No machines available",
+                      searchPlaceholder: t("newSession.machinePicker.searchPlaceholder"),
+                      recentSectionTitle: t("newSession.machinePicker.recentMachines"),
+                      favoritesSectionTitle: t("newSession.machinePicker.favoriteMachines"),
+                      noItemsMessage: t("newSession.machinePicker.noMachinesAvailable"),
                       showFavorites: true,
                       showRecent: true,
                       showSearch: true,
@@ -2477,10 +2477,10 @@ function NewSessionWizard() {
                           .includes(searchText.toLowerCase());
                       },
                       searchPlaceholder:
-                        "Type to filter or enter custom directory...",
-                      recentSectionTitle: "Recent Directories",
-                      favoritesSectionTitle: "Favorite Directories",
-                      noItemsMessage: "No recent directories",
+                        t("newSession.directoryPicker.searchPlaceholder"),
+                      recentSectionTitle: t("newSession.directoryPicker.recentDirectories"),
+                      favoritesSectionTitle: t("newSession.directoryPicker.favoriteDirectories"),
+                      noItemsMessage: t("newSession.directoryPicker.noRecentDirectories"),
                       showFavorites: true,
                       showRecent: true,
                       showSearch: true,

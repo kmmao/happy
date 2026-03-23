@@ -113,7 +113,7 @@ function Restore() {
             <View style={styles.container}>
                 <View style={styles.contentWrapper}>
                     <Text style={styles.instructionText}>
-                        Enter your secret key to restore access to your account.
+                        {t('connect.restoreInstructions')}
                     </Text>
 
                     <TextInput

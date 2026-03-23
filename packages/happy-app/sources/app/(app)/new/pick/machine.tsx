@@ -89,14 +89,14 @@ function MachinePickerScreen() {
                 <Stack.Screen
                     options={{
                         headerShown: true,
-                        headerTitle: 'Select Machine',
+                        headerTitle: t('newSession.machinePicker.title'),
                         headerBackTitle: t('common.back')
                     }}
                 />
                 <View style={styles.container}>
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>
-                            No machines available
+                            {t('newSession.machinePicker.noMachinesAvailable')}
                         </Text>
                     </View>
                 </View>
@@ -154,10 +154,10 @@ function MachinePickerScreen() {
                             const search = searchText.toLowerCase();
                             return displayName.includes(search) || host.includes(search);
                         },
-                        searchPlaceholder: "Type to filter machines...",
-                        recentSectionTitle: "Recent Machines",
-                        favoritesSectionTitle: "Favorite Machines",
-                        noItemsMessage: "No machines available",
+                        searchPlaceholder: t("newSession.machinePicker.searchPlaceholder"),
+                        recentSectionTitle: t("newSession.machinePicker.recentMachines"),
+                        favoritesSectionTitle: t("newSession.machinePicker.favoriteMachines"),
+                        noItemsMessage: t("newSession.machinePicker.noMachinesAvailable"),
                         showFavorites: false,  // Simpler modal experience - no favorites in modal
                         showRecent: true,
                         showSearch: true,

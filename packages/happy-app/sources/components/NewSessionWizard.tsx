@@ -594,12 +594,12 @@ export function NewSessionWizard({
       case "profile":
         return (
           <View>
-            <Text style={styles.stepTitle}>Choose AI Profile</Text>
+            <Text style={styles.stepTitle}>{t("newSession.wizard.chooseProfile")}</Text>
             <Text style={styles.stepDescription}>
-              Select a pre-configured AI profile or set up manually
+              {t("newSession.wizard.chooseProfileDescription")}
             </Text>
 
-            <ItemGroup title="Built-in Profiles">
+            <ItemGroup title={t("newSession.wizard.builtInProfiles")}>
               {builtInProfiles.map((profile) => (
                 <ProfileSelectionItem
                   key={profile.id}
@@ -613,7 +613,7 @@ export function NewSessionWizard({
             </ItemGroup>
 
             {profiles.length > 0 && (
-              <ItemGroup title="Custom Profiles">
+              <ItemGroup title={t("newSession.wizard.customProfiles")}>
                 {profiles.map((profile) => (
                   <ProfileSelectionItem
                     key={profile.id}
@@ -763,15 +763,15 @@ export function NewSessionWizard({
         return (
           <View>
             <Text style={styles.stepTitle}>
-              Configure{" "}
+              {t("newSession.wizard.configureProfile")}{" "}
               {allProfiles.find((p) => p.id === selectedProfileId)?.name ||
                 "Profile"}
             </Text>
             <Text style={styles.stepDescription}>
-              Enter your API keys and configuration details
+              {t("newSession.wizard.configureProfileDescription")}
             </Text>
 
-            <ItemGroup title="Required Configuration">
+            <ItemGroup title={t("newSession.wizard.requiredConfiguration")}>
               {getProfileRequiredFields(selectedProfileId, allProfiles).map((field) => (
                 <View key={field.key} style={{ marginBottom: 16 }}>
                   <Text
@@ -875,13 +875,13 @@ export function NewSessionWizard({
         return (
           <View>
             <Text style={styles.stepTitle}>
-              Choose AI Backend & Session Type
+              {t("newSession.wizard.chooseBackendAndSessionType")}
             </Text>
             <Text style={styles.stepDescription}>
-              Select your AI provider and how you want to work with your code
+              {t("newSession.wizard.chooseBackendDescription")}
             </Text>
 
-            <ItemGroup title="AI Backend">
+            <ItemGroup title={t("newSession.wizard.aiBackend")}>
               {[
                 {
                   id: "anthropic",
@@ -957,9 +957,9 @@ export function NewSessionWizard({
       case "agent":
         return (
           <View>
-            <Text style={styles.stepTitle}>Choose AI Agent</Text>
+            <Text style={styles.stepTitle}>{t("newSession.wizard.chooseAgent")}</Text>
             <Text style={styles.stepDescription}>
-              Select which AI assistant you want to use
+              {t("newSession.wizard.chooseAgentDescription")}
             </Text>
 
             {selectedProfileId && (
@@ -1133,9 +1133,9 @@ export function NewSessionWizard({
       case "options":
         return (
           <View>
-            <Text style={styles.stepTitle}>Agent Options</Text>
+            <Text style={styles.stepTitle}>{t("newSession.wizard.agentOptions")}</Text>
             <Text style={styles.stepDescription}>
-              Configure how the AI agent should behave
+              {t("newSession.wizard.agentOptionsDescription")}
             </Text>
 
             {selectedProfileId && (
@@ -1327,12 +1327,12 @@ export function NewSessionWizard({
       case "machine":
         return (
           <View>
-            <Text style={styles.stepTitle}>Select Machine</Text>
+            <Text style={styles.stepTitle}>{t("newSession.wizard.selectMachine")}</Text>
             <Text style={styles.stepDescription}>
-              Choose which machine to run your session on
+              {t("newSession.wizard.selectMachineDescription")}
             </Text>
 
-            <ItemGroup title="Available Machines">
+            <ItemGroup title={t("newSession.wizard.availableMachines")}>
               {machines.map((machine, index) => (
                 <Item
                   key={machine.id}
@@ -1376,14 +1376,14 @@ export function NewSessionWizard({
       case "path":
         return (
           <View>
-            <Text style={styles.stepTitle}>Working Directory</Text>
+            <Text style={styles.stepTitle}>{t("newSession.wizard.workingDirectory")}</Text>
             <Text style={styles.stepDescription}>
-              Choose the directory to work in
+              {t("newSession.wizard.workingDirectoryDescription")}
             </Text>
 
             {/* Recent Paths */}
             {recentPaths.length > 0 && (
-              <ItemGroup title="Recent Paths">
+              <ItemGroup title={t("newSession.wizard.recentPaths")}>
                 {recentPaths.map((path, index) => (
                   <Item
                     key={path}
@@ -1515,7 +1515,7 @@ export function NewSessionWizard({
                 <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="Enter directory path (e.g. /home/user/my-project)"
+                    placeholder={t("newSession.wizard.enterDirectoryPlaceholder")}
                     placeholderTextColor={theme.colors.textSecondary}
                     value={customPath}
                     onChangeText={setCustomPath}
@@ -1532,9 +1532,9 @@ export function NewSessionWizard({
       case "prompt":
         return (
           <View>
-            <Text style={styles.stepTitle}>Initial Message</Text>
+            <Text style={styles.stepTitle}>{t("newSession.wizard.initialMessage")}</Text>
             <Text style={styles.stepDescription}>
-              Write your first message to the AI agent
+              {t("newSession.wizard.initialMessageDescription")}
             </Text>
 
             <TextInput
