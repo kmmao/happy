@@ -521,6 +521,7 @@ model SupervisorRun {
     @@index([projectId])
     @@index([projectId, status])
     @@index([accountId, status])
+    @@index([projectId, accountId, status])
     @@index([projectId, createdAt(sort: Desc)])
     @@index([loopId])
 }
@@ -566,6 +567,7 @@ model SupervisorAction {
     @@index([projectId, accountId, approval])
     @@index([projectId, category, title, approval])
     @@index([projectId, fixStatus])
+    @@index([projectId, accountId, fixStatus, updatedAt(sort: Desc)])
 }
 
 //
