@@ -160,23 +160,21 @@ export async function dispatchWebhook(
       return { dispatched: false, reason: "pr_no_linked_issues" };
     }
 
-    // Handle PR merge: archive associated sessions
+    // Handle PR merge: archive associated sessions (concurrent)
+    const prMergeResults = await Promise.allSettled(
+      routes.map((route) =>
+        processRoutePRMerge(route, provider, rawBody, headers, deliveryId, prMerge),
+      ),
+    );
+
     let anyDispatched = false;
-    for (const route of routes) {
-      try {
-        const dispatched = await processRoutePRMerge(
-          route,
-          provider,
-          rawBody,
-          headers,
-          deliveryId,
-          prMerge,
-        );
-        if (dispatched) anyDispatched = true;
-      } catch (error) {
+    for (const result of prMergeResults) {
+      if (result.status === "fulfilled" && result.value) {
+        anyDispatched = true;
+      } else if (result.status === "rejected") {
         log(
           { module: "webhook", level: "error" },
-          `Failed to process PR merge for route ${route.id}: ${error}`,
+          `Failed to process PR merge: ${result.reason}`,
         );
       }
     }
@@ -467,73 +465,73 @@ async function processRoutePRMerge(
     return false;
   }
 
-  let anyArchived = false;
+  // 4. Batch-archive all associated sessions in a single DB call
+  const sessionIds = webhookEvents
+    .map((e) => e.sessionId)
+    .filter((id): id is string => id != null);
 
-  // 4. Archive each associated session
+  if (sessionIds.length === 0) return false;
+
+  const now = Date.now();
+
+  try {
+    await db.session.updateMany({
+      where: {
+        id: { in: sessionIds },
+        accountId: route.accountId,
+        active: true,
+      },
+      data: {
+        active: false,
+        lastActiveAt: new Date(now),
+      },
+    });
+  } catch (error) {
+    log(
+      { module: "webhook", level: "error" },
+      `Failed to batch-archive sessions for PR #${prMerge.prNumber}: ${error}`,
+    );
+    return false;
+  }
+
+  // Evict from cache and emit events for each session
   for (const webhookEvent of webhookEvents) {
     if (!webhookEvent.sessionId) continue;
 
-    try {
-      const now = Date.now();
+    activityCache.invalidateSession(webhookEvent.sessionId);
 
-      // Archive the session
-      const updated = await db.session.updateMany({
-        where: {
-          id: webhookEvent.sessionId,
-          accountId: route.accountId,
-          active: true,
-        },
-        data: {
-          active: false,
-          lastActiveAt: new Date(now),
-        },
-      });
+    eventRouter.emitEphemeral({
+      userId: route.accountId,
+      payload: buildSessionActivityEphemeral(
+        webhookEvent.sessionId,
+        false,
+        now,
+        false,
+      ),
+      recipientFilter: { type: "user-scoped-only" },
+    });
 
-      // Evict from cache so heartbeats are immediately rejected
-      activityCache.invalidateSession(webhookEvent.sessionId);
+    eventRouter.emitEphemeral({
+      userId: route.accountId,
+      payload: {
+        type: "webhook-pr-merged",
+        prNumber: prMerge.prNumber,
+        prUrl: prMerge.prUrl,
+        issueNumber: webhookEvent.issueNumber,
+        sessionId: webhookEvent.sessionId,
+        machineId: route.machineId,
+        repoPath: route.repoPath,
+      },
+      recipientFilter: { type: "user-scoped-only" },
+    });
 
-      // Notify App: session is no longer active
-      eventRouter.emitEphemeral({
-        userId: route.accountId,
-        payload: buildSessionActivityEphemeral(
-          webhookEvent.sessionId,
-          false,
-          now,
-          false,
-        ),
-        recipientFilter: { type: "user-scoped-only" },
-      });
-
-      // Notify App: PR was merged, update IssueSessionLink status
-      eventRouter.emitEphemeral({
-        userId: route.accountId,
-        payload: {
-          type: "webhook-pr-merged",
-          prNumber: prMerge.prNumber,
-          prUrl: prMerge.prUrl,
-          issueNumber: webhookEvent.issueNumber,
-          sessionId: webhookEvent.sessionId,
-          machineId: route.machineId,
-          repoPath: route.repoPath,
-        },
-        recipientFilter: { type: "user-scoped-only" },
-      });
-
-      log(
-        { module: "webhook" },
-        `PR #${prMerge.prNumber} merged: archived session ${webhookEvent.sessionId} for issue #${webhookEvent.issueNumber}${updated.count === 0 ? " (already inactive)" : ""}`,
-      );
-
-      anyArchived = true;
-    } catch (error) {
-      log(
-        { module: "webhook", level: "error" },
-        `Failed to archive session ${webhookEvent.sessionId} for PR #${prMerge.prNumber}: ${error}`,
-      );
-    }
+    log(
+      { module: "webhook" },
+      `PR #${prMerge.prNumber} merged: archived session ${webhookEvent.sessionId} for issue #${webhookEvent.issueNumber}`,
+    );
   }
 
-  return anyArchived;
+  return true;
 }
 
 /**
@@ -581,15 +579,14 @@ async function handlePushSupervisorTrigger(
     return { dispatched: false, reason: "no_push_trigger_projects" };
   }
 
-  let anyTriggered = false;
-
-  for (const project of projects) {
-    try {
+  // Process projects concurrently
+  const results = await Promise.allSettled(
+    projects.map(async (project) => {
       // Find a matching route for signature verification
       const route = routes.find(
         (r) => r.accountId === project.accountId,
       );
-      if (!route) continue;
+      if (!route) return false;
 
       // Verify signature
       const secret = decryptString(
@@ -597,7 +594,7 @@ async function handlePushSupervisorTrigger(
         route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
       );
       const valid = verifyWebhookSignature(provider, secret, rawBody, headers);
-      if (!valid) continue;
+      if (!valid) return false;
 
       // Check daily limit
       const limitCheck = await checkDailyRunLimit(project.id);
@@ -606,7 +603,7 @@ async function handlePushSupervisorTrigger(
           { module: "webhook" },
           `Push trigger: daily limit reached for project ${project.id}`,
         );
-        continue;
+        return false;
       }
 
       // Check no active run + create in a single transaction to prevent race conditions
@@ -645,7 +642,7 @@ async function handlePushSupervisorTrigger(
 
         return created;
       });
-      if (!run) continue;
+      if (!run) return false;
 
       // Parse dimensions
       const dimensions = project.supervisorEnabledDimensions
@@ -677,11 +674,18 @@ async function handlePushSupervisorTrigger(
         `Push trigger: started supervisor run ${run.id} for project ${project.id} (${changedFiles.length} files on ${branch})`,
       );
 
+      return true;
+    }),
+  );
+
+  let anyTriggered = false;
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value) {
       anyTriggered = true;
-    } catch (error) {
+    } else if (result.status === "rejected") {
       log(
         { module: "webhook", level: "error" },
-        `Push trigger failed for project ${project.id}: ${error}`,
+        `Push trigger failed: ${result.reason}`,
       );
     }
   }
