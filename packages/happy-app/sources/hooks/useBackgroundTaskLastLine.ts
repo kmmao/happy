@@ -47,6 +47,8 @@ export function useBackgroundTaskLastLine(
         isDead: false,
     });
 
+    const failCountRef = React.useRef(0);
+
     const fetchLastLine = React.useCallback(async () => {
         if (!outputFile) return;
         try {
@@ -55,10 +57,21 @@ export function useBackgroundTaskLastLine(
             });
             const line = stripAnsi(result.stdout ?? "").trim();
             if (line.length > 0) {
+                failCountRef.current = 0;
                 setState({ lastLine: line, isDead: detectExit(line) });
+            } else {
+                // Empty output — file may not exist or be empty; mark dead after 2 attempts
+                failCountRef.current++;
+                if (failCountRef.current >= 2) {
+                    setState((prev) => ({ ...prev, isDead: true }));
+                }
             }
         } catch {
-            // Best effort — ignore failures
+            // Request failed — mark dead after 2 attempts
+            failCountRef.current++;
+            if (failCountRef.current >= 2) {
+                setState((prev) => ({ ...prev, isDead: true }));
+            }
         }
     }, [sessionId, outputFile]);
 
