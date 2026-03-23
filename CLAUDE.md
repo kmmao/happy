@@ -48,7 +48,7 @@ yarn workspace happy-agent test         # Agent: build then vitest run
 
 ## Architecture
 
-See `/docs/` for detailed architecture — key docs: `cli-architecture.md`, `protocol.md`, `encryption.md`, `backend-architecture.md`.
+See `/docs/` for detailed architecture — key docs: `cli-architecture.md`, `protocol.md`, `encryption.md`, `backend-architecture.md`, `api.md`.
 
 System: `Mobile/Web ←→ Server (Fastify+Socket.IO) ←→ CLI Daemon ←→ Claude Code/Codex` with PostgreSQL+Redis+S3. All content E2E encrypted (AES-256-GCM / NaCl secretbox). Data isolation: `~/.happy` (stable) vs `~/.happy-dev` (dev).
 
@@ -97,7 +97,5 @@ System: `Mobile/Web ←→ Server (Fastify+Socket.IO) ←→ CLI Daemon ←→ C
 - Logging to `~/.happy-dev/logs/` or `$HAPPY_HOME_DIR/logs/`
 
 ## Key Documentation
-
-Detailed docs in `/docs/`: `protocol.md`, `encryption.md`, `cli-architecture.md`, `backend-architecture.md`, `api.md`.
 
 Each package has its own `CLAUDE.md` with package-specific rules — read it before working on that package.
