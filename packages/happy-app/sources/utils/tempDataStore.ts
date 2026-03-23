@@ -22,15 +22,32 @@ const tempDataMap = new Map<string, TempDataEntry>();
 const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const MAX_AGE = 10 * 60 * 1000; // 10 minutes
 
-// Auto-cleanup old entries
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of tempDataMap.entries()) {
-        if (now - entry.timestamp > MAX_AGE) {
-            tempDataMap.delete(key);
-        }
+// Auto-cleanup old entries (guard against duplicate timers from hot reload)
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+function startCleanup(): ReturnType<typeof setInterval> {
+    if (cleanupTimer !== null) {
+        clearInterval(cleanupTimer);
     }
-}, CLEANUP_INTERVAL);
+    cleanupTimer = setInterval(() => {
+        const now = Date.now();
+        for (const [key, entry] of tempDataMap.entries()) {
+            if (now - entry.timestamp > MAX_AGE) {
+                tempDataMap.delete(key);
+            }
+        }
+    }, CLEANUP_INTERVAL);
+    return cleanupTimer;
+}
+
+export function stopCleanup(): void {
+    if (cleanupTimer !== null) {
+        clearInterval(cleanupTimer);
+        cleanupTimer = null;
+    }
+}
+
+startCleanup();
 
 /**
  * Store temporary data and return a UUID key
