@@ -1661,6 +1661,7 @@ function NewSessionWizard() {
             style={{
               paddingHorizontal: screenWidth > 700 ? 16 : 8,
               paddingBottom: Math.max(16, safeArea.bottom),
+              zIndex: 3,
             }}
           >
             <View
