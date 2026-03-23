@@ -2,6 +2,7 @@ import { decodeBase64, encodeBase64 } from '@/encryption/base64';
 import { MachineMetadata, MachineMetadataSchema } from '../storageTypes';
 import { EncryptionCache } from './encryptionCache';
 import { Decryptor, Encryptor } from './encryptor';
+import { log } from '@/log';
 
 export class MachineEncryption {
     private machineId: string;
@@ -46,7 +47,7 @@ export class MachineEncryption {
             
             const parsed = MachineMetadataSchema.safeParse(decrypted[0]);
             if (!parsed.success) {
-                console.error('Failed to parse machine metadata:', parsed.error);
+                log.error('Failed to parse machine metadata:', parsed.error);
                 return null;
             }
 
@@ -54,7 +55,7 @@ export class MachineEncryption {
             this.cache.setCachedMachineMetadata(this.machineId, version, parsed.data);
             return parsed.data;
         } catch (error) {
-            console.error('Failed to decrypt machine metadata:', error);
+            log.error('Failed to decrypt machine metadata:', error);
             return null;
         }
     }
@@ -91,7 +92,7 @@ export class MachineEncryption {
             this.cache.setCachedDaemonState(this.machineId, version, result);
             return result;
         } catch (error) {
-            console.error('Failed to decrypt daemon state:', error);
+            log.error('Failed to decrypt daemon state:', error);
             // Cache null result to avoid repeated decryption attempts
             this.cache.setCachedDaemonState(this.machineId, version, null);
             return null;
@@ -115,7 +116,7 @@ export class MachineEncryption {
             const decrypted = await this.encryptor.decrypt([encryptedData]);
             return decrypted[0] || null;
         } catch (error) {
-            console.error('Failed to decrypt raw data:', error);
+            log.error('Failed to decrypt raw data:', error);
             return null;
         }
     }

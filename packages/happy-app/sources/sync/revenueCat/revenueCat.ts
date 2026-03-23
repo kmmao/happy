@@ -16,6 +16,7 @@ import {
     PaywallResult,
     PaywallOptions
 } from './types';
+import { log } from '@/log';
 
 // Map native log levels to our common ones
 const logLevelMap = {
@@ -104,7 +105,7 @@ class RevenueCatNative implements RevenueCatInterface {
                     return PaywallResult.ERROR;
             }
         } catch (error) {
-            console.error('Error presenting paywall:', error);
+            log.error('Error presenting paywall:', error);
             return PaywallResult.ERROR;
         }
     }
@@ -140,7 +141,7 @@ class RevenueCatNative implements RevenueCatInterface {
                     return PaywallResult.ERROR;
             }
         } catch (error) {
-            console.error('Error presenting paywall if needed:', error);
+            log.error('Error presenting paywall if needed:', error);
             return PaywallResult.ERROR;
         }
     }

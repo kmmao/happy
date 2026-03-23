@@ -4,6 +4,7 @@ import { Item } from '@/components/Item';
 import { ItemGroup } from '@/components/ItemGroup';
 import { ItemList } from '@/components/ItemList';
 import { Switch } from '@/components/Switch';
+import { log } from '@/log';
 
 function ListDemoScreen() {
     const [isEnabled, setIsEnabled] = React.useState(false);
@@ -24,7 +25,7 @@ function ListDemoScreen() {
                 />
                 <Item 
                     title="Clickable Item"
-                    onPress={() => console.log('Item pressed')}
+                    onPress={() => log.log('Item pressed')}
                 />
             </ItemGroup>
 
@@ -112,12 +113,12 @@ function ListDemoScreen() {
                 <Item 
                     title="Long Press Me"
                     subtitle="Try long pressing this item"
-                    onLongPress={() => console.log('Long pressed!')}
+                    onLongPress={() => log.log('Long pressed!')}
                 />
                 <Item 
                     title="Press and Long Press"
-                    onPress={() => console.log('Pressed')}
-                    onLongPress={() => console.log('Long pressed')}
+                    onPress={() => log.log('Pressed')}
+                    onLongPress={() => log.log('Long pressed')}
                 />
             </ItemGroup>
         </ItemList>

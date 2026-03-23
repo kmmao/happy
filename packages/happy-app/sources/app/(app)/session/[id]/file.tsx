@@ -18,6 +18,7 @@ import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { FileIcon } from "@/components/FileIcon";
 import { base64ToUtf8 } from "@/utils/stringUtils";
+import { log } from '@/log';
 
 interface FileContent {
   content: string;
@@ -274,7 +275,7 @@ function FileScreen() {
               setDiffContent(diffResponse.stdout ?? "");
             }
           } catch (diffError) {
-            console.log("Could not fetch git diff:", diffError);
+            log.log("Could not fetch git diff:", diffError);
             // Continue with file loading even if diff fails
           }
         }
@@ -307,7 +308,7 @@ function FileScreen() {
               }
             }
           } catch (showError) {
-            console.error("Failed to read file at commit:", showError);
+            log.error("Failed to read file at commit:", showError);
             if (!isCancelled) {
               setError("Failed to read file at commit");
             }
@@ -395,7 +396,7 @@ function FileScreen() {
           }
         }
       } catch (error) {
-        console.error("Failed to load file:", error);
+        log.error("Failed to load file:", error);
         if (!isCancelled) {
           setError("Failed to load file");
         }

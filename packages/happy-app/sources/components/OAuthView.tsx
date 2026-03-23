@@ -11,6 +11,7 @@ import { runOnJS } from 'react-native-worklets';
 import WebView from 'react-native-webview';
 import { t } from '@/text';
 import { Modal } from '@/modal';
+import { log } from '@/log';
 
 const styles = StyleSheet.create((theme) => ({
     container: {
@@ -209,7 +210,7 @@ export const OAuthViewRender = React.memo((props: {
     }, [webViewLoadingOpacity]);
 
     const handleNavigationStateChange = React.useCallback(async (navState: any) => {
-        console.log('handleNavigationStateChange', navState.url);
+        log.log('handleNavigationStateChange', navState.url);
         // Prevent processing the same URL multiple times
         if (isProcessingRef.current) {
             return;
@@ -255,7 +256,7 @@ export const OAuthViewRender = React.memo((props: {
                     );
                 }
             } catch (err: any) {
-                console.error('Token exchange failed:', err);
+                log.error('Token exchange failed:', err);
                 const errorMessage = err.message || t('errors.tokenExchangeFailed');
                 setError(errorMessage);
                 props.config.onError?.(errorMessage);
@@ -282,9 +283,9 @@ export const OAuthViewRender = React.memo((props: {
     }, [props.parameters, props.config]);
 
     const handleWebViewError = React.useCallback((syntheticEvent: any) => {
-        console.log('handleWebViewError', syntheticEvent);
+        log.log('handleWebViewError', syntheticEvent);
         const { nativeEvent } = syntheticEvent;
-        console.error('WebView error:', nativeEvent);
+        log.error('WebView error:', nativeEvent);
 
         // Ignore localhost connection errors (expected)
         if (nativeEvent.url?.includes('localhost')) {

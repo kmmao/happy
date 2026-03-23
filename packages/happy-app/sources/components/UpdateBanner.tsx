@@ -9,6 +9,7 @@ import { useNativeUpdate } from '@/hooks/useNativeUpdate';
 import { useRouter } from 'expo-router';
 import { Linking, Platform } from 'react-native';
 import { t } from '@/text';
+import { log } from '@/log';
 
 export const UpdateBanner = React.memo(() => {
     const { theme } = useUnistyles();
@@ -26,7 +27,7 @@ export const UpdateBanner = React.memo(() => {
                     await Linking.openURL(updateUrl);
                 }
             } catch (error) {
-                console.error('Error opening app store:', error);
+                log.error('Error opening app store:', error);
             }
         };
 

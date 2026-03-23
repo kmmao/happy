@@ -90,7 +90,7 @@ export async function handleNewMessageUpdate(
     // Get encryption
     const encryption = ctx.encryption.getSessionEncryption(body.sid);
     if (!encryption) {
-        console.error(`Session ${body.sid} not found`);
+        log.error(`Session ${body.sid} not found`);
         ctx.fetchSessions();
         return;
     }
@@ -359,7 +359,7 @@ export async function handleUpdateSessionUpdate(
 
     const sessionEncryption = ctx.encryption.getSessionEncryption(body.id);
     if (!sessionEncryption) {
-        console.error(
+        log.error(
             `Session encryption not found for ${body.id} - this should never happen`,
         );
         return;
@@ -508,7 +508,7 @@ export async function handleUpdateAccountUpdate(
 
             const settingsSchemaVersion = parsedSettings.schemaVersion ?? 1;
             if (settingsSchemaVersion > SUPPORTED_SCHEMA_VERSION) {
-                console.warn(
+                log.warn(
                     `⚠️ Received settings schema v${settingsSchemaVersion}, ` +
                     `we support v${SUPPORTED_SCHEMA_VERSION}. Update app for full functionality.`,
                 );
@@ -521,7 +521,7 @@ export async function handleUpdateAccountUpdate(
                 `📋 Settings synced from server (schema v${settingsSchemaVersion}, version ${body.settings.version})`,
             );
         } catch (error) {
-            console.error("❌ Failed to process settings update:", error);
+            log.error("❌ Failed to process settings update:", error);
         }
     }
 }
@@ -552,7 +552,7 @@ export async function handleUpdateMachineUpdate(
 
     const machineEncryption = ctx.encryption.getMachineEncryption(machineId);
     if (!machineEncryption) {
-        console.error(
+        log.error(
             `Machine encryption not found for ${machineId} - cannot decrypt updates`,
         );
         return;
@@ -568,7 +568,7 @@ export async function handleUpdateMachineUpdate(
             updatedMachine.metadata = metadata;
             updatedMachine.metadataVersion = metadataUpdate.version;
         } catch (error) {
-            console.error(
+            log.error(
                 `Failed to decrypt machine metadata for ${machineId}:`,
                 error,
             );
@@ -585,7 +585,7 @@ export async function handleUpdateMachineUpdate(
             updatedMachine.daemonState = daemonState;
             updatedMachine.daemonStateVersion = daemonStateUpdate.version;
         } catch (error) {
-            console.error(
+            log.error(
                 `Failed to decrypt machine daemonState for ${machineId}:`,
                 error,
             );
@@ -634,7 +634,7 @@ export async function handleNewArtifactUpdate(
             body.dataEncryptionKey,
         );
         if (!decryptedKey) {
-            console.error(`Failed to decrypt key for new artifact ${artifactId}`);
+            log.error(`Failed to decrypt key for new artifact ${artifactId}`);
             return;
         }
 
@@ -664,7 +664,7 @@ export async function handleNewArtifactUpdate(
         storage.getState().addArtifact(decryptedArtifact);
         log.log(`📦 Added new artifact ${artifactId} to storage`);
     } catch (error) {
-        console.error(`Failed to process new artifact ${artifactId}:`, error);
+        log.error(`Failed to process new artifact ${artifactId}:`, error);
     }
 }
 
@@ -681,7 +681,7 @@ export async function handleUpdateArtifactUpdate(
 
     const existingArtifact = storage.getState().artifacts[artifactId];
     if (!existingArtifact) {
-        console.error(`Artifact ${artifactId} not found in storage`);
+        log.error(`Artifact ${artifactId} not found in storage`);
         ctx.artifactsSync.invalidate();
         return;
     }
@@ -689,7 +689,7 @@ export async function handleUpdateArtifactUpdate(
     try {
         let dataEncryptionKey = ctx.artifactDataKeys.get(artifactId);
         if (!dataEncryptionKey) {
-            console.error(
+            log.error(
                 `Encryption key not found for artifact ${artifactId}, fetching artifacts`,
             );
             ctx.artifactsSync.invalidate();
@@ -725,7 +725,7 @@ export async function handleUpdateArtifactUpdate(
         storage.getState().updateArtifact(updatedArtifact);
         log.log(`📦 Updated artifact ${artifactId} in storage`);
     } catch (error) {
-        console.error(
+        log.error(
             `Failed to process artifact update ${artifactId}:`,
             error,
         );

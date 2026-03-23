@@ -374,7 +374,7 @@ class Sync {
         void issueRecoverMissingPRUrls();
       })
       .catch((error) => {
-        console.error("Failed to load initial data:", error);
+        log.error("Failed to load initial data:", error);
       });
   }
 
@@ -635,14 +635,14 @@ class Sync {
     const encryption = this.encryption.getSessionEncryption(sessionId);
     if (!encryption) {
       // Should never happen
-      console.error(`Session ${sessionId} not found`);
+      log.error(`Session ${sessionId} not found`);
       return;
     }
 
     // Get session data from storage
     const session = storage.getState().sessions[sessionId];
     if (!session) {
-      console.error(`Session ${sessionId} not found in storage`);
+      log.error(`Session ${sessionId} not found in storage`);
       return;
     }
 
@@ -889,7 +889,7 @@ class Sync {
           const profile = await getUserProfile(this.credentials!, id);
           return { id, profile }; // profile is null if 404
         } catch (error) {
-          console.error(`Failed to fetch user ${id}:`, error);
+          log.error(`Failed to fetch user ${id}:`, error);
           return { id, profile: null }; // Treat errors as 404
         }
       }),
@@ -953,7 +953,7 @@ class Sync {
           session.dataEncryptionKey,
         );
         if (!decrypted) {
-          console.error(
+          log.error(
             `Failed to decrypt data encryption key for session ${session.id}`,
           );
           continue;
@@ -975,7 +975,7 @@ class Sync {
         session.id,
       );
       if (!sessionEncryption) {
-        console.error(
+        log.error(
           `Session encryption not found for ${session.id} - this should never happen`,
         );
         continue;
@@ -1355,7 +1355,7 @@ class Sync {
     });
 
     if (!response.ok) {
-      console.error(`Failed to fetch machines: ${response.status}`);
+      log.error(`Failed to fetch machines: ${response.status}`);
       return;
     }
 
@@ -1385,7 +1385,7 @@ class Sync {
           machine.dataEncryptionKey,
         );
         if (!decryptedKey) {
-          console.error(
+          log.error(
             `Failed to decrypt data encryption key for machine ${machine.id}`,
           );
           continue;
@@ -1409,7 +1409,7 @@ class Sync {
         machine.id,
       );
       if (!machineEncryption) {
-        console.error(
+        log.error(
           `Machine encryption not found for ${machine.id} - this should never happen`,
         );
         continue;
@@ -1444,7 +1444,7 @@ class Sync {
           daemonStateVersion: machine.daemonStateVersion || 0,
         });
       } catch (error) {
-        console.error(`Failed to decrypt machine ${machine.id}:`, error);
+        log.error(`Failed to decrypt machine ${machine.id}:`, error);
         // Still add the machine with null metadata
         decryptedMachines.push({
           id: machine.id,
@@ -1479,7 +1479,7 @@ class Sync {
         `👥 fetchFriends completed - processed ${friendsList.length} friends`,
       );
     } catch (error) {
-      console.error("Failed to fetch friends:", error);
+      log.error("Failed to fetch friends:", error);
       // Silently handle error - UI will show appropriate state
     }
   };
@@ -1579,7 +1579,7 @@ class Sync {
         `📰 fetchFeed completed - loaded ${compatibleItems.length} compatible items (${allItems.length - compatibleItems.length} filtered)`,
       );
     } catch (error) {
-      console.error("Failed to fetch feed:", error);
+      log.error("Failed to fetch feed:", error);
     }
   };
 
@@ -1837,7 +1837,7 @@ class Sync {
       // Apply to storage (storage handles the transformation)
       storage.getState().applyPurchases(customerInfo);
     } catch (error) {
-      console.error("Failed to sync purchases:", error);
+      log.error("Failed to sync purchases:", error);
       // Don't throw - purchases are optional
     }
   };
@@ -2676,7 +2676,7 @@ export const sync = new Sync();
 let isInitialized = false;
 export async function syncCreate(credentials: AuthCredentials) {
   if (isInitialized) {
-    console.warn("Sync already initialized: ignoring");
+    log.warn("Sync already initialized: ignoring");
     return;
   }
   isInitialized = true;
@@ -2685,7 +2685,7 @@ export async function syncCreate(credentials: AuthCredentials) {
 
 export async function syncRestore(credentials: AuthCredentials) {
   if (isInitialized) {
-    console.warn("Sync already initialized: ignoring");
+    log.warn("Sync already initialized: ignoring");
     return;
   }
   isInitialized = true;

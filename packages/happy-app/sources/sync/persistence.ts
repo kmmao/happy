@@ -15,6 +15,7 @@ import { Purchases, purchasesDefaults, purchasesParse } from "./purchases";
 import { Profile, profileDefaults, profileParse } from "./profile";
 import type { PermissionModeKey } from "@/components/PermissionModeSelector";
 import { clearAllMessageCaches } from "./messageCache";
+import { log } from '@/log';
 
 const mmkv = new MMKV();
 const NEW_SESSION_DRAFT_KEY = "new-session-draft-v1";
@@ -42,7 +43,7 @@ export function loadSettings(): { settings: Settings; version: number | null } {
         version: parsed.version,
       };
     } catch (e) {
-      console.error("Failed to parse settings", e);
+      log.error("Failed to parse settings", e);
       return { settings: { ...settingsDefaults }, version: null };
     }
   }
@@ -60,7 +61,7 @@ export function loadPendingSettings(): Partial<Settings> {
       const parsed = JSON.parse(pending);
       return SettingsSchema.partial().parse(parsed);
     } catch (e) {
-      console.error("Failed to parse pending settings", e);
+      log.error("Failed to parse pending settings", e);
       return {};
     }
   }
@@ -78,7 +79,7 @@ export function loadLocalSettings(): LocalSettings {
       const parsed = JSON.parse(localSettings);
       return localSettingsParse(parsed);
     } catch (e) {
-      console.error("Failed to parse local settings", e);
+      log.error("Failed to parse local settings", e);
       return { ...localSettingsDefaults };
     }
   }
@@ -97,7 +98,7 @@ export function loadThemePreference(): "light" | "dark" | "adaptive" {
       const settings = localSettingsParse(parsed);
       return settings.themePreference;
     } catch (e) {
-      console.error("Failed to parse local settings for theme preference", e);
+      log.error("Failed to parse local settings for theme preference", e);
       return localSettingsDefaults.themePreference;
     }
   }
@@ -111,7 +112,7 @@ export function loadPurchases(): Purchases {
       const parsed = JSON.parse(purchases);
       return purchasesParse(parsed);
     } catch (e) {
-      console.error("Failed to parse purchases", e);
+      log.error("Failed to parse purchases", e);
       return { ...purchasesDefaults };
     }
   }
@@ -128,7 +129,7 @@ export function loadSessionDrafts(): Record<string, string> {
     try {
       return JSON.parse(drafts);
     } catch (e) {
-      console.error("Failed to parse session drafts", e);
+      log.error("Failed to parse session drafts", e);
       return {};
     }
   }
@@ -180,7 +181,7 @@ export function loadNewSessionDraft(): NewSessionDraft | null {
       updatedAt,
     };
   } catch (e) {
-    console.error("Failed to parse new session draft", e);
+    log.error("Failed to parse new session draft", e);
     return null;
   }
 }
@@ -199,7 +200,7 @@ export function loadSessionPermissionModes(): Record<string, string> {
     try {
       return JSON.parse(modes);
     } catch (e) {
-      console.error("Failed to parse session permission modes", e);
+      log.error("Failed to parse session permission modes", e);
       return {};
     }
   }
@@ -216,7 +217,7 @@ export function loadSessionModelModes(): Record<string, string> {
     try {
       return JSON.parse(modes);
     } catch (e) {
-      console.error("Failed to parse session model modes", e);
+      log.error("Failed to parse session model modes", e);
       return {};
     }
   }
@@ -246,7 +247,7 @@ export function loadSessionLastViewed(): Record<string, number> {
       }
       return result;
     } catch (e) {
-      console.error("Failed to parse session last viewed timestamps", e);
+      log.error("Failed to parse session last viewed timestamps", e);
       return {};
     }
   }
@@ -271,7 +272,7 @@ export function loadSessionSdkSettings(): Record<string, SessionSdkSettings> {
     try {
       return JSON.parse(data);
     } catch (e) {
-      console.error("Failed to parse session SDK settings", e);
+      log.error("Failed to parse session SDK settings", e);
       return {};
     }
   }
@@ -290,7 +291,7 @@ export function loadSessionNeedsAttention(): Record<string, boolean> {
     try {
       return JSON.parse(data);
     } catch (e) {
-      console.error("Failed to parse session needs attention", e);
+      log.error("Failed to parse session needs attention", e);
       return {};
     }
   }
@@ -311,7 +312,7 @@ export function loadSessionModelMappings(): Record<
     try {
       return JSON.parse(data);
     } catch (e) {
-      console.error("Failed to parse session model mappings", e);
+      log.error("Failed to parse session model mappings", e);
       return {};
     }
   }
@@ -337,7 +338,7 @@ export function loadSessionCustomModels(): Record<string, CustomModelEntry> {
     try {
       return JSON.parse(data);
     } catch (e) {
-      console.error("Failed to parse session custom models", e);
+      log.error("Failed to parse session custom models", e);
       return {};
     }
   }
@@ -359,7 +360,7 @@ export function loadSessionProfiles(): Record<string, SessionProfileEntry> {
     try {
       return JSON.parse(data);
     } catch (e) {
-      console.error("Failed to parse session profiles", e);
+      log.error("Failed to parse session profiles", e);
       return {};
     }
   }
@@ -379,7 +380,7 @@ export function loadProfile(): Profile {
       const parsed = JSON.parse(profile);
       return profileParse(parsed);
     } catch (e) {
-      console.error("Failed to parse profile", e);
+      log.error("Failed to parse profile", e);
       return { ...profileDefaults };
     }
   }
@@ -410,7 +411,7 @@ export function loadSessionBookmarks(sessionId: string): BookmarkItem[] {
         );
       }
     } catch (e) {
-      console.error("Failed to parse session bookmarks", e);
+      log.error("Failed to parse session bookmarks", e);
     }
   }
   return [];
@@ -513,7 +514,7 @@ export function loadResearchPrefs(projectId: string): ResearchPrefs | null {
         };
       }
     } catch (e) {
-      console.error("Failed to parse research prefs", e);
+      log.error("Failed to parse research prefs", e);
     }
   }
   // Migrate from old dimensions-only key

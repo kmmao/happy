@@ -89,6 +89,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUnistyles } from "react-native-unistyles";
 import { Message } from "@/sync/typesMessage";
+import { log } from '@/log';
 
 const FILE_EDIT_TOOLS = new Set(["Edit", "edit", "MultiEdit", "Write"]);
 
@@ -696,7 +697,7 @@ function SessionViewInner({
         await startRealtimeSession(sessionId);
         tracking?.capture("voice_session_started", { sessionId });
       } catch (error) {
-        console.error("Failed to start realtime session:", error);
+        log.error("Failed to start realtime session:", error);
         Modal.alert(t("common.error"), t("errors.voiceSessionFailed"));
         tracking?.capture("voice_session_error", {
           error: error instanceof Error ? error.message : "Unknown error",

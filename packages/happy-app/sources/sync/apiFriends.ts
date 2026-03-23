@@ -10,6 +10,7 @@ import {
     FriendsResponseSchema,
     UsersSearchResponseSchema
 } from './friendTypes';
+import { log } from '@/log';
 
 /**
  * Search for users by username (returns multiple results)
@@ -41,7 +42,7 @@ export async function searchUsersByUsername(
         const data = await response.json();
         const parsed = UsersSearchResponseSchema.safeParse(data);
         if (!parsed.success) {
-            console.error('Failed to parse search response:', parsed.error);
+            log.error('Failed to parse search response:', parsed.error);
             return [];
         }
         
@@ -79,7 +80,7 @@ export async function getUserProfile(
         const data = await response.json();
         const parsed = UserResponseSchema.safeParse(data);
         if (!parsed.success) {
-            console.error('Failed to parse user response:', parsed.error);
+            log.error('Failed to parse user response:', parsed.error);
             return null;
         }
 
@@ -133,7 +134,7 @@ export async function sendFriendRequest(
         const data = await response.json();
         const parsed = UserResponseSchema.safeParse(data);
         if (!parsed.success) {
-            console.error('Failed to parse add friend response:', parsed.error);
+            log.error('Failed to parse add friend response:', parsed.error);
             return null;
         }
 
@@ -170,7 +171,7 @@ export async function getFriendsList(
         const data = await response.json();
         const parsed = FriendsResponseSchema.safeParse(data);
         if (!parsed.success) {
-            console.error('Failed to parse friends list:', parsed.error);
+            log.error('Failed to parse friends list:', parsed.error);
             return [];
         }
 
@@ -207,7 +208,7 @@ export async function removeFriend(
         const data = await response.json();
         const parsed = UserResponseSchema.safeParse(data);
         if (!parsed.success) {
-            console.error('Failed to parse remove friend response:', parsed.error);
+            log.error('Failed to parse remove friend response:', parsed.error);
             return null;
         }
 

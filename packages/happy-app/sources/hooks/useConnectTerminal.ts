@@ -9,6 +9,7 @@ import { useCheckScannerPermissions } from '@/hooks/useCheckCameraPermissions';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { sync } from '@/sync/sync';
+import { log } from '@/log';
 
 interface UseConnectTerminalOptions {
     onSuccess?: () => void;
@@ -45,7 +46,7 @@ export function useConnectTerminal(options?: UseConnectTerminalOptions) {
             ]);
             return true;
         } catch (e) {
-            console.error(e);
+            log.error(e);
             Modal.alert(t('common.error'), t('modals.failedToConnectTerminal'), [{ text: t('common.ok') }]);
             options?.onError?.(e);
             return false;

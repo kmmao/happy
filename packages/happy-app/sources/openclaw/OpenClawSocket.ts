@@ -21,6 +21,7 @@ import {
   signPayload,
   getPublicKeyBase64Url,
 } from "./deviceIdentity";
+import { log } from '@/log';
 
 const PROTOCOL_VERSION = 3;
 
@@ -272,12 +273,12 @@ class OpenClawSocketClass {
     this.connectSent = false;
 
     const url = this.config.url;
-    if (__DEV__) console.log(`[OpenClaw] Connecting to: ${url}`);
+    if (__DEV__) log.log(`[OpenClaw] Connecting to: ${url}`);
 
     try {
       this.ws = new WebSocket(url);
     } catch (err) {
-      if (__DEV__) console.error("[OpenClaw] WebSocket create failed:", err);
+      if (__DEV__) log.error("[OpenClaw] WebSocket create failed:", err);
       this.updateStatus("error", "Failed to create connection");
       this.scheduleReconnect();
       return;
@@ -285,7 +286,7 @@ class OpenClawSocketClass {
 
     this.ws.onopen = () => {
       if (__DEV__)
-        console.log("[OpenClaw] WebSocket opened, waiting for challenge...");
+        log.log("[OpenClaw] WebSocket opened, waiting for challenge...");
     };
 
     this.ws.onmessage = (event) => {
@@ -301,7 +302,7 @@ class OpenClawSocketClass {
     };
 
     this.ws.onerror = (event) => {
-      if (__DEV__) console.error("[OpenClaw] WebSocket error:", event);
+      if (__DEV__) log.error("[OpenClaw] WebSocket error:", event);
       if (this.status === "connecting") {
         this.updateStatus("error", "Connection failed");
       }
@@ -309,7 +310,7 @@ class OpenClawSocketClass {
 
     this.ws.onclose = (event) => {
       if (__DEV__)
-        console.log(
+        log.log(
           `[OpenClaw] WebSocket closed: code=${event.code} reason=${event.reason}`,
         );
       this.failAllPending(new Error("Connection closed"));
@@ -322,14 +323,14 @@ class OpenClawSocketClass {
   private async sendConnect() {
     if (!this.ws || !this.config || this.connectSent) return;
     this.connectSent = true;
-    if (__DEV__) console.log("[OpenClaw] sendConnect() started");
+    if (__DEV__) log.log("[OpenClaw] sendConnect() started");
 
     try {
       // Load device identity (creates one if doesn't exist)
       const identity = await loadOrCreateDeviceIdentity();
       this.deviceId = identity.deviceId;
       if (__DEV__)
-        console.log(
+        log.log(
           `[OpenClaw] Device ID: ${identity.deviceId.slice(0, 16)}...`,
         );
 
@@ -417,12 +418,12 @@ class OpenClawSocketClass {
         });
       });
 
-      if (__DEV__) console.log("[OpenClaw] Sending connect request...");
+      if (__DEV__) log.log("[OpenClaw] Sending connect request...");
       this.ws.send(JSON.stringify(frame));
 
       const result = await resultPromise;
       if (__DEV__)
-        console.log(
+        log.log(
           "[OpenClaw] Connect response received:",
           JSON.stringify(result).slice(0, 200),
         );
@@ -441,9 +442,9 @@ class OpenClawSocketClass {
       this.serverHost = result.server?.host ?? null;
       this.updateStatus("connected");
       if (__DEV__)
-        console.log(`[OpenClaw] Connected! Server: ${this.serverHost}`);
+        log.log(`[OpenClaw] Connected! Server: ${this.serverHost}`);
     } catch (error) {
-      if (__DEV__) console.error("[OpenClaw] Connect failed:", error);
+      if (__DEV__) log.error("[OpenClaw] Connect failed:", error);
       // Check if pairing is required
       const errorMsg = error instanceof Error ? error.message : "";
       if (errorMsg.includes("NOT_PAIRED")) {
@@ -472,12 +473,12 @@ class OpenClawSocketClass {
       frame = JSON.parse(data);
     } catch {
       if (__DEV__)
-        console.error("[OpenClaw] Invalid JSON:", data.slice(0, 100));
+        log.error("[OpenClaw] Invalid JSON:", data.slice(0, 100));
       return;
     }
 
     if (__DEV__)
-      console.log(
+      log.log(
         `[OpenClaw] Frame: type=${frame.type} ${frame.type === "event" ? `event=${frame.event}` : `id=${frame.id} ok=${"ok" in frame ? frame.ok : "n/a"}`}`,
       );
 
@@ -491,7 +492,7 @@ class OpenClawSocketClass {
         } else {
           const err = frame.error;
           if (__DEV__)
-            console.error(
+            log.error(
               `[OpenClaw] Request error: ${err?.code} ${err?.message}`,
             );
           pending.reject(

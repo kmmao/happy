@@ -1,6 +1,7 @@
 import { Platform, Alert } from "react-native";
 import { t } from "@/text";
 import { AlertButton, ModalConfig, CustomModalConfig, IModal } from "./types";
+import { log } from '@/log';
 
 class ModalManagerClass implements IModal {
   private showModalFn: ((config: Omit<ModalConfig, "id">) => string) | null =
@@ -29,7 +30,7 @@ class ModalManagerClass implements IModal {
     if (Platform.OS === "web") {
       // Show custom web modal
       if (!this.showModalFn) {
-        console.error(
+        log.error(
           "ModalManager not initialized. Make sure ModalProvider is mounted.",
         );
         return;
@@ -59,7 +60,7 @@ class ModalManagerClass implements IModal {
     if (Platform.OS === "web") {
       // Show custom web modal
       if (!this.showModalFn) {
-        console.error(
+        log.error(
           "ModalManager not initialized. Make sure ModalProvider is mounted.",
         );
         return false;
@@ -119,7 +120,7 @@ class ModalManagerClass implements IModal {
 
   show(config: Omit<CustomModalConfig, "id" | "type">): string {
     if (!this.showModalFn) {
-      console.error(
+      log.error(
         "ModalManager not initialized. Make sure ModalProvider is mounted.",
       );
       return "";
@@ -133,7 +134,7 @@ class ModalManagerClass implements IModal {
 
   hide(id: string): void {
     if (!this.hideModalFn) {
-      console.error(
+      log.error(
         "ModalManager not initialized. Make sure ModalProvider is mounted.",
       );
       return;
@@ -144,7 +145,7 @@ class ModalManagerClass implements IModal {
 
   hideAll(): void {
     if (!this.hideAllModalsFn) {
-      console.error(
+      log.error(
         "ModalManager not initialized. Make sure ModalProvider is mounted.",
       );
       return;
@@ -206,7 +207,7 @@ class ModalManagerClass implements IModal {
     } else {
       // Use custom modal for web and Android
       if (!this.showModalFn) {
-        console.error(
+        log.error(
           "ModalManager not initialized. Make sure ModalProvider is mounted.",
         );
         return null;

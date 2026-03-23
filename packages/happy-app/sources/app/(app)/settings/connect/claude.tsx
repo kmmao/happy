@@ -12,6 +12,7 @@ import { View } from 'react-native';
 import { Text } from '@/components/StyledText';
 import { StyleSheet } from 'react-native-unistyles';
 import { Platform } from 'react-native';
+import { log } from '@/log';
 
 function ClaudeOAuth() {
     // const router = useRouter();
@@ -37,7 +38,7 @@ function ClaudeOAuth() {
     //             ]
     //         );
     //     } catch (error) {
-    //         console.error('Failed to connect Claude account:', error);
+    //         log.error('Failed to connect Claude account:', error);
     //         Modal.alert(
     //             t('common.error'),
     //             t('errors.connectServiceFailed', { service: 'Claude' })

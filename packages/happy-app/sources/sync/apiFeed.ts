@@ -41,7 +41,7 @@ export async function fetchFeed(
         const parsed = FeedResponseSchema.safeParse(data);
         
         if (!parsed.success) {
-            console.error('Failed to parse feed response:', parsed.error);
+            log.error('Failed to parse feed response:', parsed.error);
             throw new Error('Invalid feed response format');
         }
 

@@ -11,6 +11,7 @@ import { ja } from './translations/ja';
 import * as Localization from 'expo-localization';
 import { loadSettings } from '@/sync/persistence';
 import { type SupportedLanguage, SUPPORTED_LANGUAGES, SUPPORTED_LANGUAGE_CODES, DEFAULT_LANGUAGE } from './_all';
+import { log } from '@/log';
 
 /**
  * Extract all possible dot-notation keys from the nested translation object
@@ -172,7 +173,7 @@ export function t<K extends TranslationKey>(
         for (const k of keys) {
             value = value[k];
             if (value === undefined) {
-                console.warn(`Translation missing: ${key}`);
+                log.warn(`Translation missing: ${key}`);
                 return key;
             }
         }
@@ -189,10 +190,10 @@ export function t<K extends TranslationKey>(
         }
 
         // Fallback for unexpected types
-        console.warn(`Invalid translation value type for key: ${key}`);
+        log.warn(`Invalid translation value type for key: ${key}`);
         return key;
     } catch (error) {
-        console.error(`Translation error for key: ${key}`, error);
+        log.error(`Translation error for key: ${key}`, error);
         return key;
     }
 }

@@ -24,6 +24,7 @@ import {
   extractEnvVarReferences,
 } from "@/hooks/useEnvironmentVariables";
 import { EnvironmentVariablesList } from "@/components/EnvironmentVariablesList";
+import { log } from '@/log';
 
 export interface ProfileEditFormProps {
   profile: AIBackendProfile;
@@ -227,7 +228,7 @@ export function ProfileEditForm({
                       await Linking.openURL(url);
                     }
                   } catch (error) {
-                    console.error("Failed to open URL:", error);
+                    log.error("Failed to open URL:", error);
                   }
                 }}
                 style={{

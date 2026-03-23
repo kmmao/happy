@@ -12,6 +12,7 @@ import { sync } from '@/sync/sync';
 import { deleteArtifact } from '@/sync/apiArtifacts';
 import { storage } from '@/sync/storage';
 import { MarkdownView } from '@/components/markdown/MarkdownView';
+import { log } from '@/log';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -105,7 +106,7 @@ function ArtifactDetailScreen() {
                 }
             } catch (err) {
                 if (!cancelled) {
-                    console.error('Failed to load artifact:', err);
+                    log.error('Failed to load artifact:', err);
                     setError(t('artifacts.error'));
                 }
             } finally {
@@ -150,7 +151,7 @@ function ArtifactDetailScreen() {
             // Navigate back
             router.back();
         } catch (err) {
-            console.error('Failed to delete artifact:', err);
+            log.error('Failed to delete artifact:', err);
             Modal.alert(
                 t('common.error'),
                 'Failed to delete artifact'

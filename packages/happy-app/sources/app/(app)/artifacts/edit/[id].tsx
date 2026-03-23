@@ -10,6 +10,7 @@ import { sync } from '@/sync/sync';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useArtifact } from '@/sync/storage';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { log } from '@/log';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -121,7 +122,7 @@ function EditArtifactScreen() {
                     setBody(artifact.body || '');
                 }
             } catch (err) {
-                console.error('Failed to load artifact for editing:', err);
+                log.error('Failed to load artifact for editing:', err);
             } finally {
                 if (!cancelled) {
                     setIsLoading(false);
@@ -168,7 +169,7 @@ function EditArtifactScreen() {
             // Navigate back
             router.back();
         } catch (err) {
-            console.error('Failed to update artifact:', err);
+            log.error('Failed to update artifact:', err);
             await Modal.alert(
                 t('common.error'),
                 t('artifacts.updateError')

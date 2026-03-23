@@ -18,6 +18,7 @@ import {
 import { Switch } from "@/components/Switch";
 import { useUnistyles } from "react-native-unistyles";
 import { setLastViewedVersion, getLatestVersion } from "@/changelog";
+import { log } from '@/log';
 
 function DevScreen() {
   const router = useRouter();
@@ -63,7 +64,7 @@ function DevScreen() {
       { confirmText: "Clear", destructive: true },
     );
     if (confirmed) {
-      console.log("Cache cleared");
+      log.log("Cache cleared");
       Modal.alert("Success", "Cache has been cleared");
     }
   };
@@ -329,7 +330,7 @@ function DevScreen() {
               { confirmText: "Reset", destructive: true },
             );
             if (confirmed) {
-              console.log("App state reset");
+              log.log("App state reset");
             }
           }}
         />

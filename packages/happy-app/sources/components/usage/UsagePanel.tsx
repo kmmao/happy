@@ -142,6 +142,7 @@ const styles = StyleSheet.create((theme) => ({
 
 // Re-export for backward compatibility — canonical source is modelModeOptions.ts
 import { formatModelName } from "@/components/modelModeOptions";
+import { log } from '@/log';
 
 const TOKEN_TYPE_LABELS: Record<string, string> = {
   input: "Input",
@@ -197,7 +198,7 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
       setUsageData(response.usage || []);
       setTotals(calculateTotals(response.usage || []));
     } catch (err) {
-      console.error("Failed to load usage data:", err);
+      log.error("Failed to load usage data:", err);
       if (err instanceof HappyError) {
         setError(err.message);
       } else {

@@ -14,6 +14,7 @@ import { trackAccountCreated, trackAccountRestored } from "@/track";
 import { HomeHeaderNotAuth } from "@/components/HomeHeader";
 import { MainView } from "@/components/MainView";
 import { t } from "@/text";
+import { log } from '@/log';
 
 function Home() {
   const auth = useAuth();
@@ -43,7 +44,7 @@ function NotAuthenticated() {
         trackAccountCreated();
       }
     } catch (error) {
-      console.error("Error creating account", error);
+      log.error("Error creating account", error);
     }
   };
 

@@ -9,6 +9,7 @@ import { sync } from '@/sync/sync';
 import { Typography } from '@/constants/Typography';
 import { Ionicons } from '@expo/vector-icons';
 import { Modal } from '@/modal';
+import { log } from '@/log';
 
 function PurchasesDevScreen() {
     // Get purchases directly from storage
@@ -41,7 +42,7 @@ function PurchasesDevScreen() {
                 Modal.alert('Purchase Failed', result.error || 'Unknown error');
             }
         } catch (e) {
-            console.error('Error purchasing product', e);
+            log.error('Error purchasing product', e);
         } finally {
             setIsPurchasing(false);
         }
@@ -55,23 +56,23 @@ function PurchasesDevScreen() {
                 setOfferings(result.offerings);
 
                 // Log full offerings data
-                console.log('=== RevenueCat Offerings ===');
-                console.log('Current offering:', result.offerings.current?.identifier || 'None');
+                log.log('=== RevenueCat Offerings ===');
+                log.log('Current offering:', result.offerings.current?.identifier || 'None');
 
                 if (result.offerings.current) {
-                    console.log('\nCurrent Offering Packages:');
+                    log.log('\nCurrent Offering Packages:');
                     Object.entries(result.offerings.current.availablePackages || {}).forEach(([key, pkg]: [string, any]) => {
-                        console.log(`  - ${key}: ${pkg.product.identifier} (${pkg.product.priceString})`);
+                        log.log(`  - ${key}: ${pkg.product.identifier} (${pkg.product.priceString})`);
                     });
                 }
 
-                console.log('\nAll Offerings:');
+                log.log('\nAll Offerings:');
                 Object.entries(result.offerings.all || {}).forEach(([id, offering]: [string, any]) => {
-                    console.log(`  - ${id} (${Object.keys(offering.availablePackages || {}).length} packages)`);
+                    log.log(`  - ${id} (${Object.keys(offering.availablePackages || {}).length} packages)`);
                 });
 
-                console.log('\nFull JSON:', JSON.stringify(result.offerings, null, 2));
-                console.log('===========================');
+                log.log('\nFull JSON:', JSON.stringify(result.offerings, null, 2));
+                log.log('===========================');
             } else {
                 Modal.alert('Error', result.error || 'Failed to fetch offerings');
             }

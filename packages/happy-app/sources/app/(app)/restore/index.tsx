@@ -12,6 +12,7 @@ import { Modal } from '@/modal';
 import { t } from '@/text';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { QRCode } from '@/components/qr/QRCode';
+import { log } from '@/log';
 
 const stylesheet = StyleSheet.create((theme) => ({
     scrollView: {
@@ -115,7 +116,7 @@ function Restore() {
 
             } catch (error) {
                 if (!isCancelledRef.current) {
-                    console.error('QR Auth error:', error);
+                    log.error('QR Auth error:', error);
                     Modal.alert(t('common.error'), t('errors.authenticationFailed'));
                 }
             } finally {

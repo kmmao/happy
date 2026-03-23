@@ -6,6 +6,7 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
+import { log } from '@/log';
 
 /**
  * Escape HTML special characters to prevent XSS when interpolating
@@ -40,7 +41,7 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
       await Clipboard.setStringAsync(props.content);
       Modal.toast(t("markdown.mermaidCopied"));
     } catch (error) {
-      console.error("Failed to copy mermaid source:", error);
+      log.error("Failed to copy mermaid source:", error);
       Modal.alert(t("common.error"), t("markdown.copyFailed"), [
         { text: t("common.ok"), style: "cancel" },
       ]);
@@ -98,7 +99,7 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
           }
         } catch (error) {
           if (isMounted) {
-            console.warn(
+            log.warn(
               `[Mermaid] ${t("markdown.mermaidRenderFailed")}: ${error instanceof Error ? error.message : String(error)}`,
             );
             setHasError(true);

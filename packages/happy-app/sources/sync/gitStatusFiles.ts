@@ -10,6 +10,7 @@ import {
   getCurrentBranchV2,
 } from "./git-parsers/parseStatusV2";
 import { parseNumStat, createDiffStatsMap } from "./git-parsers/parseDiff";
+import { log } from '@/log';
 
 const MAX_SUBMODULES = 20;
 
@@ -109,7 +110,7 @@ export async function getGitStatusFiles(
 
     return mainResult;
   } catch (error) {
-    console.error(
+    log.error(
       "Error fetching git status files for session",
       sessionId,
       ":",
@@ -200,7 +201,7 @@ async function fetchSubmoduleFiles(
       totalUnstaged: parsed.totalUnstaged,
     };
   } catch (error) {
-    console.warn(
+    log.warn(
       `Failed to fetch submodule files for ${submodulePath}:`,
       error instanceof Error ? error.message : String(error),
     );
@@ -335,7 +336,7 @@ function parseGitStatusFilesV2(
     // Skip directory entries since we're using --untracked-files=all
     // This is a fallback in case git still reports directories
     if (isDirectory) {
-      console.warn(`Unexpected directory in untracked files: ${untrackedPath}`);
+      log.warn(`Unexpected directory in untracked files: ${untrackedPath}`);
       continue;
     }
 

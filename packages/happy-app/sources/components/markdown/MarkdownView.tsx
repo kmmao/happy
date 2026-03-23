@@ -19,6 +19,7 @@ import { useAppendToInput } from "@/hooks/useInputContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
 import { ShimmerOverlay } from "../ShimmerOverlay";
+import { log } from '@/log';
 
 // Option type for callback
 export type Option = {
@@ -46,7 +47,7 @@ export const MarkdownView = React.memo(
         const textId = storeTempText(props.markdown);
         router.push(`/text-selection?textId=${textId}`);
       } catch (error) {
-        console.error("Error storing text for selection:", error);
+        log.error("Error storing text for selection:", error);
         Modal.alert(
           "Error",
           "Failed to open text selection. Please try again.",
@@ -257,7 +258,7 @@ function RenderCodeBlock(props: {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch (error) {
-      console.error("Failed to copy code:", error);
+      log.error("Failed to copy code:", error);
     }
   }, [props.content]);
 

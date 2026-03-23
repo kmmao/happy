@@ -16,6 +16,7 @@ import { AIBackendProfile } from "@/sync/settings";
 import { layout } from "@/components/layout";
 import { callbacks } from "../index";
 import { peekTempData } from "@/utils/tempDataStore";
+import { log } from '@/log';
 
 function ProfileEditScreen() {
   const { theme } = useUnistyles();
@@ -34,7 +35,7 @@ function ProfileEditScreen() {
       if (data) {
         return data;
       }
-      console.error(
+      log.error(
         "[ProfileEdit] Failed to retrieve profile from tempDataStore, key:",
         params.profileKey,
       );

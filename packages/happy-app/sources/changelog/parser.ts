@@ -1,5 +1,6 @@
 import { ChangelogEntry, LocalizedChangelogData } from "./types";
 import { getCurrentLanguage } from "@/text";
+import { log } from '@/log';
 
 const DEFAULT_LOCALE = "en";
 
@@ -11,7 +12,7 @@ function loadChangelogData(): LocalizedChangelogData {
         try {
             changelogData = require("./changelog.json") as LocalizedChangelogData;
         } catch (error) {
-            console.warn("Changelog data not found, returning empty changelog");
+            log.warn("Changelog data not found, returning empty changelog");
             changelogData = { entries: {}, latestVersion: "", availableLocales: [] };
         }
     }

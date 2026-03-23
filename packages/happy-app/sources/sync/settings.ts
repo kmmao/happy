@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { log } from '@/log';
 
 //
 // Configuration Profile Schema (for environment variable profiles)
@@ -722,7 +723,7 @@ export function settingsParse(settings: unknown): Settings {
 
   // Migration: Convert old 'zh' language code to 'zh-Hans'
   if (parsed.data.preferredLanguage === "zh") {
-    console.log(
+    log.log(
       '[Settings Migration] Converting language code from "zh" to "zh-Hans"',
     );
     parsed.data.preferredLanguage = "zh-Hans";

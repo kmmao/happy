@@ -3,6 +3,7 @@ import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { Typography } from '@/constants/Typography';
 import { Item } from '@/components/Item';
 import { ItemGroup } from '@/components/ItemGroup';
+import { log } from '@/log';
 
 const TextSample = ({ title, style, text = "The quick brown fox jumps over the lazy dog" }: { title: string; style: any; text?: string }) => (
     <View style={styles.sampleContainer}>
@@ -15,7 +16,7 @@ const CodeSample = ({ title, style }: { title: string; style: any }) => (
     <View style={styles.sampleContainer}>
         <Text style={styles.sampleTitle}>{title}</Text>
         <Text style={[{ fontSize: 14 }, style]}>
-            {`const greeting = "Hello, World!";\nconsole.log(greeting);`}
+            {`const greeting = "Hello, World!";\nlog.log(greeting);`}
         </Text>
     </View>
 );

@@ -15,6 +15,7 @@ import {
   uploadImage,
   type MultiImageUploadResult,
 } from "@/utils/imageUpload.shared";
+import { log } from '@/log';
 
 export { MAX_IMAGES } from "@/utils/imageUpload.shared";
 export type { MultiImageUploadResult } from "@/utils/imageUpload.shared";
@@ -129,7 +130,7 @@ export async function pickAndUploadImages(
   let failedCount = 0;
   for (const r of encodeResults) {
     if (r.status === "rejected") {
-      console.warn(
+      log.warn(
         "Image encode failed:",
         r.reason instanceof Error ? r.reason.message : r.reason,
       );
@@ -141,7 +142,7 @@ export async function pickAndUploadImages(
       paths.push(path);
       displayUris.push(r.value.displayUri);
     } catch (err) {
-      console.warn(
+      log.warn(
         "Image upload failed:",
         err instanceof Error ? err.message : err,
       );

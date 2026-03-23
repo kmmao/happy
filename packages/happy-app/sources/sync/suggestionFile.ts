@@ -6,6 +6,7 @@
 import Fuse from 'fuse.js';
 import { sessionRipgrep } from './ops';
 import { AsyncLock } from '@/utils/lock';
+import { log } from '@/log';
 
 export interface FileItem {
     fileName: string;
@@ -85,7 +86,7 @@ class FileSearchCache {
                 return;
             }
 
-            console.log(`FileSearchCache: Refreshing file cache for session ${sessionId}...`);
+            log.log(`FileSearchCache: Refreshing file cache for session ${sessionId}...`);
 
             // Use ripgrep to get all files in the project
             const response = await sessionRipgrep(
@@ -95,8 +96,8 @@ class FileSearchCache {
             );
 
             if (!response.success || !response.stdout) {
-                console.error('FileSearchCache: Failed to fetch files', response.error);
-                console.log(response);
+                log.error('FileSearchCache: Failed to fetch files', response.error);
+                log.log(response);
                 return;
             }
 
@@ -150,7 +151,7 @@ class FileSearchCache {
             cache.lastRefresh = Date.now();
             this.initializeFuse(cache);
 
-            console.log(`FileSearchCache: Cached ${cache.files.length} files and directories for session ${sessionId}`);
+            log.log(`FileSearchCache: Cached ${cache.files.length} files and directories for session ${sessionId}`);
         });
     }
 

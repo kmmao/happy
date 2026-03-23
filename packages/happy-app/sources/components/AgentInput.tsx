@@ -50,6 +50,7 @@ import { getContextWarning, ContextProgressBar } from "./ContextProgressBar";
 import { ImagePickButton } from "./ImagePickButton";
 import { GitStatusButton } from "./GitStatusButton";
 import { AgentInputSettingsOverlay } from "./AgentInputSettingsOverlay";
+import { log } from '@/log';
 
 export type {
   ReasoningProps,
@@ -283,7 +284,7 @@ export const AgentInput = React.memo(
       } catch (error) {
         // Shake on error
         shakerRef.current?.shake();
-        console.error("Abort RPC call failed:", error);
+        log.error("Abort RPC call failed:", error);
       } finally {
         setIsAborting(false);
       }

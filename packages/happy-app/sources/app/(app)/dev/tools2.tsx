@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { ToolView } from '@/components/tools/ToolView';
+import { log } from '@/log';
 import { ItemGroup } from '@/components/ItemGroup';
 import { Item } from '@/components/Item';
 
@@ -24,6 +25,7 @@ function Tools2Screen() {
             description: null,
             result: `import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { log } from '@/log';
 
 export const Header = ({ title }) => {
     return (
@@ -369,7 +371,7 @@ export function formatTime(date: Date): string {
                 <ToolView 
                     tool={example} 
                     metadata={null}
-                    onPress={() => console.log(`Pressed tool: ${key}`)}
+                    onPress={() => log.log(`Pressed tool: ${key}`)}
                 />
             </View>
         );

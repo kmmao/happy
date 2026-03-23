@@ -13,6 +13,7 @@ import '@/encryption/deriveKey.appspec';
 import '@/sync/encryption/encryptor.appspec';
 import '@/encryption/aes.appspec';
 import '@/encryption/base64.appspec';
+import { log } from '@/log';
 
 interface TestRunState {
     running: boolean;
@@ -32,7 +33,7 @@ function TestsScreen() {
             const results = await testRunner.runAll();
             setState({ running: false, results });
         } catch (error) {
-            console.error('Error running tests:', error);
+            log.error('Error running tests:', error);
             setState({ running: false, results: [] });
         }
     };
@@ -52,7 +53,7 @@ function TestsScreen() {
                 }));
             }
         } catch (error) {
-            console.error('Error running test suite:', error);
+            log.error('Error running test suite:', error);
             setState(prev => ({ ...prev, running: false }));
         }
     };

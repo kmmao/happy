@@ -3,25 +3,36 @@
  * Does NOT write to console to keep browser/device console clean.
  * Keeps last 5k records in memory with change notifications for UI updates.
  */
+
+function formatArgs(args: unknown[]): string {
+    return args
+        .map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
+        .join(' ');
+}
+
 class Logger {
     private logs: string[] = [];
     private maxLogs = 5000;
     private listeners: Array<() => void> = [];
 
-    /**
-     * Log a message - stores in internal array only (no console output)
-     */
-    log(message: string): void {
-        // Add to internal array
-        this.logs.push(message);
-
-        // Maintain 5k limit with circular buffer
+    private push(entry: string): void {
+        this.logs.push(entry);
         if (this.logs.length > this.maxLogs) {
             this.logs.shift();
         }
+        this.listeners.forEach((listener) => listener());
+    }
 
-        // Notify listeners for real-time updates
-        this.listeners.forEach(listener => listener());
+    log(...args: unknown[]): void {
+        this.push(formatArgs(args));
+    }
+
+    error(...args: unknown[]): void {
+        this.push(`[ERROR] ${formatArgs(args)}`);
+    }
+
+    warn(...args: unknown[]): void {
+        this.push(`[WARN] ${formatArgs(args)}`);
     }
 
     /**

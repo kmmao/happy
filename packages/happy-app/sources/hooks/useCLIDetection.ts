@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { machineBash } from '@/sync/ops';
+import { log } from '@/log';
 
 interface CLIAvailability {
     claude: boolean | null; // null = unknown/loading, true = installed, false = not installed
@@ -52,7 +53,7 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
         const detectCLIs = async () => {
             // Set detecting flag (non-blocking - UI stays responsive)
             setAvailability(prev => ({ ...prev, isDetecting: true }));
-            console.log('[useCLIDetection] Starting detection for machineId:', machineId);
+            log.log('[useCLIDetection] Starting detection for machineId:', machineId);
 
             try {
                 // Use single bash command to check both CLIs efficiently
@@ -66,7 +67,7 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
                 );
 
                 if (cancelled) return;
-                console.log('[useCLIDetection] Result:', { success: result.success, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr });
+                log.log('[useCLIDetection] Result:', { success: result.success, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr });
 
                 if (result.success && result.exitCode === 0) {
                     // Parse output: "claude:true\ncodex:false\ngemini:false"
@@ -80,7 +81,7 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
                         }
                     });
 
-                    console.log('[useCLIDetection] Parsed CLI status:', cliStatus);
+                    log.log('[useCLIDetection] Parsed CLI status:', cliStatus);
                     setAvailability({
                         claude: cliStatus.claude ?? null,
                         codex: cliStatus.codex ?? null,
@@ -90,7 +91,7 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
                     });
                 } else {
                     // Detection command failed - CONSERVATIVE fallback (don't assume availability)
-                    console.log('[useCLIDetection] Detection failed (success=false or exitCode!=0):', result);
+                    log.log('[useCLIDetection] Detection failed (success=false or exitCode!=0):', result);
                     setAvailability({
                         claude: null,
                         codex: null,
@@ -104,7 +105,7 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
                 if (cancelled) return;
 
                 // Network/RPC error - CONSERVATIVE fallback (don't assume availability)
-                console.log('[useCLIDetection] Network/RPC error:', error);
+                log.log('[useCLIDetection] Network/RPC error:', error);
                 setAvailability({
                     claude: null,
                     codex: null,

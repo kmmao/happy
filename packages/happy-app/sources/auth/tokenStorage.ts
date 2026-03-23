@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { log } from '@/log';
 
 const AUTH_KEY = 'auth_credentials';
 
@@ -22,7 +23,7 @@ export const TokenStorage = {
             credentialsCache = stored; // Update cache
             return JSON.parse(stored) as AuthCredentials;
         } catch (error) {
-            console.error('Error getting credentials:', error);
+            log.error('Error getting credentials:', error);
             return null;
         }
     },
@@ -38,7 +39,7 @@ export const TokenStorage = {
             credentialsCache = json; // Update cache
             return true;
         } catch (error) {
-            console.error('Error setting credentials:', error);
+            log.error('Error setting credentials:', error);
             return false;
         }
     },
@@ -53,7 +54,7 @@ export const TokenStorage = {
             credentialsCache = null; // Clear cache
             return true;
         } catch (error) {
-            console.error('Error removing credentials:', error);
+            log.error('Error removing credentials:', error);
             return false;
         }
     },

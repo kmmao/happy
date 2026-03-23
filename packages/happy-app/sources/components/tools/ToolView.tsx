@@ -28,6 +28,7 @@ import { Modal } from "@/modal/ModalManager";
 import { sessionAllow } from "@/sync/ops";
 import { useToolReview } from "./useToolReview";
 import { PermissionFooter } from "./PermissionFooter";
+import { log } from '@/log';
 
 interface ToolViewProps {
   metadata: Metadata | null;
@@ -320,7 +321,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     parseToolUseError(tool.result).isToolUseError
   ) {
     isToolUseError = true;
-    console.log("isToolUseError", tool.result);
+    log.log("isToolUseError", tool.result);
   }
 
   // Check permission status first for denied/canceled states

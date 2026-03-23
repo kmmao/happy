@@ -8,6 +8,7 @@ import { authAccountApprove } from '@/auth/authAccountApprove';
 import { useCheckScannerPermissions } from '@/hooks/useCheckCameraPermissions';
 import { Modal } from '@/modal';
 import { t } from '@/text';
+import { log } from '@/log';
 
 interface UseConnectAccountOptions {
     onSuccess?: () => void;
@@ -40,7 +41,7 @@ export function useConnectAccount(options?: UseConnectAccountOptions) {
             ]);
             return true;
         } catch (e) {
-            console.error(e);
+            log.error(e);
             Modal.alert(t('common.error'), t('modals.failedToLinkDevice'), [{ text: t('common.ok') }]);
             options?.onError?.(e);
             return false;

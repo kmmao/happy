@@ -36,6 +36,7 @@ import { monkeyPatchConsoleForRemoteLoggingForFasterAiAutoDebuggingOnlyInLocalBu
 import { useUnistyles } from "react-native-unistyles";
 import { AsyncLock } from "@/utils/lock";
 import { useNotificationNavigation } from "@/hooks/useNotificationNavigation";
+import { log } from '@/log';
 
 // Configure notification handler for foreground notifications
 Notifications.setNotificationHandler({
@@ -137,7 +138,7 @@ async function loadFonts() {
       });
     } else {
       // For Tauri, skip Font Face Observer as fonts are loaded via CSS
-      console.log("Do not wait for fonts to load");
+      log.log("Do not wait for fonts to load");
       (async () => {
         try {
           await Fonts.loadAsync({
@@ -206,7 +207,7 @@ export default function RootLayout() {
 
         setInitState({ credentials });
       } catch (error) {
-        console.error("Error initializing:", error);
+        log.error("Error initializing:", error);
       }
     })();
   }, []);

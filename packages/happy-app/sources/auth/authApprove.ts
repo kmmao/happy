@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { encodeBase64 } from "../encryption/base64";
 import { getServerUrl } from "@/sync/serverConfig";
+import { log } from '@/log';
 
 interface AuthRequestStatus {
     status: 'not_found' | 'pending' | 'authorized';
@@ -27,13 +28,13 @@ export async function authApprove(token: string, publicKey: Uint8Array, answerV1
     // Handle different status cases
     if (status === 'not_found') {
         // Already authorized, no need to approve again
-        console.log('Auth request already authorized or not found');
+        log.log('Auth request already authorized or not found');
         return;
     }
     
     if (status === 'authorized') {
         // Already authorized, no need to approve again
-        console.log('Auth request already authorized');
+        log.log('Auth request already authorized');
         return;
     }
     

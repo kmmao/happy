@@ -16,6 +16,7 @@ import { Modal } from '@/modal';
 import { t } from '@/text';
 import { trackFriendsConnect } from '@/track';
 import { Ionicons } from '@expo/vector-icons';
+import { log } from '@/log';
 
 function UserProfileScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,7 +36,7 @@ function UserProfileScreen() {
                 const profile = await getUserProfile(credentials, id);
                 setUserProfile(profile);
             } catch (error) {
-                console.error('Failed to load user profile:', error);
+                log.error('Failed to load user profile:', error);
                 await Modal.alert(t('errors.failedToLoadProfile'), '', [
                     {
                         text: t('common.ok'),

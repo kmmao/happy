@@ -2,6 +2,7 @@ import { decodeBase64, encodeBase64 } from '@/encryption/base64';
 import { ArtifactHeader, ArtifactBody } from '../artifactTypes';
 import { AES256Encryption } from './encryptor';
 import * as Random from 'expo-crypto';
+import { log } from '@/log';
 
 export class ArtifactEncryption {
     private encryptor: AES256Encryption;
@@ -44,7 +45,7 @@ export class ArtifactEncryption {
                 title: typeof header.title === 'string' ? header.title : null
             };
         } catch (error) {
-            console.error('Failed to decrypt artifact header:', error);
+            log.error('Failed to decrypt artifact header:', error);
             return null;
         }
     }
@@ -76,7 +77,7 @@ export class ArtifactEncryption {
                 body: typeof body.body === 'string' ? body.body : null
             };
         } catch (error) {
-            console.error('Failed to decrypt artifact body:', error);
+            log.error('Failed to decrypt artifact body:', error);
             return null;
         }
     }

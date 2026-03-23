@@ -26,6 +26,7 @@ import {
   createProjectKey,
   SubmoduleInfo,
 } from "./projectManager";
+import { log } from '@/log';
 
 const MAX_SUBMODULES = 20;
 const SUBMODULE_PATHS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -236,7 +237,7 @@ export class GitStatusSync {
       ]);
 
       if (!statusResult.success) {
-        console.error("Failed to get git status:", statusResult.error);
+        log.error("Failed to get git status:", statusResult.error);
         return;
       }
 
@@ -271,7 +272,7 @@ export class GitStatusSync {
         );
       }
     } catch (error) {
-      console.error(
+      log.error(
         "Error fetching git status for session",
         sessionId,
         ":",
@@ -323,7 +324,7 @@ export class GitStatusSync {
 
       projectManager.updateProjectSubmodules(projectKey, submodules);
     } catch (error) {
-      console.error("Error fetching submodule statuses:", error);
+      log.error("Error fetching submodule statuses:", error);
     }
   }
 
@@ -368,7 +369,7 @@ export class GitStatusSync {
 
       projectManager.updateProjectSubmodules(projectKey, submodules);
     } catch (error) {
-      console.error("Error fetching child git repo statuses:", error);
+      log.error("Error fetching child git repo statuses:", error);
     }
   }
 

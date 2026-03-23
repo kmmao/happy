@@ -46,7 +46,7 @@ export async function fetchArtifactsList(ctx: ArtifactContext): Promise<void> {
                     artifact.dataEncryptionKey,
                 );
                 if (!decryptedKey) {
-                    console.error(`Failed to decrypt key for artifact ${artifact.id}`);
+                    log.error(`Failed to decrypt key for artifact ${artifact.id}`);
                     continue;
                 }
 
@@ -75,7 +75,7 @@ export async function fetchArtifactsList(ctx: ArtifactContext): Promise<void> {
                     isDecrypted: !!header,
                 });
             } catch (err) {
-                console.error(`Failed to decrypt artifact ${artifact.id}:`, err);
+                log.error(`Failed to decrypt artifact ${artifact.id}:`, err);
                 decryptedArtifacts.push({
                     id: artifact.id,
                     title: null,
@@ -96,7 +96,7 @@ export async function fetchArtifactsList(ctx: ArtifactContext): Promise<void> {
         log.log("📦 fetchArtifactsList: Artifacts applied to storage");
     } catch (error) {
         log.log(`📦 fetchArtifactsList: Error fetching artifacts: ${error}`);
-        console.error("Failed to fetch artifacts:", error);
+        log.error("Failed to fetch artifacts:", error);
         throw error;
     }
 }
@@ -115,7 +115,7 @@ export async function fetchArtifactWithBody(
             artifact.dataEncryptionKey,
         );
         if (!decryptedKey) {
-            console.error(`Failed to decrypt key for artifact ${artifactId}`);
+            log.error(`Failed to decrypt key for artifact ${artifactId}`);
             return null;
         }
 
@@ -142,7 +142,7 @@ export async function fetchArtifactWithBody(
             isDecrypted: !!header,
         };
     } catch (error) {
-        console.error(`Failed to fetch artifact ${artifactId}:`, error);
+        log.error(`Failed to fetch artifact ${artifactId}:`, error);
         return null;
     }
 }
@@ -203,7 +203,7 @@ export async function createArtifactAction(
 
         return artifactId;
     } catch (error) {
-        console.error("Failed to create artifact:", error);
+        log.error("Failed to create artifact:", error);
         throw error;
     }
 }
@@ -313,7 +313,7 @@ export async function updateArtifactAction(
 
         storage.getState().updateArtifact(updatedArtifact);
     } catch (error) {
-        console.error("Failed to update artifact:", error);
+        log.error("Failed to update artifact:", error);
         throw error;
     }
 }

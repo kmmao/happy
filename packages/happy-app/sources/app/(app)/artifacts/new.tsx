@@ -10,6 +10,7 @@ import { sync } from '@/sync/sync';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { log } from '@/log';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -103,7 +104,7 @@ function NewArtifactScreen() {
             // Navigate to the new artifact
             router.replace(`/artifacts/${artifactId}`);
         } catch (err) {
-            console.error('Failed to create artifact:', err);
+            log.error('Failed to create artifact:', err);
             await Modal.alert(
                 t('common.error'),
                 t('artifacts.createError')

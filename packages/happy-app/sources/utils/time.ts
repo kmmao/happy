@@ -1,3 +1,4 @@
+import { log } from '@/log';
 export async function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -49,4 +50,4 @@ export function createBackoff(
     };
 }
 
-export let backoff = createBackoff({ onError: (e) => { console.warn(e); } });
+export let backoff = createBackoff({ onError: (e) => { log.warn(e); } });

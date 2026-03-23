@@ -18,6 +18,7 @@ import {
     PaywallResult,
     PaywallOptions
 } from './types';
+import { log } from '@/log';
 
 class RevenueCatWeb implements RevenueCatInterface {
     private purchases: Purchases | null = null;
@@ -117,7 +118,7 @@ class RevenueCatWeb implements RevenueCatInterface {
     setLogLevel(level: LogLevel): void {
         // Web SDK doesn't support log levels
         // This is a no-op on web
-        console.log(`RevenueCat log level set to ${LogLevel[level]} (not supported on web)`);
+        log.log(`RevenueCat log level set to ${LogLevel[level]} (not supported on web)`);
     }
 
     async presentPaywall(options?: PaywallOptions): Promise<PaywallResult> {
@@ -133,7 +134,7 @@ class RevenueCatWeb implements RevenueCatInterface {
             const offering = options?.offering || offerings.current;
             
             if (!offering || offering.availablePackages.length === 0) {
-                console.error('No offerings available');
+                log.error('No offerings available');
                 return PaywallResult.ERROR;
             }
 
@@ -149,11 +150,11 @@ class RevenueCatWeb implements RevenueCatInterface {
                 if (purchaseError.message?.includes('cancelled') || purchaseError.code === 'UserCancelled') {
                     return PaywallResult.CANCELLED;
                 }
-                console.error('Purchase failed:', purchaseError);
+                log.error('Purchase failed:', purchaseError);
                 return PaywallResult.ERROR;
             }
         } catch (error) {
-            console.error('Error presenting paywall on web:', error);
+            log.error('Error presenting paywall on web:', error);
             return PaywallResult.ERROR;
         }
     }
@@ -172,7 +173,7 @@ class RevenueCatWeb implements RevenueCatInterface {
             // User doesn't have entitlement, present paywall
             return this.presentPaywall(options);
         } catch (error) {
-            console.error('Error checking entitlement:', error);
+            log.error('Error checking entitlement:', error);
             return PaywallResult.ERROR;
         }
     }
@@ -215,7 +216,7 @@ class RevenueCatWeb implements RevenueCatInterface {
                 .map(pkg => {
                     const product = pkg.webBillingProduct;
                     if (!product) {
-                        console.error('Package has no product:', pkg);
+                        log.error('Package has no product:', pkg);
                         return null;
                     }
                     return {

@@ -11,6 +11,7 @@ import { trackFriendsConnect } from '@/track';
 import { ItemList } from '@/components/ItemList';
 import { ItemGroup } from '@/components/ItemGroup';
 import { useSearch } from '@/hooks/useSearch';
+import { log } from '@/log';
 
 function SearchFriendsScreen() {
     const { credentials } = useAuth();
@@ -37,12 +38,12 @@ function SearchFriendsScreen() {
 
             if (updatedProfile) {
                 trackFriendsConnect();
-                console.log(t('friends.requestSent'));
+                log.log(t('friends.requestSent'));
             } else {
                 await Modal.alert(t('friends.bothMustHaveGithub'));
             }
         } catch (error: any) {
-            console.error('Failed to send friend request:', error);
+            log.error('Failed to send friend request:', error);
             if (error.message?.includes('yourself')) {
                 await Modal.alert(t('friends.cannotAddYourself'));
             } else {

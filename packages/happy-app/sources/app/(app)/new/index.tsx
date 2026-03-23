@@ -94,6 +94,7 @@ import {
   getRecentPathForMachine,
 } from "./newSessionHelpers";
 import { CLIWarningBanner } from "./CLIWarningBanner";
+import { log } from '@/log';
 
 // Simple temporary state for passing selections back from picker screens
 let onMachineSelected: (machineId: string) => void = () => {};
@@ -537,7 +538,7 @@ function NewSessionWizard() {
               ? "gemini"
               : "claude"; // Fallback to claude (will fail at spawn with clear error)
 
-      console.warn(
+      log.warn(
         `[AgentSelection] ${agentType} not available, switching to ${availableAgent}`,
       );
       setAgentType(availableAgent);
@@ -885,7 +886,7 @@ function NewSessionWizard() {
               scrollViewRef.current?.scrollTo({ y: y - 20, animated: true });
             },
             () => {
-              console.warn("measureLayout failed");
+              log.warn("measureLayout failed");
             },
           );
         }
@@ -1373,7 +1374,7 @@ function NewSessionWizard() {
         throw new Error("Session spawning failed - no session ID returned.");
       }
     } catch (error) {
-      console.error("Failed to start session", error);
+      log.error("Failed to start session", error);
       let errorMessage = t("newSession.failedToStart");
       if (error instanceof Error) {
         if (error.message.includes("timeout")) {

@@ -15,6 +15,7 @@ import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { log } from '@/log';
 
 export interface ItemProps {
   title: string;
@@ -166,7 +167,7 @@ export const Item = React.memo<ItemProps>((props) => {
       await Clipboard.setStringAsync(textToCopy);
       Modal.toast(t("items.copiedToClipboard", { label: title }));
     } catch (error) {
-      console.error("Failed to copy:", error);
+      log.error("Failed to copy:", error);
     }
   }, [copy, isWeb, title, subtitle, detail]);
 

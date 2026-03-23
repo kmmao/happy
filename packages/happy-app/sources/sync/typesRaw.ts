@@ -1,6 +1,7 @@
 import * as z from "zod";
 import { isCuid } from "@paralleldrive/cuid2";
 import { MessageMetaSchema, MessageMeta } from "./typesMessageMeta";
+import { log } from '@/log';
 
 //
 // Raw types
@@ -1193,10 +1194,10 @@ export function normalizeRawMessage(
   // Zod transform handles normalization during validation
   let parsed = rawRecordSchema.safeParse(raw);
   if (!parsed.success) {
-    console.error("=== VALIDATION ERROR ===");
-    console.error("Zod issues:", JSON.stringify(parsed.error.issues, null, 2));
-    console.error("Raw message:", JSON.stringify(raw, null, 2));
-    console.error("=== END ERROR ===");
+    log.error("=== VALIDATION ERROR ===");
+    log.error("Zod issues:", JSON.stringify(parsed.error.issues, null, 2));
+    log.error("Raw message:", JSON.stringify(raw, null, 2));
+    log.error("=== END ERROR ===");
     return null;
   }
   raw = parsed.data;

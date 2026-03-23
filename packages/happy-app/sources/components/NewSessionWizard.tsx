@@ -36,6 +36,7 @@ import {
   getProfileRequiredFields,
   BUILT_IN_PROFILES,
 } from "./NewSessionWizardHelpers";
+import { log } from '@/log';
 
 export function NewSessionWizard({
   onComplete,
@@ -176,7 +177,7 @@ export function NewSessionWizard({
         profileSyncService
           .setActiveProfile(selectedProfileId)
           .catch((error) => {
-            console.error(
+            log.error(
               "[Wizard] Failed to sync active profile to CLI:",
               error,
             );
@@ -191,7 +192,7 @@ export function NewSessionWizard({
       try {
         await profileSyncService.bidirectionalSync(allProfiles);
       } catch (error) {
-        console.error("[Wizard] Failed to sync profiles with CLI:", error);
+        log.error("[Wizard] Failed to sync profiles with CLI:", error);
         // Continue without sync - profiles work locally
       }
     };
@@ -202,7 +203,7 @@ export function NewSessionWizard({
     // Set up sync listener for profile changes
     const handleSyncEvent = (event: any) => {
       if (event.status === "error") {
-        console.warn("[Wizard] Profile sync error:", event.error);
+        log.warn("[Wizard] Profile sync error:", event.error);
       }
     };
 
@@ -356,7 +357,7 @@ export function NewSessionWizard({
 
         // Sync with CLI
         profileSyncService.syncGuiToCli(updatedProfiles).catch((error) => {
-          console.error("[Wizard] Failed to sync new profile with CLI:", error);
+          log.error("[Wizard] Failed to sync new profile with CLI:", error);
         });
 
         // Auto-select the newly created profile
@@ -398,7 +399,7 @@ export function NewSessionWizard({
 
         // Sync with CLI
         profileSyncService.syncGuiToCli(updatedProfiles).catch((error) => {
-          console.error(
+          log.error(
             "[Wizard] Failed to sync duplicated profile with CLI:",
             error,
           );
@@ -429,7 +430,7 @@ export function NewSessionWizard({
 
         // Sync with CLI
         profileSyncService.syncGuiToCli(updatedProfiles).catch((error) => {
-          console.error(
+          log.error(
             "[Wizard] Failed to sync profile deletion with CLI:",
             error,
           );

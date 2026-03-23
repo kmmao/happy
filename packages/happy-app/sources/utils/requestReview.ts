@@ -12,6 +12,7 @@ import {
 import { sync } from '@/sync/sync';
 import { storage as syncStorage } from '@/sync/storage';
 import { Platform } from 'react-native';
+import { log } from '@/log';
 
 const localStorage = new MMKV();
 
@@ -36,7 +37,7 @@ export function requestReview() {
             // Check if store review is available
             const isAvailable = await StoreReview.isAvailableAsync();
             if (!isAvailable) {
-                console.log('Store review is not available on this platform');
+                log.log('Store review is not available on this platform');
                 return;
             }
 
@@ -117,7 +118,7 @@ export function requestReview() {
             localStorage.set(LOCAL_KEYS.STORE_REVIEW_LAST_SHOWN, new Date().toISOString());
 
         } catch (error) {
-            console.error('Error requesting review:', error);
+            log.error('Error requesting review:', error);
         }
     });
 }

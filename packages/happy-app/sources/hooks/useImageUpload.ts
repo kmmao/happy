@@ -10,6 +10,7 @@ import {
 } from "@/utils/imageUpload";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { AsyncLock } from "@/utils/lock";
+import { log } from '@/log';
 
 export interface UseImageUploadResult {
   pendingImagePaths: string[];
@@ -137,7 +138,7 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
         });
       } catch (e) {
         // Swallow lock-acquisition or unexpected errors — paste failures should not crash the UI
-        console.error("handleImagePaste failed:", e);
+        log.error("handleImagePaste failed:", e);
       }
     },
     [sessionId],

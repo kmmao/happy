@@ -20,6 +20,7 @@ import { Modal } from "@/modal";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { MAX_IMAGES } from "@/utils/imageUpload";
 import { hapticsLight } from "@/components/haptics";
+import { log } from '@/log';
 
 interface PermissionFooterProps {
   permission: {
@@ -75,7 +76,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
         storage.getState().updateSessionPermissionMode(sessionId, "default");
       }
     } catch (error) {
-      console.error("Failed to approve permission:", error);
+      log.error("Failed to approve permission:", error);
     } finally {
       setLoadingButton(null);
     }
@@ -96,7 +97,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
       // Update the session permission mode to 'acceptEdits' for future permissions
       storage.getState().updateSessionPermissionMode(sessionId, "acceptEdits");
     } catch (error) {
-      console.error("Failed to approve all edits:", error);
+      log.error("Failed to approve all edits:", error);
     } finally {
       setLoadingAllEdits(false);
     }
@@ -123,7 +124,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
 
       await sessionAllow(sessionId, permission.id, undefined, [toolIdentifier]);
     } catch (error) {
-      console.error("Failed to approve for session:", error);
+      log.error("Failed to approve for session:", error);
     } finally {
       setLoadingForSession(false);
     }
@@ -142,7 +143,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
     try {
       await sessionDeny(sessionId, permission.id);
     } catch (error) {
-      console.error("Failed to deny permission:", error);
+      log.error("Failed to deny permission:", error);
     } finally {
       setLoadingButton(null);
     }
@@ -167,7 +168,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
         "approved",
       );
     } catch (error) {
-      console.error("Failed to approve permission:", error);
+      log.error("Failed to approve permission:", error);
     } finally {
       setLoadingButton(null);
     }
@@ -191,7 +192,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
         "approved_for_session",
       );
     } catch (error) {
-      console.error("Failed to approve for session:", error);
+      log.error("Failed to approve for session:", error);
     } finally {
       setLoadingForSession(false);
     }
@@ -215,7 +216,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
         "abort",
       );
     } catch (error) {
-      console.error("Failed to abort permission:", error);
+      log.error("Failed to abort permission:", error);
     } finally {
       setLoadingButton(null);
     }
@@ -515,7 +516,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
           .getState()
           .updateSessionPermissionMode(sessionId, "bypassPermissions");
       } catch (error) {
-        console.error("Failed to approve plan with bypass:", error);
+        log.error("Failed to approve plan with bypass:", error);
       } finally {
         setLoadingAllEdits(false);
       }
@@ -541,7 +542,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
           feedbackText.trim(),
         );
       } catch (error) {
-        console.error("Failed to deny plan with reason:", error);
+        log.error("Failed to deny plan with reason:", error);
       } finally {
         setLoadingButton(null);
       }
