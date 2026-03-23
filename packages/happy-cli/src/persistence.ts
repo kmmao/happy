@@ -877,3 +877,77 @@ export async function getEnvironmentVariable(
 
   return undefined;
 }
+
+//
+// Session Encryption Keys
+//
+
+function sessionKeyPath(sessionId: string): string {
+  // Sanitize sessionId to prevent path traversal (UUIDs are safe, but be defensive)
+  const safe = sessionId.replace(/[^a-zA-Z0-9-]/g, "");
+  return `${configuration.sessionKeysDir}/${safe}.key`;
+}
+
+/**
+ * Read a persisted session encryption key.
+ * Returns null if the key file doesn't exist or is corrupted.
+ */
+export async function readSessionKey(
+  sessionId: string,
+): Promise<Uint8Array | null> {
+  const keyFile = sessionKeyPath(sessionId);
+  if (!existsSync(keyFile)) {
+    return null;
+  }
+  try {
+    const content = await readFile(keyFile, "utf8");
+    const bytes = Buffer.from(content.trim(), "base64");
+    if (bytes.length !== 32) {
+      logger.debug(
+        `[PERSISTENCE] Session key for ${sessionId} has invalid length: ${bytes.length}`,
+      );
+      return null;
+    }
+    return new Uint8Array(bytes);
+  } catch (error) {
+    logger.debug(`[PERSISTENCE] Failed to read session key for ${sessionId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Persist a session encryption key to disk.
+ * Uses atomic write (tmp + rename) and restrictive permissions (0o600).
+ */
+export async function writeSessionKey(
+  sessionId: string,
+  key: Uint8Array,
+): Promise<void> {
+  try {
+    if (!existsSync(configuration.sessionKeysDir)) {
+      await mkdir(configuration.sessionKeysDir, { recursive: true, mode: 0o700 });
+    }
+    const keyFile = sessionKeyPath(sessionId);
+    const tmpFile = keyFile + ".tmp";
+    const base64 = Buffer.from(key).toString("base64");
+    await writeFile(tmpFile, base64, { mode: 0o600 });
+    await rename(tmpFile, keyFile);
+    logger.debug(`[PERSISTENCE] Session key persisted for ${sessionId}`);
+  } catch (error) {
+    logger.warn(`[PERSISTENCE] Failed to write session key for ${sessionId} — next reconnect will generate a new key:`, error);
+  }
+}
+
+/**
+ * Delete a persisted session encryption key.
+ */
+export async function deleteSessionKey(sessionId: string): Promise<void> {
+  const keyFile = sessionKeyPath(sessionId);
+  if (existsSync(keyFile)) {
+    try {
+      await unlink(keyFile);
+    } catch {
+      // Ignore — file may have been deleted concurrently
+    }
+  }
+}

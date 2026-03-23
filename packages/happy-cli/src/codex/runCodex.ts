@@ -6,7 +6,7 @@ import { CodexPermissionHandler } from "./utils/permissionHandler";
 import { ReasoningProcessor } from "./utils/reasoningProcessor";
 import { DiffProcessor } from "./utils/diffProcessor";
 import { logger } from "@/ui/logger";
-import { Credentials, readSettings } from "@/persistence";
+import { Credentials, readSettings, writeSessionKey } from "@/persistence";
 import { initialMachineMetadata } from "@/daemon/run";
 import { configuration } from "@/configuration";
 import packageJson from "../../package.json";
@@ -148,6 +148,10 @@ export async function runCodex(opts: {
     machineId,
     path: projectPath_,
   });
+  // Persist encryption key for future reconnects
+  if (response) {
+    await writeSessionKey(response.id, response.encryptionKey);
+  }
 
   // Handle server unreachable case - create offline stub with hot reconnection
   let session: ApiSessionClient;

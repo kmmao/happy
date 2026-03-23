@@ -22,6 +22,7 @@ class Configuration {
   public readonly privateKeyFile: string;
   public readonly daemonStateFile: string;
   public readonly daemonLockFile: string;
+  public readonly sessionKeysDir: string;
   public readonly currentCliVersion: string;
 
   public readonly isExperimentalEnabled: boolean;
@@ -53,6 +54,7 @@ class Configuration {
     this.privateKeyFile = join(this.happyHomeDir, "access.key");
     this.daemonStateFile = join(this.happyHomeDir, "daemon.state.json");
     this.daemonLockFile = join(this.happyHomeDir, "daemon.state.json.lock");
+    this.sessionKeysDir = join(this.happyHomeDir, "session-keys");
 
     this.isExperimentalEnabled = ["true", "1", "yes"].includes(
       process.env.HAPPY_EXPERIMENTAL?.toLowerCase() || "",
@@ -84,6 +86,9 @@ class Configuration {
     // Ensure directories exist
     if (!existsSync(this.logsDir)) {
       mkdirSync(this.logsDir, { recursive: true });
+    }
+    if (!existsSync(this.sessionKeysDir)) {
+      mkdirSync(this.sessionKeysDir, { recursive: true, mode: 0o700 });
     }
   }
 }

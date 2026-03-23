@@ -358,21 +358,31 @@ export class ApiClient {
     state: AgentState | null;
     machineId?: string;
     path?: string;
+    existingEncryptionKey?: Uint8Array;
   }): Promise<Session | null> {
-    // Resolve encryption key (same logic as getOrCreateSession)
+    // Resolve encryption key — reuse persisted key when available to avoid
+    // invalidating messages that were encrypted with the previous key.
     let dataEncryptionKey: Uint8Array | null = null;
     let encryptionKey: Uint8Array;
     let encryptionVariant: "legacy" | "dataKey";
     if (this.credential.encryption.type === "dataKey") {
-      encryptionKey = getRandomBytes(32);
+      if (opts.existingEncryptionKey) {
+        // Reuse persisted key — do NOT send dataEncryptionKey to server
+        // so the server keeps the old (identical) encrypted key intact.
+        encryptionKey = opts.existingEncryptionKey;
+        logger.debug("[API] reconnectSession: reusing persisted encryption key");
+      } else {
+        encryptionKey = getRandomBytes(32);
+        logger.debug("[API] reconnectSession: generated new encryption key (no persisted key found)");
+        let encryptedDataKey = libsodiumEncryptForPublicKey(
+          encryptionKey,
+          this.credential.encryption.publicKey,
+        );
+        dataEncryptionKey = new Uint8Array(encryptedDataKey.length + 1);
+        dataEncryptionKey.set([0], 0);
+        dataEncryptionKey.set(encryptedDataKey, 1);
+      }
       encryptionVariant = "dataKey";
-      let encryptedDataKey = libsodiumEncryptForPublicKey(
-        encryptionKey,
-        this.credential.encryption.publicKey,
-      );
-      dataEncryptionKey = new Uint8Array(encryptedDataKey.length + 1);
-      dataEncryptionKey.set([0], 0);
-      dataEncryptionKey.set(encryptedDataKey, 1);
     } else {
       encryptionKey = this.credential.encryption.secret;
       encryptionVariant = "legacy";
@@ -392,6 +402,8 @@ export class ApiClient {
                 encrypt(encryptionKey, encryptionVariant, opts.state),
               )
             : null,
+          // Only send dataEncryptionKey when generating a new key.
+          // When reusing, server keeps the existing key unchanged.
           dataEncryptionKey: dataEncryptionKey
             ? encodeBase64(dataEncryptionKey)
             : null,

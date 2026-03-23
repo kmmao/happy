@@ -8,7 +8,7 @@ import { logger } from "@/ui/logger";
 import { loop } from "@/claude/loop";
 import { AgentState, Metadata } from "@/api/types";
 import packageJson from "../../package.json";
-import { Credentials, readSettings } from "@/persistence";
+import { Credentials, readSettings, readSessionKey, writeSessionKey } from "@/persistence";
 import { EnhancedMode, PermissionMode } from "./loop";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { hashObject } from "@/utils/deterministicJson";
@@ -195,8 +195,10 @@ export async function runClaude(
   // Session creation: reconnect to existing or create new
   let response;
   if (options.happySessionId) {
+    // Try to read persisted encryption key to avoid key rotation
+    const existingKey = await readSessionKey(options.happySessionId);
     logger.debug(
-      `[CLAUDE] Reconnecting to existing session: ${options.happySessionId}, metadata.claudeSessionId=${metadata.claudeSessionId}`,
+      `[CLAUDE] Reconnecting to existing session: ${options.happySessionId}, metadata.claudeSessionId=${metadata.claudeSessionId}, hasPersistedKey=${!!existingKey}`,
     );
     response = await api.reconnectSession({
       sessionId: options.happySessionId,
@@ -204,7 +206,15 @@ export async function runClaude(
       state,
       machineId,
       path: projectPath_,
+      existingEncryptionKey: existingKey ?? undefined,
     });
+    // Persist the key if it was newly generated (no existing key found)
+    if (response && !existingKey) {
+      if (response.id !== options.happySessionId) {
+        logger.warn(`[CLAUDE] Server returned different session ID: expected=${options.happySessionId}, got=${response.id}`);
+      }
+      await writeSessionKey(response.id, response.encryptionKey);
+    }
   } else {
     const sessionTag = randomUUID();
     response = await api.getOrCreateSession({
@@ -214,6 +224,10 @@ export async function runClaude(
       machineId,
       path: projectPath_,
     });
+    // Persist encryption key for future reconnects
+    if (response) {
+      await writeSessionKey(response.id, response.encryptionKey);
+    }
   }
 
   // Handle server unreachable case - run Claude locally with hot reconnection
@@ -226,13 +240,18 @@ export async function runClaude(
       onReconnected: async () => {
         let resp;
         if (options.happySessionId) {
+          const existingKey = await readSessionKey(options.happySessionId);
           resp = await api.reconnectSession({
             sessionId: options.happySessionId,
             metadata,
             state,
             machineId,
             path: projectPath_,
+            existingEncryptionKey: existingKey ?? undefined,
           });
+          if (resp && !existingKey) {
+            await writeSessionKey(resp.id, resp.encryptionKey);
+          }
         } else {
           const sessionTag = randomUUID();
           resp = await api.getOrCreateSession({
@@ -242,6 +261,9 @@ export async function runClaude(
             machineId,
             path: projectPath_,
           });
+          if (resp) {
+            await writeSessionKey(resp.id, resp.encryptionKey);
+          }
         }
         if (!resp) throw new Error("Server unavailable");
         const session = api.sessionSyncClient(resp);

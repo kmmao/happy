@@ -1961,7 +1961,7 @@ class Sync {
             : [];
           if (newestMessages.length > 0) {
             const { normalized, promptSuggestion, needsContinue } =
-              await this.decryptAndNormalizeBatch(encryption, newestMessages);
+              await this.decryptAndNormalizeBatch(encryption, newestMessages, sessionId);
             if (promptSuggestion !== null) {
               latestPromptSuggestion = promptSuggestion;
             }
@@ -2032,6 +2032,7 @@ class Sync {
         const decryptResult = await this.decryptAndNormalizeBatch(
           encryption,
           messages,
+          sessionId,
         );
         const batchNormalized = decryptResult.normalized;
         if (decryptResult.promptSuggestion !== null) {
@@ -2515,6 +2516,7 @@ class Sync {
   private async decryptAndNormalizeBatch(
     encryption: SessionEncryption,
     rawMessages: ApiMessage[],
+    sessionId?: string,
   ): Promise<{
     normalized: NormalizedMessage[];
     promptSuggestion: string | null;
@@ -2524,9 +2526,10 @@ class Sync {
     const normalized: NormalizedMessage[] = [];
     let promptSuggestion: string | null = null;
     let needsContinue = false;
+    let decryptFailCount = 0;
     for (let i = 0; i < decryptedMessages.length; i++) {
       const decrypted = decryptedMessages[i];
-      if (!decrypted) continue;
+      if (!decrypted) { decryptFailCount++; continue; }
       const suggestion = extractPromptSuggestionFromRaw(decrypted.content);
       if (suggestion !== null) promptSuggestion = suggestion;
       if (extractNeedsContinueFromRaw(decrypted.content)) {
@@ -2541,6 +2544,11 @@ class Sync {
         decrypted.content,
       );
       if (msg) normalized.push(msg);
+    }
+    if (decryptFailCount > 0) {
+      log.warn(
+        `⚠️ ${decryptFailCount}/${rawMessages.length} messages failed to decrypt for session ${sessionId ?? "unknown"} (possible encryption key mismatch after session reconnect)`,
+      );
     }
     return { normalized, promptSuggestion, needsContinue };
   }

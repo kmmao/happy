@@ -13,6 +13,7 @@ import { MachineEncryption } from "./machineEncryption";
 import { encodeBase64, decodeBase64 } from "@/encryption/base64";
 import sodium from "@/encryption/libsodium.lib";
 import { decryptBox, encryptBox } from "@/encryption/libsodium";
+import { log } from "@/log";
 import { randomUUID } from "expo-crypto";
 
 export class Encryption {
@@ -93,6 +94,9 @@ export class Encryption {
           continue; // Same key — nothing to do
         }
         // Key changed (session reconnect) — remove old encryptor + cache
+        log.warn(
+            `🔑 Session ${sessionId} encryption key changed: ${prev?.slice(0, 8)}… → ${keyHex?.slice(0, 8)}… — old messages may become undecryptable`,
+        );
         this.sessionEncryptions.delete(sessionId);
         this.cache.clearSessionCache(sessionId);
       }

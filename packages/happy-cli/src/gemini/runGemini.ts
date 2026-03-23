@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
 
 import { ApiClient } from "@/api/api";
 import { logger } from "@/ui/logger";
-import { Credentials, readSettings } from "@/persistence";
+import { Credentials, readSettings, writeSessionKey } from "@/persistence";
 import {
   createSessionMetadata,
   enrichMetadataWithWorktree,
@@ -153,6 +153,10 @@ export async function runGemini(opts: {
     machineId,
     path: projectPath_,
   });
+  // Persist encryption key for future reconnects
+  if (response) {
+    await writeSessionKey(response.id, response.encryptionKey);
+  }
 
   // Handle server unreachable case - create offline stub with hot reconnection
   let session: ApiSessionClient;
