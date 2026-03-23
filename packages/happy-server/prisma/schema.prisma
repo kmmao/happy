@@ -565,6 +565,7 @@ model SupervisorAction {
     @@index([accountId, approval])
     @@index([projectId, accountId, approval])
     @@index([projectId, category, title, approval])
+    @@index([projectId, fixStatus])
 }
 
 //
