@@ -69,7 +69,16 @@ export function useBackgroundTasks(messages: readonly Message[]): BackgroundTask
             });
         }
 
-        return tasks;
+        // Dedup: same command may appear multiple times (retries / Docker restarts).
+        // Keep only the latest (last) entry per command string.
+        const seen = new Map<string, number>();
+        for (let i = tasks.length - 1; i >= 0; i--) {
+            const key = tasks[i].command;
+            if (!seen.has(key)) {
+                seen.set(key, i);
+            }
+        }
+        return tasks.filter((_, i) => seen.get(tasks[i].command) === i);
     }, [messages]);
 
     const tasks = React.useMemo(
