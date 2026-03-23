@@ -142,11 +142,18 @@ function TaskItem({
     const [topRowWidth, setTopRowWidth] = React.useState(0);
 
     // Only poll logs for background tasks that have an output file
-    const lastLine = useBackgroundTaskLastLine(
+    const { lastLine, isDead } = useBackgroundTaskLastLine(
         sessionId,
         task.outputFile,
         task.isBackground && task.status === "running",
     );
+
+    // Auto-dismiss when process exit is detected from log output
+    React.useEffect(() => {
+        if (isDead && onClose) {
+            onClose();
+        }
+    }, [isDead, onClose]);
 
     React.useEffect(() => {
         if (task.status !== "running") return;
@@ -158,7 +165,10 @@ function TaskItem({
 
     const category = detectCategory(task.command);
     const toolTag = detectToolTag(task.command);
-    const label = task.description !== task.command ? task.description : buildSmartLabel(task.command);
+    const port = extractPort(task.command);
+    const baseLabel = task.description !== task.command ? task.description : buildSmartLabel(task.command);
+    // Always append port if detected and not already in the label
+    const label = port && !baseLabel.includes(`:${port}`) ? `${baseLabel} :${port}` : baseLabel;
     const icon = categoryIcon[category];
     const iconColor = categoryColor[category];
     const status = statusInfo(task.status, theme.colors);
