@@ -8,6 +8,7 @@ import {
     updateSettings,
     type SandboxConfig,
 } from '@/persistence';
+import { logger } from '@/ui/logger';
 
 const DEFAULT_WORKSPACE_ROOT = '~/Workspace';
 const DEFAULT_DENY_READ_PATHS = ['~/.ssh', '~/.aws', '~/.gnupg'];
@@ -63,7 +64,7 @@ export async function handleSandboxCommand(args: string[]): Promise<void> {
             await handleSandboxDisable();
             break;
         default:
-            console.error(chalk.red(`Unknown sandbox subcommand: ${subcommand}`));
+            logger.printError(chalk.red(`Unknown sandbox subcommand: ${subcommand}`));
             handleSandboxHelp();
             process.exit(1);
     }
@@ -128,8 +129,8 @@ export async function handleSandboxConfigure(): Promise<void> {
         allowLocalBinding: Boolean(answers.allowLocalBinding),
     });
 
-    console.log(chalk.bold('\nSandbox configuration summary:'));
-    console.log(JSON.stringify(sandboxConfig, null, 2));
+    logger.print(chalk.bold('\nSandbox configuration summary:'));
+    logger.print(JSON.stringify(sandboxConfig, null, 2));
 
     const { confirmSave } = await inquirer.prompt([
         {
@@ -141,7 +142,7 @@ export async function handleSandboxConfigure(): Promise<void> {
     ]);
 
     if (!confirmSave) {
-        console.log(chalk.yellow('Sandbox configuration cancelled.'));
+        logger.print(chalk.yellow('Sandbox configuration cancelled.'));
         return;
     }
 
@@ -150,8 +151,8 @@ export async function handleSandboxConfigure(): Promise<void> {
         sandboxConfig,
     }));
 
-    console.log(chalk.green('Sandbox configuration saved and enabled.'));
-    console.log(chalk.gray('Use --no-sandbox to bypass sandboxing for a single session.'));
+    logger.print(chalk.green('Sandbox configuration saved and enabled.'));
+    logger.print(chalk.gray('Use --no-sandbox to bypass sandboxing for a single session.'));
 }
 
 export async function handleSandboxStatus(): Promise<void> {
@@ -159,19 +160,19 @@ export async function handleSandboxStatus(): Promise<void> {
     const config = settings.sandboxConfig;
 
     if (!config) {
-        console.log('Sandbox is not configured. Run `happy sandbox configure`.');
+        logger.print('Sandbox is not configured. Run `happy sandbox configure`.');
         return;
     }
 
-    console.log(chalk.bold('Sandbox status'));
-    console.log(`Enabled: ${config.enabled ? 'yes' : 'no'}`);
+    logger.print(chalk.bold('Sandbox status'));
+    logger.print(`Enabled: ${config.enabled ? 'yes' : 'no'}`);
     const scope = config.sessionIsolation === 'workspace' ? 'workspace' : 'per-project';
-    console.log(`Scope: ${scope}`);
+    logger.print(`Scope: ${scope}`);
     if (scope === 'workspace') {
-        console.log(`Workspace root: ${config.workspaceRoot ?? DEFAULT_WORKSPACE_ROOT}`);
+        logger.print(`Workspace root: ${config.workspaceRoot ?? DEFAULT_WORKSPACE_ROOT}`);
     }
-    console.log(`Network mode: ${config.networkMode}`);
-    console.log(`Allow localhost binding: ${config.allowLocalBinding ? 'yes' : 'no'}`);
+    logger.print(`Network mode: ${config.networkMode}`);
+    logger.print(`Allow localhost binding: ${config.allowLocalBinding ? 'yes' : 'no'}`);
 }
 
 export async function handleSandboxDisable(): Promise<void> {
@@ -183,11 +184,11 @@ export async function handleSandboxDisable(): Promise<void> {
         }),
     }));
 
-    console.log(chalk.green('Sandbox disabled.'));
+    logger.print(chalk.green('Sandbox disabled.'));
 }
 
 export function handleSandboxHelp(): void {
-    console.log(`
+    logger.print(`
 ${chalk.bold('happy sandbox')} - Sandbox management
 
 ${chalk.bold('Usage:')}

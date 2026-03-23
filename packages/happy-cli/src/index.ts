@@ -53,9 +53,9 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
     // Check for clean subcommand
     if (args[1] === "clean") {
       const result = await killRunawayHappyProcesses();
-      console.log(`Cleaned up ${result.killed} runaway processes`);
+      logger.print(`Cleaned up ${result.killed} runaway processes`);
       if (result.errors.length > 0) {
-        console.log("Errors:", result.errors);
+        logger.print("Errors:", result.errors);
       }
       process.exit(0);
     }
@@ -66,7 +66,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
     try {
       await handleAuthCommand(args.slice(1));
     } catch (error) {
-      console.error(
+      logger.printError(
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
@@ -79,7 +79,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
     try {
       await handleConnectCommand(args.slice(1));
     } catch (error) {
-      console.error(
+      logger.printError(
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
@@ -91,7 +91,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
     try {
       await handleSandboxCommand(args.slice(1));
     } catch (error) {
-      console.error(
+      logger.printError(
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
@@ -100,7 +100,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
     }
     return;
   } else if (subcommand === "bye") {
-    console.log("Bye!");
+    logger.print("Bye!");
     process.exit(0);
   } else if (subcommand === "codex") {
     // Handle codex command
@@ -124,7 +124,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
       });
       // Do not force exit here; allow instrumentation to show lingering handles
     } catch (error) {
-      console.error(
+      logger.printError(
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
@@ -146,8 +146,8 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
       ];
 
       if (!validModels.includes(modelName)) {
-        console.error(`Invalid model: ${modelName}`);
-        console.error(`Available models: ${validModels.join(", ")}`);
+        logger.printError(`Invalid model: ${modelName}`);
+        logger.printError(`Available models: ${validModels.join(", ")}`);
         process.exit(1);
       }
 
@@ -185,12 +185,12 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
 
         // Write config back
         writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
-        console.log(`✓ Model set to: ${modelName}`);
-        console.log(`  Config saved to: ${configPath}`);
-        console.log(`  This model will be used in future sessions.`);
+        logger.print(`✓ Model set to: ${modelName}`);
+        logger.print(`  Config saved to: ${configPath}`);
+        logger.print(`  This model will be used in future sessions.`);
         process.exit(0);
       } catch (error) {
-        console.error("Failed to save model configuration:", error);
+        logger.printError("Failed to save model configuration:", error);
         process.exit(1);
       }
     }
@@ -221,17 +221,17 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         }
 
         if (model) {
-          console.log(`Current model: ${model}`);
+          logger.print(`Current model: ${model}`);
         } else if (process.env.GEMINI_MODEL) {
-          console.log(
+          logger.print(
             `Current model: ${process.env.GEMINI_MODEL} (from GEMINI_MODEL env var)`,
           );
         } else {
-          console.log("Current model: gemini-2.5-pro (default)");
+          logger.print("Current model: gemini-2.5-pro (default)");
         }
         process.exit(0);
       } catch (error) {
-        console.error("Failed to read model configuration:", error);
+        logger.printError("Failed to read model configuration:", error);
         process.exit(1);
       }
     }
@@ -268,16 +268,16 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         }
 
         saveGoogleCloudProjectToConfig(projectId, userEmail);
-        console.log(`✓ Google Cloud Project set to: ${projectId}`);
+        logger.print(`✓ Google Cloud Project set to: ${projectId}`);
         if (userEmail) {
-          console.log(`  Linked to account: ${userEmail}`);
+          logger.print(`  Linked to account: ${userEmail}`);
         }
-        console.log(
+        logger.print(
           `  This project will be used for Google Workspace accounts.`,
         );
         process.exit(0);
       } catch (error) {
-        console.error("Failed to save project configuration:", error);
+        logger.printError("Failed to save project configuration:", error);
         process.exit(1);
       }
     }
@@ -289,54 +289,54 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         const config = readGeminiLocalConfig();
 
         if (config.googleCloudProject) {
-          console.log(
+          logger.print(
             `Current Google Cloud Project: ${config.googleCloudProject}`,
           );
           if (config.googleCloudProjectEmail) {
-            console.log(
+            logger.print(
               `  Linked to account: ${config.googleCloudProjectEmail}`,
             );
           } else {
-            console.log(`  Applies to: all accounts (global)`);
+            logger.print(`  Applies to: all accounts (global)`);
           }
         } else if (process.env.GOOGLE_CLOUD_PROJECT) {
-          console.log(
+          logger.print(
             `Current Google Cloud Project: ${process.env.GOOGLE_CLOUD_PROJECT} (from env var)`,
           );
         } else {
-          console.log("No Google Cloud Project configured.");
-          console.log("");
-          console.log(
+          logger.print("No Google Cloud Project configured.");
+          logger.print("");
+          logger.print(
             'If you see "Authentication required" error, you may need to set a project:',
           );
-          console.log("  happy gemini project set <your-project-id>");
-          console.log("");
-          console.log("This is required for Google Workspace accounts.");
-          console.log(
+          logger.print("  happy gemini project set <your-project-id>");
+          logger.print("");
+          logger.print("This is required for Google Workspace accounts.");
+          logger.print(
             "Guide: https://goo.gle/gemini-cli-auth-docs#workspace-gca",
           );
         }
         process.exit(0);
       } catch (error) {
-        console.error("Failed to read project configuration:", error);
+        logger.printError("Failed to read project configuration:", error);
         process.exit(1);
       }
     }
 
     // Handle "happy gemini project" (no subcommand) - show help
     if (geminiSubcommand === "project" && !args[2]) {
-      console.log("Usage: happy gemini project <command>");
-      console.log("");
-      console.log("Commands:");
-      console.log("  set <project-id>   Set Google Cloud Project ID");
-      console.log("  get                Show current Google Cloud Project ID");
-      console.log("");
-      console.log("Google Workspace accounts require a Google Cloud Project.");
-      console.log(
+      logger.print("Usage: happy gemini project <command>");
+      logger.print("");
+      logger.print("Commands:");
+      logger.print("  set <project-id>   Set Google Cloud Project ID");
+      logger.print("  get                Show current Google Cloud Project ID");
+      logger.print("");
+      logger.print("Google Workspace accounts require a Google Cloud Project.");
+      logger.print(
         'If you see "Authentication required" error, set your project ID.',
       );
-      console.log("");
-      console.log("Guide: https://goo.gle/gemini-cli-auth-docs#workspace-gca");
+      logger.print("");
+      logger.print("Guide: https://goo.gle/gemini-cli-auth-docs#workspace-gca");
       process.exit(0);
     }
 
@@ -371,7 +371,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
 
       await runGemini({ credentials, startedBy });
     } catch (error) {
-      console.error(
+      logger.printError(
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
@@ -428,7 +428,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         args: resolved.args,
       });
     } catch (error) {
-      console.error(
+      logger.printError(
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
@@ -438,7 +438,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
     return;
   } else if (subcommand === "logout") {
     // Keep for backward compatibility - redirect to auth logout
-    console.log(
+    logger.print(
       chalk.yellow(
         'Note: "happy logout" is deprecated. Use "happy auth logout" instead.\n',
       ),
@@ -446,7 +446,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
     try {
       await handleAuthCommand(["logout"]);
     } catch (error) {
-      console.error(
+      logger.printError(
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
@@ -459,7 +459,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
     try {
       await handleNotifyCommand(args.slice(1));
     } catch (error) {
-      console.error(
+      logger.printError(
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
@@ -472,7 +472,7 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
       const { handleWorktreeCommand } = await import("./commands/worktree");
       await handleWorktreeCommand(args.slice(1));
     } catch (error) {
-      console.error(
+      logger.printError(
         chalk.red("Worktree error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
@@ -489,29 +489,29 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         const sessions = await listDaemonSessions();
 
         if (sessions.length === 0) {
-          console.log(
+          logger.print(
             "No active sessions this daemon is aware of (they might have been started by a previous version of the daemon)",
           );
         } else {
-          console.log("Active sessions:");
-          console.log(JSON.stringify(sessions, null, 2));
+          logger.print("Active sessions:");
+          logger.print(JSON.stringify(sessions, null, 2));
         }
       } catch (error) {
-        console.log("No daemon running");
+        logger.print("No daemon running");
       }
       return;
     } else if (daemonSubcommand === "stop-session") {
       const sessionId = args[2];
       if (!sessionId) {
-        console.error("Session ID required");
+        logger.printError("Session ID required");
         process.exit(1);
       }
 
       try {
         const success = await stopDaemonSession(sessionId);
-        console.log(success ? "Session stopped" : "Failed to stop session");
+        logger.print(success ? "Session stopped" : "Failed to stop session");
       } catch (error) {
-        console.log("No daemon running");
+        logger.print("No daemon running");
       }
       return;
     } else if (daemonSubcommand === "start") {
@@ -534,9 +534,9 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
       }
 
       if (started) {
-        console.log("Daemon started successfully");
+        logger.print("Daemon started successfully");
       } else {
-        console.error("Failed to start daemon");
+        logger.printError("Failed to start daemon");
         process.exit(1);
       }
       process.exit(0);
@@ -554,16 +554,16 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
       // Simply print the path to the latest daemon log file
       const latest = await getLatestDaemonLog();
       if (!latest) {
-        console.log("No daemon logs found");
+        logger.print("No daemon logs found");
       } else {
-        console.log(latest.path);
+        logger.print(latest.path);
       }
       process.exit(0);
     } else if (daemonSubcommand === "install") {
       try {
         await install();
       } catch (error) {
-        console.error(
+        logger.printError(
           chalk.red("Error:"),
           error instanceof Error ? error.message : "Unknown error",
         );
@@ -573,14 +573,14 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
       try {
         await uninstall();
       } catch (error) {
-        console.error(
+        logger.printError(
           chalk.red("Error:"),
           error instanceof Error ? error.message : "Unknown error",
         );
         process.exit(1);
       }
     } else {
-      console.log(`
+      logger.print(`
 ${chalk.bold("happy daemon")} - Daemon management
 
 ${chalk.bold("Usage:")}
@@ -638,7 +638,7 @@ ${chalk.bold("To clean up runaway processes:")} Use ${chalk.cyan("happy doctor c
       } else if (arg === "--js-runtime") {
         const runtime = args[++i];
         if (runtime !== "node" && runtime !== "bun") {
-          console.error(
+          logger.printError(
             chalk.red(
               `Invalid --js-runtime value: ${runtime}. Must be 'node' or 'bun'`,
             ),
@@ -656,7 +656,7 @@ ${chalk.bold("To clean up runaway processes:")} Use ${chalk.cyan("happy doctor c
           options.claudeEnvVars = options.claudeEnvVars || {};
           options.claudeEnvVars[key] = value;
         } else {
-          console.error(
+          logger.printError(
             chalk.red(
               `Invalid --claude-env format: ${envArg}. Expected KEY=VALUE`,
             ),
@@ -672,17 +672,17 @@ ${chalk.bold("To clean up runaway processes:")} Use ${chalk.cyan("happy doctor c
       } else if (arg === "--settings") {
         // Intercept --settings flag - Happy uses this internally for session hooks
         const settingsValue = args[++i]; // consume the value
-        console.warn(
+        logger.warn(
           chalk.yellow(
             `⚠️  Warning: --settings is used internally by Happy for session tracking.`,
           ),
         );
-        console.warn(
+        logger.warn(
           chalk.yellow(
             `   Your settings file "${settingsValue}" will be ignored.`,
           ),
         );
-        console.warn(
+        logger.warn(
           chalk.yellow(
             `   To configure Claude, edit ~/.claude/settings.json instead.`,
           ),
@@ -712,7 +712,7 @@ ${chalk.bold("To clean up runaway processes:")} Use ${chalk.cyan("happy doctor c
 
     // Show help
     if (showHelp) {
-      console.log(`
+      logger.print(`
 ${chalk.bold("happy")} - Claude Code On the Go
 
 ${chalk.bold("Usage:")}
@@ -761,9 +761,9 @@ ${chalk.bold.cyan("Claude Code Options (from `claude --help`):")}
         const claudeHelp = execFileSync(claudeCliPath, ["--help"], {
           encoding: "utf8",
         });
-        console.log(claudeHelp);
+        logger.print(claudeHelp);
       } catch (e) {
-        console.log(
+        logger.print(
           chalk.yellow(
             "Could not retrieve claude help. Make sure claude is installed.",
           ),
@@ -775,7 +775,7 @@ ${chalk.bold.cyan("Claude Code Options (from `claude --help`):")}
 
     // Show version
     if (showVersion) {
-      console.log(`happy version: ${packageJson.version}`);
+      logger.print(`happy version: ${packageJson.version}`);
       // Don't exit - continue to pass --version to Claude Code
     }
 
@@ -806,7 +806,7 @@ ${chalk.bold.cyan("Claude Code Options (from `claude --help`):")}
     try {
       await runClaude(credentials, options);
     } catch (error) {
-      console.error(
+      logger.printError(
         chalk.red("Error:"),
         error instanceof Error ? error.message : "Unknown error",
       );
@@ -835,13 +835,13 @@ async function handleNotifyCommand(args: string[]): Promise<void> {
     } else if (arg === "-h" || arg === "--help") {
       showHelp = true;
     } else {
-      console.error(chalk.red(`Unknown argument for notify command: ${arg}`));
+      logger.printError(chalk.red(`Unknown argument for notify command: ${arg}`));
       process.exit(1);
     }
   }
 
   if (showHelp) {
-    console.log(`
+    logger.print(`
 ${chalk.bold("happy notify")} - Send notification
 
 ${chalk.bold("Usage:")}
@@ -861,19 +861,19 @@ ${chalk.bold("Examples:")}
   }
 
   if (!message) {
-    console.error(
+    logger.printError(
       chalk.red(
         'Error: Message is required. Use -p "your message" to specify the notification text.',
       ),
     );
-    console.log(chalk.gray('Run "happy notify --help" for usage information.'));
+    logger.print(chalk.gray('Run "happy notify --help" for usage information.'));
     process.exit(1);
   }
 
   // Load credentials
   let credentials = await readCredentials();
   if (!credentials) {
-    console.error(
+    logger.printError(
       chalk.red(
         'Error: Not authenticated. Please run "happy auth login" first.',
       ),
@@ -881,7 +881,7 @@ ${chalk.bold("Examples:")}
     process.exit(1);
   }
 
-  console.log(chalk.blue("📱 Sending push notification..."));
+  logger.print(chalk.blue("📱 Sending push notification..."));
 
   try {
     // Create API client and send push notification
@@ -896,15 +896,15 @@ ${chalk.bold("Examples:")}
       timestamp: Date.now(),
     });
 
-    console.log(chalk.green("✓ Push notification sent successfully!"));
-    console.log(chalk.gray(`  Title: ${notificationTitle}`));
-    console.log(chalk.gray(`  Message: ${message}`));
-    console.log(chalk.gray("  Check your mobile device for the notification."));
+    logger.print(chalk.green("✓ Push notification sent successfully!"));
+    logger.print(chalk.gray(`  Title: ${notificationTitle}`));
+    logger.print(chalk.gray(`  Message: ${message}`));
+    logger.print(chalk.gray("  Check your mobile device for the notification."));
 
     // Give a moment for the async operation to start
     await new Promise((resolve) => setTimeout(resolve, 1000));
   } catch (error) {
-    console.error(chalk.red("✗ Failed to send push notification"));
+    logger.printError(chalk.red("✗ Failed to send push notification"));
     throw error;
   }
 }

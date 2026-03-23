@@ -86,7 +86,7 @@ function colorizeAcpLine(kind: AcpLogKind, line: string): string {
 
 function logAcp(kind: AcpLogKind, message: string): void {
   const line = `[${formatAcpTime()}] ${message}`;
-  console.log(colorizeAcpLine(kind, line));
+  logger.print(colorizeAcpLine(kind, line));
 }
 
 function toSingleLine(text: string): string {

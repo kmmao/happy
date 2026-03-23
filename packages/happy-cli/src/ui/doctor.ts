@@ -15,6 +15,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { projectPath } from '@/projectPath'
+import { logger } from '@/ui/logger'
 import packageJson from '../../package.json'
 
 /**
@@ -77,102 +78,102 @@ export async function runDoctorCommand(filter?: 'all' | 'daemon'): Promise<void>
         filter = 'all';
     }
     
-    console.log(chalk.bold.cyan('\n🩺 Happy CLI Doctor\n'));
+    logger.print(chalk.bold.cyan('\n🩺 Happy CLI Doctor\n'));
 
     // For 'all' filter, show everything. For 'daemon', only show daemon-related info
     if (filter === 'all') {
         // Version and basic info
-        console.log(chalk.bold('📋 Basic Information'));
-        console.log(`Happy CLI Version: ${chalk.green(packageJson.version)}`);
-        console.log(`Platform: ${chalk.green(process.platform)} ${process.arch}`);
-        console.log(`Node.js Version: ${chalk.green(process.version)}`);
-        console.log('');
+        logger.print(chalk.bold('📋 Basic Information'));
+        logger.print(`Happy CLI Version: ${chalk.green(packageJson.version)}`);
+        logger.print(`Platform: ${chalk.green(process.platform)} ${process.arch}`);
+        logger.print(`Node.js Version: ${chalk.green(process.version)}`);
+        logger.print('');
 
         // Daemon spawn diagnostics
-        console.log(chalk.bold('🔧 Daemon Spawn Diagnostics'));
+        logger.print(chalk.bold('🔧 Daemon Spawn Diagnostics'));
         const projectRoot = projectPath();
         const wrapperPath = join(projectRoot, 'bin', 'happy.mjs');
         const cliEntrypoint = join(projectRoot, 'dist', 'index.mjs');
         
-        console.log(`Project Root: ${chalk.blue(projectRoot)}`);
-        console.log(`Wrapper Script: ${chalk.blue(wrapperPath)}`);
-        console.log(`CLI Entrypoint: ${chalk.blue(cliEntrypoint)}`);
-        console.log(`Wrapper Exists: ${existsSync(wrapperPath) ? chalk.green('✓ Yes') : chalk.red('❌ No')}`);
-        console.log(`CLI Exists: ${existsSync(cliEntrypoint) ? chalk.green('✓ Yes') : chalk.red('❌ No')}`);
-        console.log('');
+        logger.print(`Project Root: ${chalk.blue(projectRoot)}`);
+        logger.print(`Wrapper Script: ${chalk.blue(wrapperPath)}`);
+        logger.print(`CLI Entrypoint: ${chalk.blue(cliEntrypoint)}`);
+        logger.print(`Wrapper Exists: ${existsSync(wrapperPath) ? chalk.green('✓ Yes') : chalk.red('❌ No')}`);
+        logger.print(`CLI Exists: ${existsSync(cliEntrypoint) ? chalk.green('✓ Yes') : chalk.red('❌ No')}`);
+        logger.print('');
 
         // Configuration
-        console.log(chalk.bold('⚙️  Configuration'));
-        console.log(`Happy Home: ${chalk.blue(configuration.happyHomeDir)}`);
-        console.log(`Server URL: ${chalk.blue(configuration.serverUrl)}`);
-        console.log(`Logs Dir: ${chalk.blue(configuration.logsDir)}`);
+        logger.print(chalk.bold('⚙️  Configuration'));
+        logger.print(`Happy Home: ${chalk.blue(configuration.happyHomeDir)}`);
+        logger.print(`Server URL: ${chalk.blue(configuration.serverUrl)}`);
+        logger.print(`Logs Dir: ${chalk.blue(configuration.logsDir)}`);
 
         // Environment
-        console.log(chalk.bold('\n🌍 Environment Variables'));
+        logger.print(chalk.bold('\n🌍 Environment Variables'));
         const env = getEnvironmentInfo();
-        console.log(`HAPPY_HOME_DIR: ${env.HAPPY_HOME_DIR ? chalk.green(env.HAPPY_HOME_DIR) : chalk.gray('not set')}`);
-        console.log(`HAPPY_SERVER_URL: ${env.HAPPY_SERVER_URL ? chalk.green(env.HAPPY_SERVER_URL) : chalk.gray('not set')}`);
-        console.log(`DANGEROUSLY_LOG_TO_SERVER: ${env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING ? chalk.yellow('ENABLED') : chalk.gray('not set')}`);
-        console.log(`DEBUG: ${env.DEBUG ? chalk.green(env.DEBUG) : chalk.gray('not set')}`);
-        console.log(`NODE_ENV: ${env.NODE_ENV ? chalk.green(env.NODE_ENV) : chalk.gray('not set')}`);
+        logger.print(`HAPPY_HOME_DIR: ${env.HAPPY_HOME_DIR ? chalk.green(env.HAPPY_HOME_DIR) : chalk.gray('not set')}`);
+        logger.print(`HAPPY_SERVER_URL: ${env.HAPPY_SERVER_URL ? chalk.green(env.HAPPY_SERVER_URL) : chalk.gray('not set')}`);
+        logger.print(`DANGEROUSLY_LOG_TO_SERVER: ${env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING ? chalk.yellow('ENABLED') : chalk.gray('not set')}`);
+        logger.print(`DEBUG: ${env.DEBUG ? chalk.green(env.DEBUG) : chalk.gray('not set')}`);
+        logger.print(`NODE_ENV: ${env.NODE_ENV ? chalk.green(env.NODE_ENV) : chalk.gray('not set')}`);
 
         // Settings
         try {
             const settings = await readSettings();
-            console.log(chalk.bold('\n📄 Settings (settings.json):'));
-            console.log(chalk.gray(JSON.stringify(settings, null, 2)));
+            logger.print(chalk.bold('\n📄 Settings (settings.json):'));
+            logger.print(chalk.gray(JSON.stringify(settings, null, 2)));
         } catch (error) {
-            console.log(chalk.bold('\n📄 Settings:'));
-            console.log(chalk.red('❌ Failed to read settings'));
+            logger.print(chalk.bold('\n📄 Settings:'));
+            logger.print(chalk.red('❌ Failed to read settings'));
         }
 
         // Authentication status
-        console.log(chalk.bold('\n🔐 Authentication'));
+        logger.print(chalk.bold('\n🔐 Authentication'));
         try {
             const credentials = await readCredentials();
             if (credentials) {
-                console.log(chalk.green('✓ Authenticated (credentials found)'));
+                logger.print(chalk.green('✓ Authenticated (credentials found)'));
             } else {
-                console.log(chalk.yellow('⚠️  Not authenticated (no credentials)'));
+                logger.print(chalk.yellow('⚠️  Not authenticated (no credentials)'));
             }
         } catch (error) {
-            console.log(chalk.red('❌ Error reading credentials'));
+            logger.print(chalk.red('❌ Error reading credentials'));
         }
     }
 
     // Daemon status - shown for both 'all' and 'daemon' filters
-    console.log(chalk.bold('\n🤖 Daemon Status'));
+    logger.print(chalk.bold('\n🤖 Daemon Status'));
     try {
         const result = await checkDaemonStatus();
 
         if (result.status === 'running') {
             const state = result.state;
-            console.log(chalk.green('✓ Daemon is running'));
-            console.log(`  PID: ${state.pid}`);
-            console.log(`  Started: ${new Date(state.startTime).toLocaleString()}`);
-            console.log(`  CLI Version: ${state.startedWithCliVersion}`);
+            logger.print(chalk.green('✓ Daemon is running'));
+            logger.print(`  PID: ${state.pid}`);
+            logger.print(`  Started: ${new Date(state.startTime).toLocaleString()}`);
+            logger.print(`  CLI Version: ${state.startedWithCliVersion}`);
             if (state.httpPort) {
-                console.log(`  HTTP Port: ${state.httpPort}`);
+                logger.print(`  HTTP Port: ${state.httpPort}`);
             }
         } else if (result.status === 'stale-cleaned') {
-            console.log(chalk.yellow('⚠️  Daemon state exists but process not running (stale)'));
+            logger.print(chalk.yellow('⚠️  Daemon state exists but process not running (stale)'));
         } else {
-            console.log(chalk.red('❌ Daemon is not running'));
+            logger.print(chalk.red('❌ Daemon is not running'));
         }
 
         const state = await readDaemonState();
 
         // Show daemon state file
         if (state) {
-            console.log(chalk.bold('\n📄 Daemon State:'));
-            console.log(chalk.blue(`Location: ${configuration.daemonStateFile}`));
-            console.log(chalk.gray(JSON.stringify(state, null, 2)));
+            logger.print(chalk.bold('\n📄 Daemon State:'));
+            logger.print(chalk.blue(`Location: ${configuration.daemonStateFile}`));
+            logger.print(chalk.gray(JSON.stringify(state, null, 2)));
         }
 
         // All Happy processes
         const allProcesses = await findAllHappyProcesses();
         if (allProcesses.length > 0) {
-            console.log(chalk.bold('\n🔍 All Happy CLI Processes'));
+            logger.print(chalk.bold('\n🔍 All Happy CLI Processes'));
 
             // Group by type
             const grouped = allProcesses.reduce((groups, process) => {
@@ -198,29 +199,29 @@ export async function runDoctorCommand(filter?: 'all' | 'daemon'): Promise<void>
                     'unknown': '❓ Unknown'
                 };
 
-                console.log(chalk.blue(`\n${typeLabels[type] || type}:`));
+                logger.print(chalk.blue(`\n${typeLabels[type] || type}:`));
                 processes.forEach(({ pid, command }) => {
                     const color = type === 'current' ? chalk.green :
                         type.startsWith('dev') ? chalk.cyan :
                             type.includes('daemon') ? chalk.blue : chalk.gray;
-                    console.log(`  ${color(`PID ${pid}`)}: ${chalk.gray(command)}`);
+                    logger.print(`  ${color(`PID ${pid}`)}: ${chalk.gray(command)}`);
                 });
             });
         } else {
-            console.log(chalk.red('❌ No happy processes found'));
+            logger.print(chalk.red('❌ No happy processes found'));
         }
 
         if (filter === 'all' && allProcesses.length > 1) { // More than just current process
-            console.log(chalk.bold('\n💡 Process Management'));
-            console.log(chalk.gray('To clean up runaway processes: happy doctor clean'));
+            logger.print(chalk.bold('\n💡 Process Management'));
+            logger.print(chalk.gray('To clean up runaway processes: happy doctor clean'));
         }
     } catch (error) {
-        console.log(chalk.red('❌ Error checking daemon status'));
+        logger.print(chalk.red('❌ Error checking daemon status'));
     }
 
     // Log files - only show for 'all' filter
     if (filter === 'all') {
-        console.log(chalk.bold('\n📝 Log Files'));
+        logger.print(chalk.bold('\n📝 Log Files'));
 
         // Get ALL log files
         const allLogs = getLogFiles(configuration.logsDir);
@@ -232,40 +233,40 @@ export async function runDoctorCommand(filter?: 'all' | 'daemon'): Promise<void>
 
             // Show regular logs (max 10)
             if (regularLogs.length > 0) {
-                console.log(chalk.blue('\nRecent Logs:'));
+                logger.print(chalk.blue('\nRecent Logs:'));
                 const logsToShow = regularLogs.slice(0, 10);
                 logsToShow.forEach(({ file, path, modified }) => {
-                    console.log(`  ${chalk.green(file)} - ${modified.toLocaleString()}`);
-                    console.log(chalk.gray(`    ${path}`));
+                    logger.print(`  ${chalk.green(file)} - ${modified.toLocaleString()}`);
+                    logger.print(chalk.gray(`    ${path}`));
                 });
                 if (regularLogs.length > 10) {
-                    console.log(chalk.gray(`  ... and ${regularLogs.length - 10} more log files`));
+                    logger.print(chalk.gray(`  ... and ${regularLogs.length - 10} more log files`));
                 }
             }
 
             // Show daemon logs (max 5)
             if (daemonLogs.length > 0) {
-                console.log(chalk.blue('\nDaemon Logs:'));
+                logger.print(chalk.blue('\nDaemon Logs:'));
                 const daemonLogsToShow = daemonLogs.slice(0, 5);
                 daemonLogsToShow.forEach(({ file, path, modified }) => {
-                    console.log(`  ${chalk.green(file)} - ${modified.toLocaleString()}`);
-                    console.log(chalk.gray(`    ${path}`));
+                    logger.print(`  ${chalk.green(file)} - ${modified.toLocaleString()}`);
+                    logger.print(chalk.gray(`    ${path}`));
                 });
                 if (daemonLogs.length > 5) {
-                    console.log(chalk.gray(`  ... and ${daemonLogs.length - 5} more daemon log files`));
+                    logger.print(chalk.gray(`  ... and ${daemonLogs.length - 5} more daemon log files`));
                 }
             } else {
-                console.log(chalk.yellow('\nNo daemon log files found'));
+                logger.print(chalk.yellow('\nNo daemon log files found'));
             }
         } else {
-            console.log(chalk.yellow('No log files found'));
+            logger.print(chalk.yellow('No log files found'));
         }
 
         // Support and bug reports
-        console.log(chalk.bold('\n🐛 Support & Bug Reports'));
-        console.log(`Report issues: ${chalk.blue('https://github.com/slopus/happy-cli/issues')}`);
-        console.log(`Documentation: ${chalk.blue('https://happy.engineering/')}`);
+        logger.print(chalk.bold('\n🐛 Support & Bug Reports'));
+        logger.print(`Report issues: ${chalk.blue('https://github.com/slopus/happy-cli/issues')}`);
+        logger.print(`Documentation: ${chalk.blue('https://happy.engineering/')}`);
     }
 
-    console.log(chalk.green('\n✅ Doctor diagnosis complete!\n'));
+    logger.print(chalk.green('\n✅ Doctor diagnosis complete!\n'));
 }

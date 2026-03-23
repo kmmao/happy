@@ -4,6 +4,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { readCredentials } from "@/persistence";
 import { ApiClient } from "@/api/api";
+import { logger } from "@/ui/logger";
 import { authenticateCodex } from "./connect/authenticateCodex";
 import { authenticateClaude } from "./connect/authenticateClaude";
 import { authenticateGemini } from "./connect/authenticateGemini";
@@ -45,14 +46,14 @@ export async function handleConnectCommand(args: string[]): Promise<void> {
       await handleConnectStatus();
       break;
     default:
-      console.error(chalk.red(`Unknown connect target: ${subcommand}`));
+      logger.printError(chalk.red(`Unknown connect target: ${subcommand}`));
       showConnectHelp();
       process.exit(1);
   }
 }
 
 function showConnectHelp(): void {
-  console.log(`
+  logger.print(`
 ${chalk.bold("happy connect")} - Connect AI vendor API keys to Happy cloud
 
 ${chalk.bold("Usage:")}
@@ -84,13 +85,13 @@ async function handleConnectVendor(
   vendor: "codex" | "claude" | "gemini",
   displayName: string,
 ): Promise<void> {
-  console.log(chalk.bold(`\n🔌 Connecting ${displayName} to Happy cloud\n`));
+  logger.print(chalk.bold(`\n🔌 Connecting ${displayName} to Happy cloud\n`));
 
   // Check if authenticated
   const credentials = await readCredentials();
   if (!credentials) {
-    console.log(chalk.yellow("⚠️  Not authenticated with Happy"));
-    console.log(chalk.gray('  Please run "happy auth login" first'));
+    logger.print(chalk.yellow("⚠️  Not authenticated with Happy"));
+    logger.print(chalk.gray('  Please run "happy auth login" first'));
     process.exit(1);
   }
 
@@ -99,22 +100,22 @@ async function handleConnectVendor(
 
   // Handle vendor authentication
   if (vendor === "codex") {
-    console.log("🚀 Registering Codex token with server");
+    logger.print("🚀 Registering Codex token with server");
     const codexAuthTokens = await authenticateCodex();
     await api.registerVendorToken("openai", { oauth: codexAuthTokens });
-    console.log("✅ Codex token registered with server");
+    logger.print("✅ Codex token registered with server");
     process.exit(0);
   } else if (vendor === "claude") {
-    console.log("🚀 Registering Anthropic token with server");
+    logger.print("🚀 Registering Anthropic token with server");
     const anthropicAuthTokens = await authenticateClaude();
     await api.registerVendorToken("anthropic", { oauth: anthropicAuthTokens });
-    console.log("✅ Anthropic token registered with server");
+    logger.print("✅ Anthropic token registered with server");
     process.exit(0);
   } else if (vendor === "gemini") {
-    console.log("🚀 Registering Gemini token with server");
+    logger.print("🚀 Registering Gemini token with server");
     const geminiAuthTokens = await authenticateGemini();
     await api.registerVendorToken("gemini", { oauth: geminiAuthTokens });
-    console.log("✅ Gemini token registered with server");
+    logger.print("✅ Gemini token registered with server");
 
     // Also update local Gemini config to keep tokens in sync
     updateLocalGeminiCredentials(geminiAuthTokens);
@@ -129,13 +130,13 @@ async function handleConnectVendor(
  * Show connection status for all vendors
  */
 async function handleConnectStatus(): Promise<void> {
-  console.log(chalk.bold("\n🔌 Connection Status\n"));
+  logger.print(chalk.bold("\n🔌 Connection Status\n"));
 
   // Check if authenticated
   const credentials = await readCredentials();
   if (!credentials) {
-    console.log(chalk.yellow("⚠️  Not authenticated with Happy"));
-    console.log(chalk.gray('  Please run "happy auth login" first'));
+    logger.print(chalk.yellow("⚠️  Not authenticated with Happy"));
+    logger.print(chalk.gray('  Please run "happy auth login" first'));
     process.exit(1);
   }
 
@@ -177,30 +178,30 @@ async function handleConnectStatus(): Promise<void> {
         const isExpired = expiresAt && expiresAt < Date.now();
 
         if (isExpired) {
-          console.log(
+          logger.print(
             `  ${chalk.yellow("⚠️")}  ${vendor.display}: ${chalk.yellow("expired")}${userInfo}`,
           );
         } else {
-          console.log(
+          logger.print(
             `  ${chalk.green("✓")}  ${vendor.display}: ${chalk.green("connected")}${userInfo}`,
           );
         }
       } else {
-        console.log(
+        logger.print(
           `  ${chalk.gray("○")}  ${vendor.display}: ${chalk.gray("not connected")}`,
         );
       }
     } catch {
-      console.log(
+      logger.print(
         `  ${chalk.gray("○")}  ${vendor.display}: ${chalk.gray("not connected")}`,
       );
     }
   }
 
-  console.log("");
-  console.log(chalk.gray("To connect a vendor, run: happy connect <vendor>"));
-  console.log(chalk.gray("Example: happy connect gemini"));
-  console.log("");
+  logger.print("");
+  logger.print(chalk.gray("To connect a vendor, run: happy connect <vendor>"));
+  logger.print(chalk.gray("Example: happy connect gemini"));
+  logger.print("");
 }
 
 /**
@@ -239,10 +240,10 @@ function updateLocalGeminiCredentials(tokens: {
       JSON.stringify(credentials, null, 2),
       "utf-8",
     );
-    console.log(chalk.gray(`  Updated local credentials: ${credentialsPath}`));
+    logger.print(chalk.gray(`  Updated local credentials: ${credentialsPath}`));
   } catch (error) {
     // Non-critical error - server tokens will still work
-    console.log(
+    logger.print(
       chalk.yellow(`  ⚠️ Could not update local credentials: ${error}`),
     );
   }

@@ -2,6 +2,7 @@ import chalk from "chalk";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { generateWorktreeName } from "@/utils/generateWorktreeName";
+import { logger } from "@/ui/logger";
 
 const execAsync = promisify(exec);
 
@@ -38,14 +39,14 @@ export async function handleWorktreeCommand(args: string[]): Promise<void> {
       await handleWorktreeRemove(args[1]);
       break;
     default:
-      console.error(chalk.red(`Unknown worktree subcommand: ${subcommand}`));
+      logger.printError(chalk.red(`Unknown worktree subcommand: ${subcommand}`));
       showWorktreeHelp();
       process.exit(1);
   }
 }
 
 function showWorktreeHelp(): void {
-  console.log(`
+  logger.print(`
 ${chalk.bold("happy worktree")} - Manage git worktrees for isolated development
 
 ${chalk.bold("Usage:")}
@@ -110,7 +111,7 @@ async function handleWorktreeList(): Promise<void> {
   try {
     await execAsync("git rev-parse --git-dir", { cwd, timeout: 5000 });
   } catch {
-    console.error(chalk.red("Not a git repository"));
+    logger.printError(chalk.red("Not a git repository"));
     process.exit(1);
   }
 
@@ -118,18 +119,18 @@ async function handleWorktreeList(): Promise<void> {
   const happyEntries = entries.filter((e) => e.isHappyManaged);
 
   if (happyEntries.length === 0) {
-    console.log(chalk.dim("No Happy-managed worktrees found."));
-    console.log(chalk.dim("Use `happy worktree create` to create one."));
+    logger.print(chalk.dim("No Happy-managed worktrees found."));
+    logger.print(chalk.dim("Use `happy worktree create` to create one."));
     return;
   }
 
-  console.log(chalk.bold(`Happy Worktrees (${happyEntries.length}):\n`));
+  logger.print(chalk.bold(`Happy Worktrees (${happyEntries.length}):\n`));
   for (const entry of happyEntries) {
     const name = entry.path.split(".dev/worktree/").pop() || entry.branch;
-    console.log(
+    logger.print(
       `  ${chalk.green(name)}  ${chalk.dim(entry.commit)}  ${chalk.cyan(entry.branch)}`,
     );
-    console.log(`    ${chalk.dim(entry.path)}`);
+    logger.print(`    ${chalk.dim(entry.path)}`);
   }
 }
 
@@ -139,7 +140,7 @@ async function handleWorktreeCreate(repoPath?: string): Promise<void> {
   try {
     await execAsync("git rev-parse --git-dir", { cwd, timeout: 5000 });
   } catch {
-    console.error(chalk.red("Not a git repository"));
+    logger.printError(chalk.red("Not a git repository"));
     process.exit(1);
   }
 
@@ -152,7 +153,7 @@ async function handleWorktreeCreate(repoPath?: string): Promise<void> {
   const name = generateWorktreeName();
   const worktreePath = `.dev/worktree/${name}`;
 
-  console.log(
+  logger.print(
     chalk.dim(`Creating worktree '${name}' from ${parentBranch.trim()}...`),
   );
 
@@ -178,11 +179,11 @@ async function handleWorktreeCreate(repoPath?: string): Promise<void> {
             cwd,
             timeout: 30000,
           });
-          console.log(chalk.green(`Worktree created: ${retryName}`));
-          console.log(chalk.dim(`  Path: ${cwd}/${retryPath}`));
-          console.log(chalk.dim(`  Branch: ${retryName}`));
-          console.log(chalk.dim(`  Parent: ${parentBranch.trim()}`));
-          console.log(
+          logger.print(chalk.green(`Worktree created: ${retryName}`));
+          logger.print(chalk.dim(`  Path: ${cwd}/${retryPath}`));
+          logger.print(chalk.dim(`  Branch: ${retryName}`));
+          logger.print(chalk.dim(`  Parent: ${parentBranch.trim()}`));
+          logger.print(
             `\nTo start a session: ${chalk.cyan(`cd ${cwd}/${retryPath} && happy`)}`,
           );
           return;
@@ -192,24 +193,24 @@ async function handleWorktreeCreate(repoPath?: string): Promise<void> {
       }
     }
 
-    console.error(chalk.red(`Failed to create worktree: ${errorMsg}`));
+    logger.printError(chalk.red(`Failed to create worktree: ${errorMsg}`));
     process.exit(1);
   }
 
-  console.log(chalk.green(`Worktree created: ${name}`));
-  console.log(chalk.dim(`  Path: ${cwd}/${worktreePath}`));
-  console.log(chalk.dim(`  Branch: ${name}`));
-  console.log(chalk.dim(`  Parent: ${parentBranch.trim()}`));
-  console.log(
+  logger.print(chalk.green(`Worktree created: ${name}`));
+  logger.print(chalk.dim(`  Path: ${cwd}/${worktreePath}`));
+  logger.print(chalk.dim(`  Branch: ${name}`));
+  logger.print(chalk.dim(`  Parent: ${parentBranch.trim()}`));
+  logger.print(
     `\nTo start a session: ${chalk.cyan(`cd ${cwd}/${worktreePath} && happy`)}`,
   );
 }
 
 async function handleWorktreeRemove(name?: string): Promise<void> {
   if (!name) {
-    console.error(chalk.red("Please specify the worktree name to remove."));
-    console.error(chalk.dim("Usage: happy worktree remove <name>"));
-    console.error(
+    logger.printError(chalk.red("Please specify the worktree name to remove."));
+    logger.printError(chalk.dim("Usage: happy worktree remove <name>"));
+    logger.printError(
       chalk.dim("Use `happy worktree list` to see available worktrees."),
     );
     process.exit(1);
@@ -220,7 +221,7 @@ async function handleWorktreeRemove(name?: string): Promise<void> {
   try {
     await execAsync("git rev-parse --git-dir", { cwd, timeout: 5000 });
   } catch {
-    console.error(chalk.red("Not a git repository"));
+    logger.printError(chalk.red("Not a git repository"));
     process.exit(1);
   }
 
@@ -239,16 +240,16 @@ async function handleWorktreeRemove(name?: string): Promise<void> {
       cwd,
       timeout: 30000,
     });
-    console.log(chalk.green(`Worktree removed: ${name}`));
+    logger.print(chalk.green(`Worktree removed: ${name}`));
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
     if (errorMsg.includes("not a working tree")) {
-      console.error(chalk.red(`Worktree '${name}' not found.`));
-      console.error(
+      logger.printError(chalk.red(`Worktree '${name}' not found.`));
+      logger.printError(
         chalk.dim("Use `happy worktree list` to see available worktrees."),
       );
     } else if (errorMsg.includes("contains modified or untracked files")) {
-      console.error(
+      logger.printError(
         chalk.yellow(
           `Worktree '${name}' has uncommitted changes. Use --force to remove anyway.`,
         ),
@@ -256,7 +257,7 @@ async function handleWorktreeRemove(name?: string): Promise<void> {
       // Don't force remove by default — that would destroy work
       process.exit(1);
     } else {
-      console.error(chalk.red(`Failed to remove worktree: ${errorMsg}`));
+      logger.printError(chalk.red(`Failed to remove worktree: ${errorMsg}`));
       process.exit(1);
     }
     return;
@@ -265,18 +266,18 @@ async function handleWorktreeRemove(name?: string): Promise<void> {
   // Try to delete the branch (safe delete — fails if not merged)
   try {
     await execAsync(`git branch -d "${name}"`, { cwd, timeout: 10000 });
-    console.log(chalk.green(`Branch deleted: ${name}`));
+    logger.print(chalk.green(`Branch deleted: ${name}`));
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "";
     if (errorMsg.includes("not fully merged")) {
-      console.log(
+      logger.print(
         chalk.yellow(
           `Branch '${name}' not deleted (not fully merged). Use \`git branch -D ${name}\` to force delete.`,
         ),
       );
     } else {
       // Branch might not exist or already deleted
-      console.log(chalk.dim(`Branch '${name}' already removed or not found.`));
+      logger.print(chalk.dim(`Branch '${name}' already removed or not found.`));
     }
   }
 }

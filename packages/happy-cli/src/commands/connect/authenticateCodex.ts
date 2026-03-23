@@ -9,6 +9,7 @@ import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { randomBytes, createHash } from 'crypto';
 import { CodexAuthTokens, PKCECodes } from './types';
 import { openBrowser } from '@/utils/browser';
+import { logger } from '@/ui/logger';
 
 // Configuration
 const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
@@ -261,8 +262,8 @@ export async function authenticateCodex(): Promise<CodexAuthTokens> {
     // Use /oauth/authorize path
     const authUrl = `${AUTH_BASE_URL}/oauth/authorize?${queryString}`;
 
-    console.log('📋 Opening browser for authentication...');
-    console.log(`If browser doesn't open, visit:\n${authUrl}\n`);
+    logger.print('📋 Opening browser for authentication...');
+    logger.print(`If browser doesn't open, visit:\n${authUrl}\n`);
 
     // Open browser AFTER server is running
     await openBrowser(authUrl);
@@ -270,7 +271,7 @@ export async function authenticateCodex(): Promise<CodexAuthTokens> {
     // Wait for authentication and return tokens
     const tokens = await serverPromise;
 
-    console.log('🎉 Authentication successful!');
+    logger.print('🎉 Authentication successful!');
 
     return tokens;
 }

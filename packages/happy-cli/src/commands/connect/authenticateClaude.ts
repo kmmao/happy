@@ -9,6 +9,7 @@ import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { randomBytes, createHash } from 'crypto';
 import { openBrowser } from '@/utils/browser';
 import { ClaudeAuthTokens, PKCECodes } from './types';
+import { logger } from '@/ui/logger';
 
 // Anthropic OAuth Configuration for Claude.ai
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
@@ -204,7 +205,7 @@ async function startCallbackServer(
  * @returns Promise resolving to AnthropicAuthTokens with all token information
  */
 export async function authenticateClaude(): Promise<ClaudeAuthTokens> {
-    console.log('🚀 Starting Anthropic Claude authentication...');
+    logger.print('🚀 Starting Anthropic Claude authentication...');
 
     // Generate PKCE codes and state
     const { verifier, challenge } = generatePKCE();
@@ -215,11 +216,11 @@ export async function authenticateClaude(): Promise<ClaudeAuthTokens> {
     const portAvailable = await isPortAvailable(port);
 
     if (!portAvailable) {
-        console.log(`Port ${port} is in use, finding an available port...`);
+        logger.print(`Port ${port} is in use, finding an available port...`);
         port = await findAvailablePort();
     }
 
-    console.log(`📡 Using callback port: ${port}`);
+    logger.print(`📡 Using callback port: ${port}`);
 
     // Start callback server FIRST (before opening browser)
     const serverPromise = startCallbackServer(state, verifier, port);
@@ -244,11 +245,11 @@ export async function authenticateClaude(): Promise<ClaudeAuthTokens> {
 
     const authUrl = `${CLAUDE_AI_AUTHORIZE_URL}?${params}`;
 
-    console.log('📋 Opening browser for authentication...');
-    console.log('If browser doesn\'t open, visit this URL:');
-    console.log();
-    console.log(`${authUrl}`);
-    console.log();
+    logger.print('📋 Opening browser for authentication...');
+    logger.print('If browser doesn\'t open, visit this URL:');
+    logger.print();
+    logger.print(`${authUrl}`);
+    logger.print();
 
     // Open browser AFTER server is running
     await openBrowser(authUrl);
@@ -257,12 +258,12 @@ export async function authenticateClaude(): Promise<ClaudeAuthTokens> {
     try {
         const tokens = await serverPromise;
 
-        console.log('🎉 Authentication successful!');
-        console.log('✅ OAuth tokens received');
+        logger.print('🎉 Authentication successful!');
+        logger.print('✅ OAuth tokens received');
 
         return tokens;
     } catch (error) {
-        console.error('\n❌ Failed to authenticate with Anthropic');
+        logger.printError('\n❌ Failed to authenticate with Anthropic');
         throw error;
     }
 }

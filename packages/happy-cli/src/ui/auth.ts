@@ -20,7 +20,7 @@ export async function doAuth(): Promise<Credentials | null> {
     // Show authentication method selector
     const authMethod = await selectAuthenticationMethod();
     if (!authMethod) {
-        console.log('\nAuthentication cancelled.\n');
+        logger.print('\nAuthentication cancelled.\n');
         process.exit(0);
     }
 
@@ -31,21 +31,21 @@ export async function doAuth(): Promise<Credentials | null> {
     // Create a new authentication request
     try {
         if (process.env.DEBUG) {
-            console.log(`[AUTH DEBUG] Sending auth request to: ${configuration.serverUrl}/v1/auth/request`);
-            console.log(`[AUTH DEBUG] Public key: ${encodeBase64(keypair.publicKey).substring(0, 20)}...`);
+            logger.infoDeveloper(`[AUTH DEBUG] Sending auth request to: ${configuration.serverUrl}/v1/auth/request`);
+            logger.infoDeveloper(`[AUTH DEBUG] Public key: ${encodeBase64(keypair.publicKey).substring(0, 20)}...`);
         }
         await axios.post(`${configuration.serverUrl}/v1/auth/request`, {
             publicKey: encodeBase64(keypair.publicKey),
             supportsV2: true
         });
         if (process.env.DEBUG) {
-            console.log(`[AUTH DEBUG] Auth request sent successfully`);
+            logger.infoDeveloper(`[AUTH DEBUG] Auth request sent successfully`);
         }
     } catch (error) {
         if (process.env.DEBUG) {
-            console.log(`[AUTH DEBUG] Failed to send auth request:`, error);
+            logger.infoDeveloper(`[AUTH DEBUG] Failed to send auth request: ${error}`);
         }
-        console.log('Failed to create authentication request, please try again later.');
+        logger.print('Failed to create authentication request, please try again later.');
         return null;
     }
 
@@ -92,15 +92,15 @@ function selectAuthenticationMethod(): Promise<AuthMethod | null> {
  */
 async function doMobileAuth(keypair: tweetnacl.BoxKeyPair): Promise<Credentials | null> {
     console.clear();
-    console.log('\nMobile Authentication\n');
-    console.log('Scan this QR code with your Happy mobile app:\n');
+    logger.print('\nMobile Authentication\n');
+    logger.print('Scan this QR code with your Happy mobile app:\n');
 
     const authUrl = 'happy://terminal?' + encodeBase64Url(keypair.publicKey);
     displayQRCode(authUrl);
 
-    console.log('\nOr manually enter this URL:');
-    console.log(authUrl);
-    console.log('');
+    logger.print('\nOr manually enter this URL:');
+    logger.print(authUrl);
+    logger.print('');
 
     return await waitForAuthentication(keypair);
 }
@@ -110,27 +110,27 @@ async function doMobileAuth(keypair: tweetnacl.BoxKeyPair): Promise<Credentials 
  */
 async function doWebAuth(keypair: tweetnacl.BoxKeyPair): Promise<Credentials | null> {
     console.clear();
-    console.log('\nWeb Authentication\n');
+    logger.print('\nWeb Authentication\n');
 
     const webUrl = generateWebAuthUrl(keypair.publicKey);
-    console.log('Opening your browser...');
+    logger.print('Opening your browser...');
 
     const browserOpened = await openBrowser(webUrl);
 
     if (browserOpened) {
-        console.log('✓ Browser opened\n');
-        console.log('Complete authentication in your browser window.');
+        logger.print('✓ Browser opened\n');
+        logger.print('Complete authentication in your browser window.');
     } else {
-        console.log('Could not open browser automatically.');
+        logger.print('Could not open browser automatically.');
     }
 
     // I changed this to always show the URL because we got a report from
     // someone running happy inside a devcontainer that they saw the
     // "Complete authentication in your browser window." but nothing opened.
     // https://github.com/slopus/happy/issues/19
-    console.log('\nIf the browser did not open, please copy and paste this URL:');
-    console.log(webUrl);
-    console.log('');
+    logger.print('\nIf the browser did not open, please copy and paste this URL:');
+    logger.print(webUrl);
+    logger.print('');
 
     return await waitForAuthentication(keypair);
 }
@@ -146,7 +146,7 @@ async function waitForAuthentication(keypair: tweetnacl.BoxKeyPair): Promise<Cre
     // Handle Ctrl-C during waiting
     const handleInterrupt = () => {
         cancelled = true;
-        console.log('\n\nAuthentication cancelled.');
+        logger.print('\n\nAuthentication cancelled.');
         process.exit(0);
     };
 
@@ -170,7 +170,7 @@ async function waitForAuthentication(keypair: tweetnacl.BoxKeyPair): Promise<Cre
                                 token: token
                             }
                             await writeCredentialsLegacy(credentials);
-                            console.log('\n\n✓ Authentication successful\n');
+                            logger.print('\n\n✓ Authentication successful\n');
                             return {
                                 encryption: {
                                     type: 'legacy',
@@ -186,7 +186,7 @@ async function waitForAuthentication(keypair: tweetnacl.BoxKeyPair): Promise<Cre
                                     token: token
                                 }
                                 await writeCredentialsDataKey(credentials);
-                                console.log('\n\n✓ Authentication successful\n');
+                                logger.print('\n\n✓ Authentication successful\n');
                                 return {
                                     encryption: {
                                         type: 'dataKey',
@@ -196,17 +196,17 @@ async function waitForAuthentication(keypair: tweetnacl.BoxKeyPair): Promise<Cre
                                     token: token
                                 };
                             } else {
-                                console.log('\n\nFailed to decrypt response. Please try again.');
+                                logger.print('\n\nFailed to decrypt response. Please try again.');
                                 return null;
                             }
                         }
                     } else {
-                        console.log('\n\nFailed to decrypt response. Please try again.');
+                        logger.print('\n\nFailed to decrypt response. Please try again.');
                         return null;
                     }
                 }
             } catch (error) {
-                console.log('\n\nFailed to check authentication status. Please try again.');
+                logger.print('\n\nFailed to check authentication status. Please try again.');
                 return null;
             }
 

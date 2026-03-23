@@ -10,6 +10,7 @@ import { randomBytes, createHash } from 'crypto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { GeminiAuthTokens, PKCECodes } from './types';
+import { logger } from '@/ui/logger';
 
 const execAsync = promisify(exec);
 
@@ -201,7 +202,7 @@ async function startCallbackServer(
  * @returns Promise resolving to GeminiAuthTokens with all token information
  */
 export async function authenticateGemini(): Promise<GeminiAuthTokens> {
-    console.log('🚀 Starting Google Gemini authentication...');
+    logger.print('🚀 Starting Google Gemini authentication...');
     
     // Generate PKCE codes and state
     const { verifier, challenge } = generatePKCE();
@@ -212,11 +213,11 @@ export async function authenticateGemini(): Promise<GeminiAuthTokens> {
     const portAvailable = await isPortAvailable(port);
     
     if (!portAvailable) {
-        console.log(`Port ${port} is in use, finding an available port...`);
+        logger.print(`Port ${port} is in use, finding an available port...`);
         port = await findAvailablePort();
     }
     
-    console.log(`📡 Using callback port: ${port}`);
+    logger.print(`📡 Using callback port: ${port}`);
     
     // Start callback server FIRST (before opening browser)
     const serverPromise = startCallbackServer(state, verifier, port);
@@ -241,9 +242,9 @@ export async function authenticateGemini(): Promise<GeminiAuthTokens> {
     
     const authUrl = `${AUTHORIZE_URL}?${params}`;
     
-    console.log('\n📋 Opening browser for authentication...');
-    console.log('If browser doesn\'t open, visit this URL:');
-    console.log(`\n${authUrl}\n`);
+    logger.print('\n📋 Opening browser for authentication...');
+    logger.print('If browser doesn\'t open, visit this URL:');
+    logger.print(`\n${authUrl}\n`);
     
     // Open browser AFTER server is running
     const platform = process.platform;
@@ -255,19 +256,19 @@ export async function authenticateGemini(): Promise<GeminiAuthTokens> {
     try {
         await execAsync(`${openCommand} "${authUrl}"`);
     } catch {
-        console.log('⚠️  Could not open browser automatically');
+        logger.print('⚠️  Could not open browser automatically');
     }
     
     // Wait for authentication and return tokens
     try {
         const tokens = await serverPromise;
         
-        console.log('\n🎉 Authentication successful!');
-        console.log('✅ OAuth tokens received');
+        logger.print('\n🎉 Authentication successful!');
+        logger.print('✅ OAuth tokens received');
         
         return tokens;
     } catch (error) {
-        console.error('\n❌ Failed to authenticate with Google');
+        logger.printError('\n❌ Failed to authenticate with Google');
         throw error;
     }
 }

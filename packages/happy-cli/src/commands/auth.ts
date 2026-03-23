@@ -27,14 +27,14 @@ export async function handleAuthCommand(args: string[]): Promise<void> {
       await handleAuthStatus();
       break;
     default:
-      console.error(chalk.red(`Unknown auth subcommand: ${subcommand}`));
+      logger.printError(chalk.red(`Unknown auth subcommand: ${subcommand}`));
       showAuthHelp();
       process.exit(1);
   }
 }
 
 function showAuthHelp(): void {
-  console.log(`
+  logger.print(`
 ${chalk.bold('happy auth')} - Authentication management
 
 ${chalk.bold('Usage:')}
@@ -57,31 +57,31 @@ async function handleAuthLogin(args: string[]): Promise<void> {
 
   if (forceAuth) {
     // As per user's request: "--force-auth will clear credentials, clear machine ID, stop daemon"
-    console.log(chalk.yellow('Force authentication requested.'));
-    console.log(chalk.gray('This will:'));
-    console.log(chalk.gray('  • Clear existing credentials'));
-    console.log(chalk.gray('  • Clear machine ID'));
-    console.log(chalk.gray('  • Stop daemon if running'));
-    console.log(chalk.gray('  • Re-authenticate and register machine\n'));
+    logger.print(chalk.yellow('Force authentication requested.'));
+    logger.print(chalk.gray('This will:'));
+    logger.print(chalk.gray('  • Clear existing credentials'));
+    logger.print(chalk.gray('  • Clear machine ID'));
+    logger.print(chalk.gray('  • Stop daemon if running'));
+    logger.print(chalk.gray('  • Re-authenticate and register machine\n'));
 
     // Stop daemon if running
     try {
       logger.debug('Stopping daemon for force auth...');
       await stopDaemon();
-      console.log(chalk.gray('✓ Stopped daemon'));
+      logger.print(chalk.gray('✓ Stopped daemon'));
     } catch (error) {
       logger.debug('Daemon was not running or failed to stop:', error);
     }
 
     // Clear credentials
     await clearCredentials();
-    console.log(chalk.gray('✓ Cleared credentials'));
+    logger.print(chalk.gray('✓ Cleared credentials'));
 
     // Clear machine ID
     await clearMachineId();
-    console.log(chalk.gray('✓ Cleared machine ID'));
+    logger.print(chalk.gray('✓ Cleared machine ID'));
 
-    console.log('');
+    logger.print('');
   }
 
   // Check if already authenticated (if not forcing)
@@ -90,15 +90,15 @@ async function handleAuthLogin(args: string[]): Promise<void> {
     const settings = await readSettings();
 
     if (existingCreds && settings?.machineId) {
-      console.log(chalk.green('✓ Already authenticated'));
-      console.log(chalk.gray(`  Machine ID: ${settings.machineId}`));
-      console.log(chalk.gray(`  Host: ${os.hostname()}`));
-      console.log(chalk.gray(`  Use 'happy auth login --force' to re-authenticate`));
+      logger.print(chalk.green('✓ Already authenticated'));
+      logger.print(chalk.gray(`  Machine ID: ${settings.machineId}`));
+      logger.print(chalk.gray(`  Host: ${os.hostname()}`));
+      logger.print(chalk.gray(`  Use 'happy auth login --force' to re-authenticate`));
       return;
     } else if (existingCreds && !settings?.machineId) {
-      console.log(chalk.yellow('⚠️  Credentials exist but machine ID is missing'));
-      console.log(chalk.gray('  This can happen if --auth flag was used previously'));
-      console.log(chalk.gray('  Fixing by setting up machine...\n'));
+      logger.print(chalk.yellow('⚠️  Credentials exist but machine ID is missing'));
+      logger.print(chalk.gray('  This can happen if --auth flag was used previously'));
+      logger.print(chalk.gray('  Fixing by setting up machine...\n'));
     }
   }
 
@@ -106,10 +106,10 @@ async function handleAuthLogin(args: string[]): Promise<void> {
   // "Finally we'll run the auth and setup machine if needed"
   try {
     const result = await authAndSetupMachineIfNeeded();
-    console.log(chalk.green('\n✓ Authentication successful'));
-    console.log(chalk.gray(`  Machine ID: ${result.machineId}`));
+    logger.print(chalk.green('\n✓ Authentication successful'));
+    logger.print(chalk.gray(`  Machine ID: ${result.machineId}`));
   } catch (error) {
-    console.error(chalk.red('Authentication failed:'), error instanceof Error ? error.message : 'Unknown error');
+    logger.printError(chalk.red('Authentication failed:'), error instanceof Error ? error.message : 'Unknown error');
     process.exit(1);
   }
 }
@@ -121,12 +121,12 @@ async function handleAuthLogout(): Promise<void> {
   // Check if authenticated
   const credentials = await readCredentials();
   if (!credentials) {
-    console.log(chalk.yellow('Not currently authenticated'));
+    logger.print(chalk.yellow('Not currently authenticated'));
     return;
   }
 
-  console.log(chalk.blue('This will log you out of Happy'));
-  console.log(chalk.yellow('⚠️  You will need to re-authenticate to use Happy again'));
+  logger.print(chalk.blue('This will log you out of Happy'));
+  logger.print(chalk.yellow('⚠️  You will need to re-authenticate to use Happy again'));
 
   // Ask for confirmation
   const rl = createInterface({
@@ -145,7 +145,7 @@ async function handleAuthLogout(): Promise<void> {
       // Stop daemon if running
       try {
         await stopDaemon();
-        console.log(chalk.gray('Stopped daemon'));
+        logger.print(chalk.gray('Stopped daemon'));
       } catch { }
 
       // Remove entire happy directory (as current logout does)
@@ -153,13 +153,13 @@ async function handleAuthLogout(): Promise<void> {
         rmSync(happyDir, { recursive: true, force: true });
       }
 
-      console.log(chalk.green('✓ Successfully logged out'));
-      console.log(chalk.gray('  Run "happy auth login" to authenticate again'));
+      logger.print(chalk.green('✓ Successfully logged out'));
+      logger.print(chalk.gray('  Run "happy auth login" to authenticate again'));
     } catch (error) {
       throw new Error(`Failed to logout: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   } else {
-    console.log(chalk.blue('Logout cancelled'));
+    logger.print(chalk.blue('Logout cancelled'));
   }
 }
 
@@ -167,42 +167,42 @@ async function handleAuthStatus(): Promise<void> {
   const credentials = await readCredentials();
   const settings = await readSettings();
 
-  console.log(chalk.bold('\nAuthentication Status\n'));
+  logger.print(chalk.bold('\nAuthentication Status\n'));
 
   if (!credentials) {
-    console.log(chalk.red('✗ Not authenticated'));
-    console.log(chalk.gray('  Run "happy auth login" to authenticate'));
+    logger.print(chalk.red('✗ Not authenticated'));
+    logger.print(chalk.gray('  Run "happy auth login" to authenticate'));
     return;
   }
 
-  console.log(chalk.green('✓ Authenticated'));
+  logger.print(chalk.green('✓ Authenticated'));
 
   // Token preview (first few chars for security)
   const tokenPreview = credentials.token.substring(0, 30) + '...';
-  console.log(chalk.gray(`  Token: ${tokenPreview}`));
+  logger.print(chalk.gray(`  Token: ${tokenPreview}`));
 
   // Machine status
   if (settings?.machineId) {
-    console.log(chalk.green('✓ Machine registered'));
-    console.log(chalk.gray(`  Machine ID: ${settings.machineId}`));
-    console.log(chalk.gray(`  Host: ${os.hostname()}`));
+    logger.print(chalk.green('✓ Machine registered'));
+    logger.print(chalk.gray(`  Machine ID: ${settings.machineId}`));
+    logger.print(chalk.gray(`  Host: ${os.hostname()}`));
   } else {
-    console.log(chalk.yellow('⚠️  Machine not registered'));
-    console.log(chalk.gray('  Run "happy auth login --force" to fix this'));
+    logger.print(chalk.yellow('⚠️  Machine not registered'));
+    logger.print(chalk.gray('  Run "happy auth login --force" to fix this'));
   }
 
   // Data location
-  console.log(chalk.gray(`\n  Data directory: ${configuration.happyHomeDir}`));
+  logger.print(chalk.gray(`\n  Data directory: ${configuration.happyHomeDir}`));
 
   // Daemon status
   try {
     const running = (await checkDaemonStatus()).status === 'running';
     if (running) {
-      console.log(chalk.green('✓ Daemon running'));
+      logger.print(chalk.green('✓ Daemon running'));
     } else {
-      console.log(chalk.gray('✗ Daemon not running'));
+      logger.print(chalk.gray('✗ Daemon not running'));
     }
   } catch {
-    console.log(chalk.gray('✗ Daemon not running'));
+    logger.print(chalk.gray('✗ Daemon not running'));
   }
 }

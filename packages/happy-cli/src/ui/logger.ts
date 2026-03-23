@@ -143,6 +143,26 @@ class Logger {
     this.logToConsole('warn', '', message, ...args)
     this.debug(`[WARN] ${message}`, ...args)
   }
+
+  /**
+   * Print to console and log to file with no formatting prefix.
+   * Use for CLI command UI output that should also be recorded in logs.
+   */
+  print(...args: unknown[]): void {
+    console.log(...args)
+    const message = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')
+    this.logToFile(`[${this.localTimezoneTimestamp()}] [PRINT]`, message)
+  }
+
+  /**
+   * Print error to stderr and log to file.
+   * Use for CLI command error output that should also be recorded in logs.
+   */
+  printError(...args: unknown[]): void {
+    console.error(...args)
+    const message = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')
+    this.logToFile(`[${this.localTimezoneTimestamp()}] [ERROR]`, message)
+  }
   
   getLogPath(): string {
     return this.logFilePath
