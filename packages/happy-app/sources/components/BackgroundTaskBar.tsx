@@ -148,6 +148,7 @@ function TaskItem({
     const { lastLine, isDead } = useBackgroundTaskLastLine(
         sessionId,
         task.outputFile,
+        task.command,
         task.isBackground && task.status === "running",
     );
 
