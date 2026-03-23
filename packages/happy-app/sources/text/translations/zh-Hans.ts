@@ -910,6 +910,7 @@ export const zhHans: TranslationStructure = {
     elevenLabsVoiceId: "Voice ID",
     elevenLabsVoiceIdPlaceholder: "默认：Rachel",
     elevenLabsVoiceIdSubtitle: "留空使用默认语音（Rachel）",
+    elevenLabsConfig: "ElevenLabs",
   },
 
   voiceStatusBar: {
@@ -1108,6 +1109,7 @@ export const zhHans: TranslationStructure = {
     metadataVersion: "元数据版本",
     untitledSession: "无标题会话",
     back: "返回",
+    previousSessions: "历史会话（最近 5 个）",
   },
 
   message: {

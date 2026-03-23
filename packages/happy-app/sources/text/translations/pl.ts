@@ -964,6 +964,7 @@ export const pl: TranslationStructure = {
     elevenLabsVoiceId: "Voice ID",
     elevenLabsVoiceIdPlaceholder: "Domyślny: Rachel",
     elevenLabsVoiceIdSubtitle: "Pozostaw puste dla domyślnego głosu (Rachel)",
+    elevenLabsConfig: "ElevenLabs",
   },
 
   voiceStatusBar: {
@@ -1172,6 +1173,7 @@ export const pl: TranslationStructure = {
     metadataVersion: "Wersja metadanych",
     untitledSession: "Sesja bez nazwy",
     back: "Wstecz",
+    previousSessions: "Poprzednie sesje (do 5 najnowszych)",
   },
 
   message: {

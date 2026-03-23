@@ -1018,6 +1018,7 @@ export const ja: TranslationStructure = {
     elevenLabsVoiceId: "Voice ID",
     elevenLabsVoiceIdPlaceholder: "デフォルト：Rachel",
     elevenLabsVoiceIdSubtitle: "空欄でデフォルト音声（Rachel）を使用",
+    elevenLabsConfig: "ElevenLabs",
   },
 
   voiceStatusBar: {
@@ -1224,6 +1225,7 @@ export const ja: TranslationStructure = {
     metadataVersion: "メタデータバージョン",
     untitledSession: "無題のセッション",
     back: "戻る",
+    previousSessions: "過去のセッション（最新5件）",
   },
 
   message: {

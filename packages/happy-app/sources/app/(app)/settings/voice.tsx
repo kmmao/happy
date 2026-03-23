@@ -70,7 +70,7 @@ function VoiceSettingsScreen() {
 
       {/* ElevenLabs Configuration (shown only when ElevenLabs is selected) */}
       {isElevenLabs && (
-        <ItemGroup title="ElevenLabs">
+        <ItemGroup title={t("settingsVoice.elevenLabsConfig")}>
           <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
             <TextInput
               style={{

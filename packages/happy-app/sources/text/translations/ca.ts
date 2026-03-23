@@ -955,6 +955,7 @@ export const ca: TranslationStructure = {
     elevenLabsVoiceIdPlaceholder: "Predeterminat: Rachel",
     elevenLabsVoiceIdSubtitle:
       "Deixa buit per a la veu predeterminada (Rachel)",
+    elevenLabsConfig: "ElevenLabs",
   },
 
   voiceStatusBar: {
@@ -1164,6 +1165,7 @@ export const ca: TranslationStructure = {
     metadataVersion: "Versió de les metadades",
     untitledSession: "Sessió sense títol",
     back: "Enrere",
+    previousSessions: "Sessions anteriors (fins a 5 més recents)",
   },
 
   message: {

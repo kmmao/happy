@@ -641,7 +641,7 @@ function MachineDetailScreen() {
 
         {/* Previous Sessions (debug view) */}
         {previousSessions.length > 0 && (
-          <ItemGroup title={"Previous Sessions (up to 5 most recent)"}>
+          <ItemGroup title={t("machine.previousSessions")}>
             {previousSessions.map((session) => (
               <Item
                 key={session.id}

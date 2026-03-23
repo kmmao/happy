@@ -966,6 +966,7 @@ export const ru: TranslationStructure = {
     elevenLabsVoiceIdPlaceholder: "По умолчанию: Rachel",
     elevenLabsVoiceIdSubtitle:
       "Оставьте пустым для голоса по умолчанию (Rachel)",
+    elevenLabsConfig: "ElevenLabs",
   },
 
   voiceStatusBar: {
@@ -1159,6 +1160,7 @@ export const ru: TranslationStructure = {
     metadataVersion: "Версия метаданных",
     untitledSession: "Безымянная сессия",
     back: "Назад",
+    previousSessions: "Предыдущие сессии (до 5 последних)",
   },
 
   message: {
