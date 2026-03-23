@@ -176,8 +176,14 @@ export function startSocket(app: Fastify) {
       rpcListeners.set(userId, userRpcListeners);
     }
     rpcHandler(userId, socket, userRpcListeners);
-    // Cleanup empty rpcListeners entry after rpcHandler's disconnect runs
+    // Safety-net cleanup: remove any orphaned entries for this socket,
+    // then delete the user's Map if empty.
     socket.on("disconnect", () => {
+      for (const [method, registeredSocket] of userRpcListeners.entries()) {
+        if (registeredSocket === socket) {
+          userRpcListeners.delete(method);
+        }
+      }
       if (userRpcListeners.size === 0) {
         rpcListeners.delete(userId);
       }
