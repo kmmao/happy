@@ -45,8 +45,8 @@ export function useBackgroundTasks(messages: readonly Message[]): BackgroundTask
 
             const isBackground = Boolean(tool.backgroundTaskId && tool.outputFile);
 
-            // Foreground commands: only show while running
-            if (!isBackground && tool.state !== "running") continue;
+            // Only show tasks that are still running
+            if (tool.state !== "running") continue;
 
             const command =
                 typeof tool.input?.command === "string"
@@ -65,12 +65,7 @@ export function useBackgroundTasks(messages: readonly Message[]): BackgroundTask
                 outputFile: tool.outputFile ?? null,
                 startedAt: tool.startedAt ?? msg.createdAt,
                 isBackground,
-                status:
-                    tool.state === "error"
-                        ? "failed"
-                        : tool.state === "completed"
-                          ? "completed"
-                          : "running",
+                status: "running" as const,
             });
         }
 

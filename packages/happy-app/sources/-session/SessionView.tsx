@@ -339,23 +339,6 @@ function SessionViewInner({
   const { tasks: backgroundTasks, dismissTask: dismissBackgroundTask } = useBackgroundTasks(messages);
   const [viewingTask, setViewingTask] = React.useState<BackgroundTask | null>(null);
 
-  // Auto-dismiss completed/failed tasks after a short delay
-  const viewingTaskRef = React.useRef(viewingTask);
-  viewingTaskRef.current = viewingTask;
-  React.useEffect(() => {
-    const finishedTasks = backgroundTasks.filter((bt) => bt.status !== "running");
-    if (finishedTasks.length === 0) return;
-    const timer = setTimeout(() => {
-      for (const task of finishedTasks) {
-        dismissBackgroundTask(task.taskId);
-        if (viewingTaskRef.current?.taskId === task.taskId) {
-          setViewingTask(null);
-        }
-      }
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [backgroundTasks, dismissBackgroundTask]);
-
   const handleCloseTask = React.useCallback(
     async (task: BackgroundTask) => {
       if (task.status === "running") {
