@@ -23,6 +23,8 @@ import { Text } from "@/components/StyledText";
 import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
 import { usePreview, type DetectedPort } from "@/hooks/usePreview";
+import { useHiddenProcesses } from "@/hooks/useHiddenProcesses";
+import { useSession } from "@/sync/storage";
 import { layout } from "@/components/layout";
 
 type DiffTab = "before" | "after" | "diff";
@@ -41,6 +43,9 @@ export default React.memo(function PreviewPage() {
     clearBaseline,
     compareWithBaseline,
   } = usePreview(sessionId);
+  const session = useSession(sessionId);
+  const machineId = session?.metadata?.machineId;
+  const { filterProcesses } = useHiddenProcesses(machineId);
   const { theme } = useUnistyles();
   const [customUrl, setCustomUrl] = React.useState(initialUrl ?? "");
   const [diffTab, setDiffTab] = React.useState<DiffTab>("after");
@@ -151,7 +156,7 @@ export default React.memo(function PreviewPage() {
   }
 
   const ports = "ports" in state ? state.ports : [];
-  const webPorts = ports.filter((p) => p.isWeb);
+  const webPorts = filterProcesses(ports.filter((p) => p.isWeb));
 
   // Determine which diff image to show
   const getDiffImageUri = (): string | null => {
