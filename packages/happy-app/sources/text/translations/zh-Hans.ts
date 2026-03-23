@@ -2049,6 +2049,8 @@ export const zhHans: TranslationStructure = {
     stop: "停止",
     stopConfirmTitle: "停止任务",
     stopConfirmMessage: "确定要停止这个后台任务吗？",
+    stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `确定要停止「${name}」（端口 ${port}）吗？`,
+    stopConfirmDetailNoPort: ({ name }: { name: string }) => `确定要停止「${name}」吗？`,
   },
 
   processManager: {

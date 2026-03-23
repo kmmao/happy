@@ -2161,6 +2161,8 @@ export const pl: TranslationStructure = {
     stop: "Zatrzymaj",
     stopConfirmTitle: "Zatrzymaj zadanie",
     stopConfirmMessage: "Czy na pewno chcesz zatrzymać to zadanie w tle?",
+    stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Zatrzymać "${name}" na porcie ${port}?`,
+    stopConfirmDetailNoPort: ({ name }: { name: string }) => `Zatrzymać "${name}"?`,
   },
 
   processManager: {

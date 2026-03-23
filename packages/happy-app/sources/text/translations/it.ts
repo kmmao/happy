@@ -2140,6 +2140,8 @@ export const it: TranslationStructure = {
     stop: "Ferma",
     stopConfirmTitle: "Ferma attività",
     stopConfirmMessage: "Sei sicuro di voler fermare questa attività in background?",
+    stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Fermare "${name}" sulla porta ${port}?`,
+    stopConfirmDetailNoPort: ({ name }: { name: string }) => `Fermare "${name}"?`,
   },
 
   processManager: {

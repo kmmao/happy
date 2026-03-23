@@ -2124,6 +2124,8 @@ export const en = {
     stop: "Stop",
     stopConfirmTitle: "Stop Task",
     stopConfirmMessage: "Are you sure you want to stop this background task?",
+    stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Stop "${name}" on port ${port}?`,
+    stopConfirmDetailNoPort: ({ name }: { name: string }) => `Stop "${name}"?`,
   },
 
   processManager: {

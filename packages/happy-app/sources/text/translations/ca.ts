@@ -2146,6 +2146,8 @@ export const ca: TranslationStructure = {
     stop: "Aturar",
     stopConfirmTitle: "Aturar tasca",
     stopConfirmMessage: "Esteu segur que voleu aturar aquesta tasca en segon pla?",
+    stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Aturar "${name}" al port ${port}?`,
+    stopConfirmDetailNoPort: ({ name }: { name: string }) => `Aturar "${name}"?`,
   },
 
   processManager: {

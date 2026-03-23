@@ -32,7 +32,8 @@ export function detectCategory(command: string): TaskCategory {
         /\b(serve|server|dev|start|preview|http\.server|uvicorn|gunicorn|flask run|rails s|php -S)\b/.test(lower) ||
         /\bnext\b/.test(lower) ||
         /\bnuxt\b/.test(lower) ||
-        /\bvite\b(?!st)/.test(lower)
+        /\bvite\b(?!st)/.test(lower) ||
+        /\bdocker\s+run\b/.test(lower)
     ) {
         return "server";
     }
@@ -53,6 +54,10 @@ export function detectCategory(command: string): TaskCategory {
 }
 
 export function extractPort(command: string): string | null {
+    // Docker port mapping: -p 8888:80 → host port 8888
+    const dockerPortMatch = command.match(/-p\s+(\d{2,5}):\d{2,5}\b/);
+    if (dockerPortMatch) return dockerPortMatch[1];
+
     const flagMatch = command.match(/(?:--port|--Port|-p|-P)[=\s]+(\d{2,5})\b/);
     if (flagMatch) return flagMatch[1];
 
@@ -73,6 +78,25 @@ export function extractCommandName(command: string): string {
     if (pyMatch) return pyMatch[1];
     const first = stripped.split(/\s+/)[0];
     return first.split("/").pop() ?? first;
+}
+
+/**
+ * Returns a short tool/runtime tag for display (e.g. "Docker", "Git", "Node").
+ * Falls back to "Bash" for unrecognized commands.
+ */
+export function detectToolTag(command: string): string {
+    const lower = command.toLowerCase();
+    if (/\bdocker\b/.test(lower)) return "Docker";
+    if (/\bgit\b/.test(lower)) return "Git";
+    if (/\b(node|npx|npm|yarn|pnpm|bun)\b/.test(lower)) return "Node";
+    if (/\b(python[23]?|pip|uv|poetry)\b/.test(lower)) return "Python";
+    if (/\b(cargo|rustc)\b/.test(lower)) return "Rust";
+    if (/\bgo\b/.test(lower)) return "Go";
+    if (/\b(java|mvn|gradle)\b/.test(lower)) return "Java";
+    if (/\b(curl|wget|http)\b/.test(lower)) return "HTTP";
+    if (/\b(ssh|scp|rsync)\b/.test(lower)) return "SSH";
+    if (/\b(make|cmake)\b/.test(lower)) return "Make";
+    return "Bash";
 }
 
 export function buildSmartLabel(command: string): string {

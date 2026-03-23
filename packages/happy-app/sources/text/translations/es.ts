@@ -2141,6 +2141,8 @@ export const es: TranslationStructure = {
     stop: "Detener",
     stopConfirmTitle: "Detener tarea",
     stopConfirmMessage: "¿Estás seguro de que quieres detener esta tarea en segundo plano?",
+    stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `¿Detener "${name}" en el puerto ${port}?`,
+    stopConfirmDetailNoPort: ({ name }: { name: string }) => `¿Detener "${name}"?`,
   },
 
   processManager: {

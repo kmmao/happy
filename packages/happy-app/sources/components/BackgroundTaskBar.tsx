@@ -1,27 +1,34 @@
 /**
- * Floating bar above the input area showing active background tasks.
+ * Floating bar above the input area showing active tasks.
  *
- * Each task shows a type icon, smart label (with port if detected),
- * elapsed time, and a tap target to open the log sheet.
+ * Shows two kinds of tasks:
+ * 1. Background tasks (run_in_background) — with log polling, preview, and close button
+ * 2. Foreground commands (regular Bash, running state only) — lightweight display
+ *
+ * Each task shows a type icon, tool tag, smart label (with port if detected),
+ * elapsed time, and optionally the latest log line.
  * Horizontally scrollable when multiple tasks exist.
- * Non-running tasks show a dismiss button. Long press running tasks to stop.
  */
 
 import * as React from "react";
-import { Pressable, ScrollView, View, Text } from "react-native";
+import { Pressable, ScrollView, View, Text, useWindowDimensions } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { layout } from "@/components/layout";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
 import { BackgroundTask } from "@/hooks/useBackgroundTasks";
+import { useBackgroundTaskLastLine } from "@/hooks/useBackgroundTaskLastLine";
 import {
     detectCategory,
     categoryIcon,
     categoryColor,
     buildSmartLabel,
     extractPort,
+    detectToolTag,
 } from "@/utils/commandAnalysis";
 
 type Props = {
+    readonly sessionId: string;
     readonly tasks: readonly BackgroundTask[];
     readonly onViewLog: (task: BackgroundTask) => void;
     readonly onClose: (task: BackgroundTask) => void;
@@ -65,18 +72,27 @@ function statusInfo(
 // ---------------------------------------------------------------------------
 
 function TaskItem({
+    sessionId,
     task,
     onPress,
     onClose,
     onPreview,
 }: {
+    readonly sessionId: string;
     readonly task: BackgroundTask;
-    readonly onPress: () => void;
-    readonly onClose: () => void;
+    readonly onPress?: () => void;
+    readonly onClose?: () => void;
     readonly onPreview?: () => void;
 }) {
     const { theme } = useUnistyles();
     const [elapsed, setElapsed] = React.useState(() => formatElapsed(task.startedAt));
+
+    // Only poll logs for background tasks that have an output file
+    const lastLine = useBackgroundTaskLastLine(
+        sessionId,
+        task.outputFile,
+        task.isBackground && task.status === "running",
+    );
 
     React.useEffect(() => {
         if (task.status !== "running") return;
@@ -87,7 +103,8 @@ function TaskItem({
     }, [task.startedAt, task.status]);
 
     const category = detectCategory(task.command);
-    const label = buildSmartLabel(task.command);
+    const toolTag = detectToolTag(task.command);
+    const label = task.description !== task.command ? task.description : buildSmartLabel(task.command);
     const icon = categoryIcon[category];
     const iconColor = categoryColor[category];
     const status = statusInfo(task.status, theme.colors);
@@ -95,52 +112,76 @@ function TaskItem({
     return (
         <Pressable
             onPress={onPress}
-            style={({ pressed }) => [styles.taskItem, { backgroundColor: `${iconColor}15`, opacity: pressed ? 0.7 : 1 }]}
+            disabled={!onPress}
+            style={({ pressed }) => [
+                styles.taskItem,
+                { backgroundColor: `${iconColor}15`, opacity: pressed && onPress ? 0.7 : 1 },
+            ]}
         >
-            <Ionicons name={icon} size={14} color={iconColor} />
-            <Text
-                style={[styles.taskLabel, { color: theme.colors.text }]}
-                numberOfLines={1}
-            >
-                {label}
-            </Text>
-            <Text style={[styles.statusLabel, { color: status.color }]}>
-                {status.label}
-            </Text>
-            <Text style={[styles.taskElapsed, { color: theme.colors.textSecondary }]}>
-                {elapsed}
-            </Text>
-            {onPreview && (
-                <Pressable
-                    onPress={(e) => {
-                        e.stopPropagation();
-                        onPreview();
-                    }}
-                    hitSlop={8}
-                    style={({ pressed }) => [styles.previewButton, pressed && { opacity: 0.7 }]}
+            <View style={styles.taskTopRow}>
+                <Ionicons name={icon} size={14} color={iconColor} />
+                <View style={[styles.toolTagBadge, { backgroundColor: `${iconColor}20` }]}>
+                    <Text style={[styles.toolTagText, { color: iconColor }]}>
+                        {toolTag}
+                    </Text>
+                </View>
+                <Text
+                    style={[styles.taskLabel, { color: theme.colors.text }]}
+                    numberOfLines={1}
                 >
-                    <Ionicons name="eye-outline" size={14} color={theme.colors.textLink} />
-                </Pressable>
+                    {label}
+                </Text>
+                <Text style={[styles.statusLabel, { color: status.color }]}>
+                    {status.label}
+                </Text>
+                <Text style={[styles.taskElapsed, { color: theme.colors.textSecondary }]}>
+                    {elapsed}
+                </Text>
+                {onPreview && (
+                    <Pressable
+                        onPress={(e) => {
+                            e.stopPropagation();
+                            onPreview();
+                        }}
+                        hitSlop={8}
+                        style={({ pressed }) => [styles.previewButton, pressed && { opacity: 0.7 }]}
+                    >
+                        <Ionicons name="eye-outline" size={14} color={theme.colors.textLink} />
+                    </Pressable>
+                )}
+                {onClose && (
+                    <Pressable
+                        onPress={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                        }}
+                        hitSlop={8}
+                        style={({ pressed }) => [styles.dismissButton, pressed && { opacity: 0.7 }]}
+                    >
+                        <Ionicons name="close" size={12} color={theme.colors.textSecondary} />
+                    </Pressable>
+                )}
+            </View>
+            {lastLine.length > 0 && (
+                <Text
+                    style={[styles.logLine, { color: theme.colors.textSecondary }]}
+                    numberOfLines={1}
+                >
+                    {lastLine}
+                </Text>
             )}
-            <Pressable
-                onPress={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                }}
-                hitSlop={8}
-                style={({ pressed }) => [styles.dismissButton, pressed && { opacity: 0.7 }]}
-            >
-                <Ionicons name="close" size={12} color={theme.colors.textSecondary} />
-            </Pressable>
         </Pressable>
     );
 }
 
-function BackgroundTaskBarInner({ tasks, onViewLog, onClose, onPreview }: Props) {
+function BackgroundTaskBarInner({ sessionId, tasks, onViewLog, onClose, onPreview }: Props) {
+    const { width: windowWidth } = useWindowDimensions();
+    const containerWidth = Math.min(windowWidth, layout.maxWidth);
+
     if (tasks.length === 0) return null;
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { maxWidth: containerWidth, alignSelf: "center", width: "100%" }]}>
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -152,11 +193,13 @@ function BackgroundTaskBarInner({ tasks, onViewLog, onClose, onPreview }: Props)
                     return (
                         <TaskItem
                             key={task.taskId}
+                            sessionId={sessionId}
                             task={task}
-                            onPress={() => onViewLog(task)}
-                            onClose={() => onClose(task)}
+                            // Foreground commands: no log sheet, no close button
+                            onPress={task.isBackground ? () => onViewLog(task) : undefined}
+                            onClose={task.isBackground ? () => onClose(task) : undefined}
                             onPreview={
-                                onPreview && isServer && port && task.status === "running"
+                                onPreview && task.isBackground && isServer && port && task.status === "running"
                                     ? () => onPreview(`http://localhost:${port}`)
                                     : undefined
                             }
@@ -177,15 +220,28 @@ const styles = StyleSheet.create(() => ({
     },
     scrollContent: {
         gap: 8,
-        alignItems: "center",
+        alignItems: "flex-start",
     },
     taskItem: {
+        gap: 4,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+    },
+    taskTopRow: {
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
-        paddingVertical: 5,
-        paddingHorizontal: 10,
-        borderRadius: 16,
+        flexWrap: "nowrap",
+    },
+    toolTagBadge: {
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
+    },
+    toolTagText: {
+        fontSize: 10,
+        fontWeight: "700",
     },
     statusLabel: {
         fontSize: 11,
@@ -194,11 +250,17 @@ const styles = StyleSheet.create(() => ({
     taskLabel: {
         fontSize: 13,
         fontWeight: "500",
-        maxWidth: 200,
+        flexShrink: 1,
     },
     taskElapsed: {
         fontSize: 11,
         opacity: 0.6,
+    },
+    logLine: {
+        fontSize: 11,
+        fontFamily: "monospace",
+        opacity: 0.7,
+        paddingLeft: 20,
     },
     previewButton: {
         marginLeft: 2,

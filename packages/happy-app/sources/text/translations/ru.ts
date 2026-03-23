@@ -2160,6 +2160,8 @@ export const ru: TranslationStructure = {
     stop: "Остановить",
     stopConfirmTitle: "Остановить задачу",
     stopConfirmMessage: "Вы уверены, что хотите остановить эту фоновую задачу?",
+    stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Остановить «${name}» на порту ${port}?`,
+    stopConfirmDetailNoPort: ({ name }: { name: string }) => `Остановить «${name}»?`,
   },
 
   processManager: {

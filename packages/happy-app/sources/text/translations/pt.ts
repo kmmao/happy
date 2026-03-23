@@ -2144,6 +2144,8 @@ export const pt: TranslationStructure = {
     stop: "Parar",
     stopConfirmTitle: "Parar tarefa",
     stopConfirmMessage: "Tem certeza de que deseja parar esta tarefa em segundo plano?",
+    stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Parar "${name}" na porta ${port}?`,
+    stopConfirmDetailNoPort: ({ name }: { name: string }) => `Parar "${name}"?`,
   },
 
   processManager: {

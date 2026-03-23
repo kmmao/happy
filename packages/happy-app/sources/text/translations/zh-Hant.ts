@@ -2051,6 +2051,8 @@ export const zhHant: TranslationStructure = {
     stop: "停止",
     stopConfirmTitle: "停止任務",
     stopConfirmMessage: "確定要停止這個背景任務嗎？",
+    stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `確定要停止「${name}」（連接埠 ${port}）嗎？`,
+    stopConfirmDetailNoPort: ({ name }: { name: string }) => `確定要停止「${name}」嗎？`,
   },
 
   processManager: {

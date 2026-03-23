@@ -2117,6 +2117,8 @@ export const ja: TranslationStructure = {
     stop: "停止",
     stopConfirmTitle: "タスクを停止",
     stopConfirmMessage: "このバックグラウンドタスクを停止しますか？",
+    stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `「${name}」（ポート ${port}）を停止しますか？`,
+    stopConfirmDetailNoPort: ({ name }: { name: string }) => `「${name}」を停止しますか？`,
   },
 
   processManager: {

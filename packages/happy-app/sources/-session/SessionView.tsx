@@ -30,6 +30,7 @@ import { useSessionIssueInfo } from "@/hooks/useSessionIssueInfo";
 import { useBackgroundTasks, BackgroundTask } from "@/hooks/useBackgroundTasks";
 import { BackgroundTaskBar } from "@/components/BackgroundTaskBar";
 import { BackgroundTaskLogSheet } from "@/components/BackgroundTaskLogSheet";
+import { buildSmartLabel, extractPort } from "@/utils/commandAnalysis";
 import { Modal } from "@/modal";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import {
@@ -338,23 +339,43 @@ function SessionViewInner({
   const { tasks: backgroundTasks, dismissTask: dismissBackgroundTask } = useBackgroundTasks(messages);
   const [viewingTask, setViewingTask] = React.useState<BackgroundTask | null>(null);
 
+  // Auto-dismiss completed/failed tasks after a short delay
+  const viewingTaskRef = React.useRef(viewingTask);
+  viewingTaskRef.current = viewingTask;
+  React.useEffect(() => {
+    const finishedTasks = backgroundTasks.filter((bt) => bt.status !== "running");
+    if (finishedTasks.length === 0) return;
+    const timer = setTimeout(() => {
+      for (const task of finishedTasks) {
+        dismissBackgroundTask(task.taskId);
+        if (viewingTaskRef.current?.taskId === task.taskId) {
+          setViewingTask(null);
+        }
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [backgroundTasks, dismissBackgroundTask]);
+
   const handleCloseTask = React.useCallback(
     async (task: BackgroundTask) => {
       if (task.status === "running") {
+        const label = buildSmartLabel(task.command);
+        const port = extractPort(task.command);
+        const detail = port
+          ? t("backgroundTasks.stopConfirmDetail", { name: label, port })
+          : t("backgroundTasks.stopConfirmDetailNoPort", { name: label });
         const confirmed = await Modal.confirm(
           t("backgroundTasks.stopConfirmTitle"),
-          t("backgroundTasks.stopConfirmMessage"),
+          detail,
           { destructive: true, confirmText: t("backgroundTasks.stop") },
         );
         if (!confirmed) return;
 
         try {
-          const portMatch = task.command.match(/(\d{2,5})/);
-          const port = portMatch?.[1];
-          const cmd = port
+          const killCmd = port
             ? `lsof -ti :${port} | xargs kill 2>/dev/null || true`
             : `pkill -f ${JSON.stringify(task.command.slice(0, 60))} 2>/dev/null || true`;
-          await sessionBash(sessionId, { command: cmd });
+          await sessionBash(sessionId, { command: killCmd });
         } catch {
           // Best effort — task may have already exited
         }
@@ -843,6 +864,7 @@ function SessionViewInner({
   const input = (
     <>
       <BackgroundTaskBar
+        sessionId={sessionId}
         tasks={backgroundTasks}
         onViewLog={setViewingTask}
         onClose={handleCloseTask}
