@@ -139,6 +139,46 @@ export async function removeWorktreeForced(
 export interface CreateWorktreeOptions {
   readonly issueNumber?: number;
   readonly prefix?: string;
+  readonly startPoint?: string;
+}
+
+/**
+ * Resolve the parent branch name for the current repository.
+ * Returns the current HEAD branch, or falls back to the remote default branch, or "main".
+ */
+/**
+ * Fetch a branch from origin. Best-effort: returns true on success, false on failure.
+ */
+export async function fetchOriginBranch(
+  basePath: string,
+  branch: string,
+): Promise<boolean> {
+  const result = await execFileAsync(
+    "git",
+    ["fetch", "origin", branch],
+    basePath,
+  );
+  return result.exitCode === 0;
+}
+
+export async function resolveParentBranch(basePath: string): Promise<string> {
+  const branchResult = await execFileAsync(
+    "git",
+    ["rev-parse", "--abbrev-ref", "HEAD"],
+    basePath,
+  );
+  const branch = branchResult.stdout.trim();
+  if (branchResult.exitCode === 0 && branch && branch !== "HEAD") {
+    return branch;
+  }
+  const defaultResult = await execFileAsync(
+    "git",
+    ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"],
+    basePath,
+  );
+  return defaultResult.exitCode === 0
+    ? defaultResult.stdout.trim().replace("origin/", "")
+    : "main";
 }
 
 export async function createWorktreeLocal(
@@ -170,46 +210,28 @@ export async function createWorktreeLocal(
     };
   }
 
-  // Get current branch name (parent branch for the worktree)
-  const branchResult = await execFileAsync(
-    "git",
-    ["rev-parse", "--abbrev-ref", "HEAD"],
-    basePath,
-  );
-  let parentBranch: string;
-  if (branchResult.exitCode === 0 && branchResult.stdout.trim()) {
-    parentBranch = branchResult.stdout.trim();
-  } else {
-    // Fallback: detect remote default branch
-    const defaultResult = await execFileAsync(
-      "git",
-      ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"],
-      basePath,
-    );
-    parentBranch =
-      defaultResult.exitCode === 0
-        ? defaultResult.stdout.trim().replace("origin/", "")
-        : "main";
-  }
+  // Determine parent branch: derive from startPoint if provided, otherwise detect from HEAD
+  const startPoint = options?.startPoint;
+  const parentBranch = startPoint
+    ? startPoint.replace(/^origin\//, "")
+    : await resolveParentBranch(basePath);
 
-  // Create the worktree with new branch
+  // Create the worktree with new branch (optionally from a specific start point)
   const worktreeRelPath = `.dev/worktree/${name}`;
-  let result = await execFileAsync(
-    "git",
-    ["worktree", "add", "-b", name, worktreeRelPath],
-    basePath,
-  );
+  const worktreeArgs = startPoint
+    ? ["worktree", "add", "-b", name, worktreeRelPath, startPoint]
+    : ["worktree", "add", "-b", name, worktreeRelPath];
+  let result = await execFileAsync("git", worktreeArgs, basePath);
 
   // If worktree/branch exists, try with numbered suffixes
   if (result.exitCode !== 0 && result.stderr.includes("already exists")) {
     for (let i = 2; i <= 4; i++) {
       const newName = `${name}-${i}`;
       const newRelPath = `.dev/worktree/${newName}`;
-      result = await execFileAsync(
-        "git",
-        ["worktree", "add", "-b", newName, newRelPath],
-        basePath,
-      );
+      const retryArgs = startPoint
+        ? ["worktree", "add", "-b", newName, newRelPath, startPoint]
+        : ["worktree", "add", "-b", newName, newRelPath];
+      result = await execFileAsync("git", retryArgs, basePath);
 
       if (result.exitCode === 0) {
         logger.debug(

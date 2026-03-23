@@ -27,6 +27,8 @@ import {
 import {
   createWorktreeLocal,
   removeWorktreeForced,
+  resolveParentBranch,
+  fetchOriginBranch,
 } from "@/webhook/createWorktreeLocal";
 import type {
   SupervisorTriggerData,
@@ -520,8 +522,20 @@ async function handleFixTrigger(
     `[SUPERVISOR] Processing fix ${actionId} for project ${projectId}: "${fixAction.title}"`,
   );
 
-  // 1. Create worktree for isolated fix
-  const worktreeResult = await createWorktreeLocal(repoPath, { prefix: "fix" });
+  // 1. Fetch latest remote state and create worktree from it
+  const parentBranch = await resolveParentBranch(repoPath);
+  const fetchOk = await fetchOriginBranch(repoPath, parentBranch);
+  const startPoint = fetchOk ? `origin/${parentBranch}` : undefined;
+  if (fetchOk) {
+    logger.debug(
+      `[SUPERVISOR] Fetched origin/${parentBranch} for fix worktree`,
+    );
+  } else {
+    logger.debug(
+      `[SUPERVISOR] Pre-worktree fetch failed (will use local HEAD)`,
+    );
+  }
+  const worktreeResult = await createWorktreeLocal(repoPath, { prefix: "fix", startPoint });
   if (!worktreeResult.success) {
     const errorMessage = worktreeResult.error ?? "Failed to create worktree";
     logger.debug(`[SUPERVISOR] Worktree creation failed: ${errorMessage}`);

@@ -88,25 +88,35 @@ function buildDirectModeProcess(options: FixPromptOptions, reportUrl: string): s
 2. Apply the fix with minimal changes
 3. Run tests if available (\`npm test\`, \`yarn test\`, or similar)
 4. Commit the fix with message: "fix: ${options.title}${closesRef}"
-5. Rebase onto the latest base branch:
-   \`\`\`
-   git fetch origin ${options.parentBranch}
-   git rebase origin/${options.parentBranch}
-   \`\`\`
-   If there are rebase conflicts, resolve them carefully. After resolving, continue with \`git rebase --continue\`.
-6. Run tests AGAIN after rebase to verify the fix still works
-7. Push directly to the base branch (fast-forward):
-   \`\`\`
-   git push origin ${options.branchName}:${options.parentBranch}
-   \`\`\`
+5. Push to base branch with **retry loop** (up to 3 attempts):
+
+   For each attempt (1, 2, 3):
+   a. Fetch latest: \`git fetch origin ${options.parentBranch}\`
+   b. Rebase: \`git rebase origin/${options.parentBranch}\`
+      - If rebase conflicts **cannot be resolved**: run \`git rebase --abort\`, then **stop retrying** and fall back to PR mode
+   c. Run tests again to verify the fix still works after rebase
+      - If tests **fail**: **stop retrying** and fall back to PR mode
+   d. Push: \`git push origin ${options.branchName}:${options.parentBranch}\`
+      - If push **succeeds**: report success and exit
+      - If push is **rejected** (non-fast-forward): this means another commit landed on ${options.parentBranch} while you were rebasing — **loop back** to step (a) for the next attempt
+
+   After 3 failed push attempts, fall back to PR mode.
 
 ### Fallback to PR Mode
-If ANY of these fail — rebase conflicts cannot be resolved, tests fail after rebase, or push is rejected — fall back to PR mode:
+Only fall back if: rebase conflicts cannot be resolved, tests fail after rebase, or push is still rejected after 3 attempts.
+
+**If rebase conflicts cannot be resolved or tests fail:**
 1. Abort the rebase if in progress: \`git rebase --abort\`
-2. Reset to your commit: \`git checkout ${options.branchName}\`
+2. You are now back on \`${options.branchName}\` with your original fix commit
 3. Push your branch: \`git push -u origin ${options.branchName}\`
-4. Create a PR: \`gh pr create --base "${options.parentBranch}" --head "${options.branchName}" --title "fix: ${options.title}" --body "${options.issueNumber ? `Closes #${options.issueNumber}\\n\\n` : ""}Automated fix for supervisor finding: ${options.title}"\`
-5. Get the PR URL: \`PR_URL=$(gh pr view --json url -q .url 2>/dev/null || echo "")\`
+
+**If push is still rejected after 3 attempts** (rebase succeeded, tests passed, but push keeps failing):
+1. Do NOT abort — your branch already has the latest rebase result
+2. Push your branch: \`git push -u origin ${options.branchName}\`
+
+**Then create the PR:**
+1. \`gh pr create --base "${options.parentBranch}" --head "${options.branchName}" --title "fix: ${options.title}" --body "${options.issueNumber ? `Closes #${options.issueNumber}\\n\\n` : ""}Automated fix for supervisor finding: ${options.title}"\`
+2. Get the PR URL: \`PR_URL=$(gh pr view --json url -q .url 2>/dev/null || echo "")\`
 
 ## MANDATORY: Report Results (CRITICAL — do this AFTER your fix)
 
