@@ -276,8 +276,6 @@ class ApiSocket {
 
     // Connection events
     this.socket.on("connect", () => {
-      // console.log('🔌 SyncSocket: Connected, recovered: ' + this.socket?.recovered);
-      // console.log('🔌 SyncSocket: Socket ID:', this.socket?.id);
       this.updateStatus("connected");
       if (!this.socket?.recovered) {
         this.reconnectedListeners.forEach((listener) => listener());
@@ -285,30 +283,23 @@ class ApiSocket {
     });
 
     this.socket.on("disconnect", (reason) => {
-      // console.log('🔌 SyncSocket: Disconnected', reason);
       this.updateStatus("disconnected");
     });
 
     // Error events
     this.socket.on("connect_error", (error) => {
-      // console.error('🔌 SyncSocket: Connection error', error);
       this.updateStatus("error");
     });
 
     this.socket.on("error", (error) => {
-      // console.error('🔌 SyncSocket: Error', error);
       this.updateStatus("error");
     });
 
     // Message handling
     this.socket.onAny((event, data) => {
-      // console.log(`📥 SyncSocket: Received event '${event}':`, JSON.stringify(data).substring(0, 200));
       const handler = this.messageHandlers.get(event);
       if (handler) {
-        // console.log(`📥 SyncSocket: Calling handler for '${event}'`);
         handler(data);
-      } else {
-        // console.log(`📥 SyncSocket: No handler registered for '${event}'`);
       }
     });
   }

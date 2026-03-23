@@ -52,7 +52,6 @@ export function monkeyPatchConsoleForRemoteLoggingForFasterAiAutoDebuggingOnlyIn
         })
       })
     } catch (e) {
-      // console.error('[RemoteLogger] Failed to send log:', e)
       // Fail silently
     }
   }

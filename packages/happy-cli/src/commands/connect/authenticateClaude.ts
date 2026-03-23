@@ -181,7 +181,6 @@ async function startCallbackServer(
         });
 
         server.listen(port, '127.0.0.1', () => {
-            // console.log(`🔐 OAuth callback server listening on port ${port}`);
         });
 
         // Timeout after 5 minutes

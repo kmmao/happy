@@ -718,7 +718,6 @@ export const storage = create<StorageState>()((set, get) => {
           listData.push(...inactiveSessions);
         }
 
-        // console.log(`📊 Storage: applySessions called with ${sessions.length} sessions, active: ${activeSessions.length}, inactive: ${inactiveSessions.length}`);
 
         // Process AgentState updates for sessions that already have messages loaded
         const updatedSessionMessages = { ...state.sessionMessages };

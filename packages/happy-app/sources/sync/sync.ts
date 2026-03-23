@@ -2323,9 +2323,7 @@ class Sync {
     }
 
     if (sessions.length > 0) {
-      // console.log('flushing activity updates ' + sessions.length);
       this.applySessions(sessions);
-      // log.log(`🔄 Activity updates flushed - updated ${sessions.length} sessions`);
     }
   };
 
@@ -2339,7 +2337,6 @@ class Sync {
 
     // Process activity updates through smart debounce accumulator
     if (updateData.type === "activity") {
-      // console.log('adding activity update ' + updateData.id);
       this.activityAccumulator.addUpdate(updateData);
     }
 

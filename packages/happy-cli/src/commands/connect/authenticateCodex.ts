@@ -195,7 +195,6 @@ async function startCallbackServer(
         });
 
         server.listen(port, '127.0.0.1', () => {
-            // console.log(`🔐 OAuth callback server listening on port ${port}`);
         });
 
         // Timeout after 5 minutes
@@ -219,7 +218,6 @@ async function startCallbackServer(
  * @returns Promise resolving to CodexAuthTokens with all token information
  */
 export async function authenticateCodex(): Promise<CodexAuthTokens> {
-    // console.log('🚀 Starting Codex authentication...');
 
     // Generate PKCE codes and state
     const { verifier, challenge } = generatePKCE();
@@ -230,11 +228,9 @@ export async function authenticateCodex(): Promise<CodexAuthTokens> {
     const portAvailable = await isPortAvailable(port);
 
     if (!portAvailable) {
-        // console.log(`Port ${port} is in use, finding an available port...`);
         port = await findAvailablePort();
     }
 
-    // console.log(`📡 Using callback port: ${port}`);
 
     // Start callback server FIRST (before opening browser)
     const serverPromise = startCallbackServer(state, verifier, port);
@@ -275,7 +271,6 @@ export async function authenticateCodex(): Promise<CodexAuthTokens> {
     const tokens = await serverPromise;
 
     console.log('🎉 Authentication successful!');
-    // console.log(`Account ID: ${tokens.account_id || 'N/A'}`);
 
     return tokens;
 }

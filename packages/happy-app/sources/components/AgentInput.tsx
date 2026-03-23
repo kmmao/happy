@@ -162,7 +162,6 @@ export const AgentInput = React.memo(
     // Handle combined text and selection state changes
     const handleInputStateChange = React.useCallback(
       (newState: TextInputState) => {
-        // console.log('📝 Input state changed:', JSON.stringify(newState));
         setInputState(newState);
       },
       [],
