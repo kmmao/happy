@@ -11,7 +11,7 @@ import * as React from 'react';
 import { View, Pressable, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Text } from './StyledText';
 import { sessionReadFile } from '@/sync/ops';
 import { t } from '@/text';
@@ -30,6 +30,7 @@ export const MessageImage = React.memo((props: {
     imagePath: string;
 }) => {
     const [state, setState] = React.useState<LoadState>({ status: 'loading' });
+    const { theme } = useUnistyles();
     const router = useRouter();
 
     React.useEffect(() => {
@@ -77,7 +78,7 @@ export const MessageImage = React.memo((props: {
     if (state.status === 'error') {
         return (
             <View style={styles.placeholder}>
-                <Ionicons name="image-outline" size={24} color="#999" />
+                <Ionicons name="image-outline" size={24} color={theme.colors.textSecondary} />
                 <Text style={styles.errorText}>{t('session.imageLoadFailed')}</Text>
             </View>
         );

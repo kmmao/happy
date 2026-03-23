@@ -82,7 +82,7 @@ export const ProjectListView = React.memo(() => {
                     <Ionicons
                         name="add-circle-outline"
                         size={20}
-                        color="#FFFFFF"
+                        color={theme.colors.button.primary.tint}
                     />
                     <Text style={styles.addButtonText}>
                         {t("projects.addProject")}
@@ -177,6 +177,6 @@ const styles = StyleSheet.create((theme) => ({
     addButtonText: {
         ...Typography.default("semiBold"),
         fontSize: 15,
-        color: "#FFFFFF",
+        color: theme.colors.button.primary.tint,
     },
 }));

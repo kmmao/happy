@@ -183,14 +183,14 @@ const stylesheet = StyleSheet.create((theme) => ({
     ...Typography.default(),
   },
   tagBranch: {
-    backgroundColor: "rgba(88, 86, 214, 0.12)",
+    backgroundColor: `${theme.colors.accentPurple}1F`,
   },
   tagBranchText: {
     color: theme.colors.accentPurple,
     ...Typography.default("semiBold"),
   },
   tagMain: {
-    backgroundColor: "rgba(52, 199, 89, 0.12)",
+    backgroundColor: `${theme.colors.success}1F`,
   },
   tagMainText: {
     color: theme.colors.success,
@@ -296,7 +296,7 @@ const stylesheet = StyleSheet.create((theme) => ({
   swipeActionText: {
     marginTop: 4,
     fontSize: 12,
-    color: "#FFFFFF",
+    color: theme.colors.button.primary.tint,
     textAlign: "center",
     ...Typography.default("semiBold"),
   },
@@ -555,6 +555,7 @@ const SessionItem = React.memo(
     isSingle?: boolean;
   }) => {
     const styles = stylesheet;
+    const { theme } = useUnistyles();
     const sessionStatus = useSessionStatus(session);
     const sessionName = getSessionName(session);
     const sessionSubtitle = getSessionSubtitle(session);
@@ -848,7 +849,7 @@ const SessionItem = React.memo(
             onPress={handleResume}
             disabled={isBusy}
           >
-            <Ionicons name="play-outline" size={20} color="#FFFFFF" />
+            <Ionicons name="play-outline" size={20} color={theme.colors.button.primary.tint} />
             <Text style={styles.swipeActionText} numberOfLines={2}>
               {t("sessionInfo.resumeSession")}
             </Text>
@@ -859,7 +860,7 @@ const SessionItem = React.memo(
           onPress={handleDelete}
           disabled={isBusy}
         >
-          <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+          <Ionicons name="trash-outline" size={20} color={theme.colors.button.primary.tint} />
           <Text style={styles.swipeActionText} numberOfLines={2}>
             {t("sessionInfo.deleteSession")}
           </Text>
