@@ -213,26 +213,16 @@ export async function dispatchWebhook(
   };
 }
 
-async function processRoute(
-  route: {
-    id: string;
-    accountId: string;
-    repoUrl: string;
-    webhookSecret: Uint8Array<ArrayBuffer>;
-    apiToken: Uint8Array<ArrayBuffer> | null;
-    labels: string[];
-    authors: string[];
-    machineId: string;
-    repoPath: string;
-    provider: string;
-  },
+/**
+ * Verify the webhook signature for a route.
+ * Returns true if signature is valid.
+ */
+function verifyRouteSignature(
+  route: { id: string; accountId: string; repoUrl: string; webhookSecret: Uint8Array<ArrayBuffer> },
   provider: string,
   rawBody: string,
   headers: Record<string, string | undefined>,
-  deliveryId: string,
-  issue: ParsedWebhookIssue,
-): Promise<boolean> {
-  // 1. Decrypt webhook secret and verify signature (use route.repoUrl — already normalized in DB)
+): boolean {
   const secret = decryptString(
     ["webhook-route", `${route.accountId}:${route.repoUrl}`],
     route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
@@ -243,56 +233,60 @@ async function processRoute(
       { module: "webhook", level: "warn" },
       `Signature verification failed for route ${route.id}`,
     );
-    return false;
   }
+  return valid;
+}
 
-  // 2. Match labels — if payload labels are empty and we have an API token,
-  //    fetch real labels from the provider API (Gitea bug workaround).
-  let effectiveLabels = issue.issueLabels;
+/**
+ * Resolve effective labels for an issue.
+ * Falls back to fetching from provider API when payload labels are empty (Gitea bug workaround).
+ */
+async function resolveEffectiveLabels(
+  issue: ParsedWebhookIssue,
+  route: { labels: string[]; apiToken: Uint8Array<ArrayBuffer> | null; accountId: string },
+  provider: string,
+): Promise<readonly string[]> {
   if (
-    effectiveLabels.length === 0 &&
-    route.labels.length > 0 &&
-    route.apiToken
+    issue.issueLabels.length > 0 ||
+    route.labels.length === 0 ||
+    !route.apiToken
   ) {
-    log(
-      { module: "webhook" },
-      `Issue #${issue.issueNumber} has no labels in payload, fetching from API...`,
-    );
-    const fetched = await fetchIssueLabelsFromProvider({
-      provider,
-      repoUrl: issue.repoUrl,
-      issueNumber: issue.issueNumber,
-      encryptedApiToken: route.apiToken as unknown as Uint8Array<ArrayBuffer>,
-      accountId: route.accountId,
-    });
-    if (fetched) {
-      effectiveLabels = fetched;
-      log(
-        { module: "webhook" },
-        `Fetched labels from API for issue #${issue.issueNumber}: [${fetched.join(",")}]`,
-      );
-    }
+    return issue.issueLabels;
   }
 
-  if (!labelsMatch(effectiveLabels, route.labels)) {
+  log(
+    { module: "webhook" },
+    `Issue #${issue.issueNumber} has no labels in payload, fetching from API...`,
+  );
+  const fetched = await fetchIssueLabelsFromProvider({
+    provider,
+    repoUrl: issue.repoUrl,
+    issueNumber: issue.issueNumber,
+    encryptedApiToken: route.apiToken as unknown as Uint8Array<ArrayBuffer>,
+    accountId: route.accountId,
+  });
+  if (fetched) {
     log(
       { module: "webhook" },
-      `Issue #${issue.issueNumber} labels don't match route ${route.id} — issue has [${effectiveLabels.join(",")}], route expects [${route.labels.join(",")}]`,
+      `Fetched labels from API for issue #${issue.issueNumber}: [${fetched.join(",")}]`,
     );
-    return false;
+    return fetched;
   }
+  return issue.issueLabels;
+}
 
-  // 3. Match author
-  if (!authorAllowed(issue.issueAuthor, route.authors)) {
-    log(
-      { module: "webhook" },
-      `Issue #${issue.issueNumber} author "${issue.issueAuthor}" not allowed for route ${route.id}`,
-    );
-    return false;
-  }
-
-  // 4. Dedup + create in a single transaction to prevent race conditions
-  const event = await inTx(async (tx) => {
+/**
+ * Dedup check + create a pending webhook event in a single transaction.
+ * Returns null if the issue was already processed.
+ */
+async function createWebhookEventIfNew(
+  route: { accountId: string; machineId: string },
+  provider: string,
+  deliveryId: string,
+  issue: ParsedWebhookIssue,
+  effectiveLabels: readonly string[],
+) {
+  return await inTx(async (tx) => {
     const existing = await tx.webhookEvent.findFirst({
       where: {
         repoUrl: issue.repoUrl.toLowerCase(),
@@ -313,14 +307,77 @@ async function processRoute(
         issueTitle: issue.issueTitle,
         issueBody: issue.issueBody,
         issueAuthor: issue.issueAuthor,
-        issueLabels: effectiveLabels,
+        issueLabels: [...effectiveLabels],
         issueUrl: issue.issueUrl,
         status: "pending",
         machineId: route.machineId,
       },
     });
   });
+}
 
+/**
+ * Decrypt the route's API token for CLI-side use (comment fetching, PR creation).
+ * Returns undefined if no token or decryption fails (non-critical).
+ */
+function decryptRouteApiToken(
+  route: { apiToken: Uint8Array<ArrayBuffer> | null; accountId: string; repoUrl: string },
+): string | undefined {
+  if (!route.apiToken) return undefined;
+  try {
+    return decryptString(
+      ["webhook-route-token", `${route.accountId}:${route.repoUrl}`],
+      route.apiToken as unknown as Uint8Array<ArrayBuffer>,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Process a single route for an issue webhook event.
+ * Orchestrates: signature verification → label matching → author check → dedup → dispatch.
+ */
+async function processRoute(
+  route: {
+    id: string;
+    accountId: string;
+    repoUrl: string;
+    webhookSecret: Uint8Array<ArrayBuffer>;
+    apiToken: Uint8Array<ArrayBuffer> | null;
+    labels: string[];
+    authors: string[];
+    machineId: string;
+    repoPath: string;
+    provider: string;
+  },
+  provider: string,
+  rawBody: string,
+  headers: Record<string, string | undefined>,
+  deliveryId: string,
+  issue: ParsedWebhookIssue,
+): Promise<boolean> {
+  if (!verifyRouteSignature(route, provider, rawBody, headers)) return false;
+
+  const effectiveLabels = await resolveEffectiveLabels(issue, route, provider);
+
+  if (!labelsMatch(effectiveLabels, route.labels)) {
+    log(
+      { module: "webhook" },
+      `Issue #${issue.issueNumber} labels don't match route ${route.id} — issue has [${effectiveLabels.join(",")}], route expects [${route.labels.join(",")}]`,
+    );
+    return false;
+  }
+
+  if (!authorAllowed(issue.issueAuthor, route.authors)) {
+    log(
+      { module: "webhook" },
+      `Issue #${issue.issueNumber} author "${issue.issueAuthor}" not allowed for route ${route.id}`,
+    );
+    return false;
+  }
+
+  const event = await createWebhookEventIfNew(route, provider, deliveryId, issue, effectiveLabels);
   if (!event) {
     log(
       { module: "webhook" },
@@ -329,20 +386,8 @@ async function processRoute(
     return false;
   }
 
-  // 5. Decrypt API token for CLI-side use (comment fetching, PR creation)
-  let decryptedApiToken: string | undefined;
-  if (route.apiToken) {
-    try {
-      decryptedApiToken = decryptString(
-        ["webhook-route-token", `${route.accountId}:${route.repoUrl}`],
-        route.apiToken as unknown as Uint8Array<ArrayBuffer>,
-      );
-    } catch {
-      // Non-critical: CLI will proceed without token
-    }
-  }
+  const decryptedApiToken = decryptRouteApiToken(route);
 
-  // 6. Emit ephemeral event to target machine
   eventRouter.emitEphemeral({
     userId: route.accountId,
     payload: {
@@ -365,7 +410,6 @@ async function processRoute(
     },
   });
 
-  // 7. Update status to dispatched
   await db.webhookEvent.update({
     where: { id: event.id },
     data: { status: "dispatched" },
