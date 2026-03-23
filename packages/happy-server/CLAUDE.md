@@ -3,20 +3,28 @@
 ## Folder Structure
 ```
 /sources
-├── /app           # Application entry points
-├── /apps/api      # API server with /routes
-├── /modules       # Reusable modules (ai, eventbus, lock, media)
-├── /utils         # Low-level utilities (name file = function name)
-├── /recipes       # Standalone scripts
-├── /services      # Core services (pubsub)
-└── /storage       # DB client, inTx, cache
+├── /app              # Application domains
+│   ├── /api          # API server (/routes, /socket, /utils)
+│   ├── /auth         # Authentication
+│   ├── /events       # Event handling
+│   ├── /feed         # Feed system
+│   ├── /github       # GitHub integration
+│   ├── /kv           # Key-value operations
+│   ├── /monitoring   # Monitoring
+│   ├── /presence     # Presence tracking
+│   ├── /session      # Session management
+│   ├── /social       # Social features
+│   └── /webhook      # Webhook handlers
+├── /modules          # Reusable modules (encrypt, github, push, supervisor)
+├── /utils            # Low-level utilities (name file = function name)
+└── /storage          # DB client, inTx, cache
 ```
 
 ## Key Modules
-- **ai**: AI service wrappers
-- **eventbus**: Local or Redis-based; use `afterTx` to emit after commit
-- **lock**: Cluster-wide resource locking
-- **media**: Media file processing (requires FFmpeg + Python3)
+- **encrypt**: Encryption utilities
+- **github**: GitHub API integration
+- **pushSend**: Push notification delivery
+- **supervisor***: Supervisor system (config, loop engine, scheduling, scoring, limits, fix watchdog, usage)
 
 ## Remote Logging
 Set `DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING=true` to enable.
