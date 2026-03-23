@@ -301,7 +301,7 @@ class ActivityCache {
         );
         await db.$executeRaw`
           UPDATE "Machine" AS m
-          SET "lastActiveAt" = v."lastActiveAt"
+          SET "lastActiveAt" = v."lastActiveAt", "active" = true
           FROM (VALUES ${machineValues}) AS v(id, "accountId", "lastActiveAt")
           WHERE m.id = v.id AND m."accountId" = v."accountId"
         `;

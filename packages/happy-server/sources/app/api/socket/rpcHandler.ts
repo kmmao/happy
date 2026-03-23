@@ -27,36 +27,41 @@ export function rpcHandler(
   rpcListeners: Map<string, Socket>,
 ) {
   // RPC register - Register this socket as a listener for an RPC method
-  socket.on("rpc-register", async (data: any) => {
+  // Supports optional ack callback for reliable registration
+  socket.on("rpc-register", async (data: any, ack?: (response: any) => void) => {
     try {
       const { method } = data;
 
       if (!method || typeof method !== "string") {
-        socket.emit("rpc-error", {
-          type: "register",
-          error: "Invalid method name",
-        });
+        if (ack) {
+          ack({ ok: false, error: "Invalid method name" });
+        } else {
+          socket.emit("rpc-error", {
+            type: "register",
+            error: "Invalid method name",
+          });
+        }
         return;
-      }
-
-      // Check if method was already registered
-      const previousSocket = rpcListeners.get(method);
-      if (previousSocket && previousSocket !== socket) {
-        // log({ module: 'websocket-rpc' }, `RPC method ${method} re-registered: ${previousSocket.id} -> ${socket.id}`);
       }
 
       // Register this socket as the listener for this method
       rpcListeners.set(method, socket);
 
-      socket.emit("rpc-registered", { method });
-      // log({ module: 'websocket-rpc' }, `RPC method registered: ${method} on socket ${socket.id} (user: ${userId})`);
-      // log({ module: 'websocket-rpc' }, `Active RPC methods for user ${userId}: ${Array.from(rpcListeners.keys()).join(', ')}`);
+      if (ack) {
+        ack({ ok: true, method });
+      } else {
+        socket.emit("rpc-registered", { method });
+      }
     } catch (error) {
       log(
         { module: "websocket", level: "error" },
         `Error in rpc-register: ${error}`,
       );
-      socket.emit("rpc-error", { type: "register", error: "Internal error" });
+      if (ack) {
+        ack({ ok: false, error: "Internal error" });
+      } else {
+        socket.emit("rpc-error", { type: "register", error: "Internal error" });
+      }
     }
   });
 

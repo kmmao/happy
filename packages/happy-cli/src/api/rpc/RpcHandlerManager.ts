@@ -20,6 +20,7 @@ export class RpcHandlerManager {
     private readonly encryptionVariant: 'legacy' | 'dataKey';
     private readonly logger: (message: string, data?: any) => void;
     private socket: Socket | null = null;
+    private reregisterInterval: ReturnType<typeof setInterval> | null = null;
 
     constructor(config: RpcHandlerConfig) {
         this.scopePrefix = config.scopePrefix;
@@ -43,7 +44,7 @@ export class RpcHandlerManager {
         this.handlers.set(prefixedMethod, handler);
 
         if (this.socket) {
-            this.socket.emit('rpc-register', { method: prefixedMethod });
+            this.emitRegisterWithRetry(this.socket, prefixedMethod);
         }
     }
 
@@ -88,13 +89,13 @@ export class RpcHandlerManager {
 
     onSocketConnect(socket: Socket): void {
         this.socket = socket;
-        for (const [prefixedMethod] of this.handlers) {
-            socket.emit('rpc-register', { method: prefixedMethod });
-        }
+        this.registerAllHandlers(socket);
+        this.startReregisterInterval();
     }
 
     onSocketDisconnect(): void {
         this.socket = null;
+        this.stopReregisterInterval();
     }
 
     /**
@@ -119,6 +120,59 @@ export class RpcHandlerManager {
     clearHandlers(): void {
         this.handlers.clear();
         this.logger('Cleared all RPC handlers');
+    }
+
+    /**
+     * Register a single method with ack + retry.
+     * Falls back to fire-and-forget emit after all retries are exhausted.
+     */
+    private emitRegisterWithRetry(socket: Socket, method: string, maxRetries = 3): void {
+        const attempt = (remaining: number) => {
+            if (this.socket !== socket) return; // socket changed, abort
+            socket.timeout(5000).emit('rpc-register', { method }, (err: any, ackResponse: any) => {
+                if (this.socket !== socket) return; // socket changed during await
+                if (err && remaining > 0) {
+                    this.logger('[RPC] rpc-register ack timeout, retrying', { method, remaining });
+                    setTimeout(() => attempt(remaining - 1), 1000);
+                } else if (err) {
+                    this.logger('[RPC] [WARN] rpc-register failed after retries, falling back to emit', { method });
+                    socket.emit('rpc-register', { method });
+                } else if (!ackResponse?.ok) {
+                    this.logger('[RPC] [WARN] rpc-register rejected by server', { method, error: ackResponse?.error });
+                }
+            });
+        };
+        attempt(maxRetries);
+    }
+
+    /**
+     * Register all handlers on the given socket with ack + retry.
+     */
+    private registerAllHandlers(socket: Socket): void {
+        for (const [prefixedMethod] of this.handlers) {
+            this.emitRegisterWithRetry(socket, prefixedMethod);
+        }
+    }
+
+    /**
+     * Periodic re-registration every 60s as a safety net.
+     * If the server lost our registrations (e.g. deploy, network glitch),
+     * this ensures they are restored without requiring a daemon restart.
+     */
+    private startReregisterInterval(): void {
+        this.stopReregisterInterval();
+        this.reregisterInterval = setInterval(() => {
+            if (this.socket && this.handlers.size > 0) {
+                this.registerAllHandlers(this.socket);
+            }
+        }, 60_000);
+    }
+
+    private stopReregisterInterval(): void {
+        if (this.reregisterInterval) {
+            clearInterval(this.reregisterInterval);
+            this.reregisterInterval = null;
+        }
     }
 
     /**
