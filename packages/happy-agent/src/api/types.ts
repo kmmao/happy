@@ -83,6 +83,24 @@ export const MachineMetadataSchema = z.object({
 
 export type MachineMetadata = z.infer<typeof MachineMetadataSchema>;
 
+const TailscaleServeEntrySchema = z.object({
+  port: z.number(),
+  protocol: z.string(),
+  target: z.string(),
+  funnel: z.boolean(),
+  hostname: z.string(),
+});
+
+const TailscaleInfoSchema = z.object({
+  status: z.enum(["connected", "disconnected", "not-installed"]),
+  ipv4: z.string().optional(),
+  ipv6: z.string().optional(),
+  hostname: z.string().optional(),
+  tailnetName: z.string().optional(),
+  version: z.string().optional(),
+  serves: z.array(TailscaleServeEntrySchema).optional(),
+});
+
 export const DaemonStateSchema = z.object({
   status: z.union([
     z.enum(["running", "shutting-down"]),
@@ -98,6 +116,7 @@ export const DaemonStateSchema = z.object({
       z.string(),
     ])
     .optional(),
+  tailscale: TailscaleInfoSchema.optional(),
 });
 
 export type DaemonState = z.infer<typeof DaemonStateSchema>;
