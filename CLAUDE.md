@@ -96,6 +96,46 @@ System: `Mobile/Web ←→ Server (Fastify+Socket.IO) ←→ CLI Daemon ←→ C
 - All debugging through file logs (never console output that disturbs Claude sessions)
 - Logging to `~/.happy-dev/logs/` or `$HAPPY_HOME_DIR/logs/`
 
+## Package Dependency & Sync Rules
+
+### happy-wire is the single source of truth
+
+`@kmmao/happy-wire` defines shared Zod schemas consumed by all other packages:
+
+| Schema | File | Consumers |
+|--------|------|-----------|
+| `MachineMetadataSchema` | `machineTypes.ts` | CLI, Agent, Server, App |
+| `DaemonStateSchema` | `machineTypes.ts` | CLI, Agent, Server, App |
+| `TailscaleInfoSchema` | `machineTypes.ts` | CLI, Agent, Server, App |
+| `SessionMessageSchema` | `messages.ts` | CLI, Agent, Server, App |
+| `UpdateMachineBodySchema` | `messages.ts` | CLI, Agent, Server, App |
+
+**When modifying shared types** (DaemonState, MachineMetadata, etc.):
+1. Edit in `packages/happy-wire/src/` only
+2. Build wire: `yarn workspace @kmmao/happy-wire build`
+3. Verify downstream builds: CLI, Agent, Server, App
+4. Publish wire first, then downstream packages
+
+### Publish order (always follow)
+
+```
+1. @kmmao/happy-wire   (shared types — must be first)
+2. @kmmao/happy-coder  (CLI — depends on wire as devDependency, pkgroll inlines)
+3. @kmmao/happy-agent  (Agent — depends on wire as runtime dependency)
+```
+
+### When to update each package together
+
+| Change | Wire | CLI | Agent | App |
+|--------|------|-----|-------|-----|
+| Add/modify DaemonState fields | Yes | Yes (re-export) | Yes (re-export) | UI if needed |
+| Add/modify wire message types | Yes | If consumed | If consumed | If consumed |
+| CLI-only feature (new RPC handler) | No | Yes | No | If UI needed |
+| Agent-only feature | No | No | Yes | If UI needed |
+| Tailscale detection changes | No | Yes (detection logic) | Yes (detection logic) | If UI changed |
+
+**Note**: CLI and Agent each have their own `utils/tailscale.ts` (adapted from the same source). Changes to Tailscale detection logic must be synced to both files. This is intentional — the packages cannot import each other.
+
 ## Key Documentation
 
 Each package has its own `CLAUDE.md` with package-specific rules — read it before working on that package.
