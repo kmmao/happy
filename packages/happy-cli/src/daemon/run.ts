@@ -47,6 +47,7 @@ import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
 import { handleWebhookTrigger } from "@/webhook/handleWebhookTrigger";
 import { handleSupervisorTrigger, cleanupFixWorktree, getFixWorktreeInfo } from "@/supervisor/handleSupervisorTrigger";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
+import { detectTailscale } from "@/utils/tailscale";
 
 
 // Prepare initial metadata
@@ -945,6 +946,7 @@ export async function startDaemon(): Promise<void> {
             parentBranch: fixInfo.parentBranch,
             actionId: fixInfo.actionId,
             projectId: fixInfo.projectId,
+            fixMode: fixInfo.fixMode,
             emitFixStatus: (data) => apiMachine.emitSupervisorFixStatus(data),
           }).catch((err) => {
             logger.debug(`[DAEMON RUN] Fix status diagnosis failed: ${err}`);
@@ -983,12 +985,17 @@ export async function startDaemon(): Promise<void> {
     writeDaemonState(fileState);
     logger.debug("[DAEMON RUN] Daemon state written");
 
+    // Detect Tailscale (non-blocking, 3s timeout)
+    const tailscaleInfo = await detectTailscale();
+    logger.debug(`[DAEMON RUN] Tailscale: ${tailscaleInfo.status}`);
+
     // Prepare initial daemon state
     const initialDaemonState: DaemonState = {
       status: "offline",
       pid: process.pid,
       httpPort: controlPort,
       startedAt: Date.now(),
+      tailscale: tailscaleInfo,
     };
 
     // Create API client
@@ -1004,6 +1011,7 @@ export async function startDaemon(): Promise<void> {
 
     // Create realtime machine session
     const apiMachine = api.machineSyncClient(machine);
+    apiMachine.setTailscaleInfo(tailscaleInfo);
 
     // Set RPC handlers
     apiMachine.setRPCHandlers({

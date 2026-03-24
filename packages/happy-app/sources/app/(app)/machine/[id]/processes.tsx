@@ -20,6 +20,8 @@ import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 import type { DetectedPort } from "@/hooks/portDetection";
+import { useMachine } from "@/sync/storage";
+import { buildPreviewUrl } from "@/utils/previewUrl";
 
 export default React.memo(function ProcessesPage() {
     const { id: machineId } = useLocalSearchParams<{ id: string }>();
@@ -28,6 +30,7 @@ export default React.memo(function ProcessesPage() {
         showHidden, filterProcesses, isHidden,
         toggleShowHidden, hideProcess, unhideProcess,
     } = useHiddenProcesses(machineId);
+    const machine = useMachine(machineId);
     const { theme } = useUnistyles();
     const router = useRouter();
 
@@ -77,9 +80,9 @@ export default React.memo(function ProcessesPage() {
     const handlePreview = React.useCallback((port: number) => {
         router.push({
             pathname: "/session/recent",
-            params: { previewUrl: `http://localhost:${port}` },
+            params: { previewUrl: buildPreviewUrl(port, machine) },
         });
-    }, [router]);
+    }, [router, machine]);
 
     const handleHide = React.useCallback(async (p: DetectedPort) => {
         const confirmed = await Modal.confirm(

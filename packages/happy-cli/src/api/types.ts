@@ -226,6 +226,20 @@ export const MachineMetadataSchema = z.object({
 export type MachineMetadata = z.infer<typeof MachineMetadataSchema>;
 
 /**
+ * Tailscale runtime info — detected by daemon, optional.
+ */
+export const TailscaleInfoSchema = z.object({
+  status: z.enum(["connected", "disconnected", "not-installed"]),
+  ipv4: z.string().optional(),
+  ipv6: z.string().optional(),
+  hostname: z.string().optional(),
+  tailnetName: z.string().optional(),
+  version: z.string().optional(),
+});
+
+export type TailscaleInfo = z.infer<typeof TailscaleInfoSchema>;
+
+/**
  * Daemon state - dynamic runtime information (frequently updated)
  */
 export const DaemonStateSchema = z.object({
@@ -243,6 +257,7 @@ export const DaemonStateSchema = z.object({
       z.string(), // Forward compatibility
     ])
     .optional(),
+  tailscale: TailscaleInfoSchema.optional(),
 });
 
 export type DaemonState = z.infer<typeof DaemonStateSchema>;

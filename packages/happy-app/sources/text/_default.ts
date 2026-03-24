@@ -1023,6 +1023,7 @@ export const en = {
     elevenLabsVoiceId: "Voice ID",
     elevenLabsVoiceIdPlaceholder: "Default: Rachel",
     elevenLabsVoiceIdSubtitle: "Leave empty for default voice (Rachel)",
+    elevenLabsConfig: "ElevenLabs",
   },
 
   voiceStatusBar: {
@@ -1232,6 +1233,15 @@ export const en = {
     metadataVersion: "Metadata Version",
     untitledSession: "Untitled Session",
     back: "Back",
+    previousSessions: "Previous Sessions",
+    tailscale: "Tailscale",
+    tailscaleStatus: "Status",
+    tailscaleIp: "Tailscale IP",
+    tailscaleHostname: "MagicDNS Hostname",
+    tailscaleConnected: "Connected",
+    tailscaleDisconnected: "Disconnected",
+    tailscaleNotInstalled: "Not Installed",
+    tailscaleVersion: "Tailscale Version",
   },
 
   message: {
@@ -2442,6 +2452,9 @@ export const en = {
     retryFix: "Retry",
     analyze: "Analyze",
     analyzeComplete: "Analysis Complete",
+    analyzing: "Analyzing...",
+    fixing: "Fixing...",
+    analyzeStatus: "Analysis Status",
 
     // Phase 7: Report export
     exportReport: "Export Report",

@@ -584,6 +584,53 @@ function MachineDetailScreen() {
           />
         </ItemGroup>
 
+        {/* Tailscale */}
+        {machine.daemonState?.tailscale &&
+          machine.daemonState.tailscale.status !== "not-installed" && (
+          <ItemGroup title={t("machine.tailscale")}>
+            <Item
+              title={t("machine.tailscaleStatus")}
+              detail={
+                machine.daemonState.tailscale.status === "connected"
+                  ? t("machine.tailscaleConnected")
+                  : t("machine.tailscaleDisconnected")
+              }
+              detailStyle={{
+                color:
+                  machine.daemonState.tailscale.status === "connected"
+                    ? "#34C759"
+                    : "#FF9500",
+              }}
+              showChevron={false}
+            />
+            {machine.daemonState.tailscale.ipv4 && (
+              <Item
+                title={t("machine.tailscaleIp")}
+                subtitle={machine.daemonState.tailscale.ipv4}
+                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+              />
+            )}
+            {machine.daemonState.tailscale.hostname && (
+              <Item
+                title={t("machine.tailscaleHostname")}
+                subtitle={
+                  machine.daemonState.tailscale.tailnetName
+                    ? `${machine.daemonState.tailscale.hostname}.${machine.daemonState.tailscale.tailnetName}`
+                    : machine.daemonState.tailscale.hostname
+                }
+                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+              />
+            )}
+            {machine.daemonState.tailscale.version && (
+              <Item
+                title={t("machine.tailscaleVersion")}
+                subtitle={machine.daemonState.tailscale.version}
+                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+              />
+            )}
+          </ItemGroup>
+        )}
+
         {/* Background processes */}
         <ItemGroup title={t("processManager.title")}>
           <Item
