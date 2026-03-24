@@ -2,3 +2,4 @@ export type { TunnelProvider, TunnelAddParams, TunnelRemoveParams, TunnelOpResul
 export { TunnelManager } from "./tunnelManager";
 export { TailscaleProvider } from "./providers/tailscale";
 export { UpnpProvider } from "./providers/upnp";
+export { CaddyProvider } from "./providers/caddy";
