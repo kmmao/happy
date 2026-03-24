@@ -194,62 +194,71 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
       )}
       {displayText.length > 0 && (
         <View style={styles.userBubbleRow}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.userBookmarkButton,
-              pressed && { opacity: 0.5 },
-            ]}
-            onPress={() => appendToInput(displayText)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel={t("session.appendToInput")}
-          >
-            <Ionicons
-              name="copy-outline"
-              size={14}
-              color={theme.colors.textSecondary}
-            />
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.userBookmarkButton,
-              pressed && { opacity: 0.5 },
-            ]}
-            onPress={() => toggleBookmark(displayText, "user")}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons
-              name={bookmarked ? "bookmark" : "bookmark-outline"}
-              size={14}
-              color={
-                bookmarked
-                  ? theme.colors.radio.active
-                  : theme.colors.textSecondary
-              }
-            />
-          </Pressable>
-          {!isQueued && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.userBookmarkButton,
-                (pressed || rewinding) && { opacity: 0.5 },
-              ]}
-              onPress={handleRewind}
-              disabled={rewinding}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel={t("session.rewindTitle")}
-            >
-              <Ionicons
-                name="play-back-outline"
-                size={14}
-                color={theme.colors.textSecondary}
-              />
-            </Pressable>
-          )}
           <View style={styles.userMessageBubble}>
             <MarkdownView
               markdown={displayText}
               onOptionPress={handleOptionPress}
             />
+          </View>
+          <View style={styles.userActionsRow}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.userBookmarkButton,
+                pressed && { opacity: 0.5 },
+              ]}
+              onPress={() => appendToInput(displayText)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel={t("session.appendToInput")}
+              // @ts-expect-error RN Web supports title for tooltip
+              title={t("session.appendToInput")}
+            >
+              <Ionicons
+                name="copy-outline"
+                size={13}
+                color={theme.colors.textSecondary}
+              />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.userBookmarkButton,
+                pressed && { opacity: 0.5 },
+              ]}
+              onPress={() => toggleBookmark(displayText, "user")}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel={t("session.bookmarkOption")}
+              // @ts-expect-error RN Web supports title for tooltip
+              title={t("session.bookmarkOption")}
+            >
+              <Ionicons
+                name={bookmarked ? "bookmark" : "bookmark-outline"}
+                size={13}
+                color={
+                  bookmarked
+                    ? theme.colors.radio.active
+                    : theme.colors.textSecondary
+                }
+              />
+            </Pressable>
+            {!isQueued && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.userBookmarkButton,
+                  (pressed || rewinding) && { opacity: 0.5 },
+                ]}
+                onPress={handleRewind}
+                disabled={rewinding}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel={t("session.rewindTitle")}
+                // @ts-expect-error RN Web supports title for tooltip
+                title={t("session.rewindTitle")}
+              >
+                <Ionicons
+                  name="play-back-outline"
+                  size={13}
+                  color={theme.colors.textSecondary}
+                />
+              </Pressable>
+            )}
           </View>
         </View>
       )}
@@ -582,10 +591,16 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: 16,
   },
   userBubbleRow: {
+    flexDirection: "column",
+    alignItems: "flex-end",
+    maxWidth: "100%",
+  },
+  userActionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    maxWidth: "100%",
+    gap: 2,
+    marginTop: 2,
+    marginBottom: 8,
   },
   userBookmarkButton: {
     padding: 4,
@@ -605,7 +620,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 2,
     flexShrink: 1,
   },
   queuedIndicator: {

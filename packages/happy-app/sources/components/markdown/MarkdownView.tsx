@@ -378,10 +378,12 @@ function RenderOptionsBlock(props: {
                 onPress={() => appendToInput(item)}
                 hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                 accessibilityLabel={t("session.appendToInput")}
+                // @ts-expect-error RN Web supports title for tooltip
+                title={t("session.appendToInput")}
               >
                 <Ionicons
                   name="copy-outline"
-                  size={16}
+                  size={13}
                   color={theme.colors.textSecondary}
                 />
               </Pressable>
@@ -393,10 +395,12 @@ function RenderOptionsBlock(props: {
                 onPress={() => toggleBookmark(item, "ai")}
                 hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                 accessibilityLabel={t("session.bookmarkOption")}
+                // @ts-expect-error RN Web supports title for tooltip
+                title={t("session.bookmarkOption")}
               >
                 <Ionicons
                   name={bookmarked ? "bookmark" : "bookmark-outline"}
-                  size={16}
+                  size={13}
                   color={
                     bookmarked
                       ? theme.colors.radio.active

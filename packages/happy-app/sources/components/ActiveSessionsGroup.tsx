@@ -138,7 +138,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 2,
+    marginTop: 6,
   },
   statusLeft: {
     flexDirection: "row",
