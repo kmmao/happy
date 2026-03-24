@@ -135,11 +135,21 @@ export function supervisorActionRoutes(app: Fastify) {
             const { id, actionId } = request.params;
             const { approval } = request.body;
 
-            // Restore: dismissed → pending
-            // Forward: pending → approved/skipped/ignored
-            const fromApproval = approval === "pending"
-                ? { in: ["skipped", "ignored"] as string[] }
-                : "pending";
+            // State transitions:
+            // - Restore: dismissed → pending
+            // - Forward: pending → approved/skipped/ignored
+            // - Post-analysis: approved (with fixStatus=analyzed) → ignored/skipped
+            let fromApproval: string | { in: string[] };
+            if (approval === "pending") {
+                // Restore from dismissed
+                fromApproval = { in: ["skipped", "ignored"] };
+            } else if (approval === "skipped" || approval === "ignored") {
+                // Allow from pending OR from approved (post-analysis dismiss)
+                fromApproval = { in: ["pending", "approved"] };
+            } else {
+                // approved: only from pending
+                fromApproval = "pending";
+            }
 
             const result = await db.supervisorAction.updateMany({
                 where: {
@@ -150,8 +160,10 @@ export function supervisorActionRoutes(app: Fastify) {
                 },
                 data: {
                     approval,
-                    // Reset fix status when restoring to pending
-                    ...(approval === "pending" ? { fixStatus: null, fixSessionId: null } : {}),
+                    // Reset fix status when restoring to pending or dismissing after analysis
+                    ...(approval === "pending" || approval === "skipped" || approval === "ignored"
+                        ? { fixStatus: null, fixSessionId: null, fixMode: null }
+                        : {}),
                 },
             });
 
