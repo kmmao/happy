@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from "react";
+import { Linking } from "react-native";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { Ionicons } from "@expo/vector-icons";
@@ -88,35 +89,54 @@ export const TailscaleServeSection = React.memo(function TailscaleServeSection({
         }
     }, [machineId]);
 
-    const handleFunnelToggle = useCallback(async (serve: ServeEntry) => {
+    const buildServeUrl = useCallback((serve: ServeEntry): string => {
+        // Funnel serves have public HTTPS URLs
+        if (serve.funnel) {
+            return `https://${serve.hostname}:${serve.port}/`;
+        }
+        // Tailnet-only serves: use Tailscale IP if available
+        const tsIp = machine.daemonState?.tailscale?.ipv4;
+        if (tsIp) {
+            return `http://${tsIp}:${serve.port}/`;
+        }
+        return `http://localhost:${serve.port}/`;
+    }, [machine.daemonState?.tailscale?.ipv4]);
+
+    const handleOpenServe = useCallback((serve: ServeEntry) => {
+        Linking.openURL(buildServeUrl(serve));
+    }, [buildServeUrl]);
+
+    const handleServeManage = useCallback(async (serve: ServeEntry) => {
         if (!online) return;
-        const msg = serve.funnel
+
+        // First ask: toggle funnel?
+        const funnelMsg = serve.funnel
             ? t("machine.tailscaleServeFunnelToggleOff")
             : t("machine.tailscaleServeFunnelToggleOn");
-        const confirmed = await Modal.confirm(`:${serve.port}`, msg);
-        if (!confirmed) return;
+        const toggleFunnel = await Modal.confirm(`:${serve.port}`, funnelMsg);
 
-        const result = await machineTailscaleFunnelToggle(machineId, serve.port, !serve.funnel);
-        if (!result.success && result.stderr) {
-            Modal.alert(t("machine.tailscaleServeError"), result.stderr);
-        } else {
-            await refreshServes();
+        if (toggleFunnel) {
+            const result = await machineTailscaleFunnelToggle(machineId, serve.port, !serve.funnel);
+            if (!result.success && result.stderr) {
+                Modal.alert(t("machine.tailscaleServeError"), result.stderr);
+            } else {
+                await refreshServes();
+            }
+            return;
         }
-    }, [machineId, online, refreshServes]);
 
-    const handleServeRemove = useCallback(async (serve: ServeEntry) => {
-        if (!online) return;
-        const confirmed = await Modal.confirm(
+        // Second ask: remove?
+        const remove = await Modal.confirm(
             t("machine.tailscaleServeRemove"),
             t("machine.tailscaleServeRemoveConfirm"),
         );
-        if (!confirmed) return;
-
-        const result = await machineTailscaleServeRemove(machineId, serve.port);
-        if (!result.success && result.stderr) {
-            Modal.alert(t("machine.tailscaleServeError"), result.stderr);
-        } else {
-            await refreshServes();
+        if (remove) {
+            const result = await machineTailscaleServeRemove(machineId, serve.port);
+            if (!result.success && result.stderr) {
+                Modal.alert(t("machine.tailscaleServeError"), result.stderr);
+            } else {
+                await refreshServes();
+            }
         }
     }, [machineId, online, refreshServes]);
 
@@ -163,8 +183,12 @@ export const TailscaleServeSection = React.memo(function TailscaleServeSection({
                 <Item
                     key={serve.port}
                     title={`:${serve.port}`}
-                    subtitle={serve.target}
-                    subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                    subtitle={buildServeUrl(serve)}
+                    subtitleStyle={{
+                        fontFamily: "Menlo",
+                        fontSize: 12,
+                        color: theme.colors.textLink,
+                    }}
                     detail={
                         serve.funnel
                             ? t("machine.tailscaleServeFunnelOn")
@@ -173,9 +197,9 @@ export const TailscaleServeSection = React.memo(function TailscaleServeSection({
                     detailStyle={{
                         color: serve.funnel ? theme.colors.success : theme.colors.textSecondary,
                     }}
-                    onPress={online ? () => handleFunnelToggle(serve) : undefined}
-                    onLongPress={online ? () => handleServeRemove(serve) : undefined}
-                    showChevron={online}
+                    onPress={() => handleOpenServe(serve)}
+                    onLongPress={online ? () => handleServeManage(serve) : undefined}
+                    showChevron
                 />
             ))}
             {online && (
