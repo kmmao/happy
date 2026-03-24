@@ -193,7 +193,7 @@ model UsageReport {
     accountId String
     account   Account  @relation(fields: [accountId], references: [id])
     sessionId String?
-    session   Session? @relation(fields: [sessionId], references: [id])
+    session   Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
     /// [UsageReportData]
     data      Json
     createdAt DateTime @default(now())
@@ -202,6 +202,7 @@ model UsageReport {
     @@index([accountId])
     @@index([sessionId])
     @@index([accountId, sessionId, key])
+    @@index([accountId, createdAt])
 }
 
 //
@@ -552,7 +553,8 @@ model SupervisorAction {
 
     // Fix tracking
     fixSessionId    String?   // Claude Code session executing the fix
-    fixStatus       String?   // pending | running | completed | failed
+    fixStatus       String?   // pending | running | completed | failed | analyzed
+    fixMode         String?   // "fix" | "analyze-first" — null means "fix"
     issueUrl        String?   // GitHub Issue URL if created
 
     // Deduplication — tracks last run that detected this issue

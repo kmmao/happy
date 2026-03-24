@@ -115,6 +115,24 @@ export const SupervisorActionCard = React.memo(
             }, [projectId, action.id, onUpdated]),
         );
 
+        const [analyzeLoading, doAnalyze] = useHappyAction(
+            React.useCallback(async () => {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                // Auto-approve then trigger fix with analyze-first mode
+                await updateActionApproval(
+                    credentials,
+                    projectId,
+                    action.id,
+                    "approved",
+                );
+                await triggerActionFix(credentials, projectId, action.id, {
+                    mode: "analyze-first",
+                });
+                onUpdated();
+            }, [projectId, action.id, onUpdated]),
+        );
+
         const [restoreLoading, doRestore] = useHappyAction(
             React.useCallback(async () => {
                 const credentials = await TokenStorage.getCredentials();
@@ -191,7 +209,7 @@ export const SupervisorActionCard = React.memo(
 
         const forceResolveBusy = forceCompleteLoading || forceFailLoading;
 
-        const actionBusy = approveLoading || skipLoading || ignoreLoading || restoreLoading || deleteLoading;
+        const actionBusy = approveLoading || skipLoading || ignoreLoading || restoreLoading || deleteLoading || analyzeLoading;
 
         const isPending = action.approval === "pending";
         const isApproved = action.approval === "approved";
@@ -200,6 +218,8 @@ export const SupervisorActionCard = React.memo(
         const isFixing =
             action.fixStatus === "pending" ||
             action.fixStatus === "running";
+        const isAnalyzed = action.fixStatus === "analyzed";
+        const isAnalyzeFirst = action.fixMode === "analyze-first";
 
         const showDetail = React.useCallback(() => {
             const message = action.suggestedFix
@@ -295,13 +315,19 @@ export const SupervisorActionCard = React.memo(
                     )}
                 </Pressable>
 
-                {/* Fix progress */}
+                {/* Fix/Analyze progress */}
                 {isApproved && action.fixStatus && (
                     <View style={styles.fixProgressRow}>
                         {isFixing ? (
                             <ActivityIndicator
                                 size="small"
-                                color={theme.colors.header.tint}
+                                color={isAnalyzeFirst ? "#AF52DE" : theme.colors.header.tint}
+                            />
+                        ) : isAnalyzed ? (
+                            <Ionicons
+                                name="search-circle"
+                                size={18}
+                                color="#AF52DE"
                             />
                         ) : action.fixStatus === "completed" ? (
                             <Ionicons
@@ -317,7 +343,15 @@ export const SupervisorActionCard = React.memo(
                             />
                         )}
                         <Text style={styles.fixProgressText}>
-                            {t("supervisor.fixStatus")}: {action.fixStatus}
+                            {isAnalyzed
+                                ? t("supervisor.analyzeComplete")
+                                : isFixing && isAnalyzeFirst
+                                    ? t("supervisor.analyzing")
+                                    : isFixing
+                                        ? t("supervisor.fixing")
+                                        : isAnalyzeFirst
+                                            ? `${t("supervisor.analyzeStatus")}: ${action.fixStatus}`
+                                            : `${t("supervisor.fixStatus")}: ${action.fixStatus}`}
                         </Text>
                         {action.updatedAt > 0 && (
                             <Text style={styles.fixTimeText}>
@@ -454,6 +488,22 @@ export const SupervisorActionCard = React.memo(
                                 </Text>
                             )}
                         </Pressable>
+                        <Pressable
+                            style={[styles.analyzeButton, actionBusy && !analyzeLoading && styles.buttonDisabled]}
+                            onPress={doAnalyze}
+                            disabled={actionBusy}
+                        >
+                            {analyzeLoading ? (
+                                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                            ) : (
+                                <>
+                                    <Ionicons name="search-outline" size={13} color={theme.colors.textSecondary} />
+                                    <Text style={styles.analyzeButtonText}>
+                                        {t("supervisor.analyze")}
+                                    </Text>
+                                </>
+                            )}
+                        </Pressable>
                     </View>
                 )}
 
@@ -540,6 +590,41 @@ export const SupervisorActionCard = React.memo(
                             ) : (
                                 <Text style={styles.approveButtonText}>
                                     {t("supervisor.retryFix")}
+                                </Text>
+                            )}
+                        </Pressable>
+                    </View>
+                )}
+
+                {/* Actions after analysis: fix now or ignore */}
+                {isAnalyzed && (
+                    <View style={styles.buttonRow}>
+                        <Pressable
+                            style={styles.approveButton}
+                            onPress={doFix}
+                            disabled={fixLoading}
+                        >
+                            {fixLoading ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Ionicons name="hammer-outline" size={14} color="#FFFFFF" />
+                                    <Text style={styles.approveButtonText}>
+                                        {t("supervisor.triggerFix")}
+                                    </Text>
+                                </>
+                            )}
+                        </Pressable>
+                        <Pressable
+                            style={[styles.secondaryButton, ignoreLoading && styles.buttonDisabled]}
+                            onPress={doIgnore}
+                            disabled={ignoreLoading}
+                        >
+                            {ignoreLoading ? (
+                                <ActivityIndicator size="small" color={theme.colors.text} />
+                            ) : (
+                                <Text style={styles.secondaryButtonText}>
+                                    {t("supervisor.ignore")}
                                 </Text>
                             )}
                         </Pressable>
@@ -684,7 +769,26 @@ const styles = StyleSheet.create((theme) => ({
     buttonDisabled: {
         opacity: 0.4,
     },
+    analyzeButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 3,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 6,
+        borderWidth: 0.5,
+        borderColor: theme.colors.divider,
+        marginLeft: "auto",
+    },
+    analyzeButtonText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+    },
     approveButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
         backgroundColor: theme.colors.header.tint,
         paddingHorizontal: 16,
         paddingVertical: 8,

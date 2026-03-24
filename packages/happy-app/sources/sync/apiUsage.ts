@@ -14,6 +14,7 @@ export interface UsageQueryParams {
   startTime?: number; // Unix timestamp in seconds
   endTime?: number; // Unix timestamp in seconds
   groupBy?: "hour" | "day";
+  timezone?: string; // IANA timezone name (e.g. "Asia/Shanghai")
 }
 
 export interface UsageResponse {
@@ -178,6 +179,7 @@ export async function getUsageForPeriod(
     startTime,
     endTime: now,
     groupBy,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 
   return {

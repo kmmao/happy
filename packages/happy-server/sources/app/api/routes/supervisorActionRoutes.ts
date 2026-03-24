@@ -28,8 +28,9 @@ export function supervisorActionRoutes(app: Fastify) {
                             .enum(["pending", "approved", "skipped", "ignored"])
                             .optional(),
                         view: z
-                            .enum(["approved", "fixing", "done", "dismissed"])
+                            .enum(["approved", "fixing", "analyzing", "done", "dismissed"])
                             .optional(),
+                        category: z.string().optional(),
                         runId: z.string().optional(),
                         limit: z.coerce
                             .number()
@@ -47,6 +48,7 @@ export function supervisorActionRoutes(app: Fastify) {
             const { id } = request.params;
             const approval = request.query?.approval;
             const view = request.query?.view;
+            const category = request.query?.category;
             const runId = request.query?.runId;
             const limit = request.query?.limit ?? 50;
             const offset = request.query?.offset ?? 0;
@@ -65,6 +67,7 @@ export function supervisorActionRoutes(app: Fastify) {
                 accountId: userId,
             };
             if (runId) where.runId = runId;
+            if (category) where.category = category;
 
             // view takes precedence over approval
             if (view === "approved") {
@@ -73,17 +76,22 @@ export function supervisorActionRoutes(app: Fastify) {
             } else if (view === "fixing") {
                 where.approval = "approved";
                 where.fixStatus = { in: ["pending", "running"] };
+                where.fixMode = { not: "analyze-first" };
+            } else if (view === "analyzing") {
+                where.approval = "approved";
+                where.fixStatus = { in: ["pending", "running"] };
+                where.fixMode = "analyze-first";
             } else if (view === "done") {
                 where.approval = "approved";
-                where.fixStatus = { in: ["completed", "failed"] };
+                where.fixStatus = { in: ["completed", "failed", "analyzed"] };
             } else if (view === "dismissed") {
                 where.approval = { in: ["skipped", "ignored"] };
             } else if (approval) {
                 where.approval = approval;
             }
 
-            // Sort by updatedAt for done/fixing views (shows latest status change first)
-            const orderBy = (view === "done" || view === "fixing")
+            // Sort by updatedAt for done/fixing/analyzing views (shows latest status change first)
+            const orderBy = (view === "done" || view === "fixing" || view === "analyzing")
                 ? { updatedAt: "desc" as const }
                 : { createdAt: "desc" as const };
 
@@ -306,6 +314,22 @@ export function supervisorActionRoutes(app: Fastify) {
                 }),
             ]);
 
+            // Count analyzing actions separately (safe fallback if fixMode column doesn't exist yet)
+            let analyzingCount = 0;
+            try {
+                analyzingCount = await db.supervisorAction.count({
+                    where: {
+                        projectId: id,
+                        accountId: userId,
+                        approval: "approved",
+                        fixMode: "analyze-first",
+                        fixStatus: { in: ["pending", "running"] },
+                    },
+                });
+            } catch {
+                // fixMode column may not exist yet — gracefully default to 0
+            }
+
             const approvalMap: Record<string, number> = {};
             for (const row of approvalGroups) {
                 approvalMap[row.approval] = row._count._all;
@@ -317,6 +341,10 @@ export function supervisorActionRoutes(app: Fastify) {
                 fixMap[key] = row._count._all;
             }
 
+            // fixPending/fixRunning include both fix and analyze modes;
+            // subtract analyzing count for pure fix stats
+            const totalInProgress = (fixMap["pending"] ?? 0) + (fixMap["running"] ?? 0);
+
             return reply.send({
                 pending: approvalMap["pending"] ?? 0,
                 approved: approvalMap["approved"] ?? 0,
@@ -327,6 +355,9 @@ export function supervisorActionRoutes(app: Fastify) {
                 fixRunning: fixMap["running"] ?? 0,
                 fixCompleted: fixMap["completed"] ?? 0,
                 fixFailed: fixMap["failed"] ?? 0,
+                fixAnalyzed: fixMap["analyzed"] ?? 0,
+                analyzing: analyzingCount,
+                fixing: totalInProgress - analyzingCount,
             });
         },
     );
@@ -345,6 +376,7 @@ export function supervisorActionRoutes(app: Fastify) {
                     .object({
                         machineId: z.string().optional(),
                         repoPath: z.string().optional(),
+                        mode: z.enum(["fix", "analyze-first"]).optional(),
                     })
                     .optional(),
             },
@@ -379,7 +411,7 @@ export function supervisorActionRoutes(app: Fastify) {
                 });
             }
 
-            // Get project for machine/path info
+            // Get project for machine/path info + config
             const project = await db.project.findFirst({
                 where: { id, accountId: userId },
                 select: {
@@ -387,6 +419,7 @@ export function supervisorActionRoutes(app: Fastify) {
                     machineId: true,
                     path: true,
                     fixStrategy: true,
+                    supervisorConfig: true,
                 },
             });
 
@@ -394,10 +427,21 @@ export function supervisorActionRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Project not found" });
             }
 
-            // Update fix status to pending
+            const fixMode = request.body?.mode ?? "fix";
+
+            // Read analyzeAutoFix from project config
+            let analyzeAutoFix = false;
+            if (fixMode === "analyze-first" && project.supervisorConfig) {
+                try {
+                    const parsed = JSON.parse(project.supervisorConfig);
+                    analyzeAutoFix = parsed.analyzeAutoFix === true;
+                } catch { /* ignore parse errors */ }
+            }
+
+            // Update fix status to pending and store fixMode
             await db.supervisorAction.update({
                 where: { id: actionId },
-                data: { fixStatus: "pending" },
+                data: { fixStatus: "pending", fixMode },
             });
 
             const machineId =
@@ -422,6 +466,8 @@ export function supervisorActionRoutes(app: Fastify) {
                         severity: action.severity,
                     },
                     fixStrategy: project.fixStrategy ?? undefined,
+                    fixMode,
+                    analyzeAutoFix,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",
@@ -453,6 +499,7 @@ export function supervisorActionRoutes(app: Fastify) {
                         "running",
                         "completed",
                         "failed",
+                        "analyzed",
                     ]),
                     fixSessionId: z.string().optional(),
                     issueUrl: z.string().url().optional(),
@@ -501,9 +548,9 @@ export function supervisorActionRoutes(app: Fastify) {
                 });
             }
 
-            // On completion/failure: tell CLI daemon to kill the fix session
+            // On completion/failure/analyzed: tell CLI daemon to kill the fix session
             if (
-                (fixStatus === "completed" || fixStatus === "failed") &&
+                (fixStatus === "completed" || fixStatus === "failed" || fixStatus === "analyzed") &&
                 updated?.fixSessionId
             ) {
                 const project = await db.project.findUnique({
@@ -528,25 +575,29 @@ export function supervisorActionRoutes(app: Fastify) {
                 }
 
                 // Send push notification
-                const title =
+                const notifTitle =
                     fixStatus === "completed"
                         ? "Fix Applied Successfully"
-                        : "Fix Failed";
-                const body =
+                        : fixStatus === "analyzed"
+                            ? "Analysis Complete"
+                            : "Fix Failed";
+                const notifBody =
                     fixStatus === "completed"
                         ? `Fixed: ${updated.title}`
-                        : `Failed to fix: ${updated.title}`;
+                        : fixStatus === "analyzed"
+                            ? `Analyzed: ${updated.title}`
+                            : `Failed to fix: ${updated.title}`;
                 await pushSupervisorNotification(userId, {
                     projectId: id,
                     runId: updated.runId,
-                    type: fixStatus === "completed" ? "fix_complete" : "error",
-                    title,
-                    body,
+                    type: fixStatus === "completed" || fixStatus === "analyzed" ? "fix_complete" : "error",
+                    title: notifTitle,
+                    body: notifBody,
                 });
             }
 
             // Loop progression: if this fix belongs to a loop, check if all fixes are done
-            if (fixStatus === "completed" || fixStatus === "failed") {
+            if (fixStatus === "completed" || fixStatus === "failed" || fixStatus === "analyzed") {
                 try {
                     await loopOnFixCompleted(userId, actionId, id, fixStatus);
                 } catch (loopError) {
@@ -698,6 +749,7 @@ function serializeSupervisorAction(action: {
     approval: string;
     fixSessionId: string | null;
     fixStatus: string | null;
+    fixMode: string | null;
     issueUrl: string | null;
     lastSeenRunId: string | null;
     createdAt: Date;
@@ -716,6 +768,7 @@ function serializeSupervisorAction(action: {
         approval: action.approval,
         fixSessionId: action.fixSessionId,
         fixStatus: action.fixStatus,
+        fixMode: action.fixMode,
         issueUrl: action.issueUrl,
         lastSeenRunId: action.lastSeenRunId,
         createdAt: action.createdAt.getTime(),

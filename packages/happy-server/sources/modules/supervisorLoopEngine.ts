@@ -288,7 +288,7 @@ export async function onFixCompleted(
     userId: string,
     actionId: string,
     projectId: string,
-    fixStatus: "completed" | "failed",
+    fixStatus: "completed" | "failed" | "analyzed",
 ): Promise<void> {
     // Find the action and its run's loop
     const action = await db.supervisorAction.findUnique({

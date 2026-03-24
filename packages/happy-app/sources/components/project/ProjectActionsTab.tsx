@@ -31,15 +31,16 @@ import {
     SEVERITY_ORDER,
     URGENCY_ORDER,
     URGENCY_COLORS,
+    CATEGORY_KEY_MAP,
     getUrgencyLevel,
 } from "./supervisorConstants";
 
 // --- Types ---
 
-type ActionTab = "pending" | "approved" | "fixing" | "done" | "dismissed";
+type ActionTab = "pending" | "approved" | "fixing" | "analyzing" | "done" | "dismissed";
 type UrgencyFilter = "all" | UrgencyLevel;
 
-const TABS: ActionTab[] = ["pending", "approved", "fixing", "done", "dismissed"];
+const TABS: ActionTab[] = ["pending", "approved", "fixing", "analyzing", "done", "dismissed"];
 const SORT_FIELDS: SortField[] = ["severity", "category", "confidence", "urgency"];
 const URGENCY_FILTERS: UrgencyFilter[] = ["all", "urgent", "must-fix", "optional"];
 const PAGE_SIZE = 20;
@@ -54,6 +55,8 @@ function getTabLabel(tab: ActionTab): string {
             return t("supervisor.tabApproved");
         case "fixing":
             return t("supervisor.tabFixing");
+        case "analyzing":
+            return t("supervisor.tabAnalyzing");
         case "done":
             return t("supervisor.tabDone");
         case "dismissed":
@@ -75,10 +78,13 @@ function getTabCount(
             count = stats.approvedNoFix ?? 0;
             break;
         case "fixing":
-            count = (stats.fixPending ?? 0) + (stats.fixRunning ?? 0);
+            count = stats.fixing ?? 0;
+            break;
+        case "analyzing":
+            count = stats.analyzing ?? 0;
             break;
         case "done":
-            count = (stats.fixCompleted ?? 0) + (stats.fixFailed ?? 0);
+            count = (stats.fixCompleted ?? 0) + (stats.fixFailed ?? 0) + (stats.fixAnalyzed ?? 0);
             break;
         case "dismissed":
             count = (stats.skipped ?? 0) + (stats.ignored ?? 0);
@@ -116,6 +122,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
     const [sortField, setSortField] = React.useState<SortField | null>(null);
     const [sortAsc, setSortAsc] = React.useState(false);
     const [urgencyFilter, setUrgencyFilter] = React.useState<UrgencyFilter>("all");
+    const [categoryFilter, setCategoryFilter] = React.useState<string | null>(null);
 
     // Fetch actions and stats when activeTab changes (stats also refreshed here)
     React.useEffect(() => {
@@ -131,6 +138,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
                 const [data, statsData] = await Promise.all([
                     fetchSupervisorActions(credentials, projectId, {
                         ...getTabFetchParams(activeTab),
+                        category: categoryFilter ?? undefined,
                         limit: PAGE_SIZE,
                         offset: 0,
                     }),
@@ -158,7 +166,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
         return () => {
             cancelled = true;
         };
-    }, [projectId, activeTab]);
+    }, [projectId, activeTab, categoryFilter]);
 
     const handleLoadMore = React.useCallback(async () => {
         if (loadingMore || actions.length >= total) return;
@@ -168,6 +176,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
             if (!credentials) return;
             const data = await fetchSupervisorActions(credentials, projectId, {
                 ...getTabFetchParams(activeTab),
+                category: categoryFilter ?? undefined,
                 limit: PAGE_SIZE,
                 offset: actions.length,
             });
@@ -178,7 +187,7 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
         } finally {
             setLoadingMore(false);
         }
-    }, [projectId, activeTab, actions.length, total, loadingMore]);
+    }, [projectId, activeTab, categoryFilter, actions.length, total, loadingMore]);
 
     const handleRefresh = React.useCallback(async () => {
         try {
@@ -246,7 +255,8 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
             if (
                 event.status === "fix-running" ||
                 event.status === "fix-completed" ||
-                event.status === "fix-failed"
+                event.status === "fix-failed" ||
+                event.status === "fix-analyzed"
             ) {
                 handleUpdated();
             }
@@ -468,6 +478,58 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
                     </ScrollView>
                 </View>
             )}
+
+            {/* Category filter */}
+            <View style={styles.filterBar}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.filterBarContent}
+                >
+                    <Pressable
+                        style={[
+                            styles.chip,
+                            !categoryFilter && styles.chipActive,
+                        ]}
+                        onPress={() => setCategoryFilter(null)}
+                    >
+                        <Text
+                            style={[
+                                styles.chipText,
+                                !categoryFilter && styles.chipTextActive,
+                            ]}
+                        >
+                            {t("supervisor.categoryAll")}
+                        </Text>
+                    </Pressable>
+                    {Object.keys(CATEGORY_KEY_MAP).filter((k) => k !== "ui-ux").map((cat) => {
+                        const isActive = categoryFilter === cat;
+                        return (
+                            <Pressable
+                                key={cat}
+                                style={[
+                                    styles.chip,
+                                    isActive && styles.chipActive,
+                                ]}
+                                onPress={() =>
+                                    setCategoryFilter(isActive ? null : cat)
+                                }
+                            >
+                                <Text
+                                    style={[
+                                        styles.chipText,
+                                        isActive && styles.chipTextActive,
+                                    ]}
+                                >
+                                    {CATEGORY_KEY_MAP[cat]
+                                        ? t(CATEGORY_KEY_MAP[cat])
+                                        : cat}
+                                </Text>
+                            </Pressable>
+                        );
+                    })}
+                </ScrollView>
+            </View>
 
             {/* Action List */}
             {loading ? (

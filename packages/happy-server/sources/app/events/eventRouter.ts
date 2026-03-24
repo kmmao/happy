@@ -961,6 +961,8 @@ export interface SupervisorTriggerOptions {
   fixAction?: { title: string; description: string; suggestedFix: string | null; category: string; severity: string; issueNumber?: number };
   researchParams?: string;
   fixStrategy?: string;
+  fixMode?: string; // "fix" | "analyze-first"
+  analyzeAutoFix?: boolean;
   existingActions?: readonly { category: string; title: string; severity: string; approval: string; fixStatus: string | null }[];
   maxConcurrentAnalysis?: number;
   maxConcurrentFix?: number;

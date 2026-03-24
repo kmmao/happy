@@ -59,6 +59,7 @@ const defaultConfig = {
         maxAnalysisSessions: 3,
         maxFixSessions: 2,
     },
+    analyzeAutoFix: false,
     maxFindings: 0,
     notifications: {
         onAnalysisComplete: true,
@@ -544,6 +545,23 @@ function SupervisorSettingsScreen() {
                     }
                     isLast
                 />
+            </ItemGroup>
+
+            {/* Analyze Auto-Fix */}
+            <ItemGroup title={t("supervisor.analyzeAutoFixSection")}>
+                <ToggleRow
+                    label={t("supervisor.analyzeAutoFixLabel")}
+                    value={config.analyzeAutoFix}
+                    onToggle={() =>
+                        updateConfig((prev) => ({
+                            ...prev,
+                            analyzeAutoFix: !prev.analyzeAutoFix,
+                        }))
+                    }
+                />
+                <Text style={styles.safetyText}>
+                    {t("supervisor.analyzeAutoFixDesc")}
+                </Text>
             </ItemGroup>
 
             {/* Concurrency Limits */}

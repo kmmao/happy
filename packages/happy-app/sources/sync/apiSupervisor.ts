@@ -605,7 +605,8 @@ export interface SupervisorAction {
     confidence: number | null;
     approval: string; // "pending" | "approved" | "skipped" | "ignored"
     fixSessionId: string | null;
-    fixStatus: string | null; // "pending" | "running" | "completed" | "failed"
+    fixStatus: string | null; // "pending" | "running" | "completed" | "failed" | "analyzed"
+    fixMode: string | null; // "fix" | "analyze-first"
     issueUrl: string | null;
     lastSeenRunId: string | null;
     createdAt: number;
@@ -626,6 +627,7 @@ export async function fetchSupervisorActions(
     params?: {
         approval?: string;
         view?: string;
+        category?: string;
         runId?: string;
         limit?: number;
         offset?: number;
@@ -635,6 +637,7 @@ export async function fetchSupervisorActions(
     const query = new URLSearchParams();
     if (params?.approval) query.set("approval", params.approval);
     if (params?.view) query.set("view", params.view);
+    if (params?.category) query.set("category", params.category);
     if (params?.runId) query.set("runId", params.runId);
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
     if (params?.offset !== undefined)
@@ -697,7 +700,7 @@ export async function triggerActionFix(
     credentials: AuthCredentials,
     projectId: string,
     actionId: string,
-    params?: { machineId?: string; repoPath?: string },
+    params?: { machineId?: string; repoPath?: string; mode?: "fix" | "analyze-first"; analyzeAutoFix?: boolean },
 ): Promise<SupervisorAction | null> {
     const API_ENDPOINT = getServerUrl();
 
@@ -805,6 +808,9 @@ export interface SupervisorActionStats {
     fixRunning: number;
     fixCompleted: number;
     fixFailed: number;
+    fixAnalyzed: number;
+    analyzing: number;
+    fixing: number;
 }
 
 export interface RunExport {

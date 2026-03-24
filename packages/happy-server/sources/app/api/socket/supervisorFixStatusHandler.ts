@@ -20,7 +20,7 @@ import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEn
 const supervisorFixStatusSchema = z.object({
     actionId: z.string().min(1),
     projectId: z.string().min(1),
-    fixStatus: z.enum(["running", "completed", "failed"]),
+    fixStatus: z.enum(["running", "completed", "failed", "analyzed"]),
     fixSessionId: z.string().min(1).optional(),
 });
 
@@ -83,7 +83,8 @@ export function supervisorFixStatusHandler(
             // regardless of outcome (unlike run handler which only archives on completed).
             if (
                 data.fixStatus === "completed" ||
-                data.fixStatus === "failed"
+                data.fixStatus === "failed" ||
+                data.fixStatus === "analyzed"
             ) {
                 // Archive the fix session first (before broadcasting status)
                 // so clients see active: false when they query after the status event.
@@ -114,24 +115,28 @@ export function supervisorFixStatusHandler(
                     });
                 }
 
-                const title =
+                const notifTitle =
                     data.fixStatus === "completed"
                         ? "Fix Applied Successfully"
-                        : "Fix Failed";
-                const body =
+                        : data.fixStatus === "analyzed"
+                            ? "Analysis Complete"
+                            : "Fix Failed";
+                const notifBody =
                     data.fixStatus === "completed"
                         ? `Fixed: ${action.title}`
-                        : `Failed to fix: ${action.title}`;
+                        : data.fixStatus === "analyzed"
+                            ? `Analyzed: ${action.title}`
+                            : `Failed to fix: ${action.title}`;
 
                 await pushSupervisorNotification(userId, {
                     projectId: data.projectId,
                     runId: action.runId,
                     type:
-                        data.fixStatus === "completed"
+                        data.fixStatus === "completed" || data.fixStatus === "analyzed"
                             ? "fix_complete"
                             : "error",
-                    title,
-                    body,
+                    title: notifTitle,
+                    body: notifBody,
                 });
             }
 
@@ -149,7 +154,8 @@ export function supervisorFixStatusHandler(
             // Loop progression: if this fix belongs to a loop, check if all fixes are done
             if (
                 data.fixStatus === "completed" ||
-                data.fixStatus === "failed"
+                data.fixStatus === "failed" ||
+                data.fixStatus === "analyzed"
             ) {
                 try {
                     await loopOnFixCompleted(

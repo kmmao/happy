@@ -9,7 +9,7 @@ import { log } from "@/utils/log";
  * Delete a session and all its related data.
  * Handles:
  * - Deleting all session messages
- * - Deleting all usage reports for the session
+ * - Detaching usage reports (setting sessionId to null to preserve history)
  * - Deleting all access keys for the session
  * - Deleting the session itself
  * - Sending socket notification to all connected clients
@@ -51,16 +51,19 @@ export async function sessionDelete(ctx: Context, sessionId: string): Promise<bo
             deletedCount: deletedMessages.count
         }, `Deleted ${deletedMessages.count} session messages`);
 
-        // 2. Delete usage reports
-        const deletedReports = await tx.usageReport.deleteMany({
-            where: { sessionId }
+        // 2. Detach usage reports (preserve for historical statistics).
+        // This is intentionally redundant with schema-level onDelete: SetNull
+        // as a double safety net — explicit app logic + DB constraint.
+        const detachedReports = await tx.usageReport.updateMany({
+            where: { sessionId },
+            data: { sessionId: null }
         });
-        log({ 
-            module: 'session-delete', 
-            userId: ctx.uid, 
+        log({
+            module: 'session-delete',
+            userId: ctx.uid,
             sessionId,
-            deletedCount: deletedReports.count
-        }, `Deleted ${deletedReports.count} usage reports`);
+            detachedCount: detachedReports.count
+        }, `Detached ${detachedReports.count} usage reports (sessionId set to null)`);
 
         // 3. Delete access keys
         const deletedAccessKeys = await tx.accessKey.deleteMany({
