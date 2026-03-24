@@ -21,7 +21,8 @@ import { sessionKill, sessionDelete, machineSpawnNewSession, sessionForkSession 
 import { useUnistyles } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
-import { isVersionSupported, MINIMUM_CLI_VERSION, compareVersions } from "@/utils/versionUtils";
+import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
+import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
 import { CodeView } from "@/components/CodeView";
 import { Session } from "@/sync/storageTypes";
 import { useHappyAction } from "@/hooks/useHappyAction";
@@ -173,18 +174,7 @@ function SessionInfoContent({ session }: { session: Session }) {
     !!machine &&
     isMachineOnline(machine);
 
-  const machineCliVersion = machine?.daemonState?.startedWithCliVersion as string | undefined;
-
-  const needsUpgrade =
-    session.active &&
-    !!session.metadata?.version &&
-    !!session.metadata?.claudeSessionId &&
-    !!session.metadata?.machineId &&
-    !!session.metadata?.path &&
-    !!machine &&
-    isMachineOnline(machine) &&
-    !!machineCliVersion &&
-    compareVersions(session.metadata.version, machineCliVersion) < 0;
+  const { needsUpgrade, machineCliVersion, handleUpgrade: handleUpgradeSession } = useSessionUpgrade(session, machine);
 
   // Check if CLI version is outdated
   const isCliOutdated =
@@ -325,44 +315,6 @@ function SessionInfoContent({ session }: { session: Session }) {
   const handleForkSession = useCallback(() => {
     performFork();
   }, [performFork]);
-
-  // Upgrade session — kill old process and resume with new CLI version
-  const [upgradingSession, performUpgrade] = useHappyAction(async () => {
-    const killResult = await sessionKill(session.id);
-    if (!killResult.success) {
-      throw new HappyError(
-        killResult.message || t("sessionInfo.failedToUpgradeSession"),
-        false,
-      );
-    }
-    const spawnResult = await machineSpawnNewSession({
-      machineId: session.metadata!.machineId!,
-      directory: session.metadata!.path!,
-      claudeSessionId: session.metadata!.claudeSessionId!,
-      happySessionId: session.id,
-      agent: (session.metadata?.flavor as "claude" | "codex" | "gemini") ?? "claude",
-    });
-    if (spawnResult.type === "error") {
-      throw new HappyError(spawnResult.errorMessage, false);
-    }
-    if (spawnResult.type === "success") {
-      router.back();
-    }
-  });
-
-  const handleUpgradeSession = useCallback(() => {
-    Modal.alert(
-      t("sessionInfo.upgradeRestart"),
-      t("sessionInfo.upgradeRestartConfirm"),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("sessionInfo.upgradeRestart"),
-          onPress: performUpgrade,
-        },
-      ],
-    );
-  }, [performUpgrade]);
 
   const formatDate = useCallback((timestamp: number) => {
     return new Date(timestamp).toLocaleString();

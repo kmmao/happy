@@ -29,7 +29,7 @@ import {
 } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
-import { compareVersions } from "@/utils/versionUtils";
+import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
 import { machineSpawnNewSession, sessionKill, sessionDelete } from "@/sync/ops";
 import { resolveAbsolutePath } from "@/utils/pathUtils";
 import { storage } from "@/sync/storage";
@@ -583,53 +583,12 @@ const CompactSessionRow = React.memo(
       ]);
     }, [performDelete, issueLink, session.metadata?.worktree]);
 
-    const machineCliVersion = machine?.daemonState?.startedWithCliVersion as string | undefined;
-
-    const needsUpgrade =
-      session.active &&
-      !!session.metadata?.version &&
-      !!session.metadata?.claudeSessionId &&
-      !!session.metadata?.machineId &&
-      !!session.metadata?.path &&
-      !!machine &&
-      isMachineOnline(machine) &&
-      !!machineCliVersion &&
-      compareVersions(session.metadata.version, machineCliVersion) < 0;
-
-    const [upgradingSession, performUpgrade] = useHappyAction(async () => {
-      const killResult = await sessionKill(session.id);
-      if (!killResult.success) {
-        throw new HappyError(
-          killResult.message || t("sessionInfo.failedToUpgradeSession"),
-          false,
-        );
-      }
-      const spawnResult = await machineSpawnNewSession({
-        machineId: session.metadata!.machineId!,
-        directory: session.metadata!.path!,
-        claudeSessionId: session.metadata!.claudeSessionId!,
-        happySessionId: session.id,
-        agent: (session.metadata?.flavor as "claude" | "codex" | "gemini") ?? "claude",
-      });
-      if (spawnResult.type === "error") {
-        throw new HappyError(spawnResult.errorMessage, false);
-      }
-    });
+    const { needsUpgrade, machineCliVersion, upgrading: upgradingSession, handleUpgrade: onUpgrade } = useSessionUpgrade(session, machine);
 
     const handleUpgrade = React.useCallback(() => {
       swipeableRef.current?.close();
-      Modal.alert(
-        t("sessionInfo.upgradeRestart"),
-        t("sessionInfo.upgradeRestartConfirm"),
-        [
-          { text: t("common.cancel"), style: "cancel" },
-          {
-            text: t("sessionInfo.upgradeRestart"),
-            onPress: performUpgrade,
-          },
-        ],
-      );
-    }, [performUpgrade]);
+      onUpgrade();
+    }, [onUpgrade]);
 
     const itemContent = (
       <View>
