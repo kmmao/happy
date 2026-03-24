@@ -1,0 +1,52 @@
+/**
+ * Tunnel Provider abstraction — unified interface for all tunnel backends.
+ *
+ * Each provider (Tailscale, UPnP, Cloudflare, FRP, etc.) implements this
+ * interface. TunnelManager aggregates all providers and exposes a single API.
+ */
+
+import type { TunnelProviderInfo, TunnelEntry } from "@kmmao/happy-wire";
+
+// ---------------------------------------------------------------------------
+// Provider interface
+// ---------------------------------------------------------------------------
+
+export interface TunnelProvider {
+  /** Unique provider name: "tailscale" | "upnp" | "cloudflare" | "frp" */
+  readonly name: string;
+
+  /** Detect provider availability and list current tunnel entries. Never throws. */
+  detect(): Promise<TunnelProviderInfo>;
+
+  /** Add a tunnel mapping */
+  add(params: TunnelAddParams): Promise<TunnelOpResult>;
+
+  /** Remove a tunnel mapping */
+  remove(params: TunnelRemoveParams): Promise<TunnelOpResult>;
+
+  /** Toggle public/private access (not all providers support this) */
+  toggleAccess?(entry: TunnelEntry, publicAccess: boolean): Promise<TunnelOpResult>;
+}
+
+// ---------------------------------------------------------------------------
+// Operation params & result
+// ---------------------------------------------------------------------------
+
+export interface TunnelAddParams {
+  localPort: number;
+  remotePort?: number;
+  protocol?: string;
+  path?: string;
+  publicAccess?: boolean;
+}
+
+export interface TunnelRemoveParams {
+  localPort?: number;
+  remotePort?: number;
+  path?: string;
+}
+
+export interface TunnelOpResult {
+  success: boolean;
+  error?: string;
+}

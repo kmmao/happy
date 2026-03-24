@@ -22,6 +22,7 @@ import { encodeBase64, decodeBase64, encrypt, decrypt } from "./encryption";
 import { backoff } from "@/utils/time";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "@/utils/tailscale";
+import type { TunnelManager } from "@/tunnel";
 
 
 interface ServerToDaemonEvents {
@@ -206,6 +207,7 @@ export class ApiMachineClient {
   private keepAliveInterval: NodeJS.Timeout | null = null;
   private tailscaleRefreshInterval: NodeJS.Timeout | null = null;
   private lastTailscaleInfo: TailscaleInfo | null = null;
+  private tunnelManager: TunnelManager | null = null;
   private rpcHandlerManager: RpcHandlerManager;
   private webhookHandler: ((data: WebhookTriggerData) => void) | null = null;
   private supervisorHandler:
@@ -556,6 +558,7 @@ export class ApiMachineClient {
         startedAt: Date.now(),
         startedWithCliVersion: configuration.currentCliVersion,
         tailscale: this.lastTailscaleInfo ?? state?.tailscale,
+        tunnels: this.tunnelManager?.getLastState() ?? state?.tunnels,
       }));
 
       // Register all handlers
@@ -689,6 +692,11 @@ export class ApiMachineClient {
     this.lastTailscaleInfo = info;
   }
 
+  /** Allow run.ts to attach TunnelManager for refresh & RPC. */
+  setTunnelManager(manager: TunnelManager) {
+    this.tunnelManager = manager;
+  }
+
   private startTailscaleRefresh() {
     this.stopTailscaleRefresh();
     this.tailscaleRefreshInterval = setInterval(async () => {
@@ -702,9 +710,11 @@ export class ApiMachineClient {
           `[API MACHINE] Tailscale changed: ${this.lastTailscaleInfo?.status} → ${fullInfo.status}, serves: ${serves.length}`,
         );
         this.lastTailscaleInfo = fullInfo;
+        // Also refresh tunnel state if manager is attached
+        const tunnels = this.tunnelManager ? await this.tunnelManager.detectAll() : undefined;
         this.updateDaemonState((state) => {
-          if (!state) return { status: "running", tailscale: fullInfo };
-          return { ...state, tailscale: fullInfo };
+          if (!state) return { status: "running", tailscale: fullInfo, tunnels };
+          return { ...state, tailscale: fullInfo, ...(tunnels ? { tunnels } : {}) };
         });
       }
     }, TAILSCALE_REFRESH_MS);

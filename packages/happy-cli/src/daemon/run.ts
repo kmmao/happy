@@ -48,6 +48,7 @@ import { handleWebhookTrigger } from "@/webhook/handleWebhookTrigger";
 import { handleSupervisorTrigger, cleanupFixWorktree, getFixWorktreeInfo } from "@/supervisor/handleSupervisorTrigger";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
 import { detectTailscale, detectTailscaleServe } from "@/utils/tailscale";
+import { TunnelManager, TailscaleProvider } from "@/tunnel";
 
 
 // Prepare initial metadata
@@ -993,6 +994,11 @@ export async function startDaemon(): Promise<void> {
     const tailscaleInfo = { ...tailscaleBase, serves: tailscaleServes };
     logger.debug(`[DAEMON RUN] Tailscale: ${tailscaleInfo.status}, serves: ${tailscaleServes.length}`);
 
+    // Detect all tunnel providers
+    const tunnelManager = new TunnelManager([new TailscaleProvider()]);
+    const tunnelState = await tunnelManager.detectAll();
+    logger.debug(`[DAEMON RUN] Tunnels: ${tunnelState.providers.length} providers, ${tunnelState.providers.reduce((n, p) => n + p.entries.length, 0)} entries`);
+
     // Prepare initial daemon state
     const initialDaemonState: DaemonState = {
       status: "offline",
@@ -1000,6 +1006,7 @@ export async function startDaemon(): Promise<void> {
       httpPort: controlPort,
       startedAt: Date.now(),
       tailscale: tailscaleInfo,
+      tunnels: tunnelState,
     };
 
     // Create API client
@@ -1016,6 +1023,7 @@ export async function startDaemon(): Promise<void> {
     // Create realtime machine session
     const apiMachine = api.machineSyncClient(machine);
     apiMachine.setTailscaleInfo(tailscaleInfo);
+    apiMachine.setTunnelManager(tunnelManager);
 
     // Set RPC handlers
     apiMachine.setRPCHandlers({
