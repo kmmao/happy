@@ -1,6 +1,7 @@
 import * as React from "react";
 import { View, ActivityIndicator, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import * as Clipboard from "expo-clipboard";
@@ -15,6 +16,7 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { machineBash } from "@/sync/ops";
 import { storage } from "@/sync/storage";
 import { getServerUrl } from "@/sync/serverConfig";
+import { isMachineOnline } from "@/utils/machineUtils";
 import {
     provisionCreate,
     provisionList,
@@ -37,6 +39,7 @@ function sanitizeContainerName(name: string): string {
 function ProvisionSettingsScreen() {
     const { theme } = useUnistyles();
     const auth = useAuth();
+    const { machineId: paramMachineId } = useLocalSearchParams<{ machineId?: string }>();
     const [tokens, setTokens] = React.useState<ProvisionTokenItem[]>([]);
     const [loading, setLoading] = React.useState(true);
 
@@ -61,8 +64,20 @@ function ProvisionSettingsScreen() {
     const [, handleCreate] = useHappyAction(async () => {
         if (!auth.credentials) return;
 
-        const machineId = findOnlineMachineId();
+        // Use specified machine or fallback to first online
+        const machineId = paramMachineId || findOnlineMachineId();
         if (!machineId) {
+            Modal.alert(
+                t("provision.createToken"),
+                t("provision.noMachineOnline"),
+            );
+            return;
+        }
+
+        // Verify machine is online
+        const machines = storage.getState().machines;
+        const machine = machines[machineId];
+        if (machine && !isMachineOnline(machine)) {
             Modal.alert(
                 t("provision.createToken"),
                 t("provision.noMachineOnline"),
@@ -92,21 +107,20 @@ function ProvisionSettingsScreen() {
             ttlHours: 8760, // 1 year
         });
 
-        // Execute docker run — daemon + ttyd auto-start, ttyd on random host port
+        // Find next available ttyd port (7001-7100)
+        const portScanResult = await machineBash(machineId, "docker ps --format '{{.Ports}}' | grep -oP '0\\.0\\.0\\.0:\\K(70[0-9]{2})' | sort -n | tail -1", "/");
+        const lastPort = parseInt(portScanResult.stdout?.trim() || "7000", 10);
+        const ttydPort = Math.max(lastPort + 1, 7001);
+
+        // Execute docker run — daemon + ttyd auto-start, fixed ttyd host port
         const containerFullName = `happy-${safeName}`;
-        const dockerCmd = `docker run -d --name "${containerFullName}" -v "${volumeName}:/root/.happy" -p 7681 -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" happy-client`;
+        const dockerCmd = `docker run -d --name "${containerFullName}" -v "${volumeName}:/root/.happy" -p ${ttydPort}:7681 -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {
-            // Query the assigned ttyd port
-            const portResult = await machineBash(machineId, `docker port "${containerFullName}" 7681 | head -1 | cut -d: -f2`, "/");
-            const ttydPort = portResult.stdout?.trim() || "?";
-
             // Build URLs
             const serverUrl = getServerUrl();
             const webAppUrl = `${serverUrl}/app?provision=${encodeURIComponent(result.provisionToken)}`;
-
-            // ttyd URL: same host as server, different port
             const serverHost = new URL(serverUrl).hostname;
             const ttydUrl = `http://${serverHost}:${ttydPort}`;
 
@@ -141,7 +155,7 @@ function ProvisionSettingsScreen() {
             if (!confirmed) return;
 
             // Stop and remove the container
-            const machineId = findOnlineMachineId();
+            const machineId = paramMachineId || findOnlineMachineId();
             if (machineId && label) {
                 const containerName = `happy-${sanitizeContainerName(label)}`;
                 await machineBash(machineId, `docker rm -f "${containerName}" 2>/dev/null || true`, "/");

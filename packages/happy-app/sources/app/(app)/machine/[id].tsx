@@ -662,6 +662,27 @@ function MachineDetailScreen() {
           />
         </ItemGroup>
 
+        {/* Docker Containers (Provision Tokens) */}
+        <ItemGroup title={t("provision.title")}>
+          <Item
+            title={t("provision.title")}
+            subtitle={t("settings.provisionSubtitle")}
+            icon={
+              <Ionicons
+                name="key-outline"
+                size={20}
+                color={theme.colors.accentOrange}
+              />
+            }
+            onPress={() =>
+              router.push(
+                `/settings/provision?machineId=${machineId}` as any,
+              )
+            }
+            showChevron
+          />
+        </ItemGroup>
+
         {/* Extensions (per-machine) */}
         <ItemGroup title={t("machine.extensions")}>
           <Item

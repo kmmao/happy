@@ -15,6 +15,7 @@ code.xycloud.info {
     handle_path /app {
         reverse_proxy host.docker.internal:8081
     }
+
     handle {
         reverse_proxy host.docker.internal:3005
     }
@@ -26,3 +27,10 @@ code.xycloud.info {
         resolvers 1.1.1.1 8.8.8.8
     }
 }
+
+# ttyd Web Terminal (port range 7001-7100)
+# Each happy-client container maps a unique host port to internal 7681
+# Access: https://code.xycloud.info:2443 won't work for ttyd ports,
+# so we listen on a separate port range via individual site blocks.
+# For now, ttyd is accessible directly via http://{host}:{port}
+# To add HTTPS, create a wildcard subdomain: *.t.code.xycloud.info
