@@ -21,7 +21,7 @@ import {
 import { encodeBase64, decodeBase64, encrypt, decrypt } from "./encryption";
 import { backoff } from "@/utils/time";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
-import { detectTailscale, type TailscaleInfo } from "@/utils/tailscale";
+import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "@/utils/tailscale";
 
 
 interface ServerToDaemonEvents {
@@ -693,14 +693,18 @@ export class ApiMachineClient {
     this.stopTailscaleRefresh();
     this.tailscaleRefreshInterval = setInterval(async () => {
       const info = await detectTailscale();
-      if (tailscaleChanged(this.lastTailscaleInfo, info)) {
+      const serves = info.status === "connected"
+        ? await detectTailscaleServe()
+        : [];
+      const fullInfo: TailscaleInfo = { ...info, serves };
+      if (tailscaleChanged(this.lastTailscaleInfo, fullInfo)) {
         logger.debug(
-          `[API MACHINE] Tailscale changed: ${this.lastTailscaleInfo?.status} → ${info.status}`,
+          `[API MACHINE] Tailscale changed: ${this.lastTailscaleInfo?.status} → ${fullInfo.status}, serves: ${serves.length}`,
         );
-        this.lastTailscaleInfo = info;
+        this.lastTailscaleInfo = fullInfo;
         this.updateDaemonState((state) => {
-          if (!state) return { status: "running", tailscale: info };
-          return { ...state, tailscale: info };
+          if (!state) return { status: "running", tailscale: fullInfo };
+          return { ...state, tailscale: fullInfo };
         });
       }
     }, TAILSCALE_REFRESH_MS);
@@ -735,6 +739,7 @@ function tailscaleChanged(
     prev.status !== next.status ||
     prev.ipv4 !== next.ipv4 ||
     prev.ipv6 !== next.ipv6 ||
-    prev.hostname !== next.hostname
+    prev.hostname !== next.hostname ||
+    JSON.stringify(prev.serves) !== JSON.stringify(next.serves)
   );
 }

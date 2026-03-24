@@ -47,7 +47,7 @@ import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
 import { handleWebhookTrigger } from "@/webhook/handleWebhookTrigger";
 import { handleSupervisorTrigger, cleanupFixWorktree, getFixWorktreeInfo } from "@/supervisor/handleSupervisorTrigger";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
-import { detectTailscale } from "@/utils/tailscale";
+import { detectTailscale, detectTailscaleServe } from "@/utils/tailscale";
 
 
 // Prepare initial metadata
@@ -985,9 +985,13 @@ export async function startDaemon(): Promise<void> {
     writeDaemonState(fileState);
     logger.debug("[DAEMON RUN] Daemon state written");
 
-    // Detect Tailscale (non-blocking, 3s timeout)
-    const tailscaleInfo = await detectTailscale();
-    logger.debug(`[DAEMON RUN] Tailscale: ${tailscaleInfo.status}`);
+    // Detect Tailscale (non-blocking, 3s timeout each)
+    const tailscaleBase = await detectTailscale();
+    const tailscaleServes = tailscaleBase.status === "connected"
+      ? await detectTailscaleServe()
+      : [];
+    const tailscaleInfo = { ...tailscaleBase, serves: tailscaleServes };
+    logger.debug(`[DAEMON RUN] Tailscale: ${tailscaleInfo.status}, serves: ${tailscaleServes.length}`);
 
     // Prepare initial daemon state
     const initialDaemonState: DaemonState = {

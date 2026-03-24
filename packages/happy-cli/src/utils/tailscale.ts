@@ -10,6 +10,14 @@ import { logger } from "@/ui/logger";
 
 export type TailscaleStatus = "connected" | "disconnected" | "not-installed";
 
+export type TailscaleServeEntry = {
+  port: number;
+  protocol: string;
+  target: string;
+  funnel: boolean;
+  hostname: string;
+};
+
 export type TailscaleInfo = {
   status: TailscaleStatus;
   ipv4?: string;
@@ -17,10 +25,11 @@ export type TailscaleInfo = {
   hostname?: string;
   tailnetName?: string;
   version?: string;
+  serves?: TailscaleServeEntry[];
 };
 
-const NOT_INSTALLED: TailscaleInfo = { status: "not-installed" };
-const DISCONNECTED: TailscaleInfo = { status: "disconnected" };
+const NOT_INSTALLED: Readonly<TailscaleInfo> = Object.freeze({ status: "not-installed" as const });
+const DISCONNECTED: Readonly<TailscaleInfo> = Object.freeze({ status: "disconnected" as const });
 
 const DETECT_TIMEOUT_MS = 3_000;
 
@@ -42,6 +51,20 @@ export async function detectTailscale(): Promise<TailscaleInfo> {
   }
 }
 
+/**
+ * Run `tailscale serve status --json` and parse active Serve/Funnel entries.
+ * Returns an empty array on any failure — never throws.
+ */
+export async function detectTailscaleServe(): Promise<TailscaleServeEntry[]> {
+  try {
+    const raw = await execTailscale(["serve", "status", "--json"]);
+    return parseTailscaleServeStatus(raw);
+  } catch (err: unknown) {
+    logger.debug(`[TAILSCALE] serve detection failed: ${String(err)}`);
+    return [];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -56,7 +79,13 @@ function execTailscale(args: string[]): Promise<string> {
 }
 
 function parseTailscaleStatus(raw: string): TailscaleInfo {
-  const json = JSON.parse(raw);
+  let json: any;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    logger.debug("[TAILSCALE] failed to parse status JSON");
+    return DISCONNECTED;
+  }
 
   // `tailscale status --json` may return BackendState = "NeedsLogin" / "Stopped"
   const backendState: string | undefined = json.BackendState;
@@ -96,6 +125,39 @@ function parseTailscaleStatus(raw: string): TailscaleInfo {
     tailnetName,
     version,
   };
+}
+
+function parseTailscaleServeStatus(raw: string): TailscaleServeEntry[] {
+  let json: any;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    logger.debug("[TAILSCALE] failed to parse serve status JSON");
+    return [];
+  }
+  const web: Record<string, { Handlers?: Record<string, { Proxy?: string }> }> =
+    json.Web ?? {};
+  const allowFunnel: Record<string, boolean> = json.AllowFunnel ?? {};
+  const entries: TailscaleServeEntry[] = [];
+
+  for (const [hostPort, config] of Object.entries(web)) {
+    const colonIdx = hostPort.lastIndexOf(":");
+    if (colonIdx === -1) continue;
+
+    const hostname = hostPort.slice(0, colonIdx);
+    const port = parseInt(hostPort.slice(colonIdx + 1), 10);
+    if (!Number.isFinite(port)) continue;
+
+    const handlers = config.Handlers ?? {};
+    const rootHandler = handlers["/"];
+    const target = rootHandler?.Proxy ?? "unknown";
+    const funnel = allowFunnel[hostPort] === true;
+
+    entries.push({ port, protocol: "HTTPS", target, funnel, hostname });
+  }
+
+  logger.debug(`[TAILSCALE] detected ${entries.length} serve entries`);
+  return entries;
 }
 
 function isNotFound(err: unknown): boolean {

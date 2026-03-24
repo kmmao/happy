@@ -35,6 +35,7 @@ import {
   MultiTextInput,
   type MultiTextInputHandle,
 } from "@/components/MultiTextInput";
+import { TailscaleServeSection } from "@/components/machine/TailscaleServeSection";
 
 const styles = StyleSheet.create((theme) => ({
   pathInputContainer: {
@@ -598,8 +599,8 @@ function MachineDetailScreen() {
               detailStyle={{
                 color:
                   machine.daemonState.tailscale.status === "connected"
-                    ? "#34C759"
-                    : "#FF9500",
+                    ? theme.colors.success
+                    : theme.colors.warning,
               }}
               showChevron={false}
             />
@@ -629,6 +630,11 @@ function MachineDetailScreen() {
               />
             )}
           </ItemGroup>
+        )}
+
+        {/* Tailscale Serve / Funnel */}
+        {machine.daemonState?.tailscale?.status === "connected" && (
+          <TailscaleServeSection machineId={machineId} machine={machine} />
         )}
 
         {/* Background processes */}

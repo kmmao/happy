@@ -338,6 +338,54 @@ export async function machineBash(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Tailscale Serve / Funnel management
+// ---------------------------------------------------------------------------
+
+function validatePort(port: number): void {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error(`Invalid port: ${port}`);
+    }
+}
+
+export async function machineTailscaleServeAdd(
+    machineId: string,
+    port: number,
+    funnel: boolean,
+): Promise<MachineBashResult> {
+    validatePort(port);
+    const cmd = funnel
+        ? `tailscale funnel --bg ${port}`
+        : `tailscale serve --bg ${port}`;
+    return machineBash(machineId, cmd, "/");
+}
+
+export async function machineTailscaleServeRemove(
+    machineId: string,
+    port: number,
+): Promise<MachineBashResult> {
+    validatePort(port);
+    return machineBash(machineId, `tailscale serve --https=${port} off`, "/");
+}
+
+export async function machineTailscaleFunnelToggle(
+    machineId: string,
+    port: number,
+    enable: boolean,
+): Promise<MachineBashResult> {
+    validatePort(port);
+    const cmd = enable
+        ? `tailscale funnel --bg ${port}`
+        : `tailscale funnel --bg --https=${port} off`;
+    return machineBash(machineId, cmd, "/");
+}
+
+export async function machineTailscaleServeStatus(
+    machineId: string,
+): Promise<MachineBashResult> {
+    return machineBash(machineId, "tailscale serve status --json", "/");
+}
+
 /** Allowed signals for machineKillProcess — whitelist to prevent abuse. */
 const KILL_SIGNALS = new Set(["SIGTERM", "SIGKILL", "SIGINT"]);
 

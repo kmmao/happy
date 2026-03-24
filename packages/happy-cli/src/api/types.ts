@@ -228,6 +228,14 @@ export type MachineMetadata = z.infer<typeof MachineMetadataSchema>;
 /**
  * Tailscale runtime info — detected by daemon, optional.
  */
+const TailscaleServeEntrySchema = z.object({
+  port: z.number(),
+  protocol: z.string(),
+  target: z.string(),
+  funnel: z.boolean(),
+  hostname: z.string(),
+});
+
 export const TailscaleInfoSchema = z.object({
   status: z.enum(["connected", "disconnected", "not-installed"]),
   ipv4: z.string().optional(),
@@ -235,6 +243,7 @@ export const TailscaleInfoSchema = z.object({
   hostname: z.string().optional(),
   tailnetName: z.string().optional(),
   version: z.string().optional(),
+  serves: z.array(TailscaleServeEntrySchema).optional(),
 });
 
 export type TailscaleInfo = z.infer<typeof TailscaleInfoSchema>;
