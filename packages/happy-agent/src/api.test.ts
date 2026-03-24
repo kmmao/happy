@@ -54,6 +54,7 @@ const mockedAxios = axios as any as {
 function makeConfig(): Config {
   return {
     serverUrl: "https://test-server.example.com",
+    webappUrl: "https://happyapp.xycloud.info",
     homeDir: "/tmp/happy-test",
     credentialPath: "/tmp/happy-test/agent.key",
   };

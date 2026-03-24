@@ -10,6 +10,7 @@ function makeTestConfig(): Config {
     const homeDir = mkdtempSync(join(tmpdir(), 'happy-agent-test-'));
     return {
         serverUrl: 'https://happyserve.xycloud.info',
+        webappUrl: 'https://happyapp.xycloud.info',
         homeDir,
         credentialPath: join(homeDir, 'agent.key'),
     };
