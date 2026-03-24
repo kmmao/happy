@@ -8,17 +8,19 @@
     acme_dns cloudflare {env.CF_API_TOKEN}
 }
 
-code.xycloud.info {
-    handle_path /app/* {
-        reverse_proxy host.docker.internal:8081
-    }
-    handle_path /app {
-        reverse_proxy host.docker.internal:8081
-    }
+s.sangreal.code.xycloud.info {
+    reverse_proxy host.docker.internal:3005
 
-    handle {
-        reverse_proxy host.docker.internal:3005
+    tls {
+        dns cloudflare {env.CF_API_TOKEN}
+        propagation_timeout 300s
+        propagation_delay 15s
+        resolvers 1.1.1.1 8.8.8.8
     }
+}
+
+w.sangreal.code.xycloud.info {
+    reverse_proxy host.docker.internal:8081
 
     tls {
         dns cloudflare {env.CF_API_TOKEN}
