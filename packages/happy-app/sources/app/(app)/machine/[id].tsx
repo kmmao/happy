@@ -35,9 +35,7 @@ import {
   MultiTextInput,
   type MultiTextInputHandle,
 } from "@/components/MultiTextInput";
-import { TailscaleServeSection } from "@/components/machine/TailscaleServeSection";
-import { UpnpTunnelSection } from "@/components/machine/UpnpTunnelSection";
-import { CaddyTunnelSection } from "@/components/machine/CaddyTunnelSection";
+import { NetworkServicesSection } from "@/components/machine/NetworkServicesSection";
 
 const styles = StyleSheet.create((theme) => ({
   pathInputContainer: {
@@ -634,16 +632,8 @@ function MachineDetailScreen() {
           </ItemGroup>
         )}
 
-        {/* Tailscale Serve / Funnel */}
-        {machine.daemonState?.tailscale?.status === "connected" && (
-          <TailscaleServeSection machineId={machineId} machine={machine} />
-        )}
-
-        {/* UPnP Port Mapping */}
-        <UpnpTunnelSection machineId={machineId} machine={machine} />
-
-        {/* Caddy HTTPS Reverse Proxy */}
-        <CaddyTunnelSection machineId={machineId} machine={machine} />
+        {/* Network Services (Tailscale + Caddy + UPnP) */}
+        <NetworkServicesSection machineId={machineId} machine={machine} />
 
         {/* Background processes */}
         <ItemGroup title={t("processManager.title")}>

@@ -41,6 +41,22 @@ export const CaddyTunnelSection = React.memo(function CaddyTunnelSection({
     machineId,
     machine,
 }: Props) {
+    const caddyProvider = useMemo(() => {
+        const providers = (machine.daemonState as any)?.tunnels?.providers;
+        if (!Array.isArray(providers)) return null;
+        return providers.find((p: any) => p.provider === "caddy") ?? null;
+    }, [machine.daemonState]);
+
+    if (!caddyProvider || caddyProvider.status !== "available") return null;
+
+    return <CaddyTunnelContent machineId={machineId} machine={machine} />;
+});
+
+/** Content export — renders per-domain ItemGroups. Used by NetworkServicesSection. */
+export const CaddyTunnelContent = React.memo(function CaddyTunnelContent({
+    machineId,
+    machine,
+}: Props) {
     const { theme } = useUnistyles();
     const online = isMachineOnline(machine);
 
@@ -50,10 +66,8 @@ export const CaddyTunnelSection = React.memo(function CaddyTunnelSection({
         return providers.find((p: any) => p.provider === "caddy") ?? null;
     }, [machine.daemonState]);
 
-    if (!caddyProvider || caddyProvider.status !== "available") return null;
-
-    const domains = (caddyProvider.metadata?.domains ?? "").split(",").filter(Boolean);
-    const routes: CaddyRoute[] = (caddyProvider.entries ?? []).map((e: any) => ({
+    const domains = (caddyProvider?.metadata?.domains ?? "").split(",").filter(Boolean);
+    const routes: CaddyRoute[] = (caddyProvider?.entries ?? []).map((e: any) => ({
         localPort: e.localPort ?? 0,
         remotePort: e.remotePort ?? 443,
         path: e.path ?? "/",
@@ -62,7 +76,6 @@ export const CaddyTunnelSection = React.memo(function CaddyTunnelSection({
         hostname: e.hostname ?? "",
     }));
 
-    // Group routes by hostname
     const grouped = useMemo(() => {
         const map = new Map<string, CaddyRoute[]>();
         for (const r of routes) {

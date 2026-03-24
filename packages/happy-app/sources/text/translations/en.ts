@@ -1310,6 +1310,7 @@ export const en: TranslationStructure = {
     tailscaleServeFunnelToggleOn: "Enable Funnel (public internet)?",
     tailscaleServeFunnelToggleOff: "Disable Funnel (tailnet only)?",
     tailscaleServeError: "Error",
+    networkServices: "Network Services",
     upnpTitle: "UPnP Port Mapping",
     upnpEmpty: "No active mappings",
     upnpPublic: "Public",

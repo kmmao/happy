@@ -494,6 +494,45 @@ export const TailscaleServeSection = React.memo(function TailscaleServeSection({
 
     return (
         <ItemGroup title={t("machine.tailscaleServes")}>
+            <TailscaleServeItems
+                displayServes={displayServes}
+                online={online}
+                togglingPorts={togglingPorts}
+                theme={theme}
+                buildServeUrl={buildServeUrl}
+                handleFunnelToggle={handleFunnelToggle}
+                handleServeRemove={handleServeRemove}
+                handleAddServe={handleAddServe}
+            />
+        </ItemGroup>
+    );
+});
+
+// ---------------------------------------------------------------------------
+// Shared items renderer (used by both standalone and unified sections)
+// ---------------------------------------------------------------------------
+
+const TailscaleServeItems = React.memo(function TailscaleServeItems({
+    displayServes,
+    online,
+    togglingPorts,
+    theme,
+    buildServeUrl,
+    handleFunnelToggle,
+    handleServeRemove,
+    handleAddServe,
+}: {
+    displayServes: ServeEntry[];
+    online: boolean;
+    togglingPorts: Set<number>;
+    theme: any;
+    buildServeUrl: (serve: ServeEntry) => string;
+    handleFunnelToggle: (serve: ServeEntry) => void;
+    handleServeRemove: (serve: ServeEntry) => void;
+    handleAddServe: () => void;
+}) {
+    return (
+        <>
             {displayServes.length === 0 && (
                 <Item
                     title={t("machine.tailscaleServesEmpty")}
@@ -570,6 +609,125 @@ export const TailscaleServeSection = React.memo(function TailscaleServeSection({
                     showChevron={false}
                 />
             )}
-        </ItemGroup>
+        </>
+    );
+});
+
+// ---------------------------------------------------------------------------
+// Content-only export (no ItemGroup wrapper) — used by NetworkServicesSection
+// ---------------------------------------------------------------------------
+
+export const TailscaleServeContent = React.memo(function TailscaleServeContent({
+    machineId,
+    machine,
+}: Props) {
+    const { theme } = useUnistyles();
+    const online = isMachineOnline(machine);
+    const serves: ServeEntry[] = useMemo(
+        () => (machine.daemonState?.tailscale?.serves ?? []).map((s: { port: number; protocol: string; target: string; funnel: boolean; hostname: string; path?: string }) => ({
+            ...s,
+            path: s.path ?? "/",
+        })),
+        [machine.daemonState?.tailscale?.serves],
+    );
+
+    const [localServes, setLocalServes] = useState<ServeEntry[] | null>(null);
+    const [togglingPorts, setTogglingPorts] = useState<Set<number>>(new Set());
+    const displayServes = localServes ?? serves;
+
+    const daemonVersion = machine.daemonStateVersion;
+    React.useEffect(() => {
+        setLocalServes(null);
+    }, [daemonVersion]);
+
+    const refreshServes = useCallback(async () => {
+        try {
+            const result = await machineTailscaleServeStatus(machineId);
+            if (result.success && result.stdout) {
+                setLocalServes(parseServeStatusJson(result.stdout));
+            }
+        } catch {
+            // ignore
+        }
+    }, [machineId]);
+
+    const buildServeUrl = useCallback((serve: ServeEntry): string => {
+        const pathSuffix = serve.path === "/" ? "/" : serve.path;
+        if (serve.hostname) {
+            const portSuffix = serve.port === 443 ? "" : `:${serve.port}`;
+            return `https://${serve.hostname}${portSuffix}${pathSuffix}`;
+        }
+        return `https://localhost:${serve.port}${pathSuffix}`;
+    }, []);
+
+    const handleFunnelToggle = useCallback(async (serve: ServeEntry) => {
+        if (!online || togglingPorts.has(serve.port)) return;
+        const funnelMsg = serve.funnel
+            ? t("machine.tailscaleServeFunnelToggleOff")
+            : t("machine.tailscaleServeFunnelToggleOn");
+        const confirmed = await Modal.confirm(`:${serve.port}`, funnelMsg);
+        if (confirmed) {
+            setTogglingPorts((prev) => new Set([...prev, serve.port]));
+            try {
+                const result = await machineTailscaleFunnelToggle(machineId, serve.port, !serve.funnel, serve.target, serve.path);
+                if (!result.success && result.stderr) {
+                    Modal.alert(t("machine.tailscaleServeError"), result.stderr);
+                } else {
+                    await refreshServes();
+                }
+            } finally {
+                setTogglingPorts((prev) => {
+                    const next = new Set(prev);
+                    next.delete(serve.port);
+                    return next;
+                });
+            }
+        }
+    }, [machineId, online, togglingPorts, refreshServes]);
+
+    const handleServeRemove = useCallback(async (serve: ServeEntry) => {
+        if (!online) return;
+        const remove = await Modal.confirm(t("machine.tailscaleServeRemove"), t("machine.tailscaleServeRemoveConfirm"));
+        if (remove) {
+            const result = await machineTailscaleServeRemove(machineId, serve.port, serve.path);
+            if (!result.success && result.stderr) {
+                Modal.alert(t("machine.tailscaleServeError"), result.stderr);
+            } else {
+                await refreshServes();
+            }
+        }
+    }, [machineId, online, refreshServes]);
+
+    const usedHttpsPorts = useMemo(() => new Set(displayServes.map((s) => s.port)), [displayServes]);
+
+    const handleAddServe = useCallback(() => {
+        if (!online) return;
+        Modal.show({
+            component: AddServeForm,
+            props: {
+                usedPorts: usedHttpsPorts,
+                onSubmit: async (result: AddServeResult) => {
+                    const addResult = await machineTailscaleServeAdd(machineId, result.localPort, result.httpsPort, result.path, result.funnel);
+                    if (!addResult.success && addResult.stderr) {
+                        Modal.alert(t("machine.tailscaleServeError"), addResult.stderr);
+                    } else {
+                        await refreshServes();
+                    }
+                },
+            },
+        });
+    }, [machineId, online, usedHttpsPorts, refreshServes]);
+
+    return (
+        <TailscaleServeItems
+            displayServes={displayServes}
+            online={online}
+            togglingPorts={togglingPorts}
+            theme={theme}
+            buildServeUrl={buildServeUrl}
+            handleFunnelToggle={handleFunnelToggle}
+            handleServeRemove={handleServeRemove}
+            handleAddServe={handleAddServe}
+        />
     );
 });

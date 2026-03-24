@@ -1378,6 +1378,7 @@ export const ja: TranslationStructure = {
     tailscaleServeFunnelToggleOn: "Funnel を有効化（公開インターネット）？",
     tailscaleServeFunnelToggleOff: "Funnel を無効化（Tailnet のみ）？",
     tailscaleServeError: "エラー",
+    networkServices: "ネットワークサービス",
     upnpTitle: "UPnP ポートマッピング",
     upnpEmpty: "アクティブなマッピングなし",
     upnpPublic: "公開",

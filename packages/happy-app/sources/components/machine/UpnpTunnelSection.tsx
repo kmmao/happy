@@ -22,6 +22,26 @@ import { isMachineOnline } from "@/utils/machineUtils";
 import { machineUpnpAdd, machineUpnpRemove } from "@/sync/ops";
 import type { Machine } from "@/sync/storageTypes";
 
+/** Convert UPnP description to a human-readable owner label */
+function formatUpnpOwner(description: string): string {
+    if (!description) return "";
+    const lower = description.toLowerCase();
+    // Known patterns
+    if (lower.startsWith("happy-tunnel")) return "Happy";
+    if (lower.startsWith("nat-pmp") || lower.startsWith("nat pmp")) {
+        // NAT-PMP is often used by Tailscale for WireGuard
+        if (lower.includes("udp")) return "Tailscale";
+        return "NAT-PMP";
+    }
+    if (lower.includes("tailscale") || lower.includes("wireguard")) return "Tailscale";
+    if (lower.includes("minecraft")) return "Minecraft";
+    if (lower.includes("torrent") || lower.includes("transmission") || lower.includes("qbittorrent")) return "BitTorrent";
+    if (lower.includes("plex")) return "Plex";
+    if (lower.includes("syncthing")) return "Syncthing";
+    // Fallback: show raw description (trimmed)
+    return description.length > 20 ? `${description.slice(0, 20)}…` : description;
+}
+
 type UpnpEntry = {
     localPort: number;
     remotePort: number;
@@ -40,21 +60,39 @@ export const UpnpTunnelSection = React.memo(function UpnpTunnelSection({
     machineId,
     machine,
 }: Props) {
-    const { theme } = useUnistyles();
-    const online = isMachineOnline(machine);
-
-    // Read from tunnels.providers where provider === "upnp"
     const upnpProvider = useMemo(() => {
         const providers = (machine.daemonState as any)?.tunnels?.providers;
         if (!Array.isArray(providers)) return null;
         return providers.find((p: any) => p.provider === "upnp") ?? null;
     }, [machine.daemonState]);
 
-    // Don't render if UPnP is not available
     if (!upnpProvider || upnpProvider.status !== "available") return null;
 
     const externalIp = upnpProvider.metadata?.externalIp ?? "";
-    const entries: UpnpEntry[] = (upnpProvider.entries ?? []).map((e: any) => ({
+
+    return (
+        <ItemGroup title={t("machine.upnpTitle")} footer={externalIp ? `IP: ${externalIp}` : undefined}>
+            <UpnpTunnelContent machineId={machineId} machine={machine} />
+        </ItemGroup>
+    );
+});
+
+/** Content-only export — used by NetworkServicesSection */
+export const UpnpTunnelContent = React.memo(function UpnpTunnelContent({
+    machineId,
+    machine,
+}: Props) {
+    const { theme } = useUnistyles();
+    const online = isMachineOnline(machine);
+
+    const upnpProvider = useMemo(() => {
+        const providers = (machine.daemonState as any)?.tunnels?.providers;
+        if (!Array.isArray(providers)) return null;
+        return providers.find((p: any) => p.provider === "upnp") ?? null;
+    }, [machine.daemonState]);
+
+    const externalIp = upnpProvider?.metadata?.externalIp ?? "";
+    const entries: UpnpEntry[] = (upnpProvider?.entries ?? []).map((e: any) => ({
         localPort: e.localPort ?? 0,
         remotePort: e.remotePort ?? 0,
         protocol: e.protocol ?? "TCP",
@@ -119,16 +157,18 @@ const UpnpSectionInner = React.memo(function UpnpSectionInner({
     }, [machineId, online, externalIp]);
 
     return (
-        <ItemGroup title={t("machine.upnpTitle")} footer={externalIp ? `IP: ${externalIp}` : undefined}>
+        <>
             {entries.length === 0 && (
                 <Item title={t("machine.upnpEmpty")} showChevron={false} />
             )}
             {entries.map((entry) => {
                 const url = entry.publicUrl;
+                const desc = entry.metadata?.description ?? "";
+                const owner = formatUpnpOwner(desc);
                 return (
                     <Item
                         key={`${entry.remotePort}-${entry.protocol}`}
-                        title={`:${entry.remotePort} ${entry.protocol}`}
+                        title={`:${entry.remotePort} ${entry.protocol}${owner ? `  ·  ${owner}` : ""}`}
                         subtitle={`→ ${entry.target}\n${url}`}
                         subtitleLines={0}
                         subtitleStyle={{
@@ -162,7 +202,7 @@ const UpnpSectionInner = React.memo(function UpnpSectionInner({
                     showChevron={false}
                 />
             )}
-        </ItemGroup>
+        </>
     );
 });
 
