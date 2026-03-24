@@ -745,16 +745,23 @@ export class ApiMachineClient {
         ? await detectTailscaleServe()
         : [];
       const fullInfo: TailscaleInfo = { ...info, serves };
-      if (tailscaleChanged(this.lastTailscaleInfo, fullInfo)) {
+      const tsChanged = tailscaleChanged(this.lastTailscaleInfo, fullInfo);
+      if (tsChanged) {
         logger.debug(
           `[API MACHINE] Tailscale changed: ${this.lastTailscaleInfo?.status} → ${fullInfo.status}, serves: ${serves.length}`,
         );
         this.lastTailscaleInfo = fullInfo;
-        // Also refresh tunnel state if manager is attached
-        const tunnels = this.tunnelManager ? await this.tunnelManager.detectAll() : undefined;
+      }
+      // Always refresh tunnel state (Caddy config may change independently)
+      const tunnels = this.tunnelManager ? await this.tunnelManager.detectAll() : undefined;
+      if (tsChanged || tunnels) {
         this.updateDaemonState((state) => {
           if (!state) return { status: "running", tailscale: fullInfo, tunnels };
-          return { ...state, tailscale: fullInfo, ...(tunnels ? { tunnels } : {}) };
+          return {
+            ...state,
+            ...(tsChanged ? { tailscale: fullInfo } : {}),
+            ...(tunnels ? { tunnels } : {}),
+          };
         });
       }
     }, TAILSCALE_REFRESH_MS);
