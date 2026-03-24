@@ -12,6 +12,8 @@ export {
   resolveSessionEncryption,
   fetchMessagesAfterSeq,
   sendMessagesBatch,
+  getOrCreateMachine,
+  listMachines,
 } from "./api/httpClient";
 
 export type {

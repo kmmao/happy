@@ -14,9 +14,45 @@ import {
   createSession,
   getSessionMessages,
   deleteSession,
+  getOrCreateMachine,
+  listMachines,
 } from "./api";
 import type { DecryptedSession } from "./api";
 import { SessionClient } from "./session";
+
+// ---------------------------------------------------------------------------
+// Library exports — for consumers using @kmmao/happy-agent as a package
+// ---------------------------------------------------------------------------
+
+export { loadConfig } from "./config";
+export type { Config } from "./config";
+export { readCredentials, requireCredentials } from "./credentials";
+export type { Credentials } from "./credentials";
+export { authLogin, authLogout, authStatus } from "./auth";
+export {
+  listSessions,
+  listActiveSessions,
+  createSession,
+  deleteSession,
+  getSessionMessages,
+  resolveSessionEncryption,
+  fetchMessagesAfterSeq,
+  sendMessagesBatch,
+  getOrCreateMachine,
+  listMachines,
+} from "./api";
+export type {
+  EncryptionVariant,
+  SessionEncryption,
+  DecryptedSession,
+  DecryptedMessage,
+} from "./api";
+export { SessionClient } from "./session";
+export type { SessionClientOptions } from "./session";
+export { MachineClient } from "./api/machineClient";
+export type { MachineClientOptions } from "./api/machineClient";
+export { RpcHandlerManager, createRpcHandlerManager } from "./api/rpc/RpcHandlerManager";
+export type { RpcHandler, RpcHandlerConfig } from "./api/rpc/types";
 import {
   formatSessionTable,
   formatSessionStatus,
@@ -76,10 +112,11 @@ program
   .description("Manage authentication")
   .addCommand(
     new Command("login")
-      .description("Authenticate via QR code")
-      .action(async () => {
+      .description("Authenticate via QR code or web URL")
+      .option("--web", "Use web URL instead of QR code (for SSH/headless environments)")
+      .action(async (opts: { web?: boolean }) => {
         const config = loadConfig();
-        await authLogin(config);
+        await authLogin(config, { web: opts.web });
       }),
   )
   .addCommand(
@@ -373,6 +410,63 @@ program
       client.close();
     }
   });
+
+program
+  .command("machine")
+  .description("Manage machine identity")
+  .addCommand(
+    new Command("register")
+      .description("Register this machine with the server")
+      .option("--json", "Output as JSON")
+      .action(async (opts: { json?: boolean }) => {
+        const config = loadConfig();
+        const creds = requireCredentials(config);
+        const metadata = {
+          host: hostname(),
+          platform: process.platform,
+          happyCliVersion: version,
+          homeDir: config.homeDir,
+          happyHomeDir: config.homeDir,
+          happyLibDir: config.homeDir,
+        };
+        const machine = await getOrCreateMachine(config, creds, metadata);
+        if (opts.json) {
+          console.log(formatJson({ id: machine.id, metadata: machine.metadata }));
+        } else {
+          console.log(
+            [
+              "## Machine Registered",
+              "",
+              `- Machine ID: \`${machine.id}\``,
+              `- Host: ${machine.metadata.host}`,
+              `- Platform: ${machine.metadata.platform}`,
+            ].join("\n"),
+          );
+        }
+      }),
+  )
+  .addCommand(
+    new Command("list")
+      .description("List all registered machines")
+      .option("--json", "Output as JSON")
+      .action(async (opts: { json?: boolean }) => {
+        const config = loadConfig();
+        const creds = requireCredentials(config);
+        const machines = await listMachines(config, creds);
+        if (opts.json) {
+          console.log(formatJson(machines));
+        } else {
+          if (machines.length === 0) {
+            console.log("No machines registered.");
+          } else {
+            console.log(`## Machines (${machines.length})`);
+            for (const m of machines) {
+              console.log(`- \`${m.id}\``);
+            }
+          }
+        }
+      }),
+  );
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err instanceof Error ? err.message : String(err));
