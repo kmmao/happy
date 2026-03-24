@@ -36,6 +36,7 @@ import {
   type MultiTextInputHandle,
 } from "@/components/MultiTextInput";
 import { TailscaleServeSection } from "@/components/machine/TailscaleServeSection";
+import { UpnpTunnelSection } from "@/components/machine/UpnpTunnelSection";
 
 const styles = StyleSheet.create((theme) => ({
   pathInputContainer: {
@@ -636,6 +637,9 @@ function MachineDetailScreen() {
         {machine.daemonState?.tailscale?.status === "connected" && (
           <TailscaleServeSection machineId={machineId} machine={machine} />
         )}
+
+        {/* UPnP Port Mapping */}
+        <UpnpTunnelSection machineId={machineId} machine={machine} />
 
         {/* Background processes */}
         <ItemGroup title={t("processManager.title")}>

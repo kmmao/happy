@@ -186,6 +186,8 @@ export const pl: TranslationStructure = {
     pluginsSubtitle: "Zarządzaj wtyczkami Claude Code",
     mcp: "Serwery MCP",
     mcpSubtitle: "Zarządzaj serwerami Model Context Protocol",
+    provision: "Tokeny prowizji",
+    provisionSubtitle: "Generuj tokeny dostępu dla kontenerów Docker",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1122,6 +1124,29 @@ export const pl: TranslationStructure = {
     restartNow: "Uruchom ponownie",
   },
 
+  provision: {
+    title: "Tokeny prowizji",
+    emptyTitle: "Brak tokenów prowizji",
+    emptyDescription: "Twórz tokeny, aby kontenery Docker mogły się uwierzytelniać bez skanowania kodu QR",
+    createToken: "Utwórz token",
+    label: "Etykieta",
+    labelPlaceholder: "np. Kontener dla Alice",
+    ttl: "Wygasa po",
+    ttlHours: ({ hours }: { hours: number }) => `${hours} godz.`,
+    ttlDays: ({ days }: { days: number }) => `${days} dni`,
+    active: "Aktywny",
+    revoked: "Unieważniony",
+    tokenCreated: "Token utworzony",
+    tokenCreatedDescription: "Skopiuj ten token teraz — nie zostanie ponownie wyświetlony",
+    copyToken: "Kopiuj token",
+    copyDockerCommand: "Kopiuj polecenie Docker",
+    copied: "Skopiowano!",
+    revokeToken: "Unieważnij token",
+    revokeConfirm: "Spowoduje to unieważnienie bearer tokenu. Każdy kontener go używający będzie musiał ponownie się uwierzytelnić.",
+    deleteConfirm: "Unieważnić ten token prowizji?",
+    expiresAt: ({ date }: { date: string }) => `Wygasa ${date}`,
+  },
+
   connectButton: {
     authenticate: "Uwierzytelnij terminal",
     authenticateWithUrlPaste: "Uwierzytelnij terminal poprzez wklejenie URL",
@@ -1291,6 +1316,17 @@ export const pl: TranslationStructure = {
     tailscaleServeFunnelToggleOn: "Włączyć Funnel (publiczny internet)?",
     tailscaleServeFunnelToggleOff: "Wyłączyć Funnel (tylko Tailnet)?",
     tailscaleServeError: "Błąd",
+    upnpTitle: "Mapowanie portów UPnP",
+    upnpEmpty: "Brak aktywnych mapowań",
+    upnpPublic: "Publiczny",
+    upnpAdd: "Dodaj mapowanie",
+    upnpAddTitle: "Dodaj mapowanie UPnP",
+    upnpLocalPort: "Port lokalny",
+    upnpExternalPort: "Port zewnętrzny (publiczny)",
+    upnpProtocol: "Protokół",
+    upnpRemove: "Usuń",
+    upnpRemoveConfirm: ({ port }: { port: string }) => `Usunąć mapowanie portu :${port}?`,
+    upnpError: "Błąd",
   },
 
   message: {

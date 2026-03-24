@@ -251,6 +251,8 @@ export const ja: TranslationStructure = {
     pluginsSubtitle: "Claude Code プラグインを管理",
     mcp: "MCP サーバー",
     mcpSubtitle: "Model Context Protocol サーバーを管理",
+    provision: "プロビジョン Token",
+    provisionSubtitle: "Docker コンテナ用のアクセス Token を生成",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1176,6 +1178,29 @@ export const ja: TranslationStructure = {
     restartNow: "今すぐ再起動",
   },
 
+  provision: {
+    title: "プロビジョン Token",
+    emptyTitle: "プロビジョン Token がありません",
+    emptyDescription: "Docker コンテナが QR コードをスキャンせずに認証できるよう Token を作成します",
+    createToken: "Token を作成",
+    label: "ラベル",
+    labelPlaceholder: "例：Alice 用コンテナ",
+    ttl: "有効期限",
+    ttlHours: ({ hours }: { hours: number }) => `${hours} 時間`,
+    ttlDays: ({ days }: { days: number }) => `${days} 日`,
+    active: "有効",
+    revoked: "取り消し済み",
+    tokenCreated: "Token が作成されました",
+    tokenCreatedDescription: "今すぐこの Token をコピーしてください——再表示されません",
+    copyToken: "Token をコピー",
+    copyDockerCommand: "Docker コマンドをコピー",
+    copied: "コピーしました！",
+    revokeToken: "Token を取り消す",
+    revokeConfirm: "Bearer Token が無効になります。それを使用しているコンテナは再認証が必要になります。",
+    deleteConfirm: "このプロビジョン Token を取り消しますか？",
+    expiresAt: ({ date }: { date: string }) => `${date} に期限切れ`,
+  },
+
   connectButton: {
     authenticate: "ターミナルを認証",
     authenticateWithUrlPaste: "URLペーストでターミナルを認証",
@@ -1343,6 +1368,17 @@ export const ja: TranslationStructure = {
     tailscaleServeFunnelToggleOn: "Funnel を有効化（公開インターネット）？",
     tailscaleServeFunnelToggleOff: "Funnel を無効化（Tailnet のみ）？",
     tailscaleServeError: "エラー",
+    upnpTitle: "UPnP ポートマッピング",
+    upnpEmpty: "アクティブなマッピングなし",
+    upnpPublic: "公開",
+    upnpAdd: "マッピング追加",
+    upnpAddTitle: "UPnP ポートマッピング追加",
+    upnpLocalPort: "ローカルポート",
+    upnpExternalPort: "外部ポート（公開）",
+    upnpProtocol: "プロトコル",
+    upnpRemove: "削除",
+    upnpRemoveConfirm: ({ port }: { port: string }) => `ポートマッピング :${port} を削除しますか？`,
+    upnpError: "エラー",
   },
 
   message: {

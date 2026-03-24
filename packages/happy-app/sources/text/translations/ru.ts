@@ -148,6 +148,8 @@ export const ru: TranslationStructure = {
     pluginsSubtitle: "Управление плагинами Claude Code",
     mcp: "MCP-серверы",
     mcpSubtitle: "Управление серверами Model Context Protocol",
+    provision: "Токены подготовки",
+    provisionSubtitle: "Генерация токенов доступа для Docker-контейнеров",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1110,6 +1112,29 @@ export const ru: TranslationStructure = {
       "Вы уверены, что хотите выйти? Убедитесь, что вы сохранили резервную копию секретного ключа!",
   },
 
+  provision: {
+    title: "Токены подготовки",
+    emptyTitle: "Нет токенов подготовки",
+    emptyDescription: "Создайте токены, чтобы Docker-контейнеры могли аутентифицироваться без сканирования QR-кода",
+    createToken: "Создать токен",
+    label: "Метка",
+    labelPlaceholder: "например, Контейнер для Alice",
+    ttl: "Истекает через",
+    ttlHours: ({ hours }: { hours: number }) => `${hours} ч.`,
+    ttlDays: ({ days }: { days: number }) => `${days} дн.`,
+    active: "Активен",
+    revoked: "Отозван",
+    tokenCreated: "Токен создан",
+    tokenCreatedDescription: "Скопируйте этот токен сейчас — он больше не будет показан",
+    copyToken: "Копировать токен",
+    copyDockerCommand: "Копировать Docker-команду",
+    copied: "Скопировано!",
+    revokeToken: "Отозвать токен",
+    revokeConfirm: "Bearer-токен будет аннулирован. Все контейнеры, использующие его, потребуют повторной аутентификации.",
+    deleteConfirm: "Отозвать этот токен подготовки?",
+    expiresAt: ({ date }: { date: string }) => `Истекает ${date}`,
+  },
+
   connectButton: {
     authenticate: "Авторизация терминала",
     authenticateWithUrlPaste: "Авторизация терминала через URL",
@@ -1278,6 +1303,17 @@ export const ru: TranslationStructure = {
     tailscaleServeFunnelToggleOn: "Включить Funnel (публичный интернет)?",
     tailscaleServeFunnelToggleOff: "Отключить Funnel (только Tailnet)?",
     tailscaleServeError: "Ошибка",
+    upnpTitle: "UPnP проброс портов",
+    upnpEmpty: "Нет активных правил",
+    upnpPublic: "Публичный",
+    upnpAdd: "Добавить правило",
+    upnpAddTitle: "Добавить UPnP проброс",
+    upnpLocalPort: "Локальный порт",
+    upnpExternalPort: "Внешний порт (публичный)",
+    upnpProtocol: "Протокол",
+    upnpRemove: "Удалить",
+    upnpRemoveConfirm: ({ port }: { port: string }) => `Удалить проброс порта :${port}?`,
+    upnpError: "Ошибка",
   },
 
   message: {

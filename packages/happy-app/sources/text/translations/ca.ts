@@ -174,6 +174,8 @@ export const ca: TranslationStructure = {
     pluginsSubtitle: "Gestionar connectors de Claude Code",
     mcp: "Servidors MCP",
     mcpSubtitle: "Gestionar servidors Model Context Protocol",
+    provision: "Tokens de proveïment",
+    provisionSubtitle: "Genera tokens d'accés per a contenidors Docker",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1113,6 +1115,29 @@ export const ca: TranslationStructure = {
     restartNow: "Reinicia ara",
   },
 
+  provision: {
+    title: "Tokens de proveïment",
+    emptyTitle: "Sense tokens de proveïment",
+    emptyDescription: "Crea tokens perquè els contenidors Docker s'autentiquin sense escanejar un codi QR",
+    createToken: "Crear token",
+    label: "Etiqueta",
+    labelPlaceholder: "p. ex. Contenidor per a Alice",
+    ttl: "Expira després de",
+    ttlHours: ({ hours }: { hours: number }) => `${hours} hores`,
+    ttlDays: ({ days }: { days: number }) => `${days} dies`,
+    active: "Actiu",
+    revoked: "Revocat",
+    tokenCreated: "Token creat",
+    tokenCreatedDescription: "Copia aquest token ara — no es tornarà a mostrar",
+    copyToken: "Copiar token",
+    copyDockerCommand: "Copiar comanda Docker",
+    copied: "Copiat!",
+    revokeToken: "Revocar token",
+    revokeConfirm: "Això invalidarà el bearer token. Qualsevol contenidor que l'utilitzi haurà de re-autenticar-se.",
+    deleteConfirm: "Revocar aquest token de proveïment?",
+    expiresAt: ({ date }: { date: string }) => `Expira el ${date}`,
+  },
+
   connectButton: {
     authenticate: "Autentica el terminal",
     authenticateWithUrlPaste: "Autentica el terminal amb enganxat d'URL",
@@ -1283,6 +1308,17 @@ export const ca: TranslationStructure = {
     tailscaleServeFunnelToggleOn: "Habilitar Funnel (internet públic)?",
     tailscaleServeFunnelToggleOff: "Deshabilitar Funnel (només Tailnet)?",
     tailscaleServeError: "Error",
+    upnpTitle: "Mapatge de ports UPnP",
+    upnpEmpty: "Cap mapatge actiu",
+    upnpPublic: "Públic",
+    upnpAdd: "Afegir mapatge",
+    upnpAddTitle: "Afegir mapatge UPnP",
+    upnpLocalPort: "Port local",
+    upnpExternalPort: "Port extern (públic)",
+    upnpProtocol: "Protocol",
+    upnpRemove: "Eliminar",
+    upnpRemoveConfirm: ({ port }: { port: string }) => `Eliminar el mapatge del port :${port}?`,
+    upnpError: "Error",
   },
 
   message: {

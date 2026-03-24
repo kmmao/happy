@@ -398,6 +398,38 @@ export async function machineTailscaleServeStatus(
     return machineBash(machineId, "tailscale serve status --json", "/");
 }
 
+// ---------------------------------------------------------------------------
+// UPnP port mapping management
+// ---------------------------------------------------------------------------
+
+export async function machineUpnpAdd(
+    machineId: string,
+    localPort: number,
+    externalPort: number,
+    protocol: "TCP" | "UDP" = "TCP",
+): Promise<MachineBashResult> {
+    validatePort(localPort);
+    validatePort(externalPort);
+    // upnpc needs the local LAN IP — get it dynamically
+    const cmd = `LOCAL_IP=$(python3 -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.connect(('8.8.8.8',80)); print(s.getsockname()[0]); s.close()") && upnpc -a $LOCAL_IP ${localPort} ${externalPort} ${protocol} 7200`;
+    return machineBash(machineId, cmd, "/");
+}
+
+export async function machineUpnpRemove(
+    machineId: string,
+    externalPort: number,
+    protocol: "TCP" | "UDP" = "TCP",
+): Promise<MachineBashResult> {
+    validatePort(externalPort);
+    return machineBash(machineId, `upnpc -d ${externalPort} ${protocol}`, "/");
+}
+
+export async function machineUpnpStatus(
+    machineId: string,
+): Promise<MachineBashResult> {
+    return machineBash(machineId, "upnpc -l", "/");
+}
+
 /** Allowed signals for machineKillProcess — whitelist to prevent abuse. */
 const KILL_SIGNALS = new Set(["SIGTERM", "SIGKILL", "SIGINT"]);
 

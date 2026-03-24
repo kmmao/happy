@@ -172,6 +172,8 @@ export const zhHant: TranslationStructure = {
     pluginsSubtitle: "管理 Claude Code 外掛",
     mcp: "MCP 伺服器",
     mcpSubtitle: "管理 Model Context Protocol 伺服器",
+    provision: "配置 Token",
+    provisionSubtitle: "為 Docker 容器產生存取 Token",
 
     // Dynamic settings messages
     accountConnected: ({ service }: { service: string }) =>
@@ -1065,6 +1067,29 @@ export const zhHant: TranslationStructure = {
     restartNow: "立即重新啟動",
   },
 
+  provision: {
+    title: "配置 Token",
+    emptyTitle: "尚無配置 Token",
+    emptyDescription: "建立 Token 以允許 Docker 容器無需掃描 QR 碼即可驗證",
+    createToken: "建立 Token",
+    label: "標籤",
+    labelPlaceholder: "例如：Alice 的容器",
+    ttl: "過期時間",
+    ttlHours: ({ hours }: { hours: number }) => `${hours} 小時`,
+    ttlDays: ({ days }: { days: number }) => `${days} 天`,
+    active: "啟用中",
+    revoked: "已撤銷",
+    tokenCreated: "Token 已建立",
+    tokenCreatedDescription: "請立即複製此 Token——它不會再次顯示",
+    copyToken: "複製 Token",
+    copyDockerCommand: "複製 Docker 命令",
+    copied: "已複製！",
+    revokeToken: "撤銷 Token",
+    revokeConfirm: "這將使 Bearer Token 失效。使用該 Token 的任何容器都需要重新驗證。",
+    deleteConfirm: "撤銷此配置 Token？",
+    expiresAt: ({ date }: { date: string }) => `${date} 過期`,
+  },
+
   connectButton: {
     authenticate: "驗證終端",
     authenticateWithUrlPaste: "透過 URL 貼上驗證終端",
@@ -1228,6 +1253,17 @@ export const zhHant: TranslationStructure = {
     tailscaleServeFunnelToggleOn: "啟用 Funnel（公網存取）？",
     tailscaleServeFunnelToggleOff: "關閉 Funnel（僅 Tailnet）？",
     tailscaleServeError: "錯誤",
+    upnpTitle: "UPnP 連接埠映射",
+    upnpEmpty: "暫無映射",
+    upnpPublic: "公網",
+    upnpAdd: "新增映射",
+    upnpAddTitle: "新增 UPnP 連接埠映射",
+    upnpLocalPort: "本地連接埠",
+    upnpExternalPort: "外部連接埠（公網）",
+    upnpProtocol: "通訊協定",
+    upnpRemove: "移除",
+    upnpRemoveConfirm: ({ port }: { port: string }) => `刪除連接埠映射 :${port}？`,
+    upnpError: "錯誤",
   },
 
   message: {
