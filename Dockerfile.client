@@ -45,6 +45,9 @@ RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.
     && git clone https://github.com/zsh-users/zsh-completions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-completions \
     && sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-completions node npm)/' ~/.zshrc
 
+# Install ttyd (web terminal)
+RUN apt-get update && apt-get install -y ttyd && rm -rf /var/lib/apt/lists/*
+
 # Install happy-coder globally
 RUN npm install -g @kmmao/happy-coder
 
@@ -60,10 +63,29 @@ RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 # Set zsh as default shell
 RUN chsh -s /usr/bin/zsh
 
+# Entrypoint script: starts happy daemon + ttyd in background
+RUN cat > /usr/local/bin/happy-entrypoint.sh << 'SCRIPT'
+#!/bin/bash
+set -e
+
+# Source zsh profile for PATH
+export PATH="$HOME/.local/bin:$PATH"
+
+# Start ttyd (web terminal) on port 7681
+ttyd -p 7681 -W zsh &
+
+# Start happy daemon (foreground, auto-authenticates with HAPPY_PROVISION_TOKEN)
+exec happy daemon start-sync
+SCRIPT
+RUN chmod +x /usr/local/bin/happy-entrypoint.sh
+
 # Persist happy data
 VOLUME /root/.happy
 
-CMD ["zsh"]
+# Expose ttyd web terminal port
+EXPOSE 7681
+
+CMD ["happy-entrypoint.sh"]
 
 # ============================================================
 # Usage

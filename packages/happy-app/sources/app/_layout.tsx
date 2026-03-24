@@ -200,6 +200,34 @@ export default function RootLayout() {
       try {
         await loadFonts();
         await sodium.ready;
+
+        // Auto-login via provision token in URL (Web only)
+        // URL format: ?provision=hp_xxx
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          const provisionToken = params.get("provision");
+          if (provisionToken) {
+            const raw = provisionToken.startsWith("hp_") ? provisionToken.slice(3) : provisionToken;
+            try {
+              const packed = JSON.parse(atob(raw.replace(/-/g, "+").replace(/_/g, "/")));
+              if (packed.t) {
+                const provisionCredentials: AuthCredentials = {
+                  token: packed.t,
+                  secret: "", // Provision tokens use bearer-only auth
+                };
+                await TokenStorage.setCredentials(provisionCredentials);
+                // Clean URL to avoid re-processing on refresh
+                window.history.replaceState({}, "", window.location.pathname);
+                await syncRestore(provisionCredentials);
+                setInitState({ credentials: provisionCredentials });
+                return;
+              }
+            } catch (e) {
+              log.error("Failed to parse provision token from URL:", e);
+            }
+          }
+        }
+
         const credentials = await TokenStorage.getCredentials();
         if (credentials) {
           await syncRestore(credentials);

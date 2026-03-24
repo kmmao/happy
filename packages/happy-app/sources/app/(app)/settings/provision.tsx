@@ -1,8 +1,9 @@
 import * as React from "react";
-import { View, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import * as Clipboard from "expo-clipboard";
 import { Text } from "@/components/StyledText";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
@@ -13,6 +14,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { machineBash } from "@/sync/ops";
 import { storage } from "@/sync/storage";
+import { getServerUrl } from "@/sync/serverConfig";
 import {
     provisionCreate,
     provisionList,
@@ -90,14 +92,30 @@ function ProvisionSettingsScreen() {
             ttlHours: 8760, // 1 year
         });
 
-        // Execute docker run on the machine
-        const dockerCmd = `docker run -d --name "happy-${safeName}" -v "${volumeName}:/root/.happy" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" happy-client sleep infinity`;
+        // Execute docker run — daemon + ttyd auto-start, ttyd on random host port
+        const containerFullName = `happy-${safeName}`;
+        const dockerCmd = `docker run -d --name "${containerFullName}" -v "${volumeName}:/root/.happy" -p 7681 -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {
+            // Query the assigned ttyd port
+            const portResult = await machineBash(machineId, `docker port "${containerFullName}" 7681 | head -1 | cut -d: -f2`, "/");
+            const ttydPort = portResult.stdout?.trim() || "?";
+
+            // Build URLs
+            const serverUrl = getServerUrl();
+            const webAppUrl = `${serverUrl}/app?provision=${encodeURIComponent(result.provisionToken)}`;
+
+            // ttyd URL: same host as server, different port
+            const serverHost = new URL(serverUrl).hostname;
+            const ttydUrl = `http://${serverHost}:${ttydPort}`;
+
+            const urls = `${t("provision.webAppUrl")}\n${webAppUrl}\n\n${t("provision.terminalUrl")}\n${ttydUrl}`;
+            await Clipboard.setStringAsync(webAppUrl);
+
             Modal.alert(
                 t("provision.containerCreated"),
-                t("provision.containerCreatedDescription", { name: safeName }),
+                t("provision.containerCreatedDescription", { name: safeName, url: urls }),
             );
         } else {
             const errorMsg = bashResult.stderr || bashResult.error || "Unknown error";
