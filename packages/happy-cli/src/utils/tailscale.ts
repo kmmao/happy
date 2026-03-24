@@ -12,6 +12,7 @@ export type TailscaleStatus = "connected" | "disconnected" | "not-installed";
 
 export type TailscaleServeEntry = {
   port: number;
+  path: string;
   protocol: string;
   target: string;
   funnel: boolean;
@@ -149,11 +150,12 @@ function parseTailscaleServeStatus(raw: string): TailscaleServeEntry[] {
     if (!Number.isFinite(port)) continue;
 
     const handlers = config.Handlers ?? {};
-    const rootHandler = handlers["/"];
-    const target = rootHandler?.Proxy ?? "unknown";
     const funnel = allowFunnel[hostPort] === true;
 
-    entries.push({ port, protocol: "HTTPS", target, funnel, hostname });
+    for (const [path, handler] of Object.entries(handlers)) {
+      const target = handler?.Proxy ?? "unknown";
+      entries.push({ port, path, protocol: "HTTPS", target, funnel, hostname });
+    }
   }
 
   logger.debug(`[TAILSCALE] detected ${entries.length} serve entries`);

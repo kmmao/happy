@@ -28,6 +28,7 @@ export type MachineMetadata = z.infer<typeof MachineMetadataSchema>;
 
 export const TailscaleServeEntrySchema = z.object({
   port: z.number(),
+  path: z.string().optional(),
   protocol: z.string(),
   target: z.string(),
   funnel: z.boolean(),
