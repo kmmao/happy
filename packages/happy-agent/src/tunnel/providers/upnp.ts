@@ -39,9 +39,11 @@ export class UpnpProvider implements TunnelProvider {
       return { provider: this.name, status: "available", entries: [], metadata: { externalIp } };
     }
 
+    const localIp = getLocalIp();
     const allMappings = parseMappingList(listResult.stdout ?? "");
+    // Show mappings created by Happy OR pointing to this machine
     const entries: TunnelEntry[] = allMappings
-      .filter((m) => m.description.startsWith(DESCRIPTION_PREFIX))
+      .filter((m) => m.description.startsWith(DESCRIPTION_PREFIX) || m.internalIp === localIp)
       .map((m) => ({
         provider: this.name,
         localPort: m.internalPort,
