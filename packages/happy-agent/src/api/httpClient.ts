@@ -25,6 +25,8 @@ import type {
   SessionEncryption,
   RawSession,
   DecryptedSession,
+  Machine,
+  MachineMetadata,
 } from "./types";
 
 // Re-export types that external code needs
@@ -371,4 +373,99 @@ export async function sendMessagesBatch(
   }
 
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// Machine API
+// ---------------------------------------------------------------------------
+
+type RawMachine = {
+  id: string;
+  metadata: string;
+  metadataVersion: number;
+  daemonState: string | null;
+  daemonStateVersion: number;
+  dataEncryptionKey: string | null;
+};
+
+/**
+ * Get or create a machine identity on the server.
+ * Returns the machine with decrypted metadata.
+ */
+export async function getOrCreateMachine(
+  config: Config,
+  creds: Credentials,
+  metadata: MachineMetadata,
+): Promise<Machine> {
+  const sessionKey = getRandomBytes(32);
+  const encryptedKey = libsodiumEncryptForPublicKey(
+    sessionKey,
+    creds.contentKeyPair.publicKey,
+  );
+  const withVersion = new Uint8Array(1 + encryptedKey.length);
+  withVersion[0] = 0x00;
+  withVersion.set(encryptedKey, 1);
+
+  const encryptedMetadata = encryptWithDataKey(metadata, sessionKey);
+
+  let data: { machine: RawMachine };
+  try {
+    const resp = await axios.post(
+      `${config.serverUrl}/v2/machines`,
+      {
+        metadata: encodeBase64(encryptedMetadata),
+        dataEncryptionKey: encodeBase64(withVersion),
+      },
+      { headers: authHeaders(creds) },
+    );
+    data = resp.data as { machine: RawMachine };
+  } catch (err) {
+    handleApiError(err, "registering machine");
+  }
+
+  const raw = data.machine;
+  let encKey: Uint8Array;
+  let encVariant: EncryptionVariant;
+  if (raw.dataEncryptionKey) {
+    const encrypted = decodeBase64(raw.dataEncryptionKey);
+    const bundle = encrypted.slice(1);
+    const key = decryptBoxBundle(bundle, creds.contentKeyPair.secretKey);
+    if (!key) throw new Error("Failed to decrypt machine encryption key");
+    encKey = key;
+    encVariant = "dataKey";
+  } else {
+    encKey = creds.secret;
+    encVariant = "legacy";
+  }
+
+  return {
+    id: raw.id,
+    encryptionKey: encKey,
+    encryptionVariant: encVariant,
+    metadata: (decryptField(raw.metadata, { key: encKey, variant: encVariant }) ?? metadata) as MachineMetadata,
+    metadataVersion: raw.metadataVersion,
+    daemonState: raw.daemonState
+      ? (decryptField(raw.daemonState, { key: encKey, variant: encVariant }) as any)
+      : null,
+    daemonStateVersion: raw.daemonStateVersion,
+  };
+}
+
+/**
+ * List all machines for the current account.
+ */
+export async function listMachines(
+  config: Config,
+  creds: Credentials,
+): Promise<RawMachine[]> {
+  let data: { machines: RawMachine[] };
+  try {
+    const resp = await axios.get(`${config.serverUrl}/v2/machines`, {
+      headers: authHeaders(creds),
+    });
+    data = resp.data as { machines: RawMachine[] };
+  } catch (err) {
+    handleApiError(err, "listing machines");
+  }
+  return data.machines;
 }

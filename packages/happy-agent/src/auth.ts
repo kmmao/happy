@@ -14,7 +14,7 @@ export type AuthRequestResponse = {
     response?: string; // base64-encoded encrypted account secret
 };
 
-export async function authLogin(config: Config): Promise<void> {
+export async function authLogin(config: Config, opts?: { web?: boolean }): Promise<void> {
     // 1. Generate ephemeral box keypair
     const seed = getRandomBytes(32);
     const keypair = tweetnacl.box.keyPair.fromSecretKey(seed);
@@ -32,16 +32,28 @@ export async function authLogin(config: Config): Promise<void> {
         throw err;
     }
 
-    // 3. Generate and display QR code
-    const qrData = `happy:///account?${encodeBase64Url(keypair.publicKey)}`;
-    console.log('');
-    qrcode.generate(qrData, { small: true }, (code: string) => {
-        console.log(code);
-    });
-    console.log('## Authentication');
-    console.log('- Action: Scan this QR code with the Happy app');
-    console.log('- Path: Settings -> Account -> Link New Device');
-    console.log('');
+    // 3. Display auth method
+    if (opts?.web) {
+        // Web authentication — generate URL for environments where QR scanning is unavailable
+        const publicKeyBase64Url = encodeBase64Url(keypair.publicKey);
+        const webUrl = `${config.webappUrl}/terminal/connect#key=${publicKeyBase64Url}`;
+        console.log('');
+        console.log('## Authentication (Web)');
+        console.log(`- Open this URL in your browser: ${webUrl}`);
+        console.log('- Then sign in with your Happy account to complete linking.');
+        console.log('');
+    } else {
+        // QR code authentication (default)
+        const qrData = `happy:///account?${encodeBase64Url(keypair.publicKey)}`;
+        console.log('');
+        qrcode.generate(qrData, { small: true }, (code: string) => {
+            console.log(code);
+        });
+        console.log('## Authentication');
+        console.log('- Action: Scan this QR code with the Happy app');
+        console.log('- Path: Settings -> Account -> Link New Device');
+        console.log('');
+    }
 
     // 4. Poll until authorized or timeout
     const startTime = Date.now();
