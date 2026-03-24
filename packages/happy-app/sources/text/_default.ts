@@ -1299,6 +1299,7 @@ export const en = {
     tailscaleServeFunnelToggleOff: "Disable Funnel (tailnet only)?",
     tailscaleServeError: "Error",
     networkServices: "Network Services",
+    networkServicesEmpty: "No network services available",
     upnpTitle: "UPnP Port Mapping",
     upnpEmpty: "No active mappings",
     upnpPublic: "Public",

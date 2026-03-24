@@ -1319,6 +1319,7 @@ export const ca: TranslationStructure = {
     tailscaleServeFunnelToggleOff: "Deshabilitar Funnel (només Tailnet)?",
     tailscaleServeError: "Error",
     networkServices: "Serveis de xarxa",
+    networkServicesEmpty: "No hi ha serveis de xarxa",
     upnpTitle: "Mapatge de ports UPnP",
     upnpEmpty: "Cap mapatge actiu",
     upnpPublic: "Públic",

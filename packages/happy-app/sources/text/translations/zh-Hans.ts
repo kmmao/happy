@@ -1263,6 +1263,7 @@ export const zhHans: TranslationStructure = {
     tailscaleServeFunnelToggleOff: "关闭 Funnel（仅 Tailnet）？",
     tailscaleServeError: "错误",
     networkServices: "网络服务",
+    networkServicesEmpty: "暂无网络服务",
     upnpTitle: "UPnP 端口映射",
     upnpEmpty: "暂无映射",
     upnpPublic: "公网",

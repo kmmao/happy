@@ -1397,6 +1397,7 @@ export const it: TranslationStructure = {
     tailscaleServeFunnelToggleOff: "Disabilitare Funnel (solo Tailnet)?",
     tailscaleServeError: "Errore",
     networkServices: "Servizi di rete",
+    networkServicesEmpty: "Nessun servizio di rete",
     upnpTitle: "Mappatura porte UPnP",
     upnpEmpty: "Nessuna mappatura attiva",
     upnpPublic: "Pubblico",

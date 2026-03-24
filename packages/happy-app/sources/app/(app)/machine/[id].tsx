@@ -35,7 +35,7 @@ import {
   MultiTextInput,
   type MultiTextInputHandle,
 } from "@/components/MultiTextInput";
-import { NetworkServicesSection } from "@/components/machine/NetworkServicesSection";
+import { NetworkServicesSummaryItem } from "@/components/machine/NetworkServicesSection";
 
 const styles = StyleSheet.create((theme) => ({
   pathInputContainer: {
@@ -632,8 +632,8 @@ function MachineDetailScreen() {
           </ItemGroup>
         )}
 
-        {/* Network Services (Tailscale + Caddy + UPnP) */}
-        <NetworkServicesSection machineId={machineId} machine={machine} />
+        {/* Network Services */}
+        <NetworkServicesSummaryItem machineId={machineId} machine={machine} />
 
         {/* Background processes */}
         <ItemGroup title={t("processManager.title")}>

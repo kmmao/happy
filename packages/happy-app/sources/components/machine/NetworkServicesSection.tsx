@@ -1,19 +1,15 @@
 /**
- * Unified network services section — combines Tailscale, Caddy, and UPnP
- * into a single collapsible module on the machine detail page.
+ * Network services summary — shows a single Item on the machine detail page
+ * that navigates to the full /machine/{id}/network page.
  */
 
 import React, { useMemo } from "react";
-import { Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { ItemGroup } from "@/components/ItemGroup";
 import { Item } from "@/components/Item";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
+import { useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
-import { isMachineOnline } from "@/utils/machineUtils";
-import { TailscaleServeContent } from "./TailscaleServeSection";
-import { CaddyTunnelContent } from "./CaddyTunnelSection";
-import { UpnpTunnelContent } from "./UpnpTunnelSection";
 import type { Machine } from "@/sync/storageTypes";
 
 type Props = {
@@ -21,81 +17,67 @@ type Props = {
     machine: Machine;
 };
 
-export const NetworkServicesSection = React.memo(function NetworkServicesSection({
+/** Hook to compute summary info for network services */
+export function useNetworkServicesSummary(machine: Machine) {
+    const ds = machine.daemonState as any;
+
+    return useMemo(() => {
+        const hasTailscale = ds?.tailscale?.status === "connected";
+        const tsServes = ds?.tailscale?.serves ?? [];
+
+        const providers = ds?.tunnels?.providers;
+        const caddy = Array.isArray(providers) ? providers.find((p: any) => p.provider === "caddy") : null;
+        const hasCaddy = caddy?.status === "available";
+        const caddyEntries = caddy?.entries ?? [];
+
+        const upnp = Array.isArray(providers) ? providers.find((p: any) => p.provider === "upnp") : null;
+        const hasUpnp = upnp?.status === "available";
+        const upnpEntries = upnp?.entries ?? [];
+
+        const hasAny = hasTailscale || hasCaddy || hasUpnp;
+
+        // Build subtitle parts
+        const parts: string[] = [];
+        if (hasTailscale) parts.push(`Tailscale${tsServes.length > 0 ? ` (${tsServes.length})` : ""}`);
+        if (hasCaddy) parts.push(`Caddy${caddyEntries.length > 0 ? ` (${caddyEntries.length})` : ""}`);
+        if (hasUpnp) parts.push(`UPnP${upnpEntries.length > 0 ? ` (${upnpEntries.length})` : ""}`);
+
+        const totalEntries = tsServes.length + caddyEntries.length + upnpEntries.length;
+
+        return {
+            hasAny,
+            subtitle: parts.join("  ·  "),
+            totalEntries,
+        };
+    }, [ds]);
+}
+
+/** Summary Item that navigates to /machine/{id}/network */
+export const NetworkServicesSummaryItem = React.memo(function NetworkServicesSummaryItem({
     machineId,
     machine,
 }: Props) {
     const { theme } = useUnistyles();
-    const online = isMachineOnline(machine);
-    const ds = machine.daemonState as any;
+    const router = useRouter();
+    const { hasAny, subtitle } = useNetworkServicesSummary(machine);
 
-    const hasTailscale = ds?.tailscale?.status === "connected";
-
-    const caddyProvider = useMemo(() => {
-        const providers = ds?.tunnels?.providers;
-        if (!Array.isArray(providers)) return null;
-        return providers.find((p: any) => p.provider === "caddy") ?? null;
-    }, [ds]);
-    const hasCaddy = caddyProvider?.status === "available";
-
-    const upnpProvider = useMemo(() => {
-        const providers = ds?.tunnels?.providers;
-        if (!Array.isArray(providers)) return null;
-        return providers.find((p: any) => p.provider === "upnp") ?? null;
-    }, [ds]);
-    const hasUpnp = upnpProvider?.status === "available";
-
-    // Don't render if none of the providers are available
-    if (!hasTailscale && !hasCaddy && !hasUpnp) return null;
+    if (!hasAny) return null;
 
     return (
-        <View>
-            {/* Section header */}
-            <View style={styles.sectionHeader}>
-                <Ionicons name="globe-outline" size={18} color={theme.colors.textSecondary} />
-                <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
-                    {t("machine.networkServices")}
-                </Text>
-            </View>
-
-            {/* Tailscale Serve / Funnel */}
-            {hasTailscale && (
-                <ItemGroup title="Tailscale">
-                    <TailscaleServeContent machineId={machineId} machine={machine} />
-                </ItemGroup>
-            )}
-
-            {/* Caddy HTTPS reverse proxy */}
-            {hasCaddy && (
-                <CaddyTunnelContent machineId={machineId} machine={machine} />
-            )}
-
-            {/* UPnP port mappings */}
-            {hasUpnp && (
-                <ItemGroup
-                    title="UPnP"
-                    footer={upnpProvider?.metadata?.externalIp ? `IP: ${upnpProvider.metadata.externalIp}` : undefined}
-                >
-                    <UpnpTunnelContent machineId={machineId} machine={machine} />
-                </ItemGroup>
-            )}
-        </View>
+        <ItemGroup title={t("machine.networkServices")}>
+            <Item
+                title={t("machine.networkServices")}
+                subtitle={subtitle}
+                icon={
+                    <Ionicons
+                        name="globe-outline"
+                        size={20}
+                        color={theme.colors.textLink}
+                    />
+                }
+                onPress={() => router.push(`/machine/${machineId}/network` as any)}
+                showChevron
+            />
+        </ItemGroup>
     );
 });
-
-const styles = StyleSheet.create((theme) => ({
-    sectionHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        paddingHorizontal: 16,
-        paddingTop: 20,
-        paddingBottom: 4,
-    },
-    sectionTitle: {
-        fontSize: 14,
-        fontWeight: "600",
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-    },
-}));

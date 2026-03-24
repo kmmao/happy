@@ -1314,6 +1314,7 @@ export const ru: TranslationStructure = {
     tailscaleServeFunnelToggleOff: "Отключить Funnel (только Tailnet)?",
     tailscaleServeError: "Ошибка",
     networkServices: "Сетевые сервисы",
+    networkServicesEmpty: "Нет сетевых сервисов",
     upnpTitle: "UPnP проброс портов",
     upnpEmpty: "Нет активных правил",
     upnpPublic: "Публичный",
