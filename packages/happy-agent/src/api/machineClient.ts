@@ -21,6 +21,9 @@ import { encodeBase64, decodeBase64, encrypt, decrypt } from "../encryption";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { registerAgentHandlers } from "./rpc/registerHandlers";
 import type { Machine, MachineMetadata, DaemonState } from "./types";
+import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "../utils/tailscale";
+
+const TAILSCALE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,6 +49,8 @@ export class MachineClient {
 
   private socket!: Socket;
   private keepAliveInterval: ReturnType<typeof setInterval> | null = null;
+  private tailscaleRefreshInterval: ReturnType<typeof setInterval> | null = null;
+  private lastTailscaleInfo: TailscaleInfo | null = null;
   private readonly token: string;
   private readonly serverUrl: string;
   private readonly onEphemeral?: (data: { type: string; [key: string]: unknown }) => void;
@@ -95,14 +100,27 @@ export class MachineClient {
       // Register RPC handlers
       this.rpcHandlerManager.onSocketConnect(this.socket);
 
+      // Report initial state with Tailscale info
+      this.updateDaemonState((state) => ({
+        ...state,
+        status: "running",
+        pid: process.pid,
+        startedAt: Date.now(),
+        tailscale: this.lastTailscaleInfo ?? state?.tailscale,
+      }));
+
       // Start keepAlive heartbeat
       this.startKeepAlive();
+
+      // Start periodic Tailscale refresh
+      this.startTailscaleRefresh();
     });
 
     this.socket.on("disconnect", () => {
       logger.debug("[MACHINE] Disconnected from server");
       this.rpcHandlerManager.onSocketDisconnect();
       this.stopKeepAlive();
+      this.stopTailscaleRefresh();
     });
 
     // Handle incoming RPC requests
@@ -237,9 +255,15 @@ export class MachineClient {
   // Lifecycle
   // -----------------------------------------------------------------------
 
+  /** Seed initial Tailscale info detected before connect. */
+  setTailscaleInfo(info: TailscaleInfo): void {
+    this.lastTailscaleInfo = info;
+  }
+
   shutdown(): void {
     logger.debug("[MACHINE] Shutting down");
     this.stopKeepAlive();
+    this.stopTailscaleRefresh();
     this.rpcHandlerManager.onSocketDisconnect();
     this.socket?.close();
   }
@@ -264,4 +288,47 @@ export class MachineClient {
       this.keepAliveInterval = null;
     }
   }
+
+  private startTailscaleRefresh(): void {
+    this.stopTailscaleRefresh();
+    this.tailscaleRefreshInterval = setInterval(async () => {
+      const info = await detectTailscale();
+      const serves = info.status === "connected"
+        ? await detectTailscaleServe()
+        : [];
+      const fullInfo: TailscaleInfo = { ...info, serves };
+      if (tailscaleChanged(this.lastTailscaleInfo, fullInfo)) {
+        logger.debug(
+          `[MACHINE] Tailscale changed: ${this.lastTailscaleInfo?.status} → ${fullInfo.status}, serves: ${serves.length}`,
+        );
+        this.lastTailscaleInfo = fullInfo;
+        this.updateDaemonState((state) => {
+          if (!state) return { status: "running", tailscale: fullInfo };
+          return { ...state, tailscale: fullInfo };
+        });
+      }
+    }, TAILSCALE_REFRESH_MS);
+    logger.debug("[MACHINE] Tailscale refresh started (5m interval)");
+  }
+
+  private stopTailscaleRefresh(): void {
+    if (this.tailscaleRefreshInterval) {
+      clearInterval(this.tailscaleRefreshInterval);
+      this.tailscaleRefreshInterval = null;
+    }
+  }
+}
+
+function tailscaleChanged(
+  prev: TailscaleInfo | null,
+  next: TailscaleInfo,
+): boolean {
+  if (!prev) return true;
+  return (
+    prev.status !== next.status ||
+    prev.ipv4 !== next.ipv4 ||
+    prev.ipv6 !== next.ipv6 ||
+    prev.hostname !== next.hostname ||
+    JSON.stringify(prev.serves) !== JSON.stringify(next.serves)
+  );
 }
