@@ -2206,6 +2206,7 @@ export const en = {
     failed: "Failed",
     viewLog: "View Log",
     noOutput: "No output yet",
+    foregroundHint: "Process monitor",
     close: "Close",
     refresh: "Refresh",
     elapsed: ({ time }: { time: string }) => `${time}`,
@@ -2392,6 +2393,11 @@ export const en = {
     fixStrategyPr: "Pull Request",
     fixStrategyPrDesc: "Create a PR for each fix (requires manual merge)",
 
+    // Settings: Analyze auto-fix
+    analyzeAutoFixSection: "Analyze & Auto-Fix",
+    analyzeAutoFixLabel: "Auto-fix after analysis",
+    analyzeAutoFixDesc: "When enabled, if analysis confirms the issue is real and fixable, the AI will automatically proceed to fix it. When disabled, analysis results are reported without code changes.",
+
     // Settings: Custom rules
     customRulesSection: "Custom Rules",
     customRulesDesc: "Add project-specific analysis rules",
@@ -2422,8 +2428,10 @@ export const en = {
     tabPending: "Pending",
     tabApproved: "Approved",
     tabFixing: "Fixing",
+    tabAnalyzing: "Analyzing",
     tabDone: "Done",
     tabDismissed: "Dismissed",
+    categoryAll: "All",
     noActions: "No actions",
     loadMore: "Load More",
     loadError: "Failed to load actions",
@@ -2432,6 +2440,8 @@ export const en = {
     viewSession: "View Session",
     viewPR: "View PR",
     retryFix: "Retry",
+    analyze: "Analyze",
+    analyzeComplete: "Analysis Complete",
 
     // Phase 7: Report export
     exportReport: "Export Report",

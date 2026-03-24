@@ -1,7 +1,10 @@
 /**
- * Bottom sheet showing real-time logs from a background task.
+ * Bottom sheet showing real-time logs from a task.
  *
- * Uses useBackgroundTaskLog to poll the output file every 3 seconds.
+ * - Background tasks (with outputFile): polls the output file every 3s via useBackgroundTaskLog.
+ * - Foreground tasks (no outputFile): monitors the running process via useForegroundTaskLog,
+ *   showing PID, CPU, memory, elapsed time, and Docker-specific info when applicable.
+ *
  * Auto-scrolls to bottom on new content. Monospace font for log output.
  */
 
@@ -18,6 +21,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
 import { useBackgroundTaskLog } from "@/hooks/useBackgroundTaskLog";
+import { useForegroundTaskLog } from "@/hooks/useForegroundTaskLog";
 import { BackgroundTask } from "@/hooks/useBackgroundTasks";
 import {
     buildSmartLabel,
@@ -50,11 +54,26 @@ function BackgroundTaskLogSheetInner({ sessionId, task, onClose, onStop, onPrevi
     const { theme } = useUnistyles();
     const scrollRef = React.useRef<ScrollView>(null);
 
-    const { log, isLoading, refresh } = useBackgroundTaskLog(
+    const isForeground = task !== null && !task.outputFile;
+
+    // Background task log (polls outputFile)
+    const bgLog = useBackgroundTaskLog(
         sessionId,
         task?.outputFile ?? null,
-        task !== null,
+        task !== null && !isForeground,
     );
+
+    // Foreground task monitor (polls process status via ps/grep)
+    const fgLog = useForegroundTaskLog(
+        sessionId,
+        isForeground ? task.command : null,
+        isForeground,
+    );
+
+    // Unified log/loading/refresh from whichever source is active
+    const log = isForeground ? fgLog.log : bgLog.log;
+    const isLoading = isForeground ? fgLog.isLoading : bgLog.isLoading;
+    const refresh = isForeground ? fgLog.refresh : bgLog.refresh;
 
     // Auto-scroll to bottom when log updates
     React.useEffect(() => {
@@ -124,6 +143,7 @@ function BackgroundTaskLogSheetInner({ sessionId, task, onClose, onStop, onPrevi
                                 style={[styles.subtitle, { color: theme.colors.textSecondary }]}
                             >
                                 {statusLabel}
+                                {isForeground ? ` · ${t("backgroundTasks.foregroundHint")}` : ""}
                             </Text>
                         </View>
                     </View>

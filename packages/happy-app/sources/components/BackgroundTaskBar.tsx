@@ -265,7 +265,7 @@ function BackgroundTaskBarInner({ sessionId, tasks, onViewLog, onClose, onDismis
                             key={task.taskId}
                             sessionId={sessionId}
                             task={task}
-                            onPress={task.isBackground ? () => onViewLog(task) : undefined}
+                            onPress={() => onViewLog(task)}
                             onClose={() => onClose(task)}
                             onDismiss={() => onDismiss(task.taskId)}
                             onPreview={

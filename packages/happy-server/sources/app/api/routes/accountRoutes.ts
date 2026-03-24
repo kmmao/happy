@@ -1,5 +1,6 @@
 import { eventRouter, buildUpdateAccountUpdate } from "@/app/events/eventRouter";
 import { db } from "@/storage/db";
+import { Prisma } from "@prisma/client";
 import { Fastify } from "../types";
 import { getPublicUrl } from "@/storage/files";
 import { z } from "zod";
@@ -182,128 +183,124 @@ export function accountRoutes(app: Fastify) {
                 sessionId: z.string().nullish(),
                 startTime: z.number().int().positive().nullish(),
                 endTime: z.number().int().positive().nullish(),
-                groupBy: z.enum(['hour', 'day']).nullish()
+                groupBy: z.enum(['hour', 'day']).nullish(),
+                timezone: z.string().min(1).nullish()
             })
         },
         preHandler: app.authenticate
     }, async (request, reply) => {
         const userId = request.userId;
-        const { sessionId, startTime, endTime, groupBy } = request.body;
+        const { sessionId, startTime, endTime, groupBy, timezone } = request.body;
         const actualGroupBy = groupBy || 'day';
 
-        try {
-            // Build query conditions
-            const where: {
-                accountId: string;
-                sessionId?: string | null;
-                createdAt?: {
-                    gte?: Date;
-                    lte?: Date;
-                };
-            } = {
-                accountId: userId
-            };
+        // Validate timezone: Intl check + strict character allowlist to prevent SQL injection.
+        // IANA timezone names only contain [A-Za-z0-9/_\-+], so anything else is rejected.
+        let validTz = 'UTC';
+        if (timezone && /^[A-Za-z0-9/_\-+]{1,64}$/.test(timezone)) {
+            try {
+                Intl.DateTimeFormat(undefined, { timeZone: timezone });
+                validTz = timezone;
+            } catch {
+                // Invalid timezone — fall back to UTC
+            }
+        }
 
+        try {
             if (sessionId) {
-                // Verify session belongs to user
                 const session = await db.session.findFirst({
-                    where: {
-                        id: sessionId,
-                        accountId: userId
-                    }
+                    where: { id: sessionId, accountId: userId }
                 });
                 if (!session) {
                     return reply.code(404).send({ error: 'Session not found' });
                 }
-                where.sessionId = sessionId;
             }
 
-            if (startTime || endTime) {
-                where.createdAt = {};
-                if (startTime) {
-                    where.createdAt.gte = new Date(startTime * 1000);
-                }
-                if (endTime) {
-                    where.createdAt.lte = new Date(endTime * 1000);
-                }
+            const startDate = startTime ? new Date(startTime * 1000) : null;
+            const endDate = endTime ? new Date(endTime * 1000) : null;
+
+            // Use date_trunc with timezone for correct local-day bucketing.
+            // jsonb_each_text expands dynamic keys (model names, token types)
+            // so we don't hardcode field names.
+            // Prisma.raw() is used for date_trunc unit and AT TIME ZONE because
+            // PostgreSQL does not accept parameterized bindings ($1) for these.
+            // Safety: truncUnit is from a hardcoded enum, validTz is verified via Intl API.
+            const truncExpr = actualGroupBy === 'hour'
+                ? Prisma.raw(`date_trunc('hour', "createdAt" AT TIME ZONE '${validTz}')`)
+                : Prisma.raw(`date_trunc('day', "createdAt" AT TIME ZONE '${validTz}')`);
+
+            interface BucketRow {
+                bucket_epoch: number;
+                category: string;
+                key: string;
+                total_value: number;
+                report_count: bigint;
             }
 
-            // Fetch usage reports
-            const reports = await db.usageReport.findMany({
-                where,
-                orderBy: {
-                    createdAt: 'desc'
-                },
-                take: 1000
-            });
+            const rows = await db.$queryRaw<BucketRow[]>`
+                SELECT
+                    EXTRACT(EPOCH FROM ${truncExpr})::bigint AS bucket_epoch,
+                    cat.category,
+                    kv.key,
+                    SUM(kv.value::double precision) AS total_value,
+                    COUNT(DISTINCT ur.id) AS report_count
+                FROM "UsageReport" ur,
+                LATERAL (
+                    VALUES ('tokens', COALESCE(ur.data->'tokens', '{}'::jsonb)),
+                           ('cost', COALESCE(ur.data->'cost', '{}'::jsonb))
+                ) AS cat(category, obj),
+                LATERAL jsonb_each_text(cat.obj) AS kv(key, value)
+                WHERE ur."accountId" = ${userId}
+                    AND (${sessionId}::text IS NULL OR ur."sessionId" = ${sessionId})
+                    AND (${startDate}::timestamp IS NULL OR ur."createdAt" >= ${startDate})
+                    AND (${endDate}::timestamp IS NULL OR ur."createdAt" <= ${endDate})
+                GROUP BY bucket_epoch, cat.category, kv.key
+                ORDER BY bucket_epoch ASC
+            `;
 
-            // Aggregate data by time period
-            const aggregated = new Map<string, {
+            // Aggregate rows into the expected response format.
+            // Each SQL row is one (bucket, category, key) tuple. We merge them
+            // into { timestamp, tokens: {...}, cost: {...}, reportCount } objects.
+            // reportCount uses MAX across keys because COUNT(DISTINCT ur.id) per key
+            // may vary if some reports lack certain keys.
+            const bucketMap = new Map<number, {
                 tokens: Record<string, number>;
                 cost: Record<string, number>;
-                count: number;
-                timestamp: number;
+                reportCount: number;
             }>();
 
-            for (const report of reports) {
-                const data = report.data as PrismaJson.UsageReportData;
-                const date = new Date(report.createdAt);
+            for (const row of rows) {
+                const ts = Number(row.bucket_epoch);
 
-                // Calculate timestamp based on groupBy
-                let timestamp: number;
-                if (actualGroupBy === 'hour') {
-                    // Round down to hour
-                    const hourDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), 0, 0, 0);
-                    timestamp = Math.floor(hourDate.getTime() / 1000);
+                if (!bucketMap.has(ts)) {
+                    bucketMap.set(ts, { tokens: {}, cost: {}, reportCount: 0 });
+                }
+
+                const entry = bucketMap.get(ts)!;
+
+                if (row.category === 'tokens') {
+                    entry.tokens[row.key] = (entry.tokens[row.key] || 0) + row.total_value;
                 } else {
-                    // Round down to day
-                    const dayDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-                    timestamp = Math.floor(dayDate.getTime() / 1000);
+                    entry.cost[row.key] = (entry.cost[row.key] || 0) + row.total_value;
                 }
 
-                const key = timestamp.toString();
-
-                if (!aggregated.has(key)) {
-                    aggregated.set(key, {
-                        tokens: {},
-                        cost: {},
-                        count: 0,
-                        timestamp
-                    });
-                }
-
-                const agg = aggregated.get(key)!;
-                agg.count++;
-
-                // Aggregate tokens
-                for (const [tokenKey, tokenValue] of Object.entries(data.tokens)) {
-                    if (typeof tokenValue === 'number') {
-                        agg.tokens[tokenKey] = (agg.tokens[tokenKey] || 0) + tokenValue;
-                    }
-                }
-
-                // Aggregate costs
-                for (const [costKey, costValue] of Object.entries(data.cost)) {
-                    if (typeof costValue === 'number') {
-                        agg.cost[costKey] = (agg.cost[costKey] || 0) + costValue;
-                    }
+                const rc = Number(row.report_count);
+                if (rc > entry.reportCount) {
+                    entry.reportCount = rc;
                 }
             }
 
-            // Convert to array and sort by timestamp
-            const result = Array.from(aggregated.values())
-                .map(data => ({
-                    timestamp: data.timestamp,
+            const result = Array.from(bucketMap.entries())
+                .map(([timestamp, data]) => ({
+                    timestamp,
                     tokens: data.tokens,
                     cost: data.cost,
-                    reportCount: data.count
+                    reportCount: data.reportCount
                 }))
                 .sort((a, b) => a.timestamp - b.timestamp);
 
             return reply.send({
                 usage: result,
-                groupBy: actualGroupBy,
-                totalReports: reports.length
+                groupBy: actualGroupBy
             });
         } catch (error) {
             log({ module: 'api', level: 'error' }, `Failed to query usage reports: ${error}`);
