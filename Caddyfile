@@ -1,0 +1,27 @@
+# Happy Caddy 反向代理配置
+# DNS-01 验证 + 非标端口
+
+{
+    https_port 2443
+    http_port 2080
+    acme_dns cloudflare {env.CF_API_TOKEN}
+}
+
+code.xycloud.info {
+    handle_path /app/* {
+        reverse_proxy host.docker.internal:8081
+    }
+    handle_path /app {
+        reverse_proxy host.docker.internal:8081
+    }
+    handle {
+        reverse_proxy host.docker.internal:3005
+    }
+
+    tls {
+        dns cloudflare {env.CF_API_TOKEN}
+        propagation_timeout 300s
+        propagation_delay 15s
+        resolvers 1.1.1.1 8.8.8.8
+    }
+}

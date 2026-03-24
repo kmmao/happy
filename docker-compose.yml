@@ -141,8 +141,28 @@ services:
       timeout: 5s
       retries: 10
 
+  caddy:
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    environment:
+      CF_API_TOKEN: ${CF_API_TOKEN}
+    ports:
+      - "2080:2080"
+      - "2443:2443"
+      - "2443:2443/udp"   # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - happy_caddy_data:/data
+      - happy_caddy_config:/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
 volumes:
   happy_pgdata:
   happy_redisdata:
   happy_miniodata:
   happy_stt_models:
+  happy_caddy_data:
+  happy_caddy_config:
