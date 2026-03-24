@@ -74,6 +74,7 @@ function makeOptions(overrides: Partial<SessionClientOptions> = {}): SessionClie
         encryptionVariant: 'dataKey' as EncryptionVariant,
         token: 'test-jwt-token',
         serverUrl: 'https://test-server.example.com',
+        enableRpc: false,
         ...overrides,
     };
 }

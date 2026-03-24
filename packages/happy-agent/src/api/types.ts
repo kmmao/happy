@@ -56,16 +56,16 @@ export type RawSession = {
 };
 
 export type DecryptedSession = {
-  readonly id: string;
-  readonly seq: number;
-  readonly createdAt: number;
-  readonly updatedAt: number;
-  readonly active: boolean;
-  readonly activeAt: number;
-  readonly metadata: unknown;
-  readonly agentState: unknown | null;
-  readonly dataEncryptionKey: string | null;
-  readonly encryption: SessionEncryption;
+  id: string;
+  seq: number;
+  createdAt: number;
+  updatedAt: number;
+  active: boolean;
+  activeAt: number;
+  metadata: unknown;
+  agentState: unknown | null;
+  dataEncryptionKey: string | null;
+  encryption: SessionEncryption;
 };
 
 // ---------------------------------------------------------------------------
