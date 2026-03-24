@@ -14,6 +14,48 @@ import React from 'react';
 import { randomUUID } from 'node:crypto';
 import { logger } from './logger';
 
+/**
+ * Headless authentication via Provision Token (for Docker containers).
+ * The token is a base64url-encoded JSON containing a bearer token.
+ * CLI unpacks it and saves directly as credentials — no QR code needed.
+ */
+async function doProvisionAuth(provisionToken: string): Promise<Credentials> {
+    logger.debug('[AUTH] Attempting provision token authentication...');
+
+    // Strip prefix and decode
+    const raw = provisionToken.startsWith('hp_') ? provisionToken.slice(3) : provisionToken;
+    const packed = JSON.parse(Buffer.from(raw, 'base64url').toString());
+    const bearerToken = packed.t as string;
+
+    if (!bearerToken) {
+        throw new Error('Invalid provision token: missing bearer token');
+    }
+
+    // Check expiry if present
+    if (packed.x) {
+        const expiresAt = new Date(packed.x);
+        if (expiresAt.getTime() < Date.now()) {
+            throw new Error(`Provision token expired at ${expiresAt.toISOString()}`);
+        }
+    }
+
+    // Generate a legacy secret for encryption (same as normal auth legacy mode)
+    const secret = new Uint8Array(randomBytes(32));
+
+    const credentials: Credentials = {
+        encryption: {
+            type: 'legacy',
+            secret,
+        },
+        token: bearerToken,
+    };
+
+    await writeCredentialsLegacy({ secret, token: bearerToken });
+
+    logger.debug('[AUTH] Provision token authentication successful');
+    return credentials;
+}
+
 export async function doAuth(): Promise<Credentials | null> {
     console.clear();
 
@@ -252,7 +294,12 @@ export async function authAndSetupMachineIfNeeded(): Promise<{
     let credentials = await readCredentials();
     let newAuth = false;
 
-    if (!credentials) {
+    if (!credentials && process.env.HAPPY_PROVISION_TOKEN) {
+        // Headless auth for Docker containers
+        logger.debug('[AUTH] Provision token detected, using headless auth...');
+        credentials = await doProvisionAuth(process.env.HAPPY_PROVISION_TOKEN);
+        newAuth = true;
+    } else if (!credentials) {
         logger.debug('[AUTH] No credentials found, starting authentication flow...');
         const authResult = await doAuth();
         if (!authResult) {

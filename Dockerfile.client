@@ -73,33 +73,60 @@ CMD ["zsh"]
 #
 #    docker build -f Dockerfile.client -t happy-client .
 #
-# 2. 启动容器（使用默认配置）
+# 2. 启动容器（手动认证 — 需要扫码）
 #
 #    docker run -it --name happy-user \
 #      -v happy-data:/root/.happy \
 #      happy-client
 #
-# 2b. 自定义 Server URL 启动
+#    容器内运行 happy，然后用 App 扫 QR 码完成认证。
 #
-#    docker run -it --name happy-user \
+# 3. 启动容器（Provision Token — 免扫码，推荐）
+#
+#    在 Happy App 设置 → Provision Tokens → 创建，复制 token 后：
+#
+#    docker run -d --name happy-user \
+#      -v happy-data:/root/.happy \
+#      -e HAPPY_PROVISION_TOKEN="hp_xxxxxxxx" \
+#      happy-client sleep infinity
+#
+#    容器启动后自动完成认证，无需扫码。
+#    Token 仅首次启动时需要，认证信息保存在数据卷中。
+#
+# 3b. 自定义 Server URL + Provision Token
+#
+#    docker run -d --name happy-user \
+#      -v happy-data:/root/.happy \
+#      -e HAPPY_PROVISION_TOKEN="hp_xxxxxxxx" \
 #      -e HAPPY_SERVER_URL="https://my-server.example.com" \
 #      -e HAPPY_WEBAPP_URL="https://my-webapp.example.com" \
-#      -v happy-data:/root/.happy \
-#      happy-client
+#      happy-client sleep infinity
 #
-# 3. 进入已运行的容器
+# 4. 进入已运行的容器
 #
 #    docker exec -it happy-user zsh
 #
-# 4. 容器内使用
+# 5. 容器内使用
 #
 #    happy             # 启动 happy-coder
 #    claude            # 启动 Claude Code
 #    tmux              # 使用 tmux 管理多会话
 #
-# 5. 停止 / 重启
+# 6. 停止 / 重启
 #
 #    docker stop happy-user
 #    docker start -i happy-user
+#
+# 7. 重建容器（数据卷保留，无需重新认证）
+#
+#    docker rm -f happy-user
+#    docker run -d --name happy-user \
+#      -v happy-data:/root/.happy \
+#      happy-client sleep infinity
+#
+# 8. 彻底清除（删除容器 + 数据卷）
+#
+#    docker rm -f happy-user
+#    docker volume rm happy-data
 #
 # ============================================================

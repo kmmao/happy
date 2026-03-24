@@ -1212,9 +1212,17 @@ export const it: TranslationStructure = {
     copyDockerCommand: "Copia comando Docker",
     copied: "Copiato!",
     revokeToken: "Revoca token",
-    revokeConfirm: "Questo invaliderà il bearer token. Qualsiasi container che lo utilizza dovrà ri-autenticarsi.",
+    revokeConfirm: "Questo invaliderà il token e fermerà il container se online.",
     deleteConfirm: "Revocare questo token di provisioning?",
     expiresAt: ({ date }: { date: string }) => `Scade il ${date}`,
+    noMachineOnline: "Nessuna macchina è online. Collega prima una macchina per creare container.",
+    containerNameDescription: "Inserisci un nome per il container Docker",
+    containerNamePlaceholder: "es. alice",
+    creatingContainer: "Creazione container in corso...",
+    containerCreated: "Container creato",
+    containerCreatedDescription: ({ name }: { name: string }) => `Il container happy-${name} è in esecuzione.\n\nAccedi con:\ndocker exec -it happy-${name} zsh\nhappy`,
+    containerFailed: "Creazione container fallita",
+    containerFailedDescription: ({ error }: { error: string }) => `Il comando Docker è fallito: ${error}\n\nIl token di provisioning è stato copiato negli appunti come alternativa.`,
   },
 
   connectButton: {

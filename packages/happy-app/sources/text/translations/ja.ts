@@ -1196,9 +1196,17 @@ export const ja: TranslationStructure = {
     copyDockerCommand: "Docker コマンドをコピー",
     copied: "コピーしました！",
     revokeToken: "Token を取り消す",
-    revokeConfirm: "Bearer Token が無効になります。それを使用しているコンテナは再認証が必要になります。",
+    revokeConfirm: "token が無効になり、オンラインのコンテナは停止されます。",
     deleteConfirm: "このプロビジョン Token を取り消しますか？",
     expiresAt: ({ date }: { date: string }) => `${date} に期限切れ`,
+    noMachineOnline: "オンラインのマシンがありません。コンテナを作成するには、まずマシンを接続してください。",
+    containerNameDescription: "Docker コンテナの名前を入力してください",
+    containerNamePlaceholder: "例: alice",
+    creatingContainer: "コンテナを作成中...",
+    containerCreated: "コンテナが作成されました",
+    containerCreatedDescription: ({ name }: { name: string }) => `コンテナ happy-${name} が実行中です。\n\n以下のコマンドで入れます：\ndocker exec -it happy-${name} zsh\nhappy`,
+    containerFailed: "コンテナの作成に失敗しました",
+    containerFailedDescription: ({ error }: { error: string }) => `Docker コマンドが失敗しました：${error}\n\n代替手段として、プロビジョン token がクリップボードにコピーされました。`,
   },
 
   connectButton: {

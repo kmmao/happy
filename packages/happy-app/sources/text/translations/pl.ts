@@ -1142,9 +1142,17 @@ export const pl: TranslationStructure = {
     copyDockerCommand: "Kopiuj polecenie Docker",
     copied: "Skopiowano!",
     revokeToken: "Unieważnij token",
-    revokeConfirm: "Spowoduje to unieważnienie bearer tokenu. Każdy kontener go używający będzie musiał ponownie się uwierzytelnić.",
+    revokeConfirm: "To unieważni token i zatrzyma kontener, jeśli jest online.",
     deleteConfirm: "Unieważnić ten token prowizji?",
     expiresAt: ({ date }: { date: string }) => `Wygasa ${date}`,
+    noMachineOnline: "Żadna maszyna nie jest online. Najpierw podłącz maszynę, aby utworzyć kontenery.",
+    containerNameDescription: "Wprowadź nazwę dla kontenera Docker",
+    containerNamePlaceholder: "np. alice",
+    creatingContainer: "Tworzenie kontenera...",
+    containerCreated: "Kontener utworzony",
+    containerCreatedDescription: ({ name }: { name: string }) => `Kontener happy-${name} jest uruchomiony.\n\nWejdź do niego poleceniem:\ndocker exec -it happy-${name} zsh\nhappy`,
+    containerFailed: "Tworzenie kontenera nie powiodło się",
+    containerFailedDescription: ({ error }: { error: string }) => `Polecenie Docker nie powiodło się: ${error}\n\nToken prowizji został skopiowany do schowka jako rozwiązanie awaryjne.`,
   },
 
   connectButton: {

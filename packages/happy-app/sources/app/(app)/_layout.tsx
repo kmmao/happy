@@ -148,6 +148,13 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="settings/provision"
+        options={{
+          headerTitle: t("provision.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="terminal/connect"
         options={{
           headerTitle: t("navigation.connectTerminal"),

@@ -1085,9 +1085,17 @@ export const zhHant: TranslationStructure = {
     copyDockerCommand: "複製 Docker 命令",
     copied: "已複製！",
     revokeToken: "撤銷 Token",
-    revokeConfirm: "這將使 Bearer Token 失效。使用該 Token 的任何容器都需要重新驗證。",
+    revokeConfirm: "這將使 token 失效，並停止在線的容器。",
     deleteConfirm: "撤銷此配置 Token？",
     expiresAt: ({ date }: { date: string }) => `${date} 過期`,
+    noMachineOnline: "沒有在線的機器。請先連接一台機器以建立容器。",
+    containerNameDescription: "輸入 Docker 容器的名稱",
+    containerNamePlaceholder: "例如 alice",
+    creatingContainer: "正在建立容器...",
+    containerCreated: "容器已建立",
+    containerCreatedDescription: ({ name }: { name: string }) => `容器 happy-${name} 正在執行。\n\n透過以下命令進入：\ndocker exec -it happy-${name} zsh\nhappy`,
+    containerFailed: "容器建立失敗",
+    containerFailedDescription: ({ error }: { error: string }) => `Docker 命令失敗：${error}\n\n配置 token 已複製到剪貼簿作為備用方案。`,
   },
 
   connectButton: {

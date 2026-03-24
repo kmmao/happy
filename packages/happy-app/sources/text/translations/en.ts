@@ -1126,9 +1126,17 @@ export const en: TranslationStructure = {
     copyDockerCommand: "Copy Docker Command",
     copied: "Copied!",
     revokeToken: "Revoke Token",
-    revokeConfirm: "This will invalidate the bearer token. Any container using it will need to re-authenticate.",
+    revokeConfirm: "This will invalidate the token and stop the container if online.",
     deleteConfirm: "Revoke this provision token?",
     expiresAt: ({ date }: { date: string }) => `Expires ${date}`,
+    noMachineOnline: "No machine is online. Connect a machine first to create containers.",
+    containerNameDescription: "Enter a name for the Docker container",
+    containerNamePlaceholder: "e.g. alice",
+    creatingContainer: "Creating container...",
+    containerCreated: "Container Created",
+    containerCreatedDescription: ({ name }: { name: string }) => `Container happy-${name} is running.\n\nEnter it with:\ndocker exec -it happy-${name} zsh\nhappy`,
+    containerFailed: "Container Creation Failed",
+    containerFailedDescription: ({ error }: { error: string }) => `Docker command failed: ${error}\n\nThe provision token has been copied to your clipboard as a fallback.`,
   },
 
   connectButton: {

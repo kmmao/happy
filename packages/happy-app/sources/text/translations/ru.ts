@@ -1130,9 +1130,17 @@ export const ru: TranslationStructure = {
     copyDockerCommand: "Копировать Docker-команду",
     copied: "Скопировано!",
     revokeToken: "Отозвать токен",
-    revokeConfirm: "Bearer-токен будет аннулирован. Все контейнеры, использующие его, потребуют повторной аутентификации.",
+    revokeConfirm: "Токен будет аннулирован, а контейнер остановлен, если он онлайн.",
     deleteConfirm: "Отозвать этот токен подготовки?",
     expiresAt: ({ date }: { date: string }) => `Истекает ${date}`,
+    noMachineOnline: "Нет машин онлайн. Сначала подключите машину для создания контейнеров.",
+    containerNameDescription: "Введите имя для Docker-контейнера",
+    containerNamePlaceholder: "напр. alice",
+    creatingContainer: "Создание контейнера...",
+    containerCreated: "Контейнер создан",
+    containerCreatedDescription: ({ name }: { name: string }) => `Контейнер happy-${name} запущен.\n\nВойдите в него командой:\ndocker exec -it happy-${name} zsh\nhappy`,
+    containerFailed: "Ошибка создания контейнера",
+    containerFailedDescription: ({ error }: { error: string }) => `Команда Docker завершилась с ошибкой: ${error}\n\nТокен подготовки скопирован в буфер обмена как запасной вариант.`,
   },
 
   connectButton: {

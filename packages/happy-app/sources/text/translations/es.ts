@@ -1133,9 +1133,17 @@ export const es: TranslationStructure = {
     copyDockerCommand: "Copiar comando Docker",
     copied: "¡Copiado!",
     revokeToken: "Revocar token",
-    revokeConfirm: "Esto invalidará el bearer token. Cualquier contenedor que lo use necesitará re-autenticarse.",
+    revokeConfirm: "Esto invalidará el token y detendrá el contenedor si está en línea.",
     deleteConfirm: "¿Revocar este token de aprovisionamiento?",
     expiresAt: ({ date }: { date: string }) => `Expira el ${date}`,
+    noMachineOnline: "No hay máquinas en línea. Conecta una máquina primero para crear contenedores.",
+    containerNameDescription: "Introduce un nombre para el contenedor Docker",
+    containerNamePlaceholder: "p. ej. alice",
+    creatingContainer: "Creando contenedor...",
+    containerCreated: "Contenedor creado",
+    containerCreatedDescription: ({ name }: { name: string }) => `El contenedor happy-${name} está en ejecución.\n\nAccede con:\ndocker exec -it happy-${name} zsh\nhappy`,
+    containerFailed: "Error al crear el contenedor",
+    containerFailedDescription: ({ error }: { error: string }) => `El comando Docker falló: ${error}\n\nEl token de aprovisionamiento se ha copiado al portapapeles como alternativa.`,
   },
 
   connectButton: {

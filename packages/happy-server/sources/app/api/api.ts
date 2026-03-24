@@ -35,6 +35,7 @@ import { supervisorAnalyticsRoutes } from "./routes/supervisorAnalyticsRoutes";
 import { supervisorLoopRoutes } from "./routes/supervisorLoopRoutes";
 import { v3SessionRoutes } from "./routes/v3SessionRoutes";
 import { webhookRoutes } from "./routes/webhookRoutes";
+import { provisionRoutes } from "./routes/provisionRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import * as path from "path";
 import * as fs from "fs";
@@ -117,6 +118,7 @@ export async function startApi() {
   supervisorAnalyticsRoutes(typed);
   supervisorLoopRoutes(typed);
   v3SessionRoutes(typed);
+  provisionRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

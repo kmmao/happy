@@ -1133,9 +1133,17 @@ export const ca: TranslationStructure = {
     copyDockerCommand: "Copiar comanda Docker",
     copied: "Copiat!",
     revokeToken: "Revocar token",
-    revokeConfirm: "Això invalidarà el bearer token. Qualsevol contenidor que l'utilitzi haurà de re-autenticar-se.",
+    revokeConfirm: "Això invalidarà el token i aturarà el contenidor si està en línia.",
     deleteConfirm: "Revocar aquest token de proveïment?",
     expiresAt: ({ date }: { date: string }) => `Expira el ${date}`,
+    noMachineOnline: "Cap màquina està en línia. Connecta primer una màquina per crear contenidors.",
+    containerNameDescription: "Introdueix un nom per al contenidor Docker",
+    containerNamePlaceholder: "p. ex. alice",
+    creatingContainer: "Creant contenidor...",
+    containerCreated: "Contenidor creat",
+    containerCreatedDescription: ({ name }: { name: string }) => `El contenidor happy-${name} s'està executant.\n\nAccedeix-hi amb:\ndocker exec -it happy-${name} zsh\nhappy`,
+    containerFailed: "Error en crear el contenidor",
+    containerFailedDescription: ({ error }: { error: string }) => `La comanda Docker ha fallat: ${error}\n\nEl token de proveïment s'ha copiat al porta-retalls com a alternativa.`,
   },
 
   connectButton: {
