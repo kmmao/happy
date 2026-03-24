@@ -148,6 +148,7 @@ services:
     environment:
       CF_API_TOKEN: ${CF_API_TOKEN}
     ports:
+      - "2019:2019"       # Admin API
       - "2080:2080"
       - "2443:2443"
       - "2443:2443/udp"   # HTTP/3

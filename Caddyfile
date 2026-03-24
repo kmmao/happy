@@ -2,6 +2,7 @@
 # DNS-01 验证 + 非标端口
 
 {
+    admin 0.0.0.0:2019
     https_port 2443
     http_port 2080
     acme_dns cloudflare {env.CF_API_TOKEN}
