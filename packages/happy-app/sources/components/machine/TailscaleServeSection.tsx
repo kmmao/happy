@@ -412,10 +412,6 @@ export const TailscaleServeSection = React.memo(function TailscaleServeSection({
         return `https://localhost:${serve.port}${pathSuffix}`;
     }, []);
 
-    const handleOpenServe = useCallback((serve: ServeEntry) => {
-        Linking.openURL(buildServeUrl(serve));
-    }, [buildServeUrl]);
-
     const handleFunnelToggle = useCallback(async (serve: ServeEntry) => {
         if (!online || togglingPorts.has(serve.port)) return;
 
@@ -507,11 +503,12 @@ export const TailscaleServeSection = React.memo(function TailscaleServeSection({
             {displayServes.map((serve) => {
                 const canFunnel = FUNNEL_ELIGIBLE_SET.has(serve.port);
                 const pathLabel = serve.path === "/" ? "" : serve.path;
+                const url = buildServeUrl(serve);
                 return (
                     <Item
                         key={`${serve.port}${serve.path}`}
                         title={`:${serve.port}${pathLabel}`}
-                        subtitle={`→ ${formatTarget(serve.target)}\n${buildServeUrl(serve)}`}
+                        subtitle={`→ ${formatTarget(serve.target)}\n${url}`}
                         subtitleLines={0}
                         subtitleStyle={{
                             fontFamily: "Menlo",
@@ -552,7 +549,7 @@ export const TailscaleServeSection = React.memo(function TailscaleServeSection({
                                 </Text>
                             )
                         }
-                        onPress={() => handleOpenServe(serve)}
+                        onPress={() => Linking.openURL(url)}
                         onLongPress={online ? () => handleServeRemove(serve) : undefined}
                         showChevron={false}
                     />
