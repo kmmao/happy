@@ -21,6 +21,7 @@ import {
 import { encodeBase64, decodeBase64, encrypt, decrypt } from "./encryption";
 import { backoff } from "@/utils/time";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
+import { detectTailscale, type TailscaleInfo } from "@/utils/tailscale";
 
 
 interface ServerToDaemonEvents {
@@ -147,6 +148,10 @@ export type SupervisorTriggerData = {
   };
   researchParams?: string;
   fixStrategy?: "direct" | "pr";
+  /** Fix mode: "fix" (default) or "analyze-first" (analyze before fixing). */
+  fixMode?: "fix" | "analyze-first";
+  /** When true and fixMode is "analyze-first", auto-fix if analysis confirms the issue. */
+  analyzeAutoFix?: boolean;
   /** Max concurrent analysis/research sessions (from project config). */
   maxConcurrentAnalysis?: number;
   /** Max concurrent fix worktree sessions (from project config). */
@@ -190,13 +195,17 @@ export type SupervisorActionData = {
 export type SupervisorFixStatusData = {
   actionId: string;
   projectId: string;
-  fixStatus: "queued" | "running" | "completed" | "failed" | "cancelled";
+  fixStatus: "queued" | "running" | "completed" | "failed" | "cancelled" | "analyzed";
   fixSessionId?: string;
 };
+
+const TAILSCALE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
 export class ApiMachineClient {
   private socket!: Socket<ServerToDaemonEvents, DaemonToServerEvents>;
   private keepAliveInterval: NodeJS.Timeout | null = null;
+  private tailscaleRefreshInterval: NodeJS.Timeout | null = null;
+  private lastTailscaleInfo: TailscaleInfo | null = null;
   private rpcHandlerManager: RpcHandlerManager;
   private webhookHandler: ((data: WebhookTriggerData) => void) | null = null;
   private supervisorHandler:
@@ -546,6 +555,7 @@ export class ApiMachineClient {
         httpPort: this.machine.daemonState?.httpPort,
         startedAt: Date.now(),
         startedWithCliVersion: configuration.currentCliVersion,
+        tailscale: this.lastTailscaleInfo ?? state?.tailscale,
       }));
 
       // Register all handlers
@@ -558,12 +568,16 @@ export class ApiMachineClient {
 
       // Start keep-alive
       this.startKeepAlive();
+
+      // Start periodic Tailscale refresh
+      this.startTailscaleRefresh();
     });
 
     this.socket.on("disconnect", () => {
       logger.debug("[API MACHINE] Disconnected from server");
       this.rpcHandlerManager.onSocketDisconnect();
       this.stopKeepAlive();
+      this.stopTailscaleRefresh();
     });
 
     // Single consolidated RPC handler
@@ -670,12 +684,57 @@ export class ApiMachineClient {
     }
   }
 
+  /** Allow run.ts to seed the initial Tailscale info detected at startup. */
+  setTailscaleInfo(info: TailscaleInfo) {
+    this.lastTailscaleInfo = info;
+  }
+
+  private startTailscaleRefresh() {
+    this.stopTailscaleRefresh();
+    this.tailscaleRefreshInterval = setInterval(async () => {
+      const info = await detectTailscale();
+      if (tailscaleChanged(this.lastTailscaleInfo, info)) {
+        logger.debug(
+          `[API MACHINE] Tailscale changed: ${this.lastTailscaleInfo?.status} → ${info.status}`,
+        );
+        this.lastTailscaleInfo = info;
+        this.updateDaemonState((state) => {
+          if (!state) return { status: "running", tailscale: info };
+          return { ...state, tailscale: info };
+        });
+      }
+    }, TAILSCALE_REFRESH_MS);
+    logger.debug("[API MACHINE] Tailscale refresh started (5m interval)");
+  }
+
+  private stopTailscaleRefresh() {
+    if (this.tailscaleRefreshInterval) {
+      clearInterval(this.tailscaleRefreshInterval);
+      this.tailscaleRefreshInterval = null;
+      logger.debug("[API MACHINE] Tailscale refresh stopped");
+    }
+  }
+
   shutdown() {
     logger.debug("[API MACHINE] Shutting down");
     this.stopKeepAlive();
+    this.stopTailscaleRefresh();
     if (this.socket) {
       this.socket.close();
       logger.debug("[API MACHINE] Socket closed");
     }
   }
+}
+
+function tailscaleChanged(
+  prev: TailscaleInfo | null,
+  next: TailscaleInfo,
+): boolean {
+  if (!prev) return true;
+  return (
+    prev.status !== next.status ||
+    prev.ipv4 !== next.ipv4 ||
+    prev.ipv6 !== next.ipv6 ||
+    prev.hostname !== next.hostname
+  );
 }

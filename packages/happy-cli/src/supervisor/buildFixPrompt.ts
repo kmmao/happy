@@ -27,10 +27,13 @@ export interface FixPromptOptions {
   readonly parentBranch: string;
   readonly issueNumber?: number;
   readonly fixStrategy?: "direct" | "pr";
+  readonly fixMode?: "fix" | "analyze-first";
+  readonly analyzeAutoFix?: boolean;
 }
 
 export function buildFixPrompt(options: FixPromptOptions): string {
   const strategy = options.fixStrategy ?? "direct";
+  const isAnalyzeFirst = options.fixMode === "analyze-first";
 
   const suggestedFixSection = options.suggestedFix
     ? `
@@ -40,6 +43,10 @@ ${options.suggestedFix}
     : "";
 
   const reportUrl = `${options.serverUrl}/v1/projects/${options.projectId}/supervisor/actions/${options.actionId}/fix-status`;
+
+  if (isAnalyzeFirst) {
+    return buildAnalyzeFirstPrompt(options, suggestedFixSection, reportUrl, strategy);
+  }
 
   const processSection = strategy === "direct"
     ? buildDirectModeProcess(options, reportUrl)
@@ -76,6 +83,101 @@ ${processSection}
 After reporting, send "/exit" to end this session.
 
 Begin fixing now.`;
+}
+
+function buildAnalyzeFirstPrompt(
+  options: FixPromptOptions,
+  suggestedFixSection: string,
+  reportUrl: string,
+  fixStrategy: "direct" | "pr",
+): string {
+  const autoFix = options.analyzeAutoFix === true;
+
+  const afterAnalysisSection = autoFix
+    ? `## After Analysis: Auto-Fix (ENABLED)
+
+If your analysis concludes the issue is real and the fix is feasible (Recommendation = FIX):
+1. **Proceed to fix the issue** with minimal, targeted changes
+2. Run existing tests to ensure nothing breaks
+3. Commit: "fix: ${options.title}"
+4. ${fixStrategy === "direct"
+      ? `Push to base branch: git fetch origin ${options.parentBranch} && git rebase origin/${options.parentBranch} && git push origin ${options.branchName}:${options.parentBranch}`
+      : `Push branch and create PR: git push -u origin ${options.branchName} && gh pr create --base "${options.parentBranch}" --head "${options.branchName}" --title "fix: ${options.title}" --fill`}
+5. Report as completed:
+\`\`\`
+curl -s -X PATCH "${reportUrl}" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"fixStatus":"completed"}'
+\`\`\`
+
+If your analysis concludes the issue should NOT be fixed (Recommendation = SKIP or IGNORE):
+- **Do NOT modify any code**
+- Report as analyzed:
+\`\`\`
+curl -s -X PATCH "${reportUrl}" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"fixStatus":"analyzed"}'
+\`\`\``
+    : `## MANDATORY: Report Results (CRITICAL — do this AFTER your analysis)
+
+**Do NOT modify any code.** Your job is to investigate and report only.
+
+After completing your analysis, you MUST report back to the server.
+
+### Report as analyzed:
+\`\`\`
+curl -s -X PATCH "${reportUrl}" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"fixStatus":"analyzed"}'
+\`\`\``;
+
+  return `You are a **Project Analysis Agent** performing a deep-dive analysis on a supervisor finding.
+
+## Context
+- Project ID: ${options.projectId}
+- Action ID: ${options.actionId}
+- Repository: ${options.repoPath}
+- Category: ${options.category}
+- Severity: ${options.severity}
+
+## Worktree
+- Branch: ${options.branchName}
+- Parent branch: ${options.parentBranch}
+
+## Finding to Analyze
+**${options.title}**
+
+${options.description}
+${suggestedFixSection}
+## Your Task
+
+Perform a thorough analysis of this finding.
+
+### Analysis Steps
+1. **Verify the issue exists**: Search the actual codebase for the described problem. Check if the code patterns, file paths, and line numbers mentioned are accurate.
+2. **Assess severity**: Is the reported severity (${options.severity}) appropriate? Would you rate it differently?
+3. **Evaluate the suggested fix**: If a fix was suggested, is it feasible? Would it introduce regressions? Are there better alternatives?
+4. **Impact analysis**: What is the blast radius of this issue? What other parts of the codebase are affected?
+5. **Risk assessment**: What are the risks of fixing vs. not fixing this issue?
+
+### Output Format
+
+Write a clear, structured analysis report with these sections:
+
+**1. Issue Verification**: Does the issue actually exist? (YES / NO / PARTIALLY)
+**2. Severity Assessment**: Is the severity accurate? (CONFIRMED / OVERRATED / UNDERRATED)
+**3. Fix Feasibility**: Is the suggested fix viable? (VIABLE / NEEDS MODIFICATION / NOT VIABLE)
+**4. Recommendation**: What should be done? (FIX / SKIP / IGNORE) with clear reasoning.
+**5. Implementation Notes**: If recommending FIX, describe the approach and any caveats.
+
+${afterAnalysisSection}
+
+After reporting, send "/exit" to end this session.
+
+Begin analysis now.`;
 }
 
 function buildDirectModeProcess(options: FixPromptOptions, reportUrl: string): string {

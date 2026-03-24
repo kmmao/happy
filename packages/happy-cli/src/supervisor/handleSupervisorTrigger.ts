@@ -62,6 +62,7 @@ const fixWorktrees = new Map<
     readonly parentBranch: string;
     readonly actionId: string;
     readonly projectId: string;
+    readonly fixMode: "fix" | "analyze-first";
   }
 >();
 
@@ -142,6 +143,8 @@ export async function handleSupervisorTrigger(
     fixAction,
     researchParams,
     fixStrategy,
+    fixMode,
+    analyzeAutoFix,
     existingActions,
     maxConcurrentAnalysis,
     maxConcurrentFix,
@@ -235,6 +238,8 @@ export async function handleSupervisorTrigger(
         repoPath,
         fixAction,
         fixStrategy ?? "direct",
+        fixMode ?? "fix",
+        analyzeAutoFix ?? false,
         deps,
       );
     } else {
@@ -516,6 +521,8 @@ async function handleFixTrigger(
   repoPath: string,
   fixAction: NonNullable<SupervisorTriggerData["fixAction"]>,
   fixStrategy: "direct" | "pr",
+  fixMode: "fix" | "analyze-first",
+  analyzeAutoFix: boolean,
   deps: SupervisorHandlerDeps,
 ): Promise<boolean> {
   logger.debug(
@@ -573,6 +580,8 @@ async function handleFixTrigger(
     parentBranch: worktreeResult.parentBranch,
     issueNumber: fixAction.issueNumber,
     fixStrategy,
+    fixMode,
+    analyzeAutoFix,
   });
 
   // 4. Write prompt to temp file in the worktree
@@ -620,6 +629,7 @@ async function handleFixTrigger(
     parentBranch: worktreeResult.parentBranch,
     actionId,
     projectId,
+    fixMode,
   });
 
   logger.debug(

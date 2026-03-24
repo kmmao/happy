@@ -17,6 +17,7 @@ interface DiagnoseOptions {
   readonly parentBranch: string;
   readonly actionId: string;
   readonly projectId: string;
+  readonly fixMode?: "fix" | "analyze-first";
   readonly emitFixStatus: (data: SupervisorFixStatusData) => void;
 }
 
@@ -131,6 +132,21 @@ export async function diagnoseAndReportFixStatus(
 
   // Not merged — check if there were any commits at all
   const commitCount = await countBranchCommits(repoPath, branchName, parentBranch);
+
+  // For analyze-first sessions: no merge is expected (analysis is read-only).
+  // Report "analyzed" unless there are commits (which means auto-fix was attempted but failed).
+  if (opts.fixMode === "analyze-first" && commitCount === 0) {
+    logger.info(
+      `[FIX-DIAGNOSE] Analyze-first session ${sessionId} completed with no commits — reporting analyzed`,
+    );
+    emitFixStatus({
+      actionId,
+      projectId,
+      fixStatus: "analyzed",
+      fixSessionId: sessionId,
+    });
+    return;
+  }
 
   if (commitCount > 0) {
     logger.info(
