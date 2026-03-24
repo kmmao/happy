@@ -59,7 +59,7 @@ export class CaddyProvider implements TunnelProvider {
                   protocol: "HTTPS",
                   path: path || "/",
                   target: upstream,
-                  publicUrl: `https://${domain}${httpsPort === 443 ? "" : `:${httpsPort}`}${path || "/"}`,
+                  publicUrl: `https://${domain}${httpsPort === 443 ? "" : `:${httpsPort}`}${path && path !== "/" ? path : ""}`,
                   accessScope: "public",
                   hostname: domain,
                 });
