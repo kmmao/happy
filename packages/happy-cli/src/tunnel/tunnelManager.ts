@@ -10,14 +10,17 @@
 
 import type { TunnelState, TunnelEntry } from "@kmmao/happy-wire";
 import type { TunnelProvider, TunnelAddParams, TunnelRemoveParams, TunnelOpResult } from "./types";
+import type { UpnpProvider } from "./providers/upnp";
 import { logger } from "@/ui/logger";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 60_000;
+const UPNP_LEASE_RENEWAL_MS = 30 * 60 * 1000; // Renew UPnP leases every 30 minutes
 const DETECT_TIMEOUT_MS = 5_000;
 
 export class TunnelManager {
   private readonly providers: TunnelProvider[];
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private leaseRenewalTimer: ReturnType<typeof setInterval> | null = null;
   private lastState: TunnelState = { providers: [] };
 
   constructor(providers: TunnelProvider[]) {
@@ -88,6 +91,18 @@ export class TunnelManager {
         onChange(next);
       }
     }, intervalMs);
+
+    // Start UPnP lease renewal if UPnP provider is present
+    const upnp = this.providers.find((p) => p.name === "upnp") as UpnpProvider | undefined;
+    if (upnp && typeof upnp.renewLeases === "function") {
+      this.leaseRenewalTimer = setInterval(async () => {
+        try {
+          await upnp.renewLeases();
+        } catch (err) {
+          logger.debug(`[TUNNEL] UPnP lease renewal failed: ${String(err)}`);
+        }
+      }, UPNP_LEASE_RENEWAL_MS);
+    }
   }
 
   /** Stop periodic refresh */
@@ -95,6 +110,10 @@ export class TunnelManager {
     if (this.refreshTimer) {
       clearInterval(this.refreshTimer);
       this.refreshTimer = null;
+    }
+    if (this.leaseRenewalTimer) {
+      clearInterval(this.leaseRenewalTimer);
+      this.leaseRenewalTimer = null;
     }
   }
 }

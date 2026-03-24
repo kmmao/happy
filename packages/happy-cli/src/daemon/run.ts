@@ -48,7 +48,7 @@ import { handleWebhookTrigger } from "@/webhook/handleWebhookTrigger";
 import { handleSupervisorTrigger, cleanupFixWorktree, getFixWorktreeInfo } from "@/supervisor/handleSupervisorTrigger";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
 import { detectTailscale, detectTailscaleServe } from "@/utils/tailscale";
-import { TunnelManager, TailscaleProvider } from "@/tunnel";
+import { TunnelManager, TailscaleProvider, UpnpProvider } from "@/tunnel";
 
 
 // Prepare initial metadata
@@ -995,7 +995,7 @@ export async function startDaemon(): Promise<void> {
     logger.debug(`[DAEMON RUN] Tailscale: ${tailscaleInfo.status}, serves: ${tailscaleServes.length}`);
 
     // Detect all tunnel providers
-    const tunnelManager = new TunnelManager([new TailscaleProvider()]);
+    const tunnelManager = new TunnelManager([new TailscaleProvider(), new UpnpProvider()]);
     const tunnelState = await tunnelManager.detectAll();
     logger.debug(`[DAEMON RUN] Tunnels: ${tunnelState.providers.length} providers, ${tunnelState.providers.reduce((n, p) => n + p.entries.length, 0)} entries`);
 
