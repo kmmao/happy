@@ -22,6 +22,7 @@ import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { registerAgentHandlers } from "./rpc/registerHandlers";
 import type { Machine, MachineMetadata, DaemonState } from "./types";
 import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "../utils/tailscale";
+import type { TunnelManager } from "../tunnel";
 
 const TAILSCALE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -51,6 +52,7 @@ export class MachineClient {
   private keepAliveInterval: ReturnType<typeof setInterval> | null = null;
   private tailscaleRefreshInterval: ReturnType<typeof setInterval> | null = null;
   private lastTailscaleInfo: TailscaleInfo | null = null;
+  private tunnelManager: TunnelManager | null = null;
   private readonly token: string;
   private readonly serverUrl: string;
   private readonly onEphemeral?: (data: { type: string; [key: string]: unknown }) => void;
@@ -260,6 +262,11 @@ export class MachineClient {
     this.lastTailscaleInfo = info;
   }
 
+  /** Attach a TunnelManager for periodic tunnel state refresh. */
+  setTunnelManager(manager: TunnelManager): void {
+    this.tunnelManager = manager;
+  }
+
   shutdown(): void {
     logger.debug("[MACHINE] Shutting down");
     this.stopKeepAlive();
@@ -297,14 +304,23 @@ export class MachineClient {
         ? await detectTailscaleServe()
         : [];
       const fullInfo: TailscaleInfo = { ...info, serves };
-      if (tailscaleChanged(this.lastTailscaleInfo, fullInfo)) {
+      const tsChanged = tailscaleChanged(this.lastTailscaleInfo, fullInfo);
+      if (tsChanged) {
         logger.debug(
           `[MACHINE] Tailscale changed: ${this.lastTailscaleInfo?.status} → ${fullInfo.status}, serves: ${serves.length}`,
         );
         this.lastTailscaleInfo = fullInfo;
+      }
+      // Always refresh tunnel state (Caddy config may change independently)
+      const tunnels = this.tunnelManager ? await this.tunnelManager.detectAll() : undefined;
+      if (tsChanged || tunnels) {
         this.updateDaemonState((state) => {
-          if (!state) return { status: "running", tailscale: fullInfo };
-          return { ...state, tailscale: fullInfo };
+          if (!state) return { status: "running", tailscale: fullInfo, tunnels };
+          return {
+            ...state,
+            ...(tsChanged ? { tailscale: fullInfo } : {}),
+            ...(tunnels ? { tunnels } : {}),
+          };
         });
       }
     }, TAILSCALE_REFRESH_MS);
