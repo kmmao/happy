@@ -1347,6 +1347,13 @@ export const pl: TranslationStructure = {
     caddyRemove: "Usuń",
     caddyRemoveConfirm: ({ path }: { path: string }) => `Usunąć trasę ${path}?`,
     caddyCannotRemoveDefault: "Nie można usunąć domyślnej trasy (/)",
+    caddyAddSite: "Dodaj stronę",
+    caddyAddSiteTitle: "Dodaj stronę HTTPS",
+    caddyDomain: "Domena",
+    caddyDomainExists: "Ta domena już istnieje",
+    caddyDnsHint: "Upewnij się, że DNS wskazuje na ten serwer przed dodaniem",
+    caddyRemoveSite: "Usuń stronę",
+    caddyRemoveSiteConfirm: ({ domain }: { domain: string }) => `Usunąć stronę ${domain} i wszystkie jej trasy?`,
     caddyError: "Błąd",
   },
 

@@ -1399,6 +1399,13 @@ export const ja: TranslationStructure = {
     caddyRemove: "削除",
     caddyRemoveConfirm: ({ path }: { path: string }) => `ルート ${path} を削除しますか？`,
     caddyCannotRemoveDefault: "デフォルトルート（/）は削除できません",
+    caddyAddSite: "サイト追加",
+    caddyAddSiteTitle: "HTTPS サイト追加",
+    caddyDomain: "ドメイン",
+    caddyDomainExists: "このドメインは既に存在します",
+    caddyDnsHint: "追加前に DNS がこのサーバーを指していることを確認してください",
+    caddyRemoveSite: "サイト削除",
+    caddyRemoveSiteConfirm: ({ domain }: { domain: string }) => `サイト ${domain} とすべてのルートを削除しますか？`,
     caddyError: "エラー",
   },
 

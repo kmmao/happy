@@ -1334,6 +1334,13 @@ export const ru: TranslationStructure = {
     caddyRemove: "Удалить",
     caddyRemoveConfirm: ({ path }: { path: string }) => `Удалить маршрут ${path}?`,
     caddyCannotRemoveDefault: "Невозможно удалить маршрут по умолчанию (/)",
+    caddyAddSite: "Добавить сайт",
+    caddyAddSiteTitle: "Добавить HTTPS сайт",
+    caddyDomain: "Домен",
+    caddyDomainExists: "Этот домен уже существует",
+    caddyDnsHint: "Перед добавлением убедитесь, что DNS указывает на этот сервер",
+    caddyRemoveSite: "Удалить сайт",
+    caddyRemoveSiteConfirm: ({ domain }: { domain: string }) => `Удалить сайт ${domain} и все его маршруты?`,
     caddyError: "Ошибка",
   },
 

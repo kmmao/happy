@@ -1284,6 +1284,13 @@ export const zhHant: TranslationStructure = {
     caddyRemove: "移除",
     caddyRemoveConfirm: ({ path }: { path: string }) => `移除路由 ${path}？`,
     caddyCannotRemoveDefault: "無法移除預設路由（/）",
+    caddyAddSite: "新增站點",
+    caddyAddSiteTitle: "新增 HTTPS 站點",
+    caddyDomain: "網域",
+    caddyDomainExists: "該網域已存在",
+    caddyDnsHint: "新增前請確保 DNS 已指向此伺服器",
+    caddyRemoveSite: "刪除站點",
+    caddyRemoveSiteConfirm: ({ domain }: { domain: string }) => `刪除站點 ${domain} 及其所有路由？`,
     caddyError: "錯誤",
   },
 

@@ -1331,6 +1331,13 @@ export const en: TranslationStructure = {
     caddyRemove: "Remove",
     caddyRemoveConfirm: ({ path }: { path: string }) => `Remove route ${path}?`,
     caddyCannotRemoveDefault: "Cannot remove the default route (/)",
+    caddyAddSite: "Add Site",
+    caddyAddSiteTitle: "Add HTTPS Site",
+    caddyDomain: "Domain",
+    caddyDomainExists: "This domain already exists",
+    caddyDnsHint: "Make sure DNS points to this server before adding",
+    caddyRemoveSite: "Remove Site",
+    caddyRemoveSiteConfirm: ({ domain }: { domain: string }) => `Remove site ${domain} and all its routes?`,
     caddyError: "Error",
   },
 

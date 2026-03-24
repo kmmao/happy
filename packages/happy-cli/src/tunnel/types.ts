@@ -38,12 +38,16 @@ export interface TunnelAddParams {
   protocol?: string;
   path?: string;
   publicAccess?: boolean;
+  hostname?: string;
 }
 
 export interface TunnelRemoveParams {
   localPort?: number;
   remotePort?: number;
   path?: string;
+  hostname?: string;
+  /** Remove entire site (all routes for this hostname) */
+  removeEntireSite?: boolean;
 }
 
 export interface TunnelOpResult {

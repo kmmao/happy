@@ -1337,6 +1337,13 @@ export const pt: TranslationStructure = {
     caddyRemove: "Remover",
     caddyRemoveConfirm: ({ path }: { path: string }) => `Remover rota ${path}?`,
     caddyCannotRemoveDefault: "Não é possível remover a rota padrão (/)",
+    caddyAddSite: "Adicionar site",
+    caddyAddSiteTitle: "Adicionar site HTTPS",
+    caddyDomain: "Domínio",
+    caddyDomainExists: "Este domínio já existe",
+    caddyDnsHint: "Certifique-se de que o DNS aponta para este servidor antes de adicionar",
+    caddyRemoveSite: "Remover site",
+    caddyRemoveSiteConfirm: ({ domain }: { domain: string }) => `Remover site ${domain} e todas as suas rotas?`,
     caddyError: "Erro",
   },
 

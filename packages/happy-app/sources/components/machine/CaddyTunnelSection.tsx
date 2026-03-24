@@ -1,11 +1,13 @@
 /**
- * Caddy HTTPS reverse proxy section for the machine detail page.
- * Shows active routes and allows add/remove via Caddy Admin API.
+ * Caddy HTTPS reverse proxy section — multi-domain support.
+ * Reads from daemonState.tunnels, grouped by hostname.
+ * Operations via tunnel RPC (not machineBash).
  */
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
     Linking,
+    Pressable,
     Text,
     TextInput,
     View,
@@ -18,7 +20,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 import { isMachineOnline } from "@/utils/machineUtils";
-import { machineBash, type MachineBashResult } from "@/sync/ops";
+import { machineTunnelAdd, machineTunnelRemove } from "@/sync/ops";
 import type { Machine } from "@/sync/storageTypes";
 
 type CaddyRoute = {
@@ -50,107 +52,154 @@ export const CaddyTunnelSection = React.memo(function CaddyTunnelSection({
 
     if (!caddyProvider || caddyProvider.status !== "available") return null;
 
-    const domain = caddyProvider.metadata?.domain ?? "";
+    const domains = (caddyProvider.metadata?.domains ?? "").split(",").filter(Boolean);
     const routes: CaddyRoute[] = (caddyProvider.entries ?? []).map((e: any) => ({
         localPort: e.localPort ?? 0,
         remotePort: e.remotePort ?? 443,
         path: e.path ?? "/",
         target: e.target ?? "",
         publicUrl: e.publicUrl ?? "",
-        hostname: e.hostname ?? domain,
+        hostname: e.hostname ?? "",
     }));
 
+    // Group routes by hostname
+    const grouped = useMemo(() => {
+        const map = new Map<string, CaddyRoute[]>();
+        for (const r of routes) {
+            const list = map.get(r.hostname) ?? [];
+            list.push(r);
+            map.set(r.hostname, list);
+        }
+        return map;
+    }, [routes]);
+
     return (
-        <CaddySectionInner
-            machineId={machineId}
-            online={online}
-            domain={domain}
-            routes={routes}
-            theme={theme}
-        />
+        <>
+            {[...grouped.entries()].map(([hostname, hostRoutes]) => (
+                <CaddyDomainGroup
+                    key={hostname}
+                    machineId={machineId}
+                    hostname={hostname}
+                    routes={hostRoutes}
+                    online={online}
+                    theme={theme}
+                    allDomains={domains}
+                />
+            ))}
+            {online && (
+                <ItemGroup>
+                    <Item
+                        title={t("machine.caddyAddSite")}
+                        titleStyle={{ color: theme.colors.textLink }}
+                        icon={<Ionicons name="globe-outline" size={20} color={theme.colors.textLink} />}
+                        onPress={() => {
+                            Modal.show({
+                                component: AddCaddySiteForm,
+                                props: {
+                                    existingDomains: domains,
+                                    onSubmit: async (domain: string, localPort: number) => {
+                                        const result = await machineTunnelAdd(machineId, "caddy", {
+                                            hostname: domain,
+                                            localPort,
+                                            path: "/",
+                                        });
+                                        if (!result.success && result.error) {
+                                            Modal.alert(t("machine.caddyError"), result.error);
+                                        }
+                                    },
+                                },
+                            });
+                        }}
+                        showChevron={false}
+                    />
+                </ItemGroup>
+            )}
+        </>
     );
 });
 
-const CaddySectionInner = React.memo(function CaddySectionInner({
+// ---------------------------------------------------------------------------
+// Per-domain group
+// ---------------------------------------------------------------------------
+
+const CaddyDomainGroup = React.memo(function CaddyDomainGroup({
     machineId,
-    online,
-    domain,
+    hostname,
     routes,
+    online,
     theme,
+    allDomains,
 }: {
     machineId: string;
-    online: boolean;
-    domain: string;
+    hostname: string;
     routes: CaddyRoute[];
+    online: boolean;
     theme: any;
+    allDomains: string[];
 }) {
-    const handleRemove = useCallback(async (route: CaddyRoute) => {
-        if (!online) return;
-        if (route.path === "/") {
-            Modal.alert(t("machine.caddyError"), t("machine.caddyCannotRemoveDefault"));
-            return;
-        }
+    const httpsPort = routes[0]?.remotePort ?? 2443;
+    const baseUrl = `https://${hostname}${httpsPort === 443 ? "" : `:${httpsPort}`}`;
+
+    const handleRemoveRoute = useCallback(async (route: CaddyRoute) => {
+        if (!online || route.path === "/") return;
         const confirmed = await Modal.confirm(
             t("machine.caddyRemove"),
             t("machine.caddyRemoveConfirm", { path: route.path }),
         );
-        if (!confirmed) return;
-
-        // Call CLI tunnel remove via a daemon RPC-like bash command
-        // For now, we use curl to Caddy admin API directly from the machine
-        const cmd = `curl -sf http://127.0.0.1:2019/config/ | python3 -c "
-import json,sys
-data=json.load(sys.stdin)
-routes=data['apps']['http']['servers']['srv0']['routes'][0]['handle'][0]['routes']
-filtered=[r for r in routes if not any('${route.path}' in (p) for m in r.get('match',[]) for p in m.get('path',[]))]
-import urllib.request
-req=urllib.request.Request('http://127.0.0.1:2019/config/apps/http/servers/srv0/routes/0/handle/0/routes',data=json.dumps(filtered).encode(),headers={'Content-Type':'application/json'},method='PATCH')
-urllib.request.urlopen(req)
-print('ok')
-"`;
-        const result = await machineBash(machineId, cmd, "/");
-        if (!result.success && result.stderr) {
-            Modal.alert(t("machine.caddyError"), result.stderr);
+        if (confirmed) {
+            const result = await machineTunnelRemove(machineId, "caddy", {
+                hostname,
+                path: route.path,
+            });
+            if (!result.success && result.error) {
+                Modal.alert(t("machine.caddyError"), result.error);
+            }
         }
-    }, [machineId, online]);
+    }, [machineId, hostname, online]);
 
-    const handleAdd = useCallback(() => {
+    const handleRemoveSite = useCallback(async () => {
+        if (!online) return;
+        const confirmed = await Modal.confirm(
+            t("machine.caddyRemoveSite"),
+            t("machine.caddyRemoveSiteConfirm", { domain: hostname }),
+        );
+        if (confirmed) {
+            const result = await machineTunnelRemove(machineId, "caddy", {
+                hostname,
+                removeEntireSite: true,
+            });
+            if (!result.success && result.error) {
+                Modal.alert(t("machine.caddyError"), result.error);
+            }
+        }
+    }, [machineId, hostname, online]);
+
+    const handleAddRoute = useCallback(() => {
         if (!online) return;
         Modal.show({
             component: AddCaddyRouteForm,
             props: {
-                domain,
+                domain: hostname,
                 existingPaths: routes.map((r) => r.path),
                 onSubmit: async (localPort: number, path: string) => {
-                    // Use curl + python to add route via Caddy admin API
-                    const mountPath = path.startsWith("/") ? path : `/${path}`;
-                    const cmd = `curl -sf http://127.0.0.1:2019/config/ | python3 -c "
-import json,sys,urllib.request
-data=json.load(sys.stdin)
-routes=data['apps']['http']['servers']['srv0']['routes'][0]['handle'][0]['routes']
-new_route={'group':'group${mountPath.replace(/\//g, "_")}','handle':[{'handler':'subroute','routes':[{'handle':[{'handler':'rewrite','strip_path_prefix':'${mountPath}'}]},{'handle':[{'handler':'reverse_proxy','upstreams':[{'dial':'host.docker.internal:${localPort}'}]}]}]}],'match':[{'path':['${mountPath}','${mountPath}/*']}]}
-routes.insert(len(routes)-1,new_route)
-req=urllib.request.Request('http://127.0.0.1:2019/config/apps/http/servers/srv0/routes/0/handle/0/routes',data=json.dumps(routes).encode(),headers={'Content-Type':'application/json'},method='PATCH')
-urllib.request.urlopen(req)
-print('ok')
-"`;
-                    const result = await machineBash(machineId, cmd, "/");
-                    if (!result.success && result.stderr) {
-                        Modal.alert(t("machine.caddyError"), result.stderr);
+                    const result = await machineTunnelAdd(machineId, "caddy", {
+                        hostname,
+                        localPort,
+                        path,
+                    });
+                    if (!result.success && result.error) {
+                        Modal.alert(t("machine.caddyError"), result.error);
                     }
                 },
             },
         });
-    }, [machineId, online, domain, routes]);
+    }, [machineId, hostname, online, routes]);
 
     return (
         <ItemGroup
-            title={t("machine.caddyTitle")}
-            footer={domain ? `https://${domain}` : undefined}
+            title={`🔒 ${hostname}`}
+            footer={baseUrl}
         >
-            {routes.length === 0 && (
-                <Item title={t("machine.caddyEmpty")} showChevron={false} />
-            )}
             {routes.map((route) => {
                 const pathLabel = route.path === "/" ? "/" : route.path;
                 const url = route.publicUrl;
@@ -168,13 +217,11 @@ print('ok')
                         rightElement={
                             <View style={{ flexDirection: "row", alignItems: "center" }}>
                                 <Ionicons name="lock-closed" size={12} color={theme.colors.success} style={{ marginRight: 4 }} />
-                                <Text style={{ fontSize: 14, color: theme.colors.success }}>
-                                    HTTPS
-                                </Text>
+                                <Text style={{ fontSize: 14, color: theme.colors.success }}>HTTPS</Text>
                             </View>
                         }
                         onPress={() => Linking.openURL(url)}
-                        onLongPress={online && route.path !== "/" ? () => handleRemove(route) : undefined}
+                        onLongPress={online && route.path !== "/" ? () => handleRemoveRoute(route) : undefined}
                         showChevron={false}
                     />
                 );
@@ -183,15 +230,18 @@ print('ok')
                 <Item
                     title={t("machine.caddyAdd")}
                     titleStyle={{ color: theme.colors.textLink }}
-                    icon={
-                        <Ionicons
-                            name="add-circle-outline"
-                            size={20}
-                            color={theme.colors.textLink}
-                        />
-                    }
-                    onPress={handleAdd}
+                    icon={<Ionicons name="add-circle-outline" size={20} color={theme.colors.textLink} />}
+                    onPress={handleAddRoute}
                     showChevron={false}
+                />
+            )}
+            {online && (
+                <Item
+                    title={t("machine.caddyRemoveSite")}
+                    titleStyle={{ color: theme.colors.textSecondary, fontSize: 13 }}
+                    onPress={handleRemoveSite}
+                    showChevron={false}
+                    destructive
                 />
             )}
         </ItemGroup>
@@ -218,30 +268,14 @@ function AddCaddyRouteForm({ onClose, onSubmit, domain, existingPaths }: {
     const isPathDuplicate = existingPaths.includes(path.trim());
     const isValid = isPortValid && isPathValid && !isPathDuplicate;
 
-    const handleSubmit = () => {
-        if (!isValid) return;
-        onSubmit(localPort, path.trim());
-        onClose();
-    };
-
     return (
-        <View style={[formStyles.card, {
-            backgroundColor: theme.colors.surface,
-            shadowColor: theme.colors.shadow.color,
-        }]}>
-            <Text style={[formStyles.title, { color: theme.colors.text }]}>
-                {t("machine.caddyAddTitle")}
-            </Text>
+        <View style={[formStyles.card, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow.color }]}>
+            <Text style={[formStyles.title, { color: theme.colors.text }]}>{t("machine.caddyAddTitle")}</Text>
+            <Text style={[formStyles.domainBadge, { color: theme.colors.textSecondary }]}>{domain}</Text>
 
-            <Text style={[formStyles.label, { color: theme.colors.text }]}>
-                {t("machine.caddyLocalPort")}
-            </Text>
+            <Text style={[formStyles.label, { color: theme.colors.text }]}>{t("machine.caddyLocalPort")}</Text>
             <TextInput
-                style={[formStyles.input, {
-                    borderColor: theme.colors.divider,
-                    color: theme.colors.text,
-                    backgroundColor: theme.colors.surfaceHigh,
-                }]}
+                style={[formStyles.input, { borderColor: theme.colors.divider, color: theme.colors.text, backgroundColor: theme.colors.surfaceHigh }]}
                 value={localPortText}
                 onChangeText={setLocalPortText}
                 placeholder="3000"
@@ -250,15 +284,9 @@ function AddCaddyRouteForm({ onClose, onSubmit, domain, existingPaths }: {
                 autoFocus
             />
 
-            <Text style={[formStyles.label, { color: theme.colors.text }]}>
-                {t("machine.caddyPath")}
-            </Text>
+            <Text style={[formStyles.label, { color: theme.colors.text }]}>{t("machine.caddyPath")}</Text>
             <TextInput
-                style={[formStyles.input, {
-                    borderColor: isPathDuplicate ? theme.colors.accentOrange : theme.colors.divider,
-                    color: theme.colors.text,
-                    backgroundColor: theme.colors.surfaceHigh,
-                }]}
+                style={[formStyles.input, { borderColor: isPathDuplicate ? theme.colors.accentOrange : theme.colors.divider, color: theme.colors.text, backgroundColor: theme.colors.surfaceHigh }]}
                 value={path}
                 onChangeText={setPath}
                 placeholder="/api"
@@ -267,9 +295,7 @@ function AddCaddyRouteForm({ onClose, onSubmit, domain, existingPaths }: {
                 autoCorrect={false}
             />
             {isPathDuplicate && (
-                <Text style={{ fontSize: 12, color: theme.colors.accentOrange, marginTop: 4 }}>
-                    {t("machine.caddyPathDuplicate")}
-                </Text>
+                <Text style={{ fontSize: 12, color: theme.colors.accentOrange, marginTop: 4 }}>{t("machine.caddyPathDuplicate")}</Text>
             )}
 
             {isPortValid && (
@@ -283,63 +309,89 @@ function AddCaddyRouteForm({ onClose, onSubmit, domain, existingPaths }: {
             <View style={formStyles.actions}>
                 <RoundButton title={t("common.cancel")} onPress={onClose} size="normal" />
                 <View style={{ width: 12 }} />
-                <RoundButton
-                    title={t("machine.caddyAdd")}
-                    onPress={handleSubmit}
-                    size="normal"
-                    disabled={!isValid}
-                    display="inverted"
-                />
+                <RoundButton title={t("machine.caddyAdd")} onPress={() => { if (isValid) { onSubmit(localPort, path.trim()); onClose(); } }} size="normal" disabled={!isValid} display="inverted" />
+            </View>
+        </View>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// AddCaddySiteForm — create new domain
+// ---------------------------------------------------------------------------
+
+function AddCaddySiteForm({ onClose, onSubmit, existingDomains }: {
+    onClose: () => void;
+    onSubmit: (domain: string, localPort: number) => void;
+    existingDomains: string[];
+}) {
+    const { theme } = useUnistyles();
+    const [domain, setDomain] = useState("");
+    const [localPortText, setLocalPortText] = useState("");
+
+    const localPort = parseInt(localPortText, 10);
+    const isPortValid = Number.isInteger(localPort) && localPort >= 1 && localPort <= 65535;
+    const isDomainValid = domain.trim().length > 0 && domain.includes(".");
+    const isDomainDuplicate = existingDomains.includes(domain.trim());
+    const isValid = isPortValid && isDomainValid && !isDomainDuplicate;
+
+    return (
+        <View style={[formStyles.card, { backgroundColor: theme.colors.surface, shadowColor: theme.colors.shadow.color }]}>
+            <Text style={[formStyles.title, { color: theme.colors.text }]}>{t("machine.caddyAddSiteTitle")}</Text>
+
+            <Text style={[formStyles.label, { color: theme.colors.text }]}>{t("machine.caddyDomain")}</Text>
+            <TextInput
+                style={[formStyles.input, { borderColor: isDomainDuplicate ? theme.colors.accentOrange : theme.colors.divider, color: theme.colors.text, backgroundColor: theme.colors.surfaceHigh }]}
+                value={domain}
+                onChangeText={setDomain}
+                placeholder="api.xycloud.info"
+                placeholderTextColor={theme.colors.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus
+            />
+            {isDomainDuplicate && (
+                <Text style={{ fontSize: 12, color: theme.colors.accentOrange, marginTop: 4 }}>{t("machine.caddyDomainExists")}</Text>
+            )}
+
+            <Text style={[formStyles.label, { color: theme.colors.text }]}>{t("machine.caddyLocalPort")}</Text>
+            <TextInput
+                style={[formStyles.input, { borderColor: theme.colors.divider, color: theme.colors.text, backgroundColor: theme.colors.surfaceHigh }]}
+                value={localPortText}
+                onChangeText={setLocalPortText}
+                placeholder="3000"
+                placeholderTextColor={theme.colors.textSecondary}
+                keyboardType="number-pad"
+            />
+
+            <Text style={[formStyles.hint, { color: theme.colors.textSecondary }]}>
+                {t("machine.caddyDnsHint")}
+            </Text>
+
+            {isValid && (
+                <View style={[formStyles.previewBox, { backgroundColor: theme.colors.surfaceHigh }]}>
+                    <Text style={[formStyles.previewText, { color: theme.colors.textSecondary }]}>
+                        {`https://${domain.trim()} → localhost:${localPort}`}
+                    </Text>
+                </View>
+            )}
+
+            <View style={formStyles.actions}>
+                <RoundButton title={t("common.cancel")} onPress={onClose} size="normal" />
+                <View style={{ width: 12 }} />
+                <RoundButton title={t("machine.caddyAddSite")} onPress={() => { if (isValid) { onSubmit(domain.trim(), localPort); onClose(); } }} size="normal" disabled={!isValid} display="inverted" />
             </View>
         </View>
     );
 }
 
 const formStyles = StyleSheet.create({
-    card: {
-        borderRadius: 14,
-        padding: 20,
-        width: 320,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
-    },
-    title: {
-        fontSize: 17,
-        fontWeight: "600",
-        textAlign: "center",
-        marginBottom: 16,
-    },
-    label: {
-        fontSize: 13,
-        fontWeight: "500",
-        marginTop: 14,
-        marginBottom: 6,
-    },
-    input: {
-        borderWidth: 1,
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        fontSize: 15,
-    },
-    previewBox: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        marginTop: 14,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-    },
-    previewText: {
-        fontSize: 12,
-        fontFamily: "Menlo",
-    },
-    actions: {
-        flexDirection: "row",
-        justifyContent: "center",
-        marginTop: 18,
-    },
+    card: { borderRadius: 14, padding: 20, width: 320, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
+    title: { fontSize: 17, fontWeight: "600", textAlign: "center", marginBottom: 4 },
+    domainBadge: { fontSize: 13, textAlign: "center", marginBottom: 12, fontFamily: "Menlo" },
+    label: { fontSize: 13, fontWeight: "500", marginTop: 14, marginBottom: 6 },
+    hint: { fontSize: 11, marginTop: 8 },
+    input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
+    previewBox: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 14, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
+    previewText: { fontSize: 12, fontFamily: "Menlo" },
+    actions: { flexDirection: "row", justifyContent: "center", marginTop: 18 },
 });

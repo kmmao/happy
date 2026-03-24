@@ -1,8 +1,8 @@
 /**
  * Caddy tunnel provider — uses Caddy Admin API for HTTPS reverse proxy management.
  *
- * Caddy automatically handles Let's Encrypt certificates.
- * Routes are managed via the Caddy REST API (default: localhost:2019).
+ * Supports multiple domains. Each domain is a separate route in Caddy's config
+ * with its own host matcher and subroute handlers.
  */
 
 import type { TunnelProviderInfo, TunnelEntry } from "@kmmao/happy-wire";
@@ -29,33 +29,44 @@ export class CaddyProvider implements TunnelProvider {
       }
 
       const servers = config?.apps?.http?.servers ?? {};
-      const entries: TunnelEntry[] = [];
       const httpsPort = config?.apps?.http?.https_port ?? 443;
+      const entries: TunnelEntry[] = [];
+      const domains: string[] = [];
 
       for (const [_name, server] of Object.entries(servers) as [string, any][]) {
-        const routes = server?.routes ?? [];
-        // Extract domain from terminal_host match
-        const domain = extractDomain(routes);
+        const routes: any[] = server?.routes ?? [];
 
-        // Walk all routes to find reverse_proxy handlers, deduplicate by path+target
-        const seen = new Set<string>();
-        walkRoutes(routes, "", (path, upstream) => {
-          const key = `${path}|${upstream}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          const port = extractPort(upstream);
-          entries.push({
-            provider: this.name,
-            localPort: port,
-            remotePort: httpsPort,
-            protocol: "HTTPS",
-            path: path || "/",
-            target: upstream,
-            publicUrl: `https://${domain}${httpsPort === 443 ? "" : `:${httpsPort}`}${path || "/"}`,
-            accessScope: "public",
-            hostname: domain,
-          });
-        });
+        for (const route of routes) {
+          // Extract domain from host match
+          const hostMatch = (route?.match ?? []).find((m: any) => m?.host?.length > 0);
+          const domain = hostMatch?.host?.[0] ?? "localhost";
+          if (!domains.includes(domain)) domains.push(domain);
+
+          // Walk subroute handlers for this domain
+          const handlers = route?.handle ?? [];
+          const seen = new Set<string>();
+
+          for (const handler of handlers) {
+            if (handler.handler === "subroute") {
+              walkRoutes(handler.routes ?? [], "", (path, upstream) => {
+                const key = `${domain}|${path}|${upstream}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+                entries.push({
+                  provider: this.name,
+                  localPort: extractPort(upstream),
+                  remotePort: httpsPort,
+                  protocol: "HTTPS",
+                  path: path || "/",
+                  target: upstream,
+                  publicUrl: `https://${domain}${httpsPort === 443 ? "" : `:${httpsPort}`}${path || "/"}`,
+                  accessScope: "public",
+                  hostname: domain,
+                });
+              });
+            }
+          }
+        }
       }
 
       return {
@@ -64,7 +75,7 @@ export class CaddyProvider implements TunnelProvider {
         entries,
         metadata: {
           adminUrl: this.adminUrl,
-          ...(entries[0]?.hostname ? { domain: entries[0].hostname } : {}),
+          domains: domains.join(","),
         },
       };
     } catch (err) {
@@ -80,60 +91,56 @@ export class CaddyProvider implements TunnelProvider {
   }
 
   async add(params: TunnelAddParams): Promise<TunnelOpResult> {
-    // Read current Caddyfile, append new route, reload
-    // Caddy API approach: POST a new route to the config
-    const { localPort, path } = params;
+    const { localPort, path, hostname } = params;
+    if (!hostname) return { success: false, error: "hostname required" };
     const mountPath = path && path !== "/" ? path : "";
 
     try {
-      // Get current config to find the domain and server
       const config = await this.apiGet("/config/");
       const servers = config?.apps?.http?.servers ?? {};
       const serverName = Object.keys(servers)[0];
       if (!serverName) return { success: false, error: "No Caddy server configured" };
 
-      const routes = servers[serverName]?.routes ?? [];
-      if (routes.length === 0) return { success: false, error: "No routes configured" };
+      const routes: any[] = servers[serverName]?.routes ?? [];
 
-      // Find the main route (first one with subroute handler)
-      const mainRoute = routes[0];
-      const subroute = mainRoute?.handle?.[0];
-      if (!subroute || subroute.handler !== "subroute") {
-        return { success: false, error: "Unexpected Caddy config structure" };
-      }
-
-      // Build new route entry
-      const newRoute = mountPath
-        ? {
-            group: `group_${mountPath.replace(/\//g, "_")}`,
-            handle: [{
-              handler: "subroute",
-              routes: [
-                { handle: [{ handler: "rewrite", strip_path_prefix: mountPath }] },
-                { handle: [{ handler: "reverse_proxy", upstreams: [{ dial: `host.docker.internal:${localPort}` }] }] },
-              ],
-            }],
-            match: [{ path: [`${mountPath}`, `${mountPath}/*`] }],
-          }
-        : {
-            handle: [{
-              handler: "subroute",
-              routes: [
-                { handle: [{ handler: "reverse_proxy", upstreams: [{ dial: `host.docker.internal:${localPort}` }] }] },
-              ],
-            }],
-          };
-
-      // Insert before the last (default) route
-      const existingRoutes = subroute.routes ?? [];
-      const insertIdx = mountPath ? existingRoutes.length - 1 : existingRoutes.length;
-      existingRoutes.splice(Math.max(0, insertIdx), 0, newRoute);
-
-      // PATCH the routes
-      await this.apiPatch(
-        `/config/apps/http/servers/${serverName}/routes/0/handle/0/routes`,
-        existingRoutes,
+      // Find existing route for this hostname
+      const routeIdx = routes.findIndex((r: any) =>
+        (r?.match ?? []).some((m: any) => (m?.host ?? []).includes(hostname)),
       );
+
+      if (routeIdx >= 0) {
+        // Add path to existing domain
+        const subroute = routes[routeIdx]?.handle?.[0];
+        if (!subroute || subroute.handler !== "subroute") {
+          return { success: false, error: "Unexpected config structure" };
+        }
+
+        const subRoutes: any[] = subroute.routes ?? [];
+        const newRoute = buildPathRoute(mountPath, localPort);
+        // Insert before last (default) route
+        const insertIdx = mountPath ? Math.max(0, subRoutes.length - 1) : subRoutes.length;
+        subRoutes.splice(insertIdx, 0, newRoute);
+
+        await this.apiPatch(
+          `/config/apps/http/servers/${serverName}/routes/${routeIdx}/handle/0/routes`,
+          subRoutes,
+        );
+      } else {
+        // Create new domain site
+        const tlsPolicy = this.extractTlsPolicy(config);
+        const newSiteRoute = buildSiteRoute(hostname, localPort, mountPath);
+        routes.push(newSiteRoute);
+
+        await this.apiPatch(
+          `/config/apps/http/servers/${serverName}/routes`,
+          routes,
+        );
+
+        // Add TLS automation policy for new domain if we have a template
+        if (tlsPolicy) {
+          await this.addTlsPolicy(config, hostname);
+        }
+      }
 
       return { success: true };
     } catch (err) {
@@ -143,8 +150,8 @@ export class CaddyProvider implements TunnelProvider {
   }
 
   async remove(params: TunnelRemoveParams): Promise<TunnelOpResult> {
-    const { path } = params;
-    if (!path || path === "/") return { success: false, error: "Cannot remove the default route" };
+    const { path, hostname, removeEntireSite } = params;
+    if (!hostname) return { success: false, error: "hostname required" };
 
     try {
       const config = await this.apiGet("/config/");
@@ -152,28 +159,47 @@ export class CaddyProvider implements TunnelProvider {
       const serverName = Object.keys(servers)[0];
       if (!serverName) return { success: false, error: "No server" };
 
-      const mainRoute = servers[serverName]?.routes?.[0];
-      const subroute = mainRoute?.handle?.[0];
-      if (!subroute) return { success: false, error: "No subroute" };
-
-      const routes: any[] = subroute.routes ?? [];
-      const filtered = routes.filter((r: any) => {
-        const matchers = r?.match ?? [];
-        for (const m of matchers) {
-          const paths: string[] = m?.path ?? [];
-          if (paths.includes(path) || paths.includes(`${path}/*`)) return false;
-        }
-        return true;
-      });
-
-      if (filtered.length === routes.length) {
-        return { success: false, error: `Route ${path} not found` };
-      }
-
-      await this.apiPatch(
-        `/config/apps/http/servers/${serverName}/routes/0/handle/0/routes`,
-        filtered,
+      const routes: any[] = servers[serverName]?.routes ?? [];
+      const routeIdx = routes.findIndex((r: any) =>
+        (r?.match ?? []).some((m: any) => (m?.host ?? []).includes(hostname)),
       );
+
+      if (routeIdx < 0) return { success: false, error: `Domain ${hostname} not found` };
+
+      if (removeEntireSite) {
+        // Remove entire domain route
+        routes.splice(routeIdx, 1);
+        await this.apiPatch(
+          `/config/apps/http/servers/${serverName}/routes`,
+          routes,
+        );
+        // Clean up TLS policy
+        await this.removeTlsPolicy(config, hostname);
+      } else {
+        // Remove single path from domain
+        if (!path || path === "/") return { success: false, error: "Cannot remove default route" };
+
+        const subroute = routes[routeIdx]?.handle?.[0];
+        if (!subroute) return { success: false, error: "No subroute" };
+
+        const subRoutes: any[] = subroute.routes ?? [];
+        const filtered = subRoutes.filter((r: any) => {
+          for (const m of r?.match ?? []) {
+            const paths: string[] = m?.path ?? [];
+            if (paths.includes(path) || paths.includes(`${path}/*`)) return false;
+          }
+          return true;
+        });
+
+        if (filtered.length === subRoutes.length) {
+          return { success: false, error: `Route ${path} not found` };
+        }
+
+        await this.apiPatch(
+          `/config/apps/http/servers/${serverName}/routes/${routeIdx}/handle/0/routes`,
+          filtered,
+        );
+      }
 
       return { success: true };
     } catch (err) {
@@ -182,7 +208,51 @@ export class CaddyProvider implements TunnelProvider {
     }
   }
 
-  // Caddy routes are always public HTTPS — no toggle needed
+  // ---------------------------------------------------------------------------
+  // TLS policy management
+  // ---------------------------------------------------------------------------
+
+  private extractTlsPolicy(config: any): any | null {
+    const policies: any[] = config?.apps?.tls?.automation?.policies ?? [];
+    // Find a policy with DNS challenge (cloudflare)
+    return policies.find((p: any) =>
+      p?.issuers?.some((i: any) => i?.challenges?.dns),
+    ) ?? null;
+  }
+
+  private async addTlsPolicy(config: any, hostname: string): Promise<void> {
+    try {
+      const policies: any[] = config?.apps?.tls?.automation?.policies ?? [];
+      const template = this.extractTlsPolicy(config);
+      if (!template) return;
+
+      // Clone template with new hostname
+      const newPolicy = JSON.parse(JSON.stringify(template));
+      newPolicy.subjects = [hostname];
+      policies.push(newPolicy);
+
+      await this.apiPatch("/config/apps/tls/automation/policies", policies);
+      logger.debug(`[TUNNEL:caddy] Added TLS policy for ${hostname}`);
+    } catch (err) {
+      logger.debug(`[TUNNEL:caddy] TLS policy add failed (non-fatal): ${String(err)}`);
+    }
+  }
+
+  private async removeTlsPolicy(config: any, hostname: string): Promise<void> {
+    try {
+      const policies: any[] = config?.apps?.tls?.automation?.policies ?? [];
+      const filtered = policies.filter((p: any) => {
+        const subjects: string[] = p?.subjects ?? [];
+        return !subjects.includes(hostname);
+      });
+      if (filtered.length < policies.length) {
+        await this.apiPatch("/config/apps/tls/automation/policies", filtered);
+        logger.debug(`[TUNNEL:caddy] Removed TLS policy for ${hostname}`);
+      }
+    } catch (err) {
+      logger.debug(`[TUNNEL:caddy] TLS policy remove failed (non-fatal): ${String(err)}`);
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Admin API helpers
@@ -231,19 +301,61 @@ export class CaddyProvider implements TunnelProvider {
 }
 
 // ---------------------------------------------------------------------------
-// Config parsing helpers
+// Route builders
 // ---------------------------------------------------------------------------
 
-function extractDomain(routes: any[]): string {
-  for (const route of routes) {
-    const matchers = route?.match ?? [];
-    for (const m of matchers) {
-      const hosts: string[] = m?.host ?? [];
-      if (hosts.length > 0) return hosts[0];
-    }
+function buildPathRoute(mountPath: string, localPort: number): any {
+  if (mountPath) {
+    return {
+      group: `group_${mountPath.replace(/\//g, "_")}`,
+      handle: [{
+        handler: "subroute",
+        routes: [
+          { handle: [{ handler: "rewrite", strip_path_prefix: mountPath }] },
+          { handle: [{ handler: "reverse_proxy", upstreams: [{ dial: `host.docker.internal:${localPort}` }] }] },
+        ],
+      }],
+      match: [{ path: [mountPath, `${mountPath}/*`] }],
+    };
   }
-  return "localhost";
+  return {
+    handle: [{
+      handler: "subroute",
+      routes: [
+        { handle: [{ handler: "reverse_proxy", upstreams: [{ dial: `host.docker.internal:${localPort}` }] }] },
+      ],
+    }],
+  };
 }
+
+function buildSiteRoute(hostname: string, localPort: number, mountPath: string): any {
+  const subRoutes = [];
+  if (mountPath) {
+    subRoutes.push(buildPathRoute(mountPath, localPort));
+  }
+  // Default route
+  subRoutes.push({
+    handle: [{
+      handler: "subroute",
+      routes: [
+        { handle: [{ handler: "reverse_proxy", upstreams: [{ dial: `host.docker.internal:${localPort}` }] }] },
+      ],
+    }],
+  });
+
+  return {
+    match: [{ host: [hostname] }],
+    handle: [{
+      handler: "subroute",
+      routes: subRoutes,
+    }],
+    terminal: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Config parsing helpers
+// ---------------------------------------------------------------------------
 
 function extractPort(dial: string): number {
   const match = dial.match(/:(\d+)$/);
@@ -256,12 +368,9 @@ function walkRoutes(
   onProxy: (path: string, upstream: string) => void,
 ): void {
   for (const route of routes) {
-    // Check for path matcher
     let routePath = currentPath;
-    const matchers = route?.match ?? [];
-    for (const m of matchers) {
+    for (const m of route?.match ?? []) {
       const paths: string[] = m?.path ?? [];
-      // Prefer non-wildcard path, fallback to stripping /* from wildcard
       const nonWild = paths.find((p: string) => !p.endsWith("/*"));
       if (nonWild) {
         routePath = nonWild;
@@ -271,8 +380,7 @@ function walkRoutes(
       }
     }
 
-    const handlers = route?.handle ?? [];
-    for (const handler of handlers) {
+    for (const handler of route?.handle ?? []) {
       if (handler.handler === "reverse_proxy") {
         const upstreams = handler.upstreams ?? [];
         if (upstreams.length > 0) {

@@ -1339,6 +1339,13 @@ export const ca: TranslationStructure = {
     caddyRemove: "Eliminar",
     caddyRemoveConfirm: ({ path }: { path: string }) => `Eliminar la ruta ${path}?`,
     caddyCannotRemoveDefault: "No es pot eliminar la ruta predeterminada (/)",
+    caddyAddSite: "Afegir lloc",
+    caddyAddSiteTitle: "Afegir lloc HTTPS",
+    caddyDomain: "Domini",
+    caddyDomainExists: "Aquest domini ja existeix",
+    caddyDnsHint: "Assegureu-vos que el DNS apunti a aquest servidor abans d'afegir",
+    caddyRemoveSite: "Eliminar lloc",
+    caddyRemoveSiteConfirm: ({ domain }: { domain: string }) => `Eliminar el lloc ${domain} i totes les seves rutes?`,
     caddyError: "Error",
   },
 

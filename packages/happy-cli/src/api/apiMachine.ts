@@ -336,6 +336,46 @@ export class ApiMachineClient {
           "Daemon stop request acknowledged, starting shutdown sequence...",
       };
     });
+
+    // Register tunnel RPC handlers
+    this.rpcHandlerManager.registerHandler("tunnel-detect", async () => {
+      if (!this.tunnelManager) return { success: false, error: "TunnelManager not available" };
+      const state = await this.tunnelManager.detectAll();
+      return { success: true, state };
+    });
+
+    this.rpcHandlerManager.registerHandler("tunnel-add", async (params: any) => {
+      if (!this.tunnelManager) return { success: false, error: "TunnelManager not available" };
+      const { provider, ...addParams } = params;
+      if (!provider) return { success: false, error: "provider required" };
+      const result = await this.tunnelManager.add(provider, addParams);
+      // Refresh state after mutation
+      if (result.success) {
+        const tunnels = await this.tunnelManager.detectAll();
+        this.updateDaemonState((state) => ({
+          ...state,
+          status: state?.status ?? "running",
+          tunnels,
+        }));
+      }
+      return result;
+    });
+
+    this.rpcHandlerManager.registerHandler("tunnel-remove", async (params: any) => {
+      if (!this.tunnelManager) return { success: false, error: "TunnelManager not available" };
+      const { provider, ...removeParams } = params;
+      if (!provider) return { success: false, error: "provider required" };
+      const result = await this.tunnelManager.remove(provider, removeParams);
+      if (result.success) {
+        const tunnels = await this.tunnelManager.detectAll();
+        this.updateDaemonState((state) => ({
+          ...state,
+          status: state?.status ?? "running",
+          tunnels,
+        }));
+      }
+      return result;
+    });
   }
 
   /**

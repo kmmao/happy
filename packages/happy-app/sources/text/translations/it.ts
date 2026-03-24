@@ -1417,6 +1417,13 @@ export const it: TranslationStructure = {
     caddyRemove: "Rimuovi",
     caddyRemoveConfirm: ({ path }: { path: string }) => `Rimuovere la rotta ${path}?`,
     caddyCannotRemoveDefault: "Impossibile rimuovere la rotta predefinita (/)",
+    caddyAddSite: "Aggiungi sito",
+    caddyAddSiteTitle: "Aggiungi sito HTTPS",
+    caddyDomain: "Dominio",
+    caddyDomainExists: "Questo dominio esiste già",
+    caddyDnsHint: "Assicurarsi che il DNS punti a questo server prima di aggiungere",
+    caddyRemoveSite: "Rimuovi sito",
+    caddyRemoveSiteConfirm: ({ domain }: { domain: string }) => `Rimuovere il sito ${domain} e tutte le sue rotte?`,
     caddyError: "Errore",
   },
 

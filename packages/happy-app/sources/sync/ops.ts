@@ -430,6 +430,56 @@ export async function machineUpnpStatus(
     return machineBash(machineId, "upnpc -l", "/");
 }
 
+// ---------------------------------------------------------------------------
+// Tunnel RPC (provider-agnostic, used by Caddy/UPnP/etc)
+// ---------------------------------------------------------------------------
+
+export interface TunnelRpcResult {
+    success: boolean;
+    error?: string;
+    state?: any;
+}
+
+export async function machineTunnelAdd(
+    machineId: string,
+    provider: string,
+    params: { localPort: number; path?: string; hostname?: string; remotePort?: number; protocol?: string; publicAccess?: boolean },
+): Promise<TunnelRpcResult> {
+    try {
+        return await apiSocket.machineRPC<TunnelRpcResult, any>(
+            machineId, "tunnel-add", { provider, ...params },
+        );
+    } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+    }
+}
+
+export async function machineTunnelRemove(
+    machineId: string,
+    provider: string,
+    params: { path?: string; hostname?: string; remotePort?: number; removeEntireSite?: boolean },
+): Promise<TunnelRpcResult> {
+    try {
+        return await apiSocket.machineRPC<TunnelRpcResult, any>(
+            machineId, "tunnel-remove", { provider, ...params },
+        );
+    } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+    }
+}
+
+export async function machineTunnelDetect(
+    machineId: string,
+): Promise<TunnelRpcResult> {
+    try {
+        return await apiSocket.machineRPC<TunnelRpcResult, any>(
+            machineId, "tunnel-detect", {},
+        );
+    } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+    }
+}
+
 /** Allowed signals for machineKillProcess — whitelist to prevent abuse. */
 const KILL_SIGNALS = new Set(["SIGTERM", "SIGKILL", "SIGINT"]);
 
