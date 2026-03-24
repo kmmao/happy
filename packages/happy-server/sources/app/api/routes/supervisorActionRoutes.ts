@@ -28,7 +28,7 @@ export function supervisorActionRoutes(app: Fastify) {
                             .enum(["pending", "approved", "skipped", "ignored"])
                             .optional(),
                         view: z
-                            .enum(["approved", "fixing", "analyzing", "done", "dismissed"])
+                            .enum(["approved", "fixing", "analyzing", "analyzed", "done", "dismissed"])
                             .optional(),
                         category: z.string().optional(),
                         runId: z.string().optional(),
@@ -81,9 +81,12 @@ export function supervisorActionRoutes(app: Fastify) {
                 where.approval = "approved";
                 where.fixStatus = { in: ["pending", "running"] };
                 where.fixMode = "analyze-first";
+            } else if (view === "analyzed") {
+                where.approval = "approved";
+                where.fixStatus = "analyzed";
             } else if (view === "done") {
                 where.approval = "approved";
-                where.fixStatus = { in: ["completed", "failed", "analyzed"] };
+                where.fixStatus = { in: ["completed", "failed"] };
             } else if (view === "dismissed") {
                 where.approval = { in: ["skipped", "ignored"] };
             } else if (approval) {
@@ -91,7 +94,7 @@ export function supervisorActionRoutes(app: Fastify) {
             }
 
             // Sort by updatedAt for done/fixing/analyzing views (shows latest status change first)
-            const orderBy = (view === "done" || view === "fixing" || view === "analyzing")
+            const orderBy = (view === "done" || view === "fixing" || view === "analyzing" || view === "analyzed")
                 ? { updatedAt: "desc" as const }
                 : { createdAt: "desc" as const };
 
