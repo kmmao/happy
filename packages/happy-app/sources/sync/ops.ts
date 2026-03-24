@@ -350,33 +350,45 @@ function validatePort(port: number): void {
 
 export async function machineTailscaleServeAdd(
     machineId: string,
-    port: number,
+    localPort: number,
+    httpsPort: number,
+    path: string,
     funnel: boolean,
 ): Promise<MachineBashResult> {
-    validatePort(port);
+    validatePort(localPort);
+    validatePort(httpsPort);
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    const pathFlag = normalizedPath === "/" ? "" : ` --set-path=${normalizedPath}`;
+    const target = `http://localhost:${localPort}`;
     const cmd = funnel
-        ? `tailscale funnel --bg ${port}`
-        : `tailscale serve --bg ${port}`;
+        ? `tailscale funnel --bg --https=${httpsPort}${pathFlag} ${target}`
+        : `tailscale serve --bg --https=${httpsPort}${pathFlag} ${target}`;
     return machineBash(machineId, cmd, "/");
 }
 
 export async function machineTailscaleServeRemove(
     machineId: string,
     port: number,
+    path?: string,
 ): Promise<MachineBashResult> {
     validatePort(port);
-    return machineBash(machineId, `tailscale serve --https=${port} off`, "/");
+    const pathFlag = path && path !== "/" ? ` --set-path=${path}` : "";
+    return machineBash(machineId, `tailscale serve --https=${port}${pathFlag} off`, "/");
 }
 
 export async function machineTailscaleFunnelToggle(
     machineId: string,
-    port: number,
+    httpsPort: number,
     enable: boolean,
+    target: string,
+    path?: string,
 ): Promise<MachineBashResult> {
-    validatePort(port);
-    const cmd = enable
-        ? `tailscale funnel --bg ${port}`
-        : `tailscale funnel --bg --https=${port} off`;
+    validatePort(httpsPort);
+    const pathFlag = path && path !== "/" ? ` --set-path=${path}` : "";
+    // Enable: re-create via `tailscale funnel` (adds funnel flag)
+    // Disable: re-create via `tailscale serve` (removes funnel flag, keeps serve)
+    const base = enable ? "tailscale funnel" : "tailscale serve";
+    const cmd = `${base} --bg --https=${httpsPort}${pathFlag} ${target}`;
     return machineBash(machineId, cmd, "/");
 }
 
