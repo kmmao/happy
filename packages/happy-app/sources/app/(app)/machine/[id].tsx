@@ -17,7 +17,7 @@ import { Typography } from "@/constants/Typography";
 import { useSessions, useAllMachines, useMachine } from "@/sync/storage";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import type { Session } from "@/sync/storageTypes";
-import { machineStopDaemon, machineUpdateMetadata } from "@/sync/ops";
+import { machineStopDaemon, machineUpdateMetadata, machineBash } from "@/sync/ops";
 import { Modal } from "@/modal";
 import {
   formatPathRelativeToHome,
@@ -100,7 +100,15 @@ function MachineDetailScreen() {
   const [isSpawning, setIsSpawning] = useState(false);
   const inputRef = useRef<MultiTextInputHandle>(null);
   const [showAllPaths, setShowAllPaths] = useState(false);
-  // Variant D only
+  const [hasDocker, setHasDocker] = useState(false);
+
+  // Check if Docker is available on this machine
+  React.useEffect(() => {
+    if (!machineId || !machine?.active) return;
+    machineBash(machineId, "docker --version", "/").then((r) => {
+      setHasDocker(r.success && r.exitCode === 0);
+    }).catch(() => setHasDocker(false));
+  }, [machineId, machine?.active]);
 
   const machineSessions = useMemo(() => {
     if (!sessions || !machineId) return [];
@@ -605,26 +613,28 @@ function MachineDetailScreen() {
           />
         </ItemGroup>
 
-        {/* Docker Containers (Provision Tokens) */}
-        <ItemGroup title={t("provision.title")}>
-          <Item
-            title={t("provision.title")}
-            subtitle={t("settings.provisionSubtitle")}
-            icon={
-              <Ionicons
-                name="key-outline"
-                size={20}
-                color={theme.colors.accentOrange}
-              />
-            }
-            onPress={() =>
-              router.push(
-                `/settings/provision?machineId=${machineId}` as any,
-              )
-            }
-            showChevron
-          />
-        </ItemGroup>
+        {/* Docker Containers (Provision Tokens) — only if Docker is available */}
+        {hasDocker && (
+          <ItemGroup title={t("provision.title")}>
+            <Item
+              title={t("provision.title")}
+              subtitle={t("settings.provisionSubtitle")}
+              icon={
+                <Ionicons
+                  name="key-outline"
+                  size={20}
+                  color={theme.colors.accentOrange}
+                />
+              }
+              onPress={() =>
+                router.push(
+                  `/settings/provision?machineId=${machineId}` as any,
+                )
+              }
+              showChevron
+            />
+          </ItemGroup>
+        )}
 
         {/* Extensions (per-machine) */}
         <ItemGroup title={t("machine.extensions")}>
