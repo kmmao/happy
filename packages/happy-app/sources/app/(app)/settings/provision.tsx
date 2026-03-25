@@ -158,7 +158,7 @@ function ProvisionSettingsScreen() {
             apiBaseUrl?.trim() ? `-e ANTHROPIC_BASE_URL="${apiBaseUrl.trim()}"` : "",
             apiKey?.trim() ? `-e ANTHROPIC_AUTH_TOKEN="${apiKey.trim()}"` : "",
         ].filter(Boolean).join(" ");
-        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" --add-host=host.docker.internal:host-gateway --dns 8.8.8.8 -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="${serverUrl}" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -e TTYD_CREDENTIAL="coder:${ttydPassword}" ${apiEnvs} -w /work happy-client`;
+        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" --add-host=host.docker.internal:host-gateway --add-host=s.sangreal.code.xycloud.info:host-gateway --dns 8.8.8.8 -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="${serverUrl}" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -e TTYD_CREDENTIAL="coder:${ttydPassword}" ${apiEnvs} -w /work happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {
