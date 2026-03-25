@@ -135,6 +135,7 @@ vi.mock("@/utils/serverConnectionErrors", () => ({
 vi.mock("@/ui/logger", () => ({
   logger: {
     debug: mocks.mockLoggerDebug,
+    print: (...args: unknown[]) => console.log(...args),
   },
 }));
 
