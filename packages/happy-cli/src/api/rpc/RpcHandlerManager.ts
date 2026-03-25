@@ -21,6 +21,7 @@ export class RpcHandlerManager {
     private readonly logger: (message: string, data?: any) => void;
     private socket: Socket | null = null;
     private reregisterInterval: ReturnType<typeof setInterval> | null = null;
+    private fastRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(config: RpcHandlerConfig) {
         this.scopePrefix = config.scopePrefix;
@@ -90,12 +91,14 @@ export class RpcHandlerManager {
     onSocketConnect(socket: Socket): void {
         this.socket = socket;
         this.registerAllHandlers(socket);
+        this.scheduleFastRetry(socket);
         this.startReregisterInterval();
     }
 
     onSocketDisconnect(): void {
         this.socket = null;
         this.stopReregisterInterval();
+        this.cancelFastRetry();
     }
 
     /**
@@ -155,7 +158,30 @@ export class RpcHandlerManager {
     }
 
     /**
-     * Periodic re-registration every 60s as a safety net.
+     * Fast retry: 5 seconds after initial connect, re-register all handlers once.
+     * Covers the case where the first batch of registrations failed silently
+     * (e.g. server not fully ready yet after restart).
+     */
+    private scheduleFastRetry(socket: Socket): void {
+        this.cancelFastRetry();
+        this.fastRetryTimer = setTimeout(() => {
+            this.fastRetryTimer = null;
+            if (this.socket === socket && this.handlers.size > 0) {
+                this.logger('[RPC] Fast retry: re-registering all handlers');
+                this.registerAllHandlers(socket);
+            }
+        }, 5_000);
+    }
+
+    private cancelFastRetry(): void {
+        if (this.fastRetryTimer) {
+            clearTimeout(this.fastRetryTimer);
+            this.fastRetryTimer = null;
+        }
+    }
+
+    /**
+     * Periodic re-registration every 30s as a safety net.
      * If the server lost our registrations (e.g. deploy, network glitch),
      * this ensures they are restored without requiring a daemon restart.
      */
@@ -165,7 +191,7 @@ export class RpcHandlerManager {
             if (this.socket && this.handlers.size > 0) {
                 this.registerAllHandlers(this.socket);
             }
-        }, 60_000);
+        }, 30_000);
     }
 
     private stopReregisterInterval(): void {

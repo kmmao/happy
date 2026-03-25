@@ -80,16 +80,6 @@ export function rpcHandler(
 
       if (rpcListeners.get(method) === socket) {
         rpcListeners.delete(method);
-        // log({ module: 'websocket-rpc' }, `RPC method unregistered: ${method} from socket ${socket.id} (user: ${userId})`);
-
-        if (rpcListeners.size === 0) {
-          rpcListeners.delete(userId);
-          // log({ module: 'websocket-rpc' }, `All RPC methods unregistered for user ${userId}`);
-        } else {
-          // log({ module: 'websocket-rpc' }, `Remaining RPC methods for user ${userId}: ${Array.from(rpcListeners.keys()).join(', ')}`);
-        }
-      } else {
-        // log({ module: 'websocket-rpc' }, `RPC unregister ignored: ${method} not registered on socket ${socket.id}`);
       }
 
       socket.emit("rpc-unregistered", { method });
@@ -198,22 +188,6 @@ export function rpcHandler(
     },
   );
 
-  socket.on("disconnect", () => {
-    const methodsToRemove: string[] = [];
-    for (const [method, registeredSocket] of rpcListeners.entries()) {
-      if (registeredSocket === socket) {
-        methodsToRemove.push(method);
-      }
-    }
-
-    if (methodsToRemove.length > 0) {
-      // log({ module: 'websocket-rpc' }, `Cleaning up RPC methods on disconnect for socket ${socket.id}: ${methodsToRemove.join(', ')}`);
-      methodsToRemove.forEach((method) => rpcListeners.delete(method));
-    }
-
-    if (rpcListeners.size === 0) {
-      rpcListeners.delete(userId);
-      // log({ module: 'websocket-rpc' }, `All RPC listeners removed for user ${userId}`);
-    }
-  });
+  // NOTE: disconnect cleanup is handled in socket.ts (the authoritative handler)
+  // to avoid duplicate cleanup and the invalid rpcListeners.delete(userId) call.
 }
