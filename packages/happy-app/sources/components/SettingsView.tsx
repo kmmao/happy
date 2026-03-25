@@ -22,7 +22,7 @@ import { trackWhatsNewClicked } from "@/track";
 import { Modal } from "@/modal";
 import { useMultiClick } from "@/hooks/useMultiClick";
 import { useAllMachines } from "@/sync/storage";
-import { isMachineOnline } from "@/utils/machineUtils";
+import { isMachineOnline, getMachineConnectionState } from "@/utils/machineUtils";
 import { useUnistyles } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { useHappyAction } from "@/hooks/useHappyAction";
@@ -219,7 +219,10 @@ export const SettingsView = React.memo(function SettingsView() {
       {allMachines.length > 0 && (
         <ItemGroup title={t("settings.machines")}>
           {[...allMachines].map((machine) => {
-            const isOnline = isMachineOnline(machine);
+            const connState = getMachineConnectionState(machine);
+            const statusLabel = connState === 'online' ? t("status.online")
+                : connState === 'connecting' ? t("status.connecting")
+                    : t("status.offline");
             const host = machine.metadata?.host || "Unknown";
             const displayName = machine.metadata?.displayName;
             const platform = machine.metadata?.platform || "";
@@ -236,10 +239,8 @@ export const SettingsView = React.memo(function SettingsView() {
               subtitle = subtitle ? `${subtitle} • ${platform}` : platform;
             }
             subtitle = subtitle
-              ? `${subtitle} • ${isOnline ? t("status.online") : t("status.offline")}`
-              : isOnline
-                ? t("status.online")
-                : t("status.offline");
+              ? `${subtitle} • ${statusLabel}`
+              : statusLabel;
 
             return (
               <Item
@@ -251,9 +252,9 @@ export const SettingsView = React.memo(function SettingsView() {
                     name="desktop-outline"
                     size={29}
                     color={
-                      isOnline
-                        ? theme.colors.status.connected
-                        : theme.colors.status.disconnected
+                      connState === 'online' ? theme.colors.status.connected
+                          : connState === 'connecting' ? '#FF9500'
+                              : theme.colors.status.disconnected
                     }
                   />
                 }

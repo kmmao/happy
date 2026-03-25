@@ -75,7 +75,7 @@ import {
 import { formatPathRelativeToHome } from "@/utils/sessionUtils";
 import { resolveAbsolutePath } from "@/utils/pathUtils";
 import { MultiTextInput } from "@/components/MultiTextInput";
-import { isMachineOnline } from "@/utils/machineUtils";
+import { isMachineOnline, getMachineConnectionState } from "@/utils/machineUtils";
 import { StatusDot } from "@/components/StatusDot";
 import {
   SearchableListSelector,
@@ -1409,16 +1409,20 @@ function NewSessionWizard() {
   // Machine online status for AgentInput (DRY - reused in info box too)
   const connectionStatus = React.useMemo(() => {
     if (!selectedMachine) return undefined;
-    const isOnline = isMachineOnline(selectedMachine);
+    const connState = getMachineConnectionState(selectedMachine);
 
     // Include CLI status only when in wizard AND detection completed
     const includeCLI = selectedMachineId && cliAvailability.timestamp > 0;
 
+    const statusColor = connState === 'online' ? theme.colors.success
+        : connState === 'connecting' ? '#FF9500'
+            : theme.colors.textDestructive;
+
     return {
-      text: isOnline ? "online" : "offline",
-      color: isOnline ? theme.colors.success : theme.colors.textDestructive,
-      dotColor: isOnline ? theme.colors.success : theme.colors.textDestructive,
-      isPulsing: isOnline,
+      text: connState === 'online' ? "online" : connState === 'connecting' ? "connecting" : "offline",
+      color: statusColor,
+      dotColor: statusColor,
+      isPulsing: connState !== 'offline',
       cliStatus: includeCLI
         ? {
             claude: cliAvailability.claude,
@@ -2304,16 +2308,28 @@ function NewSessionWizard() {
                         />
                       ),
                       getItemStatus: (machine) => {
-                        const offline = !isMachineOnline(machine);
+                        const connState = getMachineConnectionState(machine);
+                        if (connState === 'offline') {
+                          return {
+                            text: "offline",
+                            color: theme.colors.status.disconnected,
+                            dotColor: theme.colors.status.disconnected,
+                            isPulsing: false,
+                          };
+                        }
+                        if (connState === 'connecting') {
+                          return {
+                            text: "connecting",
+                            color: '#FF9500',
+                            dotColor: '#FF9500',
+                            isPulsing: true,
+                          };
+                        }
                         return {
-                          text: offline ? "offline" : "online",
-                          color: offline
-                            ? theme.colors.status.disconnected
-                            : theme.colors.status.connected,
-                          dotColor: offline
-                            ? theme.colors.status.disconnected
-                            : theme.colors.status.connected,
-                          isPulsing: !offline,
+                          text: "online",
+                          color: theme.colors.status.connected,
+                          dotColor: theme.colors.status.connected,
+                          isPulsing: true,
                         };
                       },
                       formatForDisplay: (machine) =>
