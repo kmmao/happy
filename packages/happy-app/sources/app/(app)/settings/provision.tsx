@@ -129,7 +129,7 @@ function ProvisionSettingsScreen() {
         await machineBash(machineId, `docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`, "/");
 
         // 5. Docker run
-        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" --network happy_default -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="http://happy-server-1:3005" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -w /work happy-client`;
+        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="${serverUrl}" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -w /work happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {

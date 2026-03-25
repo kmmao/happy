@@ -74,7 +74,7 @@ RUN mkdir -p /home/coder/.claude && \
     echo '{"primaryApiKey":"any","hasCompletedOnboarding":true}' > /home/coder/.claude/settings.json
 
 # Happy configuration
-ENV HAPPY_SERVER_URL="http://happy-server-1:3005"
+ENV HAPPY_SERVER_URL="https://s.sangreal.code.xycloud.info:2443"
 ENV HAPPY_WEBAPP_URL="http://localhost:8081"
 ENV HAPPY_HOME_DIR="/home/coder/.happy"
 ENV EXPO_PACKAGER_PROXY_URL="http://localhost:8081"
