@@ -1100,6 +1100,8 @@ export const zhHans: TranslationStructure = {
     createdAt: "创建时间",
     containerNameDescription: "输入 Docker 容器的名称",
     containerNamePlaceholder: "例如 alice",
+    terminalUser: "用户名",
+    terminalPassword: "密码",
     apiConfig: "API 配置",
     apiNotSet: "未设置（可选）",
     apiBaseUrlDescription: "自定义 API 地址（留空跳过）",

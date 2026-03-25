@@ -1101,6 +1101,8 @@ export const zhHant: TranslationStructure = {
     createdAt: "建立時間",
     containerNameDescription: "輸入 Docker 容器的名稱",
     containerNamePlaceholder: "例如 alice",
+    terminalUser: "使用者名稱",
+    terminalPassword: "密碼",
     apiConfig: "API 配置",
     apiNotSet: "未設定（選填）",
     apiBaseUrlDescription: "自訂 API 地址（留空跳過）",

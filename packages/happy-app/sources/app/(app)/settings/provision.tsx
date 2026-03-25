@@ -141,7 +141,9 @@ function ProvisionSettingsScreen() {
         const ttydPassword = Math.random().toString(36).slice(2, 10);
         const serverUrl = "https://s.sangreal.code.xycloud.info:2443";
         const webappUrl = `https://w.sangreal.code.xycloud.info:2443?provision=${encodeURIComponent(result.provisionToken)}&server=${encodeURIComponent(serverUrl)}`;
-        const ttydUrl = `https://coder:${ttydPassword}@t-${safeName}.code.xycloud.info:2443`;
+        const ttydHttpsUrl = `https://coder:${ttydPassword}@t-${safeName}.code.xycloud.info:2443`;
+        const ttydLanUrl = `http://${machineIp}:${ttydPort}`;
+        const ttydUrl = JSON.stringify({ https: ttydHttpsUrl, lan: ttydLanUrl });
 
         // 3. Save URLs to server
         await provisionUpdateUrls(auth.credentials, result.id, { webappUrl, ttydUrl });
@@ -350,7 +352,37 @@ function ProvisionSettingsScreen() {
             {/* Active tokens — each token is its own card */}
             {activeTokens.map((token) => {
                 const containerName = token.label ? `happy-${sanitizeContainerName(token.label)}` : null;
-                const dockerExecCmd = containerName ? `docker exec -it ${containerName} zsh` : null;
+                const dockerExecCmd = containerName ? `docker exec -it -u coder ${containerName} zsh` : null;
+
+                // Parse ttyd URL — may be JSON { https, lan } or plain URL (legacy)
+                let ttydHttpsUrl = "";
+                let ttydLanUrl = "";
+                let ttydFullUrl = ""; // with credentials for opening
+                let ttydCleanUrl = ""; // without credentials for display
+                let ttydUser = "";
+                let ttydPass = "";
+                if (token.ttydUrl) {
+                    try {
+                        const parsed = JSON.parse(token.ttydUrl);
+                        ttydHttpsUrl = parsed.https || "";
+                        ttydLanUrl = parsed.lan || "";
+                    } catch {
+                        // Legacy plain URL format
+                        ttydHttpsUrl = token.ttydUrl;
+                    }
+                    if (ttydHttpsUrl) {
+                        try {
+                            const u = new URL(ttydHttpsUrl);
+                            ttydUser = decodeURIComponent(u.username);
+                            ttydPass = decodeURIComponent(u.password);
+                            ttydCleanUrl = `${u.protocol}//${u.host}`;
+                            ttydFullUrl = ttydHttpsUrl;
+                        } catch {
+                            ttydCleanUrl = ttydHttpsUrl;
+                            ttydFullUrl = ttydHttpsUrl;
+                        }
+                    }
+                }
 
                 return (
                     <ItemGroup
@@ -395,24 +427,65 @@ function ProvisionSettingsScreen() {
                             />
                         )}
 
-                        {/* ttyd terminal link */}
-                        {token.ttydUrl && (
+                        {/* ttyd terminal — HTTPS */}
+                        {ttydCleanUrl ? (
                             <Item
                                 title="Web Terminal"
-                                subtitle={token.ttydUrl}
+                                subtitle={ttydCleanUrl}
                                 subtitleStyle={{ color: theme.colors.textLink, fontSize: 12 }}
                                 icon={<Ionicons name="terminal-outline" size={20} color={theme.colors.accentPurple} />}
-                                onPress={() => Linking.openURL(token.ttydUrl!)}
+                                onPress={() => Linking.openURL(ttydFullUrl)}
                                 rightElement={
                                     <Ionicons
                                         name="copy-outline"
                                         size={18}
                                         color={theme.colors.textSecondary}
-                                        onPress={() => copyAndToast(token.ttydUrl!)}
+                                        onPress={() => copyAndToast(ttydFullUrl)}
                                     />
                                 }
                             />
-                        )}
+                        ) : null}
+
+                        {/* ttyd terminal — LAN */}
+                        {ttydLanUrl ? (
+                            <Item
+                                title="Web Terminal (LAN)"
+                                subtitle={ttydLanUrl}
+                                subtitleStyle={{ color: theme.colors.textLink, fontSize: 12 }}
+                                icon={<Ionicons name="wifi-outline" size={20} color={theme.colors.textSecondary} />}
+                                onPress={() => Linking.openURL(ttydLanUrl)}
+                                rightElement={
+                                    <Ionicons
+                                        name="copy-outline"
+                                        size={18}
+                                        color={theme.colors.textSecondary}
+                                        onPress={() => copyAndToast(ttydLanUrl)}
+                                    />
+                                }
+                            />
+                        ) : null}
+
+                        {/* ttyd credentials */}
+                        {ttydUser ? (
+                            <Item
+                                title={t("provision.terminalUser")}
+                                subtitle={ttydUser}
+                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                                icon={<Ionicons name="person-outline" size={20} color={theme.colors.textSecondary} />}
+                                onPress={() => copyAndToast(ttydUser)}
+                                showChevron={false}
+                            />
+                        ) : null}
+                        {ttydPass ? (
+                            <Item
+                                title={t("provision.terminalPassword")}
+                                subtitle={ttydPass}
+                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                                icon={<Ionicons name="lock-closed-outline" size={20} color={theme.colors.textSecondary} />}
+                                onPress={() => copyAndToast(ttydPass)}
+                                showChevron={false}
+                            />
+                        ) : null}
 
                         {/* Docker exec command */}
                         {dockerExecCmd && (

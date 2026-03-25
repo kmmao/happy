@@ -1149,6 +1149,8 @@ export const es: TranslationStructure = {
     createdAt: "Creado",
     containerNameDescription: "Introduce un nombre para el contenedor Docker",
     containerNamePlaceholder: "p. ej. alice",
+    terminalUser: "Usuario",
+    terminalPassword: "Contraseña",
     apiConfig: "Configuración API",
     apiNotSet: "No configurado (opcional)",
     apiBaseUrlDescription: "Dirección API personalizada (dejar vacío para omitir)",
