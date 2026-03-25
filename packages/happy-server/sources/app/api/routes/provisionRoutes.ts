@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import tweetnacl from "tweetnacl";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { auth } from "@/app/auth/auth";
@@ -29,16 +30,27 @@ export function provisionRoutes(app: Fastify) {
             },
         },
     }, async (request, reply) => {
-        const accountId = request.userId;
+        const adminAccountId = request.userId;
         const { label, ttlHours, webappUrl, ttydUrl } = request.body;
 
-        const bearerToken = await auth.createToken(accountId, { provision: true });
+        // Create a NEW independent account for this container
+        const secret = new Uint8Array(randomBytes(32));
+        const keypair = tweetnacl.box.keyPair.fromSecretKey(secret);
+        const publicKeyHex = Buffer.from(keypair.publicKey).toString("hex");
+
+        const newAccount = await db.account.create({
+            data: { publicKey: publicKeyHex },
+        });
+
+        // Generate bearer token for the NEW account (not admin's)
+        const bearerToken = await auth.createToken(newAccount.id, { provision: true });
         const tokenHash = hashToken(bearerToken);
         const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
+        // Store provision record under admin (for management)
         const record = await db.provisionToken.create({
             data: {
-                accountId,
+                accountId: adminAccountId,
                 label: label ?? null,
                 tokenHash,
                 webappUrl: webappUrl ?? null,
@@ -46,14 +58,17 @@ export function provisionRoutes(app: Fastify) {
             },
         });
 
+        // Pack token with the account secret (so CLI/webapp can encrypt/decrypt)
+        const secretBase64 = Buffer.from(secret).toString("base64");
         const packed = Buffer.from(JSON.stringify({
             t: bearerToken,
+            s: secretBase64,
             x: expiresAt.toISOString(),
         })).toString("base64url");
 
         const provisionToken = `hp_${packed}`;
 
-        log({ module: "provision" }, `Created provision token ${record.id} for account ${accountId}`);
+        log({ module: "provision" }, `Created provision token ${record.id} (new account ${newAccount.id}) by admin ${adminAccountId}`);
 
         return reply.send({
             id: record.id,

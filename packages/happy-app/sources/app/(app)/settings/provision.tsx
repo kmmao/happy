@@ -24,7 +24,6 @@ import {
     provisionUpdateUrls,
     type ProvisionTokenItem,
 } from "@/sync/apiProvision";
-import { decodeBase64, encodeBase64 } from "@/encryption/base64";
 
 function findOnlineMachineId(): string | null {
     const machines = storage.getState().machines;
@@ -109,33 +108,21 @@ function ProvisionSettingsScreen() {
         const ipResult = await machineBash(machineId, "hostname -I | awk '{print $1}'", "/");
         const machineIp = ipResult.stdout?.trim() || "localhost";
 
-        // 1. Create provision token on server
+        // 1. Create provision token (server creates independent account + packs secret)
         const result = await provisionCreate(auth.credentials, {
             label: safeName,
             ttlHours: 8760,
         });
 
-        // 2. Repack token with account secret (so container uses same encryption key)
-        const serverPacked = JSON.parse(
-            new TextDecoder().decode(decodeBase64(result.provisionToken.slice(3), "base64url")),
-        );
-        const repackedToken = `hp_${encodeBase64(
-            new TextEncoder().encode(JSON.stringify({
-                ...serverPacked,
-                s: auth.credentials.secret, // account encryption secret
-            })),
-            "base64url",
-        )}`;
-
-        // 3. Build internal URLs (LAN IP)
-        const webappUrl = `http://${machineIp}:8081?provision=${encodeURIComponent(repackedToken)}`;
+        // 2. Build internal URLs (LAN IP)
+        const webappUrl = `http://${machineIp}:8081?provision=${encodeURIComponent(result.provisionToken)}`;
         const ttydUrl = `http://${machineIp}:${ttydPort}`;
 
-        // 4. Save URLs to server
+        // 3. Save URLs to server
         await provisionUpdateUrls(auth.credentials, result.id, { webappUrl, ttydUrl });
 
-        // 5. Docker run (use repacked token with secret)
-        const dockerCmd = `docker run -d --name "${containerFullName}" -v "${volumeName}:/root/.happy" -p ${ttydPort}:7681 -e HAPPY_PROVISION_TOKEN="${repackedToken}" happy-client`;
+        // 4. Docker run
+        const dockerCmd = `docker run -d --name "${containerFullName}" -v "${volumeName}:/root/.happy" -p ${ttydPort}:7681 -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {
