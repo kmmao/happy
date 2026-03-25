@@ -115,15 +115,20 @@ function ProvisionSettingsScreen() {
             ttlHours: 8760,
         });
 
-        // 2. Build URLs (LAN IP + server param so webapp knows which server to connect)
+        // 2. Build HTTPS URLs via Caddy reverse proxy
         const serverUrl = "https://s.sangreal.code.xycloud.info:2443";
-        const webappUrl = `http://${machineIp}:8081?provision=${encodeURIComponent(result.provisionToken)}&server=${encodeURIComponent(serverUrl)}`;
-        const ttydUrl = `http://${machineIp}:${ttydPort}`;
+        const webappUrl = `https://w.sangreal.code.xycloud.info:2443?provision=${encodeURIComponent(result.provisionToken)}&server=${encodeURIComponent(serverUrl)}`;
+        const ttydUrl = `https://t-${safeName}.code.xycloud.info:2443`;
 
         // 3. Save URLs to server
         await provisionUpdateUrls(auth.credentials, result.id, { webappUrl, ttydUrl });
 
-        // 4. Docker run
+        // 4. Create Caddy site file for ttyd reverse proxy
+        const caddySiteContent = `t-${safeName}.code.xycloud.info {\n\treverse_proxy host.docker.internal:${ttydPort}\n\timport cloudflare_tls\n}`;
+        await machineBash(machineId, `docker exec happy-caddy-1 sh -c 'mkdir -p /etc/caddy/sites && cat > /etc/caddy/sites/t-${safeName}.caddy << CADDYEOF\n${caddySiteContent}\nCADDYEOF'`, "/");
+        await machineBash(machineId, `docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`, "/");
+
+        // 5. Docker run
         const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" --network happy_default -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="http://happy-server-1:3005" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -w /work happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
@@ -153,8 +158,11 @@ function ProvisionSettingsScreen() {
 
             const machineId = paramMachineId || findOnlineMachineId();
             if (machineId && label) {
-                const containerName = `happy-${sanitizeContainerName(label)}`;
+                const safeName = sanitizeContainerName(label);
+                const containerName = `happy-${safeName}`;
                 await machineBash(machineId, `docker rm -f "${containerName}" 2>/dev/null || true`, "/");
+                // Remove Caddy site file and reload
+                await machineBash(machineId, `docker exec happy-caddy-1 rm -f /etc/caddy/sites/t-${safeName}.caddy && docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true`, "/");
             }
 
             await provisionRevoke(auth.credentials, tokenId);
@@ -193,11 +201,18 @@ function ProvisionSettingsScreen() {
             );
             if (!confirmed) return;
 
+            // Clean up Caddy site file if machine is online
+            const machineId = paramMachineId || findOnlineMachineId();
+            if (machineId && label) {
+                const safeName = sanitizeContainerName(label);
+                await machineBash(machineId, `docker exec happy-caddy-1 rm -f /etc/caddy/sites/t-${safeName}.caddy && docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true`, "/");
+            }
+
             await provisionRevoke(auth.credentials, tokenId);
             Modal.toast(t("provision.deleted"));
             await loadTokens();
         },
-        [auth.credentials, loadTokens],
+        [auth.credentials, loadTokens, paramMachineId],
     );
 
     const styles = StyleSheet.create({

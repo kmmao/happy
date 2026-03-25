@@ -154,6 +154,7 @@ services:
       - "2443:2443/udp"   # HTTP/3
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - happy_caddy_sites:/etc/caddy/sites
       - happy_caddy_data:/data
       - happy_caddy_config:/config
     extra_hosts:
@@ -165,5 +166,6 @@ volumes:
   happy_redisdata:
   happy_miniodata:
   happy_stt_models:
+  happy_caddy_sites:
   happy_caddy_data:
   happy_caddy_config:

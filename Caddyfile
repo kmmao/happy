@@ -2,37 +2,32 @@
 # DNS-01 验证 + 非标端口
 
 {
-    admin 0.0.0.0:2019
-    https_port 2443
-    http_port 2080
-    acme_dns cloudflare {env.CF_API_TOKEN}
+	admin 0.0.0.0:2019
+	https_port 2443
+	http_port 2080
+	acme_dns cloudflare {env.CF_API_TOKEN}
+}
+
+# Reusable TLS snippet for all *.code.xycloud.info subdomains
+(cloudflare_tls) {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+		propagation_timeout 300s
+		propagation_delay 15s
+		resolvers 1.1.1.1 8.8.8.8
+	}
 }
 
 s.sangreal.code.xycloud.info {
-    reverse_proxy host.docker.internal:3005
-
-    tls {
-        dns cloudflare {env.CF_API_TOKEN}
-        propagation_timeout 300s
-        propagation_delay 15s
-        resolvers 1.1.1.1 8.8.8.8
-    }
+	reverse_proxy host.docker.internal:3005
+	import cloudflare_tls
 }
 
 w.sangreal.code.xycloud.info {
-    reverse_proxy host.docker.internal:8081
-
-    tls {
-        dns cloudflare {env.CF_API_TOKEN}
-        propagation_timeout 300s
-        propagation_delay 15s
-        resolvers 1.1.1.1 8.8.8.8
-    }
+	reverse_proxy host.docker.internal:8081
+	import cloudflare_tls
 }
 
-# ttyd Web Terminal (port range 7001-7100)
-# Each happy-client container maps a unique host port to internal 7681
-# Access: https://code.xycloud.info:2443 won't work for ttyd ports,
-# so we listen on a separate port range via individual site blocks.
-# For now, ttyd is accessible directly via http://{host}:{port}
-# To add HTTPS, create a wildcard subdomain: *.t.code.xycloud.info
+# Dynamic container sites (ttyd web terminals)
+# Files managed by happy-app provision flow via docker exec
+import /etc/caddy/sites/*.caddy
