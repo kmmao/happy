@@ -137,10 +137,11 @@ function ProvisionSettingsScreen() {
             ttlHours: 8760,
         });
 
-        // 2. Build HTTPS URLs via Caddy reverse proxy
+        // 2. Generate ttyd password and build HTTPS URLs
+        const ttydPassword = Math.random().toString(36).slice(2, 10);
         const serverUrl = "https://s.sangreal.code.xycloud.info:2443";
         const webappUrl = `https://w.sangreal.code.xycloud.info:2443?provision=${encodeURIComponent(result.provisionToken)}&server=${encodeURIComponent(serverUrl)}`;
-        const ttydUrl = `https://t-${safeName}.code.xycloud.info:2443`;
+        const ttydUrl = `https://coder:${ttydPassword}@t-${safeName}.code.xycloud.info:2443`;
 
         // 3. Save URLs to server
         await provisionUpdateUrls(auth.credentials, result.id, { webappUrl, ttydUrl });
@@ -155,7 +156,7 @@ function ProvisionSettingsScreen() {
             apiBaseUrl?.trim() ? `-e ANTHROPIC_BASE_URL="${apiBaseUrl.trim()}"` : "",
             apiKey?.trim() ? `-e ANTHROPIC_AUTH_TOKEN="${apiKey.trim()}"` : "",
         ].filter(Boolean).join(" ");
-        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="${serverUrl}" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" ${apiEnvs} -w /work happy-client`;
+        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="${serverUrl}" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -e TTYD_CREDENTIAL="coder:${ttydPassword}" ${apiEnvs} -w /work happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {

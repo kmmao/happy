@@ -98,7 +98,11 @@ rm -f "${HAPPY_HOME_DIR:-$HOME/.happy}/daemon.state.json.lock"
 
 # Start ttyd (web terminal) on port 7681 in /work
 cd /work
-ttyd -p 7681 -W zsh &
+TTYD_ARGS="-p 7681 -W"
+if [ -n "$TTYD_CREDENTIAL" ]; then
+    TTYD_ARGS="$TTYD_ARGS -c $TTYD_CREDENTIAL"
+fi
+ttyd $TTYD_ARGS zsh &
 
 # Start happy daemon (foreground)
 exec happy daemon start-sync
