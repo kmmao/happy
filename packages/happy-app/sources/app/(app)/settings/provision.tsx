@@ -15,7 +15,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { machineBash } from "@/sync/ops";
 import { storage } from "@/sync/storage";
-import { getWebappUrl } from "@/sync/serverConfig";
+import { getWebappUrl, getServerUrl } from "@/sync/serverConfig";
 import { isMachineOnline } from "@/utils/machineUtils";
 import {
     provisionCreate,
@@ -24,16 +24,20 @@ import {
     type ProvisionTokenItem,
 } from "@/sync/apiProvision";
 
-/** Find the first online machine ID from storage. */
 function findOnlineMachineId(): string | null {
     const machines = storage.getState().machines;
     const online = Object.values(machines).find((m) => m.active);
     return online?.id ?? null;
 }
 
-/** Sanitize container name: only allow [a-zA-Z0-9_.-] */
 function sanitizeContainerName(name: string): string {
     return name.replace(/[^a-zA-Z0-9_.-]/g, "-").replace(/-+/g, "-");
+}
+
+/** Copy text and show toast */
+async function copyAndToast(text: string) {
+    await Clipboard.setStringAsync(text);
+    Modal.toast(t("provision.copied"));
 }
 
 function ProvisionSettingsScreen() {
@@ -60,32 +64,20 @@ function ProvisionSettingsScreen() {
         }, [loadTokens]),
     );
 
-    // Create: ask name → create token → docker run → show result
+    // Create container
     const [, handleCreate] = useHappyAction(async () => {
         if (!auth.credentials) return;
 
-        // Use specified machine or fallback to first online
         const machineId = paramMachineId || findOnlineMachineId();
         if (!machineId) {
             Modal.alert(t("provision.createToken"), t("provision.noMachineOnline"));
             return;
         }
 
-        // Verify machine is online
         const machines = storage.getState().machines;
         const machine = machines[machineId];
         if (machine && !isMachineOnline(machine)) {
             Modal.alert(t("provision.createToken"), t("provision.noMachineOnline"));
-            return;
-        }
-
-        // Check webapp URL is configured
-        const webappBaseUrl = getWebappUrl();
-        if (!webappBaseUrl) {
-            Modal.alert(
-                t("provision.createToken"),
-                t("provision.webappUrlNotConfigured"),
-            );
             return;
         }
 
@@ -102,58 +94,72 @@ function ProvisionSettingsScreen() {
 
         const safeName = sanitizeContainerName(containerName.trim());
         const volumeName = `happy-${safeName}-data`;
+        const containerFullName = `happy-${safeName}`;
 
         Modal.toast(t("provision.creatingContainer"));
 
-        // Find next available ttyd port (7001-7100)
+        // Find next available ttyd port
         const portScanResult = await machineBash(machineId, "docker ps --format '{{.Ports}}' | grep -oP '0\\.0\\.0\\.0:\\K(70[0-9]{2})' | sort -n | tail -1", "/");
         const lastPort = parseInt(portScanResult.stdout?.trim() || "7000", 10);
         const ttydPort = Math.max(lastPort + 1, 7001);
 
-        // Create token on server (with URLs pre-computed)
-        const serverHost = new URL(webappBaseUrl).hostname.replace(/^w\./, "");
-        const webappUrl = `${webappBaseUrl}?provision=PLACEHOLDER`;
-        const ttydUrl = `http://${serverHost}:${ttydPort}`;
+        // Build URLs
+        const webappBaseUrl = getWebappUrl();
+        const serverUrl = getServerUrl();
+        const baseHost = (() => {
+            try {
+                return new URL(webappBaseUrl || serverUrl).hostname;
+            } catch {
+                return "localhost";
+            }
+        })();
+        const ttydUrl = `http://${baseHost}:${ttydPort}`;
 
+        // Create provision token — server returns the token string
         const result = await provisionCreate(auth.credentials, {
             label: safeName,
             ttlHours: 8760,
-            // Store final URLs after we have the token
         });
 
-        // Now we have the provision token, build the real webapp URL
-        const finalWebappUrl = `${webappBaseUrl}?provision=${encodeURIComponent(result.provisionToken)}`;
-        const finalTtydUrl = ttydUrl;
+        // Now build the webapp URL with the actual token
+        const webappUrl = webappBaseUrl
+            ? `${webappBaseUrl}?provision=${encodeURIComponent(result.provisionToken)}`
+            : null;
 
-        // Update the server record with the real URLs
-        // (We'll do a PATCH-like approach — just create with the URLs embedded)
-        // For now, the URLs are passed at creation time, so we need to create AFTER we know them.
-        // Since the current API creates the token and returns it, we do a second call to update.
-        // Actually, let's just re-create properly...
-
-        // Workaround: delete and re-create with URLs
+        // Update server record with URLs (re-create with URLs)
         await provisionRevoke(auth.credentials, result.id);
-        const resultWithUrls = await provisionCreate(auth.credentials, {
+        const finalResult = await provisionCreate(auth.credentials, {
             label: safeName,
             ttlHours: 8760,
-            webappUrl: finalWebappUrl,
-            ttydUrl: finalTtydUrl,
+            webappUrl: webappUrl ?? undefined,
+            ttydUrl,
         });
 
-        // Build the real webapp URL with the NEW token
-        const realWebappUrl = `${webappBaseUrl}?provision=${encodeURIComponent(resultWithUrls.provisionToken)}`;
+        // Build final webapp URL with the NEW token
+        const finalWebappUrl = webappBaseUrl
+            ? `${webappBaseUrl}?provision=${encodeURIComponent(finalResult.provisionToken)}`
+            : null;
+
+        // Update URLs again (since token changed)
+        if (finalWebappUrl) {
+            await provisionRevoke(auth.credentials, finalResult.id);
+            await provisionCreate(auth.credentials, {
+                label: safeName,
+                ttlHours: 8760,
+                webappUrl: finalWebappUrl,
+                ttydUrl,
+            });
+        }
 
         // Execute docker run
-        const containerFullName = `happy-${safeName}`;
-        const dockerCmd = `docker run -d --name "${containerFullName}" -v "${volumeName}:/root/.happy" -p ${ttydPort}:7681 -e HAPPY_PROVISION_TOKEN="${resultWithUrls.provisionToken}" happy-client`;
+        const latestTokens = await provisionList(auth.credentials);
+        const latestToken = latestTokens.find(tk => tk.label === safeName && !tk.revokedAt);
+        // Use the provision token from the most recent create call
+        const dockerCmd = `docker run -d --name "${containerFullName}" -v "${volumeName}:/root/.happy" -p ${ttydPort}:7681 -e HAPPY_PROVISION_TOKEN="${finalResult.provisionToken}" happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {
-            await Clipboard.setStringAsync(realWebappUrl);
-            Modal.alert(
-                t("provision.containerCreated"),
-                t("provision.containerCreatedDescription", { name: safeName, url: `${t("provision.webAppUrl")}\n${realWebappUrl}\n\n${t("provision.terminalUrl")}\n${finalTtydUrl}` }),
-            );
+            Modal.toast(t("provision.containerCreated"));
         } else {
             const errorMsg = bashResult.stderr || bashResult.error || "Unknown error";
             Modal.alert(
@@ -165,11 +171,10 @@ function ProvisionSettingsScreen() {
         await loadTokens();
     });
 
-    // Active token: revoke + stop container
+    // Revoke + stop container
     const handleRevoke = React.useCallback(
         async (tokenId: string, label: string | null) => {
             if (!auth.credentials) return;
-
             const confirmed = await Modal.confirm(
                 t("provision.revokeToken"),
                 t("provision.revokeConfirm"),
@@ -190,7 +195,7 @@ function ProvisionSettingsScreen() {
         [auth.credentials, loadTokens, paramMachineId],
     );
 
-    // Revoked token: delete permanently
+    // Delete permanently
     const handleDelete = React.useCallback(
         async (tokenId: string) => {
             if (!auth.credentials) return;
@@ -219,14 +224,6 @@ function ProvisionSettingsScreen() {
             textAlign: "center",
             lineHeight: 20,
         },
-        statusBadge: {
-            fontSize: 12,
-            fontWeight: "500",
-        },
-        linkItem: {
-            fontSize: 13,
-            color: theme.colors.textLink,
-        },
     });
 
     const formatDate = (iso: string) => {
@@ -235,8 +232,13 @@ function ProvisionSettingsScreen() {
             month: "short",
             day: "numeric",
             year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
         });
     };
+
+    const activeTokens = tokens.filter(tk => !tk.revokedAt);
+    const revokedTokens = tokens.filter(tk => !!tk.revokedAt);
 
     return (
         <ItemList>
@@ -244,91 +246,144 @@ function ProvisionSettingsScreen() {
             <ItemGroup>
                 <Item
                     title={t("provision.createToken")}
-                    icon={
-                        <Ionicons
-                            name="add-circle-outline"
-                            size={29}
-                            color={theme.colors.accentBlue}
-                        />
-                    }
+                    icon={<Ionicons name="add-circle-outline" size={29} color={theme.colors.accentBlue} />}
                     onPress={handleCreate}
                     showChevron={false}
                 />
             </ItemGroup>
 
-            {/* Token list */}
-            <ItemGroup title={t("provision.title")}>
-                {loading && tokens.length === 0 && (
+            {/* Loading */}
+            {loading && tokens.length === 0 && (
+                <ItemGroup>
                     <View style={{ alignItems: "center", paddingVertical: 16 }}>
                         <ActivityIndicator size="small" color={theme.colors.primary} />
                     </View>
-                )}
+                </ItemGroup>
+            )}
 
-                {!loading && tokens.length === 0 && (
+            {/* Empty state */}
+            {!loading && tokens.length === 0 && (
+                <ItemGroup>
                     <View style={styles.emptyContainer}>
                         <Ionicons name="key-outline" size={48} color={theme.colors.textSecondary} />
                         <Text style={styles.emptyTitle}>{t("provision.emptyTitle")}</Text>
                         <Text style={styles.emptyDescription}>{t("provision.emptyDescription")}</Text>
                     </View>
-                )}
+                </ItemGroup>
+            )}
 
-                {tokens.map((token) => {
-                    const isRevoked = !!token.revokedAt;
-                    return (
-                        <React.Fragment key={token.id}>
+            {/* Active tokens — each token is its own card */}
+            {activeTokens.map((token) => {
+                const containerName = token.label ? `happy-${sanitizeContainerName(token.label)}` : null;
+                const dockerExecCmd = containerName ? `docker exec -it ${containerName} zsh` : null;
+
+                return (
+                    <ItemGroup
+                        key={token.id}
+                        title={token.label ? `🟢 ${token.label}` : `🟢 ${token.id.slice(0, 8)}`}
+                    >
+                        {/* Container name */}
+                        {containerName && (
                             <Item
-                                title={token.label || token.id.slice(0, 12)}
-                                subtitle={formatDate(token.createdAt)}
-                                icon={
+                                title={t("provision.containerName")}
+                                subtitle={containerName}
+                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                                icon={<Ionicons name="cube-outline" size={20} color={theme.colors.textSecondary} />}
+                                showChevron={false}
+                            />
+                        )}
+
+                        {/* Created at */}
+                        <Item
+                            title={t("provision.createdAt")}
+                            subtitle={formatDate(token.createdAt)}
+                            icon={<Ionicons name="time-outline" size={20} color={theme.colors.textSecondary} />}
+                            showChevron={false}
+                        />
+
+                        {/* Web App link */}
+                        {token.webappUrl && (
+                            <Item
+                                title="Web App"
+                                subtitle={token.webappUrl.length > 60 ? token.webappUrl.slice(0, 60) + "…" : token.webappUrl}
+                                subtitleStyle={{ color: theme.colors.textLink, fontSize: 12 }}
+                                icon={<Ionicons name="globe-outline" size={20} color={theme.colors.accentBlue} />}
+                                onPress={() => Linking.openURL(token.webappUrl!)}
+                                rightElement={
                                     <Ionicons
-                                        name={isRevoked ? "close-circle" : "key"}
-                                        size={24}
-                                        color={isRevoked ? theme.colors.deleteAction : theme.colors.success}
+                                        name="copy-outline"
+                                        size={18}
+                                        color={theme.colors.textSecondary}
+                                        onPress={() => copyAndToast(token.webappUrl!)}
                                     />
                                 }
+                            />
+                        )}
+
+                        {/* ttyd terminal link */}
+                        {token.ttydUrl && (
+                            <Item
+                                title="Web Terminal"
+                                subtitle={token.ttydUrl}
+                                subtitleStyle={{ color: theme.colors.textLink, fontSize: 12 }}
+                                icon={<Ionicons name="terminal-outline" size={20} color={theme.colors.accentPurple} />}
+                                onPress={() => Linking.openURL(token.ttydUrl!)}
                                 rightElement={
-                                    <Text
-                                        style={[
-                                            styles.statusBadge,
-                                            { color: isRevoked ? theme.colors.deleteAction : theme.colors.success },
-                                        ]}
-                                    >
-                                        {isRevoked ? t("provision.revoked") : t("provision.active")}
-                                    </Text>
-                                }
-                                onPress={
-                                    isRevoked
-                                        ? () => handleDelete(token.id)
-                                        : () => handleRevoke(token.id, token.label)
+                                    <Ionicons
+                                        name="copy-outline"
+                                        size={18}
+                                        color={theme.colors.textSecondary}
+                                        onPress={() => copyAndToast(token.ttydUrl!)}
+                                    />
                                 }
                             />
-                            {/* Show clickable URLs for active tokens */}
-                            {!isRevoked && token.webappUrl && (
-                                <Item
-                                    title={t("provision.webAppUrl")}
-                                    subtitle={token.webappUrl}
-                                    subtitleLines={1}
-                                    subtitleStyle={styles.linkItem}
-                                    icon={<Ionicons name="globe-outline" size={20} color={theme.colors.textLink} />}
-                                    onPress={() => Linking.openURL(token.webappUrl!)}
-                                    showChevron={false}
+                        )}
+
+                        {/* Docker exec command */}
+                        {dockerExecCmd && (
+                            <Item
+                                title="Docker Exec"
+                                subtitle={dockerExecCmd}
+                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 12 }}
+                                icon={<Ionicons name="code-slash-outline" size={20} color={theme.colors.textSecondary} />}
+                                onPress={() => copyAndToast(dockerExecCmd)}
+                                showChevron={false}
+                            />
+                        )}
+
+                        {/* Revoke button */}
+                        <Item
+                            title={t("provision.revokeToken")}
+                            titleStyle={{ color: theme.colors.deleteAction }}
+                            icon={<Ionicons name="trash-outline" size={20} color={theme.colors.deleteAction} />}
+                            onPress={() => handleRevoke(token.id, token.label)}
+                            showChevron={false}
+                        />
+                    </ItemGroup>
+                );
+            })}
+
+            {/* Revoked tokens */}
+            {revokedTokens.length > 0 && (
+                <ItemGroup title={t("provision.revoked")}>
+                    {revokedTokens.map((token) => (
+                        <Item
+                            key={token.id}
+                            title={token.label || token.id.slice(0, 12)}
+                            subtitle={formatDate(token.createdAt)}
+                            icon={<Ionicons name="close-circle" size={20} color={theme.colors.deleteAction} />}
+                            rightElement={
+                                <Ionicons
+                                    name="trash-outline"
+                                    size={18}
+                                    color={theme.colors.textSecondary}
                                 />
-                            )}
-                            {!isRevoked && token.ttydUrl && (
-                                <Item
-                                    title={t("provision.terminalUrl")}
-                                    subtitle={token.ttydUrl}
-                                    subtitleLines={1}
-                                    subtitleStyle={styles.linkItem}
-                                    icon={<Ionicons name="terminal-outline" size={20} color={theme.colors.textLink} />}
-                                    onPress={() => Linking.openURL(token.ttydUrl!)}
-                                    showChevron={false}
-                                />
-                            )}
-                        </React.Fragment>
-                    );
-                })}
-            </ItemGroup>
+                            }
+                            onPress={() => handleDelete(token.id)}
+                        />
+                    ))}
+                </ItemGroup>
+            )}
         </ItemList>
     );
 }

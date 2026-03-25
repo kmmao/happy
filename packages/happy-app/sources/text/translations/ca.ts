@@ -1137,6 +1137,8 @@ export const ca: TranslationStructure = {
     deleteConfirm: "Revocar aquest token de proveïment?",
     expiresAt: ({ date }: { date: string }) => `Expira el ${date}`,
     noMachineOnline: "Cap màquina està en línia. Connecta primer una màquina per crear contenidors.",
+    containerName: "Contenidor",
+    createdAt: "Creat",
     containerNameDescription: "Introdueix un nom per al contenidor Docker",
     containerNamePlaceholder: "p. ex. alice",
     creatingContainer: "Creant contenidor...",

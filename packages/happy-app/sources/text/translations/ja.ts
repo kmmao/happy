@@ -1200,6 +1200,8 @@ export const ja: TranslationStructure = {
     deleteConfirm: "このプロビジョン Token を取り消しますか？",
     expiresAt: ({ date }: { date: string }) => `${date} に期限切れ`,
     noMachineOnline: "オンラインのマシンがありません。コンテナを作成するには、まずマシンを接続してください。",
+    containerName: "コンテナ",
+    createdAt: "作成日時",
     containerNameDescription: "Docker コンテナの名前を入力してください",
     containerNamePlaceholder: "例: alice",
     creatingContainer: "コンテナを作成中...",

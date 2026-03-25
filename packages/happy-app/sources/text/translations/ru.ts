@@ -1134,6 +1134,8 @@ export const ru: TranslationStructure = {
     deleteConfirm: "Отозвать этот токен подготовки?",
     expiresAt: ({ date }: { date: string }) => `Истекает ${date}`,
     noMachineOnline: "Нет машин онлайн. Сначала подключите машину для создания контейнеров.",
+    containerName: "Контейнер",
+    createdAt: "Создано",
     containerNameDescription: "Введите имя для Docker-контейнера",
     containerNamePlaceholder: "напр. alice",
     creatingContainer: "Создание контейнера...",

@@ -1146,6 +1146,8 @@ export const pl: TranslationStructure = {
     deleteConfirm: "Unieważnić ten token prowizji?",
     expiresAt: ({ date }: { date: string }) => `Wygasa ${date}`,
     noMachineOnline: "Żadna maszyna nie jest online. Najpierw podłącz maszynę, aby utworzyć kontenery.",
+    containerName: "Kontener",
+    createdAt: "Utworzono",
     containerNameDescription: "Wprowadź nazwę dla kontenera Docker",
     containerNamePlaceholder: "np. alice",
     creatingContainer: "Tworzenie kontenera...",

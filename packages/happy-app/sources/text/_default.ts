@@ -1118,6 +1118,8 @@ export const en = {
     deleteConfirm: "Revoke this provision token?",
     expiresAt: ({ date }: { date: string }) => `Expires ${date}`,
     noMachineOnline: "No machine is online. Connect a machine first to create containers.",
+    containerName: "Container",
+    createdAt: "Created",
     containerNameDescription: "Enter a name for the Docker container",
     containerNamePlaceholder: "e.g. alice",
     creatingContainer: "Creating container...",

@@ -1089,6 +1089,8 @@ export const zhHant: TranslationStructure = {
     deleteConfirm: "撤銷此配置 Token？",
     expiresAt: ({ date }: { date: string }) => `${date} 過期`,
     noMachineOnline: "沒有在線的機器。請先連接一台機器以建立容器。",
+    containerName: "容器",
+    createdAt: "建立時間",
     containerNameDescription: "輸入 Docker 容器的名稱",
     containerNamePlaceholder: "例如 alice",
     creatingContainer: "正在建立容器...",

@@ -1137,6 +1137,8 @@ export const es: TranslationStructure = {
     deleteConfirm: "¿Revocar este token de aprovisionamiento?",
     expiresAt: ({ date }: { date: string }) => `Expira el ${date}`,
     noMachineOnline: "No hay máquinas en línea. Conecta una máquina primero para crear contenedores.",
+    containerName: "Contenedor",
+    createdAt: "Creado",
     containerNameDescription: "Introduce un nombre para el contenedor Docker",
     containerNamePlaceholder: "p. ej. alice",
     creatingContainer: "Creando contenedor...",
