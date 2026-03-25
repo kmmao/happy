@@ -94,6 +94,42 @@ export function provisionRoutes(app: Fastify) {
         })));
     });
 
+    // Update URLs on an existing provision token
+    app.patch('/v1/provision/:id', {
+        preHandler: app.authenticate,
+        schema: {
+            params: z.object({ id: z.string() }),
+            body: z.object({
+                webappUrl: z.string().max(2000).nullish(),
+                ttydUrl: z.string().max(2000).nullish(),
+            }),
+            response: {
+                200: z.object({ success: z.literal(true) }),
+                404: z.object({ error: z.string() }),
+            },
+        },
+    }, async (request, reply) => {
+        const { id } = request.params;
+        const { webappUrl, ttydUrl } = request.body;
+
+        const token = await db.provisionToken.findFirst({
+            where: { id, accountId: request.userId },
+        });
+        if (!token) {
+            return reply.code(404).send({ error: "Token not found" });
+        }
+
+        await db.provisionToken.update({
+            where: { id },
+            data: {
+                ...(webappUrl !== undefined ? { webappUrl } : {}),
+                ...(ttydUrl !== undefined ? { ttydUrl } : {}),
+            },
+        });
+
+        return reply.send({ success: true });
+    });
+
     // Revoke or delete a provision token
     app.delete('/v1/provision/:id', {
         preHandler: app.authenticate,

@@ -82,6 +82,32 @@ export async function provisionList(
 }
 
 /**
+ * Update URLs on an existing provision token.
+ */
+export async function provisionUpdateUrls(
+    credentials: AuthCredentials,
+    tokenId: string,
+    urls: { webappUrl?: string; ttydUrl?: string }
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+
+    await backoff(async () => {
+        const response = await fetch(`${API_ENDPOINT}/v1/provision/${tokenId}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${credentials.token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(urls),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to update provision token: ${response.status}`);
+        }
+    });
+}
+
+/**
  * Revoke a provision token (invalidates the bearer token).
  */
 export async function provisionRevoke(

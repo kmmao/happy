@@ -15,12 +15,13 @@ import { useAuth } from "@/auth/AuthContext";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { machineBash } from "@/sync/ops";
 import { storage } from "@/sync/storage";
-import { getWebappUrl, getServerUrl } from "@/sync/serverConfig";
+import { getServerUrl } from "@/sync/serverConfig";
 import { isMachineOnline } from "@/utils/machineUtils";
 import {
     provisionCreate,
     provisionList,
     provisionRevoke,
+    provisionUpdateUrls,
     type ProvisionTokenItem,
 } from "@/sync/apiProvision";
 
@@ -98,64 +99,30 @@ function ProvisionSettingsScreen() {
 
         Modal.toast(t("provision.creatingContainer"));
 
-        // Find next available ttyd port
+        // Find next available ttyd port (7001+)
         const portScanResult = await machineBash(machineId, "docker ps --format '{{.Ports}}' | grep -oP '0\\.0\\.0\\.0:\\K(70[0-9]{2})' | sort -n | tail -1", "/");
         const lastPort = parseInt(portScanResult.stdout?.trim() || "7000", 10);
         const ttydPort = Math.max(lastPort + 1, 7001);
 
-        // Build URLs
-        const webappBaseUrl = getWebappUrl();
-        const serverUrl = getServerUrl();
-        const baseHost = (() => {
-            try {
-                return new URL(webappBaseUrl || serverUrl).hostname;
-            } catch {
-                return "localhost";
-            }
-        })();
-        const ttydUrl = `http://${baseHost}:${ttydPort}`;
+        // Get machine's LAN IP for internal URLs
+        const ipResult = await machineBash(machineId, "hostname -I | awk '{print $1}'", "/");
+        const machineIp = ipResult.stdout?.trim() || "localhost";
 
-        // Create provision token — server returns the token string
+        // 1. Create provision token
         const result = await provisionCreate(auth.credentials, {
             label: safeName,
             ttlHours: 8760,
         });
 
-        // Now build the webapp URL with the actual token
-        const webappUrl = webappBaseUrl
-            ? `${webappBaseUrl}?provision=${encodeURIComponent(result.provisionToken)}`
-            : null;
+        // 2. Build internal URLs (LAN IP)
+        const webappUrl = `http://${machineIp}:8081?provision=${encodeURIComponent(result.provisionToken)}`;
+        const ttydUrl = `http://${machineIp}:${ttydPort}`;
 
-        // Update server record with URLs (re-create with URLs)
-        await provisionRevoke(auth.credentials, result.id);
-        const finalResult = await provisionCreate(auth.credentials, {
-            label: safeName,
-            ttlHours: 8760,
-            webappUrl: webappUrl ?? undefined,
-            ttydUrl,
-        });
+        // 3. Save URLs to server (PATCH, no re-create)
+        await provisionUpdateUrls(auth.credentials, result.id, { webappUrl, ttydUrl });
 
-        // Build final webapp URL with the NEW token
-        const finalWebappUrl = webappBaseUrl
-            ? `${webappBaseUrl}?provision=${encodeURIComponent(finalResult.provisionToken)}`
-            : null;
-
-        // Update URLs again (since token changed)
-        if (finalWebappUrl) {
-            await provisionRevoke(auth.credentials, finalResult.id);
-            await provisionCreate(auth.credentials, {
-                label: safeName,
-                ttlHours: 8760,
-                webappUrl: finalWebappUrl,
-                ttydUrl,
-            });
-        }
-
-        // Execute docker run
-        const latestTokens = await provisionList(auth.credentials);
-        const latestToken = latestTokens.find(tk => tk.label === safeName && !tk.revokedAt);
-        // Use the provision token from the most recent create call
-        const dockerCmd = `docker run -d --name "${containerFullName}" -v "${volumeName}:/root/.happy" -p ${ttydPort}:7681 -e HAPPY_PROVISION_TOKEN="${finalResult.provisionToken}" happy-client`;
+        // 4. Docker run
+        const dockerCmd = `docker run -d --name "${containerFullName}" -v "${volumeName}:/root/.happy" -p ${ttydPort}:7681 -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {
