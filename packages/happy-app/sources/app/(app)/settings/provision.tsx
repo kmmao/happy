@@ -89,10 +89,31 @@ function ProvisionSettingsScreen() {
             t("provision.containerNameDescription"),
             {
                 placeholder: t("provision.containerNamePlaceholder"),
-                confirmText: t("common.ok"),
+                confirmText: t("common.next"),
             },
         );
         if (!containerName?.trim()) return;
+
+        // Ask for API configuration (optional)
+        const apiBaseUrl = await Modal.prompt(
+            "API Base URL",
+            t("provision.apiBaseUrlDescription"),
+            {
+                placeholder: "https://api.anthropic.com",
+                confirmText: t("common.next"),
+                defaultValue: "",
+            },
+        );
+
+        const apiKey = await Modal.prompt(
+            "API Key",
+            t("provision.apiKeyDescription"),
+            {
+                placeholder: "sk-ant-...",
+                confirmText: t("common.ok"),
+                defaultValue: "",
+            },
+        );
 
         const safeName = sanitizeContainerName(containerName.trim());
         const volumeName = `happy-${safeName}-data`;
@@ -128,8 +149,12 @@ function ProvisionSettingsScreen() {
         await machineBash(machineId, `docker exec happy-caddy-1 sh -c 'mkdir -p /etc/caddy/sites && cat > /etc/caddy/sites/t-${safeName}.caddy << CADDYEOF\n${caddySiteContent}\nCADDYEOF'`, "/");
         await machineBash(machineId, `docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`, "/");
 
-        // 5. Docker run
-        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="${serverUrl}" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -w /work happy-client`;
+        // 5. Docker run (API keys passed at runtime, not baked into image)
+        const apiEnvs = [
+            apiBaseUrl?.trim() ? `-e ANTHROPIC_BASE_URL="${apiBaseUrl.trim()}"` : "",
+            apiKey?.trim() ? `-e ANTHROPIC_AUTH_TOKEN="${apiKey.trim()}"` : "",
+        ].filter(Boolean).join(" ");
+        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="${serverUrl}" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" ${apiEnvs} -w /work happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {

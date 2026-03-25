@@ -78,8 +78,8 @@ ENV HAPPY_SERVER_URL="https://s.sangreal.code.xycloud.info:2443"
 ENV HAPPY_WEBAPP_URL="http://localhost:8081"
 ENV HAPPY_HOME_DIR="/home/coder/.happy"
 ENV EXPO_PACKAGER_PROXY_URL="http://localhost:8081"
-ENV ANTHROPIC_BASE_URL="http://100.85.22.83:8899"
-ENV ANTHROPIC_AUTH_TOKEN="sk-eed38d0404ac17a70e24474024cf9cc56b56a0cea3bf8e1c196f0fb1253a7eb0"
+# ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN are passed at runtime via docker run -e
+# Do NOT bake API keys into the image
 
 # Entrypoint script (write as root, then switch back)
 USER root
