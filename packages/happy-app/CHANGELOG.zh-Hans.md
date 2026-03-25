@@ -1,5 +1,45 @@
 # 更新日志
 
+## 2.9.0 - 2026-03-26
+
+完整的 Docker 容器生命周期管理：一键创建、HTTPS 反代、网络隔离、AI Profile 环境变量修复。
+
+### Docker 容器管理
+- 新增一键创建容器 — 从机器详情页点击即自动创建 Docker 容器并配置 Caddy HTTPS 反代
+- 新增 Web Terminal (ttyd) HTTP Basic Auth 密码认证 — 用户名和密码以可复制字段显示
+- 新增 Web Terminal 内网地址显示 — HTTPS 链接旁同时显示 LAN 直连地址
+- 新增端口自动分配 — Docker + 系统双重扫描，从 7001-7099 找第一个空闲端口
+- 新增容器 hostname 与容器名一致 — 设备列表中清晰标识
+- 新增非 root 用户 (coder) — 修复 Claude Code 拒绝以 root 运行 `--dangerously-skip-permissions`
+- 新增容器重启时自动清理旧 daemon state — 防止 PID 误判导致 daemon 启动失败
+
+### HTTPS 与 Caddy
+- 新增按容器自动生成 Caddy 站点文件 (`t-{name}.code.xycloud.info`)
+- 新增 `*.code.xycloud.info` 泛域名 TLS 证书 — 新子域名即时可用，无需等待签发
+- 新增可复用 `cloudflare_tls` snippet 减少 Caddyfile 重复配置
+- 新增动态站点文件通过 Docker Volume 持久化，Caddy 重启后自动恢复
+- 新增撤销/删除 Token 时自动清理对应的 Caddy 站点文件
+
+### 安全加固
+- 改进容器网络隔离 — 从 `happy_default` 网络移除，无法直连 PostgreSQL/Redis/MinIO
+- 改进 API 密钥处理 — 从 Dockerfile 移除硬编码密钥，通过 docker run 或 AI Profile 运行时传入
+- 新增 API 配置作为 Provision 页面持久化设置（设一次，所有容器复用）
+- 新增 Docker 可用性检测 — 无 Docker 的机器隐藏 Provision Token 入口
+- 修复 Docker 容器中 AI Profile 环境变量被错误剥离的问题（daemon 未预设时允许 GUI 覆盖）
+
+### 渲染增强
+- 新增 LaTeX 数学公式渲染 — 支持行内 (`$...$`) 和块级 (`$$...$$`) KaTeX 表达式
+- 新增表格单元格内数学公式和行内 Markdown 渲染支持
+
+### Provision Token
+- 新增已撤销 Token 还原/重新激活功能（带确认弹窗）
+- 新增永久删除功能（与撤销分开，带确认弹窗）
+- 改进已撤销 Token 显示为独立卡片，包含撤销时间
+
+### RPC 与连接
+- 改进机器状态为三色指示（就绪/在线/离线），基于 RPC Handler 注册状态
+- 修复 RPC 断连恢复 — App 端自动重试 + CLI/Agent 快速重注册
+
 ## 2.8.0 - 2026-03-25
 
 统一网络服务管理、Docker 容器 Provision Token 免扫码认证、Supervisor 分析模式，以及大量 UI 优化。

@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.9.0 - 2026-03-26
+
+Full Docker container lifecycle management with one-tap provisioning, HTTPS reverse proxy, network isolation, and AI Profile environment variable fix.
+
+### Docker Container Management
+- Added one-tap container creation from machine detail page with automatic Caddy HTTPS reverse proxy
+- Added Web Terminal (ttyd) with HTTP Basic Auth password protection — username and password displayed as copyable fields
+- Added Web Terminal LAN address display alongside HTTPS URL for direct internal access
+- Added automatic port allocation with Docker + system dual scan to find first available port (7001-7099)
+- Added container hostname matching container name for clear identification in device list
+- Added non-root user (coder) to fix Claude Code refusing `--dangerously-skip-permissions` as root
+- Added automatic cleanup of stale daemon state on container restart to prevent PID mismatch
+
+### HTTPS & Caddy
+- Added automatic Caddy site file generation per container (`t-{name}.code.xycloud.info`)
+- Added wildcard TLS certificate for `*.code.xycloud.info` — new subdomains are instant, no certificate wait
+- Added reusable `cloudflare_tls` snippet to reduce Caddyfile duplication
+- Added dynamic site files persisted in Docker volume, surviving Caddy restarts
+- Added automatic Caddy site cleanup on token revoke/delete
+
+### Security
+- Improved container network isolation — removed from `happy_default`, cannot directly access PostgreSQL/Redis/MinIO
+- Improved API key handling — removed hardcoded keys from Dockerfile, passed at runtime via docker run or AI Profile
+- Added API configuration as persistent settings on provision page (set once, reused for all containers)
+- Added Docker availability detection — provision entry hidden on machines without Docker
+- Fixed AI Profile environment variables being stripped in Docker containers where daemon has no pre-set API keys
+
+### Rendering
+- Added LaTeX math formula rendering with KaTeX for inline (`$...$`) and block (`$$...$$`) expressions
+- Added math formula support in table cells alongside inline Markdown
+
+### Provision Token
+- Added token restore/reactivate functionality with confirmation dialog
+- Added permanent delete with confirmation (separate from revoke)
+- Improved revoked tokens displayed as individual cards with revoke timestamp
+
+### RPC & Connectivity
+- Improved machine status to three-color indicator (ready/online/offline) based on RPC handler registration
+- Fixed RPC disconnect recovery with automatic retry on App side and fast re-registration on CLI/Agent side
+
 ## 2.8.0 - 2026-03-25
 
 Unified network services management, Provision Token for Docker containers, supervisor analysis mode, and extensive UI polish.
