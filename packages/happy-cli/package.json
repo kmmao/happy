@@ -1,6 +1,6 @@
 {
   "name": "@kmmao/happy-coder",
-  "version": "0.48.27",
+  "version": "0.48.28",
   "description": "Mobile and Web client for Claude Code and Codex",
   "author": "kmmao",
   "license": "MIT",
@@ -118,7 +118,7 @@
   },
   "devDependencies": {
     "@eslint/compat": "^1",
-    "@kmmao/happy-wire": "^0.3.0",
+    "@kmmao/happy-wire": "^0.4.1",
     "@types/cross-spawn": "^6.0.6",
     "@types/http-proxy": "^1.17.17",
     "@types/inquirer": "^9.0.9",
