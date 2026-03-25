@@ -1212,6 +1212,8 @@ export const ja: TranslationStructure = {
     createdAt: "作成日時",
     containerNameDescription: "Docker コンテナの名前を入力してください",
     containerNamePlaceholder: "例: alice",
+    apiConfig: "API 設定",
+    apiNotSet: "未設定（任意）",
     apiBaseUrlDescription: "カスタム API エンドポイント（空欄でスキップ）",
     apiKeyDescription: "Claude の API キー（空欄でスキップ）",
     creatingContainer: "コンテナを作成中...",

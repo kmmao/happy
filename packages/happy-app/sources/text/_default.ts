@@ -1130,6 +1130,8 @@ export const en = {
     createdAt: "Created",
     containerNameDescription: "Enter a name for the Docker container",
     containerNamePlaceholder: "e.g. alice",
+    apiConfig: "API Configuration",
+    apiNotSet: "Not set (optional)",
     apiBaseUrlDescription: "Custom API endpoint (leave empty to skip)",
     apiKeyDescription: "API key for Claude (leave empty to skip)",
     creatingContainer: "Creating container...",

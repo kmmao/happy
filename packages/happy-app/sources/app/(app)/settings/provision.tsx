@@ -15,6 +15,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { machineBash } from "@/sync/ops";
 import { storage } from "@/sync/storage";
+import { MMKV } from "react-native-mmkv";
 import { getServerUrl } from "@/sync/serverConfig";
 import { isMachineOnline } from "@/utils/machineUtils";
 import {
@@ -42,12 +43,18 @@ async function copyAndToast(text: string) {
     Modal.toast(t("provision.copied"));
 }
 
+const provisionStorage = new MMKV({ id: "provision-config" });
+const API_BASE_URL_KEY = "api-base-url";
+const API_KEY_KEY = "api-key";
+
 function ProvisionSettingsScreen() {
     const { theme } = useUnistyles();
     const auth = useAuth();
     const { machineId: paramMachineId } = useLocalSearchParams<{ machineId?: string }>();
     const [tokens, setTokens] = React.useState<ProvisionTokenItem[]>([]);
     const [loading, setLoading] = React.useState(true);
+    const [apiBaseUrl, setApiBaseUrl] = React.useState(() => provisionStorage.getString(API_BASE_URL_KEY) ?? "");
+    const [apiKey, setApiKey] = React.useState(() => provisionStorage.getString(API_KEY_KEY) ?? "");
 
     const loadTokens = React.useCallback(async () => {
         if (!auth.credentials) return;
@@ -83,37 +90,16 @@ function ProvisionSettingsScreen() {
             return;
         }
 
-        // Ask for container name
+        // Ask for container name (API config is set in the settings section above)
         const containerName = await Modal.prompt(
             t("provision.createToken"),
             t("provision.containerNameDescription"),
             {
                 placeholder: t("provision.containerNamePlaceholder"),
-                confirmText: t("common.next"),
+                confirmText: t("common.ok"),
             },
         );
         if (!containerName?.trim()) return;
-
-        // Ask for API configuration (optional)
-        const apiBaseUrl = await Modal.prompt(
-            "API Base URL",
-            t("provision.apiBaseUrlDescription"),
-            {
-                placeholder: "https://api.anthropic.com",
-                confirmText: t("common.next"),
-                defaultValue: "",
-            },
-        );
-
-        const apiKey = await Modal.prompt(
-            "API Key",
-            t("provision.apiKeyDescription"),
-            {
-                placeholder: "sk-ant-...",
-                confirmText: t("common.ok"),
-                defaultValue: "",
-            },
-        );
 
         const safeName = sanitizeContainerName(containerName.trim());
         const volumeName = `happy-${safeName}-data`;
@@ -277,6 +263,44 @@ function ProvisionSettingsScreen() {
 
     return (
         <ItemList>
+            {/* API Configuration */}
+            <ItemGroup title={t("provision.apiConfig")}>
+                <Item
+                    title="API Base URL"
+                    subtitle={apiBaseUrl || t("provision.apiNotSet")}
+                    subtitleStyle={apiBaseUrl ? { fontFamily: "Menlo", fontSize: 12 } : { color: theme.colors.textSecondary, fontSize: 13 }}
+                    icon={<Ionicons name="server-outline" size={20} color={theme.colors.textSecondary} />}
+                    onPress={async () => {
+                        const val = await Modal.prompt("API Base URL", t("provision.apiBaseUrlDescription"), {
+                            placeholder: "https://api.anthropic.com",
+                            defaultValue: apiBaseUrl,
+                        });
+                        if (val !== null) {
+                            setApiBaseUrl(val);
+                            provisionStorage.set(API_BASE_URL_KEY, val);
+                        }
+                    }}
+                    showChevron={false}
+                />
+                <Item
+                    title="API Key"
+                    subtitle={apiKey ? `${apiKey.slice(0, 10)}...` : t("provision.apiNotSet")}
+                    subtitleStyle={apiKey ? { fontFamily: "Menlo", fontSize: 12 } : { color: theme.colors.textSecondary, fontSize: 13 }}
+                    icon={<Ionicons name="key-outline" size={20} color={theme.colors.textSecondary} />}
+                    onPress={async () => {
+                        const val = await Modal.prompt("API Key", t("provision.apiKeyDescription"), {
+                            placeholder: "sk-ant-...",
+                            defaultValue: apiKey,
+                        });
+                        if (val !== null) {
+                            setApiKey(val);
+                            provisionStorage.set(API_KEY_KEY, val);
+                        }
+                    }}
+                    showChevron={false}
+                />
+            </ItemGroup>
+
             {/* Create button */}
             <ItemGroup>
                 <Item

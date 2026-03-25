@@ -1146,6 +1146,8 @@ export const ru: TranslationStructure = {
     createdAt: "Создано",
     containerNameDescription: "Введите имя для Docker-контейнера",
     containerNamePlaceholder: "напр. alice",
+    apiConfig: "Настройки API",
+    apiNotSet: "Не задано (необязательно)",
     apiBaseUrlDescription: "Пользовательский адрес API (оставьте пустым для пропуска)",
     apiKeyDescription: "Ключ API для Claude (оставьте пустым для пропуска)",
     creatingContainer: "Создание контейнера...",
