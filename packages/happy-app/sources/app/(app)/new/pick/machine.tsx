@@ -5,7 +5,7 @@ import { CommonActions, useNavigation } from '@react-navigation/native';
 import { Typography } from '@/constants/Typography';
 import { useAllMachines, useSessions } from '@/sync/storage';
 import { Ionicons } from '@expo/vector-icons';
-import { isMachineOnline } from '@/utils/machineUtils';
+import { isMachineOnline, getMachineConnectionState } from '@/utils/machineUtils';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { ItemList } from '@/components/ItemList';
@@ -134,12 +134,28 @@ function MachinePickerScreen() {
                             />
                         ),
                         getItemStatus: (machine) => {
-                            const offline = !isMachineOnline(machine);
+                            const connState = getMachineConnectionState(machine);
+                            if (connState === 'offline') {
+                                return {
+                                    text: 'offline',
+                                    color: theme.colors.status.disconnected,
+                                    dotColor: theme.colors.status.disconnected,
+                                    isPulsing: false,
+                                };
+                            }
+                            if (connState === 'connecting') {
+                                return {
+                                    text: 'connecting',
+                                    color: '#FF9500',
+                                    dotColor: '#FF9500',
+                                    isPulsing: true,
+                                };
+                            }
                             return {
-                                text: offline ? 'offline' : 'online',
-                                color: offline ? theme.colors.status.disconnected : theme.colors.status.connected,
-                                dotColor: offline ? theme.colors.status.disconnected : theme.colors.status.connected,
-                                isPulsing: !offline,
+                                text: 'online',
+                                color: theme.colors.status.connected,
+                                dotColor: theme.colors.status.connected,
+                                isPulsing: true,
                             };
                         },
                         formatForDisplay: (machine) => machine.metadata?.displayName || machine.metadata?.host || machine.id,

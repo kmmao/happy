@@ -2,6 +2,7 @@ import { onShutdown } from "@/utils/shutdown";
 import { Fastify } from "./types";
 import {
   buildMachineActivityEphemeral,
+  buildRpcReadyEphemeral,
   ClientConnection,
   eventRouter,
 } from "@/app/events/eventRouter";
@@ -175,17 +176,41 @@ export function startSocket(app: Fastify) {
       userRpcListeners = new Map<string, Socket>();
       rpcListeners.set(userId, userRpcListeners);
     }
-    rpcHandler(userId, socket, userRpcListeners);
+    rpcHandler({
+      userId,
+      socket,
+      rpcListeners: userRpcListeners,
+      clientType: metadata.clientType,
+    });
     // Safety-net cleanup: remove any orphaned entries for this socket,
-    // then delete the user's Map if empty.
+    // broadcast rpc-ready:false for affected scopes, then delete the user's Map if empty.
     socket.on("disconnect", () => {
+      const affectedScopes = new Set<string>();
       for (const [method, registeredSocket] of userRpcListeners.entries()) {
         if (registeredSocket === socket) {
           userRpcListeners.delete(method);
+          const colonIndex = method.indexOf(":");
+          if (colonIndex > 0) {
+            affectedScopes.add(method.substring(0, colonIndex));
+          }
         }
       }
       if (userRpcListeners.size === 0) {
         rpcListeners.delete(userId);
+      }
+      // Broadcast rpc-ready:false for each scope that lost all its methods
+      const rpcScope: "machine" | "session" | null =
+          metadata.clientType === "machine-scoped" ? "machine"
+              : metadata.clientType === "session-scoped" ? "session"
+                  : null;
+      if (rpcScope) {
+        for (const scopeId of affectedScopes) {
+          eventRouter.emitEphemeral({
+            userId,
+            payload: buildRpcReadyEphemeral(rpcScope, scopeId, false),
+            recipientFilter: { type: "user-scoped-only" },
+          });
+        }
       }
     });
     usageHandler(userId, socket);

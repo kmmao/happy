@@ -236,6 +236,13 @@ export const ApiEphemeralMachineActivityUpdateSchema = z.object({
   activeAt: z.number(),
 });
 
+export const ApiEphemeralRpcReadySchema = z.object({
+  type: z.literal("rpc-ready"),
+  scope: z.enum(["machine", "session"]),
+  id: z.string(), // machineId or sessionId
+  ready: z.boolean(),
+});
+
 export const ApiEphemeralWebhookIssueLinkSchema = z.object({
   type: z.literal("webhook-issue-linked"),
   issueNumber: z.number(),
@@ -302,6 +309,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
   ApiEphemeralMachineActivityUpdateSchema,
+  ApiEphemeralRpcReadySchema,
   ApiEphemeralWebhookIssueLinkSchema,
   ApiEphemeralWebhookPRMergedSchema,
   ApiEphemeralSupervisorTriggerSchema,

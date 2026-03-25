@@ -171,6 +171,7 @@ export interface Session {
   updatedAt: number;
   active: boolean;
   activeAt: number;
+  rpcReady: boolean; // true when at least one RPC method is registered for this session
   metadata: Metadata | null;
   metadataVersion: number;
   agentState: AgentState | null;
@@ -282,6 +283,7 @@ export interface Machine {
   updatedAt: number;
   active: boolean;
   activeAt: number; // Changed from lastActiveAt to activeAt for consistency
+  rpcReady: boolean; // true when at least one RPC method is registered on the server
   metadata: MachineMetadata | null;
   metadataVersion: number;
   daemonState: any | null; // Dynamic daemon state (runtime info)

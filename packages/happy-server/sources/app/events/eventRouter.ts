@@ -230,6 +230,12 @@ export type EphemeralEvent =
       activeAt: number;
     }
   | {
+      type: "rpc-ready";
+      scope: "machine" | "session";
+      id: string; // machineId or sessionId
+      ready: boolean;
+    }
+  | {
       type: "usage";
       id: string;
       key: string;
@@ -717,6 +723,19 @@ export function buildMachineActivityEphemeral(
     id: machineId,
     active,
     activeAt,
+  };
+}
+
+export function buildRpcReadyEphemeral(
+  scope: "machine" | "session",
+  id: string,
+  ready: boolean,
+): EphemeralPayload {
+  return {
+    type: "rpc-ready",
+    scope,
+    id,
+    ready,
   };
 }
 

@@ -1001,6 +1001,7 @@ class Sync {
       // Put it all together
       const processedSession = {
         ...session,
+        rpcReady: false,
         thinking: false,
         thinkingAt: 0,
         metadata,
@@ -1438,6 +1439,7 @@ class Sync {
           updatedAt: machine.updatedAt,
           active: machine.active,
           activeAt: machine.activeAt,
+          rpcReady: false,
           metadata,
           metadataVersion: machine.metadataVersion,
           daemonState,
@@ -1453,6 +1455,7 @@ class Sync {
           updatedAt: machine.updatedAt,
           active: machine.active,
           activeAt: machine.activeAt,
+          rpcReady: false,
           metadata: null,
           metadataVersion: machine.metadataVersion,
           daemonState: null,
@@ -2352,6 +2355,27 @@ class Sync {
           activeAt: updateData.activeAt,
         };
         storage.getState().applyMachines([updatedMachine]);
+      }
+    }
+
+    // Handle RPC ready status updates
+    if (updateData.type === "rpc-ready") {
+      if (updateData.scope === "machine") {
+        const machine = storage.getState().machines[updateData.id];
+        if (machine) {
+          storage.getState().applyMachines([{
+            ...machine,
+            rpcReady: updateData.ready,
+          }]);
+        }
+      } else if (updateData.scope === "session") {
+        const session = storage.getState().sessions[updateData.id];
+        if (session) {
+          this.applySessions([{
+            ...session,
+            rpcReady: updateData.ready,
+          }]);
+        }
       }
     }
 

@@ -15,6 +15,7 @@ function createSession(
     updatedAt,
     active: true,
     activeAt: updatedAt,
+    rpcReady: false,
     presence: "online",
     thinking: false,
     thinkingAt: 0,

@@ -544,6 +544,7 @@ export async function handleUpdateMachineUpdate(
         updatedAt: updateData.createdAt,
         active: body.active ?? true,
         activeAt: body.activeAt ?? updateData.createdAt,
+        rpcReady: machine?.rpcReady ?? false,
         metadata: machine?.metadata ?? null,
         metadataVersion: machine?.metadataVersion ?? 0,
         daemonState: machine?.daemonState ?? null,

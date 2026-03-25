@@ -1,4 +1,4 @@
-import { eventRouter } from "@/app/events/eventRouter";
+import { buildRpcReadyEphemeral, eventRouter } from "@/app/events/eventRouter";
 import { log } from "@/utils/log";
 import { Socket } from "socket.io";
 
@@ -21,11 +21,75 @@ function getForwardTimeout(qualifiedMethod: string): number {
   return LONG_RUNNING_METHODS.has(bare) ? LONG_TIMEOUT : SHORT_TIMEOUT;
 }
 
-export function rpcHandler(
-  userId: string,
-  socket: Socket,
-  rpcListeners: Map<string, Socket>,
-) {
+/** Extract the scope prefix (machineId or sessionId) from a qualified method name. */
+function getScopeId(qualifiedMethod: string): string | null {
+  const colonIndex = qualifiedMethod.indexOf(":");
+  return colonIndex > 0 ? qualifiedMethod.substring(0, colonIndex) : null;
+}
+
+export interface RpcHandlerOptions {
+    userId: string;
+    socket: Socket;
+    rpcListeners: Map<string, Socket>;
+    /** "machine-scoped" or "session-scoped" — determines rpc-ready scope type. */
+    clientType: "session-scoped" | "machine-scoped" | "user-scoped";
+}
+
+/**
+ * Debounced rpc-ready broadcaster.
+ * Batches rapid-fire rpc-register calls (CLI registers 10+ methods at once)
+ * into a single rpc-ready ephemeral per scope.
+ */
+const pendingBroadcasts = new Map<string, ReturnType<typeof setTimeout>>();
+
+function broadcastRpcReady(
+    userId: string,
+    scope: "machine" | "session",
+    scopeId: string,
+    ready: boolean,
+): void {
+    const key = `${userId}:${scopeId}`;
+
+    // For "not ready", broadcast immediately (disconnect = urgent)
+    if (!ready) {
+        const pending = pendingBroadcasts.get(key);
+        if (pending) {
+            clearTimeout(pending);
+            pendingBroadcasts.delete(key);
+        }
+        eventRouter.emitEphemeral({
+            userId,
+            payload: buildRpcReadyEphemeral(scope, scopeId, false),
+            recipientFilter: { type: "user-scoped-only" },
+        });
+        return;
+    }
+
+    // For "ready", debounce 200ms to batch multiple registrations
+    const existing = pendingBroadcasts.get(key);
+    if (existing) {
+        clearTimeout(existing);
+    }
+    pendingBroadcasts.set(
+        key,
+        setTimeout(() => {
+            pendingBroadcasts.delete(key);
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildRpcReadyEphemeral(scope, scopeId, true),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+        }, 200),
+    );
+}
+
+export function rpcHandler(options: RpcHandlerOptions) {
+  const { userId, socket, rpcListeners, clientType } = options;
+  const rpcScope: "machine" | "session" | null =
+      clientType === "machine-scoped" ? "machine"
+          : clientType === "session-scoped" ? "session"
+              : null;
+
   // RPC register - Register this socket as a listener for an RPC method
   // Supports optional ack callback for reliable registration
   socket.on("rpc-register", async (data: any, ack?: (response: any) => void) => {
@@ -46,6 +110,14 @@ export function rpcHandler(
 
       // Register this socket as the listener for this method
       rpcListeners.set(method, socket);
+
+      // Broadcast rpc-ready to user-scoped connections
+      if (rpcScope) {
+        const scopeId = getScopeId(method);
+        if (scopeId) {
+          broadcastRpcReady(userId, rpcScope, scopeId, true);
+        }
+      }
 
       if (ack) {
         ack({ ok: true, method });
@@ -111,7 +183,6 @@ export function rpcHandler(
 
         const targetSocket = rpcListeners.get(method);
         if (!targetSocket || !targetSocket.connected) {
-          // log({ module: 'websocket-rpc' }, `RPC call failed: Method ${method} not available (disconnected or not registered)`);
           if (callback) {
             callback({
               ok: false,
@@ -123,7 +194,6 @@ export function rpcHandler(
 
         // Don't allow calling your own socket
         if (targetSocket === socket) {
-          // log({ module: 'websocket-rpc' }, `RPC call failed: Attempted self-call on method ${method}`);
           if (callback) {
             callback({
               ok: false,
@@ -177,7 +247,6 @@ export function rpcHandler(
           }
         }
       } catch (error) {
-        // log({ module: 'websocket', level: 'error' }, `Error in rpc-call: ${error}`);
         if (callback) {
           callback({
             ok: false,
@@ -188,6 +257,6 @@ export function rpcHandler(
     },
   );
 
-  // NOTE: disconnect cleanup is handled in socket.ts (the authoritative handler)
-  // to avoid duplicate cleanup and the invalid rpcListeners.delete(userId) call.
+  // NOTE: disconnect cleanup is handled in socket.ts (the authoritative handler).
+  // rpc-ready:false broadcasts are also emitted from socket.ts on disconnect.
 }

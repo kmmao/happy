@@ -65,6 +65,19 @@ export function useSessionStatus(session: Session): SessionStatus {
     };
   }
 
+  // RPC not yet ready (transient state after server restart / reconnection)
+  if (!session.rpcReady) {
+    return {
+      state: "waiting",
+      isConnected: true,
+      statusText: t("status.connecting"),
+      shouldShowStatus: true,
+      statusColor: "#FF9500",
+      statusDotColor: "#FF9500",
+      isPulsing: true,
+    };
+  }
+
   // Check if permission is required
   if (hasPermissions) {
     return {
