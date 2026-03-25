@@ -108,7 +108,7 @@ function ProvisionSettingsScreen() {
         Modal.toast(t("provision.creatingContainer"));
 
         // Find next available ttyd port (7001+)
-        const portScanResult = await machineBash(machineId, "docker ps --format '{{.Ports}}' | grep -oP '0\\.0\\.0\\.0:\\K(70[0-9]{2})' | sort -n | tail -1", "/");
+        const portScanResult = await machineBash(machineId, "docker ps -a --format '{{.Ports}}' | grep -o '0\\.0\\.0\\.0:70[0-9][0-9]' | sed 's/0\\.0\\.0\\.0://' | sort -n | tail -1", "/");
         const lastPort = parseInt(portScanResult.stdout?.trim() || "7000", 10);
         const ttydPort = Math.max(lastPort + 1, 7001);
 
