@@ -1096,6 +1096,7 @@ export const zhHant: TranslationStructure = {
     containerCreatedDescription: ({ name, url }: { name: string; url: string }) => `容器 happy-${name} 正在執行。\n\nWeb 存取連結（已複製到剪貼簿）：\n${url}`,
     webAppUrl: "Happy Web App（已複製）：",
     terminalUrl: "Web 終端（ttyd）：",
+    webappUrlNotConfigured: "Web App URL 未設定。請前往 設定 → 帳號 → 設定 Web App URL。",
     containerFailed: "容器建立失敗",
     containerFailedDescription: ({ error }: { error: string }) => `Docker 命令失敗：${error}\n\n配置 token 已複製到剪貼簿作為備用方案。`,
   },

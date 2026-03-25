@@ -88,6 +88,8 @@ model ProvisionToken {
     accountId   String
     account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
     tokenHash   String    @unique // SHA-256 hash of the bearer token (never store plaintext)
+    webappUrl   String?   // Web App auto-login URL (stored at creation)
+    ttydUrl     String?   // ttyd Web Terminal URL (stored at creation)
     revokedAt   DateTime?
     createdAt   DateTime  @default(now())
 

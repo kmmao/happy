@@ -4,6 +4,7 @@ import { MMKV } from "react-native-mmkv";
 const serverConfigStorage = new MMKV({ id: "server-config" });
 
 const SERVER_KEY = "custom-server-url";
+const WEBAPP_KEY = "custom-webapp-url";
 const DEFAULT_SERVER_URL = "https://happyserve.xycloud.info";
 
 export function getServerUrl(): string {
@@ -19,6 +20,22 @@ export function setServerUrl(url: string | null): void {
     serverConfigStorage.set(SERVER_KEY, url.trim());
   } else {
     serverConfigStorage.delete(SERVER_KEY);
+  }
+}
+
+export function getWebappUrl(): string | null {
+  return (
+    serverConfigStorage.getString(WEBAPP_KEY) ||
+    process.env.EXPO_PUBLIC_HAPPY_WEBAPP_URL ||
+    null
+  );
+}
+
+export function setWebappUrl(url: string | null): void {
+  if (url && url.trim()) {
+    serverConfigStorage.set(WEBAPP_KEY, url.trim());
+  } else {
+    serverConfigStorage.delete(WEBAPP_KEY);
   }
 }
 

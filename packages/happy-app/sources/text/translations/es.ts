@@ -1144,6 +1144,7 @@ export const es: TranslationStructure = {
     containerCreatedDescription: ({ name, url }: { name: string; url: string }) => `El contenedor happy-${name} está en ejecución.\n\nEnlace de acceso web (copiado al portapapeles):\n${url}`,
     webAppUrl: "Happy Web App (copiado):",
     terminalUrl: "Terminal web (ttyd):",
+    webappUrlNotConfigured: "La URL de la Web App no está configurada. Ve a Ajustes → Cuenta → configura la URL.",
     containerFailed: "Error al crear el contenedor",
     containerFailedDescription: ({ error }: { error: string }) => `El comando Docker falló: ${error}\n\nEl token de aprovisionamiento se ha copiado al portapapeles como alternativa.`,
   },

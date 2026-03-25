@@ -9,6 +9,8 @@ import { getServerUrl } from './serverConfig';
 export interface ProvisionTokenItem {
     id: string;
     label: string | null;
+    webappUrl: string | null;
+    ttydUrl: string | null;
     revokedAt: string | null;
     createdAt: string;
 }
@@ -29,7 +31,7 @@ export interface ProvisionCreateResponse {
  */
 export async function provisionCreate(
     credentials: AuthCredentials,
-    params: { label?: string; ttlHours?: number } = {}
+    params: { label?: string; ttlHours?: number; webappUrl?: string; ttydUrl?: string } = {}
 ): Promise<ProvisionCreateResponse> {
     const API_ENDPOINT = getServerUrl();
 
@@ -43,6 +45,8 @@ export async function provisionCreate(
             body: JSON.stringify({
                 label: params.label ?? null,
                 ttlHours: params.ttlHours ?? 72,
+                webappUrl: params.webappUrl ?? null,
+                ttydUrl: params.ttydUrl ?? null,
             }),
         });
 

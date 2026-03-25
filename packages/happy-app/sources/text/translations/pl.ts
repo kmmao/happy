@@ -1153,6 +1153,7 @@ export const pl: TranslationStructure = {
     containerCreatedDescription: ({ name, url }: { name: string; url: string }) => `Kontener happy-${name} jest uruchomiony.\n\nLink dostępu web (skopiowany do schowka):\n${url}`,
     webAppUrl: "Happy Web App (skopiowano):",
     terminalUrl: "Terminal webowy (ttyd):",
+    webappUrlNotConfigured: "URL aplikacji webowej nie jest skonfigurowany. Przejdź do Ustawienia → Konto → ustaw URL.",
     containerFailed: "Tworzenie kontenera nie powiodło się",
     containerFailedDescription: ({ error }: { error: string }) => `Polecenie Docker nie powiodło się: ${error}\n\nToken prowizji został skopiowany do schowka jako rozwiązanie awaryjne.`,
   },

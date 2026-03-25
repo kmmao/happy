@@ -117,7 +117,7 @@ async function main() {
                     };
                     await db.usageReport.update({
                         where: { id: report.id },
-                        data: { data: updatedData as unknown as Prisma.InputJsonValue },
+                        data: { data: updatedData as any },
                     });
                 }
                 sessionUpdates++;

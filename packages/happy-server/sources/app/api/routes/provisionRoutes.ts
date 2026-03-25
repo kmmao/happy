@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { auth } from "@/app/auth/auth";
@@ -16,7 +16,9 @@ export function provisionRoutes(app: Fastify) {
         schema: {
             body: z.object({
                 label: z.string().max(200).nullish(),
-                ttlHours: z.number().int().min(1).max(8760).default(72), // max 1 year
+                ttlHours: z.number().int().min(1).max(8760).default(72),
+                webappUrl: z.string().max(2000).nullish(),
+                ttydUrl: z.string().max(2000).nullish(),
             }),
             response: {
                 200: z.object({
@@ -28,12 +30,9 @@ export function provisionRoutes(app: Fastify) {
         },
     }, async (request, reply) => {
         const accountId = request.userId;
-        const { label, ttlHours } = request.body;
+        const { label, ttlHours, webappUrl, ttydUrl } = request.body;
 
-        // Generate a new bearer token for this account
         const bearerToken = await auth.createToken(accountId, { provision: true });
-
-        // Store hash only (never store the actual bearer token)
         const tokenHash = hashToken(bearerToken);
         const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
@@ -42,11 +41,11 @@ export function provisionRoutes(app: Fastify) {
                 accountId,
                 label: label ?? null,
                 tokenHash,
+                webappUrl: webappUrl ?? null,
+                ttydUrl: ttydUrl ?? null,
             },
         });
 
-        // Package: bearer token is the provision token itself
-        // CLI will decode and use it directly as credentials
         const packed = Buffer.from(JSON.stringify({
             t: bearerToken,
             x: expiresAt.toISOString(),
@@ -71,6 +70,8 @@ export function provisionRoutes(app: Fastify) {
                 200: z.array(z.object({
                     id: z.string(),
                     label: z.string().nullable(),
+                    webappUrl: z.string().nullable(),
+                    ttydUrl: z.string().nullable(),
                     revokedAt: z.string().nullable(),
                     createdAt: z.string(),
                 })),
@@ -86,12 +87,14 @@ export function provisionRoutes(app: Fastify) {
         return reply.send(tokens.map(t => ({
             id: t.id,
             label: t.label,
+            webappUrl: t.webappUrl,
+            ttydUrl: t.ttydUrl,
             revokedAt: t.revokedAt?.toISOString() ?? null,
             createdAt: t.createdAt.toISOString(),
         })));
     });
 
-    // Revoke a provision token
+    // Revoke or delete a provision token
     app.delete('/v1/provision/:id', {
         preHandler: app.authenticate,
         schema: {
@@ -116,11 +119,9 @@ export function provisionRoutes(app: Fastify) {
         }
 
         if (token.revokedAt) {
-            // Already revoked — delete permanently
             await db.provisionToken.delete({ where: { id } });
             log({ module: "provision" }, `Deleted provision token ${id} for account ${accountId}`);
         } else {
-            // First call — revoke (soft delete)
             await db.provisionToken.update({
                 where: { id },
                 data: { revokedAt: new Date() },

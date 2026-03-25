@@ -1137,6 +1137,7 @@ export const en: TranslationStructure = {
     containerCreatedDescription: ({ name, url }: { name: string; url: string }) => `Container happy-${name} is running.\n\nWeb access link (copied to clipboard):\n${url}`,
     webAppUrl: "Happy Web App (copied):",
     terminalUrl: "Web Terminal (ttyd):",
+    webappUrlNotConfigured: "Web App URL is not configured. Go to Settings → Account → set the Web App URL first.",
     containerFailed: "Container Creation Failed",
     containerFailedDescription: ({ error }: { error: string }) => `Docker command failed: ${error}\n\nThe provision token has been copied to your clipboard as a fallback.`,
   },

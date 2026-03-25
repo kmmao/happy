@@ -1223,6 +1223,7 @@ export const it: TranslationStructure = {
     containerCreatedDescription: ({ name, url }: { name: string; url: string }) => `Il container happy-${name} è in esecuzione.\n\nLink di accesso web (copiato negli appunti):\n${url}`,
     webAppUrl: "Happy Web App (copiato):",
     terminalUrl: "Terminale web (ttyd):",
+    webappUrlNotConfigured: "L'URL della Web App non è configurato. Vai in Impostazioni → Account → imposta l'URL.",
     containerFailed: "Creazione container fallita",
     containerFailedDescription: ({ error }: { error: string }) => `Il comando Docker è fallito: ${error}\n\nIl token di provisioning è stato copiato negli appunti come alternativa.`,
   },

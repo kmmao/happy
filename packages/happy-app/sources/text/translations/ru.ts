@@ -1141,6 +1141,7 @@ export const ru: TranslationStructure = {
     containerCreatedDescription: ({ name, url }: { name: string; url: string }) => `Контейнер happy-${name} запущен.\n\nСсылка для веб-доступа (скопирована в буфер обмена):\n${url}`,
     webAppUrl: "Happy Web App (скопировано):",
     terminalUrl: "Веб-терминал (ttyd):",
+    webappUrlNotConfigured: "URL веб-приложения не настроен. Перейдите в Настройки → Аккаунт и укажите URL.",
     containerFailed: "Ошибка создания контейнера",
     containerFailedDescription: ({ error }: { error: string }) => `Команда Docker завершилась с ошибкой: ${error}\n\nТокен подготовки скопирован в буфер обмена как запасной вариант.`,
   },

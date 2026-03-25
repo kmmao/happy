@@ -1207,6 +1207,7 @@ export const ja: TranslationStructure = {
     containerCreatedDescription: ({ name, url }: { name: string; url: string }) => `コンテナ happy-${name} が実行中です。\n\nWeb アクセスリンク（クリップボードにコピー済み）：\n${url}`,
     webAppUrl: "Happy Web App（コピー済み）：",
     terminalUrl: "Web ターミナル（ttyd）：",
+    webappUrlNotConfigured: "Web App URL が設定されていません。設定 → アカウント → Web App URL を設定してください。",
     containerFailed: "コンテナの作成に失敗しました",
     containerFailedDescription: ({ error }: { error: string }) => `Docker コマンドが失敗しました：${error}\n\n代替手段として、プロビジョン token がクリップボードにコピーされました。`,
   },

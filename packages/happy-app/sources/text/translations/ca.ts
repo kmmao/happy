@@ -1144,6 +1144,7 @@ export const ca: TranslationStructure = {
     containerCreatedDescription: ({ name, url }: { name: string; url: string }) => `El contenidor happy-${name} s'està executant.\n\nEnlaç d'accés web (copiat al porta-retalls):\n${url}`,
     webAppUrl: "Happy Web App (copiat):",
     terminalUrl: "Terminal web (ttyd):",
+    webappUrlNotConfigured: "L'URL de la Web App no està configurat. Ves a Configuració → Compte → configura l'URL.",
     containerFailed: "Error en crear el contenidor",
     containerFailedDescription: ({ error }: { error: string }) => `La comanda Docker ha fallat: ${error}\n\nEl token de proveïment s'ha copiat al porta-retalls com a alternativa.`,
   },
