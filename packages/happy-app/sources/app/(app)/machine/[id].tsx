@@ -356,7 +356,7 @@ function MachineDetailScreen() {
                   const color = connState === 'online' ? '#34C759'
                       : connState === 'connecting' ? '#FF9500'
                           : '#999';
-                  const label = connState === 'online' ? t("status.online")
+                  const label = connState === 'online' ? t("status.ready")
                       : connState === 'connecting' ? t("status.connecting")
                           : t("status.offline");
                   return (

@@ -220,7 +220,7 @@ export const SettingsView = React.memo(function SettingsView() {
         <ItemGroup title={t("settings.machines")}>
           {[...allMachines].map((machine) => {
             const connState = getMachineConnectionState(machine);
-            const statusLabel = connState === 'online' ? t("status.online")
+            const statusLabel = connState === 'online' ? t("status.ready")
                 : connState === 'connecting' ? t("status.connecting")
                     : t("status.offline");
             const host = machine.metadata?.host || "Unknown";

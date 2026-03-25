@@ -92,6 +92,7 @@ export const ca: TranslationStructure = {
     disconnected: "desconnectat",
     error: "error",
     online: "en línia",
+    ready: "preparat",
     offline: "fora de línia",
     lastSeen: ({ time }: { time: string }) => `vist per última vegada ${time}`,
     permissionRequired: "permís requerit",

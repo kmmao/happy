@@ -94,6 +94,7 @@ export const zhHans: TranslationStructure = {
     disconnected: "已断开",
     error: "错误",
     online: "在线",
+    ready: "就绪",
     offline: "离线",
     lastSeen: ({ time }: { time: string }) => `最后活跃时间 ${time}`,
     permissionRequired: "需要权限",

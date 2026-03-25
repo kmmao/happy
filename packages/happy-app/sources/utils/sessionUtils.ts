@@ -133,7 +133,7 @@ export function useSessionStatus(session: Session): SessionStatus {
   return {
     state: "waiting",
     isConnected: true,
-    statusText: t("status.online"),
+    statusText: t("status.ready"),
     shouldShowStatus: false,
     statusColor: "#34C759",
     statusDotColor: "#34C759",

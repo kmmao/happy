@@ -1419,7 +1419,7 @@ function NewSessionWizard() {
             : theme.colors.textDestructive;
 
     return {
-      text: connState === 'online' ? "online" : connState === 'connecting' ? "connecting" : "offline",
+      text: connState === 'online' ? "ready" : connState === 'connecting' ? "connecting" : "offline",
       color: statusColor,
       dotColor: statusColor,
       isPulsing: connState !== 'offline',
@@ -2326,7 +2326,7 @@ function NewSessionWizard() {
                           };
                         }
                         return {
-                          text: "online",
+                          text: "ready",
                           color: theme.colors.status.connected,
                           dotColor: theme.colors.status.connected,
                           isPulsing: true,

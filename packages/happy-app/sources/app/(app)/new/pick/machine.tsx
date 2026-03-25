@@ -152,7 +152,7 @@ function MachinePickerScreen() {
                                 };
                             }
                             return {
-                                text: 'online',
+                                text: 'ready',
                                 color: theme.colors.status.connected,
                                 dotColor: theme.colors.status.connected,
                                 isPulsing: true,
