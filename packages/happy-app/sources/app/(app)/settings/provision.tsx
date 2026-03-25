@@ -24,6 +24,7 @@ import {
     provisionUpdateUrls,
     type ProvisionTokenItem,
 } from "@/sync/apiProvision";
+import { decodeBase64, encodeBase64 } from "@/encryption/base64";
 
 function findOnlineMachineId(): string | null {
     const machines = storage.getState().machines;
@@ -116,12 +117,15 @@ function ProvisionSettingsScreen() {
 
         // 2. Repack token with account secret (so container uses same encryption key)
         const serverPacked = JSON.parse(
-            Buffer.from(result.provisionToken.slice(3), "base64url").toString(),
+            new TextDecoder().decode(decodeBase64(result.provisionToken.slice(3), "base64url")),
         );
-        const repackedToken = `hp_${Buffer.from(JSON.stringify({
-            ...serverPacked,
-            s: auth.credentials.secret, // account encryption secret
-        })).toString("base64url")}`;
+        const repackedToken = `hp_${encodeBase64(
+            new TextEncoder().encode(JSON.stringify({
+                ...serverPacked,
+                s: auth.credentials.secret, // account encryption secret
+            })),
+            "base64url",
+        )}`;
 
         // 3. Build internal URLs (LAN IP)
         const webappUrl = `http://${machineIp}:8081?provision=${encodeURIComponent(repackedToken)}`;

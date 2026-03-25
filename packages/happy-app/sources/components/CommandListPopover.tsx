@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
-import { useLocalSettingMutable } from "@/sync/storage";
+import { useSettingMutable } from "@/sync/storage";
 import { getAllCommands, CommandItem } from "@/sync/suggestionCommands";
 import { t } from "@/text";
 import { layout } from "./layout";
@@ -40,7 +40,7 @@ export const CommandListPopover = React.memo(
     const [allCommands, setAllCommands] = React.useState<CommandItem[]>([]);
     const [query, setQuery] = React.useState("");
     const [favorites, setFavorites] =
-      useLocalSettingMutable("favoriteCommands");
+      useSettingMutable("favoriteSlashCommands");
     const inputRef = React.useRef<TextInput>(null);
 
     React.useEffect(() => {

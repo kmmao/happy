@@ -23,10 +23,6 @@ export const LocalSettingsSchema = z.object({
   acknowledgedCliVersions: z
     .record(z.string(), z.string())
     .describe("Acknowledged CLI versions per machine"),
-  // Favorite slash commands
-  favoriteCommands: z
-    .array(z.string())
-    .describe("User-pinned slash commands for quick access"),
   // Tool detail view mode
   toolDetailMode: z
     .enum(["simple", "developer"])
@@ -59,7 +55,6 @@ export const localSettingsDefaults: LocalSettings = {
   themePreference: "adaptive",
   markdownCopyV2: false,
   acknowledgedCliVersions: {},
-  favoriteCommands: [],
   toolDetailMode: "simple",
   inputExpandedSessions: {},
 };

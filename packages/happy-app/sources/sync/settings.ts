@@ -484,6 +484,10 @@ export const SettingsSchema = z.object({
   favoriteCommands: z
     .array(z.string())
     .describe("User-defined favorite shell commands for quick access"),
+  // Favorite slash commands for quick access in command list popover
+  favoriteSlashCommands: z
+    .array(z.string())
+    .describe("User-defined favorite slash commands for quick access"),
   // Claude Code plugins configuration
   plugins: z
     .array(
@@ -687,6 +691,8 @@ export const settingsDefaults: Settings = {
   favoriteMachines: [],
   // Favorite commands (empty by default)
   favoriteCommands: [],
+  // Favorite slash commands (empty by default)
+  favoriteSlashCommands: [],
   // Plugins (empty by default, populated via discovery or manual add)
   plugins: [],
   // Git host provider mappings (empty by default, uses built-in detection as fallback)

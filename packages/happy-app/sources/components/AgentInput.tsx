@@ -33,7 +33,6 @@ import { useUnistyles } from "react-native-unistyles";
 import {
   useSetting,
   useSettingMutable,
-  useLocalSettingMutable,
 } from "@/sync/storage";
 import { hackMode, hackModes } from "@/sync/modeHacks";
 import { getAllCommands } from "@/sync/suggestionCommands";
@@ -232,9 +231,9 @@ export const AgentInput = React.memo(
       [favoriteCommands, setFavoriteCommands],
     );
 
-    // Favorite slash commands (local — for quick chips above input)
+    // Favorite slash commands (synced Settings — for quick chips above input)
     // Only show favorites that exist in the current session's available commands
-    const [rawFavoriteSlashCommands] = useLocalSettingMutable("favoriteCommands");
+    const [rawFavoriteSlashCommands] = useSettingMutable("favoriteSlashCommands");
     const favoriteSlashCommands = React.useMemo(() => {
       if (rawFavoriteSlashCommands.length === 0) return rawFavoriteSlashCommands;
       const available = new Set(
