@@ -413,13 +413,15 @@ export async function startDaemon(): Promise<void> {
 
         if (guiProfileProvided) {
           // GUI explicitly provided profile environment variables
-          // Security: Strip any operator-only keys to prevent SSRF / credential override
+          // Security: Only strip operator-only keys when the daemon operator has already
+          // set them in process.env. If the daemon doesn't have them (e.g. Docker container
+          // without pre-configured API keys), allow the GUI profile to provide them.
           const raw = options.environmentVariables!;
           const stripped: string[] = [];
           profileEnv = Object.fromEntries(
             Object.entries(raw).filter((entry): entry is [string, string] => {
               if (entry[1] === undefined) return false;
-              if (OPERATOR_ONLY_ENV_VARS.has(entry[0])) {
+              if (OPERATOR_ONLY_ENV_VARS.has(entry[0]) && process.env[entry[0]]) {
                 stripped.push(entry[0]);
                 return false;
               }
@@ -428,7 +430,7 @@ export async function startDaemon(): Promise<void> {
           );
           if (stripped.length > 0) {
             logger.warn(
-              `[DAEMON RUN] Security: Stripped ${stripped.length} operator-only env vars from GUI profile: ${stripped.join(", ")}`,
+              `[DAEMON RUN] Security: Stripped ${stripped.length} operator-only env vars from GUI profile (daemon already has them): ${stripped.join(", ")}`,
             );
           }
           const varCount = Object.keys(profileEnv).length;
