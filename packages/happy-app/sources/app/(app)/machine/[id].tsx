@@ -24,7 +24,7 @@ import {
   getSessionName,
   getSessionSubtitle,
 } from "@/utils/sessionUtils";
-import { isMachineOnline, getMachineConnectionState } from "@/utils/machineUtils";
+import { isMachineOnline } from "@/utils/machineUtils";
 import { sync } from "@/sync/sync";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { t } from "@/text";
@@ -351,36 +351,30 @@ function MachineDetailScreen() {
                   marginTop: 2,
                 }}
               >
-                {(() => {
-                  const connState = getMachineConnectionState(machine);
-                  const color = connState === 'online' ? '#34C759'
-                      : connState === 'connecting' ? '#FF9500'
-                          : '#999';
-                  const label = connState === 'online' ? t("status.ready")
-                      : connState === 'connecting' ? t("status.connecting")
-                          : t("status.offline");
-                  return (
-                    <>
-                      <View
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: 3,
-                          backgroundColor: color,
-                          marginRight: 4,
-                        }}
-                      />
-                      <Text
-                        style={[
-                          Typography.default(),
-                          { fontSize: 12, color },
-                        ]}
-                      >
-                        {label}
-                      </Text>
-                    </>
-                  );
-                })()}
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: isMachineOnline(machine)
+                      ? "#34C759"
+                      : "#999",
+                    marginRight: 4,
+                  }}
+                />
+                <Text
+                  style={[
+                    Typography.default(),
+                    {
+                      fontSize: 12,
+                      color: isMachineOnline(machine) ? "#34C759" : "#999",
+                    },
+                  ]}
+                >
+                  {isMachineOnline(machine)
+                    ? t("status.ready")
+                    : t("status.offline")}
+                </Text>
               </View>
             </View>
           ),
