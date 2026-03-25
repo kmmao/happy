@@ -217,6 +217,10 @@ export class ApiSessionClient extends EventEmitter {
   private modelModeKey: string | undefined;
   private readonly sendSync: InvalidateSync;
   private readonly receiveSync: InvalidateSync;
+  // Track last reported cumulative cost to compute deltas.
+  // SDK's total_cost_usd is cumulative since session start, but we report per-turn deltas.
+  private lastReportedCumulativeCost = 0;
+  private lastReportedModelCosts: Record<string, number> = {};
 
   constructor(token: string, session: Session) {
     super();
@@ -965,20 +969,42 @@ export class ApiSessionClient extends EventEmitter {
   /**
    * Send turn-end cost report using SDK-provided cost data.
    * Called once per turn with accurate cost from the official SDK.
+   *
+   * IMPORTANT: SDK's total_cost_usd and modelUsage[model].costUSD are CUMULATIVE
+   * values (total since session/process start), not per-turn values.
+   * We compute the delta from the last report to avoid double-counting.
    */
   sendTurnCostReport(resultData: {
     totalCostUsd: number;
     modelUsage: Record<string, { costUSD: number }>;
   }) {
+    // Compute delta from last reported cumulative cost.
+    // If cumulative drops (e.g., SDK reports 0 for aborted turn, or new process),
+    // treat it as a new run boundary — use the raw value as delta and reset baseline.
+    const isNewRun =
+      resultData.totalCostUsd < this.lastReportedCumulativeCost;
+    const deltaTotalCost = isNewRun
+      ? resultData.totalCostUsd
+      : Math.max(0, resultData.totalCostUsd - this.lastReportedCumulativeCost);
+    this.lastReportedCumulativeCost = resultData.totalCostUsd;
+
     const cost: { [key: string]: number; total: number } = {
-      total: resultData.totalCostUsd,
-      ...Object.fromEntries(
-        Object.entries(resultData.modelUsage).map(([model, usage]) => [
-          model,
-          usage.costUSD,
-        ]),
-      ),
+      total: deltaTotalCost,
     };
+    for (const [model, usage] of Object.entries(resultData.modelUsage)) {
+      const prevModelCost =
+        isNewRun ? 0 : this.lastReportedModelCosts[model] || 0;
+      cost[model] = Math.max(0, usage.costUSD - prevModelCost);
+      this.lastReportedModelCosts[model] = usage.costUSD;
+    }
+
+    if (isNewRun) {
+      // Reset all model costs for new run boundary
+      this.lastReportedModelCosts = {};
+      for (const [model, usage] of Object.entries(resultData.modelUsage)) {
+        this.lastReportedModelCosts[model] = usage.costUSD;
+      }
+    }
 
     const usageReport = {
       key: "claude-session",
