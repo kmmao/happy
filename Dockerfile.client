@@ -41,8 +41,8 @@ RUN apt-get update && apt-get install -y ttyd && rm -rf /var/lib/apt/lists/*
 # Use npm mirror for faster downloads
 RUN npm config set registry https://registry.npmmirror.com
 
-# Install happy-coder globally
-RUN npm install -g @kmmao/happy-coder
+# Install happy-coder globally (use official registry to get latest version)
+RUN npm install -g @kmmao/happy-coder --registry https://registry.npmjs.org
 
 # Create non-root user (Claude Code refuses --dangerously-skip-permissions as root)
 RUN useradd -m -s /usr/bin/zsh -G sudo coder && \
