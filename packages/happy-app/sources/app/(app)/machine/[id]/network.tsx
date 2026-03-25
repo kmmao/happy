@@ -24,11 +24,12 @@ import { UpnpTunnelContent } from "@/components/machine/UpnpTunnelSection";
 // Section header with icon + label
 // ---------------------------------------------------------------------------
 
-function SectionHeader({ icon, iconColor, label, badge }: {
+function SectionHeader({ icon, iconColor, label, badge, badgeColor }: {
     icon: keyof typeof Ionicons.glyphMap;
     iconColor: string;
     label: string;
     badge?: string;
+    badgeColor?: string;
 }) {
     const { theme } = useUnistyles();
     return (
@@ -40,7 +41,7 @@ function SectionHeader({ icon, iconColor, label, badge }: {
                 {label}
             </Text>
             {badge ? (
-                <Text style={[styles.sectionBadge, { color: theme.colors.textSecondary }]}>
+                <Text style={[styles.sectionBadge, { color: badgeColor ?? theme.colors.textSecondary }]}>
                     {badge}
                 </Text>
             ) : null}
@@ -77,8 +78,10 @@ export default React.memo(function NetworkPage() {
     }
 
     const ds = machine.daemonState as any;
-    const hasTailscale = ds?.tailscale?.status === "connected";
-    const tsServes = ds?.tailscale?.serves ?? [];
+    const ts = ds?.tailscale;
+    const hasTailscale = ts && ts.status !== "not-installed";
+    const tsConnected = ts?.status === "connected";
+    const tsServes = ts?.serves ?? [];
 
     const caddyProvider = ds?.tunnels?.providers?.find?.((p: any) => p.provider === "caddy");
     const hasCaddy = caddyProvider?.status === "available";
@@ -104,18 +107,51 @@ export default React.memo(function NetworkPage() {
                 </ItemGroup>
             )}
 
-            {/* Tailscale Serve / Funnel */}
+            {/* Tailscale */}
             {hasTailscale && (
                 <>
                     <SectionHeader
                         icon="logo-electron"
                         iconColor="#4F46E5"
-                        label="Tailscale Serve / Funnel"
-                        badge={tsServes.length > 0 ? `${tsServes.length}` : undefined}
+                        label="Tailscale"
+                        badge={tsConnected ? t("machine.tailscaleConnected") : t("machine.tailscaleDisconnected")}
+                        badgeColor={tsConnected ? theme.colors.success : theme.colors.warning}
                     />
                     <ItemGroup>
-                        <TailscaleServeContent machineId={machineId} machine={machine} />
+                        {ts.ipv4 && (
+                            <Item
+                                title={t("machine.tailscaleIp")}
+                                subtitle={ts.ipv4}
+                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                                showChevron={false}
+                            />
+                        )}
+                        {ts.hostname && (
+                            <Item
+                                title={t("machine.tailscaleHostname")}
+                                subtitle={
+                                    ts.tailnetName
+                                        ? `${ts.hostname}.${ts.tailnetName}`
+                                        : ts.hostname
+                                }
+                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                                showChevron={false}
+                            />
+                        )}
+                        {ts.version && (
+                            <Item
+                                title={t("machine.tailscaleVersion")}
+                                subtitle={ts.version}
+                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                                showChevron={false}
+                            />
+                        )}
                     </ItemGroup>
+                    {tsConnected && (
+                        <ItemGroup title="Serve / Funnel">
+                            <TailscaleServeContent machineId={machineId} machine={machine} />
+                        </ItemGroup>
+                    )}
                 </>
             )}
 

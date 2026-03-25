@@ -22,8 +22,11 @@ export function useNetworkServicesSummary(machine: Machine) {
     const ds = machine.daemonState as any;
 
     return useMemo(() => {
-        const hasTailscale = ds?.tailscale?.status === "connected";
-        const tsServes = ds?.tailscale?.serves ?? [];
+        // Tailscale: show if present and not "not-installed"
+        const ts = ds?.tailscale;
+        const hasTailscale = ts && ts.status !== "not-installed";
+        const tsConnected = ts?.status === "connected";
+        const tsServes = ts?.serves ?? [];
 
         const providers = ds?.tunnels?.providers;
         const caddy = Array.isArray(providers) ? providers.find((p: any) => p.provider === "caddy") : null;
@@ -38,7 +41,12 @@ export function useNetworkServicesSummary(machine: Machine) {
 
         // Build subtitle parts
         const parts: string[] = [];
-        if (hasTailscale) parts.push(`Tailscale${tsServes.length > 0 ? ` (${tsServes.length})` : ""}`);
+        if (hasTailscale) {
+            const tsLabel = tsConnected
+                ? `Tailscale${tsServes.length > 0 ? ` (${tsServes.length})` : ""}`
+                : "Tailscale ⚠";
+            parts.push(tsLabel);
+        }
         if (hasCaddy) parts.push(`Caddy${caddyEntries.length > 0 ? ` (${caddyEntries.length})` : ""}`);
         if (hasUpnp) parts.push(`UPnP${upnpEntries.length > 0 ? ` (${upnpEntries.length})` : ""}`);
 
