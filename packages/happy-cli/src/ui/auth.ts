@@ -39,8 +39,10 @@ async function doProvisionAuth(provisionToken: string): Promise<Credentials> {
         }
     }
 
-    // Generate a legacy secret for encryption (same as normal auth legacy mode)
-    const secret = new Uint8Array(randomBytes(32));
+    // Use account secret from token if provided, otherwise generate random
+    const secret = packed.s
+        ? new Uint8Array(Buffer.from(packed.s, 'base64'))
+        : new Uint8Array(randomBytes(32));
 
     const credentials: Credentials = {
         encryption: {

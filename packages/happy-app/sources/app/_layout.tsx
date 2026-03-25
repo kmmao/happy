@@ -213,7 +213,7 @@ export default function RootLayout() {
               if (packed.t) {
                 const provisionCredentials: AuthCredentials = {
                   token: packed.t,
-                  secret: "", // Provision tokens use bearer-only auth
+                  secret: packed.s || "", // Account encryption secret from provision token
                 };
                 await TokenStorage.setCredentials(provisionCredentials);
                 // Clean URL to avoid re-processing on refresh
