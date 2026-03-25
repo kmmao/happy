@@ -29,12 +29,16 @@ export type MarkdownBlock = {
     type: 'table',
     headers: string[],
     rows: string[][]
+} | {
+    type: 'math-block',
+    content: string
 }
 
 export type MarkdownSpan = {
     styles: ('italic' | 'bold' | 'semibold' | 'code')[],
     text: string,
-    url: string | null
+    url: string | null,
+    isMath?: boolean
 }
 
 export function parseMarkdown(markdown: string) {

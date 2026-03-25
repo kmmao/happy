@@ -105,6 +105,39 @@ export function parseMarkdownBlock(markdown: string) {
             continue;
         }
 
+        // Math block ($$...$$)
+        if (trimmed.startsWith('$$')) {
+            // Single-line math block: $$ content $$
+            if (trimmed.endsWith('$$') && trimmed.length > 4) {
+                const mathContent = trimmed.slice(2, -2).trim();
+                if (mathContent.length > 0) {
+                    blocks.push({ type: 'math-block', content: mathContent });
+                    continue;
+                }
+            }
+            // Multi-line math block
+            let content = [];
+            // If there's content after the opening $$
+            const firstLineContent = trimmed.slice(2).trim();
+            if (firstLineContent) {
+                content.push(firstLineContent);
+            }
+            while (index < lines.length) {
+                const nextLine = lines[index];
+                if (nextLine.trim() === '$$') {
+                    index++;
+                    break;
+                }
+                content.push(nextLine);
+                index++;
+            }
+            const mathContent = content.join('\n').trim();
+            if (mathContent.length > 0) {
+                blocks.push({ type: 'math-block', content: mathContent });
+            }
+            continue;
+        }
+
         // Horizontal rule
         if (trimmed === '---') {
             blocks.push({ type: 'horizontal-rule' });

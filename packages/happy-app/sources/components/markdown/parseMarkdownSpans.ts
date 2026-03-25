@@ -1,8 +1,9 @@
 import type { MarkdownSpan } from "./parseMarkdown";
 
-// Updated pattern to handle nested markdown and asterisks
+// Updated pattern to handle nested markdown, asterisks, and inline math
+// Group 10-11: inline math $...$ (not preceded/followed by $, content must not start/end with space)
 const pattern =
-  /(\*\*(.*?)(?:\*\*|$))|(\*(.*?)(?:\*|$))|(\[([^\]]+)\](?:\(([^)]+)\))?)|(`(.*?)(?:`|$))/g;
+  /(\*\*(.*?)(?:\*\*|$))|(\*(.*?)(?:\*|$))|(\[([^\]]+)\](?:\(([^)]+)\))?)|(`(.*?)(?:`|$))|(?<!\$)\$(?!\$)(?!\s)((?:[^$\\]|\\.)+?)(?<!\s)\$(?!\$)/g;
 
 // URL detection pattern - matches http://, https://, and www. URLs
 const urlPattern = /(https?:\/\/[^\s<>]+|www\.[^\s<>]+)/g;
@@ -83,6 +84,9 @@ export function parseMarkdownSpans(markdown: string, header: boolean) {
     } else if (match[8]) {
       // Inline code
       spans.push({ styles: ["code"], text: match[9], url: null });
+    } else if (match[10]) {
+      // Inline math $...$
+      spans.push({ styles: [], text: match[10], url: null, isMath: true });
     }
 
     lastIndex = pattern.lastIndex;

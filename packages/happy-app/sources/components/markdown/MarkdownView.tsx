@@ -13,6 +13,7 @@ import { storeTempText } from "@/sync/persistence";
 import { useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { MermaidRenderer } from "./MermaidRenderer";
+import { MathRenderer } from "./MathRenderer";
 import { t } from "@/text";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useAppendToInput } from "@/hooks/useInputContext";
@@ -114,6 +115,8 @@ export const MarkdownView = React.memo(
               );
             } else if (block.type === "mermaid") {
               return <MermaidRenderer content={block.content} key={index} />;
+            } else if (block.type === "math-block") {
+              return <MathRenderer content={block.content} mode="block" key={index} />;
             } else if (block.type === "options") {
               return (
                 <RenderOptionsBlock
@@ -444,6 +447,9 @@ function RenderSpans(props: { spans: MarkdownSpan[]; baseStyle?: any }) {
   return (
     <>
       {props.spans.map((span, index) => {
+        if (span.isMath) {
+          return <MathRenderer content={span.text} mode="inline" key={index} />;
+        }
         if (span.url) {
           return (
             <Link
