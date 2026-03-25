@@ -107,10 +107,25 @@ function ProvisionSettingsScreen() {
 
         Modal.toast(t("provision.creatingContainer"));
 
-        // Find next available ttyd port (7001+)
-        const portScanResult = await machineBash(machineId, "docker ps -a --format '{{.Ports}}' | grep -o '0\\.0\\.0\\.0:70[0-9][0-9]' | sed 's/0\\.0\\.0\\.0://' | sort -n | tail -1", "/");
-        const lastPort = parseInt(portScanResult.stdout?.trim() || "7000", 10);
-        const ttydPort = Math.max(lastPort + 1, 7001);
+        // Find first available ttyd port (7001-7099)
+        // Collect all used ports from Docker + system, then pick the first gap
+        const portCheckResult = await machineBash(machineId, [
+            "(",
+            "docker ps -a --format '{{.Ports}}' | grep -o '0\\.0\\.0\\.0:70[0-9][0-9]' | sed 's/0\\.0\\.0\\.0://'",
+            ";",
+            "ss -tlnH 2>/dev/null | grep -o ':70[0-9][0-9] ' | sed 's/://' | sed 's/ //' || true",
+            ")",
+            "| sort -un",
+        ].join(" "), "/");
+        const usedPorts = new Set(
+            (portCheckResult.stdout?.trim() || "").split("\n").map(Number).filter(Boolean),
+        );
+        let ttydPort = 7001;
+        while (usedPorts.has(ttydPort) && ttydPort < 7100) ttydPort++;
+        if (ttydPort >= 7100) {
+            Modal.alert(t("provision.containerFailed"), "No available ports (7001-7099)");
+            return;
+        }
 
         // Get machine's LAN IP for internal URLs
         const ipResult = await machineBash(machineId, "hostname -I | awk '{print $1}'", "/");
