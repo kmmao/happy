@@ -115,15 +115,16 @@ function ProvisionSettingsScreen() {
             ttlHours: 8760,
         });
 
-        // 2. Build internal URLs (LAN IP)
-        const webappUrl = `http://${machineIp}:8081?provision=${encodeURIComponent(result.provisionToken)}`;
+        // 2. Build URLs (LAN IP + server param so webapp knows which server to connect)
+        const serverUrl = "https://s.sangreal.code.xycloud.info:2443";
+        const webappUrl = `http://${machineIp}:8081?provision=${encodeURIComponent(result.provisionToken)}&server=${encodeURIComponent(serverUrl)}`;
         const ttydUrl = `http://${machineIp}:${ttydPort}`;
 
         // 3. Save URLs to server
         await provisionUpdateUrls(auth.credentials, result.id, { webappUrl, ttydUrl });
 
         // 4. Docker run
-        const dockerCmd = `docker run -d --name "${containerFullName}" --network happy_default -v "${volumeName}:/root/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="http://happy-server-1:3005" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -w /work happy-client`;
+        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" --network happy_default -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="http://happy-server-1:3005" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -w /work happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {

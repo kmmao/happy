@@ -26,6 +26,7 @@ import { ModalProvider } from "@/modal";
 import { PostHogProvider } from "posthog-react-native";
 import { tracking } from "@/track/tracking";
 import { syncRestore } from "@/sync/sync";
+import { setServerUrl } from "@/sync/serverConfig";
 import { useTrackScreens } from "@/track/useTrackScreens";
 import { RealtimeProvider } from "@/realtime/RealtimeProvider";
 import { FaviconPermissionIndicator } from "@/components/web/FaviconPermissionIndicator";
@@ -206,7 +207,12 @@ export default function RootLayout() {
         if (Platform.OS === "web" && typeof window !== "undefined") {
           const params = new URLSearchParams(window.location.search);
           const provisionToken = params.get("provision");
+          const serverParam = params.get("server");
           if (provisionToken) {
+            // Set custom server URL if provided (so webapp connects to the right server)
+            if (serverParam) {
+              setServerUrl(serverParam);
+            }
             const raw = provisionToken.startsWith("hp_") ? provisionToken.slice(3) : provisionToken;
             try {
               const packed = JSON.parse(atob(raw.replace(/-/g, "+").replace(/_/g, "/")));

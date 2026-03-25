@@ -6,14 +6,9 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV SHELL=/usr/bin/zsh
 
-# Happy configuration (override at runtime with -e)
-ENV HAPPY_SERVER_URL="http://localhost:3005"
-ENV HAPPY_WEBAPP_URL="http://localhost:8081"
-ENV HAPPY_HOME_DIR="/root/.happy"
-ENV EXPO_PACKAGER_PROXY_URL="http://localhost:8081"
-
-ENV ANTHROPIC_BASE_URL="http://100.85.22.83:8899"
-ENV ANTHROPIC_AUTH_TOKEN="sk-eed38d0404ac17a70e24474024cf9cc56b56a0cea3bf8e1c196f0fb1253a7eb0"
+# Switch to Aliyun mirror for faster downloads
+RUN sed -i 's|http://ports.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || \
+    sed -i 's|http://ports.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
 
 # System dependencies
 RUN apt-get update && apt-get install -y \
@@ -31,6 +26,7 @@ RUN apt-get update && apt-get install -y \
     jq \
     htop \
     unzip \
+    gosu \
     && rm -rf /var/lib/apt/lists/* \
     && ln -s $(which fdfind) /usr/local/bin/fd
 
@@ -39,7 +35,24 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Oh My Zsh (non-interactive)
+# Install ttyd (web terminal)
+RUN apt-get update && apt-get install -y ttyd && rm -rf /var/lib/apt/lists/*
+
+# Use npm mirror for faster downloads
+RUN npm config set registry https://registry.npmmirror.com
+
+# Install happy-coder globally
+RUN npm install -g @kmmao/happy-coder
+
+# Create non-root user (Claude Code refuses --dangerously-skip-permissions as root)
+RUN useradd -m -s /usr/bin/zsh -G sudo coder && \
+    echo 'coder ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# Switch to coder user for remaining setup
+USER coder
+WORKDIR /home/coder
+
+# Install Oh My Zsh
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 
 # Zsh plugins
@@ -48,47 +61,60 @@ RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.
     && git clone https://github.com/zsh-users/zsh-completions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-completions \
     && sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-completions node npm)/' ~/.zshrc
 
-# Install ttyd (web terminal)
-RUN apt-get update && apt-get install -y ttyd && rm -rf /var/lib/apt/lists/*
-
-# Install happy-coder globally
-RUN npm install -g @kmmao/happy-coder
-
-# Install Claude Code CLI
+# Install Claude Code CLI (as coder user)
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
-# Configure PATH for Claude CLI
-RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+# Configure PATH and aliases
+RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && \
+    echo 'alias claude="claude --dangerously-skip-permissions"' >> ~/.zshrc
 
-# Happy environment variables are set via Docker ENV (see above)
-# No need to hardcode in .zshrc — docker passes ENV to all shells
+# Pre-configure Claude Code for non-interactive/SDK usage
+RUN mkdir -p /home/coder/.claude && \
+    echo '{"agreed": true}' > /home/coder/.claude/.agreed-tos && \
+    echo '{"primaryApiKey":"any","hasCompletedOnboarding":true}' > /home/coder/.claude/settings.json
 
-# Set zsh as default shell
-RUN chsh -s /usr/bin/zsh
+# Happy configuration
+ENV HAPPY_SERVER_URL="http://happy-server-1:3005"
+ENV HAPPY_WEBAPP_URL="http://localhost:8081"
+ENV HAPPY_HOME_DIR="/home/coder/.happy"
+ENV EXPO_PACKAGER_PROXY_URL="http://localhost:8081"
+ENV ANTHROPIC_BASE_URL="http://100.85.22.83:8899"
+ENV ANTHROPIC_AUTH_TOKEN="sk-eed38d0404ac17a70e24474024cf9cc56b56a0cea3bf8e1c196f0fb1253a7eb0"
 
-# Entrypoint script: starts happy daemon + ttyd in background
+# Entrypoint script (write as root, then switch back)
+USER root
 RUN cat > /usr/local/bin/happy-entrypoint.sh << 'SCRIPT'
 #!/bin/bash
 set -e
 
-# Source zsh profile for PATH
+# Pass all environment variables to coder user and run as coder
+exec gosu coder bash -c '
 export PATH="$HOME/.local/bin:$PATH"
+export HOME=/home/coder
+
+# Clean stale daemon state from previous container run
+rm -f "${HAPPY_HOME_DIR:-$HOME/.happy}/daemon.state.json"
+rm -f "${HAPPY_HOME_DIR:-$HOME/.happy}/daemon.state.json.lock"
 
 # Start ttyd (web terminal) on port 7681 in /work
 cd /work
 ttyd -p 7681 -W zsh &
 
-# Start happy daemon (foreground, auto-authenticates with HAPPY_PROVISION_TOKEN)
+# Start happy daemon (foreground)
 exec happy daemon start-sync
+'
 SCRIPT
 RUN chmod +x /usr/local/bin/happy-entrypoint.sh
 
+# Create work directory with correct ownership
+RUN mkdir -p /work && chown coder:coder /work
+RUN mkdir -p /home/coder/.happy && chown coder:coder /home/coder/.happy
+
 # Default working directory
-RUN mkdir -p /work
 WORKDIR /work
 
 # Persist happy data and work directory
-VOLUME /root/.happy
+VOLUME /home/coder/.happy
 VOLUME /work
 
 # Expose ttyd web terminal port
@@ -104,60 +130,23 @@ CMD ["happy-entrypoint.sh"]
 #
 #    docker build -f Dockerfile.client -t happy-client .
 #
-# 2. 启动容器（手动认证 — 需要扫码）
+# 2. 启动容器（Provision Token — 免扫码，推荐）
 #
-#    docker run -it --name happy-user \
-#      -v happy-data:/root/.happy \
+#    docker run -d --name happy-user \
+#      --hostname user \
+#      --network happy_default \
+#      -v happy-user-data:/home/coder/.happy \
+#      -v happy-user-work:/work \
+#      -p 7001:7681 \
+#      -e HAPPY_PROVISION_TOKEN="hp_xxxxxxxx" \
 #      happy-client
 #
-#    容器内运行 happy，然后用 App 扫 QR 码完成认证。
+# 3. Web 终端访问
 #
-# 3. 启动容器（Provision Token — 免扫码，推荐）
-#
-#    在 Happy App 设置 → Provision Tokens → 创建，复制 token 后：
-#
-#    docker run -d --name happy-user \
-#      -v happy-data:/root/.happy \
-#      -e HAPPY_PROVISION_TOKEN="hp_xxxxxxxx" \
-#      happy-client sleep infinity
-#
-#    容器启动后自动完成认证，无需扫码。
-#    Token 仅首次启动时需要，认证信息保存在数据卷中。
-#
-# 3b. 自定义 Server URL + Provision Token
-#
-#    docker run -d --name happy-user \
-#      -v happy-data:/root/.happy \
-#      -e HAPPY_PROVISION_TOKEN="hp_xxxxxxxx" \
-#      -e HAPPY_SERVER_URL="https://my-server.example.com" \
-#      -e HAPPY_WEBAPP_URL="https://my-webapp.example.com" \
-#      happy-client sleep infinity
+#    浏览器打开 http://localhost:7001
 #
 # 4. 进入已运行的容器
 #
-#    docker exec -it happy-user zsh
-#
-# 5. 容器内使用
-#
-#    happy             # 启动 happy-coder
-#    claude            # 启动 Claude Code
-#    tmux              # 使用 tmux 管理多会话
-#
-# 6. 停止 / 重启
-#
-#    docker stop happy-user
-#    docker start -i happy-user
-#
-# 7. 重建容器（数据卷保留，无需重新认证）
-#
-#    docker rm -f happy-user
-#    docker run -d --name happy-user \
-#      -v happy-data:/root/.happy \
-#      happy-client sleep infinity
-#
-# 8. 彻底清除（删除容器 + 数据卷）
-#
-#    docker rm -f happy-user
-#    docker volume rm happy-data
+#    docker exec -it -u coder happy-user zsh
 #
 # ============================================================
