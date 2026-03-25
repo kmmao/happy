@@ -16,8 +16,6 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { AIBackendProfile } from "@/sync/settings";
 import { SessionTypeSelector } from "@/components/SessionTypeSelector";
-import { ItemGroup } from "@/components/ItemGroup";
-import { Item } from "@/components/Item";
 import { getBuiltInProfileDocumentation } from "@/sync/profileUtils";
 import {
   useEnvironmentVariables,
@@ -298,80 +296,114 @@ export function ProfileEditForm({
         >
           {t("profiles.defaultPermissionMode")}
         </Text>
-        <ItemGroup title="">
-          {[
+        <View style={{ gap: 8, marginBottom: 16 }}>
+          {([
             {
-              value: "default",
+              value: "default" as const,
               label: t("profiles.permissionDefault"),
               description: t("profiles.permissionDefaultDesc"),
-              icon: "shield-outline",
+              icon: "shield-outline" as const,
             },
             {
-              value: "acceptEdits",
+              value: "acceptEdits" as const,
               label: t("profiles.permissionAcceptEdits"),
               description: t("profiles.permissionAcceptEditsDesc"),
-              icon: "checkmark-outline",
+              icon: "checkmark-outline" as const,
             },
             {
-              value: "plan",
+              value: "plan" as const,
               label: t("profiles.permissionPlan"),
               description: t("profiles.permissionPlanDesc"),
-              icon: "list-outline",
+              icon: "list-outline" as const,
             },
             {
-              value: "bypassPermissions",
+              value: "bypassPermissions" as const,
               label: t("profiles.permissionYolo"),
               description: t("profiles.permissionYoloDesc"),
-              icon: "flash-outline",
+              icon: "flash-outline" as const,
             },
-          ].map((option, index, array) => (
-            <Item
-              key={option.value}
-              title={option.label}
-              subtitle={option.description}
-              leftElement={
-                <Ionicons
-                  name={option.icon as any}
-                  size={24}
-                  color={
-                    defaultPermissionMode === option.value
-                      ? theme.colors.button.primary.tint
-                      : theme.colors.textSecondary
-                  }
-                />
-              }
-              rightElement={
-                defaultPermissionMode === option.value ? (
+          ]).map((option) => {
+            const isSelected = defaultPermissionMode === option.value;
+            return (
+              <Pressable
+                key={option.value}
+                onPress={() =>
+                  setDefaultPermissionMode(
+                    option.value as NonNullable<
+                      AIBackendProfile["defaultPermissionMode"]
+                    >,
+                  )
+                }
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: isSelected
+                    ? theme.colors.button.primary.background
+                    : theme.colors.input.background,
+                  borderRadius: 10,
+                  padding: 14,
+                  gap: 12,
+                }}
+              >
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: isSelected
+                      ? "rgba(255,255,255,0.2)"
+                      : theme.colors.surface,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Ionicons
+                    name={option.icon}
+                    size={18}
+                    color={
+                      isSelected
+                        ? theme.colors.button.primary.tint
+                        : theme.colors.textSecondary
+                    }
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "600",
+                      color: isSelected
+                        ? theme.colors.button.primary.tint
+                        : theme.colors.text,
+                      ...Typography.default("semiBold"),
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: isSelected
+                        ? "rgba(255,255,255,0.7)"
+                        : theme.colors.textSecondary,
+                      marginTop: 2,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {option.description}
+                  </Text>
+                </View>
+                {isSelected && (
                   <Ionicons
                     name="checkmark-circle"
-                    size={20}
+                    size={22}
                     color={theme.colors.button.primary.tint}
                   />
-                ) : null
-              }
-              onPress={() =>
-                setDefaultPermissionMode(
-                  option.value as NonNullable<
-                    AIBackendProfile["defaultPermissionMode"]
-                  >,
-                )
-              }
-              showChevron={false}
-              selected={defaultPermissionMode === option.value}
-              showDivider={index < array.length - 1}
-              style={
-                defaultPermissionMode === option.value
-                  ? {
-                      borderWidth: 2,
-                      borderColor: theme.colors.button.primary.tint,
-                      borderRadius: 8,
-                    }
-                  : undefined
-              }
-            />
-          ))}
-        </ItemGroup>
-        <View style={{ marginBottom: 16 }} />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
 
         {/* Tmux Enable/Disable */}
         <View
