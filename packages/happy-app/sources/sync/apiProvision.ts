@@ -108,6 +108,29 @@ export async function provisionUpdateUrls(
 }
 
 /**
+ * Restore a revoked provision token.
+ */
+export async function provisionRestore(
+    credentials: AuthCredentials,
+    tokenId: string
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+
+    await backoff(async () => {
+        const response = await fetch(`${API_ENDPOINT}/v1/provision/${tokenId}/restore`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${credentials.token}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to restore provision token: ${response.status}`);
+        }
+    });
+}
+
+/**
  * Revoke a provision token (invalidates the bearer token).
  */
 export async function provisionRevoke(

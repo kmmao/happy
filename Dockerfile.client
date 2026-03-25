@@ -7,10 +7,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV SHELL=/usr/bin/zsh
 
 # Happy configuration (override at runtime with -e)
-ENV HAPPY_SERVER_URL="https://code.zm1.zmddg.com"
-ENV HAPPY_WEBAPP_URL="https://webcode.zm1.zmddg.com"
+ENV HAPPY_SERVER_URL="http://localhost:3005"
+ENV HAPPY_WEBAPP_URL="http://localhost:8081"
 ENV HAPPY_HOME_DIR="/root/.happy"
-ENV EXPO_PACKAGER_PROXY_URL="https://webcode.zm1.zmddg.com"
+ENV EXPO_PACKAGER_PROXY_URL="http://localhost:8081"
+
+ENV ANTHROPIC_BASE_URL="http://100.85.22.83:8899"
+ENV ANTHROPIC_AUTH_TOKEN="sk-eed38d0404ac17a70e24474024cf9cc56b56a0cea3bf8e1c196f0fb1253a7eb0"
 
 # System dependencies
 RUN apt-get update && apt-get install -y \
@@ -71,7 +74,8 @@ set -e
 # Source zsh profile for PATH
 export PATH="$HOME/.local/bin:$PATH"
 
-# Start ttyd (web terminal) on port 7681
+# Start ttyd (web terminal) on port 7681 in /work
+cd /work
 ttyd -p 7681 -W zsh &
 
 # Start happy daemon (foreground, auto-authenticates with HAPPY_PROVISION_TOKEN)
@@ -79,8 +83,13 @@ exec happy daemon start-sync
 SCRIPT
 RUN chmod +x /usr/local/bin/happy-entrypoint.sh
 
-# Persist happy data
+# Default working directory
+RUN mkdir -p /work
+WORKDIR /work
+
+# Persist happy data and work directory
 VOLUME /root/.happy
+VOLUME /work
 
 # Expose ttyd web terminal port
 EXPOSE 7681

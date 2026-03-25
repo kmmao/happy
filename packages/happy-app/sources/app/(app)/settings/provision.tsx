@@ -21,6 +21,7 @@ import {
     provisionCreate,
     provisionList,
     provisionRevoke,
+    provisionRestore,
     provisionUpdateUrls,
     type ProvisionTokenItem,
 } from "@/sync/apiProvision";
@@ -122,7 +123,7 @@ function ProvisionSettingsScreen() {
         await provisionUpdateUrls(auth.credentials, result.id, { webappUrl, ttydUrl });
 
         // 4. Docker run
-        const dockerCmd = `docker run -d --name "${containerFullName}" -v "${volumeName}:/root/.happy" -p ${ttydPort}:7681 -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" happy-client`;
+        const dockerCmd = `docker run -d --name "${containerFullName}" --network happy_default -v "${volumeName}:/root/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="http://happy-server-1:3005" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -w /work happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {
@@ -162,11 +163,37 @@ function ProvisionSettingsScreen() {
         [auth.credentials, loadTokens, paramMachineId],
     );
 
+    // Restore revoked token
+    const handleRestore = React.useCallback(
+        async (tokenId: string, label: string | null) => {
+            if (!auth.credentials) return;
+            const confirmed = await Modal.confirm(
+                t("provision.restoreToken"),
+                t("provision.restoreConfirm"),
+                { confirmText: t("provision.restoreToken") },
+            );
+            if (!confirmed) return;
+
+            await provisionRestore(auth.credentials, tokenId);
+            Modal.toast(t("provision.restored"));
+            await loadTokens();
+        },
+        [auth.credentials, loadTokens],
+    );
+
     // Delete permanently
     const handleDelete = React.useCallback(
-        async (tokenId: string) => {
+        async (tokenId: string, label: string | null) => {
             if (!auth.credentials) return;
+            const confirmed = await Modal.confirm(
+                t("provision.deleteToken"),
+                t("provision.deleteConfirm"),
+                { confirmText: t("provision.deleteToken"), destructive: true },
+            );
+            if (!confirmed) return;
+
             await provisionRevoke(auth.credentials, tokenId);
+            Modal.toast(t("provision.deleted"));
             await loadTokens();
         },
         [auth.credentials, loadTokens],
@@ -330,27 +357,47 @@ function ProvisionSettingsScreen() {
                 );
             })}
 
-            {/* Revoked tokens */}
-            {revokedTokens.length > 0 && (
-                <ItemGroup title={t("provision.revoked")}>
-                    {revokedTokens.map((token) => (
-                        <Item
-                            key={token.id}
-                            title={token.label || token.id.slice(0, 12)}
-                            subtitle={formatDate(token.createdAt)}
-                            icon={<Ionicons name="close-circle" size={20} color={theme.colors.deleteAction} />}
-                            rightElement={
-                                <Ionicons
-                                    name="trash-outline"
-                                    size={18}
-                                    color={theme.colors.textSecondary}
-                                />
-                            }
-                            onPress={() => handleDelete(token.id)}
-                        />
-                    ))}
+            {/* Revoked tokens — each as its own card */}
+            {revokedTokens.map((token) => (
+                <ItemGroup
+                    key={token.id}
+                    title={`⛔ ${token.label || token.id.slice(0, 8)}`}
+                >
+                    {/* Revoked at */}
+                    <Item
+                        title={t("provision.revokedAt")}
+                        subtitle={formatDate(token.revokedAt!)}
+                        icon={<Ionicons name="time-outline" size={20} color={theme.colors.textSecondary} />}
+                        showChevron={false}
+                    />
+
+                    {/* Created at */}
+                    <Item
+                        title={t("provision.createdAt")}
+                        subtitle={formatDate(token.createdAt)}
+                        icon={<Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />}
+                        showChevron={false}
+                    />
+
+                    {/* Restore */}
+                    <Item
+                        title={t("provision.restoreToken")}
+                        titleStyle={{ color: theme.colors.accentBlue }}
+                        icon={<Ionicons name="refresh-outline" size={20} color={theme.colors.accentBlue} />}
+                        onPress={() => handleRestore(token.id, token.label)}
+                        showChevron={false}
+                    />
+
+                    {/* Delete permanently */}
+                    <Item
+                        title={t("provision.deleteToken")}
+                        titleStyle={{ color: theme.colors.deleteAction }}
+                        icon={<Ionicons name="trash-outline" size={20} color={theme.colors.deleteAction} />}
+                        onPress={() => handleDelete(token.id, token.label)}
+                        showChevron={false}
+                    />
                 </ItemGroup>
-            )}
+            ))}
         </ItemList>
     );
 }

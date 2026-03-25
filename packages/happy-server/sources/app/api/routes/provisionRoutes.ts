@@ -145,6 +145,42 @@ export function provisionRoutes(app: Fastify) {
         return reply.send({ success: true });
     });
 
+    // Restore a revoked provision token
+    app.post('/v1/provision/:id/restore', {
+        preHandler: app.authenticate,
+        schema: {
+            params: z.object({ id: z.string() }),
+            response: {
+                200: z.object({ success: z.literal(true) }),
+                404: z.object({ error: z.string() }),
+                400: z.object({ error: z.string() }),
+            },
+        },
+    }, async (request, reply) => {
+        const { id } = request.params;
+        const accountId = request.userId;
+
+        const token = await db.provisionToken.findFirst({
+            where: { id, accountId },
+        });
+
+        if (!token) {
+            return reply.code(404).send({ error: "Token not found" });
+        }
+
+        if (!token.revokedAt) {
+            return reply.code(400).send({ error: "Token is not revoked" });
+        }
+
+        await db.provisionToken.update({
+            where: { id },
+            data: { revokedAt: null },
+        });
+
+        log({ module: "provision" }, `Restored provision token ${id} for account ${accountId}`);
+        return reply.send({ success: true });
+    });
+
     // Revoke or delete a provision token
     app.delete('/v1/provision/:id', {
         preHandler: app.authenticate,
