@@ -1,5 +1,39 @@
 # 更新日志
 
+## 2.8.0 - 2026-03-25
+
+统一网络服务管理、Docker 容器 Provision Token 免扫码认证、Supervisor 分析模式，以及大量 UI 优化。
+
+### 网络服务
+- 新增统一网络服务页面，将 Tailscale Serve/Funnel、Caddy HTTPS 反向代理和 UPnP 端口映射整合到一个管理界面
+- 新增 Caddy 多域名 HTTPS 支持，通过 DNS-01 验证自动申请 Let's Encrypt 证书
+- 新增 UPnP 端口映射管理，显示使用者标签（Tailscale、Happy 等），支持在 App 中添加/删除映射
+- 新增 Tailscale Serve/Funnel 管理，支持路径配置和 Funnel 开关
+- 改进机器详情页，以摘要入口跳转至完整网络服务页面
+
+### Provision Token
+- 新增 Provision Token，Docker 容器无需扫码即可自动认证
+- 新增 daemon 自启动和 ttyd Web 终端集成
+- 改进 Provision Token 移至机器详情页，绑定到具体设备
+
+### Supervisor
+- 新增 analyzed 标签页，独立展示分析完成的 action
+- 新增 Supervisor 分析模式、Agent API 模块和会话清理优化
+
+### 后台任务
+- 新增前台任务面板，可点击查看进程监控
+- 新增 Docker 容器支持，通过 docker inspect 可靠检测容器状态
+- 新增长日志行 marquee 滚动效果
+- 修复任务去重和过期状态处理
+
+### UI 和质量
+- 修复 576+ 处硬编码颜色值破坏主题系统
+- 修复多处用户可见的硬编码字符串未使用 i18n
+- 修复会话预览的 Dev Servers 列表现在遵循进程隐藏过滤
+- 改进活跃会话卡片布局，缩小图标和标题
+- 新增会话版本不一致时显示升级提示
+- 修复 KV Store 跨设备同步和保存状态指示器
+
 ## 2.7.0 - 2026-03-22
 
 新增插件市场、端口检测与 Web 预览、后台任务管理器、收藏命令排序，以及环境变量国际化。

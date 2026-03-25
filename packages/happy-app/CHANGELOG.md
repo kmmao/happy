@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.8.0 - 2026-03-25
+
+Unified network services management, Provision Token for Docker containers, supervisor analysis mode, and extensive UI polish.
+
+### Network Services
+- Added unified network services page combining Tailscale Serve/Funnel, Caddy HTTPS reverse proxy, and UPnP port mapping into one management interface
+- Added Caddy multi-domain HTTPS support with auto Let's Encrypt certificates via DNS-01 validation
+- Added UPnP port mapping with owner labels (Tailscale, Happy, etc.) and add/remove from the app
+- Added Tailscale Serve/Funnel management with path support and funnel toggle
+- Improved machine detail page with a summary entry that navigates to the full network services page
+
+### Provision Token
+- Added Provision Token for Docker container auto-authentication without QR code scanning
+- Added daemon auto-start and ttyd Web terminal integration for provisioned containers
+- Improved Provision Token moved to machine detail page, bound to specific device
+
+### Supervisor
+- Added analyzed tab to separately display completed analysis actions
+- Added supervisor analysis mode with agent API module and session cleanup optimization
+
+### Background Tasks
+- Added foreground task panel with clickable process monitoring
+- Added Docker container support with reliable liveness detection via docker inspect
+- Added marquee scrolling for long log lines in BackgroundTaskBar
+- Fixed task deduplication and stale state handling
+
+### UI & Quality
+- Fixed 576+ hardcoded color values breaking the theme system
+- Fixed multiple hardcoded user-visible strings not using i18n
+- Fixed session preview Dev Servers list now respects hidden process filter
+- Improved active session card layout with smaller icons and titles
+- Added session upgrade prompt when CLI version mismatch detected
+- Fixed KV Store cross-device sync and save state indicator
+
 ## 2.7.0 - 2026-03-22
 
 Plugin marketplace, port detection & web preview, background task manager, favorite command reordering, and environment variable i18n.

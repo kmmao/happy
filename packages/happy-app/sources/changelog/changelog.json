@@ -2,6 +2,34 @@
   "entries": {
     "en": [
       {
+        "version": "2.8.0",
+        "date": "2026-03-25",
+        "summary": "Unified network services management, Provision Token for Docker containers, supervisor analysis mode, and extensive UI polish.",
+        "changes": [
+          "Added unified network services page combining Tailscale Serve/Funnel, Caddy HTTPS reverse proxy, and UPnP port mapping into one management interface",
+          "Added Caddy multi-domain HTTPS support with auto Let's Encrypt certificates via DNS-01 validation",
+          "Added UPnP port mapping with owner labels (Tailscale, Happy, etc.) and add/remove from the app",
+          "Added Tailscale Serve/Funnel management with path support and funnel toggle",
+          "Improved machine detail page with a summary entry that navigates to the full network services page",
+          "Added Provision Token for Docker container auto-authentication without QR code scanning",
+          "Added daemon auto-start and ttyd Web terminal integration for provisioned containers",
+          "Improved Provision Token moved to machine detail page, bound to specific device",
+          "Added analyzed tab to separately display completed analysis actions",
+          "Added supervisor analysis mode with agent API module and session cleanup optimization",
+          "Added foreground task panel with clickable process monitoring",
+          "Added Docker container support with reliable liveness detection via docker inspect",
+          "Added marquee scrolling for long log lines in BackgroundTaskBar",
+          "Fixed task deduplication and stale state handling",
+          "Fixed 576+ hardcoded color values breaking the theme system",
+          "Fixed multiple hardcoded user-visible strings not using i18n",
+          "Fixed session preview Dev Servers list now respects hidden process filter",
+          "Improved active session card layout with smaller icons and titles",
+          "Added session upgrade prompt when CLI version mismatch detected",
+          "Fixed KV Store cross-device sync and save state indicator"
+        ],
+        "rawMarkdown": "## 2.8.0 - 2026-03-25\n\n\nUnified network services management, Provision Token for Docker containers, supervisor analysis mode, and extensive UI polish.\n\n### Network Services\n- Added unified network services page combining Tailscale Serve/Funnel, Caddy HTTPS reverse proxy, and UPnP port mapping into one management interface\n- Added Caddy multi-domain HTTPS support with auto Let's Encrypt certificates via DNS-01 validation\n- Added UPnP port mapping with owner labels (Tailscale, Happy, etc.) and add/remove from the app\n- Added Tailscale Serve/Funnel management with path support and funnel toggle\n- Improved machine detail page with a summary entry that navigates to the full network services page\n\n### Provision Token\n- Added Provision Token for Docker container auto-authentication without QR code scanning\n- Added daemon auto-start and ttyd Web terminal integration for provisioned containers\n- Improved Provision Token moved to machine detail page, bound to specific device\n\n### Supervisor\n- Added analyzed tab to separately display completed analysis actions\n- Added supervisor analysis mode with agent API module and session cleanup optimization\n\n### Background Tasks\n- Added foreground task panel with clickable process monitoring\n- Added Docker container support with reliable liveness detection via docker inspect\n- Added marquee scrolling for long log lines in BackgroundTaskBar\n- Fixed task deduplication and stale state handling\n\n### UI & Quality\n- Fixed 576+ hardcoded color values breaking the theme system\n- Fixed multiple hardcoded user-visible strings not using i18n\n- Fixed session preview Dev Servers list now respects hidden process filter\n- Improved active session card layout with smaller icons and titles\n- Added session upgrade prompt when CLI version mismatch detected\n- Fixed KV Store cross-device sync and save state indicator"
+      },
+      {
         "version": "2.7.0",
         "date": "2026-03-22",
         "summary": "Plugin marketplace, port detection & web preview, background task manager, favorite command reordering, and environment variable i18n.",
@@ -330,6 +358,34 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.8.0",
+        "date": "2026-03-25",
+        "summary": "统一网络服务管理、Docker 容器 Provision Token 免扫码认证、Supervisor 分析模式，以及大量 UI 优化。",
+        "changes": [
+          "新增统一网络服务页面，将 Tailscale Serve/Funnel、Caddy HTTPS 反向代理和 UPnP 端口映射整合到一个管理界面",
+          "新增 Caddy 多域名 HTTPS 支持，通过 DNS-01 验证自动申请 Let's Encrypt 证书",
+          "新增 UPnP 端口映射管理，显示使用者标签（Tailscale、Happy 等），支持在 App 中添加/删除映射",
+          "新增 Tailscale Serve/Funnel 管理，支持路径配置和 Funnel 开关",
+          "改进机器详情页，以摘要入口跳转至完整网络服务页面",
+          "新增 Provision Token，Docker 容器无需扫码即可自动认证",
+          "新增 daemon 自启动和 ttyd Web 终端集成",
+          "改进 Provision Token 移至机器详情页，绑定到具体设备",
+          "新增 analyzed 标签页，独立展示分析完成的 action",
+          "新增 Supervisor 分析模式、Agent API 模块和会话清理优化",
+          "新增前台任务面板，可点击查看进程监控",
+          "新增 Docker 容器支持，通过 docker inspect 可靠检测容器状态",
+          "新增长日志行 marquee 滚动效果",
+          "修复任务去重和过期状态处理",
+          "修复 576+ 处硬编码颜色值破坏主题系统",
+          "修复多处用户可见的硬编码字符串未使用 i18n",
+          "修复会话预览的 Dev Servers 列表现在遵循进程隐藏过滤",
+          "改进活跃会话卡片布局，缩小图标和标题",
+          "新增会话版本不一致时显示升级提示",
+          "修复 KV Store 跨设备同步和保存状态指示器"
+        ],
+        "rawMarkdown": "## 2.8.0 - 2026-03-25\n\n\n统一网络服务管理、Docker 容器 Provision Token 免扫码认证、Supervisor 分析模式，以及大量 UI 优化。\n\n### 网络服务\n- 新增统一网络服务页面，将 Tailscale Serve/Funnel、Caddy HTTPS 反向代理和 UPnP 端口映射整合到一个管理界面\n- 新增 Caddy 多域名 HTTPS 支持，通过 DNS-01 验证自动申请 Let's Encrypt 证书\n- 新增 UPnP 端口映射管理，显示使用者标签（Tailscale、Happy 等），支持在 App 中添加/删除映射\n- 新增 Tailscale Serve/Funnel 管理，支持路径配置和 Funnel 开关\n- 改进机器详情页，以摘要入口跳转至完整网络服务页面\n\n### Provision Token\n- 新增 Provision Token，Docker 容器无需扫码即可自动认证\n- 新增 daemon 自启动和 ttyd Web 终端集成\n- 改进 Provision Token 移至机器详情页，绑定到具体设备\n\n### Supervisor\n- 新增 analyzed 标签页，独立展示分析完成的 action\n- 新增 Supervisor 分析模式、Agent API 模块和会话清理优化\n\n### 后台任务\n- 新增前台任务面板，可点击查看进程监控\n- 新增 Docker 容器支持，通过 docker inspect 可靠检测容器状态\n- 新增长日志行 marquee 滚动效果\n- 修复任务去重和过期状态处理\n\n### UI 和质量\n- 修复 576+ 处硬编码颜色值破坏主题系统\n- 修复多处用户可见的硬编码字符串未使用 i18n\n- 修复会话预览的 Dev Servers 列表现在遵循进程隐藏过滤\n- 改进活跃会话卡片布局，缩小图标和标题\n- 新增会话版本不一致时显示升级提示\n- 修复 KV Store 跨设备同步和保存状态指示器"
+      },
+      {
         "version": "2.7.0",
         "date": "2026-03-22",
         "summary": "新增插件市场、端口检测与 Web 预览、后台任务管理器、收藏命令排序，以及环境变量国际化。",
@@ -657,7 +713,7 @@
       }
     ]
   },
-  "latestVersion": "2.7.0",
+  "latestVersion": "2.8.0",
   "availableLocales": [
     "en",
     "zh-Hans"
