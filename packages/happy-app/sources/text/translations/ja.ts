@@ -97,6 +97,7 @@ export const ja: TranslationStructure = {
     noProfileDescription: "デフォルトの環境設定を使用",
     defaultModel: "デフォルトモデル",
     addProfile: "プロファイルを追加",
+    blankProfile: "空のプロファイル",
     profileName: "プロファイル名",
     enterName: "プロファイル名を入力",
     baseURL: "ベースURL",
@@ -164,6 +165,12 @@ export const ja: TranslationStructure = {
         `「${name}」を削除してもよろしいですか？この操作は元に戻せません。`,
       confirm: "削除",
       cancel: "キャンセル",
+    },
+    reset: {
+      title: "プロファイルをリセット",
+      message: ({ name }: { name: string }) =>
+        `「${name}」を組み込みのデフォルトにリセットしますか？カスタマイズ内容は失われます。`,
+      confirm: "リセット",
     },
   },
 

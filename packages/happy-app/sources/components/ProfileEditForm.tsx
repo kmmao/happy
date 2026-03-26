@@ -134,6 +134,7 @@ export function ProfileEditForm({
       style={[profileEditFormStyles.scrollView, containerStyle]}
       contentContainerStyle={profileEditFormStyles.scrollContent}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
       <View style={profileEditFormStyles.formContainer}>
         {/* Profile Name */}
@@ -718,53 +719,27 @@ export function ProfileEditForm({
               {t("common.cancel")}
             </Text>
           </Pressable>
-          {profile.isBuiltIn ? (
-            // For built-in profiles, show "Save As" button (creates custom copy)
-            <Pressable
+          <Pressable
+            style={{
+              flex: 1,
+              backgroundColor: theme.colors.button.primary.background,
+              borderRadius: 8,
+              padding: 12,
+              alignItems: "center",
+            }}
+            onPress={handleSave}
+          >
+            <Text
               style={{
-                flex: 1,
-                backgroundColor: theme.colors.button.primary.background,
-                borderRadius: 8,
-                padding: 12,
-                alignItems: "center",
+                fontSize: 16,
+                fontWeight: "600",
+                color: theme.colors.button.primary.tint,
+                ...Typography.default("semiBold"),
               }}
-              onPress={handleSave}
             >
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: "600",
-                  color: theme.colors.button.primary.tint,
-                  ...Typography.default("semiBold"),
-                }}
-              >
-                {t("common.saveAs")}
-              </Text>
-            </Pressable>
-          ) : (
-            // For custom profiles, show regular "Save" button
-            <Pressable
-              style={{
-                flex: 1,
-                backgroundColor: theme.colors.button.primary.background,
-                borderRadius: 8,
-                padding: 12,
-                alignItems: "center",
-              }}
-              onPress={handleSave}
-            >
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: "600",
-                  color: theme.colors.button.primary.tint,
-                  ...Typography.default("semiBold"),
-                }}
-              >
-                {t("common.save")}
-              </Text>
-            </Pressable>
-          )}
+              {t("common.save")}
+            </Text>
+          </Pressable>
         </View>
       </View>
     </ScrollView>

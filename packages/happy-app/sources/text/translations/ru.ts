@@ -1651,6 +1651,7 @@ export const ru: TranslationStructure = {
     noProfileDescription: "Использовать настройки окружения по умолчанию",
     defaultModel: "Модель по Умолчанию",
     addProfile: "Добавить Профиль",
+    blankProfile: "Пустой профиль",
     profileName: "Имя Профиля",
     enterName: "Введите имя профиля",
     baseURL: "Базовый URL",
@@ -1720,6 +1721,12 @@ export const ru: TranslationStructure = {
         `Вы уверены, что хотите удалить "${name}"? Это действие нельзя отменить.`,
       confirm: "Удалить",
       cancel: "Отмена",
+    },
+    reset: {
+      title: "Сбросить Профиль",
+      message: ({ name }: { name: string }) =>
+        `Сбросить "${name}" к встроенным настройкам по умолчанию? Ваши настройки будут потеряны.`,
+      confirm: "Сбросить",
     },
   },
 

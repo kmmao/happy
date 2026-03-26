@@ -1616,6 +1616,7 @@ export const pt: TranslationStructure = {
     noProfileDescription:
       "Crie um perfil para gerenciar sua configuração de ambiente",
     addProfile: "Adicionar perfil",
+    blankProfile: "Perfil em branco",
     addProfileTitle: "Título do perfil de adição",
     editProfile: "Editar perfil",
     envCard: {
@@ -1686,6 +1687,12 @@ export const pt: TranslationStructure = {
         `Tem certeza de que deseja excluir "${name}"? Esta ação não pode ser desfeita.`,
       confirm: "Excluir",
       cancel: "Cancelar",
+    },
+    reset: {
+      title: "Redefinir Perfil",
+      message: ({ name }: { name: string }) =>
+        `Redefinir "${name}" para os padrões integrados? Suas personalizações serão perdidas.`,
+      confirm: "Redefinir",
     },
   },
 

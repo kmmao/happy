@@ -95,6 +95,7 @@ export const it: TranslationStructure = {
     noProfileDescription: "Usa le impostazioni ambiente predefinite",
     defaultModel: "Modello predefinito",
     addProfile: "Aggiungi profilo",
+    blankProfile: "Profilo vuoto",
     profileName: "Nome profilo",
     enterName: "Inserisci nome profilo",
     baseURL: "URL base",
@@ -164,6 +165,12 @@ export const it: TranslationStructure = {
         `Sei sicuro di voler eliminare "${name}"? Questa azione non può essere annullata.`,
       confirm: "Elimina",
       cancel: "Annulla",
+    },
+    reset: {
+      title: "Ripristina profilo",
+      message: ({ name }: { name: string }) =>
+        `Ripristinare "${name}" ai valori predefiniti? Le tue personalizzazioni andranno perse.`,
+      confirm: "Ripristina",
     },
   },
 

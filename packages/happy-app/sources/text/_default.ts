@@ -1617,6 +1617,7 @@ export const en = {
     noProfileDescription: "Use default environment settings",
     defaultModel: "Default Model",
     addProfile: "Add Profile",
+    blankProfile: "Blank Profile",
     profileName: "Profile Name",
     enterName: "Enter profile name",
     baseURL: "Base URL",
@@ -1684,6 +1685,12 @@ export const en = {
         `Are you sure you want to delete "${name}"? This action cannot be undone.`,
       confirm: "Delete",
       cancel: "Cancel",
+    },
+    reset: {
+      title: "Reset Profile",
+      message: ({ name }: { name: string }) =>
+        `Reset "${name}" to built-in defaults? Your customizations will be lost.`,
+      confirm: "Reset",
     },
   },
 

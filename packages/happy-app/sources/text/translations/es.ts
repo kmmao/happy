@@ -1630,6 +1630,7 @@ export const es: TranslationStructure = {
     noProfileDescription: "Usar configuración de entorno predeterminada",
     defaultModel: "Modelo Predeterminado",
     addProfile: "Agregar Perfil",
+    blankProfile: "Perfil en blanco",
     profileName: "Nombre del Perfil",
     enterName: "Ingrese el nombre del perfil",
     baseURL: "URL Base",
@@ -1699,6 +1700,12 @@ export const es: TranslationStructure = {
         `¿Estás seguro de que quieres eliminar "${name}"? Esta acción no se puede deshacer.`,
       confirm: "Eliminar",
       cancel: "Cancelar",
+    },
+    reset: {
+      title: "Restablecer Perfil",
+      message: ({ name }: { name: string }) =>
+        `¿Restablecer "${name}" a los valores predeterminados? Se perderán tus personalizaciones.`,
+      confirm: "Restablecer",
     },
   },
 

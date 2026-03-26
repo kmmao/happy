@@ -1566,6 +1566,7 @@ export const zhHant: TranslationStructure = {
     noProfileDescription: "使用預設環境設定",
     defaultModel: "預設模型",
     addProfile: "新增設定檔",
+    blankProfile: "空白設定檔",
     profileName: "設定檔名稱",
     enterName: "輸入設定檔名稱",
     baseURL: "基礎 URL",
@@ -1631,6 +1632,12 @@ export const zhHant: TranslationStructure = {
         `確定要刪除「${name}」嗎？此操作無法復原。`,
       confirm: "刪除",
       cancel: "取消",
+    },
+    reset: {
+      title: "重設設定檔",
+      message: ({ name }: { name: string }) =>
+        `將「${name}」重設為內建預設值？您的自訂設定將遺失。`,
+      confirm: "重設",
     },
   },
 

@@ -1650,6 +1650,7 @@ export const pl: TranslationStructure = {
     noProfileDescription: "Użyj domyślnych ustawień środowiska",
     defaultModel: "Domyślny Model",
     addProfile: "Dodaj Profil",
+    blankProfile: "Pusty profil",
     profileName: "Nazwa Profilu",
     enterName: "Wprowadź nazwę profilu",
     baseURL: "Adres URL",
@@ -1719,6 +1720,12 @@ export const pl: TranslationStructure = {
         `Czy na pewno chcesz usunąć "${name}"? Tej czynności nie można cofnąć.`,
       confirm: "Usuń",
       cancel: "Anuluj",
+    },
+    reset: {
+      title: "Resetuj Profil",
+      message: ({ name }: { name: string }) =>
+        `Zresetować "${name}" do wbudowanych ustawień domyślnych? Twoje dostosowania zostaną utracone.`,
+      confirm: "Resetuj",
     },
   },
 

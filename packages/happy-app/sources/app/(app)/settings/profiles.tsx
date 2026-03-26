@@ -39,10 +39,11 @@ function ProfileManager({
   const [editingProfile, setEditingProfile] =
     React.useState<AIBackendProfile | null>(null);
   const [showAddForm, setShowAddForm] = React.useState(false);
+  const [showTemplateSelector, setShowTemplateSelector] = React.useState(false);
   const safeArea = useSafeAreaInsets();
   const screenWidth = useWindowDimensions().width;
 
-  const handleAddProfile = () => {
+  const handleAddBlankProfile = () => {
     setEditingProfile({
       id: randomUUID(),
       name: "",
@@ -54,12 +55,48 @@ function ProfileManager({
       updatedAt: Date.now(),
       version: "1.0.0",
     });
+    setShowTemplateSelector(false);
+    setShowAddForm(true);
+  };
+
+  const handleAddFromTemplate = (templateId: string) => {
+    const template = getBuiltInProfile(templateId);
+    if (!template) return;
+
+    setEditingProfile({
+      ...template,
+      id: randomUUID(),
+      name: `${template.name} (Custom)`,
+      isBuiltIn: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    setShowTemplateSelector(false);
     setShowAddForm(true);
   };
 
   const handleEditProfile = (profile: AIBackendProfile) => {
     setEditingProfile({ ...profile });
     setShowAddForm(true);
+  };
+
+  const handleResetBuiltInProfile = async (profileId: string) => {
+    const builtIn = getBuiltInProfile(profileId);
+    if (!builtIn) return;
+
+    const confirmed = await HappyModal.confirm(
+      t("profiles.reset.title"),
+      t("profiles.reset.message", { name: builtIn.name }),
+      {
+        cancelText: t("common.cancel"),
+        confirmText: t("profiles.reset.confirm"),
+      },
+    );
+
+    if (!confirmed) return;
+
+    // Remove the override, restoring built-in defaults
+    setProfiles(profiles.filter((p) => p.id !== profileId));
   };
 
   const handleDeleteProfile = async (profile: AIBackendProfile) => {
@@ -115,50 +152,27 @@ function ProfileManager({
       return;
     }
 
-    // Check if this is a built-in profile being edited
-    const isBuiltIn = DEFAULT_PROFILES.some((bp) => bp.id === profile.id);
-
-    // For built-in profiles, create a new custom profile instead of modifying the built-in
-    if (isBuiltIn) {
-      const newProfile: AIBackendProfile = {
-        ...profile,
-        id: randomUUID(), // Generate new UUID for custom profile
-      };
-
-      // Check for duplicate names (excluding the new profile)
-      const isDuplicate = profiles.some(
-        (p) => p.name.trim() === newProfile.name.trim(),
-      );
-      if (isDuplicate) {
-        return;
-      }
-
-      setProfiles([...profiles, newProfile]);
-    } else {
-      // Handle custom profile updates
-      // Check for duplicate names (excluding current profile if editing)
-      const isDuplicate = profiles.some(
-        (p) => p.id !== profile.id && p.name.trim() === profile.name.trim(),
-      );
-      if (isDuplicate) {
-        return;
-      }
-
-      const existingIndex = profiles.findIndex((p) => p.id === profile.id);
-      let updatedProfiles: AIBackendProfile[];
-
-      if (existingIndex >= 0) {
-        // Update existing profile
-        updatedProfiles = [...profiles];
-        updatedProfiles[existingIndex] = profile;
-      } else {
-        // Add new profile
-        updatedProfiles = [...profiles, profile];
-      }
-
-      setProfiles(updatedProfiles);
+    // Check for duplicate names (excluding current profile)
+    const isDuplicate = profiles.some(
+      (p) => p.id !== profile.id && p.name.trim() === profile.name.trim(),
+    );
+    if (isDuplicate) {
+      return;
     }
 
+    const existingIndex = profiles.findIndex((p) => p.id === profile.id);
+    let updatedProfiles: AIBackendProfile[];
+
+    if (existingIndex >= 0) {
+      // Update existing profile (works for both custom and built-in overrides)
+      updatedProfiles = [...profiles];
+      updatedProfiles[existingIndex] = profile;
+    } else {
+      // Add new profile (or first-time override of a built-in profile)
+      updatedProfiles = [...profiles, profile];
+    }
+
+    setProfiles(updatedProfiles);
     setShowAddForm(false);
     setEditingProfile(null);
   };
@@ -249,10 +263,14 @@ function ProfileManager({
             )}
           </Pressable>
 
-          {/* Built-in profiles */}
+          {/* Built-in profiles (with override support) */}
           {DEFAULT_PROFILES.map((profileDisplay) => {
-            const profile = getBuiltInProfile(profileDisplay.id);
-            if (!profile) return null;
+            const builtInDefault = getBuiltInProfile(profileDisplay.id);
+            if (!builtInDefault) return null;
+
+            // Use saved override if exists, otherwise use built-in default
+            const override = profiles.find((p) => p.id === profileDisplay.id);
+            const profile = override || builtInDefault;
 
             return (
               <Pressable
@@ -315,9 +333,22 @@ function ProfileManager({
                       style={{ marginRight: 12 }}
                     />
                   )}
+                  {profiles.some((p) => p.id === profile.id) && (
+                    <Pressable
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      onPress={() => handleResetBuiltInProfile(profile.id)}
+                    >
+                      <Ionicons
+                        name="refresh-outline"
+                        size={20}
+                        color={theme.colors.button.secondary.tint}
+                      />
+                    </Pressable>
+                  )}
                   <Pressable
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     onPress={() => handleEditProfile(profile)}
+                    style={{ marginLeft: profiles.some((p) => p.id === profile.id) ? 16 : 0 }}
                   >
                     <Ionicons
                       name="create-outline"
@@ -330,8 +361,8 @@ function ProfileManager({
             );
           })}
 
-          {/* Custom profiles */}
-          {profiles.map((profile) => (
+          {/* Custom profiles (exclude built-in overrides, shown above) */}
+          {profiles.filter((p) => !DEFAULT_PROFILES.some((bp) => bp.id === p.id)).map((profile) => (
             <Pressable
               key={profile.id}
               style={{
@@ -419,18 +450,20 @@ function ProfileManager({
             </Pressable>
           ))}
 
-          {/* Add profile button */}
+          {/* Add profile button / template selector */}
           <Pressable
             style={{
               backgroundColor: theme.colors.surface,
               borderRadius: 12,
               padding: 16,
-              marginBottom: 12,
+              marginBottom: showTemplateSelector ? 0 : 12,
+              borderBottomLeftRadius: showTemplateSelector ? 0 : 12,
+              borderBottomRightRadius: showTemplateSelector ? 0 : 12,
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "center",
             }}
-            onPress={handleAddProfile}
+            onPress={() => setShowTemplateSelector(!showTemplateSelector)}
           >
             <Ionicons
               name="add-circle-outline"
@@ -443,12 +476,109 @@ function ProfileManager({
                 fontWeight: "600",
                 color: theme.colors.button.secondary.tint,
                 marginLeft: 8,
+                flex: 1,
                 ...Typography.default("semiBold"),
               }}
             >
               {t("profiles.addProfile")}
             </Text>
+            <Ionicons
+              name={showTemplateSelector ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={theme.colors.button.secondary.tint}
+            />
           </Pressable>
+
+          {showTemplateSelector && (
+            <View
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderBottomLeftRadius: 12,
+                borderBottomRightRadius: 12,
+                marginBottom: 12,
+                overflow: "hidden",
+              }}
+            >
+              {/* Blank profile option */}
+              <Pressable
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  padding: 14,
+                  paddingHorizontal: 16,
+                  borderTopWidth: 0.5,
+                  borderTopColor: theme.colors.input.background,
+                }}
+                onPress={handleAddBlankProfile}
+              >
+                <View
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: theme.colors.input.background,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginRight: 12,
+                  }}
+                >
+                  <Ionicons
+                    name="document-outline"
+                    size={14}
+                    color={theme.colors.textSecondary}
+                  />
+                </View>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    color: theme.colors.text,
+                    ...Typography.default(),
+                  }}
+                >
+                  {t("profiles.blankProfile")}
+                </Text>
+              </Pressable>
+
+              {/* Built-in templates */}
+              {DEFAULT_PROFILES.map((bp) => (
+                <Pressable
+                  key={bp.id}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    padding: 14,
+                    paddingHorizontal: 16,
+                    borderTopWidth: 0.5,
+                    borderTopColor: theme.colors.input.background,
+                  }}
+                  onPress={() => handleAddFromTemplate(bp.id)}
+                >
+                  <View
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: theme.colors.button.primary.background,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginRight: 12,
+                    }}
+                  >
+                    <Ionicons name="star" size={14} color="white" />
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      color: theme.colors.text,
+                      ...Typography.default(),
+                    }}
+                  >
+                    {bp.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
 

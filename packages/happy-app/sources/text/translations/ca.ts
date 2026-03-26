@@ -1620,6 +1620,7 @@ export const ca: TranslationStructure = {
     noProfileDescription:
       "Crea un perfil per gestionar la teva configuració d'entorn",
     addProfile: "Afegeix un perfil",
+    blankProfile: "Perfil en blanc",
     addProfileTitle: "Títol del perfil d'addició",
     editProfile: "Edita el perfil",
     envCard: {
@@ -1690,6 +1691,12 @@ export const ca: TranslationStructure = {
         `Estàs segur que vols eliminar "${name}"? Aquesta acció no es pot desfer.`,
       confirm: "Eliminar",
       cancel: "Cancel·lar",
+    },
+    reset: {
+      title: "Restablir Perfil",
+      message: ({ name }: { name: string }) =>
+        `Restablir "${name}" als valors predeterminats? Les teves personalitzacions es perdran.`,
+      confirm: "Restablir",
     },
   },
 

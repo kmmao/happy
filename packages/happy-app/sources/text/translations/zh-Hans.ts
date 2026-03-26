@@ -1553,6 +1553,7 @@ export const zhHans: TranslationStructure = {
     noProfile: "无配置文件",
     noProfileDescription: "创建配置文件以管理您的环境设置",
     addProfile: "添加配置文件",
+    blankProfile: "空白配置",
     addProfileTitle: "添加配置文件标题",
     editProfile: "编辑配置文件",
     envCard: {
@@ -1619,6 +1620,12 @@ export const zhHans: TranslationStructure = {
         `确定要删除"${name}"吗？此操作无法撤销。`,
       confirm: "删除",
       cancel: "取消",
+    },
+    reset: {
+      title: "重置配置",
+      message: ({ name }: { name: string }) =>
+        `将"${name}"重置为内置默认值？您的自定义设置将丢失。`,
+      confirm: "重置",
     },
   },
 
