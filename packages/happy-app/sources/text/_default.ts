@@ -1372,6 +1372,12 @@ export const en = {
     lastSeen: "Last Seen",
     never: "Never",
     metadataVersion: "Metadata Version",
+    upgradeCliButton: "Upgrade CLI",
+    upgradeCliConfirmTitle: "Upgrade CLI?",
+    upgradeCliConfirmMessage: ({ version }: { version: string }) =>
+      `Upgrade @kmmao/happy-coder to v${version}? The daemon will restart automatically after upgrade.`,
+    upgradeCliSuccess: "CLI upgraded successfully. The daemon will restart automatically within 60 seconds.",
+    upgradeCliFailed: "CLI upgrade failed",
     untitledSession: "Untitled Session",
     back: "Back",
     previousSessions: "Previous Sessions",

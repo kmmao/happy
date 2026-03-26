@@ -1390,6 +1390,12 @@ export const pl: TranslationStructure = {
     lastSeen: "Ostatnio widziana",
     never: "Nigdy",
     metadataVersion: "Wersja metadanych",
+    upgradeCliButton: "Zaktualizuj CLI",
+    upgradeCliConfirmTitle: "Zaktualizować CLI?",
+    upgradeCliConfirmMessage: ({ version }: { version: string }) =>
+      `Zaktualizować @kmmao/happy-coder do v${version}? Demon zostanie automatycznie uruchomiony ponownie po aktualizacji.`,
+    upgradeCliSuccess: "CLI zaktualizowano pomyślnie. Demon zostanie automatycznie uruchomiony ponownie w ciągu 60 sekund.",
+    upgradeCliFailed: "Aktualizacja CLI nie powiodła się",
     untitledSession: "Sesja bez nazwy",
     back: "Wstecz",
     previousSessions: "Poprzednie sesje",

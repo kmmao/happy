@@ -17,7 +17,7 @@ import { Typography } from "@/constants/Typography";
 import { useSessions, useAllMachines, useMachine } from "@/sync/storage";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import type { Session } from "@/sync/storageTypes";
-import { machineStopDaemon, machineUpdateMetadata, machineBash } from "@/sync/ops";
+import { machineStopDaemon, machineUpdateMetadata, machineBash, machineUpgradeCli } from "@/sync/ops";
 import { Modal } from "@/modal";
 import {
   formatPathRelativeToHome,
@@ -29,6 +29,7 @@ import { sync } from "@/sync/sync";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { t } from "@/text";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
+import { useCliVersionCheck } from "@/hooks/useCliVersionCheck";
 import { machineSpawnNewSession } from "@/sync/ops";
 import { resolveAbsolutePath } from "@/utils/pathUtils";
 import {
@@ -101,6 +102,10 @@ function MachineDetailScreen() {
   const inputRef = useRef<MultiTextInputHandle>(null);
   const [showAllPaths, setShowAllPaths] = useState(false);
   const [hasDocker, setHasDocker] = useState(false);
+  const [isUpgradingCli, setIsUpgradingCli] = useState(false);
+
+  const currentCliVersion = machine?.daemonState?.startedWithCliVersion as string | undefined;
+  const { latestVersion, hasUpdate, isChecking: isCheckingVersion } = useCliVersionCheck(currentCliVersion);
 
   // Check if Docker is available on this machine
   React.useEffect(() => {
@@ -182,6 +187,45 @@ function MachineDetailScreen() {
               );
             } finally {
               setIsStoppingDaemon(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleUpgradeCli = async () => {
+    if (!latestVersion) return;
+    Modal.alert(
+      t("machine.upgradeCliConfirmTitle"),
+      t("machine.upgradeCliConfirmMessage", { version: latestVersion }),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("machine.upgradeCliButton"),
+          onPress: async () => {
+            setIsUpgradingCli(true);
+            try {
+              const result = await machineUpgradeCli(machineId!, latestVersion);
+              if (result.success) {
+                Modal.alert(
+                  t("common.success"),
+                  t("machine.upgradeCliSuccess"),
+                );
+                await sync.refreshMachines();
+              } else {
+                Modal.alert(
+                  t("common.error"),
+                  t("machine.upgradeCliFailed"),
+                );
+              }
+            } catch {
+              Modal.alert(
+                t("common.error"),
+                t("machine.upgradeCliFailed"),
+              );
+            } finally {
+              setIsUpgradingCli(false);
             }
           },
         },
@@ -581,8 +625,48 @@ function MachineDetailScreen() {
               {machine.daemonState.startedWithCliVersion && (
                 <Item
                   title={t("machine.cliVersion")}
-                  subtitle={machine.daemonState.startedWithCliVersion}
-                  subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                  subtitle={
+                    hasUpdate && latestVersion
+                      ? `${machine.daemonState.startedWithCliVersion}  →  ${latestVersion}`
+                      : machine.daemonState.startedWithCliVersion
+                  }
+                  subtitleStyle={{
+                    fontFamily: "Menlo",
+                    fontSize: 13,
+                    color: hasUpdate ? "#FF9500" : undefined,
+                  }}
+                  rightElement={
+                    isCheckingVersion ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={theme.colors.textSecondary}
+                      />
+                    ) : undefined
+                  }
+                />
+              )}
+              {hasUpdate && latestVersion && isMachineOnline(machine) && (
+                <Item
+                  title={t("machine.upgradeCliButton")}
+                  titleStyle={{
+                    color: theme.colors.textLink,
+                  }}
+                  onPress={handleUpgradeCli}
+                  disabled={isUpgradingCli}
+                  rightElement={
+                    isUpgradingCli ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={theme.colors.textSecondary}
+                      />
+                    ) : (
+                      <Ionicons
+                        name="cloud-download-outline"
+                        size={20}
+                        color={theme.colors.textLink}
+                      />
+                    )
+                  }
                 />
               )}
             </>

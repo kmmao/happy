@@ -1382,6 +1382,12 @@ export const ca: TranslationStructure = {
     lastSeen: "Vist per última vegada",
     never: "Mai",
     metadataVersion: "Versió de les metadades",
+    upgradeCliButton: "Actualitzar CLI",
+    upgradeCliConfirmTitle: "Actualitzar CLI?",
+    upgradeCliConfirmMessage: ({ version }: { version: string }) =>
+      `Actualitzar @kmmao/happy-coder a v${version}? El dimoni es reiniciarà automàticament després de l'actualització.`,
+    upgradeCliSuccess: "CLI actualitzat correctament. El dimoni es reiniciarà automàticament en 60 segons.",
+    upgradeCliFailed: "Error en actualitzar CLI",
     untitledSession: "Sessió sense títol",
     back: "Enrere",
     previousSessions: "Sessions anteriors",

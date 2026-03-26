@@ -1382,6 +1382,12 @@ export const es: TranslationStructure = {
     lastSeen: "Visto por última vez",
     never: "Nunca",
     metadataVersion: "Versión de metadatos",
+    upgradeCliButton: "Actualizar CLI",
+    upgradeCliConfirmTitle: "¿Actualizar CLI?",
+    upgradeCliConfirmMessage: ({ version }: { version: string }) =>
+      `¿Actualizar @kmmao/happy-coder a v${version}? El daemon se reiniciará automáticamente después de la actualización.`,
+    upgradeCliSuccess: "CLI actualizado correctamente. El daemon se reiniciará automáticamente en 60 segundos.",
+    upgradeCliFailed: "Error al actualizar CLI",
     untitledSession: "Sesión sin título",
     back: "Atrás",
     previousSessions: "Sesiones anteriores",

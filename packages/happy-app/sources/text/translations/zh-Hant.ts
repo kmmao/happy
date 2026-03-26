@@ -1327,6 +1327,12 @@ export const zhHant: TranslationStructure = {
     lastSeen: "最後活躍",
     never: "從未",
     metadataVersion: "中繼資料版本",
+    upgradeCliButton: "升級 CLI",
+    upgradeCliConfirmTitle: "升級 CLI？",
+    upgradeCliConfirmMessage: ({ version }: { version: string }) =>
+      `將 @kmmao/happy-coder 升級到 v${version}？升級完成後守護程序將自動重啟。`,
+    upgradeCliSuccess: "CLI 升級成功。守護程序將在 60 秒內自動重啟。",
+    upgradeCliFailed: "CLI 升級失敗",
     untitledSession: "無標題工作階段",
     back: "返回",
     previousSessions: "歷史工作階段",

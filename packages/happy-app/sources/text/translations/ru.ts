@@ -1377,6 +1377,12 @@ export const ru: TranslationStructure = {
     lastSeen: "Последняя активность",
     never: "Никогда",
     metadataVersion: "Версия метаданных",
+    upgradeCliButton: "Обновить CLI",
+    upgradeCliConfirmTitle: "Обновить CLI?",
+    upgradeCliConfirmMessage: ({ version }: { version: string }) =>
+      `Обновить @kmmao/happy-coder до v${version}? Демон автоматически перезапустится после обновления.`,
+    upgradeCliSuccess: "CLI успешно обновлён. Демон автоматически перезапустится в течение 60 секунд.",
+    upgradeCliFailed: "Не удалось обновить CLI",
     untitledSession: "Безымянная сессия",
     back: "Назад",
     previousSessions: "Предыдущие сессии",

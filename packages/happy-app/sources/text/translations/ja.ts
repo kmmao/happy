@@ -1449,6 +1449,12 @@ export const ja: TranslationStructure = {
     lastSeen: "最終確認",
     never: "なし",
     metadataVersion: "メタデータバージョン",
+    upgradeCliButton: "CLI をアップグレード",
+    upgradeCliConfirmTitle: "CLI をアップグレードしますか？",
+    upgradeCliConfirmMessage: ({ version }: { version: string }) =>
+      `@kmmao/happy-coder を v${version} にアップグレードしますか？アップグレード後、デーモンは自動的に再起動します。`,
+    upgradeCliSuccess: "CLI のアップグレードが完了しました。デーモンは 60 秒以内に自動的に再起動します。",
+    upgradeCliFailed: "CLI のアップグレードに失敗しました",
     untitledSession: "無題のセッション",
     back: "戻る",
     previousSessions: "過去のセッション",

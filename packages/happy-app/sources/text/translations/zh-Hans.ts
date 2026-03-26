@@ -1326,6 +1326,12 @@ export const zhHans: TranslationStructure = {
     lastSeen: "最后活跃",
     never: "从未",
     metadataVersion: "元数据版本",
+    upgradeCliButton: "升级 CLI",
+    upgradeCliConfirmTitle: "升级 CLI？",
+    upgradeCliConfirmMessage: ({ version }: { version: string }) =>
+      `将 @kmmao/happy-coder 升级到 v${version}？升级完成后守护进程将自动重启。`,
+    upgradeCliSuccess: "CLI 升级成功。守护进程将在 60 秒内自动重启。",
+    upgradeCliFailed: "CLI 升级失败",
     untitledSession: "无标题会话",
     back: "返回",
     previousSessions: "历史会话",

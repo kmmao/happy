@@ -228,6 +228,29 @@ export async function machineStopDaemon(
 }
 
 /**
+ * Upgrade the CLI on a specific machine by running npm install -g.
+ * Uses the bash RPC with a 3-minute timeout since npm install can be slow.
+ * After success the daemon's heartbeat will detect the version mismatch
+ * and auto-restart within ~60 seconds.
+ */
+const VERSION_RE = /^\d+\.\d+\.\d+(-[\w.]+)?$/;
+
+export async function machineUpgradeCli(
+  machineId: string,
+  targetVersion: string,
+): Promise<MachineBashResult> {
+  if (!VERSION_RE.test(targetVersion)) {
+    return { success: false, error: `Invalid version format: ${targetVersion}` };
+  }
+  return machineBash(
+    machineId,
+    `npm install -g @kmmao/happy-coder@${targetVersion}`,
+    "/",
+    180_000, // 3 minutes — npm install can be slow
+  );
+}
+
+/**
  * Scan a machine for git repositories and return their paths + remote URLs.
  */
 export interface GitRepoEntry {
@@ -317,6 +340,7 @@ export async function machineBash(
   machineId: string,
   command: string,
   cwd: string,
+  timeout?: number,
 ): Promise<MachineBashResult> {
   try {
     const result = await apiSocket.machineRPC<
@@ -324,8 +348,9 @@ export async function machineBash(
       {
         command: string;
         cwd: string;
+        timeout?: number;
       }
-    >(machineId, "bash", { command, cwd });
+    >(machineId, "bash", { command, cwd, ...(timeout != null && { timeout }) });
     return result;
   } catch (error) {
     return {
