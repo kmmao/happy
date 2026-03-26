@@ -114,6 +114,8 @@ export const sessionTaskStartEventSchema = z.object({
   toolUseId: z.string().optional(),
   description: z.string(),
   taskType: z.string().optional(),
+  /** meta.name from the workflow script (e.g. 'spec'). Only set when taskType is 'local_workflow'. */
+  workflowName: z.string().optional(),
 });
 
 export const sessionTaskProgressEventSchema = z.object({
@@ -161,6 +163,12 @@ export const sessionNeedsContinueEventSchema = z.object({
   t: z.literal("needs-continue"),
 });
 
+export const sessionStateChangedEventSchema = z.object({
+  t: z.literal("session-state-changed"),
+  /** Authoritative session lifecycle state from the SDK */
+  state: z.enum(["idle", "running", "requires_action"]),
+});
+
 export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -178,6 +186,7 @@ export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionToolProgressEventSchema,
   sessionPromptSuggestionEventSchema,
   sessionNeedsContinueEventSchema,
+  sessionStateChangedEventSchema,
 ]);
 
 export type SessionEvent = z.infer<typeof sessionEventSchema>;
@@ -213,7 +222,8 @@ export const sessionEnvelopeSchema = z
         envelope.ev.t === "task-end" ||
         envelope.ev.t === "tool-progress" ||
         envelope.ev.t === "prompt-suggestion" ||
-        envelope.ev.t === "needs-continue") &&
+        envelope.ev.t === "needs-continue" ||
+        envelope.ev.t === "session-state-changed") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({

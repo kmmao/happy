@@ -68,6 +68,18 @@ describe("session protocol schemas", () => {
         elapsedSeconds: 2.5,
         taskId: "task-1",
       },
+      { t: "prompt-suggestion", suggestion: "What should we focus on next?" },
+      { t: "needs-continue" },
+      { t: "session-state-changed", state: "running" },
+      { t: "session-state-changed", state: "idle" },
+      { t: "session-state-changed", state: "requires_action" },
+      {
+        t: "task-start",
+        taskId: "task-wf",
+        description: "Run workflow",
+        taskType: "local_workflow",
+        workflowName: "spec",
+      },
     ];
 
     for (const event of events) {
@@ -101,6 +113,13 @@ describe("session protocol schemas", () => {
     );
     expect(sessionEventSchema.safeParse({ t: "service" }).success).toBe(false);
     expect(sessionEventSchema.safeParse({ t: "not-real" }).success).toBe(false);
+    expect(
+      sessionEventSchema.safeParse({ t: "session-state-changed", state: "invalid" })
+        .success,
+    ).toBe(false);
+    expect(
+      sessionEventSchema.safeParse({ t: "session-state-changed" }).success,
+    ).toBe(false);
   });
 
   it("validates envelopes that include turn/subagent", () => {
