@@ -1105,6 +1105,7 @@ export const zhHant: TranslationStructure = {
     containerNamePlaceholder: "例如 alice",
     terminalUser: "使用者名稱",
     terminalPassword: "密碼",
+    containerConfig: "容器配置",
     resourceLimits: "資源限制",
     memoryLimit: "記憶體限制",
     memoryLimitDescription: "例如 4g、512m（留空不限制）",

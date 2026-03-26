@@ -1150,6 +1150,7 @@ export const ru: TranslationStructure = {
     containerNamePlaceholder: "напр. alice",
     terminalUser: "Имя пользователя",
     terminalPassword: "Пароль",
+    containerConfig: "Конфигурация",
     resourceLimits: "Ограничения ресурсов",
     memoryLimit: "Лимит памяти",
     memoryLimitDescription: "напр. 4g, 512m (оставьте пустым для без ограничений)",

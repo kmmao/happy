@@ -1216,6 +1216,7 @@ export const ja: TranslationStructure = {
     containerNamePlaceholder: "例: alice",
     terminalUser: "ユーザー名",
     terminalPassword: "パスワード",
+    containerConfig: "構成",
     resourceLimits: "リソース制限",
     memoryLimit: "メモリ制限",
     memoryLimitDescription: "例: 4g, 512m（空欄で無制限）",

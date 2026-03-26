@@ -149,7 +149,15 @@ function ProvisionSettingsScreen() {
         const webappUrl = `https://w.sangreal.code.xycloud.info:2443?provision=${encodeURIComponent(result.provisionToken)}&server=${encodeURIComponent(serverUrl)}`;
         const ttydHttpsUrl = `https://coder:${ttydPassword}@t-${safeName}.code.xycloud.info:2443`;
         const ttydLanUrl = `http://${machineIp}:${ttydPort}`;
-        const ttydUrl = JSON.stringify({ https: ttydHttpsUrl, lan: ttydLanUrl });
+        const ttydUrl = JSON.stringify({
+            https: ttydHttpsUrl,
+            lan: ttydLanUrl,
+            config: {
+                memory: memoryLimit?.trim() || null,
+                cpu: cpuLimit?.trim() || null,
+                sudo: !disableSudo,
+            },
+        });
 
         // 3. Save URLs to server
         await provisionUpdateUrls(auth.credentials, result.id, { webappUrl, ttydUrl });
@@ -413,18 +421,20 @@ function ProvisionSettingsScreen() {
                 const containerName = token.label ? `happy-${sanitizeContainerName(token.label)}` : null;
                 const dockerExecCmd = containerName ? `docker exec -it -u coder ${containerName} zsh` : null;
 
-                // Parse ttyd URL — may be JSON { https, lan } or plain URL (legacy)
+                // Parse ttyd URL — may be JSON { https, lan, config } or plain URL (legacy)
                 let ttydHttpsUrl = "";
                 let ttydLanUrl = "";
                 let ttydFullUrl = ""; // with credentials for opening
                 let ttydCleanUrl = ""; // without credentials for display
                 let ttydUser = "";
                 let ttydPass = "";
+                let containerConfig: { memory?: string | null; cpu?: string | null; sudo?: boolean } = {};
                 if (token.ttydUrl) {
                     try {
                         const parsed = JSON.parse(token.ttydUrl);
                         ttydHttpsUrl = parsed.https || "";
                         ttydLanUrl = parsed.lan || "";
+                        containerConfig = parsed.config || {};
                     } catch {
                         // Legacy plain URL format
                         ttydHttpsUrl = token.ttydUrl;
@@ -557,6 +567,21 @@ function ProvisionSettingsScreen() {
                                 showChevron={false}
                             />
                         )}
+
+                        {/* Container config summary */}
+                        {(containerConfig.memory || containerConfig.cpu || containerConfig.sudo === false) ? (
+                            <Item
+                                title={t("provision.containerConfig")}
+                                subtitle={[
+                                    containerConfig.memory ? `${t("provision.memoryLimit")}: ${containerConfig.memory}` : null,
+                                    containerConfig.cpu ? `${t("provision.cpuLimit")}: ${containerConfig.cpu}` : null,
+                                    containerConfig.sudo === false ? t("provision.sudoDisabled") : null,
+                                ].filter(Boolean).join(" · ")}
+                                subtitleStyle={{ fontSize: 12 }}
+                                icon={<Ionicons name="settings-outline" size={20} color={theme.colors.textSecondary} />}
+                                showChevron={false}
+                            />
+                        ) : null}
 
                         {/* Revoke button */}
                         <Item

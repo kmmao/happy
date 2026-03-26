@@ -1153,6 +1153,7 @@ export const ca: TranslationStructure = {
     containerNamePlaceholder: "p. ex. alice",
     terminalUser: "Nom d'usuari",
     terminalPassword: "Contrasenya",
+    containerConfig: "Configuració",
     resourceLimits: "Límits de recursos",
     memoryLimit: "Límit de memòria",
     memoryLimitDescription: "p. ex. 4g, 512m (deixa buit per il·limitat)",

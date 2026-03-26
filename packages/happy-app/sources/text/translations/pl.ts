@@ -1162,6 +1162,7 @@ export const pl: TranslationStructure = {
     containerNamePlaceholder: "np. alice",
     terminalUser: "Nazwa użytkownika",
     terminalPassword: "Hasło",
+    containerConfig: "Konfiguracja",
     resourceLimits: "Limity zasobów",
     memoryLimit: "Limit pamięci",
     memoryLimitDescription: "np. 4g, 512m (pozostaw puste dla braku limitu)",

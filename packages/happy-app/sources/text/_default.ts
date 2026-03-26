@@ -1134,6 +1134,7 @@ export const en = {
     containerNamePlaceholder: "e.g. alice",
     terminalUser: "Username",
     terminalPassword: "Password",
+    containerConfig: "Configuration",
     resourceLimits: "Resource Limits",
     memoryLimit: "Memory Limit",
     memoryLimitDescription: "e.g. 4g, 512m (leave empty for unlimited)",
