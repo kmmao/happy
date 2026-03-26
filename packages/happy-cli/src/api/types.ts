@@ -262,6 +262,7 @@ export const MessageMetaSchema = z.object({
   allowedTools: z.array(z.string()).nullable().optional(), // Allowed tools for this message (null = reset)
   disallowedTools: z.array(z.string()).nullable().optional(), // Disallowed tools for this message (null = reset)
   maxBudgetUsd: z.number().nullable().optional(), // Maximum USD budget for this session (null = reset)
+  taskBudget: z.object({ total: z.number() }).nullable().optional(), // Task token budget (alpha)
   thinking: z
     .object({
       type: z.enum(["adaptive", "enabled", "disabled"]),

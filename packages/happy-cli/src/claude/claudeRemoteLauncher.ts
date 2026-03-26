@@ -33,7 +33,7 @@ import { createEnvelope } from "@kmmao/happy-wire";
 import { hashObject } from "@/utils/deterministicJson";
 import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
 import { getProjectPath } from "./utils/path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
@@ -307,6 +307,9 @@ export async function claudeRemoteLauncher(
     permissionHandler.getResponses(),
   );
 
+  // Track files that have been Read by the SDK (for seedReadState after compact)
+  const readFilePaths = new Set<string>();
+
   // Handle messages
   let planModeToolCalls = new Set<string>();
   let latestPlanFilePath: string | null = null;
@@ -335,6 +338,21 @@ export async function claudeRemoteLauncher(
 
     // Write to permission handler for tool id resolving
     permissionHandler.onMessage(message);
+
+    // Track Read tool calls for seedReadState after compact
+    if (message.type === "assistant") {
+      const aMsg = message as SDKAssistantMessage;
+      if (aMsg.message.content && Array.isArray(aMsg.message.content)) {
+        for (const c of aMsg.message.content) {
+          if (c.type === "tool_use" && c.name === "Read") {
+            const filePath = (c.input as Record<string, unknown>)?.file_path;
+            if (typeof filePath === "string") {
+              readFilePaths.add(filePath);
+            }
+          }
+        }
+      }
+    }
 
     // Detect plan mode tool calls
     if (message.type === "assistant") {
@@ -425,6 +443,21 @@ export async function claudeRemoteLauncher(
           type: "message",
           message: "Context compacted",
         });
+        // After compaction, seed read state for all tracked files so Edit doesn't fail
+        if (currentQuery && readFilePaths.size > 0) {
+          logger.debug(
+            `[remote]: seeding read state for ${readFilePaths.size} files after compact`,
+          );
+          for (const filePath of readFilePaths) {
+            stat(filePath)
+              .then((s) =>
+                currentQuery!.seedReadState(filePath, Math.floor(s.mtimeMs)),
+              )
+              .catch((e) =>
+                logger.debug(`[remote]: seedReadState skipped for ${filePath}: ${e}`),
+              );
+          }
+        }
       }
     }
 

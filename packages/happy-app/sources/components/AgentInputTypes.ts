@@ -6,9 +6,12 @@ export interface ReasoningProps {
     thinkingMode?: string | null;
     effortLevel?: string | null;
     maxBudgetUsd?: number | null;
+    /** API-side task budget in tokens — model self-paces tool use within the limit (alpha) */
+    taskBudgetTokens?: number | null;
     onThinkingModeChange?: (mode: string) => void;
     onEffortLevelChange?: (level: string) => void;
     onMaxBudgetUsdChange?: (budget: number | null) => void;
+    onTaskBudgetTokensChange?: (tokens: number | null) => void;
 }
 
 /** Speech-to-text state */

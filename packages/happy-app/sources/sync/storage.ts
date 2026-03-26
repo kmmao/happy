@@ -597,6 +597,11 @@ export const storage = create<StorageState>()((set, get) => {
             session.maxBudgetUsd ??
             savedSdk?.maxBudgetUsd ??
             null;
+          const resolvedTaskBudgetTokens =
+            existingSdk?.taskBudgetTokens ??
+            session.taskBudgetTokens ??
+            savedSdk?.taskBudgetTokens ??
+            null;
 
           // Resolve needsAttention: prefer explicit value from update, then existing, then saved
           const existingNeedsAttention =
@@ -671,6 +676,7 @@ export const storage = create<StorageState>()((set, get) => {
             thinkingBudget: resolvedThinkingBudget,
             effortLevel: resolvedEffortLevel,
             maxBudgetUsd: resolvedMaxBudgetUsd,
+            taskBudgetTokens: resolvedTaskBudgetTokens,
             needsAttention: resolvedNeedsAttention,
             // Preserve client-only latestUsage — server doesn't return it
             latestUsage: state.sessions[session.id]?.latestUsage,
@@ -1499,6 +1505,9 @@ export const storage = create<StorageState>()((set, get) => {
             ...("maxBudgetUsd" in settings && {
               maxBudgetUsd: settings.maxBudgetUsd,
             }),
+            ...("taskBudgetTokens" in settings && {
+              taskBudgetTokens: settings.taskBudgetTokens,
+            }),
           },
         };
 
@@ -1511,6 +1520,8 @@ export const storage = create<StorageState>()((set, get) => {
             sdk.thinkingBudget = sess.thinkingBudget;
           if (sess.effortLevel) sdk.effortLevel = sess.effortLevel;
           if (sess.maxBudgetUsd != null) sdk.maxBudgetUsd = sess.maxBudgetUsd;
+          if (sess.taskBudgetTokens != null)
+            sdk.taskBudgetTokens = sess.taskBudgetTokens;
           if (Object.keys(sdk).length > 0) {
             allSdkSettings[id] = sdk;
           }

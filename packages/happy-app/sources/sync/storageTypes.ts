@@ -160,6 +160,7 @@ export const SessionPreferencesSchema = z.object({
   thinkingBudget: z.number().nullish(),
   effortLevel: z.string().nullish(),
   maxBudgetUsd: z.number().nullish(),
+  taskBudgetTokens: z.number().nullish(),
 });
 
 export type SessionPreferences = z.infer<typeof SessionPreferencesSchema>;
@@ -202,6 +203,7 @@ export interface Session {
   thinkingBudget?: number | null; // Budget tokens when thinkingMode is "enabled"
   effortLevel?: string | null; // "low" | "medium" | "high" | "max"
   maxBudgetUsd?: number | null; // Max budget in USD
+  taskBudgetTokens?: number | null; // Task token budget (alpha) — model self-paces within limit
   // IMPORTANT: latestUsage is extracted from reducerState.latestUsage after message processing.
   // We store it directly on Session to ensure it's available immediately on load.
   // Do NOT store reducerState itself on Session - it's mutable and should only exist in SessionMessages.

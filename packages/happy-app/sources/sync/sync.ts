@@ -651,7 +651,7 @@ class Sync {
       storage.getState().applySessions([{ ...session, needsAttention: false }]);
     }
 
-    const { permissionMode, model, thinking, effort, maxBudgetUsd } =
+    const { permissionMode, model, thinking, effort, maxBudgetUsd, taskBudget } =
       resolveMessageModeMeta(session);
 
     // Generate local ID (or use provided one)
@@ -694,6 +694,7 @@ class Sync {
         ...(thinking && { thinking }),
         ...(effort && { effort }),
         ...(maxBudgetUsd != null && { maxBudgetUsd }),
+        ...(taskBudget && { taskBudget }),
         ...(options?.continue && { continue: true }),
       },
     };
@@ -1020,6 +1021,7 @@ class Sync {
               thinkingBudget: preferences.thinkingBudget,
               effortLevel: preferences.effortLevel,
               maxBudgetUsd: preferences.maxBudgetUsd,
+              taskBudgetTokens: preferences.taskBudgetTokens,
             }
           : {}),
       };
@@ -1059,7 +1061,8 @@ class Sync {
         session.profileId ||
         session.thinkingMode ||
         session.effortLevel ||
-        session.maxBudgetUsd != null;
+        session.maxBudgetUsd != null ||
+        session.taskBudgetTokens != null;
       if (!hasLocalData) continue;
 
       // Trigger sync (debounced, will batch naturally)
@@ -1247,6 +1250,7 @@ class Sync {
           thinkingBudget: session.thinkingBudget,
           effortLevel: session.effortLevel,
           maxBudgetUsd: session.maxBudgetUsd,
+          taskBudgetTokens: session.taskBudgetTokens,
         };
 
         const encrypted =

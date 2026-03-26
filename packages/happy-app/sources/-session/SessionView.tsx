@@ -686,6 +686,15 @@ function SessionViewInner({
     [sessionId],
   );
 
+  const updateTaskBudgetTokens = React.useCallback(
+    (tokens: number | null) => {
+      storage
+        .getState()
+        .updateSessionSdkSettings(sessionId, { taskBudgetTokens: tokens });
+    },
+    [sessionId],
+  );
+
   // Handle microphone button press - memoized to prevent button flashing
   const handleMicrophonePress = React.useCallback(async () => {
     if (realtimeStatus === "connecting") {
@@ -893,9 +902,11 @@ function SessionViewInner({
           thinkingMode: session.thinkingMode,
           effortLevel: session.effortLevel,
           maxBudgetUsd: session.maxBudgetUsd,
+          taskBudgetTokens: session.taskBudgetTokens,
           onThinkingModeChange: updateThinkingMode,
           onEffortLevelChange: updateEffortLevel,
           onMaxBudgetUsdChange: updateMaxBudgetUsd,
+          onTaskBudgetTokensChange: updateTaskBudgetTokens,
         }}
         metadata={session.metadata}
         connectionStatus={{

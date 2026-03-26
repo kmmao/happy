@@ -21,6 +21,7 @@ export interface ResolvedMessageMeta {
   } | null;
   effort: "low" | "medium" | "high" | "max" | null;
   maxBudgetUsd: number | null;
+  taskBudget: { total: number } | null;
 }
 
 export function resolveMessageModeMeta(
@@ -34,6 +35,7 @@ export function resolveMessageModeMeta(
     | "thinkingBudget"
     | "effortLevel"
     | "maxBudgetUsd"
+    | "taskBudgetTokens"
   >,
 ): ResolvedMessageMeta {
   const sandboxEnabled = isSandboxEnabled(session.metadata);
@@ -75,11 +77,17 @@ export function resolveMessageModeMeta(
   // Resolve max budget
   const maxBudgetUsd = session.maxBudgetUsd ?? null;
 
+  // Resolve task budget (token-based, alpha)
+  const taskBudget = session.taskBudgetTokens
+    ? { total: session.taskBudgetTokens }
+    : null;
+
   return {
     permissionMode,
     model,
     thinking,
     effort,
     maxBudgetUsd,
+    taskBudget,
   };
 }

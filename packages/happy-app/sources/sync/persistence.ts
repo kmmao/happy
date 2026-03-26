@@ -264,6 +264,7 @@ export interface SessionSdkSettings {
   thinkingBudget?: number | null;
   effortLevel?: string | null;
   maxBudgetUsd?: number | null;
+  taskBudgetTokens?: number | null;
 }
 
 export function loadSessionSdkSettings(): Record<string, SessionSdkSettings> {

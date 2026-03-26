@@ -828,7 +828,7 @@ function normalizeSessionEnvelope(
       content: [
         {
           type: "text",
-          text: `**Task:** ${envelope.ev.description}${envelope.ev.taskType ? ` (${envelope.ev.taskType})` : ""}`,
+          text: `**Task:** ${envelope.ev.description}${envelope.ev.taskType ? ` (${envelope.ev.taskType})` : ""}${envelope.ev.workflowName ? ` — ${envelope.ev.workflowName}` : ""}`,
           uuid: contentUUID,
           parentUUID,
         },

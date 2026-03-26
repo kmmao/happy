@@ -536,6 +536,112 @@ export const AgentInputSettingsOverlay = React.memo(
                                 </View>
                             </>
                         )}
+                        {/* Task Token Budget Section (only for Claude, alpha) */}
+                        {!isCodex && !isGemini && reasoning?.onTaskBudgetTokensChange && (
+                            <>
+                                <View
+                                    style={{
+                                        height: 1,
+                                        backgroundColor: theme.colors.divider,
+                                        marginHorizontal: 16,
+                                    }}
+                                />
+                                <View style={{ paddingVertical: 8 }}>
+                                    <Text
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: "600",
+                                            color: theme.colors.textSecondary,
+                                            paddingHorizontal: 16,
+                                            paddingBottom: 4,
+                                            ...Typography.default("semiBold"),
+                                        }}
+                                    >
+                                        {t("agentInput.taskBudget.title")}
+                                    </Text>
+                                    {[
+                                        { key: null, name: t("agentInput.taskBudget.off"), description: t("agentInput.taskBudget.offDesc") },
+                                        { key: 50000, name: "50K", description: t("agentInput.taskBudget.quickDesc") },
+                                        { key: 100000, name: "100K", description: t("agentInput.taskBudget.standardDesc") },
+                                        { key: 200000, name: "200K", description: t("agentInput.taskBudget.largeDesc") },
+                                        { key: 500000, name: "500K", description: t("agentInput.taskBudget.unlimitedDesc") },
+                                    ].map((preset) => {
+                                        const isSelected = reasoning?.taskBudgetTokens == null
+                                            ? preset.key === null
+                                            : reasoning?.taskBudgetTokens === preset.key;
+
+                                        return (
+                                            <Pressable
+                                                key={String(preset.key)}
+                                                onPress={() => {
+                                                    hapticsLight();
+                                                    reasoning?.onTaskBudgetTokensChange?.(preset.key);
+                                                }}
+                                                style={({ pressed }) => ({
+                                                    flexDirection: "row",
+                                                    alignItems: "center",
+                                                    paddingHorizontal: 16,
+                                                    paddingVertical: 8,
+                                                    backgroundColor: pressed
+                                                        ? theme.colors.surfacePressed
+                                                        : "transparent",
+                                                })}
+                                            >
+                                                <View
+                                                    style={{
+                                                        width: 16,
+                                                        height: 16,
+                                                        borderRadius: 8,
+                                                        borderWidth: 2,
+                                                        borderColor: isSelected
+                                                            ? theme.colors.radio.active
+                                                            : theme.colors.radio.inactive,
+                                                        alignItems: "center",
+                                                        justifyContent: "center",
+                                                        marginRight: 12,
+                                                    }}
+                                                >
+                                                    {isSelected && (
+                                                        <View
+                                                            style={{
+                                                                width: 6,
+                                                                height: 6,
+                                                                borderRadius: 3,
+                                                                backgroundColor: theme.colors.radio.dot,
+                                                            }}
+                                                        />
+                                                    )}
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 14,
+                                                            color: isSelected
+                                                                ? theme.colors.radio.active
+                                                                : theme.colors.text,
+                                                            ...Typography.default(),
+                                                        }}
+                                                    >
+                                                        {preset.name}
+                                                    </Text>
+                                                    {!!preset.description && (
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 11,
+                                                                color: theme.colors.textSecondary,
+                                                                ...Typography.default(),
+                                                            }}
+                                                        >
+                                                            {preset.description}
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            </>
+                        )}
                     </FloatingOverlay>
                 </View>
             </>
