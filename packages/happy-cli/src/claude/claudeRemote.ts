@@ -267,6 +267,7 @@ export async function claudeRemote(opts: {
     maxBudgetUsd: initial.mode.maxBudgetUsd,
     thinking: initial.mode.thinking,
     effort: initial.mode.effort,
+    taskBudget: initial.mode.taskBudget,
     promptSuggestions: true,
     onElicitation: opts.onElicitation,
     // ── New SDK capabilities ──

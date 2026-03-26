@@ -78,7 +78,14 @@ export function useSessionStatus(session: Session): SessionStatus {
     };
   }
 
-  if (session.thinking === true) {
+  // Use authoritative SDK session state when available (idle/running/requires_action),
+  // falling back to the legacy `thinking` boolean for older CLI versions.
+  const isRunning =
+    session.sdkSessionState != null
+      ? session.sdkSessionState === "running"
+      : session.thinking === true;
+
+  if (isRunning) {
     // Show retry status when API is being retried
     if (session.apiRetry) {
       return {

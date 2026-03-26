@@ -86,6 +86,7 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   if (opts.maxBudgetUsd != null) result.maxBudgetUsd = opts.maxBudgetUsd;
   if (opts.thinking) result.thinking = opts.thinking;
   if (opts.effort != null) result.effort = opts.effort;
+  if (opts.taskBudget) result.taskBudget = opts.taskBudget;
   if (opts.promptSuggestions) result.promptSuggestions = opts.promptSuggestions;
 
   // ── toolConfig (AskUserQuestion previewFormat etc.) ──

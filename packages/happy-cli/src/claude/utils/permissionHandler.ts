@@ -8,7 +8,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { logger } from "@/lib";
 import { SDKAssistantMessage, SDKMessage, SDKUserMessage } from "../sdk";
-import { PermissionResult } from "../sdk/types";
+import type { PermissionResult, PermissionDecisionClassification } from "../sdk/types";
 import { PLAN_FAKE_REJECT, PLAN_FAKE_RESTART } from "../sdk/prompts";
 import { Session } from "../session";
 import { getToolName } from "./getToolName";
@@ -118,9 +118,20 @@ export class PermissionHandler {
       }
     } else {
       // Handle default case for all other tools
+      // Classify the decision for telemetry:
+      //   - allowTools present → user granted session-wide permission (permanent)
+      //   - approved without allowTools → one-time allow (temporary)
+      //   - denied → user_reject
+      const classification: PermissionDecisionClassification = response.approved
+        ? response.allowTools && response.allowTools.length > 0
+          ? "user_permanent"
+          : "user_temporary"
+        : "user_reject";
+
       const result: PermissionResult = response.approved
         ? {
             behavior: "allow",
+            decisionClassification: classification,
             updatedInput: {
               ...((pending.input as Record<string, unknown>) || {}),
               // For AskUserQuestion: merge user answers into updatedInput
@@ -130,6 +141,7 @@ export class PermissionHandler {
           }
         : {
             behavior: "deny",
+            decisionClassification: classification,
             message:
               response.reason ||
               `The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.`,

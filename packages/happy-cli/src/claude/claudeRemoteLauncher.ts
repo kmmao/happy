@@ -19,6 +19,7 @@ import type {
   SDKAPIRetryMessage,
   SDKToolProgressMessage,
   SDKPromptSuggestionMessage,
+  SDKSessionStateChangedMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
@@ -261,6 +262,28 @@ export async function claudeRemoteLauncher(
     },
   );
 
+  // Register RPC handler for seeding read state after compact/snip
+  session.client.rpcHandlerManager.registerHandler(
+    "seedReadState",
+    async (args: { path: string; mtime: number }) => {
+      if (!currentQuery) {
+        return { error: "No active query" };
+      }
+      if (!args.path || args.mtime == null) {
+        return { error: "Missing path or mtime" };
+      }
+      try {
+        await currentQuery.seedReadState(args.path, args.mtime);
+        return { success: true };
+      } catch (err) {
+        logger.debug(`[remote]: seedReadState failed: ${err}`);
+        return {
+          error: err instanceof Error ? err.message : "seedReadState failed",
+        };
+      }
+    },
+  );
+
   // Create permission handler
   const permissionHandler = new PermissionHandler(session);
 
@@ -417,6 +440,7 @@ export async function claudeRemoteLauncher(
         toolUseId: m.tool_use_id,
         description: m.description,
         taskType: m.task_type,
+        workflowName: (m as any).workflow_name,
       });
       session.client.sendSessionProtocolMessage(envelope);
     }
@@ -503,6 +527,19 @@ export async function claudeRemoteLauncher(
         });
         session.client.sendSessionProtocolMessage(envelope);
       }
+    }
+
+    // Forward session state changes (idle/running/requires_action) to App
+    if (
+      message.type === "system" &&
+      (message as SDKSessionStateChangedMessage).subtype === "session_state_changed"
+    ) {
+      const m = message as SDKSessionStateChangedMessage;
+      const envelope = createEnvelope("agent", {
+        t: "session-state-changed",
+        state: m.state,
+      });
+      session.client.sendSessionProtocolMessage(envelope);
     }
 
     // Convert SDK message to log format and send to client
@@ -804,6 +841,7 @@ export async function claudeRemoteLauncher(
           maxBudgetUsd: m.maxBudgetUsd,
           thinking: m.thinking,
           effort: m.effort,
+          taskBudget: m.taskBudget,
           locale: m.locale,
           betas: m.betas,
           agent: m.agent,

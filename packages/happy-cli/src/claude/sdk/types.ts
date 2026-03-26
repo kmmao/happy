@@ -13,8 +13,11 @@ export type {
   SDKResultSuccess,
   SDKResultError,
   SDKAPIRetryMessage,
+  SDKSessionStateChangedMessage,
   PermissionResult,
+  PermissionDecisionClassification,
   ThinkingConfig,
+  EffortLevel,
   Settings,
   ElicitationRequest,
   ElicitationResult,
@@ -77,8 +80,15 @@ export interface QueryOptions {
   maxBudgetUsd?: number;
   /** Controls Claude's thinking/reasoning behavior */
   thinking?: import("@anthropic-ai/claude-agent-sdk").ThinkingConfig;
-  /** Controls how much effort Claude puts into its response (low/medium/high/max) */
-  effort?: "low" | "medium" | "high" | "max";
+  /** Controls how much effort Claude puts into its response */
+  effort?: import("@anthropic-ai/claude-agent-sdk").EffortLevel;
+  /**
+   * API-side task budget in tokens. When set, the model is made aware of
+   * its remaining token budget so it can pace tool use and wrap up before
+   * the limit. Requires `task-budgets-2026-03-13` beta header.
+   * @alpha
+   */
+  taskBudget?: { total: number };
   /** Enable prompt suggestions — agent emits a prompt_suggestion after each turn */
   promptSuggestions?: boolean;
   /**

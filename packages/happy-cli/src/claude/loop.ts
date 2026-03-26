@@ -27,7 +27,12 @@ export interface EnhancedMode {
   /** Controls thinking/reasoning behavior (adaptive, enabled, disabled) */
   thinking?: ThinkingConfig;
   /** Controls how much effort Claude puts into its response */
-  effort?: "low" | "medium" | "high" | "max";
+  effort?: import("@anthropic-ai/claude-agent-sdk").EffortLevel;
+  /**
+   * API-side task budget in tokens — model self-paces tool use within the limit.
+   * @alpha
+   */
+  taskBudget?: { total: number };
   /** When true, continue from last conversation without a new prompt (one-time flag) */
   continue?: boolean;
   /** User's preferred UI language (e.g. 'en', 'zh-Hans', 'ja') */

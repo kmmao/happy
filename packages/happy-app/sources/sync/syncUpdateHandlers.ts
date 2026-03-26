@@ -5,6 +5,7 @@ import {
     normalizeRawMessage,
     extractPromptSuggestionFromRaw,
     extractNeedsContinueFromRaw,
+    extractSessionStateFromRaw,
     type NormalizedMessage,
 } from "./typesRaw";
 import type { Session, Machine } from "./storageTypes";
@@ -109,6 +110,20 @@ export async function handleNewMessageUpdate(
             // Extract needs-continue signal
             if (extractNeedsContinueFromRaw(decrypted.content)) {
                 storage.getState().setNeedsContinue(body.sid, true);
+            }
+
+            // Extract SDK session state (idle/running/requires_action)
+            const sdkState = extractSessionStateFromRaw(decrypted.content);
+            if (sdkState !== null) {
+                const currentSession = storage.getState().sessions[body.sid];
+                if (currentSession) {
+                    ctx.applySessions([
+                        {
+                            ...currentSession,
+                            sdkSessionState: sdkState,
+                        },
+                    ]);
+                }
             }
 
             lastMessage = normalizeRawMessage(

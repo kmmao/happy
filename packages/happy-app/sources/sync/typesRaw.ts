@@ -187,6 +187,7 @@ const sessionTaskStartEventSchema = z.object({
   toolUseId: z.string().optional(),
   description: z.string(),
   taskType: z.string().optional(),
+  workflowName: z.string().optional(),
 });
 
 const sessionTaskProgressEventSchema = z.object({
@@ -234,6 +235,11 @@ const sessionNeedsContinueEventSchema = z.object({
   t: z.literal("needs-continue"),
 });
 
+const sessionStateChangedEventSchema = z.object({
+  t: z.literal("session-state-changed"),
+  state: z.enum(["idle", "running", "requires_action"]),
+});
+
 const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -251,6 +257,7 @@ const sessionEventSchema = z.discriminatedUnion("t", [
   sessionToolProgressEventSchema,
   sessionPromptSuggestionEventSchema,
   sessionNeedsContinueEventSchema,
+  sessionStateChangedEventSchema,
 ]);
 
 const sessionEnvelopeSchema = z
@@ -283,7 +290,8 @@ const sessionEnvelopeSchema = z
         envelope.ev.t === "task-progress" ||
         envelope.ev.t === "task-end" ||
         envelope.ev.t === "tool-progress" ||
-        envelope.ev.t === "prompt-suggestion") &&
+        envelope.ev.t === "prompt-suggestion" ||
+        envelope.ev.t === "session-state-changed") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({
@@ -1106,6 +1114,12 @@ function normalizeSessionEnvelope(
     } satisfies NormalizedMessage;
   }
 
+  if (envelope.ev.t === "session-state-changed") {
+    // Session state changes are lifecycle signals, not chat messages.
+    // They are extracted separately via extractSessionStateFromRaw().
+    return null;
+  }
+
   if (envelope.ev.t === "prompt-suggestion") {
     // Prompt suggestions are side-channel signals, not chat messages.
     // They are extracted separately via extractPromptSuggestionFromRaw().
@@ -1165,6 +1179,34 @@ export function extractNeedsContinueFromRaw(
     envelope = raw.content.data;
   }
   return envelope?.ev?.t === "needs-continue";
+}
+
+/**
+ * Extract SDK session state from a raw record.
+ * Returns the authoritative session lifecycle state (idle/running/requires_action)
+ * or null if the record is not a session-state-changed event.
+ */
+export function extractSessionStateFromRaw(
+  raw: RawRecord | null | undefined,
+): "idle" | "running" | "requires_action" | null {
+  if (!raw) return null;
+  let envelope: any = null;
+  if (raw.role === "session" && raw.content?.data) {
+    envelope = raw.content.data;
+  } else if (
+    raw.role === "agent" &&
+    raw.content?.type === "session" &&
+    raw.content?.data
+  ) {
+    envelope = raw.content.data;
+  }
+  if (
+    envelope?.ev?.t === "session-state-changed" &&
+    typeof envelope.ev.state === "string"
+  ) {
+    return envelope.ev.state as "idle" | "running" | "requires_action";
+  }
+  return null;
 }
 
 /**

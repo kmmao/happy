@@ -207,6 +207,8 @@ export interface Session {
   // Do NOT store reducerState itself on Session - it's mutable and should only exist in SessionMessages.
   resolvedModelId?: string | null; // Actual model ID reported by CLI in turn-end (e.g. "claude-opus-4-6")
   needsAttention?: boolean; // true when turn-end received and user hasn't viewed the session
+  /** Authoritative SDK session lifecycle state (idle/running/requires_action) */
+  sdkSessionState?: "idle" | "running" | "requires_action" | null;
   latestUsage?: {
     inputTokens: number;
     outputTokens: number;
