@@ -134,6 +134,13 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="settings/installation-guide"
+        options={{
+          headerTitle: t("settings.installGuide"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="settings/plugin-detail"
         options={{
           headerTitle: t("settingsPlugins.pluginDetail"),
