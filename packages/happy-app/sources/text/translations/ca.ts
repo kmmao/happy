@@ -803,9 +803,9 @@ export const ca: TranslationStructure = {
       disabledDesc: "Sense pensament ampliat",
     },
     taskBudget: {
-      title: "PRESSUPOST DE TOKENS",
+      title: "PRESSUPOST DE TOKENS (alpha)",
       off: "Desactivat",
-      offDesc: "Sense límit de tokens",
+      offDesc: "Sense límit (recomanat)",
       quickDesc: "Tasques ràpides",
       standardDesc: "Tasques estàndard",
       largeDesc: "Tasques complexes",

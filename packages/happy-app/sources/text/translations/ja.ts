@@ -875,9 +875,9 @@ export const ja: TranslationStructure = {
       disabledDesc: "拡張思考なし",
     },
     taskBudget: {
-      title: "タスクトークン予算",
+      title: "タスクトークン予算 (alpha)",
       off: "オフ",
-      offDesc: "トークン制限なし",
+      offDesc: "制限なし (推奨)",
       quickDesc: "短いタスク",
       standardDesc: "標準タスク",
       largeDesc: "複雑なタスク",

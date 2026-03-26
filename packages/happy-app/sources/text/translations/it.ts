@@ -887,9 +887,9 @@ export const it: TranslationStructure = {
       disabledDesc: "Nessun pensiero esteso",
     },
     taskBudget: {
-      title: "BUDGET TOKEN ATTIVITÀ",
+      title: "BUDGET TOKEN ATTIVITÀ (alpha)",
       off: "Disattivato",
-      offDesc: "Nessun limite di token",
+      offDesc: "Nessun limite (consigliato)",
       quickDesc: "Attività rapide",
       standardDesc: "Attività standard",
       largeDesc: "Attività complesse",

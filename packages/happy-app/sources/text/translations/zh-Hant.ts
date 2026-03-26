@@ -768,9 +768,9 @@ export const zhHant: TranslationStructure = {
       disabledDesc: "不使用擴展思考",
     },
     taskBudget: {
-      title: "任務 Token 預算",
+      title: "任務 Token 預算 (alpha)",
       off: "關閉",
-      offDesc: "不限制 Token",
+      offDesc: "不限制 (推荐)",
       quickDesc: "快速任務",
       standardDesc: "標準任務",
       largeDesc: "複雜任務",

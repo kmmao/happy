@@ -800,9 +800,9 @@ export const en: TranslationStructure = {
       disabledDesc: "No extended thinking",
     },
     taskBudget: {
-      title: "TASK TOKEN BUDGET",
+      title: "TASK TOKEN BUDGET (alpha)",
       off: "Off",
-      offDesc: "No token limit",
+      offDesc: "No limit (recommended)",
       quickDesc: "Quick tasks",
       standardDesc: "Standard tasks",
       largeDesc: "Complex tasks",

@@ -768,9 +768,9 @@ export const zhHans: TranslationStructure = {
       disabledDesc: "不使用扩展思考",
     },
     taskBudget: {
-      title: "任务 Token 预算",
+      title: "任务 Token 预算 (alpha)",
       off: "关闭",
-      offDesc: "不限制 Token",
+      offDesc: "不限制 (推荐)",
       quickDesc: "快速任务",
       standardDesc: "标准任务",
       largeDesc: "复杂任务",

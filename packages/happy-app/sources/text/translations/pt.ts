@@ -801,9 +801,9 @@ export const pt: TranslationStructure = {
       disabledDesc: "Sem pensamento estendido",
     },
     taskBudget: {
-      title: "ORÇAMENTO DE TOKENS",
+      title: "ORÇAMENTO DE TOKENS (alpha)",
       off: "Desativado",
-      offDesc: "Sem limite de tokens",
+      offDesc: "Sem limite (recomendado)",
       quickDesc: "Tarefas rápidas",
       standardDesc: "Tarefas padrão",
       largeDesc: "Tarefas complexas",

@@ -811,9 +811,9 @@ export const pl: TranslationStructure = {
       disabledDesc: "Bez rozszerzonego myślenia",
     },
     taskBudget: {
-      title: "BUDŻET TOKENÓW ZADANIA",
+      title: "BUDŻET TOKENÓW ZADANIA (alpha)",
       off: "Wył.",
-      offDesc: "Bez limitu tokenów",
+      offDesc: "Bez limitu (zalecane)",
       quickDesc: "Szybkie zadania",
       standardDesc: "Standardowe zadania",
       largeDesc: "Złożone zadania",
