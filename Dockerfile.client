@@ -76,16 +76,22 @@ RUN mkdir -p /home/coder/.claude && \
 # Pre-install everything-claude-code plugin
 RUN mkdir -p /home/coder/.claude/plugins/cache/everything-claude-code/everything-claude-code \
     /home/coder/.claude/plugins/marketplaces && \
+    git config --global --add safe.directory '*' && \
     git clone --depth 1 https://github.com/anthropics/claude-plugins-official.git \
         /home/coder/.claude/plugins/marketplaces/claude-plugins-official && \
     git clone --depth 1 https://github.com/kmmao/everything-claude-code.git \
         /home/coder/.claude/plugins/marketplaces/everything-claude-code && \
+    ECC_SHA=$(git -C /home/coder/.claude/plugins/marketplaces/everything-claude-code rev-parse HEAD) && \
+    ECC_VER=$(grep -o '"version": *"[^"]*"' /home/coder/.claude/plugins/marketplaces/everything-claude-code/package.json | head -1 | grep -o '"[^"]*"$' | tr -d '"' || echo "latest") && \
     cp -r /home/coder/.claude/plugins/marketplaces/everything-claude-code \
-        /home/coder/.claude/plugins/cache/everything-claude-code/everything-claude-code/latest && \
-    echo '{"version":2,"plugins":{"everything-claude-code@everything-claude-code":[{"scope":"user","installPath":"/home/coder/.claude/plugins/cache/everything-claude-code/everything-claude-code/latest","version":"latest","installedAt":"2026-01-01T00:00:00.000Z","lastUpdated":"2026-01-01T00:00:00.000Z"}]}}' \
-        > /home/coder/.claude/plugins/installed_plugins.json && \
+        /home/coder/.claude/plugins/cache/everything-claude-code/everything-claude-code/$ECC_VER && \
+    printf '{"version":2,"plugins":{"everything-claude-code@everything-claude-code":[{"scope":"user","installPath":"/home/coder/.claude/plugins/cache/everything-claude-code/everything-claude-code/%s","version":"%s","installedAt":"2026-01-01T00:00:00.000Z","lastUpdated":"2026-01-01T00:00:00.000Z","gitCommitSha":"%s"}]}}' \
+        "$ECC_VER" "$ECC_VER" "$ECC_SHA" > /home/coder/.claude/plugins/installed_plugins.json && \
     echo '{"everything-claude-code":{"source":{"source":"github","repo":"kmmao/everything-claude-code"},"installLocation":"/home/coder/.claude/plugins/marketplaces/everything-claude-code","autoUpdate":true},"claude-plugins-official":{"source":{"source":"github","repo":"anthropics/claude-plugins-official"},"installLocation":"/home/coder/.claude/plugins/marketplaces/claude-plugins-official","autoUpdate":true}}' \
-        > /home/coder/.claude/plugins/known_marketplaces.json
+        > /home/coder/.claude/plugins/known_marketplaces.json && \
+    mkdir -p /home/coder/.claude/rules && \
+    cp /home/coder/.claude/plugins/marketplaces/everything-claude-code/rules/common/*.md /home/coder/.claude/rules/ && \
+    cp /home/coder/.claude/plugins/marketplaces/everything-claude-code/rules/typescript/*.md /home/coder/.claude/rules/ 2>/dev/null || true
 
 # Happy configuration
 ENV HAPPY_SERVER_URL="https://s.sangreal.code.xycloud.info:2443"
