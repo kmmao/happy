@@ -78,6 +78,23 @@ export function useSessionStatus(session: Session): SessionStatus {
     };
   }
 
+  // SDK signals requires_action when the session needs user input (e.g. MCP elicitation,
+  // tool approval not yet surfaced via agentState). Show as needs_attention with pulsing orange.
+  if (
+    session.sdkSessionState === "requires_action" &&
+    !hasPermissions
+  ) {
+    return {
+      state: "needs_attention",
+      isConnected: true,
+      statusText: t("status.needsAttention"),
+      shouldShowStatus: true,
+      statusColor: "#FF9500",
+      statusDotColor: "#FF9500",
+      isPulsing: true,
+    };
+  }
+
   // Use authoritative SDK session state when available (idle/running/requires_action),
   // falling back to the legacy `thinking` boolean for older CLI versions.
   const isRunning =
