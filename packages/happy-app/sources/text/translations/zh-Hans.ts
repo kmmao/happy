@@ -461,6 +461,16 @@ export const zhHans: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${total} 张图片中有 ${failed} 张上传失败`,
     couldNotAttachFile: "无法附加此文件",
+    attachOptions: "添加附件",
+    takePhoto: "拍照",
+    chooseFromLibrary: "从相册选择",
+    chooseFile: "选择文件",
+    sentFile: "已发送一个文件",
+    sentFiles: ({ count }: { count: number }) => `已发送 ${count} 个文件`,
+    fileTooLarge: "文件太大，无法发送",
+    fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${failed}/${total} 个文件上传失败`,
+    cameraPermissionRequired: "需要相机权限才能拍照",
     imageLoadFailed: "图片加载失败",
     bookmarkOption: "收藏",
     appendToInput: "编辑后发送",
@@ -1140,6 +1150,12 @@ export const zhHans: TranslationStructure = {
     restoreNoMachine: "Token 已还原，但无在线机器，容器需手动重建",
     restoreNoUrlData: "Token 已还原，但缺少容器配置信息，无法自动重建",
     restoreContainerFailed: ({ error }: { error: string }) => `Token 已还原，但容器重建失败：${error}`,
+    showDetails: "详情",
+    hideDetails: "收起",
+    restartContainer: "重启容器",
+    restartConfirm: "将重启 Docker 容器，运行中的会话将被中断。",
+    restarting: "正在重启容器...",
+    restarted: "容器已重启",
   },
 
   connectButton: {

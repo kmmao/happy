@@ -489,6 +489,16 @@ export const ca: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} de ${total} imatges no s'han pogut pujar`,
     couldNotAttachFile: "No s'ha pogut adjuntar aquest fitxer",
+    attachOptions: "Afegir adjunt",
+    takePhoto: "Fer foto",
+    chooseFromLibrary: "Triar de la galeria",
+    chooseFile: "Triar fitxer",
+    sentFile: "Fitxer enviat",
+    sentFiles: ({ count }: { count: number }) => `${count} fitxers enviats`,
+    fileTooLarge: "El fitxer és massa gran per enviar",
+    fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${failed} de ${total} fitxers no s'han pogut pujar`,
+    cameraPermissionRequired: "Cal permís de la càmera per fer fotos",
     imageLoadFailed: "No s'ha pogut carregar la imatge",
     bookmarkOption: "Marcador",
     appendToInput: "Edita al camp d'entrada",
@@ -1189,6 +1199,12 @@ export const ca: TranslationStructure = {
     restoreNoMachine: "Token restaurat, però no hi ha cap màquina en línia — el contenidor s'ha de reconstruir manualment.",
     restoreNoUrlData: "Token restaurat, però falta la configuració del contenidor — no es pot reconstruir automàticament.",
     restoreContainerFailed: ({ error }: { error: string }) => `Token restaurat, però la reconstrucció del contenidor ha fallat: ${error}`,
+    showDetails: "Detalls",
+    hideDetails: "Amagar",
+    restartContainer: "Reiniciar contenidor",
+    restartConfirm: "Es reiniciarà el contenidor Docker. Les sessions en execució s'interrompran.",
+    restarting: "Reiniciant contenidor...",
+    restarted: "Contenidor reiniciat",
   },
 
   connectButton: {

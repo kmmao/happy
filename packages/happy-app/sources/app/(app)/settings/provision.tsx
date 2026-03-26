@@ -118,6 +118,28 @@ function ProvisionSettingsScreen() {
     const [memoryLimit, setMemoryLimit] = React.useState(() => provisionStorage.getString(MEMORY_LIMIT_KEY) ?? "");
     const [cpuLimit, setCpuLimit] = React.useState(() => provisionStorage.getString(CPU_LIMIT_KEY) ?? "");
     const [disableSudo, setDisableSudo] = React.useState(() => provisionStorage.getBoolean(DISABLE_SUDO_KEY) ?? false);
+    const [expandedTokens, setExpandedTokens] = React.useState<Record<string, boolean>>({});
+    const [runningContainers, setRunningContainers] = React.useState<Set<string> | null>(null);
+
+    const toggleExpanded = React.useCallback((tokenId: string) => {
+        setExpandedTokens(prev => ({ ...prev, [tokenId]: !prev[tokenId] }));
+    }, []);
+
+    /** Check which happy-* containers are running on the machine */
+    const refreshContainerStatuses = React.useCallback(async () => {
+        const machineId = paramMachineId || findOnlineMachineId();
+        if (!machineId) {
+            setRunningContainers(new Set());
+            return;
+        }
+        const result = await machineBash(machineId, "docker ps --format '{{.Names}}' --filter 'name=happy-'", "/");
+        if (result.success) {
+            const names = result.stdout
+                ? result.stdout.trim().split("\n").filter(Boolean).filter(n => n.startsWith("happy-"))
+                : [];
+            setRunningContainers(new Set(names));
+        }
+    }, [paramMachineId]);
 
     const loadTokens = React.useCallback(async () => {
         if (!auth.credentials) return;
@@ -133,7 +155,8 @@ function ProvisionSettingsScreen() {
     useFocusEffect(
         React.useCallback(() => {
             loadTokens();
-        }, [loadTokens]),
+            refreshContainerStatuses();
+        }, [loadTokens, refreshContainerStatuses]),
     );
 
     /** Scan ports 7001-7099 and return the first available one */
@@ -379,6 +402,33 @@ function ProvisionSettingsScreen() {
         [auth.credentials, loadTokens, paramMachineId, findAvailablePort, getMachineIp, setupCaddySite, apiBaseUrl, apiKey],
     );
 
+    // Restart a running container
+    const handleRestart = React.useCallback(
+        async (containerName: string) => {
+            const machineId = paramMachineId || findOnlineMachineId();
+            if (!machineId) {
+                Modal.alert(t("provision.restartContainer"), t("provision.noMachineOnline"));
+                return;
+            }
+            const confirmed = await Modal.confirm(
+                t("provision.restartContainer"),
+                t("provision.restartConfirm"),
+                { confirmText: t("provision.restartContainer") },
+            );
+            if (!confirmed) return;
+
+            Modal.toast(t("provision.restarting"));
+            const result = await machineBash(machineId, `docker restart ${shellEscape(containerName)}`, "/");
+            if (result.success && result.exitCode === 0) {
+                Modal.toast(t("provision.restarted"));
+            } else {
+                Modal.alert(t("provision.containerFailed"), result.stderr || result.error || "Unknown error");
+            }
+            await refreshContainerStatuses();
+        },
+        [paramMachineId, refreshContainerStatuses],
+    );
+
     // Delete permanently
     const handleDelete = React.useCallback(
         async (tokenId: string, label: string | null) => {
@@ -563,6 +613,7 @@ function ProvisionSettingsScreen() {
             {activeTokens.map((token) => {
                 const containerName = token.label ? `happy-${sanitizeContainerName(token.label)}` : null;
                 const dockerExecCmd = containerName ? `docker exec -it -u coder ${containerName} zsh` : null;
+                const isRunning = runningContainers !== null && containerName ? runningContainers.has(containerName) : null;
 
                 const ttydInfo = parseTtydUrl(token.ttydUrl);
                 const ttydLanUrl = ttydInfo?.lanUrl ?? "";
@@ -572,29 +623,14 @@ function ProvisionSettingsScreen() {
                 const ttydPass = ttydInfo?.password ?? "";
                 const containerConfig = ttydInfo?.config ?? {};
 
+                const isExpanded = expandedTokens[token.id] ?? false;
+
                 return (
                     <ItemGroup
                         key={token.id}
-                        title={token.label ? `🟢 ${token.label}` : `🟢 ${token.id.slice(0, 8)}`}
+                        title={`${isRunning === null ? "⚪" : isRunning ? "🟢" : "🔴"} ${token.label || token.id.slice(0, 8)}`}
                     >
-                        {/* Container name */}
-                        {containerName && (
-                            <Item
-                                title={t("provision.containerName")}
-                                subtitle={containerName}
-                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
-                                icon={<Ionicons name="cube-outline" size={20} color={theme.colors.textSecondary} />}
-                                showChevron={false}
-                            />
-                        )}
-
-                        {/* Created at */}
-                        <Item
-                            title={t("provision.createdAt")}
-                            subtitle={formatDate(token.createdAt)}
-                            icon={<Ionicons name="time-outline" size={20} color={theme.colors.textSecondary} />}
-                            showChevron={false}
-                        />
+                        {/* === Core section (always visible) === */}
 
                         {/* Web App link */}
                         {token.webappUrl && (
@@ -615,7 +651,7 @@ function ProvisionSettingsScreen() {
                             />
                         )}
 
-                        {/* ttyd terminal — HTTPS */}
+                        {/* Web Terminal — HTTPS */}
                         {ttydCleanUrl ? (
                             <Item
                                 title="Web Terminal"
@@ -634,73 +670,117 @@ function ProvisionSettingsScreen() {
                             />
                         ) : null}
 
-                        {/* ttyd terminal — LAN */}
-                        {ttydLanUrl ? (
-                            <Item
-                                title="Web Terminal (LAN)"
-                                subtitle={ttydLanUrl}
-                                subtitleStyle={{ color: theme.colors.textLink, fontSize: 12 }}
-                                icon={<Ionicons name="wifi-outline" size={20} color={theme.colors.textSecondary} />}
-                                onPress={() => Linking.openURL(ttydLanUrl)}
-                                rightElement={
-                                    <Ionicons
-                                        name="copy-outline"
-                                        size={18}
-                                        color={theme.colors.textSecondary}
-                                        onPress={() => copyAndToast(ttydLanUrl)}
+                        {/* Details toggle */}
+                        <Item
+                            title={isExpanded ? t("provision.hideDetails") : t("provision.showDetails")}
+                            titleStyle={{ color: theme.colors.textSecondary }}
+                            icon={<Ionicons name={isExpanded ? "chevron-up-outline" : "chevron-down-outline"} size={20} color={theme.colors.textSecondary} />}
+                            onPress={() => toggleExpanded(token.id)}
+                            showChevron={false}
+                        />
+
+                        {/* === Expanded section === */}
+                        {isExpanded && (
+                            <>
+                                {/* Container name */}
+                                {containerName && (
+                                    <Item
+                                        title={t("provision.containerName")}
+                                        subtitle={containerName}
+                                        subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                                        icon={<Ionicons name="cube-outline" size={20} color={theme.colors.textSecondary} />}
+                                        showChevron={false}
                                     />
-                                }
-                            />
-                        ) : null}
+                                )}
 
-                        {/* ttyd credentials */}
-                        {ttydUser ? (
-                            <Item
-                                title={t("provision.terminalUser")}
-                                subtitle={ttydUser}
-                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
-                                icon={<Ionicons name="person-outline" size={20} color={theme.colors.textSecondary} />}
-                                onPress={() => copyAndToast(ttydUser)}
-                                showChevron={false}
-                            />
-                        ) : null}
-                        {ttydPass ? (
-                            <Item
-                                title={t("provision.terminalPassword")}
-                                subtitle={ttydPass}
-                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
-                                icon={<Ionicons name="lock-closed-outline" size={20} color={theme.colors.textSecondary} />}
-                                onPress={() => copyAndToast(ttydPass)}
-                                showChevron={false}
-                            />
-                        ) : null}
+                                {/* Created at */}
+                                <Item
+                                    title={t("provision.createdAt")}
+                                    subtitle={formatDate(token.createdAt)}
+                                    icon={<Ionicons name="time-outline" size={20} color={theme.colors.textSecondary} />}
+                                    showChevron={false}
+                                />
 
-                        {/* Docker exec command */}
-                        {dockerExecCmd && (
+                                {/* Web Terminal — LAN */}
+                                {ttydLanUrl ? (
+                                    <Item
+                                        title="Web Terminal (LAN)"
+                                        subtitle={ttydLanUrl}
+                                        subtitleStyle={{ color: theme.colors.textLink, fontSize: 12 }}
+                                        icon={<Ionicons name="wifi-outline" size={20} color={theme.colors.textSecondary} />}
+                                        onPress={() => Linking.openURL(ttydLanUrl)}
+                                        rightElement={
+                                            <Ionicons
+                                                name="copy-outline"
+                                                size={18}
+                                                color={theme.colors.textSecondary}
+                                                onPress={() => copyAndToast(ttydLanUrl)}
+                                            />
+                                        }
+                                    />
+                                ) : null}
+
+                                {/* ttyd credentials */}
+                                {ttydUser ? (
+                                    <Item
+                                        title={t("provision.terminalUser")}
+                                        subtitle={ttydUser}
+                                        subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                                        icon={<Ionicons name="person-outline" size={20} color={theme.colors.textSecondary} />}
+                                        onPress={() => copyAndToast(ttydUser)}
+                                        showChevron={false}
+                                    />
+                                ) : null}
+                                {ttydPass ? (
+                                    <Item
+                                        title={t("provision.terminalPassword")}
+                                        subtitle={ttydPass}
+                                        subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+                                        icon={<Ionicons name="lock-closed-outline" size={20} color={theme.colors.textSecondary} />}
+                                        onPress={() => copyAndToast(ttydPass)}
+                                        showChevron={false}
+                                    />
+                                ) : null}
+
+                                {/* Docker exec command */}
+                                {dockerExecCmd && (
+                                    <Item
+                                        title="Docker Exec"
+                                        subtitle={dockerExecCmd}
+                                        subtitleStyle={{ fontFamily: "Menlo", fontSize: 12 }}
+                                        icon={<Ionicons name="code-slash-outline" size={20} color={theme.colors.textSecondary} />}
+                                        onPress={() => copyAndToast(dockerExecCmd)}
+                                        showChevron={false}
+                                    />
+                                )}
+
+                                {/* Container config summary */}
+                                {(containerConfig.memory || containerConfig.cpu || containerConfig.sudo === false) ? (
+                                    <Item
+                                        title={t("provision.containerConfig")}
+                                        subtitle={[
+                                            containerConfig.memory ? `${t("provision.memoryLimit")}: ${containerConfig.memory}` : null,
+                                            containerConfig.cpu ? `${t("provision.cpuLimit")}: ${containerConfig.cpu}` : null,
+                                            containerConfig.sudo === false ? t("provision.sudoDisabled") : null,
+                                        ].filter(Boolean).join(" · ")}
+                                        subtitleStyle={{ fontSize: 12 }}
+                                        icon={<Ionicons name="settings-outline" size={20} color={theme.colors.textSecondary} />}
+                                        showChevron={false}
+                                    />
+                                ) : null}
+                            </>
+                        )}
+
+                        {/* Restart button — only when container is confirmed running */}
+                        {isRunning === true && containerName && (
                             <Item
-                                title="Docker Exec"
-                                subtitle={dockerExecCmd}
-                                subtitleStyle={{ fontFamily: "Menlo", fontSize: 12 }}
-                                icon={<Ionicons name="code-slash-outline" size={20} color={theme.colors.textSecondary} />}
-                                onPress={() => copyAndToast(dockerExecCmd)}
+                                title={t("provision.restartContainer")}
+                                titleStyle={{ color: theme.colors.accentOrange }}
+                                icon={<Ionicons name="refresh-outline" size={20} color={theme.colors.accentOrange} />}
+                                onPress={() => handleRestart(containerName)}
                                 showChevron={false}
                             />
                         )}
-
-                        {/* Container config summary */}
-                        {(containerConfig.memory || containerConfig.cpu || containerConfig.sudo === false) ? (
-                            <Item
-                                title={t("provision.containerConfig")}
-                                subtitle={[
-                                    containerConfig.memory ? `${t("provision.memoryLimit")}: ${containerConfig.memory}` : null,
-                                    containerConfig.cpu ? `${t("provision.cpuLimit")}: ${containerConfig.cpu}` : null,
-                                    containerConfig.sudo === false ? t("provision.sudoDisabled") : null,
-                                ].filter(Boolean).join(" · ")}
-                                subtitleStyle={{ fontSize: 12 }}
-                                icon={<Ionicons name="settings-outline" size={20} color={theme.colors.textSecondary} />}
-                                showChevron={false}
-                            />
-                        ) : null}
 
                         {/* Revoke button */}
                         <Item

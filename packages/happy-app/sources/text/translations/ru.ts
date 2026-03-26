@@ -681,6 +681,16 @@ export const ru: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} из ${total} изображений не удалось загрузить`,
     couldNotAttachFile: "Не удалось прикрепить этот файл",
+    attachOptions: "Добавить вложение",
+    takePhoto: "Сделать фото",
+    chooseFromLibrary: "Выбрать из галереи",
+    chooseFile: "Выбрать файл",
+    sentFile: "Отправлен файл",
+    sentFiles: ({ count }: { count: number }) => `Отправлено ${count} файлов`,
+    fileTooLarge: "Файл слишком большой для отправки",
+    fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${failed} из ${total} файлов не удалось загрузить`,
+    cameraPermissionRequired: "Для съёмки фото необходимо разрешение камеры",
     imageLoadFailed: "Не удалось загрузить изображение",
     bookmarkOption: "Закладка",
     appendToInput: "Редактировать в поле ввода",
@@ -1186,6 +1196,12 @@ export const ru: TranslationStructure = {
     restoreNoMachine: "Токен восстановлен, но нет онлайн-машины — контейнер нужно пересоздать вручную.",
     restoreNoUrlData: "Токен восстановлен, но отсутствует конфигурация контейнера — автоматическое пересоздание невозможно.",
     restoreContainerFailed: ({ error }: { error: string }) => `Токен восстановлен, но пересоздание контейнера не удалось: ${error}`,
+    showDetails: "Подробнее",
+    hideDetails: "Скрыть",
+    restartContainer: "Перезапустить контейнер",
+    restartConfirm: "Контейнер будет перезапущен. Текущие сессии будут прерваны.",
+    restarting: "Перезапуск контейнера...",
+    restarted: "Контейнер перезапущен",
   },
 
   connectButton: {

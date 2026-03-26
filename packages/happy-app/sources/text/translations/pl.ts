@@ -499,6 +499,16 @@ export const pl: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} z ${total} obrazów nie udało się przesłać`,
     couldNotAttachFile: "Nie można załączyć tego pliku",
+    attachOptions: "Dodaj załącznik",
+    takePhoto: "Zrób zdjęcie",
+    chooseFromLibrary: "Wybierz z galerii",
+    chooseFile: "Wybierz plik",
+    sentFile: "Wysłano plik",
+    sentFiles: ({ count }: { count: number }) => `Wysłano ${count} plików`,
+    fileTooLarge: "Plik jest zbyt duży do wysłania",
+    fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${failed} z ${total} plików nie udało się przesłać`,
+    cameraPermissionRequired: "Wymagane uprawnienia do aparatu",
     imageLoadFailed: "Nie udało się załadować obrazu",
     bookmarkOption: "Zakładka",
     appendToInput: "Edytuj w polu wpisywania",
@@ -1198,6 +1208,12 @@ export const pl: TranslationStructure = {
     restoreNoMachine: "Token przywrócony, ale brak maszyny online — kontener trzeba odtworzyć ręcznie.",
     restoreNoUrlData: "Token przywrócony, ale brakuje konfiguracji kontenera — nie można odtworzyć automatycznie.",
     restoreContainerFailed: ({ error }: { error: string }) => `Token przywrócony, ale odtworzenie kontenera nie powiodło się: ${error}`,
+    showDetails: "Szczegóły",
+    hideDetails: "Zwiń",
+    restartContainer: "Uruchom ponownie kontener",
+    restartConfirm: "Kontener zostanie uruchomiony ponownie. Bieżące sesje zostaną przerwane.",
+    restarting: "Ponowne uruchamianie kontenera...",
+    restarted: "Kontener uruchomiony ponownie",
   },
 
   connectButton: {

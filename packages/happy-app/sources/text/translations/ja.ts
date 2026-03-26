@@ -561,6 +561,16 @@ export const ja: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${total}枚中${failed}枚の画像のアップロードに失敗しました`,
     couldNotAttachFile: "このファイルを添付できませんでした",
+    attachOptions: "添付を追加",
+    takePhoto: "写真を撮る",
+    chooseFromLibrary: "ライブラリから選択",
+    chooseFile: "ファイルを選択",
+    sentFile: "ファイルを送信しました",
+    sentFiles: ({ count }: { count: number }) => `${count}件のファイルを送信しました`,
+    fileTooLarge: "ファイルが大きすぎて送信できません",
+    fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${total}件中${failed}件のファイルのアップロードに失敗しました`,
+    cameraPermissionRequired: "写真を撮るにはカメラの権限が必要です",
     imageLoadFailed: "画像の読み込みに失敗しました",
     bookmarkOption: "ブックマーク",
     appendToInput: "入力欄で編集",
@@ -1259,6 +1269,12 @@ export const ja: TranslationStructure = {
     restoreNoMachine: "トークンは復元されましたが、オンラインのマシンがないため、コンテナは手動で再構築する必要があります。",
     restoreNoUrlData: "トークンは復元されましたが、コンテナの設定情報が不足しているため自動再構築できません。",
     restoreContainerFailed: ({ error }: { error: string }) => `トークンは復元されましたが、コンテナの再構築に失敗しました: ${error}`,
+    showDetails: "詳細",
+    hideDetails: "閉じる",
+    restartContainer: "コンテナを再起動",
+    restartConfirm: "Docker コンテナを再起動します。実行中のセッションは中断されます。",
+    restarting: "コンテナを再起動中...",
+    restarted: "コンテナを再起動しました",
   },
 
   connectButton: {

@@ -489,6 +489,16 @@ export const en: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} of ${total} images failed to upload`,
     couldNotAttachFile: "Could not attach this file",
+    attachOptions: "Add Attachment",
+    takePhoto: "Take Photo",
+    chooseFromLibrary: "Choose from Library",
+    chooseFile: "Choose File",
+    sentFile: "Sent a file",
+    sentFiles: ({ count }: { count: number }) => `Sent ${count} files`,
+    fileTooLarge: "File is too large to send",
+    fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${failed} of ${total} files failed to upload`,
+    cameraPermissionRequired: "Camera permission is required to take photos",
     imageLoadFailed: "Failed to load image",
     bookmarkOption: "Bookmark",
     appendToInput: "Edit in input",
@@ -1182,6 +1192,12 @@ export const en: TranslationStructure = {
     restoreNoMachine: "Token restored, but no machine online — container must be rebuilt manually.",
     restoreNoUrlData: "Token restored, but missing container config — cannot rebuild automatically.",
     restoreContainerFailed: ({ error }: { error: string }) => `Token restored, but container rebuild failed: ${error}`,
+    showDetails: "Details",
+    hideDetails: "Hide Details",
+    restartContainer: "Restart Container",
+    restartConfirm: "This will restart the Docker container. Running sessions will be interrupted.",
+    restarting: "Restarting container...",
+    restarted: "Container Restarted",
   },
 
   connectButton: {

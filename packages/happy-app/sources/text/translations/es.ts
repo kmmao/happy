@@ -492,6 +492,16 @@ export const es: TranslationStructure = {
     imageUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} de ${total} imágenes no se pudieron subir`,
     couldNotAttachFile: "No se pudo adjuntar este archivo",
+    attachOptions: "Añadir adjunto",
+    takePhoto: "Tomar foto",
+    chooseFromLibrary: "Elegir de la galería",
+    chooseFile: "Elegir archivo",
+    sentFile: "Archivo enviado",
+    sentFiles: ({ count }: { count: number }) => `${count} archivos enviados`,
+    fileTooLarge: "El archivo es demasiado grande para enviar",
+    fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
+      `${failed} de ${total} archivos no se pudieron subir`,
+    cameraPermissionRequired: "Se requiere permiso de cámara para tomar fotos",
     imageLoadFailed: "Error al cargar la imagen",
     bookmarkOption: "Marcador",
     appendToInput: "Editar en el campo de entrada",
@@ -1189,6 +1199,12 @@ export const es: TranslationStructure = {
     restoreNoMachine: "Token restaurado, pero no hay máquina en línea — el contenedor debe reconstruirse manualmente.",
     restoreNoUrlData: "Token restaurado, pero falta la configuración del contenedor — no se puede reconstruir automáticamente.",
     restoreContainerFailed: ({ error }: { error: string }) => `Token restaurado, pero la reconstrucción del contenedor falló: ${error}`,
+    showDetails: "Detalles",
+    hideDetails: "Ocultar",
+    restartContainer: "Reiniciar contenedor",
+    restartConfirm: "Se reiniciará el contenedor Docker. Las sesiones en ejecución se interrumpirán.",
+    restarting: "Reiniciando contenedor...",
+    restarted: "Contenedor reiniciado",
   },
 
   connectButton: {
