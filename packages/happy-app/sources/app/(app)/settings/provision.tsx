@@ -46,6 +46,9 @@ async function copyAndToast(text: string) {
 const provisionStorage = new MMKV({ id: "provision-config" });
 const API_BASE_URL_KEY = "api-base-url";
 const API_KEY_KEY = "api-key";
+const MEMORY_LIMIT_KEY = "memory-limit";
+const CPU_LIMIT_KEY = "cpu-limit";
+const DISABLE_SUDO_KEY = "disable-sudo";
 
 function ProvisionSettingsScreen() {
     const { theme } = useUnistyles();
@@ -55,6 +58,9 @@ function ProvisionSettingsScreen() {
     const [loading, setLoading] = React.useState(true);
     const [apiBaseUrl, setApiBaseUrl] = React.useState(() => provisionStorage.getString(API_BASE_URL_KEY) ?? "");
     const [apiKey, setApiKey] = React.useState(() => provisionStorage.getString(API_KEY_KEY) ?? "");
+    const [memoryLimit, setMemoryLimit] = React.useState(() => provisionStorage.getString(MEMORY_LIMIT_KEY) ?? "");
+    const [cpuLimit, setCpuLimit] = React.useState(() => provisionStorage.getString(CPU_LIMIT_KEY) ?? "");
+    const [disableSudo, setDisableSudo] = React.useState(() => provisionStorage.getBoolean(DISABLE_SUDO_KEY) ?? false);
 
     const loadTokens = React.useCallback(async () => {
         if (!auth.credentials) return;
@@ -153,12 +159,15 @@ function ProvisionSettingsScreen() {
         await machineBash(machineId, `docker exec happy-caddy-1 sh -c 'mkdir -p /etc/caddy/sites && cat > /etc/caddy/sites/t-${safeName}.caddy << CADDYEOF\n${caddySiteContent}\nCADDYEOF'`, "/");
         await machineBash(machineId, `docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`, "/");
 
-        // 5. Docker run (API keys passed at runtime, not baked into image)
-        const apiEnvs = [
+        // 5. Docker run (API keys + resource limits passed at runtime)
+        const extraArgs = [
             apiBaseUrl?.trim() ? `-e ANTHROPIC_BASE_URL="${apiBaseUrl.trim()}"` : "",
             apiKey?.trim() ? `-e ANTHROPIC_AUTH_TOKEN="${apiKey.trim()}"` : "",
+            memoryLimit?.trim() ? `--memory=${memoryLimit.trim()}` : "",
+            cpuLimit?.trim() ? `--cpus=${cpuLimit.trim()}` : "",
+            disableSudo ? `-e DISABLE_SUDO=1` : "",
         ].filter(Boolean).join(" ");
-        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" --add-host=host.docker.internal:host-gateway --add-host=s.sangreal.code.xycloud.info:host-gateway --dns 8.8.8.8 -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="${serverUrl}" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -e TTYD_CREDENTIAL="coder:${ttydPassword}" ${apiEnvs} -w /work happy-client`;
+        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" --add-host=host.docker.internal:host-gateway --add-host=s.sangreal.code.xycloud.info:host-gateway --dns 8.8.8.8 -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="${serverUrl}" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -e TTYD_CREDENTIAL="coder:${ttydPassword}" ${extraArgs} -w /work happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {
@@ -314,6 +323,56 @@ function ProvisionSettingsScreen() {
                             setApiKey(val);
                             provisionStorage.set(API_KEY_KEY, val);
                         }
+                    }}
+                    showChevron={false}
+                />
+            </ItemGroup>
+
+            {/* Resource Limits */}
+            <ItemGroup title={t("provision.resourceLimits")}>
+                <Item
+                    title={t("provision.memoryLimit")}
+                    subtitle={memoryLimit || t("provision.unlimited")}
+                    subtitleStyle={memoryLimit ? { fontFamily: "Menlo", fontSize: 13 } : { color: theme.colors.textSecondary, fontSize: 13 }}
+                    icon={<Ionicons name="hardware-chip-outline" size={20} color={theme.colors.textSecondary} />}
+                    onPress={async () => {
+                        const val = await Modal.prompt(t("provision.memoryLimit"), t("provision.memoryLimitDescription"), {
+                            placeholder: "4g",
+                            defaultValue: memoryLimit,
+                        });
+                        if (val !== null) {
+                            setMemoryLimit(val);
+                            provisionStorage.set(MEMORY_LIMIT_KEY, val);
+                        }
+                    }}
+                    showChevron={false}
+                />
+                <Item
+                    title={t("provision.cpuLimit")}
+                    subtitle={cpuLimit || t("provision.unlimited")}
+                    subtitleStyle={cpuLimit ? { fontFamily: "Menlo", fontSize: 13 } : { color: theme.colors.textSecondary, fontSize: 13 }}
+                    icon={<Ionicons name="speedometer-outline" size={20} color={theme.colors.textSecondary} />}
+                    onPress={async () => {
+                        const val = await Modal.prompt(t("provision.cpuLimit"), t("provision.cpuLimitDescription"), {
+                            placeholder: "2",
+                            defaultValue: cpuLimit,
+                        });
+                        if (val !== null) {
+                            setCpuLimit(val);
+                            provisionStorage.set(CPU_LIMIT_KEY, val);
+                        }
+                    }}
+                    showChevron={false}
+                />
+                <Item
+                    title={t("provision.disableSudo")}
+                    subtitle={disableSudo ? t("provision.sudoDisabled") : t("provision.sudoEnabled")}
+                    subtitleStyle={{ color: theme.colors.textSecondary, fontSize: 13 }}
+                    icon={<Ionicons name="shield-outline" size={20} color={disableSudo ? theme.colors.accentOrange : theme.colors.textSecondary} />}
+                    onPress={() => {
+                        const next = !disableSudo;
+                        setDisableSudo(next);
+                        provisionStorage.set(DISABLE_SUDO_KEY, next);
                     }}
                     showChevron={false}
                 />

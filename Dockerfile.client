@@ -87,6 +87,11 @@ RUN cat > /usr/local/bin/happy-entrypoint.sh << 'SCRIPT'
 #!/bin/bash
 set -e
 
+# Disable sudo if requested (must run as root before switching to coder)
+if [ "$DISABLE_SUDO" = "1" ]; then
+    sed -i '/^coder/d' /etc/sudoers
+fi
+
 # Pass all environment variables to coder user and run as coder
 exec gosu coder bash -c '
 export PATH="$HOME/.local/bin:$PATH"
