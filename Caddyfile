@@ -19,7 +19,10 @@
 }
 
 s.sangreal.code.xycloud.info {
-	reverse_proxy host.docker.internal:3005
+	reverse_proxy server:3005 {
+		# Flush immediately for WebSocket / SSE / Socket.IO
+		flush_interval -1
+	}
 	import cloudflare_tls
 }
 
