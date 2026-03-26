@@ -108,6 +108,15 @@ export function rpcHandler(options: RpcHandlerOptions) {
         return;
       }
 
+      // Evict stale socket if present (disconnected but not yet cleaned up)
+      const existing = rpcListeners.get(method);
+      if (existing && existing !== socket && !existing.connected) {
+        log(
+          { module: "websocket-rpc" },
+          `Replacing stale RPC listener for ${method} (old socket ${existing.id} disconnected)`,
+        );
+      }
+
       // Register this socket as the listener for this method
       rpcListeners.set(method, socket);
 
@@ -181,8 +190,29 @@ export function rpcHandler(options: RpcHandlerOptions) {
           return;
         }
 
-        const targetSocket = rpcListeners.get(method);
-        if (!targetSocket || !targetSocket.connected) {
+        let targetSocket = rpcListeners.get(method);
+
+        // Proactively evict stale (disconnected) socket and broadcast rpc-ready:false
+        if (targetSocket && !targetSocket.connected) {
+          log(
+            { module: "websocket-rpc", level: "warn" },
+            `Evicting stale RPC listener for ${method} (socket ${targetSocket.id} disconnected)`,
+          );
+          rpcListeners.delete(method);
+          // Broadcast rpc-ready:false — use "machine" scope since machine-scoped
+          // methods are the most common stale case (daemon reconnect)
+          const scopeId = getScopeId(method);
+          if (scopeId) {
+            broadcastRpcReady(userId, "machine", scopeId, false);
+          }
+          targetSocket = undefined;
+        }
+
+        if (!targetSocket) {
+          log(
+            { module: "websocket-rpc", level: "warn" },
+            `RPC method not available: ${method} | registered: [${[...rpcListeners.keys()].join(", ")}]`,
+          );
           if (callback) {
             callback({
               ok: false,
