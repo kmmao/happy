@@ -73,6 +73,20 @@ RUN mkdir -p /home/coder/.claude && \
     echo '{"agreed": true}' > /home/coder/.claude/.agreed-tos && \
     echo '{"primaryApiKey":"any","hasCompletedOnboarding":true}' > /home/coder/.claude/settings.json
 
+# Pre-install everything-claude-code plugin
+RUN mkdir -p /home/coder/.claude/plugins/cache/everything-claude-code/everything-claude-code \
+    /home/coder/.claude/plugins/marketplaces && \
+    git clone --depth 1 https://github.com/anthropics/claude-plugins-official.git \
+        /home/coder/.claude/plugins/marketplaces/claude-plugins-official && \
+    git clone --depth 1 https://github.com/kmmao/everything-claude-code.git \
+        /home/coder/.claude/plugins/marketplaces/everything-claude-code && \
+    cp -r /home/coder/.claude/plugins/marketplaces/everything-claude-code \
+        /home/coder/.claude/plugins/cache/everything-claude-code/everything-claude-code/latest && \
+    echo '{"version":2,"plugins":{"everything-claude-code@everything-claude-code":[{"scope":"user","installPath":"/home/coder/.claude/plugins/cache/everything-claude-code/everything-claude-code/latest","version":"latest","installedAt":"2026-01-01T00:00:00.000Z","lastUpdated":"2026-01-01T00:00:00.000Z"}]}}' \
+        > /home/coder/.claude/plugins/installed_plugins.json && \
+    echo '{"everything-claude-code":{"source":{"source":"github","repo":"kmmao/everything-claude-code"},"installLocation":"/home/coder/.claude/plugins/marketplaces/everything-claude-code","autoUpdate":true},"claude-plugins-official":{"source":{"source":"github","repo":"anthropics/claude-plugins-official"},"installLocation":"/home/coder/.claude/plugins/marketplaces/claude-plugins-official","autoUpdate":true}}' \
+        > /home/coder/.claude/plugins/known_marketplaces.json
+
 # Happy configuration
 ENV HAPPY_SERVER_URL="https://s.sangreal.code.xycloud.info:2443"
 ENV HAPPY_WEBAPP_URL="http://localhost:8081"
