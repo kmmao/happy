@@ -28,6 +28,7 @@ import { Modal } from "@/modal/ModalManager";
 import { sessionAllow } from "@/sync/ops";
 import { useToolReview } from "./useToolReview";
 import { PermissionFooter } from "./PermissionFooter";
+import { shouldAutoApprove } from "@/utils/shouldAutoApprove";
 import { log } from '@/log';
 
 interface ToolViewProps {
@@ -37,6 +38,7 @@ interface ToolViewProps {
   onPress?: () => void;
   sessionId?: string;
   messageId?: string;
+  permissionModeKey?: string | null;
 }
 
 export const ToolView = React.memo<ToolViewProps>((props) => {
@@ -110,25 +112,40 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     sessionId,
   });
 
-  // Auto-approve tool permissions — ExitPlanMode and AskUserQuestion require manual approval
-  const isExitPlanMode =
-    tool.name === "ExitPlanMode" || tool.name === "exit_plan_mode";
+  // Auto-approve tool permissions based on permission mode.
+  // In default mode: never auto-approve — show PermissionFooter for manual review.
+  // In other modes: auto-approve per shouldAutoApprove() with fallback on failure.
+  const [autoApproveFailed, setAutoApproveFailed] = React.useState(false);
+  const willAutoApprove = shouldAutoApprove(props.permissionModeKey, tool.name);
+
   React.useEffect(() => {
     if (
-      sessionId &&
-      tool.permission?.status === "pending" &&
-      tool.permission?.id &&
-      tool.name !== "AskUserQuestion" &&
-      !isExitPlanMode
+      !sessionId ||
+      tool.permission?.status !== "pending" ||
+      !tool.permission?.id ||
+      !willAutoApprove
     ) {
-      sessionAllow(sessionId, tool.permission.id);
+      return;
     }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        await sessionAllow(sessionId, tool.permission!.id);
+      } catch (error) {
+        log.error("Auto-approve failed, falling back to manual review:", error);
+        if (!cancelled) {
+          setAutoApproveFailed(true);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [
     sessionId,
     tool.permission?.status,
     tool.permission?.id,
-    tool.name,
-    isExitPlanMode,
+    willAutoApprove,
   ]);
 
   let knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
@@ -412,8 +429,6 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     }
   }
 
-  // Quick approve/deny buttons removed — all tools are auto-approved
-
   const statsBar =
     diffStats && tool.state !== "running" ? (
       <DiffStatsBar
@@ -572,8 +587,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         );
       })()}
 
-      {/* Permission footer for ExitPlanMode — requires manual approval */}
-      {isExitPlanMode && sessionId && tool.permission && (
+      {/* Permission footer — shown when manual review is needed or auto-approve failed */}
+      {sessionId &&
+        tool.permission &&
+        tool.permission.status === "pending" &&
+        (!willAutoApprove || autoApproveFailed) && (
         <PermissionFooter
           permission={tool.permission}
           sessionId={sessionId}

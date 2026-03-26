@@ -42,6 +42,7 @@ export const ChatList = React.memo(
         metadata={props.session.metadata}
         sessionId={props.session.id}
         messages={messages}
+        permissionModeKey={props.session.permissionMode}
         onScrollAwayFromBottom={props.onScrollAwayFromBottom}
         onScrollActivity={props.onScrollActivity}
         onVisibleUserMessageChange={props.onVisibleUserMessageChange}
@@ -82,6 +83,7 @@ const ChatListInternal = React.memo(
       metadata: Metadata | null;
       sessionId: string;
       messages: Message[];
+      permissionModeKey?: string | null;
       onScrollAwayFromBottom?: (isAway: boolean) => void;
       onScrollActivity?: () => void;
       onVisibleUserMessageChange?: (msgIndex: number) => void;
@@ -156,6 +158,8 @@ const ChatListInternal = React.memo(
       return props.messages.filter((msg) => {
         if (msg.kind !== "tool-call") return true;
         if (ALWAYS_VISIBLE_TOOLS.has(msg.tool.name)) return true;
+        // Always show tools with pending permissions so PermissionFooter can render
+        if (msg.tool.permission?.status === "pending") return true;
         const knownTool = knownTools[msg.tool.name as keyof typeof knownTools] as any;
         if (knownTool?.hidden) return false;
         return false;
@@ -325,6 +329,7 @@ const ChatListInternal = React.memo(
             showAvatar={showAvatarMap.get(item.id) ?? false}
             isLatestAgent={item.id === latestAgentId}
             hasTurnsWithThinking={hasThinking}
+            permissionModeKey={props.permissionModeKey}
           />
         );
       },
@@ -334,6 +339,7 @@ const ChatListInternal = React.memo(
         showAvatarMap,
         latestAgentId,
         thinkingTurnIds,
+        props.permissionModeKey,
       ],
     );
     return (

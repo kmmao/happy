@@ -34,6 +34,7 @@ export const MessageView = (props: {
   showAvatar?: boolean;
   isLatestAgent?: boolean;
   hasTurnsWithThinking?: boolean;
+  permissionModeKey?: string | null;
 }) => {
   return (
     <View style={styles.messageContainer} renderToHardwareTextureAndroid={true}>
@@ -46,6 +47,7 @@ export const MessageView = (props: {
           showAvatar={props.showAvatar}
           isLatestAgent={props.isLatestAgent}
           hasTurnsWithThinking={props.hasTurnsWithThinking}
+          permissionModeKey={props.permissionModeKey}
         />
       </View>
     </View>
@@ -61,6 +63,7 @@ function RenderBlock(props: {
   showAvatar?: boolean;
   isLatestAgent?: boolean;
   hasTurnsWithThinking?: boolean;
+  permissionModeKey?: string | null;
 }): React.ReactElement {
   switch (props.message.kind) {
     case "user-text":
@@ -86,6 +89,7 @@ function RenderBlock(props: {
           metadata={props.metadata}
           sessionId={props.sessionId}
           getMessageById={props.getMessageById}
+          permissionModeKey={props.permissionModeKey}
         />
       );
 
@@ -555,6 +559,7 @@ function ToolCallBlock(props: {
   metadata: Metadata | null;
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
+  permissionModeKey?: string | null;
 }) {
   if (!props.message.tool) {
     return null;
@@ -567,6 +572,7 @@ function ToolCallBlock(props: {
         messages={props.message.children}
         sessionId={props.sessionId}
         messageId={props.message.id}
+        permissionModeKey={props.permissionModeKey}
       />
     </View>
   );
