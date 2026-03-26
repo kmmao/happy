@@ -702,7 +702,7 @@ const styles = StyleSheet.create((theme) => ({
     fixBox: {
         marginTop: 8,
         padding: 10,
-        backgroundColor: theme.colors.surface,
+        backgroundColor: theme.dark ? theme.colors.surfaceHigh : theme.colors.surface,
         borderRadius: 6,
     },
     fixLabel: {
@@ -789,7 +789,7 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         alignItems: "center",
         gap: 4,
-        backgroundColor: theme.colors.header.tint,
+        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 6,
@@ -800,7 +800,7 @@ const styles = StyleSheet.create((theme) => ({
         color: "#FFFFFF",
     },
     secondaryButton: {
-        backgroundColor: theme.colors.surface,
+        backgroundColor: theme.dark ? theme.colors.surfaceHighest : theme.colors.surface,
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 6,

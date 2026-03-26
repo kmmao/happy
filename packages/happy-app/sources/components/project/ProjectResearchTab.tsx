@@ -803,7 +803,7 @@ const styles = StyleSheet.create((theme) => ({
         gap: 6,
     },
     startButton: {
-        backgroundColor: theme.colors.header.tint,
+        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
     },
     cancelButton: {
         backgroundColor: theme.colors.deleteAction,

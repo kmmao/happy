@@ -452,7 +452,7 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
-        backgroundColor: theme.colors.header.tint,
+        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 8,

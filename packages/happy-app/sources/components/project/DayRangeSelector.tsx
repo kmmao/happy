@@ -23,7 +23,7 @@ export const DayRangeSelector = React.memo(
                         style={[
                             styles.button,
                             selectedDays === days && {
-                                backgroundColor: theme.colors.header.tint,
+                                backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
                             },
                         ]}
                         onPress={() => onDaysChange(days)}

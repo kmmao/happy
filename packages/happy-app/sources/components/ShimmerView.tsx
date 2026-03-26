@@ -93,15 +93,15 @@ export const ShimmerView = React.memo<ShimmerViewProps>(({
     );
 });
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
     maskContainer: {
         flex: 1,
         backgroundColor: 'transparent',
     },
     background: {
-        backgroundColor: '#E0E0E0',
+        backgroundColor: theme.dark ? '#3A3A3C' : '#E0E0E0',
     },
     hiddenChildren: {
         opacity: 0,
     },
-});
+}));

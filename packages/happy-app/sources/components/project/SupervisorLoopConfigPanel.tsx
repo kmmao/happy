@@ -226,7 +226,7 @@ export const SupervisorLoopConfigPanel = React.memo(
                         </Text>
                     </Pressable>
                     <Pressable
-                        style={[styles.button, styles.startButton, { backgroundColor: theme.colors.header.tint }]}
+                        style={[styles.button, styles.startButton, { backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint }]}
                         onPress={doStart}
                         disabled={startLoading}
                     >

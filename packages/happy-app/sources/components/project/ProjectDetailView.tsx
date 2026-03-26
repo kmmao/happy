@@ -200,7 +200,7 @@ const styles = StyleSheet.create((theme) => ({
         borderRadius: 6,
     },
     segmentButtonActive: {
-        backgroundColor: theme.colors.header.tint,
+        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
     },
     segmentLabelRow: {
         flexDirection: "row",

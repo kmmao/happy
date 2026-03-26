@@ -1089,7 +1089,7 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surface,
     },
     concurrencyOptionSelected: {
-        backgroundColor: theme.colors.header.tint,
+        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
     },
     concurrencyOptionText: {
         ...Typography.default("semiBold"),
@@ -1105,7 +1105,7 @@ const styles = StyleSheet.create((theme) => ({
         paddingBottom: 16,
     },
     saveButton: {
-        backgroundColor: theme.colors.header.tint,
+        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: "center",

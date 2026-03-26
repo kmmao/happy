@@ -639,7 +639,7 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.groupped.background,
     },
     tabActive: {
-        backgroundColor: theme.colors.header.tint,
+        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
     },
     tabLabel: {
         ...Typography.default(),
@@ -702,7 +702,7 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surface,
     },
     chipActive: {
-        backgroundColor: theme.colors.header.tint,
+        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
     },
     chipText: {
         ...Typography.default(),
