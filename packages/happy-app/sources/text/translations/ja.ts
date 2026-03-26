@@ -1252,8 +1252,13 @@ export const ja: TranslationStructure = {
     webAppUrl: "Happy Web App（コピー済み）：",
     terminalUrl: "Web ターミナル（ttyd）：",
     webappUrlNotConfigured: "Web App URL が設定されていません。設定 → アカウント → Web App URL を設定してください。",
-    containerFailed: "コンテナの作成に失敗しました",
+    containerFailed: "コンテナ失敗",
     containerFailedDescription: ({ error }: { error: string }) => `Docker コマンドが失敗しました：${error}\n\n代替手段として、プロビジョン token がクリップボードにコピーされました。`,
+    restoringContainer: "コンテナを再構築中...",
+    containerRestored: "コンテナを復元しました",
+    restoreNoMachine: "トークンは復元されましたが、オンラインのマシンがないため、コンテナは手動で再構築する必要があります。",
+    restoreNoUrlData: "トークンは復元されましたが、コンテナの設定情報が不足しているため自動再構築できません。",
+    restoreContainerFailed: ({ error }: { error: string }) => `トークンは復元されましたが、コンテナの再構築に失敗しました: ${error}`,
   },
 
   connectButton: {

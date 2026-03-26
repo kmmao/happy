@@ -16,7 +16,6 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { machineBash } from "@/sync/ops";
 import { storage } from "@/sync/storage";
 import { MMKV } from "react-native-mmkv";
-import { getServerUrl } from "@/sync/serverConfig";
 import { isMachineOnline } from "@/utils/machineUtils";
 import {
     provisionCreate,
@@ -37,10 +36,68 @@ function sanitizeContainerName(name: string): string {
     return name.replace(/[^a-zA-Z0-9_.-]/g, "-").replace(/-+/g, "-");
 }
 
+/** Escape a value for safe use in shell single-quoted strings */
+function shellEscape(value: string): string {
+    return "'" + value.replace(/'/g, "'\\''") + "'";
+}
+
 /** Copy text and show toast */
 async function copyAndToast(text: string) {
     await Clipboard.setStringAsync(text);
     Modal.toast(t("provision.copied"));
+}
+
+/** Parse ttydUrl (JSON or legacy plain URL) into structured parts */
+function parseTtydUrl(ttydUrl: string | null): {
+    httpsUrl: string;
+    lanUrl: string;
+    fullUrl: string;
+    cleanUrl: string;
+    user: string;
+    password: string;
+    config: { memory?: string | null; cpu?: string | null; sudo?: boolean };
+} | null {
+    if (!ttydUrl) return null;
+    let httpsUrl = "";
+    let lanUrl = "";
+    let config: { memory?: string | null; cpu?: string | null; sudo?: boolean } = {};
+    try {
+        const parsed = JSON.parse(ttydUrl);
+        httpsUrl = parsed.https || "";
+        lanUrl = parsed.lan || "";
+        config = parsed.config || {};
+    } catch {
+        httpsUrl = ttydUrl;
+    }
+    if (!httpsUrl) return null;
+    let user = "";
+    let password = "";
+    let cleanUrl = httpsUrl;
+    let fullUrl = httpsUrl;
+    try {
+        const u = new URL(httpsUrl);
+        user = decodeURIComponent(u.username);
+        password = decodeURIComponent(u.password);
+        cleanUrl = `${u.protocol}//${u.host}`;
+        fullUrl = httpsUrl;
+    } catch {
+        // keep as-is
+    }
+    return { httpsUrl, lanUrl, fullUrl, cleanUrl, user, password, config };
+}
+
+/** Extract provision token and server URL from webappUrl query params */
+function parseWebappUrl(webappUrl: string | null): { provisionToken: string; serverUrl: string } | null {
+    if (!webappUrl) return null;
+    try {
+        const u = new URL(webappUrl);
+        const provisionToken = u.searchParams.get("provision");
+        const serverUrl = u.searchParams.get("server");
+        if (!provisionToken || !serverUrl) return null;
+        return { provisionToken, serverUrl };
+    } catch {
+        return null;
+    }
 }
 
 const provisionStorage = new MMKV({ id: "provision-config" });
@@ -79,6 +136,37 @@ function ProvisionSettingsScreen() {
         }, [loadTokens]),
     );
 
+    /** Scan ports 7001-7099 and return the first available one */
+    const findAvailablePort = React.useCallback(async (machineId: string): Promise<number | null> => {
+        const portCheckResult = await machineBash(machineId, [
+            "(",
+            "docker ps -a --format '{{.Ports}}' | grep -o '0\\.0\\.0\\.0:70[0-9][0-9]' | sed 's/0\\.0\\.0\\.0://'",
+            ";",
+            "ss -tlnH 2>/dev/null | grep -o ':70[0-9][0-9] ' | sed 's/://' | sed 's/ //' || true",
+            ")",
+            "| sort -un",
+        ].join(" "), "/");
+        const usedPorts = new Set(
+            (portCheckResult.stdout?.trim() || "").split("\n").map(Number).filter(Boolean),
+        );
+        let port = 7001;
+        while (usedPorts.has(port) && port < 7100) port++;
+        return port < 7100 ? port : null;
+    }, []);
+
+    /** Get machine LAN IP */
+    const getMachineIp = React.useCallback(async (machineId: string): Promise<string> => {
+        const ipResult = await machineBash(machineId, "hostname -I | awk '{print $1}'", "/");
+        return ipResult.stdout?.trim() || "localhost";
+    }, []);
+
+    /** Create Caddy site file and reload */
+    const setupCaddySite = React.useCallback(async (machineId: string, safeName: string, port: number) => {
+        const caddySiteContent = `t-${safeName}.code.xycloud.info {\n\treverse_proxy host.docker.internal:${port}\n\timport cloudflare_tls\n}`;
+        await machineBash(machineId, `docker exec happy-caddy-1 sh -c 'mkdir -p /etc/caddy/sites && cat > /etc/caddy/sites/t-${safeName}.caddy << CADDYEOF\n${caddySiteContent}\nCADDYEOF'`, "/");
+        await machineBash(machineId, `docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`, "/");
+    }, []);
+
     // Create container
     const [, handleCreate] = useHappyAction(async () => {
         if (!auth.credentials) return;
@@ -113,29 +201,13 @@ function ProvisionSettingsScreen() {
 
         Modal.toast(t("provision.creatingContainer"));
 
-        // Find first available ttyd port (7001-7099)
-        // Collect all used ports from Docker + system, then pick the first gap
-        const portCheckResult = await machineBash(machineId, [
-            "(",
-            "docker ps -a --format '{{.Ports}}' | grep -o '0\\.0\\.0\\.0:70[0-9][0-9]' | sed 's/0\\.0\\.0\\.0://'",
-            ";",
-            "ss -tlnH 2>/dev/null | grep -o ':70[0-9][0-9] ' | sed 's/://' | sed 's/ //' || true",
-            ")",
-            "| sort -un",
-        ].join(" "), "/");
-        const usedPorts = new Set(
-            (portCheckResult.stdout?.trim() || "").split("\n").map(Number).filter(Boolean),
-        );
-        let ttydPort = 7001;
-        while (usedPorts.has(ttydPort) && ttydPort < 7100) ttydPort++;
-        if (ttydPort >= 7100) {
+        const ttydPort = await findAvailablePort(machineId);
+        if (!ttydPort) {
             Modal.alert(t("provision.containerFailed"), "No available ports (7001-7099)");
             return;
         }
 
-        // Get machine's LAN IP for internal URLs
-        const ipResult = await machineBash(machineId, "hostname -I | awk '{print $1}'", "/");
-        const machineIp = ipResult.stdout?.trim() || "localhost";
+        const machineIp = await getMachineIp(machineId);
 
         // 1. Create provision token (server creates independent account + packs secret)
         const result = await provisionCreate(auth.credentials, {
@@ -163,19 +235,17 @@ function ProvisionSettingsScreen() {
         await provisionUpdateUrls(auth.credentials, result.id, { webappUrl, ttydUrl });
 
         // 4. Create Caddy site file for ttyd reverse proxy
-        const caddySiteContent = `t-${safeName}.code.xycloud.info {\n\treverse_proxy host.docker.internal:${ttydPort}\n\timport cloudflare_tls\n}`;
-        await machineBash(machineId, `docker exec happy-caddy-1 sh -c 'mkdir -p /etc/caddy/sites && cat > /etc/caddy/sites/t-${safeName}.caddy << CADDYEOF\n${caddySiteContent}\nCADDYEOF'`, "/");
-        await machineBash(machineId, `docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`, "/");
+        await setupCaddySite(machineId, safeName, ttydPort);
 
-        // 5. Docker run (API keys + resource limits passed at runtime)
+        // 5. Docker run (API keys + resource limits passed at runtime, shell-escaped)
         const extraArgs = [
-            apiBaseUrl?.trim() ? `-e ANTHROPIC_BASE_URL="${apiBaseUrl.trim()}"` : "",
-            apiKey?.trim() ? `-e ANTHROPIC_AUTH_TOKEN="${apiKey.trim()}"` : "",
-            memoryLimit?.trim() ? `--memory=${memoryLimit.trim()}` : "",
-            cpuLimit?.trim() ? `--cpus=${cpuLimit.trim()}` : "",
+            apiBaseUrl?.trim() ? `-e ANTHROPIC_BASE_URL=${shellEscape(apiBaseUrl.trim())}` : "",
+            apiKey?.trim() ? `-e ANTHROPIC_AUTH_TOKEN=${shellEscape(apiKey.trim())}` : "",
+            memoryLimit?.trim() ? `--memory=${shellEscape(memoryLimit.trim())}` : "",
+            cpuLimit?.trim() ? `--cpus=${shellEscape(cpuLimit.trim())}` : "",
             disableSudo ? `-e DISABLE_SUDO=1` : "",
         ].filter(Boolean).join(" ");
-        const dockerCmd = `docker run -d --name "${containerFullName}" --hostname "${safeName}" --add-host=host.docker.internal:host-gateway --add-host=s.sangreal.code.xycloud.info:host-gateway --dns 8.8.8.8 -v "${volumeName}:/home/coder/.happy" -v "${volumeName}-work:/work" -p ${ttydPort}:7681 -e HAPPY_SERVER_URL="${serverUrl}" -e HAPPY_PROVISION_TOKEN="${result.provisionToken}" -e TTYD_CREDENTIAL="coder:${ttydPassword}" ${extraArgs} -w /work happy-client`;
+        const dockerCmd = `docker run -d --name ${shellEscape(containerFullName)} --hostname ${shellEscape(safeName)} --add-host=host.docker.internal:host-gateway --add-host=s.sangreal.code.xycloud.info:host-gateway --dns 8.8.8.8 -v ${shellEscape(`${volumeName}:/home/coder/.happy`)} -v ${shellEscape(`${volumeName}-work:/work`)} -p ${ttydPort}:7681 -e HAPPY_SERVER_URL=${shellEscape(serverUrl)} -e HAPPY_PROVISION_TOKEN=${shellEscape(result.provisionToken)} -e TTYD_CREDENTIAL=${shellEscape(`coder:${ttydPassword}`)} ${extraArgs} -w /work happy-client`;
         const bashResult = await machineBash(machineId, dockerCmd, "/");
 
         if (bashResult.success && bashResult.exitCode === 0) {
@@ -206,9 +276,9 @@ function ProvisionSettingsScreen() {
             if (machineId && label) {
                 const safeName = sanitizeContainerName(label);
                 const containerName = `happy-${safeName}`;
-                await machineBash(machineId, `docker rm -f "${containerName}" 2>/dev/null || true`, "/");
+                await machineBash(machineId, `docker rm -f ${shellEscape(containerName)} 2>/dev/null || true`, "/");
                 // Remove Caddy site file and reload
-                await machineBash(machineId, `docker exec happy-caddy-1 rm -f /etc/caddy/sites/t-${safeName}.caddy && docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true`, "/");
+                await machineBash(machineId, `docker exec happy-caddy-1 rm -f /etc/caddy/sites/t-${shellEscape(safeName)}.caddy && docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true`, "/");
             }
 
             await provisionRevoke(auth.credentials, tokenId);
@@ -218,9 +288,9 @@ function ProvisionSettingsScreen() {
         [auth.credentials, loadTokens, paramMachineId],
     );
 
-    // Restore revoked token
+    // Restore revoked token + rebuild container
     const handleRestore = React.useCallback(
-        async (tokenId: string, label: string | null) => {
+        async (token: ProvisionTokenItem) => {
             if (!auth.credentials) return;
             const confirmed = await Modal.confirm(
                 t("provision.restoreToken"),
@@ -229,11 +299,84 @@ function ProvisionSettingsScreen() {
             );
             if (!confirmed) return;
 
-            await provisionRestore(auth.credentials, tokenId);
-            Modal.toast(t("provision.restored"));
+            // 1. Always restore the token first (even if container rebuild fails)
+            await provisionRestore(auth.credentials, token.id);
+
+            // 2. Parse existing data for container rebuild
+            const ttydInfo = parseTtydUrl(token.ttydUrl);
+            const webappInfo = parseWebappUrl(token.webappUrl);
+            const machineId = paramMachineId || findOnlineMachineId();
+
+            if (!machineId) {
+                Modal.toast(t("provision.restoreNoMachine"));
+                await loadTokens();
+                return;
+            }
+
+            if (!ttydInfo || !webappInfo || !token.label) {
+                Modal.toast(t("provision.restoreNoUrlData"));
+                await loadTokens();
+                return;
+            }
+
+            // 3. Rebuild container
+            Modal.toast(t("provision.restoringContainer"));
+            const safeName = sanitizeContainerName(token.label);
+            const containerName = `happy-${safeName}`;
+            const volumeName = `happy-${safeName}-data`;
+
+            const port = await findAvailablePort(machineId);
+            if (!port) {
+                Modal.alert(t("provision.containerFailed"), "No available ports (7001-7099)");
+                await loadTokens();
+                return;
+            }
+
+            const machineIp = await getMachineIp(machineId);
+
+            // 4. Remove stale container if it still exists
+            await machineBash(machineId, `docker rm -f ${shellEscape(containerName)} 2>/dev/null || true`, "/");
+
+            // 5. Setup Caddy reverse proxy
+            await setupCaddySite(machineId, safeName, port);
+
+            // 6. Docker run with existing volumes and credentials (shell-escaped)
+            const extraArgs = [
+                apiBaseUrl?.trim() ? `-e ANTHROPIC_BASE_URL=${shellEscape(apiBaseUrl.trim())}` : "",
+                apiKey?.trim() ? `-e ANTHROPIC_AUTH_TOKEN=${shellEscape(apiKey.trim())}` : "",
+                ttydInfo.config.memory ? `--memory=${shellEscape(ttydInfo.config.memory)}` : "",
+                ttydInfo.config.cpu ? `--cpus=${shellEscape(ttydInfo.config.cpu)}` : "",
+                ttydInfo.config.sudo === false ? `-e DISABLE_SUDO=1` : "",
+            ].filter(Boolean).join(" ");
+
+            const dockerCmd = `docker run -d --name ${shellEscape(containerName)} --hostname ${shellEscape(safeName)} --add-host=host.docker.internal:host-gateway --add-host=s.sangreal.code.xycloud.info:host-gateway --dns 8.8.8.8 -v ${shellEscape(`${volumeName}:/home/coder/.happy`)} -v ${shellEscape(`${volumeName}-work:/work`)} -p ${port}:7681 -e HAPPY_SERVER_URL=${shellEscape(webappInfo.serverUrl)} -e HAPPY_PROVISION_TOKEN=${shellEscape(webappInfo.provisionToken)} -e TTYD_CREDENTIAL=${shellEscape(`coder:${ttydInfo.password}`)} ${extraArgs} -w /work happy-client`;
+            const bashResult = await machineBash(machineId, dockerCmd, "/");
+
+            if (bashResult.success && bashResult.exitCode === 0) {
+                // 6. Update LAN URL if port changed
+                const newLanUrl = `http://${machineIp}:${port}`;
+                if (newLanUrl !== ttydInfo.lanUrl) {
+                    const newTtydUrl = JSON.stringify({
+                        https: ttydInfo.httpsUrl,
+                        lan: newLanUrl,
+                        config: ttydInfo.config,
+                    });
+                    await provisionUpdateUrls(auth.credentials, token.id, { ttydUrl: newTtydUrl });
+                }
+                Modal.toast(t("provision.containerRestored"));
+            } else {
+                // Clean up Caddy site file since container failed to start
+                await machineBash(machineId, `docker exec happy-caddy-1 rm -f /etc/caddy/sites/t-${shellEscape(safeName)}.caddy && docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true`, "/");
+                const errorMsg = bashResult.stderr || bashResult.error || "Unknown error";
+                Modal.alert(
+                    t("provision.containerFailed"),
+                    t("provision.restoreContainerFailed", { error: errorMsg }),
+                );
+            }
+
             await loadTokens();
         },
-        [auth.credentials, loadTokens],
+        [auth.credentials, loadTokens, paramMachineId, findAvailablePort, getMachineIp, setupCaddySite, apiBaseUrl, apiKey],
     );
 
     // Delete permanently
@@ -251,7 +394,7 @@ function ProvisionSettingsScreen() {
             const machineId = paramMachineId || findOnlineMachineId();
             if (machineId && label) {
                 const safeName = sanitizeContainerName(label);
-                await machineBash(machineId, `docker exec happy-caddy-1 rm -f /etc/caddy/sites/t-${safeName}.caddy && docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true`, "/");
+                await machineBash(machineId, `docker exec happy-caddy-1 rm -f /etc/caddy/sites/t-${shellEscape(safeName)}.caddy && docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true`, "/");
             }
 
             await provisionRevoke(auth.credentials, tokenId);
@@ -421,37 +564,13 @@ function ProvisionSettingsScreen() {
                 const containerName = token.label ? `happy-${sanitizeContainerName(token.label)}` : null;
                 const dockerExecCmd = containerName ? `docker exec -it -u coder ${containerName} zsh` : null;
 
-                // Parse ttyd URL — may be JSON { https, lan, config } or plain URL (legacy)
-                let ttydHttpsUrl = "";
-                let ttydLanUrl = "";
-                let ttydFullUrl = ""; // with credentials for opening
-                let ttydCleanUrl = ""; // without credentials for display
-                let ttydUser = "";
-                let ttydPass = "";
-                let containerConfig: { memory?: string | null; cpu?: string | null; sudo?: boolean } = {};
-                if (token.ttydUrl) {
-                    try {
-                        const parsed = JSON.parse(token.ttydUrl);
-                        ttydHttpsUrl = parsed.https || "";
-                        ttydLanUrl = parsed.lan || "";
-                        containerConfig = parsed.config || {};
-                    } catch {
-                        // Legacy plain URL format
-                        ttydHttpsUrl = token.ttydUrl;
-                    }
-                    if (ttydHttpsUrl) {
-                        try {
-                            const u = new URL(ttydHttpsUrl);
-                            ttydUser = decodeURIComponent(u.username);
-                            ttydPass = decodeURIComponent(u.password);
-                            ttydCleanUrl = `${u.protocol}//${u.host}`;
-                            ttydFullUrl = ttydHttpsUrl;
-                        } catch {
-                            ttydCleanUrl = ttydHttpsUrl;
-                            ttydFullUrl = ttydHttpsUrl;
-                        }
-                    }
-                }
+                const ttydInfo = parseTtydUrl(token.ttydUrl);
+                const ttydLanUrl = ttydInfo?.lanUrl ?? "";
+                const ttydFullUrl = ttydInfo?.fullUrl ?? "";
+                const ttydCleanUrl = ttydInfo?.cleanUrl ?? "";
+                const ttydUser = ttydInfo?.user ?? "";
+                const ttydPass = ttydInfo?.password ?? "";
+                const containerConfig = ttydInfo?.config ?? {};
 
                 return (
                     <ItemGroup
@@ -622,7 +741,7 @@ function ProvisionSettingsScreen() {
                         title={t("provision.restoreToken")}
                         titleStyle={{ color: theme.colors.accentBlue }}
                         icon={<Ionicons name="refresh-outline" size={20} color={theme.colors.accentBlue} />}
-                        onPress={() => handleRestore(token.id, token.label)}
+                        onPress={() => handleRestore(token)}
                         showChevron={false}
                     />
 

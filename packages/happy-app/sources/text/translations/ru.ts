@@ -1179,8 +1179,13 @@ export const ru: TranslationStructure = {
     webAppUrl: "Happy Web App (скопировано):",
     terminalUrl: "Веб-терминал (ttyd):",
     webappUrlNotConfigured: "URL веб-приложения не настроен. Перейдите в Настройки → Аккаунт и укажите URL.",
-    containerFailed: "Ошибка создания контейнера",
+    containerFailed: "Ошибка контейнера",
     containerFailedDescription: ({ error }: { error: string }) => `Команда Docker завершилась с ошибкой: ${error}\n\nТокен подготовки скопирован в буфер обмена как запасной вариант.`,
+    restoringContainer: "Пересоздание контейнера...",
+    containerRestored: "Контейнер восстановлен",
+    restoreNoMachine: "Токен восстановлен, но нет онлайн-машины — контейнер нужно пересоздать вручную.",
+    restoreNoUrlData: "Токен восстановлен, но отсутствует конфигурация контейнера — автоматическое пересоздание невозможно.",
+    restoreContainerFailed: ({ error }: { error: string }) => `Токен восстановлен, но пересоздание контейнера не удалось: ${error}`,
   },
 
   connectButton: {

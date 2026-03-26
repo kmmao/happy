@@ -38,11 +38,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 # Install ttyd (web terminal)
 RUN apt-get update && apt-get install -y ttyd && rm -rf /var/lib/apt/lists/*
 
-# Use npm mirror for faster downloads
-RUN npm config set registry https://registry.npmmirror.com
-
-# Install happy-coder globally (use official registry to get latest version)
-RUN npm install -g @kmmao/happy-coder --registry https://registry.npmjs.org
+# Install happy-coder globally
+RUN npm install -g @kmmao/happy-coder
 
 # Create non-root user (Claude Code refuses --dangerously-skip-permissions as root)
 RUN useradd -m -s /usr/bin/zsh -G sudo coder && \
@@ -129,8 +126,11 @@ if [ -n "$TTYD_CREDENTIAL" ]; then
 fi
 ttyd $TTYD_ARGS zsh &
 
-# Start happy daemon (foreground)
-exec happy daemon start-sync
+# Start happy daemon (background, auto-restarts on CLI update without killing container)
+happy daemon start
+
+# Keep container alive
+exec tail -f /dev/null
 '
 SCRIPT
 RUN chmod +x /usr/local/bin/happy-entrypoint.sh

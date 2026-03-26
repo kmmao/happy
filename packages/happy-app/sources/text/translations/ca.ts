@@ -1182,8 +1182,13 @@ export const ca: TranslationStructure = {
     webAppUrl: "Happy Web App (copiat):",
     terminalUrl: "Terminal web (ttyd):",
     webappUrlNotConfigured: "L'URL de la Web App no està configurat. Ves a Configuració → Compte → configura l'URL.",
-    containerFailed: "Error en crear el contenidor",
+    containerFailed: "Error del contenidor",
     containerFailedDescription: ({ error }: { error: string }) => `La comanda Docker ha fallat: ${error}\n\nEl token de proveïment s'ha copiat al porta-retalls com a alternativa.`,
+    restoringContainer: "Reconstruint el contenidor...",
+    containerRestored: "Contenidor restaurat",
+    restoreNoMachine: "Token restaurat, però no hi ha cap màquina en línia — el contenidor s'ha de reconstruir manualment.",
+    restoreNoUrlData: "Token restaurat, però falta la configuració del contenidor — no es pot reconstruir automàticament.",
+    restoreContainerFailed: ({ error }: { error: string }) => `Token restaurat, però la reconstrucció del contenidor ha fallat: ${error}`,
   },
 
   connectButton: {

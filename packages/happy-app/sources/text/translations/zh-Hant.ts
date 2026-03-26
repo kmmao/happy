@@ -1134,8 +1134,13 @@ export const zhHant: TranslationStructure = {
     webAppUrl: "Happy Web App（已複製）：",
     terminalUrl: "Web 終端（ttyd）：",
     webappUrlNotConfigured: "Web App URL 未設定。請前往 設定 → 帳號 → 設定 Web App URL。",
-    containerFailed: "容器建立失敗",
+    containerFailed: "容器失敗",
     containerFailedDescription: ({ error }: { error: string }) => `Docker 命令失敗：${error}\n\n配置 token 已複製到剪貼簿作為備用方案。`,
+    restoringContainer: "正在重建容器...",
+    containerRestored: "容器已重建",
+    restoreNoMachine: "Token 已還原，但無在線機器，容器需手動重建",
+    restoreNoUrlData: "Token 已還原，但缺少容器配置資訊，無法自動重建",
+    restoreContainerFailed: ({ error }: { error: string }) => `Token 已還原，但容器重建失敗：${error}`,
   },
 
   connectButton: {

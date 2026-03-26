@@ -1191,8 +1191,13 @@ export const pl: TranslationStructure = {
     webAppUrl: "Happy Web App (skopiowano):",
     terminalUrl: "Terminal webowy (ttyd):",
     webappUrlNotConfigured: "URL aplikacji webowej nie jest skonfigurowany. Przejdź do Ustawienia → Konto → ustaw URL.",
-    containerFailed: "Tworzenie kontenera nie powiodło się",
+    containerFailed: "Błąd kontenera",
     containerFailedDescription: ({ error }: { error: string }) => `Polecenie Docker nie powiodło się: ${error}\n\nToken prowizji został skopiowany do schowka jako rozwiązanie awaryjne.`,
+    restoringContainer: "Odtwarzanie kontenera...",
+    containerRestored: "Kontener odtworzony",
+    restoreNoMachine: "Token przywrócony, ale brak maszyny online — kontener trzeba odtworzyć ręcznie.",
+    restoreNoUrlData: "Token przywrócony, ale brakuje konfiguracji kontenera — nie można odtworzyć automatycznie.",
+    restoreContainerFailed: ({ error }: { error: string }) => `Token przywrócony, ale odtworzenie kontenera nie powiodło się: ${error}`,
   },
 
   connectButton: {

@@ -1163,8 +1163,13 @@ export const en = {
     webAppUrl: "Happy Web App (copied):",
     terminalUrl: "Web Terminal (ttyd):",
     webappUrlNotConfigured: "Web App URL is not configured. Go to Settings → Account → set the Web App URL first.",
-    containerFailed: "Container Creation Failed",
+    containerFailed: "Container Failed",
     containerFailedDescription: ({ error }: { error: string }) => `Docker command failed: ${error}\n\nThe provision token has been copied to your clipboard as a fallback.`,
+    restoringContainer: "Rebuilding container...",
+    containerRestored: "Container Restored",
+    restoreNoMachine: "Token restored, but no machine online — container must be rebuilt manually.",
+    restoreNoUrlData: "Token restored, but missing container config — cannot rebuild automatically.",
+    restoreContainerFailed: ({ error }: { error: string }) => `Token restored, but container rebuild failed: ${error}`,
   },
 
   connectButton: {

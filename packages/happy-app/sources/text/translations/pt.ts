@@ -1180,8 +1180,13 @@ export const pt: TranslationStructure = {
     webAppUrl: "Happy Web App (copiado):",
     terminalUrl: "Terminal web (ttyd):",
     webappUrlNotConfigured: "A URL do Web App não está configurada. Vá para Configurações → Conta → defina a URL.",
-    containerFailed: "Falha ao criar contêiner",
+    containerFailed: "Falha no contêiner",
     containerFailedDescription: ({ error }: { error: string }) => `O comando Docker falhou: ${error}\n\nO token de provisionamento foi copiado para a área de transferência como alternativa.`,
+    restoringContainer: "Reconstruindo contêiner...",
+    containerRestored: "Contêiner restaurado",
+    restoreNoMachine: "Token restaurado, mas nenhuma máquina online — o contêiner precisa ser reconstruído manualmente.",
+    restoreNoUrlData: "Token restaurado, mas falta a configuração do contêiner — não é possível reconstruir automaticamente.",
+    restoreContainerFailed: ({ error }: { error: string }) => `Token restaurado, mas a reconstrução do contêiner falhou: ${error}`,
   },
 
   connectButton: {
