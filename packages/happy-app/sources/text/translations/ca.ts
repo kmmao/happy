@@ -499,6 +499,7 @@ export const ca: TranslationStructure = {
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} de ${total} fitxers no s'han pogut pujar`,
     cameraPermissionRequired: "Cal permís de la càmera per fer fotos",
+    dropFilesHere: "Deixa els fitxers aquí",
     imageLoadFailed: "No s'ha pogut carregar la imatge",
     bookmarkOption: "Marcador",
     appendToInput: "Edita al camp d'entrada",

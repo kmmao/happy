@@ -471,6 +471,7 @@ export const zhHans: TranslationStructure = {
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed}/${total} 个文件上传失败`,
     cameraPermissionRequired: "需要相机权限才能拍照",
+    dropFilesHere: "拖放文件到此处",
     imageLoadFailed: "图片加载失败",
     bookmarkOption: "收藏",
     appendToInput: "编辑后发送",

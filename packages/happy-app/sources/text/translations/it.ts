@@ -586,6 +586,7 @@ export const it: TranslationStructure = {
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} di ${total} file non sono stati caricati`,
     cameraPermissionRequired: "È necessario il permesso della fotocamera per scattare foto",
+    dropFilesHere: "Rilascia i file qui",
     imageLoadFailed: "Impossibile caricare l'immagine",
     bookmarkOption: "Segnalibro",
     appendToInput: "Modifica nel campo di input",

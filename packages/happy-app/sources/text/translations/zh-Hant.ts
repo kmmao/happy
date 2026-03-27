@@ -471,6 +471,7 @@ export const zhHant: TranslationStructure = {
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed}/${total} 個檔案上傳失敗`,
     cameraPermissionRequired: "需要相機權限才能拍照",
+    dropFilesHere: "拖放檔案到此處",
     imageLoadFailed: "圖片載入失敗",
     bookmarkOption: "收藏",
     appendToInput: "編輯後發送",

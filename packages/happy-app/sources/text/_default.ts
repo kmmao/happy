@@ -484,6 +484,7 @@ export const en = {
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} of ${total} files failed to upload`,
     cameraPermissionRequired: "Camera permission is required to take photos",
+    dropFilesHere: "Drop files here",
     imageLoadFailed: "Failed to load image",
     bookmarkOption: "Bookmark",
     appendToInput: "Edit in input",

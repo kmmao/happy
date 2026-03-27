@@ -571,6 +571,7 @@ export const ja: TranslationStructure = {
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${total}件中${failed}件のファイルのアップロードに失敗しました`,
     cameraPermissionRequired: "写真を撮るにはカメラの権限が必要です",
+    dropFilesHere: "ここにファイルをドロップ",
     imageLoadFailed: "画像の読み込みに失敗しました",
     bookmarkOption: "ブックマーク",
     appendToInput: "入力欄で編集",

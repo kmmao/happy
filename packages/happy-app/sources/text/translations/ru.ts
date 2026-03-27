@@ -691,6 +691,7 @@ export const ru: TranslationStructure = {
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} из ${total} файлов не удалось загрузить`,
     cameraPermissionRequired: "Для съёмки фото необходимо разрешение камеры",
+    dropFilesHere: "Перетащите файлы сюда",
     imageLoadFailed: "Не удалось загрузить изображение",
     bookmarkOption: "Закладка",
     appendToInput: "Редактировать в поле ввода",

@@ -509,6 +509,7 @@ export const pl: TranslationStructure = {
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} z ${total} plików nie udało się przesłać`,
     cameraPermissionRequired: "Wymagane uprawnienia do aparatu",
+    dropFilesHere: "Upuść pliki tutaj",
     imageLoadFailed: "Nie udało się załadować obrazu",
     bookmarkOption: "Zakładka",
     appendToInput: "Edytuj w polu wpisywania",

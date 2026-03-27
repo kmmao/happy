@@ -509,14 +509,49 @@ export const AgentInput = React.memo(
           style={[
             styles.innerContainer,
             { maxWidth: layout.maxWidth },
-            isDraggingOver && Platform.OS === "web" && {
-              borderColor: theme.colors.success,
-              borderStyle: "dashed" as const,
-              borderWidth: 2,
-              backgroundColor: `${theme.colors.success}08`,
-            },
           ]}
         >
+          {/* Drop zone overlay (web only) */}
+          {isDraggingOver && Platform.OS === "web" && (
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 100,
+                borderRadius: 16,
+                overflow: "hidden",
+                alignItems: "center",
+                justifyContent: "center",
+                // @ts-ignore Web-only CSS property
+                backdropFilter: "blur(6px)",
+                backgroundColor: `${theme.colors.success}18`,
+                borderWidth: 2,
+                borderStyle: "dashed",
+                borderColor: theme.colors.success,
+              }}
+              pointerEvents="none"
+            >
+              <Ionicons
+                name="cloud-upload-outline"
+                size={28}
+                color={theme.colors.success}
+              />
+              <Text
+                style={{
+                  marginTop: 4,
+                  fontSize: 13,
+                  color: theme.colors.success,
+                  ...Typography.default("semiBold"),
+                }}
+              >
+                {t("session.dropFilesHere")}
+              </Text>
+            </View>
+          )}
+
           {/* Autocomplete suggestions overlay */}
           {suggestions.length > 0 && (
             <View
