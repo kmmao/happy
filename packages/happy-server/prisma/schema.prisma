@@ -432,9 +432,11 @@ model Project {
     updatedAt       DateTime  @updatedAt
 
     // Relations
-    sessions        Session[]
-    supervisorRuns  SupervisorRun[]
-    supervisorLoops SupervisorLoop[]
+    sessions           Session[]
+    supervisorRuns     SupervisorRun[]
+    supervisorLoops    SupervisorLoop[]
+    knowledgeEntries   ProjectKnowledge[]
+    profile            ProjectProfile?
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
@@ -638,4 +640,59 @@ model WebhookEvent {
     @@unique([provider, deliveryId])
     @@index([repoUrl, issueNumber])
     @@index([status])
+}
+
+//
+// Project Knowledge Base (medical record metaphor)
+//
+
+model ProjectKnowledge {
+    id              String   @id @default(cuid())
+    projectId       String
+    project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    // Classification
+    entryType       String   // discovery | decision | fix | convention | warning
+    contributorType String   // session | supervisor | user
+    action          String   // create | amend | supersede | verify
+    status          String   @default("active") // active | superseded | archived
+
+    // Content
+    title           String
+    content         String   // Encrypted: narrative description
+    structured      String?  // Encrypted: JSON {request, findings, analysis, outcome, nextSteps}
+
+    // Metadata
+    tags            String   @default("[]")  // JSON array (plaintext for filtering)
+    confidence      String   @default("medium") // high | medium | low
+    model           String?  // Model that generated this entry
+    sessionId       String?  // Source session ID
+    affectedFiles   String   @default("[]")  // JSON array
+
+    // Relations (knowledge evolution)
+    supersedesId    String?
+    supersedes      ProjectKnowledge? @relation("KnowledgeSupersession", fields: [supersedesId], references: [id])
+    supersededBy    ProjectKnowledge[] @relation("KnowledgeSupersession")
+
+    // User curation
+    pinned          Boolean  @default(false)
+
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    @@index([projectId, status])
+    @@index([projectId, entryType])
+    @@index([projectId, createdAt])
+}
+
+model ProjectProfile {
+    id        String   @id @default(cuid())
+    projectId String   @unique
+    project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    content   String   // Encrypted: ProjectProfile JSON
+    version   Int      @default(1)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 }

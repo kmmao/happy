@@ -9,12 +9,13 @@ import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTab";
 import { ProjectActionsTab } from "./ProjectActionsTab";
 import { ProjectConfigTab } from "./ProjectConfigTab";
+import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
-import { storage } from "@/sync/storage";
+import { storage, useSetting } from "@/sync/storage";
 import { gitStatusSync } from "@/sync/gitStatusSync";
 
-type TabKey = "sessions" | "git" | "health" | "actions" | "research" | "config";
+type TabKey = "sessions" | "git" | "health" | "actions" | "research" | "knowledge" | "config";
 
 interface ProjectDetailViewProps {
     project: Project;
@@ -29,6 +30,7 @@ export const ProjectDetailView = React.memo(
         );
         const [researchSyncStatus, setResearchSyncStatus] =
             React.useState<ResearchSyncStatus>("idle");
+        const knowledgeBaseEnabled = useSetting("knowledgeBase");
 
         // Proactively trigger git status refresh on mount if project has active sessions
         React.useEffect(() => {
@@ -42,15 +44,21 @@ export const ProjectDetailView = React.memo(
         }, [project.sessionIds]);
 
         const tabs: { key: TabKey; label: string }[] = React.useMemo(
-            () => [
-                { key: "sessions", label: t("projects.tabSessions") },
-                { key: "git", label: t("projects.tabGit") },
-                { key: "health", label: t("projects.tabHealth") },
-                { key: "actions", label: t("projects.tabActions") },
-                { key: "research", label: t("projects.tabResearch") },
-                { key: "config", label: t("projects.tabConfig") },
-            ],
-            [],
+            () => {
+                const base: { key: TabKey; label: string }[] = [
+                    { key: "sessions", label: t("projects.tabSessions") },
+                    { key: "git", label: t("projects.tabGit") },
+                    { key: "health", label: t("projects.tabHealth") },
+                    { key: "actions", label: t("projects.tabActions") },
+                    { key: "research", label: t("projects.tabResearch") },
+                ];
+                if (knowledgeBaseEnabled) {
+                    base.push({ key: "knowledge", label: t("projects.tabKnowledge") });
+                }
+                base.push({ key: "config", label: t("projects.tabConfig") });
+                return base;
+            },
+            [knowledgeBaseEnabled],
         );
 
         return (
@@ -154,6 +162,17 @@ export const ProjectDetailView = React.memo(
                             onSyncStatusChange={setResearchSyncStatus}
                         />
                     </View>
+                    {knowledgeBaseEnabled && (
+                        <View
+                            style={
+                                activeTab === "knowledge"
+                                    ? styles.tabVisible
+                                    : styles.tabHidden
+                            }
+                        >
+                            <ProjectKnowledgeTab projectServerId={project.serverId ?? undefined} />
+                        </View>
+                    )}
                     <View
                         style={
                             activeTab === "config"

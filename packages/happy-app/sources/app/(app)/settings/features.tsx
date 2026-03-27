@@ -29,6 +29,8 @@ function FeaturesSettingsScreen() {
   const [useEnhancedSessionWizard, setUseEnhancedSessionWizard] =
     useSettingMutable("useEnhancedSessionWizard");
   const [sttCorrection, setSttCorrection] = useSettingMutable("sttCorrection");
+  const [knowledgeBase, setKnowledgeBase] = useSettingMutable("knowledgeBase");
+  const [knowledgeBaseMode, setKnowledgeBaseMode] = useSettingMutable("knowledgeBaseMode");
   const [webNotifications, setWebNotifications] =
     useSettingMutable("webNotifications");
   const [webNotificationsPersistent, setWebNotificationsPersistent] =
@@ -109,6 +111,59 @@ function FeaturesSettingsScreen() {
           }
           showChevron={false}
         />
+        <Item
+          title={t("settingsFeatures.knowledgeBase")}
+          subtitle={
+            knowledgeBase
+              ? t("settingsFeatures.knowledgeBaseEnabled")
+              : t("settingsFeatures.knowledgeBaseDisabled")
+          }
+          icon={<Ionicons name="bulb-outline" size={29} color={theme.colors.accentOrange} />}
+          rightElement={
+            <Switch value={knowledgeBase} onValueChange={setKnowledgeBase} />
+          }
+          showChevron={false}
+        />
+        {knowledgeBase && (
+          <>
+            <Item
+              title={t("settingsFeatures.knowledgeBaseMode")}
+              subtitle={t("settingsFeatures.knowledgeBaseModeAuto")}
+              icon={<Ionicons name="flash-outline" size={29} color={theme.colors.accentOrange} />}
+              rightElement={
+                <Switch
+                  value={knowledgeBaseMode === "auto"}
+                  onValueChange={() => setKnowledgeBaseMode("auto")}
+                />
+              }
+              showChevron={false}
+            />
+            <Item
+              title={t("settingsFeatures.knowledgeBaseMode")}
+              subtitle={t("settingsFeatures.knowledgeBaseModeFull")}
+              icon={<Ionicons name="server-outline" size={29} color={theme.colors.accentOrange} />}
+              rightElement={
+                <Switch
+                  value={knowledgeBaseMode === "full"}
+                  onValueChange={() => setKnowledgeBaseMode("full")}
+                />
+              }
+              showChevron={false}
+            />
+            <Item
+              title={t("settingsFeatures.knowledgeBaseMode")}
+              subtitle={t("settingsFeatures.knowledgeBaseModeMinimal")}
+              icon={<Ionicons name="leaf-outline" size={29} color={theme.colors.accentOrange} />}
+              rightElement={
+                <Switch
+                  value={knowledgeBaseMode === "minimal"}
+                  onValueChange={() => setKnowledgeBaseMode("minimal")}
+                />
+              }
+              showChevron={false}
+            />
+          </>
+        )}
       </ItemGroup>
 
       {/* Web-only Features */}

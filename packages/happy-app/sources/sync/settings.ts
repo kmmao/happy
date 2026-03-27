@@ -364,6 +364,12 @@ export const SettingsSchema = z.object({
     .describe(
       "Enable Haiku-based STT correction to fix homophones and punctuation errors in voice transcripts",
     ),
+  knowledgeBase: z
+    .boolean()
+    .describe("Enable project knowledge base (experimental)"),
+  knowledgeBaseMode: z
+    .enum(["auto", "full", "minimal"])
+    .describe("Knowledge injection mode"),
   useEnhancedSessionWizard: z
     .boolean()
     .describe("A/B test flag: Use enhanced profile-based session wizard UI"),
@@ -659,6 +665,8 @@ export const settingsDefaults: Settings = {
   experiments: false,
   showAgentActivity: true,
   sttCorrection: false,
+  knowledgeBase: false,
+  knowledgeBaseMode: "auto" as const,
   useEnhancedSessionWizard: false,
   alwaysShowContextSize: true,
   agentInputEnterToSend: true,

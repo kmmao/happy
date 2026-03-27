@@ -2,3 +2,4 @@ export * from './messages';
 export * from './legacyProtocol';
 export * from './sessionProtocol';
 export * from './machineTypes';
+export * from './knowledge';
