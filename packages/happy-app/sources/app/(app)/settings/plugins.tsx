@@ -484,7 +484,7 @@ function PluginsSettingsScreen() {
                             key={mp.name}
                             title={mp.name}
                             subtitle={`${mp.repo} · ${mp.installedCount}/${mp.availableCount}`}
-                            detail={mp.lastUpdated.split("T")[0]}
+                            detail={mp.lastUpdated?.split("T")[0] ?? ""}
                             icon={
                                 actionInProgress.has(`mp:${mp.name}`) ? (
                                     <ActivityIndicator

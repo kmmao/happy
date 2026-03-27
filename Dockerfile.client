@@ -84,7 +84,7 @@ RUN mkdir -p /home/coder/.claude/plugins/cache/everything-claude-code/everything
         /home/coder/.claude/plugins/cache/everything-claude-code/everything-claude-code/$ECC_VER && \
     printf '{"version":2,"plugins":{"everything-claude-code@everything-claude-code":[{"scope":"user","installPath":"/home/coder/.claude/plugins/cache/everything-claude-code/everything-claude-code/%s","version":"%s","installedAt":"2026-01-01T00:00:00.000Z","lastUpdated":"2026-01-01T00:00:00.000Z","gitCommitSha":"%s"}]}}' \
         "$ECC_VER" "$ECC_VER" "$ECC_SHA" > /home/coder/.claude/plugins/installed_plugins.json && \
-    echo '{"everything-claude-code":{"source":{"source":"github","repo":"kmmao/everything-claude-code"},"installLocation":"/home/coder/.claude/plugins/marketplaces/everything-claude-code","autoUpdate":true},"claude-plugins-official":{"source":{"source":"github","repo":"anthropics/claude-plugins-official"},"installLocation":"/home/coder/.claude/plugins/marketplaces/claude-plugins-official","autoUpdate":true}}' \
+    echo '{"everything-claude-code":{"source":{"source":"github","repo":"kmmao/everything-claude-code"},"installLocation":"/home/coder/.claude/plugins/marketplaces/everything-claude-code","lastUpdated":"2026-01-01T00:00:00.000Z","autoUpdate":true},"claude-plugins-official":{"source":{"source":"github","repo":"anthropics/claude-plugins-official"},"installLocation":"/home/coder/.claude/plugins/marketplaces/claude-plugins-official","lastUpdated":"2026-01-01T00:00:00.000Z","autoUpdate":true}}' \
         > /home/coder/.claude/plugins/known_marketplaces.json && \
     mkdir -p /home/coder/.claude/rules && \
     cp /home/coder/.claude/plugins/marketplaces/everything-claude-code/rules/common/*.md /home/coder/.claude/rules/ && \
