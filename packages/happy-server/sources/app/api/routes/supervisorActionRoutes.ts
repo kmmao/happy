@@ -136,13 +136,13 @@ export function supervisorActionRoutes(app: Fastify) {
             const { approval } = request.body;
 
             // State transitions:
-            // - Restore: dismissed → pending
+            // - Restore: dismissed/approved → pending (approved only when not actively fixing)
             // - Forward: pending → approved/skipped/ignored
             // - Post-analysis: approved (with fixStatus=analyzed) → ignored/skipped
             let fromApproval: string | { in: string[] };
             if (approval === "pending") {
-                // Restore from dismissed
-                fromApproval = { in: ["skipped", "ignored"] };
+                // Restore from dismissed or approved
+                fromApproval = { in: ["skipped", "ignored", "approved"] };
             } else if (approval === "skipped" || approval === "ignored") {
                 // Allow from pending OR from approved (post-analysis dismiss)
                 fromApproval = { in: ["pending", "approved"] };
@@ -157,6 +157,10 @@ export function supervisorActionRoutes(app: Fastify) {
                     projectId: id,
                     accountId: userId,
                     approval: fromApproval,
+                    // Block restore to pending if fix is actively running
+                    ...(approval === "pending"
+                        ? { fixStatus: { notIn: ["pending", "running"] } }
+                        : {}),
                 },
                 data: {
                     approval,

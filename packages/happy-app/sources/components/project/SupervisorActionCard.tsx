@@ -552,13 +552,13 @@ export const SupervisorActionCard = React.memo(
                     </View>
                 )}
 
-                {/* Fix trigger for approved but not yet fixed */}
+                {/* Fix trigger + restore for approved but not yet fixed */}
                 {isApproved && !action.fixStatus && (
                     <View style={styles.buttonRow}>
                         <Pressable
                             style={styles.approveButton}
                             onPress={doFix}
-                            disabled={fixLoading}
+                            disabled={fixLoading || actionBusy}
                         >
                             {fixLoading ? (
                                 <ActivityIndicator
@@ -571,16 +571,32 @@ export const SupervisorActionCard = React.memo(
                                 </Text>
                             )}
                         </Pressable>
+                        <Pressable
+                            style={[styles.restoreButton, actionBusy && !restoreLoading && styles.buttonDisabled]}
+                            onPress={doRestore}
+                            disabled={actionBusy}
+                        >
+                            {restoreLoading ? (
+                                <ActivityIndicator size="small" color={theme.colors.header.tint} />
+                            ) : (
+                                <>
+                                    <Ionicons name="arrow-undo-outline" size={14} color={theme.colors.header.tint} />
+                                    <Text style={[styles.restoreButtonText, { color: theme.colors.header.tint }]}>
+                                        {t("supervisor.restore")}
+                                    </Text>
+                                </>
+                            )}
+                        </Pressable>
                     </View>
                 )}
 
-                {/* Retry button for failed fixes */}
+                {/* Retry + restore button for failed fixes */}
                 {isApproved && action.fixStatus === "failed" && (
                     <View style={styles.buttonRow}>
                         <Pressable
                             style={styles.approveButton}
                             onPress={doFix}
-                            disabled={fixLoading}
+                            disabled={fixLoading || actionBusy}
                         >
                             {fixLoading ? (
                                 <ActivityIndicator
@@ -591,6 +607,22 @@ export const SupervisorActionCard = React.memo(
                                 <Text style={styles.approveButtonText}>
                                     {t("supervisor.retryFix")}
                                 </Text>
+                            )}
+                        </Pressable>
+                        <Pressable
+                            style={[styles.restoreButton, actionBusy && !restoreLoading && styles.buttonDisabled]}
+                            onPress={doRestore}
+                            disabled={actionBusy}
+                        >
+                            {restoreLoading ? (
+                                <ActivityIndicator size="small" color={theme.colors.header.tint} />
+                            ) : (
+                                <>
+                                    <Ionicons name="arrow-undo-outline" size={14} color={theme.colors.header.tint} />
+                                    <Text style={[styles.restoreButtonText, { color: theme.colors.header.tint }]}>
+                                        {t("supervisor.restore")}
+                                    </Text>
+                                </>
                             )}
                         </Pressable>
                     </View>
