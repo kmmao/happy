@@ -95,6 +95,10 @@ export function rpcHandler(options: RpcHandlerOptions) {
   socket.on("rpc-register", async (data: any, ack?: (response: any) => void) => {
     try {
       const { method } = data;
+      log(
+        { module: "websocket-rpc" },
+        `RPC register request: method=${method} userId=${userId} socketId=${socket.id} clientType=${clientType}`,
+      );
 
       if (!method || typeof method !== "string") {
         if (ack) {
