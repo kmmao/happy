@@ -176,23 +176,24 @@ export const MultiTextInput = React.forwardRef<
       const items = e.clipboardData?.items;
       if (!items) return;
 
+      const IMAGE_EXTS = /\.(jpe?g|png|gif|webp|bmp|heic|heif|svg)$/i;
+
       for (const item of Array.from(items)) {
-        // Images handled by existing onImagePaste
-        if (item.type.startsWith("image/") && onImagePaste) {
+        if (item.kind !== "file") continue;
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        // Detect images by MIME type or file extension
+        const isImage = item.type.startsWith("image/") || IMAGE_EXTS.test(file.name);
+
+        if (isImage && onImagePaste) {
           e.preventDefault();
-          const blob = item.getAsFile();
-          if (blob) {
-            onImagePaste(blob);
-          }
+          onImagePaste(file);
           return;
         }
-        // Non-image files handled by onFilePaste
-        if (item.kind === "file" && !item.type.startsWith("image/") && onFilePaste) {
+        if (!isImage && onFilePaste) {
           e.preventDefault();
-          const file = item.getAsFile();
-          if (file) {
-            onFilePaste(file);
-          }
+          onFilePaste(file);
           return;
         }
       }

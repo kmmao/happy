@@ -476,8 +476,10 @@ export const AgentInput = React.memo(
         setIsDraggingOver(false);
         const files = e.dataTransfer?.files;
         if (!files || files.length === 0) return;
+        const IMAGE_EXTS = /\.(jpe?g|png|gif|webp|bmp|heic|heif|svg)$/i;
         for (const file of Array.from(files)) {
-          if (file.type.startsWith("image/")) {
+          const isImage = file.type.startsWith("image/") || IMAGE_EXTS.test(file.name);
+          if (isImage) {
             props.images?.onImagePaste?.(file);
           } else {
             props.images?.onFilePaste?.(file);
