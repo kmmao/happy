@@ -156,6 +156,8 @@ function ProvisionSettingsScreen() {
         React.useCallback(() => {
             loadTokens();
             refreshContainerStatuses();
+            const interval = setInterval(refreshContainerStatuses, 15_000);
+            return () => clearInterval(interval);
         }, [loadTokens, refreshContainerStatuses]),
     );
 
