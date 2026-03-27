@@ -201,63 +201,6 @@ export const MultiTextInput = React.forwardRef<
     [onImagePaste, onFilePaste],
   );
 
-  // Drag-and-drop support for images and files
-  const [isDragging, setIsDragging] = React.useState(false);
-  const dragCounterRef = React.useRef(0);
-
-  const handleDragEnter = React.useCallback(
-    (e: React.DragEvent<HTMLTextAreaElement>) => {
-      e.preventDefault();
-      dragCounterRef.current++;
-      if (e.dataTransfer.types.includes("Files")) {
-        setIsDragging(true);
-      }
-    },
-    [],
-  );
-
-  const handleDragLeave = React.useCallback(
-    (e: React.DragEvent<HTMLTextAreaElement>) => {
-      e.preventDefault();
-      dragCounterRef.current--;
-      if (dragCounterRef.current <= 0) {
-        dragCounterRef.current = 0;
-        setIsDragging(false);
-      }
-    },
-    [],
-  );
-
-  const handleDragOver = React.useCallback(
-    (e: React.DragEvent<HTMLTextAreaElement>) => {
-      e.preventDefault();
-      if (e.dataTransfer.types.includes("Files")) {
-        e.dataTransfer.dropEffect = "copy";
-      }
-    },
-    [],
-  );
-
-  const handleDrop = React.useCallback(
-    (e: React.DragEvent<HTMLTextAreaElement>) => {
-      e.preventDefault();
-      dragCounterRef.current = 0;
-      setIsDragging(false);
-
-      const files = e.dataTransfer.files;
-      if (!files || files.length === 0) return;
-
-      for (const file of Array.from(files)) {
-        if (file.type.startsWith("image/") && onImagePaste) {
-          onImagePaste(file);
-        } else if (onFilePaste) {
-          onFilePaste(file);
-        }
-      }
-    },
-    [onImagePaste, onFilePaste],
-  );
-
   // Imperative handle for direct control
   React.useImperativeHandle(
     ref,
@@ -305,11 +248,9 @@ export const MultiTextInput = React.forwardRef<
           fontSize: "16px",
           color: theme.colors.input.text,
           border: "none",
-          outline: isDragging ? `2px dashed ${theme.colors.success}` : "none",
-          outlineOffset: isDragging ? "-2px" : undefined,
-          borderRadius: isDragging ? "8px" : undefined,
+          outline: "none",
           resize: "none" as const,
-          backgroundColor: isDragging ? `${theme.colors.success}08` : "transparent",
+          backgroundColor: "transparent",
           fontFamily: Typography.default().fontFamily,
           lineHeight: "1.4",
           scrollbarWidth: "none",
@@ -317,18 +258,13 @@ export const MultiTextInput = React.forwardRef<
           paddingBottom: props.paddingBottom,
           paddingLeft: props.paddingLeft,
           paddingRight: props.paddingRight,
-          transition: "background-color 0.15s, outline 0.15s",
         }}
-        placeholder={isDragging ? "Drop files here..." : placeholder}
+        placeholder={placeholder}
         value={value}
         onChange={handleChange}
         onSelect={handleSelect}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
         maxRows={maxRows}
         autoCapitalize="sentences"
         autoCorrect="on"

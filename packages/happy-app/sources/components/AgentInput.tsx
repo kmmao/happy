@@ -439,6 +439,64 @@ export const AgentInput = React.memo(
       };
     }, []);
 
+    // Drag-and-drop zone covering the entire input area (web only)
+    const dropZoneRef = React.useRef<View>(null);
+    const [isDraggingOver, setIsDraggingOver] = React.useState(false);
+    const dragCounterRef = React.useRef(0);
+
+    React.useEffect(() => {
+      if (Platform.OS !== "web") return;
+      const el = dropZoneRef.current as unknown as HTMLElement | null;
+      if (!el) return;
+
+      const onDragEnter = (e: DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current++;
+        if (e.dataTransfer?.types.includes("Files")) {
+          setIsDraggingOver(true);
+        }
+      };
+      const onDragLeave = (e: DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current--;
+        if (dragCounterRef.current <= 0) {
+          dragCounterRef.current = 0;
+          setIsDraggingOver(false);
+        }
+      };
+      const onDragOver = (e: DragEvent) => {
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = "copy";
+        }
+      };
+      const onDrop = (e: DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current = 0;
+        setIsDraggingOver(false);
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return;
+        for (const file of Array.from(files)) {
+          if (file.type.startsWith("image/")) {
+            props.images?.onImagePaste?.(file);
+          } else {
+            props.images?.onFilePaste?.(file);
+          }
+        }
+      };
+
+      el.addEventListener("dragenter", onDragEnter);
+      el.addEventListener("dragleave", onDragLeave);
+      el.addEventListener("dragover", onDragOver);
+      el.addEventListener("drop", onDrop);
+      return () => {
+        el.removeEventListener("dragenter", onDragEnter);
+        el.removeEventListener("dragleave", onDragLeave);
+        el.removeEventListener("dragover", onDragOver);
+        el.removeEventListener("drop", onDrop);
+      };
+    }, [props.images?.onImagePaste, props.images?.onFilePaste]);
+
     return (
       <View
         style={[
@@ -446,7 +504,19 @@ export const AgentInput = React.memo(
           { paddingHorizontal: screenWidth > 700 ? 16 : 8 },
         ]}
       >
-        <View style={[styles.innerContainer, { maxWidth: layout.maxWidth }]}>
+        <View
+          ref={dropZoneRef}
+          style={[
+            styles.innerContainer,
+            { maxWidth: layout.maxWidth },
+            isDraggingOver && Platform.OS === "web" && {
+              borderColor: theme.colors.success,
+              borderStyle: "dashed" as const,
+              borderWidth: 2,
+              backgroundColor: `${theme.colors.success}08`,
+            },
+          ]}
+        >
           {/* Autocomplete suggestions overlay */}
           {suggestions.length > 0 && (
             <View
