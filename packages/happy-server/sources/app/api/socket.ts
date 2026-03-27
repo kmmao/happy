@@ -25,6 +25,7 @@ import { supervisorFixStatusHandler } from "./socket/supervisorFixStatusHandler"
 import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
 import { accessKeyHandler } from "./socket/accessKeyHandler";
 import { sessionPreferencesHandler } from "./socket/sessionPreferencesHandler";
+import { knowledgeHandler } from "./socket/knowledgeHandler";
 
 export function startSocket(app: Fastify) {
   const io = new Server(app.server, {
@@ -227,6 +228,7 @@ export function startSocket(app: Fastify) {
     webhookStatusHandler(socket, userId);
     supervisorRunStatusHandler(socket, userId);
     supervisorFixStatusHandler(socket, userId);
+    knowledgeHandler(userId, socket);
     // Ready
     log({ module: "websocket" }, `User connected: ${userId}`);
   });

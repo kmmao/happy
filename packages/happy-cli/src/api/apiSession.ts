@@ -928,6 +928,67 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
+   * Submit knowledge entry to the server for the project knowledge base.
+   * Non-blocking: fires and forgets via socket.io.
+   */
+  submitKnowledge(entry: {
+    entryType: string;
+    contributorType: string;
+    action: string;
+    title: string;
+    content: string;
+    request?: string;
+    outcome?: string;
+    tags: string[];
+    confidence: string;
+    model?: string;
+    affectedFiles: string[];
+  }) {
+    this.socket.emit("submit-knowledge", {
+      sid: this.sessionId,
+      entry,
+    });
+  }
+
+  /**
+   * Fetch knowledge context from server for injection into session.
+   * Uses socket.io emitWithAck (already authenticated).
+   * Returns null on timeout or error.
+   */
+  async fetchKnowledge(
+    mode: "auto" | "full" | "minimal",
+    contextHints?: string[],
+  ): Promise<{
+    profile: {
+      techStack: string[];
+      architectureType?: string;
+      knownPitfalls: string[];
+      coreConventions: string[];
+      lastUpdatedAt: number;
+    } | null;
+    entries: {
+      id: string;
+      entryType: string;
+      title: string;
+      content: string;
+      tags: string[];
+      confidence: string;
+      createdAt: string;
+    }[];
+  } | null> {
+    try {
+      const result = await this.socket.timeout(10_000).emitWithAck("fetch-knowledge", {
+        sid: this.sessionId,
+        mode,
+        contextHints,
+      });
+      return result;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Send per-request usage data (tokens only) to the server.
    * Cost is reported once at turn end using SDK-provided data.
    */

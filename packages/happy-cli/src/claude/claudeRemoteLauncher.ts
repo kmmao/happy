@@ -37,6 +37,7 @@ import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
+import { TurnCollector } from "@/knowledge";
 
 interface PermissionsField {
   date: number;
@@ -120,6 +121,26 @@ export async function claudeRemoteLauncher(
 
   // Track current SDK Query for runtime control (interrupt, stopTask)
   let currentQuery: OfficialQuery | null = null;
+
+  // Knowledge base: turn-level data collection + injection
+  // Enabled via env var HAPPY_KNOWLEDGE_BASE=true
+  const knowledgeEnabled = process.env.HAPPY_KNOWLEDGE_BASE !== "false"; // Default ON for testing, will be controlled by App setting later
+  const turnCollector = knowledgeEnabled ? new TurnCollector() : null;
+  let knowledgeInjected = false; // Track whether knowledge was already injected
+  let knowledgeContext: string | null = null; // Cached knowledge for system prompt
+
+  // Pre-fetch knowledge context for injection (non-blocking)
+  if (knowledgeEnabled) {
+    const mode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
+    session.client.fetchKnowledge(mode).then((result) => {
+      if (result && (result.profile || result.entries.length > 0)) {
+        knowledgeContext = formatKnowledgeForInjection(result);
+        logger.debug(`[knowledge] Pre-fetched context: ${knowledgeContext!.length} chars, ${result.entries.length} entries`);
+      }
+    }).catch((err) => {
+      logger.debug(`[knowledge] Failed to pre-fetch: ${err}`);
+    });
+  }
 
   async function doInterrupt() {
     logger.debug("[remote]: doInterrupt — graceful interrupt via SDK");
@@ -348,6 +369,34 @@ export async function claudeRemoteLauncher(
             const filePath = (c.input as Record<string, unknown>)?.file_path;
             if (typeof filePath === "string") {
               readFilePaths.add(filePath);
+            }
+          }
+        }
+      }
+    }
+
+    // Knowledge base: collect turn data from SDK messages
+    if (turnCollector) {
+      if (message.type === "user") {
+        const uMsg = message as SDKUserMessage;
+        const text = typeof uMsg.message === "string" ? uMsg.message : "";
+        turnCollector.collectUserMessage(text);
+      }
+      if (message.type === "assistant") {
+        const aMsg = message as SDKAssistantMessage;
+        if (aMsg.message.content && Array.isArray(aMsg.message.content)) {
+          for (const c of aMsg.message.content) {
+            if (c.type === "text") {
+              turnCollector.collectAssistantText(c.text);
+            }
+            if (c.type === "tool_use") {
+              turnCollector.collectToolCall();
+              if (c.name === "Write" || c.name === "Edit") {
+                const filePath = (c.input as Record<string, unknown>)?.file_path;
+                if (typeof filePath === "string") {
+                  turnCollector.collectFileEdit(filePath, c.name === "Write" ? "create" : "edit");
+                }
+              }
             }
           }
         }
@@ -1092,9 +1141,24 @@ export async function claudeRemoteLauncher(
               currentColdHash = coldModeHash(mode);
               permissionHandler.handleModeChange(mode.permissionMode);
               startMidTurnDrain();
+
+              // Knowledge injection: append to first message's system prompt
+              const returnMode = !knowledgeInjected && knowledgeContext
+                ? {
+                  ...msg.mode,
+                  appendSystemPrompt: msg.mode.appendSystemPrompt
+                    ? msg.mode.appendSystemPrompt + "\n\n" + knowledgeContext
+                    : knowledgeContext,
+                }
+                : msg.mode;
+              if (!knowledgeInjected && knowledgeContext) {
+                knowledgeInjected = true;
+                logger.debug("[knowledge] Injected knowledge into first message system prompt");
+              }
+
               return {
                 message: msg.message,
-                mode: msg.mode,
+                mode: returnMode,
               };
             }
 
@@ -1120,6 +1184,12 @@ export async function claudeRemoteLauncher(
           },
           onQueryReady: (query) => {
             currentQuery = query;
+            // Knowledge base: mark new turn start
+            if (turnCollector) {
+              const turnId = `turn-${Date.now()}`;
+              const model = session.model ?? "unknown";
+              turnCollector.startTurn(turnId, model);
+            }
           },
           onMessagesReady: (pushFn) => {
             midTurnPushFn = pushFn;
@@ -1154,6 +1224,34 @@ export async function claudeRemoteLauncher(
           onReady: async () => {
             // Stop mid-turn drain before flushing — prevents race with nextMessage()
             stopMidTurnDrain();
+
+            // Knowledge base: process turn end and check if extraction needed
+            if (turnCollector) {
+              const outputTokens = lastResultData?.modelUsage
+                ? Object.values(lastResultData.modelUsage).reduce((sum, m) => sum + m.outputTokens, 0)
+                : 0;
+              const readyTurns = turnCollector.onTurnEnd(outputTokens);
+              if (readyTurns) {
+                logger.debug(`[knowledge] Submitting ${readyTurns.length} turns`);
+                for (const turn of readyTurns) {
+                  session.client.submitKnowledge({
+                    entryType: inferEntryType(turn.userMessage, turn.assistantText),
+                    contributorType: "session",
+                    action: "create",
+                    title: turn.userMessage.split("\n")[0].slice(0, 200) || "Session activity",
+                    content: turn.assistantText.slice(0, 2000),
+                    request: turn.userMessage.slice(0, 500),
+                    outcome: turn.fileEdits.length > 0
+                      ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
+                      : undefined,
+                    tags: extractTags(turn.fileEdits),
+                    confidence: turn.outputTokens > 1000 ? "high" : "medium",
+                    model: turn.model,
+                    affectedFiles: turn.fileEdits.map((f) => f.path),
+                  });
+                }
+              }
+            }
 
             // Flush queued messages before closing the turn to prevent
             // turn-end from arriving at the App before delayed tool call messages
@@ -1284,4 +1382,79 @@ export async function claudeRemoteLauncher(
   }
 
   return exitReason || "exit";
+}
+
+// ─── Knowledge base helpers ───
+
+function inferEntryType(userMessage: string, assistantText: string): string {
+  const text = `${userMessage} ${assistantText}`.toLowerCase();
+  if (text.includes("fix") || text.includes("bug") || text.includes("error") || text.includes("修复")) return "fix";
+  if (text.includes("决策") || text.includes("选型") || text.includes("decision") || text.includes("choose")) return "decision";
+  if (text.includes("规范") || text.includes("convention") || text.includes("规则")) return "convention";
+  if (text.includes("注意") || text.includes("warning") || text.includes("危险") || text.includes("雷区")) return "warning";
+  return "discovery";
+}
+
+function extractTags(fileEdits: { path: string; type: string }[]): string[] {
+  const tags = new Set<string>();
+  for (const edit of fileEdits) {
+    const ext = edit.path.split(".").pop();
+    if (ext) tags.add(ext);
+    const parts = edit.path.split("/");
+    if (parts.length > 1) {
+      const dir = parts[parts.length - 2];
+      if (dir && dir.length < 20) tags.add(dir);
+    }
+  }
+  return [...tags].slice(0, 10);
+}
+
+function formatKnowledgeForInjection(result: {
+  profile: {
+    techStack: string[];
+    architectureType?: string;
+    knownPitfalls: string[];
+    coreConventions: string[];
+  } | null;
+  entries: {
+    entryType: string;
+    title: string;
+    content: string;
+    tags: string[];
+    confidence: string;
+    createdAt: string;
+  }[];
+}): string {
+  const parts: string[] = ["## Project Knowledge Base"];
+
+  if (result.profile) {
+    if (result.profile.techStack.length > 0) {
+      parts.push(`Tech Stack: ${result.profile.techStack.join(", ")}`);
+    }
+    if (result.profile.architectureType) {
+      parts.push(`Architecture: ${result.profile.architectureType}`);
+    }
+    if (result.profile.knownPitfalls.length > 0) {
+      parts.push("Known Pitfalls:");
+      for (const p of result.profile.knownPitfalls) parts.push(`- ⚠️ ${p}`);
+    }
+    if (result.profile.coreConventions.length > 0) {
+      parts.push("Core Conventions:");
+      for (const c of result.profile.coreConventions) parts.push(`- ${c}`);
+    }
+  }
+
+  if (result.entries.length > 0) {
+    parts.push("\n### Recent Knowledge");
+    const icons: Record<string, string> = { discovery: "💡", decision: "📋", fix: "🔧", convention: "📏", warning: "⚠️" };
+    for (const entry of result.entries) {
+      parts.push(`${icons[entry.entryType] || "📝"} **${entry.title}** (${entry.confidence}, ${entry.createdAt})`);
+      parts.push(`  ${entry.content.slice(0, 300)}`);
+      if (entry.tags.length > 0) {
+        parts.push(`  Tags: ${entry.tags.map((t) => `#${t}`).join(" ")}`);
+      }
+    }
+  }
+
+  return parts.join("\n");
 }
