@@ -123,8 +123,9 @@ export async function claudeRemoteLauncher(
   let currentQuery: OfficialQuery | null = null;
 
   // Knowledge base: turn-level data collection + injection
-  // Enabled via env var HAPPY_KNOWLEDGE_BASE=true
-  const knowledgeEnabled = process.env.HAPPY_KNOWLEDGE_BASE !== "false"; // Default ON for testing, will be controlled by App setting later
+  // Default ON — collection runs silently in background (minimal overhead).
+  // App setting `knowledgeBase` controls Tab visibility; env HAPPY_KNOWLEDGE_BASE=false to fully disable.
+  const knowledgeEnabled = process.env.HAPPY_KNOWLEDGE_BASE !== "false";
   const turnCollector = knowledgeEnabled ? new TurnCollector() : null;
   let knowledgeInjected = false; // Track whether knowledge was already injected
   let knowledgeContext: string | null = null; // Cached knowledge for system prompt
