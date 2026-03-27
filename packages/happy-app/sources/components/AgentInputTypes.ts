@@ -21,14 +21,19 @@ export interface SttProps {
     isSttCorrecting?: boolean;
 }
 
-/** Image attachment handling */
+/** Image/file attachment handling */
 export interface ImageProps {
     onImagePaste?: (blob: Blob) => void;
+    onFilePaste?: (file: File) => void;
     onImagePickPress?: () => void;
+    onTakePhotoPress?: () => void;
+    onFilePickPress?: () => void;
     isPickingImage?: boolean;
     imagePaths?: string[];
     /** Displayable URIs parallel to imagePaths — used to render thumbnails */
     imageUris?: string[];
+    /** Map from remote path to original filename (for non-image file display). */
+    fileNameMap?: ReadonlyMap<string, string>;
     onImageRemove?: (path: string) => void;
 }
 

@@ -533,9 +533,13 @@ function SessionViewInner({
     isProcessingImage,
     pendingImagePathsRef,
     doPickImage,
+    doTakePhoto,
+    doPickFile,
     handleImagePaste,
+    handleFilePaste,
     setPendingImagePaths,
     pendingImageUris,
+    fileNameMap,
     removeImageByPath,
   } = useImageUpload(sessionId);
 
@@ -941,7 +945,10 @@ function SessionViewInner({
           const currentPaths = isSpecialCommand
             ? []
             : pendingImagePathsRef.current;
-          const imageRefs = currentPaths.map((p) => `[image: ${p}]`).join("\n");
+          const imageRefs = currentPaths.map((p) => {
+            const name = fileNameMap.get(p);
+            return name ? `[image: ${p} | ${name}]` : `[image: ${p}]`;
+          }).join("\n");
           const finalMessage = [text, imageRefs].filter(Boolean).join("\n");
 
           if (!finalMessage) return;
@@ -1015,10 +1022,14 @@ function SessionViewInner({
         currentModelCode={effectiveModelCode}
         images={{
           onImagePaste: handleImagePaste,
+          onFilePaste: handleFilePaste,
           onImagePickPress: doPickImage,
+          onTakePhotoPress: doTakePhoto,
+          onFilePickPress: doPickFile,
           isPickingImage: isPickingImage || isProcessingImage,
           imagePaths: pendingImagePaths,
           imageUris: pendingImageUris,
+          fileNameMap,
           onImageRemove: removeImageByPath,
         }}
         onShellCommand={(command) => {

@@ -1,8 +1,10 @@
 /**
- * Renders an image attachment inside a chat message bubble.
+ * Renders an image or file attachment inside a chat message bubble.
  *
- * Loads image data on-demand via `sessionReadFile` RPC (base64) and displays
- * it with expo-image. Tapping the image navigates to a full-screen viewer.
+ * For images: loads data on-demand via `sessionReadFile` RPC (base64) and
+ * displays with expo-image. Tapping navigates to a full-screen viewer.
+ *
+ * For non-image files: displays a file card with icon + filename.
  *
  * States: loading → loaded | error
  */
@@ -16,9 +18,24 @@ import { Text } from './StyledText';
 import { sessionReadFile } from '@/sync/ops';
 import { t } from '@/text';
 import { Ionicons } from '@expo/vector-icons';
+import { Typography } from '@/constants/Typography';
 
 const MAX_IMAGE_WIDTH = 240;
 const MAX_IMAGE_HEIGHT = 240;
+
+const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.heif'];
+
+function getFileIcon(ext: string): React.ComponentProps<typeof Ionicons>['name'] {
+    if (IMAGE_EXTS.includes(ext)) return 'image';
+    if (['.pdf'].includes(ext)) return 'document-text-outline';
+    if (['.xls', '.xlsx', '.csv'].includes(ext)) return 'grid-outline';
+    if (['.doc', '.docx', '.txt', '.rtf', '.md'].includes(ext)) return 'document-text-outline';
+    if (['.zip', '.rar', '.7z', '.tar', '.gz'].includes(ext)) return 'archive-outline';
+    if (['.mp3', '.wav', '.aac', '.flac', '.ogg'].includes(ext)) return 'musical-note-outline';
+    if (['.mp4', '.mov', '.avi', '.mkv', '.webm'].includes(ext)) return 'videocam-outline';
+    if (['.json', '.xml', '.yaml', '.yml', '.toml'].includes(ext)) return 'code-slash-outline';
+    return 'document-outline';
+}
 
 type LoadState =
     | { status: 'loading' }
@@ -28,12 +45,20 @@ type LoadState =
 export const MessageImage = React.memo((props: {
     sessionId: string;
     imagePath: string;
+    displayName?: string;
 }) => {
-    const [state, setState] = React.useState<LoadState>({ status: 'loading' });
+    const nameForExt = props.displayName ?? props.imagePath;
+    const ext = nameForExt.slice(nameForExt.lastIndexOf('.')).toLowerCase();
+    const isImage = IMAGE_EXTS.includes(ext);
+
+    const [state, setState] = React.useState<LoadState>(
+        isImage ? { status: 'loading' } : { status: 'error' },
+    );
     const { theme } = useUnistyles();
     const router = useRouter();
 
     React.useEffect(() => {
+        if (!isImage) return;
         let cancelled = false;
 
         async function load() {
@@ -58,14 +83,39 @@ export const MessageImage = React.memo((props: {
 
         load();
         return () => { cancelled = true; };
-    }, [props.sessionId, props.imagePath]);
+    }, [props.sessionId, props.imagePath, isImage]);
 
     const handlePress = React.useCallback(() => {
-        if (state.status !== 'loaded') return;
+        if (!isImage || state.status !== 'loaded') return;
         router.push(
             `/session/${props.sessionId}/image?path=${encodeURIComponent(props.imagePath)}`,
         );
-    }, [state.status, props.sessionId, props.imagePath, router]);
+    }, [state.status, props.sessionId, props.imagePath, router, isImage]);
+
+    // Non-image file: render a file card
+    if (!isImage) {
+        const fileName = props.displayName ?? props.imagePath.slice(props.imagePath.lastIndexOf('/') + 1);
+        const icon = getFileIcon(ext);
+        return (
+            <View style={[styles.fileCard, { backgroundColor: theme.colors.surfaceHighest }]}>
+                <View style={[styles.fileIconContainer, { backgroundColor: `${theme.colors.success}18` }]}>
+                    <Ionicons name={icon} size={20} color={theme.colors.success} />
+                </View>
+                <View style={styles.fileInfo}>
+                    <Text
+                        style={[styles.fileName, { color: theme.colors.text }]}
+                        numberOfLines={1}
+                        ellipsizeMode="middle"
+                    >
+                        {fileName}
+                    </Text>
+                    <Text style={[styles.fileExt, { color: theme.colors.textSecondary }]}>
+                        {ext.replace('.', '').toUpperCase()}
+                    </Text>
+                </View>
+            </View>
+        );
+    }
 
     if (state.status === 'loading') {
         return (
@@ -113,5 +163,31 @@ const styles = StyleSheet.create((theme) => ({
     },
     pressed: {
         opacity: 0.7,
+    },
+    fileCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 10,
+        padding: 10,
+        gap: 10,
+        maxWidth: MAX_IMAGE_WIDTH,
+    },
+    fileIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    fileInfo: {
+        flex: 1,
+        gap: 2,
+    },
+    fileName: {
+        fontSize: 13,
+        ...Typography.default('semiBold'),
+    },
+    fileExt: {
+        fontSize: 11,
     },
 }));

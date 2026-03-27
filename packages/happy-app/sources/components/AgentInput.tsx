@@ -46,7 +46,7 @@ import { GitBrowseTab } from "./git/GitBrowseTab";
 import type { AgentInputProps } from "./AgentInputTypes";
 import { stylesheet, FAVORITE_CHIP_GRADIENTS } from "./AgentInputStyles";
 import { getContextWarning, ContextProgressBar } from "./ContextProgressBar";
-import { ImagePickButton } from "./ImagePickButton";
+import { AttachButton, type AttachAction } from "./AttachButton";
 import { GitStatusButton } from "./GitStatusButton";
 import { AgentInputSettingsOverlay } from "./AgentInputSettingsOverlay";
 import { log } from '@/log';
@@ -918,7 +918,7 @@ export const AgentInput = React.memo(
               />
             ) : null}
 
-            {/* Image attachment chips */}
+            {/* Image/file attachment chips */}
             {hasImages && (
               <ScrollView
                 horizontal
@@ -932,6 +932,22 @@ export const AgentInput = React.memo(
               >
                 {(props.images?.imagePaths ?? []).map((path, index) => {
                   const uri = props.images?.imageUris?.[index];
+                  const originalName = props.images?.fileNameMap?.get(path);
+                  const fileName = originalName ?? path.slice(path.lastIndexOf("/") + 1);
+                  const ext = fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
+                  const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".heif"];
+                  const isImageFile = IMAGE_EXTS.includes(ext);
+                  const showThumbnail = uri && isImageFile;
+                  const fileIcon: React.ComponentProps<typeof Ionicons>["name"] =
+                    isImageFile ? "image"
+                    : [".pdf"].includes(ext) ? "document-text-outline"
+                    : [".xls", ".xlsx", ".csv"].includes(ext) ? "grid-outline"
+                    : [".doc", ".docx", ".txt", ".rtf", ".md"].includes(ext) ? "document-text-outline"
+                    : [".zip", ".rar", ".7z", ".tar", ".gz"].includes(ext) ? "archive-outline"
+                    : [".mp3", ".wav", ".aac", ".flac", ".ogg"].includes(ext) ? "musical-note-outline"
+                    : [".mp4", ".mov", ".avi", ".mkv", ".webm"].includes(ext) ? "videocam-outline"
+                    : [".json", ".xml", ".yaml", ".yml", ".toml"].includes(ext) ? "code-slash-outline"
+                    : "document-outline";
                   return (
                     <View
                       key={path}
@@ -943,10 +959,10 @@ export const AgentInput = React.memo(
                         borderWidth: 1,
                         borderColor: theme.colors.divider,
                         overflow: "hidden",
-                        height: uri ? 52 : 36,
+                        height: showThumbnail ? 52 : 36,
                       }}
                     >
-                      {uri ? (
+                      {showThumbnail ? (
                         <Pressable
                           onPress={() => {
                             hapticsLight();
@@ -974,6 +990,7 @@ export const AgentInput = React.memo(
                             flexDirection: "row",
                             alignItems: "center",
                             gap: 6,
+                            maxWidth: 160,
                           }}
                         >
                           <View
@@ -987,22 +1004,26 @@ export const AgentInput = React.memo(
                             }}
                           >
                             <Ionicons
-                              name="image"
+                              name={fileIcon}
                               size={13}
                               color={theme.colors.success}
                             />
                           </View>
                           <Text
                             style={{
-                              fontSize: 13,
+                              fontSize: 12,
                               color: theme.colors.text,
                               ...Typography.default("semiBold"),
+                              flexShrink: 1,
                             }}
                             numberOfLines={1}
+                            ellipsizeMode="middle"
                           >
-                            {(props.images?.imagePaths ?? []).length === 1
-                              ? t("session.imageAttached")
-                              : t("session.imageLabel", { index: index + 1 })}
+                            {isImageFile
+                              ? (props.images?.imagePaths ?? []).length === 1
+                                ? t("session.imageAttached")
+                                : t("session.imageLabel", { index: index + 1 })
+                              : fileName}
                           </Text>
                         </View>
                       )}
@@ -1230,6 +1251,7 @@ export const AgentInput = React.memo(
                 onStateChange={handleInputStateChange}
                 maxHeight={120}
                 onImagePaste={props.images?.onImagePaste}
+                onFilePaste={props.images?.onFilePaste}
               />
             </View>
 
@@ -1546,10 +1568,14 @@ export const AgentInput = React.memo(
                       </Pressable>
                     )}
 
-                    {/* Image pick button */}
-                    {props.images?.onImagePickPress && (
-                      <ImagePickButton
-                        onPress={props.images?.onImagePickPress}
+                    {/* Attach button (gallery / camera / file) */}
+                    {(props.images?.onImagePickPress || props.images?.onTakePhotoPress || props.images?.onFilePickPress) && (
+                      <AttachButton
+                        onAction={(action: AttachAction) => {
+                          if (action === "gallery") props.images?.onImagePickPress?.();
+                          else if (action === "camera") props.images?.onTakePhotoPress?.();
+                          else if (action === "file") props.images?.onFilePickPress?.();
+                        }}
                         isPickingImage={props.images?.isPickingImage}
                         imagePaths={props.images?.imagePaths}
                       />

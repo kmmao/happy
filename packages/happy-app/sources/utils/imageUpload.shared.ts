@@ -29,10 +29,10 @@ export const MAX_BASE64_SIZE = 650_000; // 650KB — after encryption re-encodin
 const uploadDirCache = new Map<string, string>();
 
 /** Generate a random hex filename to prevent collision and enumeration. */
-function randomFilename(): string {
+function randomFilename(ext: string = ".jpg"): string {
   const bytes = getRandomBytes(16);
   return (
-    Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("") + ".jpg"
+    Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("") + ext
   );
 }
 
@@ -137,6 +137,50 @@ export async function uploadImage(
   } else {
     throw new HappyError(
       "Failed to upload image (getUploadDir RPC failed)",
+      false,
+    );
+  }
+}
+
+/** Upload raw base64 file data (any type) to the CLI machine's OS temp dir.
+ *  Unlike uploadImage, does NOT validate image magic bytes. */
+export async function uploadRawFile(
+  sessionId: string,
+  base64: string,
+  originalName: string,
+): Promise<string> {
+  if (base64.length > MAX_BASE64_SIZE) {
+    throw new HappyError("File is too large to send (max ~500KB)", false);
+  }
+
+  evictStaleCache();
+
+  const dotIdx = originalName.lastIndexOf(".");
+  const ext = dotIdx >= 0 ? originalName.slice(dotIdx) : "";
+  const filename = randomFilename(ext);
+
+  const cached = uploadDirCache.get(sessionId);
+  if (cached) {
+    const remotePath = `${cached}/${filename}`;
+    const cacheErr = await writeImageFile(sessionId, remotePath, base64);
+    if (cacheErr === null) {
+      return remotePath;
+    }
+    uploadDirCache.delete(sessionId);
+  }
+
+  const tempDir = await getUploadDir(sessionId);
+  if (tempDir) {
+    const remotePath = `${tempDir}/${filename}`;
+    const writeErr = await writeImageFile(sessionId, remotePath, base64);
+    if (writeErr === null) {
+      uploadDirCache.set(sessionId, tempDir);
+      return remotePath;
+    }
+    throw new HappyError(`Failed to upload file (write: ${writeErr})`, false);
+  } else {
+    throw new HappyError(
+      "Failed to upload file (getUploadDir RPC failed)",
       false,
     );
   }

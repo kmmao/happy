@@ -192,6 +192,7 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
               key={path}
               sessionId={props.sessionId}
               imagePath={path}
+              displayName={parsed.displayNames.get(path)}
             />
           ))}
         </View>

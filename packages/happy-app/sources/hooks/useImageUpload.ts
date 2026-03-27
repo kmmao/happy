@@ -8,6 +8,10 @@ import {
   blobToResizedBase64,
   MAX_IMAGES,
 } from "@/utils/imageUpload";
+import { uploadRawFile, MAX_BASE64_SIZE } from "@/utils/imageUpload.shared";
+import { captureAndUploadPhoto } from "@/utils/cameraCapture";
+import { pickAndUploadFiles } from "@/utils/filePicker";
+import { encodeBase64 } from "@/encryption/base64";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { AsyncLock } from "@/utils/lock";
 import { log } from '@/log';
@@ -16,12 +20,17 @@ export interface UseImageUploadResult {
   pendingImagePaths: string[];
   /** Displayable URIs parallel to pendingImagePaths (local asset URIs or data URIs). */
   pendingImageUris: string[];
+  /** Map from remote path to original filename (for non-image files). */
+  fileNameMap: ReadonlyMap<string, string>;
   isPickingImage: boolean;
   isProcessingImage: boolean;
   /** Current paths ref — always reflects the latest value for use in callbacks. */
   pendingImagePathsRef: React.RefObject<string[]>;
   doPickImage: () => void;
+  doTakePhoto: () => void;
+  doPickFile: () => void;
   handleImagePaste: ((blob: Blob) => void) | undefined;
+  handleFilePaste: ((file: File) => void) | undefined;
   setPendingImagePaths: React.Dispatch<React.SetStateAction<string[]>>;
   /** Remove an image by its remote path, keeping pendingImageUris in sync. */
   removeImageByPath: (path: string) => void;
@@ -44,6 +53,7 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
     [],
   );
   const [pendingImageUris, setPendingImageUris] = React.useState<string[]>([]);
+  const [fileNameMap, setFileNameMap] = React.useState<ReadonlyMap<string, string>>(new Map());
   const [isProcessingImage, setIsProcessingImage] = React.useState(false);
   const mountedRef = React.useRef(true);
   React.useEffect(() => {
@@ -144,6 +154,140 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
     [sessionId],
   );
 
+  // Handle clipboard file paste (web only)
+  const handleFilePaste = React.useCallback(
+    async (file: File) => {
+      try {
+        if (pendingImagePathsRef.current.length >= MAX_IMAGES) return;
+        await uploadLockRef.current.inLock(async () => {
+          if (pendingImagePathsRef.current.length >= MAX_IMAGES) return;
+          if (!mountedRef.current) return;
+          setIsProcessingImage(true);
+          try {
+            const maxRawSize = Math.floor(MAX_BASE64_SIZE * 3 / 4);
+            if (file.size > maxRawSize) {
+              Modal.alert(t("common.error"), t("session.fileTooLarge"));
+              return;
+            }
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            const base64 = encodeBase64(bytes);
+            const name = file.name || "file";
+            const path = await uploadRawFile(sessionId, base64, name);
+            if (!mountedRef.current) return;
+            setPendingImagePaths((prev) =>
+              prev.length >= MAX_IMAGES ? prev : [...prev, path],
+            );
+            setPendingImageUris((prev) =>
+              prev.length >= MAX_IMAGES
+                ? prev
+                : [...prev, URL.createObjectURL(file)],
+            );
+            setFileNameMap((prev) => {
+              const next = new Map(prev);
+              next.set(path, name);
+              return next;
+            });
+          } catch (err) {
+            if (!mountedRef.current) return;
+            const errorMessage =
+              err instanceof Error
+                ? err.message
+                : t("session.couldNotAttachFile");
+            Modal.alert(t("common.error"), errorMessage);
+          } finally {
+            if (mountedRef.current) {
+              setIsProcessingImage(false);
+            }
+          }
+        });
+      } catch (e) {
+        log.error("handleFilePaste failed:", e);
+      }
+    },
+    [sessionId],
+  );
+
+  // Take photo from camera
+  const [isTakingPhoto, doTakePhoto] = useHappyAction(
+    React.useCallback(async () => {
+      await uploadLockRef.current.inLock(async () => {
+        const result = await captureAndUploadPhoto(
+          sessionId,
+          pendingImagePathsRef.current.length,
+        );
+        if (!mountedRef.current) return;
+        if (result) {
+          const remaining = MAX_IMAGES - pendingImagePathsRef.current.length;
+          if (remaining <= 0) return;
+          setPendingImagePaths((prev) => [
+            ...prev,
+            ...result.paths.slice(0, remaining),
+          ]);
+          setPendingImageUris((prev) => [
+            ...prev,
+            ...result.displayUris.slice(0, remaining),
+          ]);
+          if (result.failedCount > 0) {
+            const total = result.paths.length + result.failedCount;
+            Modal.alert(
+              t("common.error"),
+              t("session.imageUploadFailed", {
+                failed: result.failedCount,
+                total,
+              }),
+            );
+          }
+        }
+      });
+    }, [sessionId]),
+  );
+
+  // Pick files from document picker
+  const [isPickingFile, doPickFile] = useHappyAction(
+    React.useCallback(async () => {
+      await uploadLockRef.current.inLock(async () => {
+        const result = await pickAndUploadFiles(
+          sessionId,
+          pendingImagePathsRef.current.length,
+        );
+        if (!mountedRef.current) return;
+        if (result) {
+          const remaining = MAX_IMAGES - pendingImagePathsRef.current.length;
+          if (remaining <= 0) return;
+          setPendingImagePaths((prev) => [
+            ...prev,
+            ...result.paths.slice(0, remaining),
+          ]);
+          setPendingImageUris((prev) => [
+            ...prev,
+            ...result.displayUris.slice(0, remaining),
+          ]);
+          // Track original filenames for display
+          if (result.fileNames?.length) {
+            setFileNameMap((prev) => {
+              const next = new Map(prev);
+              const added = result.paths.slice(0, remaining);
+              const names = result.fileNames.slice(0, remaining);
+              added.forEach((p, i) => next.set(p, names[i]));
+              return next;
+            });
+          }
+          if (result.failedCount > 0) {
+            const total = result.paths.length + result.failedCount;
+            Modal.alert(
+              t("common.error"),
+              t("session.fileUploadFailed", {
+                failed: result.failedCount,
+                total,
+              }),
+            );
+          }
+        }
+      });
+    }, [sessionId]),
+  );
+
   const removeImageByPath = React.useCallback((path: string) => {
     setPendingImagePaths((prev) => {
       const idx = prev.indexOf(path);
@@ -156,21 +300,32 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
       if (idx === -1) return prev;
       return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
     });
+    setFileNameMap((prev) => {
+      if (!prev.has(path)) return prev;
+      const next = new Map(prev);
+      next.delete(path);
+      return next;
+    });
   }, []);
 
   const clearImages = React.useCallback(() => {
     setPendingImagePaths([]);
     setPendingImageUris([]);
+    setFileNameMap(new Map());
   }, []);
 
   return {
     pendingImagePaths,
     pendingImageUris,
-    isPickingImage,
+    fileNameMap,
+    isPickingImage: isPickingImage || isTakingPhoto || isPickingFile,
     isProcessingImage,
     pendingImagePathsRef,
     doPickImage,
+    doTakePhoto,
+    doPickFile,
     handleImagePaste: Platform.OS === "web" ? handleImagePaste : undefined,
+    handleFilePaste: Platform.OS === "web" ? handleFilePaste : undefined,
     setPendingImagePaths,
     removeImageByPath,
     clearImages,

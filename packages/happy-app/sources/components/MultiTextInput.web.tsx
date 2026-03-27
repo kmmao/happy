@@ -50,6 +50,7 @@ interface MultiTextInputProps {
   onSelectionChange?: (selection: { start: number; end: number }) => void;
   onStateChange?: (state: TextInputState) => void;
   onImagePaste?: (blob: Blob) => void;
+  onFilePaste?: (file: File) => void;
 }
 
 export const MultiTextInput = React.forwardRef<
@@ -65,6 +66,7 @@ export const MultiTextInput = React.forwardRef<
     onSelectionChange,
     onStateChange,
     onImagePaste,
+    onFilePaste,
   } = props;
 
   const { theme } = useUnistyles();
@@ -167,15 +169,16 @@ export const MultiTextInput = React.forwardRef<
     [value, onSelectionChange, onStateChange],
   );
 
-  // Intercept clipboard paste to detect images
+  // Intercept clipboard paste to detect images and files
   const handlePaste = React.useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      if (!onImagePaste) return;
+      if (!onImagePaste && !onFilePaste) return;
       const items = e.clipboardData?.items;
       if (!items) return;
 
       for (const item of Array.from(items)) {
-        if (item.type.startsWith("image/")) {
+        // Images handled by existing onImagePaste
+        if (item.type.startsWith("image/") && onImagePaste) {
           e.preventDefault();
           const blob = item.getAsFile();
           if (blob) {
@@ -183,10 +186,19 @@ export const MultiTextInput = React.forwardRef<
           }
           return;
         }
+        // Non-image files handled by onFilePaste
+        if (item.kind === "file" && !item.type.startsWith("image/") && onFilePaste) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            onFilePaste(file);
+          }
+          return;
+        }
       }
-      // If no image found, let default text paste proceed
+      // If no file found, let default text paste proceed
     },
-    [onImagePaste],
+    [onImagePaste, onFilePaste],
   );
 
   // Imperative handle for direct control
