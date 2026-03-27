@@ -66,6 +66,8 @@ import {
   uploadBase64Image,
   MAX_IMAGES,
 } from "@/utils/imageUpload";
+import { encodeBase64 } from "@/encryption/base64";
+import { uploadRawFile } from "@/utils/imageUpload.shared";
 import { useCLIDetection } from "@/hooks/useCLIDetection";
 import {
   useEnvironmentVariables,
@@ -435,14 +437,27 @@ function NewSessionWizard() {
         : stt.interimTranscript
       : sessionPrompt;
 
-  // Image picking (deferred upload — happens after session creation)
+  // Image/file picking (deferred upload — happens after session creation)
+  // Each pending item stores base64 + optional fileName (for non-image files)
   const [pendingImages, setPendingImages] = React.useState<
-    { id: string; base64: string }[]
+    { id: string; base64: string; fileName?: string }[]
   >([]);
   const pendingImagesRef = React.useRef(pendingImages);
   React.useEffect(() => {
     pendingImagesRef.current = pendingImages;
   }, [pendingImages]);
+
+  // Build fileNameMap for display in attachment chips
+  const newSessionFileNameMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const img of pendingImages) {
+      if (img.fileName) {
+        map.set(img.id, img.fileName);
+      }
+    }
+    return map;
+  }, [pendingImages]);
+
   const [isPickingImage, doPickImage] = useHappyAction(
     React.useCallback(async () => {
       const result = await pickImagesAsBase64(pendingImagesRef.current.length);
@@ -469,6 +484,28 @@ function NewSessionWizard() {
             });
           } catch {
             // Silently ignore paste errors — non-critical UX path
+          }
+        }
+      : () => {},
+    [],
+  );
+
+  // Handle clipboard file paste in new session wizard (web only)
+  const handleNewSessionFilePaste = React.useCallback(
+    Platform.OS === "web"
+      ? async (file: File) => {
+          if (pendingImagesRef.current.length >= MAX_IMAGES) return;
+          try {
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            const base64 = encodeBase64(bytes);
+            const name = file.name || "file";
+            setPendingImages((prev) => {
+              if (prev.length >= MAX_IMAGES) return prev;
+              return [...prev, { id: `${randomUUID()}.${name.split(".").pop() || "bin"}`, base64, fileName: name }];
+            });
+          } catch {
+            // Silently ignore paste errors
           }
         }
       : () => {},
@@ -1329,22 +1366,33 @@ function NewSessionWizard() {
         const hasText = effectivePrompt.trim().length > 0;
         const hasImages = currentImages.length > 0;
         if (hasText || hasImages) {
-          // Upload any pending images to the newly created session
+          // Upload any pending images/files to the newly created session
           let imageRefs = "";
           if (hasImages) {
             const uploadResults = await Promise.allSettled(
-              currentImages.map((img) =>
-                uploadBase64Image(result.sessionId, img.base64),
-              ),
+              currentImages.map(async (img) => {
+                if (img.fileName) {
+                  // Non-image file: use uploadRawFile
+                  const path = await uploadRawFile(result.sessionId, img.base64, img.fileName);
+                  return { path, fileName: img.fileName };
+                }
+                // Image: use uploadBase64Image
+                const path = await uploadBase64Image(result.sessionId, img.base64);
+                return { path, fileName: undefined };
+              }),
             );
-            const paths = uploadResults
+            const refs = uploadResults
               .filter(
-                (r): r is PromiseFulfilledResult<string> =>
+                (r): r is PromiseFulfilledResult<{ path: string; fileName?: string }> =>
                   r.status === "fulfilled",
               )
-              .map((r) => r.value);
-            if (paths.length > 0) {
-              imageRefs = paths.map((p) => `[image: ${p}]`).join("\n");
+              .map((r) =>
+                r.value.fileName
+                  ? `[image: ${r.value.path} | ${r.value.fileName}]`
+                  : `[image: ${r.value.path}]`,
+              );
+            if (refs.length > 0) {
+              imageRefs = refs.join("\n");
             }
           }
           const finalMessage = [effectivePrompt.trim(), imageRefs]
@@ -1716,12 +1764,14 @@ function NewSessionWizard() {
                 }}
                 images={{
                   onImagePaste: handleNewSessionImagePaste,
+                  onFilePaste: handleNewSessionFilePaste,
                   onImagePickPress: doPickImage,
                   isPickingImage,
                   imagePaths: pendingImages.map((img) => img.id),
-                  imageUris: pendingImages.map(
-                    (img) => `data:image/jpeg;base64,${img.base64}`,
+                  imageUris: pendingImages.map((img) =>
+                    img.fileName ? "" : `data:image/jpeg;base64,${img.base64}`,
                   ),
+                  fileNameMap: newSessionFileNameMap,
                   onImageRemove: (id) =>
                     setPendingImages((prev) =>
                       prev.filter((img) => img.id !== id),
