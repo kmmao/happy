@@ -480,7 +480,7 @@ function NewSessionWizard() {
             const base64 = await blobToResizedBase64(blob);
             setPendingImages((prev) => {
               if (prev.length >= MAX_IMAGES) return prev;
-              return [...prev, { id: randomUUID(), base64 }];
+              return [...prev, { id: `${randomUUID()}.jpg`, base64 }];
             });
           } catch {
             // Silently ignore paste errors — non-critical UX path

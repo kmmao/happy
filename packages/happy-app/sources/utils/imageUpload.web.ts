@@ -150,7 +150,7 @@ export async function pickImagesAsBase64(
   const results = await Promise.allSettled(
     selected.map(async (file, i) => {
       const base64 = await blobToResizedBase64(file);
-      return { id: `img-${Date.now()}-${i}`, base64 };
+      return { id: `img-${Date.now()}-${i}.jpg`, base64 };
     }),
   );
 

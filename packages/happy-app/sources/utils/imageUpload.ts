@@ -88,7 +88,7 @@ export async function pickImagesAsBase64(
         asset.width,
         asset.height,
       );
-      return { id: `img-${Date.now()}-${i}`, base64 };
+      return { id: `img-${Date.now()}-${i}.jpg`, base64 };
     }),
   );
 
