@@ -215,7 +215,7 @@ export function rpcHandler(options: RpcHandlerOptions) {
         if (!targetSocket) {
           log(
             { module: "websocket-rpc", level: "warn" },
-            `RPC method not available: ${method} | registered: [${[...rpcListeners.keys()].join(", ")}]`,
+            `RPC method not available: ${method} | userId=${userId} socketId=${socket.id} clientType=${clientType} | registered: [${[...rpcListeners.keys()].join(", ")}]`,
           );
           if (callback) {
             callback({

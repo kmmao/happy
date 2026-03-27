@@ -170,7 +170,10 @@ export function startSocket(app: Fastify) {
       }
     });
 
-    // Handlers
+    // Handlers — always reuse the same Map instance per userId.
+    // CRITICAL: Never replace with a new Map, because other sockets for
+    // the same userId hold a reference to the existing Map. Replacing it
+    // would leave those sockets querying a stale (empty) Map.
     let userRpcListeners = rpcListeners.get(userId);
     if (!userRpcListeners) {
       userRpcListeners = new Map<string, Socket>();
@@ -195,9 +198,10 @@ export function startSocket(app: Fastify) {
           }
         }
       }
-      if (userRpcListeners.size === 0) {
-        rpcListeners.delete(userId);
-      }
+      // NOTE: Do NOT delete the userId Map even when empty.
+      // Other sockets for the same userId hold a reference to this Map.
+      // Deleting it would cause the next socket to create a new Map,
+      // leaving existing sockets with a stale (orphaned) reference.
       // Broadcast rpc-ready:false for each scope that lost all its methods
       const rpcScope: "machine" | "session" | null =
           metadata.clientType === "machine-scoped" ? "machine"
