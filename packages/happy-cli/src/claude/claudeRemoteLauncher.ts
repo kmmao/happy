@@ -377,31 +377,36 @@ export async function claudeRemoteLauncher(
     }
 
     // Knowledge base: collect turn data from SDK messages
-    if (turnCollector) {
-      if (message.type === "user") {
-        const uMsg = message as SDKUserMessage;
-        const text = typeof uMsg.message === "string" ? uMsg.message : "";
-        turnCollector.collectUserMessage(text);
-      }
-      if (message.type === "assistant") {
-        const aMsg = message as SDKAssistantMessage;
-        if (aMsg.message.content && Array.isArray(aMsg.message.content)) {
-          for (const c of aMsg.message.content) {
-            if (c.type === "text") {
-              turnCollector.collectAssistantText(c.text);
-            }
-            if (c.type === "tool_use") {
-              turnCollector.collectToolCall();
-              if (c.name === "Write" || c.name === "Edit") {
-                const filePath = (c.input as Record<string, unknown>)?.file_path;
-                if (typeof filePath === "string") {
-                  turnCollector.collectFileEdit(filePath, c.name === "Write" ? "create" : "edit");
+    // Wrapped in try-catch to never interfere with message processing
+    try {
+      if (turnCollector) {
+        if (message.type === "user") {
+          const uMsg = message as SDKUserMessage;
+          const text = typeof uMsg.message === "string" ? uMsg.message : "";
+          turnCollector.collectUserMessage(text);
+        }
+        if (message.type === "assistant") {
+          const aMsg = message as SDKAssistantMessage;
+          if (aMsg.message.content && Array.isArray(aMsg.message.content)) {
+            for (const c of aMsg.message.content) {
+              if (c.type === "text") {
+                turnCollector.collectAssistantText(c.text);
+              }
+              if (c.type === "tool_use") {
+                turnCollector.collectToolCall();
+                if (c.name === "Write" || c.name === "Edit") {
+                  const filePath = (c.input as Record<string, unknown>)?.file_path;
+                  if (typeof filePath === "string") {
+                    turnCollector.collectFileEdit(filePath, c.name === "Write" ? "create" : "edit");
+                  }
                 }
               }
             }
           }
         }
       }
+    } catch (err) {
+      logger.debug(`[knowledge] Error collecting turn data: ${err}`);
     }
 
     // Detect plan mode tool calls
@@ -1227,31 +1232,36 @@ export async function claudeRemoteLauncher(
             stopMidTurnDrain();
 
             // Knowledge base: process turn end and check if extraction needed
-            if (turnCollector) {
-              const outputTokens = lastResultData?.modelUsage
-                ? Object.values(lastResultData.modelUsage).reduce((sum, m) => sum + m.outputTokens, 0)
-                : 0;
-              const readyTurns = turnCollector.onTurnEnd(outputTokens);
-              if (readyTurns) {
-                logger.debug(`[knowledge] Submitting ${readyTurns.length} turns`);
-                for (const turn of readyTurns) {
-                  session.client.submitKnowledge({
-                    entryType: inferEntryType(turn.userMessage, turn.assistantText),
-                    contributorType: "session",
-                    action: "create",
-                    title: turn.userMessage.split("\n")[0].slice(0, 200) || "Session activity",
-                    content: turn.assistantText.slice(0, 2000),
-                    request: turn.userMessage.slice(0, 500),
-                    outcome: turn.fileEdits.length > 0
-                      ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
-                      : undefined,
-                    tags: extractTags(turn.fileEdits),
-                    confidence: turn.outputTokens > 1000 ? "high" : "medium",
-                    model: turn.model,
-                    affectedFiles: turn.fileEdits.map((f) => f.path),
-                  });
+            // Wrapped in try-catch to never block session flow
+            try {
+              if (turnCollector) {
+                const outputTokens = lastResultData?.modelUsage
+                  ? Object.values(lastResultData.modelUsage).reduce((sum, m) => sum + m.outputTokens, 0)
+                  : 0;
+                const readyTurns = turnCollector.onTurnEnd(outputTokens);
+                if (readyTurns) {
+                  logger.debug(`[knowledge] Submitting ${readyTurns.length} turns`);
+                  for (const turn of readyTurns) {
+                    session.client.submitKnowledge({
+                      entryType: inferEntryType(turn.userMessage, turn.assistantText),
+                      contributorType: "session",
+                      action: "create",
+                      title: turn.userMessage.split("\n")[0].slice(0, 200) || "Session activity",
+                      content: turn.assistantText.slice(0, 2000),
+                      request: turn.userMessage.slice(0, 500),
+                      outcome: turn.fileEdits.length > 0
+                        ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
+                        : undefined,
+                      tags: extractTags(turn.fileEdits),
+                      confidence: turn.outputTokens > 1000 ? "high" : "medium",
+                      model: turn.model,
+                      affectedFiles: turn.fileEdits.map((f) => f.path),
+                    });
+                  }
                 }
               }
+            } catch (err) {
+              logger.debug(`[knowledge] Error in onReady turn processing: ${err}`);
             }
 
             // Flush queued messages before closing the turn to prevent
@@ -1328,28 +1338,33 @@ export async function claudeRemoteLauncher(
         ongoingToolCalls.clear();
 
         // Knowledge base: flush any pending turns before session teardown
-        if (turnCollector) {
-          const finalTurns = turnCollector.flush();
-          if (finalTurns) {
-            logger.debug(`[knowledge] Flushing ${finalTurns.length} pending turns on exit`);
-            for (const turn of finalTurns) {
-              session.client.submitKnowledge({
-                entryType: inferEntryType(turn.userMessage, turn.assistantText),
-                contributorType: "session",
-                action: "create",
-                title: turn.userMessage.split("\n")[0].slice(0, 200) || "Session activity",
-                content: turn.assistantText.slice(0, 2000),
-                request: turn.userMessage.slice(0, 500),
-                outcome: turn.fileEdits.length > 0
-                  ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
-                  : undefined,
-                tags: extractTags(turn.fileEdits),
-                confidence: turn.outputTokens > 1000 ? "high" : "medium",
-                model: turn.model,
-                affectedFiles: turn.fileEdits.map((f) => f.path),
-              });
+        // Wrapped in try-catch to never block session cleanup
+        try {
+          if (turnCollector) {
+            const finalTurns = turnCollector.flush();
+            if (finalTurns) {
+              logger.debug(`[knowledge] Flushing ${finalTurns.length} pending turns on exit`);
+              for (const turn of finalTurns) {
+                session.client.submitKnowledge({
+                  entryType: inferEntryType(turn.userMessage, turn.assistantText),
+                  contributorType: "session",
+                  action: "create",
+                  title: turn.userMessage.split("\n")[0].slice(0, 200) || "Session activity",
+                  content: turn.assistantText.slice(0, 2000),
+                  request: turn.userMessage.slice(0, 500),
+                  outcome: turn.fileEdits.length > 0
+                    ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
+                    : undefined,
+                  tags: extractTags(turn.fileEdits),
+                  confidence: turn.outputTokens > 1000 ? "high" : "medium",
+                  model: turn.model,
+                  affectedFiles: turn.fileEdits.map((f) => f.path),
+                });
+              }
             }
           }
+        } catch (err) {
+          logger.debug(`[knowledge] Error flushing turns on exit: ${err}`);
         }
 
         // Flush any remaining messages in the queue
