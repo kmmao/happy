@@ -180,6 +180,19 @@ export async function machineSpawnNewSession(
   } = options;
 
   try {
+    // Inject knowledge base settings as environment variables
+    const settings = storage.getState().settings;
+    const knowledgeEnvVars: Record<string, string> = {};
+    knowledgeEnvVars.HAPPY_KNOWLEDGE_BASE = settings.knowledgeBase ? "true" : "false";
+    knowledgeEnvVars.HAPPY_KNOWLEDGE_MODE = settings.knowledgeBaseMode;
+    knowledgeEnvVars.HAPPY_KNOWLEDGE_SENSITIVITY = settings.knowledgeBaseSensitivity;
+    knowledgeEnvVars.HAPPY_KNOWLEDGE_TRACK_FILE_EDITS = String(settings.knowledgeBaseTrackFileEdits);
+    knowledgeEnvVars.HAPPY_KNOWLEDGE_TRACK_TOOL_CALLS = String(settings.knowledgeBaseTrackToolCalls);
+    knowledgeEnvVars.HAPPY_KNOWLEDGE_TRACK_TOKENS = String(settings.knowledgeBaseTrackTokens);
+
+    // Caller env vars (e.g. from profile) take precedence over knowledge settings
+    const mergedEnvironmentVariables = { ...knowledgeEnvVars, ...environmentVariables };
+
     const result = await apiSocket.machineRPC<
       SpawnSessionResult,
       {
@@ -200,7 +213,7 @@ export async function machineSpawnNewSession(
       agent,
       sessionId: claudeSessionId,
       happySessionId,
-      environmentVariables,
+      environmentVariables: mergedEnvironmentVariables,
     });
     return result;
   } catch (error) {

@@ -15,6 +15,35 @@ interface TurnData {
   outputTokens: number;
 }
 
+export type Sensitivity = "conservative" | "balanced" | "aggressive";
+
+export interface TurnCollectorConfig {
+  sensitivity: Sensitivity;
+  trackFileEdits: boolean;
+  trackToolCalls: boolean;
+  trackTokens: boolean;
+}
+
+interface SensitivityPreset {
+  turnThreshold: number;
+  timeThresholdMs: number;
+  toolCallThreshold: number;
+  tokenThreshold: number;
+}
+
+const SENSITIVITY_PRESETS: Record<Sensitivity, SensitivityPreset> = {
+  conservative: { turnThreshold: 5, timeThresholdMs: 60 * 60 * 1000, toolCallThreshold: 8, tokenThreshold: 800 },
+  balanced:     { turnThreshold: 3, timeThresholdMs: 30 * 60 * 1000, toolCallThreshold: 5, tokenThreshold: 500 },
+  aggressive:   { turnThreshold: 1, timeThresholdMs: 10 * 60 * 1000, toolCallThreshold: 3, tokenThreshold: 200 },
+};
+
+const DEFAULT_CONFIG: TurnCollectorConfig = {
+  sensitivity: "balanced",
+  trackFileEdits: true,
+  trackToolCalls: true,
+  trackTokens: true,
+};
+
 /**
  * Collects data from SDK messages during a turn for knowledge extraction.
  * Resets on each new turn. Only tracks data when knowledge base is enabled.
@@ -30,9 +59,14 @@ export class TurnCollector {
   private pendingTurns: TurnData[] = [];
   private lastExtractionTime: number = Date.now();
 
-  // Accumulation thresholds
-  private readonly TURN_THRESHOLD = 3;
-  private readonly TIME_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+  private readonly config: TurnCollectorConfig;
+  private readonly preset: SensitivityPreset;
+
+  constructor(config?: Partial<TurnCollectorConfig>) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.preset = SENSITIVITY_PRESETS[this.config.sensitivity];
+    logger.debug(`[knowledge] TurnCollector initialized: sensitivity=${this.config.sensitivity}, trackFileEdits=${this.config.trackFileEdits}, trackToolCalls=${this.config.trackToolCalls}, trackTokens=${this.config.trackTokens}`);
+  }
 
   startTurn(turnId: string, model: string): void {
     this.currentTurnId = turnId;
@@ -72,9 +106,10 @@ export class TurnCollector {
 
     if (!this.currentTurnId) return null;
 
-    const isValuable = this.fileEdits.length > 0
-      || this.toolCallCount > 5
-      || this.outputTokens > 500;
+    const isValuable =
+      (this.config.trackFileEdits && this.fileEdits.length > 0)
+      || (this.config.trackToolCalls && this.toolCallCount > this.preset.toolCallThreshold)
+      || (this.config.trackTokens && this.outputTokens > this.preset.tokenThreshold);
 
     if (isValuable) {
       this.pendingTurns.push({
@@ -95,8 +130,8 @@ export class TurnCollector {
     // Check if we should trigger extraction
     const timeSinceLastExtraction = Date.now() - this.lastExtractionTime;
     const shouldExtract =
-      this.pendingTurns.length >= this.TURN_THRESHOLD
-      || (this.pendingTurns.length > 0 && timeSinceLastExtraction > this.TIME_THRESHOLD_MS);
+      this.pendingTurns.length >= this.preset.turnThreshold
+      || (this.pendingTurns.length > 0 && timeSinceLastExtraction > this.preset.timeThresholdMs);
 
     if (shouldExtract) {
       const turns = [...this.pendingTurns];

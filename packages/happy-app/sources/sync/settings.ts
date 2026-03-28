@@ -370,6 +370,18 @@ export const SettingsSchema = z.object({
   knowledgeBaseMode: z
     .enum(["auto", "full", "minimal"])
     .describe("Knowledge injection mode"),
+  knowledgeBaseSensitivity: z
+    .enum(["conservative", "balanced", "aggressive"])
+    .describe("Knowledge collection sensitivity preset"),
+  knowledgeBaseTrackFileEdits: z
+    .boolean()
+    .describe("Track file edits as valuable turn signal"),
+  knowledgeBaseTrackToolCalls: z
+    .boolean()
+    .describe("Track tool call count as valuable turn signal"),
+  knowledgeBaseTrackTokens: z
+    .boolean()
+    .describe("Track output token count as valuable turn signal"),
   useEnhancedSessionWizard: z
     .boolean()
     .describe("A/B test flag: Use enhanced profile-based session wizard UI"),
@@ -667,6 +679,10 @@ export const settingsDefaults: Settings = {
   sttCorrection: false,
   knowledgeBase: false,
   knowledgeBaseMode: "auto" as const,
+  knowledgeBaseSensitivity: "balanced" as const,
+  knowledgeBaseTrackFileEdits: true,
+  knowledgeBaseTrackToolCalls: true,
+  knowledgeBaseTrackTokens: true,
   useEnhancedSessionWizard: false,
   alwaysShowContextSize: true,
   agentInputEnterToSend: true,

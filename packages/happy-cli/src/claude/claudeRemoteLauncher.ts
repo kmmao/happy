@@ -38,6 +38,7 @@ import { join } from "node:path";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
 import { TurnCollector } from "@/knowledge";
+import type { TurnCollectorConfig } from "@/knowledge";
 
 interface PermissionsField {
   date: number;
@@ -126,7 +127,21 @@ export async function claudeRemoteLauncher(
   // Default ON — collection runs silently in background (minimal overhead).
   // App setting `knowledgeBase` controls Tab visibility; env HAPPY_KNOWLEDGE_BASE=false to fully disable.
   const knowledgeEnabled = process.env.HAPPY_KNOWLEDGE_BASE !== "false";
-  const turnCollector = knowledgeEnabled ? new TurnCollector() : null;
+  const turnCollectorConfig: Partial<TurnCollectorConfig> = {};
+  const rawSensitivity = process.env.HAPPY_KNOWLEDGE_SENSITIVITY;
+  if (rawSensitivity === "conservative" || rawSensitivity === "balanced" || rawSensitivity === "aggressive") {
+    turnCollectorConfig.sensitivity = rawSensitivity;
+  }
+  if (process.env.HAPPY_KNOWLEDGE_TRACK_FILE_EDITS !== undefined) {
+    turnCollectorConfig.trackFileEdits = process.env.HAPPY_KNOWLEDGE_TRACK_FILE_EDITS !== "false";
+  }
+  if (process.env.HAPPY_KNOWLEDGE_TRACK_TOOL_CALLS !== undefined) {
+    turnCollectorConfig.trackToolCalls = process.env.HAPPY_KNOWLEDGE_TRACK_TOOL_CALLS !== "false";
+  }
+  if (process.env.HAPPY_KNOWLEDGE_TRACK_TOKENS !== undefined) {
+    turnCollectorConfig.trackTokens = process.env.HAPPY_KNOWLEDGE_TRACK_TOKENS !== "false";
+  }
+  const turnCollector = knowledgeEnabled ? new TurnCollector(turnCollectorConfig) : null;
   let knowledgeInjected = false; // Track whether knowledge was already injected
   let knowledgeContext: string | null = null; // Cached knowledge for system prompt
 
