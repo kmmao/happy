@@ -12,6 +12,8 @@ import { z } from "zod";
  *   OLLAMA_URL=http://localhost:11434
  *   OLLAMA_CHAT_MODEL=gpt-oss:20b     (default)
  *   ANTHROPIC_API_KEY=sk-ant-...
+ *   ANTHROPIC_BASE_URL=https://api.anthropic.com (default, supports proxies)
+ *   ANTHROPIC_PROFILE_MODEL=claude-haiku-4-5-20251001 (default)
  */
 
 const ProfileSchema = z.object({
@@ -63,6 +65,10 @@ function getAnthropicKey(): string | null {
     return key.length > 0 ? key : null;
 }
 
+function getAnthropicBaseUrl(): string {
+    return (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com").replace(/\/+$/, "");
+}
+
 function getOllamaUrl(): string {
     return process.env.OLLAMA_URL || "http://localhost:11434";
 }
@@ -77,7 +83,7 @@ async function callAnthropic(userMessage: string): Promise<string | null> {
     const apiKey = getAnthropicKey();
     if (!apiKey) return null;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

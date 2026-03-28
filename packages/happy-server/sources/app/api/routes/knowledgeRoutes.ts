@@ -9,6 +9,7 @@ import { fetchKnowledgeChain } from "@/modules/knowledgeChain";
 import { generateEmbedding, truncateForEmbedding } from "@/modules/embeddingService";
 import { regenerateProfile } from "@/modules/knowledgeProfileGenerator";
 import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
+import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 
 // Inline Zod schemas (mirrors @kmmao/happy-wire/knowledge.ts)
 // Server uses CommonJS resolution which can't import ESM-only wire values directly.
@@ -201,6 +202,16 @@ export function knowledgeRoutes(app: Fastify) {
 
             // Fire-and-forget: generate embedding for semantic search
             void storeKnowledgeEmbedding(entry.id, entry.title, entry.content);
+            // Fire-and-forget: LLM refinement (rewrites title/content/structured in-place)
+            void refineKnowledgeEntry({
+                id: entry.id,
+                title: entry.title,
+                content: entry.content,
+                entryType: entry.entryType,
+                tags: JSON.stringify(body.tags),
+                confidence: body.confidence,
+                structured: entry.structured,
+            });
             trackKnowledgeCreation(id);
 
             return reply.code(201).send({
@@ -304,13 +315,18 @@ export function knowledgeRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Project not found" });
             }
 
-            const profile = await db.projectProfile.findUnique({
+            const profileRecord = await db.projectProfile.findUnique({
                 where: { projectId: id },
             });
 
+            if (!profileRecord) {
+                return reply.send({ profile: null });
+            }
+
+            const parsed = parseProfileContent(profileRecord.content);
             return reply.send({
-                profile: profile
-                    ? { ...profile, createdAt: profile.createdAt.getTime(), updatedAt: profile.updatedAt.getTime() }
+                profile: parsed
+                    ? { ...parsed, lastUpdatedAt: profileRecord.updatedAt.getTime() }
                     : null,
             });
         },
@@ -443,13 +459,17 @@ export function knowledgeRoutes(app: Fastify) {
             }
 
             // Fetch the updated profile to return
-            const profile = await db.projectProfile.findUnique({
+            const profileRecord = await db.projectProfile.findUnique({
                 where: { projectId: id },
             });
 
+            const parsed = profileRecord
+                ? parseProfileContent(profileRecord.content)
+                : null;
+
             return reply.send({
-                profile: profile
-                    ? { ...profile, createdAt: profile.createdAt.getTime(), updatedAt: profile.updatedAt.getTime() }
+                profile: parsed
+                    ? { ...parsed, lastUpdatedAt: profileRecord!.updatedAt.getTime() }
                     : null,
                 version: result.version,
             });

@@ -8,13 +8,13 @@ import { log } from "@/utils/log";
  * Config via env vars:
  *   EMBEDDING_PROVIDER=ollama|openai   (default: auto-detect)
  *   OLLAMA_URL=http://localhost:11434   (default)
- *   OLLAMA_EMBED_MODEL=nomic-embed-text (default, 768-dim)
+ *   OLLAMA_EMBED_MODEL=bge-m3          (default, 1024-dim, multilingual)
  *   OPENAI_API_KEY=sk-...
  *   OPENAI_EMBED_MODEL=text-embedding-3-small (default)
  */
 
-// Unified to 768 dims — nomic-embed-text native, OpenAI supports dimension param
-const EMBEDDING_DIMENSIONS = 768;
+// Unified to 1024 dims — bge-m3 native, OpenAI supports dimension param
+const EMBEDDING_DIMENSIONS = 1024;
 const MAX_EMBEDDING_CHARS = 2048;
 
 // ─── Provider detection ───
@@ -39,7 +39,7 @@ function getOllamaUrl(): string | null {
 }
 
 function getOllamaModel(): string {
-    return process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
+    return process.env.OLLAMA_EMBED_MODEL || "bge-m3";
 }
 
 function getOpenAIKey(): string | null {
@@ -83,7 +83,11 @@ async function ollamaEmbed(text: string): Promise<number[] | null> {
         }
 
         const data = await response.json() as { embeddings: number[][] };
-        return data.embeddings[0] ?? null;
+        const vec = data.embeddings[0] ?? null;
+        if (vec) {
+            log({ module: "embedding" }, `Ollama embed ok: ${getOllamaModel()}, ${vec.length} dims, ${text.length} chars`);
+        }
+        return vec;
     } catch (err) {
         log({ module: "embedding" }, `Ollama embed failed: ${err}`);
         return null;
@@ -112,6 +116,7 @@ async function ollamaEmbedBatch(texts: string[]): Promise<number[][] | null> {
         }
 
         const data = await response.json() as { embeddings: number[][] };
+        log({ module: "embedding" }, `Ollama batch embed ok: ${getOllamaModel()}, ${data.embeddings.length} texts, ${data.embeddings[0]?.length ?? 0} dims`);
         return data.embeddings;
     } catch (err) {
         log({ module: "embedding" }, `Ollama batch embed failed: ${err}`);
@@ -147,7 +152,9 @@ async function openaiEmbed(text: string): Promise<number[] | null> {
         }
 
         const data = await response.json() as { data: { embedding: number[] }[] };
-        return data.data[0].embedding;
+        const vec = data.data[0].embedding;
+        log({ module: "embedding" }, `OpenAI embed ok: ${getOpenAIModel()}, ${vec.length} dims, ${text.length} chars`);
+        return vec;
     } catch (err) {
         log({ module: "embedding" }, `OpenAI embed failed: ${err}`);
         return null;
@@ -181,6 +188,7 @@ async function openaiEmbedBatch(texts: string[]): Promise<number[][] | null> {
 
         const data = await response.json() as { data: { embedding: number[]; index: number }[] };
         const sorted = [...data.data].sort((a, b) => a.index - b.index);
+        log({ module: "embedding" }, `OpenAI batch embed ok: ${getOpenAIModel()}, ${sorted.length} texts, ${sorted[0]?.embedding.length ?? 0} dims`);
         return sorted.map((item) => item.embedding);
     } catch (err) {
         log({ module: "embedding" }, `OpenAI batch embed failed: ${err}`);

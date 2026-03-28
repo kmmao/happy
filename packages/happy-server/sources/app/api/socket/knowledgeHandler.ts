@@ -6,6 +6,7 @@ import { consolidate } from "@/modules/knowledgeConsolidate";
 import { parseProfileContent, safeParseJsonArray } from "@/modules/knowledgeSerialize";
 import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
 import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
+import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 import { inTx } from "@/storage/inTx";
 
 // Zod schema for socket knowledge submissions (defense-in-depth)
@@ -104,6 +105,18 @@ export function knowledgeHandler(userId: string, socket: Socket) {
 
             // Fire-and-forget: generate embedding for semantic search
             void storeKnowledgeEmbedding(created.id, entry.title, entry.content);
+            // Fire-and-forget: LLM refinement (rewrites title/content/structured in-place)
+            void refineKnowledgeEntry({
+                id: created.id,
+                title: entry.title,
+                content: entry.content,
+                entryType: entry.entryType,
+                tags: JSON.stringify(entry.tags),
+                confidence: entry.confidence,
+                structured: entry.request || entry.outcome
+                    ? JSON.stringify({ request: entry.request, outcome: entry.outcome })
+                    : null,
+            });
             trackKnowledgeCreation(projectId);
 
             log({ module: "knowledge" }, `Knowledge ${action.type}: "${entry.title.slice(0, 50)}" for project ${projectId}`);

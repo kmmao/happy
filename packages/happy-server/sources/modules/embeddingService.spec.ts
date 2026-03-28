@@ -35,14 +35,14 @@ describe("embeddingService", () => {
     });
 
     describe("EMBEDDING_DIMENSIONS", () => {
-        it("should be 768 (unified for Ollama nomic-embed-text + OpenAI)", () => {
-            expect(EMBEDDING_DIMENSIONS).toBe(768);
+        it("should be 1024 (unified for Ollama bge-m3 + OpenAI)", () => {
+            expect(EMBEDDING_DIMENSIONS).toBe(1024);
         });
     });
 
     describe("generateEmbedding", () => {
         it("should return embedding array on success (OpenAI)", async () => {
-            const fakeEmbedding = Array.from({ length: 768 }, (_, i) => i * 0.001);
+            const fakeEmbedding = Array.from({ length: 1024 }, (_, i) => i * 0.001);
             mockFetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
@@ -52,14 +52,14 @@ describe("embeddingService", () => {
 
             const result = await generateEmbedding("test text");
             expect(result).toEqual(fakeEmbedding);
-            expect(result).toHaveLength(768);
+            expect(result).toHaveLength(1024);
 
             expect(mockFetch).toHaveBeenCalledOnce();
             const [url, options] = mockFetch.mock.calls[0];
             expect(url).toBe("https://api.openai.com/v1/embeddings");
             expect(options.headers["Authorization"]).toBe("Bearer test-key-123");
             const body = JSON.parse(options.body);
-            expect(body.dimensions).toBe(768);
+            expect(body.dimensions).toBe(1024);
         });
 
         it("should return null when no provider is configured", async () => {
@@ -91,8 +91,8 @@ describe("embeddingService", () => {
     describe("generateEmbeddings", () => {
         it("should return array of embeddings for batch input", async () => {
             const fakeEmbeddings = [
-                Array.from({ length: 768 }, () => 0.1),
-                Array.from({ length: 768 }, () => 0.2),
+                Array.from({ length: 1024 }, () => 0.1),
+                Array.from({ length: 1024 }, () => 0.2),
             ];
             mockFetch.mockResolvedValueOnce({
                 ok: true,
@@ -103,8 +103,8 @@ describe("embeddingService", () => {
 
             const result = await generateEmbeddings(["text one", "text two"]);
             expect(result).toHaveLength(2);
-            expect(result![0]).toHaveLength(768);
-            expect(result![1]).toHaveLength(768);
+            expect(result![0]).toHaveLength(1024);
+            expect(result![1]).toHaveLength(1024);
         });
 
         it("should return null on failure", async () => {

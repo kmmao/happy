@@ -671,7 +671,7 @@ model ProjectKnowledge {
     relatedIds      String   @default("[]")  // JSON array of related entry IDs
 
     // Embedding (pgvector — Phase 2 semantic search)
-    embedding       Unsupported("vector(768)")?
+    embedding       Unsupported("vector(1024)")?
 
     // Relations (knowledge evolution)
     supersedesId    String?

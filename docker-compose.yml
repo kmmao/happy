@@ -82,10 +82,9 @@ services:
       STT_WS_URL: ws://stt:8001/ws
       # TTS 微服务地址（同 compose 网络内访问）
       TTS_BASE_URL: http://tts:8000
-      # Anthropic API（用于 STT 纠错等服务端直接调用）
-      # 注意：容器内 127.0.0.1 指向自身，必须用 host.docker.internal 访问宿主机服务
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-quotio-local-A4DB6F36}
-      ANTHROPIC_BASE_URL: http://host.docker.internal:8317
+      # Anthropic API: key 从 .env 读取，URL 通过宿主机 socat 转发到 Tailscale 代理
+      # 宿主机 launchd: com.happy.anthropic-proxy → socat 0.0.0.0:8899 → 100.85.22.83:8899
+      ANTHROPIC_BASE_URL: http://host.docker.internal:8899
     depends_on:
       postgres:
         condition: service_healthy

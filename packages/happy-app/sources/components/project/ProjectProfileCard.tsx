@@ -52,7 +52,7 @@ export const ProjectProfileCard = React.memo<ProjectProfileCardProps>(
                 {expanded && (
                     <View style={styles.body}>
                         {/* Tech Stack */}
-                        {profile.techStack.length > 0 && (
+                        {profile.techStack?.length > 0 && (
                             <View style={styles.section}>
                                 <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
                                     {t("projects.knowledgeTechStack")}
@@ -85,7 +85,7 @@ export const ProjectProfileCard = React.memo<ProjectProfileCardProps>(
                         )}
 
                         {/* Known Pitfalls */}
-                        {profile.knownPitfalls.length > 0 && (
+                        {profile.knownPitfalls?.length > 0 && (
                             <View style={styles.section}>
                                 <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
                                     {t("projects.knowledgePitfalls")}
@@ -106,7 +106,7 @@ export const ProjectProfileCard = React.memo<ProjectProfileCardProps>(
                         )}
 
                         {/* Core Conventions */}
-                        {profile.coreConventions.length > 0 && (
+                        {profile.coreConventions?.length > 0 && (
                             <View style={styles.section}>
                                 <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
                                     {t("projects.knowledgeConventions")}

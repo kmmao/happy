@@ -357,9 +357,9 @@ Server 启动时依次加载 `.env` 和 `.env.dev`（后者覆盖前者）。
 |------|--------|------|
 | `EMBEDDING_PROVIDER` | 自动检测 | 嵌入提供者：`ollama`（本地免费）或 `openai`（云端付费） |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama 服务地址 |
-| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Ollama 嵌入模型（768 维） |
+| `OLLAMA_EMBED_MODEL` | `bge-m3` | Ollama 嵌入模型（1024 维，多语言） |
 | `OPENAI_API_KEY` / `EMBEDDING_API_KEY` | — | OpenAI API Key（使用 OpenAI 嵌入时必填） |
-| `OPENAI_EMBED_MODEL` | `text-embedding-3-small` | OpenAI 嵌入模型（768 维） |
+| `OPENAI_EMBED_MODEL` | `text-embedding-3-small` | OpenAI 嵌入模型（1024 维） |
 
 ### 知识概要生成（LLM）
 
@@ -621,10 +621,10 @@ Server 的模型配置影响**知识库**功能（嵌入 + 概要生成），不
 ### 方案 A：全本地（免费，需 GPU 或较强 CPU）
 
 ```bash
-# 嵌入：Ollama nomic-embed-text
+# 嵌入：Ollama bge-m3（多语言，中英双优）
 EMBEDDING_PROVIDER=ollama
 OLLAMA_URL=http://localhost:11434
-OLLAMA_EMBED_MODEL=nomic-embed-text
+OLLAMA_EMBED_MODEL=bge-m3
 
 # 概要：Ollama 本地模型
 PROFILE_PROVIDER=ollama
@@ -634,7 +634,7 @@ OLLAMA_CHAT_MODEL=gpt-oss:20b
 先安装 Ollama 并拉取模型：
 
 ```bash
-ollama pull nomic-embed-text
+ollama pull bge-m3
 ollama pull gpt-oss:20b    # 或其他你偏好的模型
 ```
 
