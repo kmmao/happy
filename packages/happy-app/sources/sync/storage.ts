@@ -121,6 +121,7 @@ interface StorageState {
   sessionListViewData: SessionListViewItem[] | null;
   sessionMessages: Record<string, SessionMessages>;
   sessionGitStatus: Record<string, GitStatus | null>;
+  sessionKnowledgeCount: Record<string, number>;
   sessionPromptSuggestions: Record<string, string | null>;
   setPromptSuggestion: (sessionId: string, suggestion: string | null) => void;
   sessionNeedsContinue: Record<string, boolean>;
@@ -420,6 +421,7 @@ export const storage = create<StorageState>()((set, get) => {
     sessionListViewData: null,
     sessionMessages: {},
     sessionGitStatus: {},
+    sessionKnowledgeCount: {},
     sessionPromptSuggestions: {},
     setPromptSuggestion: (sessionId: string, suggestion: string | null) =>
       set((prev) => ({
@@ -2151,6 +2153,10 @@ export function useNeedsContinue(sessionId: string): boolean {
   return storage(
     useShallow((state) => state.sessionNeedsContinue[sessionId] ?? false),
   );
+}
+
+export function useSessionKnowledgeCount(sessionId: string): number {
+  return storage((state) => state.sessionKnowledgeCount[sessionId] ?? 0);
 }
 
 export function useIsDataReady(): boolean {

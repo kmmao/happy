@@ -2369,6 +2369,8 @@ export const ca: TranslationStructure = {
     knowledgeRegenerateProfile: "Regenerar",
     knowledgeRegenerateSuccess: "Perfil regenerat correctament",
     knowledgeViewEvolution: "Evolució",
+    knowledgeRefine: "Refinar",
+    knowledgeRefining: "Refinant...",
     knowledgeEvolutionTitle: "Evolució del coneixement",
     knowledgeEvolutionEmpty: "Sense historial d'evolució",
     knowledgeEvolutionEmptySubtitle: "Aquesta entrada encara no té versions relacionades",

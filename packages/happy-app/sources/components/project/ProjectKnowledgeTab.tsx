@@ -55,6 +55,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             refreshIfStale,
             updateEntry,
             deleteEntry,
+            refineEntry,
             regenerateProfile,
         } = useProjectKnowledge(projectServerId);
 
@@ -117,11 +118,12 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                     entry={item}
                     onUpdate={updateEntry}
                     onDelete={isArchivedFilter ? deleteEntry : undefined}
+                    onRefine={isArchivedFilter ? undefined : refineEntry}
                     isArchived={isArchivedFilter}
                     onViewEvolution={handleViewEvolution}
                 />
             ),
-            [updateEntry, deleteEntry, isArchivedFilter, handleViewEvolution],
+            [updateEntry, deleteEntry, refineEntry, isArchivedFilter, handleViewEvolution],
         );
 
         const keyExtractor = React.useCallback(

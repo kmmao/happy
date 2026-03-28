@@ -2365,6 +2365,8 @@ export const it: TranslationStructure = {
     knowledgeRegenerateProfile: "Rigenera",
     knowledgeRegenerateSuccess: "Profilo rigenerato con successo",
     knowledgeViewEvolution: "Evoluzione",
+    knowledgeRefine: "Raffina",
+    knowledgeRefining: "Raffinamento...",
     knowledgeEvolutionTitle: "Evoluzione della conoscenza",
     knowledgeEvolutionEmpty: "Nessuna cronologia di evoluzione",
     knowledgeEvolutionEmptySubtitle: "Questa voce non ha ancora versioni correlate",

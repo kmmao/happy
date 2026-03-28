@@ -49,6 +49,7 @@ import {
   useSession,
   useSessionMessages,
   useSessionUsage,
+  useSessionKnowledgeCount,
   useSetting,
 } from "@/sync/storage";
 import { Session } from "@/sync/storageTypes";
@@ -119,6 +120,7 @@ export const SessionView = React.memo((props: { id: string }) => {
   const headerHeight = useHeaderHeight();
   const realtimeStatus = useRealtimeStatus();
   const isTablet = useIsTablet();
+  const knowledgeCount = useSessionKnowledgeCount(sessionId);
 
   const showAgentActivity = useSetting("showAgentActivity");
 
@@ -222,6 +224,7 @@ export const SessionView = React.memo((props: { id: string }) => {
         >
           <ChatHeaderView
             {...headerProps}
+            knowledgeCount={knowledgeCount}
             onBackPress={() => router.back()}
             onRefreshPress={() => sync.refreshSession(sessionId)}
             onPreviewPress={

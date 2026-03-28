@@ -2285,6 +2285,8 @@ export const zhHans: TranslationStructure = {
     knowledgeRegenerateProfile: "重新生成",
     knowledgeRegenerateSuccess: "档案重新生成成功",
     knowledgeViewEvolution: "演变",
+    knowledgeRefine: "精炼",
+    knowledgeRefining: "精炼中...",
     knowledgeEvolutionTitle: "知识演变",
     knowledgeEvolutionEmpty: "暂无演变历史",
     knowledgeEvolutionEmptySubtitle: "该条目尚无相关版本",

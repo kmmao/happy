@@ -295,6 +295,62 @@ export function knowledgeRoutes(app: Fastify) {
         },
     );
 
+    // ─── Refine knowledge entry via LLM ───
+    app.post(
+        "/v1/projects/:id/knowledge/:entryId/refine",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string(), entryId: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id, entryId } = request.params;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const entry = await db.projectKnowledge.findFirst({
+                where: { id: entryId, projectId: id },
+            });
+            if (!entry) {
+                return reply.code(404).send({ error: "Entry not found" });
+            }
+
+            // Clear structured so refiner treats it as unrefined
+            await db.projectKnowledge.update({
+                where: { id: entryId },
+                data: { structured: null },
+            });
+
+            // Synchronous refinement — wait for LLM to complete
+            await refineKnowledgeEntry({
+                id: entryId,
+                title: entry.title,
+                content: entry.content,
+                entryType: entry.entryType,
+                tags: entry.tags,
+                confidence: entry.confidence,
+                structured: null,
+            });
+
+            // Return the updated entry
+            const updated = await db.projectKnowledge.findFirst({
+                where: { id: entryId },
+            });
+
+            return reply.send({
+                success: true,
+                entry: updated ? serializeKnowledgeEntry(updated) : null,
+            });
+        },
+    );
+
     // ─── Get project profile ───
     app.get(
         "/v1/projects/:id/profile",

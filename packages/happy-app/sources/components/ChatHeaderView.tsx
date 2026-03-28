@@ -24,6 +24,7 @@ interface ChatHeaderViewProps {
   tintColor?: string;
   isConnected?: boolean;
   flavor?: string | null;
+  knowledgeCount?: number;
 }
 
 export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
@@ -37,6 +38,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   avatarId,
   isConnected = true,
   flavor,
+  knowledgeCount,
 }) => {
   const { theme } = useUnistyles();
   const router = useRouter();
@@ -149,6 +151,15 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
               </Text>
             )}
           </View>
+
+          {knowledgeCount != null && knowledgeCount > 0 && (
+            <View style={[styles.knowledgeBadge, { backgroundColor: theme.colors.primary + "20" }]}>
+              <Ionicons name="bulb-outline" size={11} color={theme.colors.primary} />
+              <Text style={[styles.knowledgeBadgeText, { color: theme.colors.primary }]}>
+                {knowledgeCount}
+              </Text>
+            </View>
+          )}
 
           {onRefreshPress && (
             <Pressable
@@ -265,5 +276,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: Platform.select({ ios: -8, default: -8 }),
+  },
+  knowledgeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 4,
+    gap: 2,
+  },
+  knowledgeBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
 });

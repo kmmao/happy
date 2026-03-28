@@ -337,6 +337,11 @@ export type EphemeralEvent =
       exitReason: string | null;
       consecutiveFailures: number;
     }
+  | {
+      type: "knowledge-count";
+      id: string;
+      count: number;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -1038,6 +1043,17 @@ export function buildSupervisorLoopStatusEphemeral(opts: SupervisorLoopStatusOpt
   return {
     type: "supervisor-loop-status",
     ...opts,
+  };
+}
+
+export function buildKnowledgeCountEphemeral(
+  sessionId: string,
+  count: number,
+): EphemeralPayload {
+  return {
+    type: "knowledge-count",
+    id: sessionId,
+    count,
   };
 }
 

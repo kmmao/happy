@@ -2387,6 +2387,8 @@ export const ru: TranslationStructure = {
     knowledgeRegenerateProfile: "Пересоздать",
     knowledgeRegenerateSuccess: "Профиль успешно пересоздан",
     knowledgeViewEvolution: "Эволюция",
+    knowledgeRefine: "Уточнить",
+    knowledgeRefining: "Уточнение...",
     knowledgeEvolutionTitle: "Эволюция знаний",
     knowledgeEvolutionEmpty: "Нет истории изменений",
     knowledgeEvolutionEmptySubtitle: "У этой записи пока нет связанных версий",

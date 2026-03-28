@@ -7,6 +7,7 @@ import { parseProfileContent, safeParseJsonArray } from "@/modules/knowledgeSeri
 import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
 import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
+import { buildKnowledgeCountEphemeral, eventRouter } from "@/app/events/eventRouter";
 import { inTx } from "@/storage/inTx";
 
 // Zod schema for socket knowledge submissions (defense-in-depth)
@@ -118,6 +119,16 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                     : null,
             });
             trackKnowledgeCreation(projectId);
+
+            // Push knowledge count to App (ephemeral, user-scoped only)
+            const knowledgeCount = await db.projectKnowledge.count({
+                where: { sessionId: sid, status: "active" },
+            });
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildKnowledgeCountEphemeral(sid, knowledgeCount),
+                recipientFilter: { type: "user-scoped-only" },
+            });
 
             log({ module: "knowledge" }, `Knowledge ${action.type}: "${entry.title.slice(0, 50)}" for project ${projectId}`);
         } catch (err) {

@@ -63,7 +63,6 @@ const MAX_RETRIES = 2;
 const MIN_CONTENT_LENGTH = 50;
 
 const SKIP_TITLE_PATTERNS: RegExp[] = [
-    /^session activity$/i,
     /^\[?request interrupted/i,
     /^modified\s/i,
     /^untitled/i,
@@ -106,8 +105,17 @@ Rules:
 // ─── Stage 1: Rule-based filter ───
 
 export function shouldRefine(input: RefineInput): FilterResult {
+    // Only skip if structured has LLM-refined fields (findings/analysis/nextSteps).
+    // Raw CLI structured ({request, outcome}) still needs refinement.
     if (input.structured) {
-        return { pass: false, reason: "already-structured" };
+        try {
+            const parsed = JSON.parse(input.structured);
+            if (parsed.findings || parsed.analysis || parsed.nextSteps) {
+                return { pass: false, reason: "already-refined" };
+            }
+        } catch {
+            // invalid JSON, proceed to refine
+        }
     }
 
     for (const pattern of SKIP_TITLE_PATTERNS) {

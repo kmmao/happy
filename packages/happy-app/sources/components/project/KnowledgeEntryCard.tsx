@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, Pressable, LayoutAnimation } from "react-native";
+import { Animated, View, Text, Pressable, LayoutAnimation, ActivityIndicator, Easing } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
@@ -28,6 +28,7 @@ interface KnowledgeEntryCardProps {
     };
     onUpdate: (entryId: string, data: { status?: string; pinned?: boolean }) => void;
     onDelete?: (entryId: string) => void;
+    onRefine?: (entryId: string) => Promise<void>;
     isArchived?: boolean;
     onViewEvolution?: (entryId: string) => void;
 }
@@ -113,9 +114,36 @@ function soapLabel(field: string): string {
 }
 
 export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
-    ({ entry, onUpdate, onDelete, isArchived, onViewEvolution }) => {
+    ({ entry, onUpdate, onDelete, onRefine, isArchived, onViewEvolution }) => {
         const { theme } = useUnistyles();
         const [expanded, setExpanded] = React.useState(false);
+        const [refining, setRefining] = React.useState(false);
+        const pulseAnim = React.useRef(new Animated.Value(1)).current;
+
+        React.useEffect(() => {
+            if (refining) {
+                const loop = Animated.loop(
+                    Animated.sequence([
+                        Animated.timing(pulseAnim, {
+                            toValue: 0.45,
+                            duration: 800,
+                            easing: Easing.inOut(Easing.ease),
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(pulseAnim, {
+                            toValue: 1,
+                            duration: 800,
+                            easing: Easing.inOut(Easing.ease),
+                            useNativeDriver: true,
+                        }),
+                    ]),
+                );
+                loop.start();
+                return () => loop.stop();
+            } else {
+                pulseAnim.setValue(1);
+            }
+        }, [refining, pulseAnim]);
 
         const typeColor = TYPE_COLORS[entry.entryType] ?? theme.colors.textSecondary;
         const confColor = CONFIDENCE_COLORS[entry.confidence] ?? "#9CA3AF";
@@ -156,7 +184,7 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
         }, [entry.structured]);
 
         return (
-            <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+            <Animated.View style={[styles.card, { backgroundColor: theme.colors.surface, opacity: pulseAnim }]}>
                 {/* Header row: type badge + title + pinned */}
                 <Pressable
                     style={styles.headerRow}
@@ -320,11 +348,40 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
                                         </Text>
                                     </Pressable>
                                 )}
+                                {onRefine && (
+                                    <Pressable
+                                        onPress={async () => {
+                                            if (refining) return;
+                                            setRefining(true);
+                                            try {
+                                                await onRefine(entry.id);
+                                            } finally {
+                                                setRefining(false);
+                                            }
+                                        }}
+                                        style={[styles.actionButton, refining && { opacity: 0.5 }]}
+                                        hitSlop={8}
+                                        disabled={refining}
+                                    >
+                                        {refining ? (
+                                            <ActivityIndicator size={14} color={theme.colors.primary} />
+                                        ) : (
+                                            <Ionicons
+                                                name="sparkles-outline"
+                                                size={18}
+                                                color={theme.colors.textSecondary}
+                                            />
+                                        )}
+                                        <Text style={[styles.actionText, { color: refining ? theme.colors.primary : theme.colors.textSecondary }]}>
+                                            {refining ? t("projects.knowledgeRefining") : t("projects.knowledgeRefine")}
+                                        </Text>
+                                    </Pressable>
+                                )}
                             </>
                         )}
                     </View>
                 </View>
-            </View>
+            </Animated.View>
         );
     },
 );

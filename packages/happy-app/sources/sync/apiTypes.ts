@@ -305,6 +305,12 @@ export const ApiEphemeralSupervisorLoopStatusSchema = z.object({
   consecutiveFailures: z.number(),
 });
 
+export const ApiEphemeralKnowledgeCountSchema = z.object({
+  type: z.literal("knowledge-count"),
+  id: z.string(),  // sessionId
+  count: z.number(),
+});
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
@@ -315,6 +321,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralSupervisorTriggerSchema,
   ApiEphemeralSupervisorStatusSchema,
   ApiEphemeralSupervisorLoopStatusSchema,
+  ApiEphemeralKnowledgeCountSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

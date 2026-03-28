@@ -2441,6 +2441,16 @@ class Sync {
       }
     }
 
+    // Handle knowledge-count: update session knowledge badge in header
+    if (updateData.type === "knowledge-count") {
+      storage.setState((prev) => ({
+        sessionKnowledgeCount: {
+          ...prev.sessionKnowledgeCount,
+          [updateData.id]: updateData.count,
+        },
+      }));
+    }
+
     // Handle supervisor-loop-status: notify listeners for real-time Loop status updates.
     if (updateData.type === "supervisor-loop-status") {
       const loopEvent = {

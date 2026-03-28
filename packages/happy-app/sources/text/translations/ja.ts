@@ -2344,6 +2344,8 @@ export const ja: TranslationStructure = {
     knowledgeRegenerateProfile: "再生成",
     knowledgeRegenerateSuccess: "プロファイルが正常に再生成されました",
     knowledgeViewEvolution: "変遷",
+    knowledgeRefine: "精製",
+    knowledgeRefining: "精製中...",
     knowledgeEvolutionTitle: "ナレッジの変遷",
     knowledgeEvolutionEmpty: "変遷履歴がありません",
     knowledgeEvolutionEmptySubtitle: "このエントリにはまだ関連バージョンがありません",

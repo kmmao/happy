@@ -64,16 +64,20 @@ describe("knowledgeRefiner", () => {
     // ─── shouldRefine (pure function) ───
 
     describe("shouldRefine", () => {
-        it("should skip when structured is non-null", () => {
-            const result = shouldRefine(makeInput({ structured: '{"request":"test"}' }));
+        it("should skip when structured has LLM-refined fields", () => {
+            const result = shouldRefine(makeInput({ structured: '{"findings":"discovered X","analysis":"root cause"}' }));
             expect(result.pass).toBe(false);
-            expect(result.reason).toBe("already-structured");
+            expect(result.reason).toBe("already-refined");
         });
 
-        it("should skip title 'Session activity'", () => {
+        it("should NOT skip raw CLI structured (only request/outcome)", () => {
+            const result = shouldRefine(makeInput({ structured: '{"request":"","outcome":"Modified 5 files"}' }));
+            expect(result.pass).toBe(true);
+        });
+
+        it("should pass 'Session activity' title for LLM refinement", () => {
             const result = shouldRefine(makeInput({ title: "Session activity" }));
-            expect(result.pass).toBe(false);
-            expect(result.reason).toContain("skip-title");
+            expect(result.pass).toBe(true);
         });
 
         it("should skip title starting with 'Modified'", () => {
@@ -119,7 +123,7 @@ describe("knowledgeRefiner", () => {
         it("should skip when shouldRefine returns false", async () => {
             vi.stubEnv("PROFILE_PROVIDER", "anthropic");
             vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
-            await refineKnowledgeEntry(makeInput({ title: "Session activity" }));
+            await refineKnowledgeEntry(makeInput({ title: "[Request interrupted by user]" }));
             expect(mockFetch).not.toHaveBeenCalled();
         });
 

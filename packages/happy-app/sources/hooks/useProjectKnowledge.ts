@@ -311,5 +311,39 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         }
     }, [projectServerId, refresh]);
 
-    return { entries, archivedEntries, profile, loading, lastRefreshAt, refresh, refreshIfStale, updateEntry, deleteEntry, search, regenerateProfile };
+    const refineEntry = React.useCallback(
+        async (entryId: string) => {
+            if (!projectServerId) return;
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return;
+
+            const API_ENDPOINT = getServerUrl();
+            try {
+                const result = await backoff(async () => {
+                    const res = await fetch(
+                        `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge/${entryId}/refine`,
+                        {
+                            method: "POST",
+                            headers: authHeaders(credentials.token),
+                        },
+                    );
+                    if (!res.ok) {
+                        throw new Error(`Failed to refine entry: ${res.status}`);
+                    }
+                    return (await res.json()) as { success: boolean; entry: KnowledgeEntry | null };
+                });
+                // Update the entry in-place with the refined version
+                if (result?.entry) {
+                    setEntries((prev) =>
+                        prev.map((e) => (e.id === entryId ? result.entry! : e)),
+                    );
+                }
+            } catch {
+                // Silently fail — user can retry
+            }
+        },
+        [projectServerId],
+    );
+
+    return { entries, archivedEntries, profile, loading, lastRefreshAt, refresh, refreshIfStale, updateEntry, deleteEntry, refineEntry, search, regenerateProfile };
 }
