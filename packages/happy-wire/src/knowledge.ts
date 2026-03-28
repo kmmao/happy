@@ -122,6 +122,55 @@ export const KnowledgeInjectionResponseSchema = z.object({
 });
 export type KnowledgeInjectionResponse = z.infer<typeof KnowledgeInjectionResponseSchema>;
 
+// ===== Knowledge Evolution Chain (Phase 2) =====
+export const KnowledgeChainRelationSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  type: z.enum(["supersedes", "related"]),
+});
+export type KnowledgeChainRelation = z.infer<typeof KnowledgeChainRelationSchema>;
+
+export const KnowledgeChainEntrySchema = z.object({
+  id: z.string(),
+  entryType: KnowledgeEntryTypeSchema,
+  action: KnowledgeActionSchema,
+  status: KnowledgeStatusSchema,
+  title: z.string(),
+  content: z.string(),
+  tags: z.array(z.string()),
+  confidence: KnowledgeConfidenceSchema,
+  supersedesId: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type KnowledgeChainEntry = z.infer<typeof KnowledgeChainEntrySchema>;
+
+export const KnowledgeChainResponseSchema = z.object({
+  chain: z.array(KnowledgeChainEntrySchema),
+  relations: z.array(KnowledgeChainRelationSchema),
+});
+export type KnowledgeChainResponse = z.infer<typeof KnowledgeChainResponseSchema>;
+
+// ===== Cross-Project Knowledge Search (Phase 2) =====
+export const CrossProjectSearchResultSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  projectPath: z.string(),
+  entryType: KnowledgeEntryTypeSchema,
+  title: z.string(),
+  content: z.string(),
+  tags: z.array(z.string()),
+  confidence: KnowledgeConfidenceSchema,
+  similarity: z.number().optional(), // Present when using semantic search
+  createdAt: z.string(),
+});
+export type CrossProjectSearchResult = z.infer<typeof CrossProjectSearchResultSchema>;
+
+export const CrossProjectSearchResponseSchema = z.object({
+  results: z.array(CrossProjectSearchResultSchema),
+  total: z.number(),
+});
+export type CrossProjectSearchResponse = z.infer<typeof CrossProjectSearchResponseSchema>;
+
 // ===== Turn Knowledge Extraction (CLI → Server) =====
 export const TurnKnowledgeExtractionSchema = z.object({
   projectId: z.string(),
