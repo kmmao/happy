@@ -587,10 +587,13 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         );
       })()}
 
-      {/* Permission footer — shown when manual review is needed or auto-approve failed */}
+      {/* Permission footer — shown when manual review is needed or auto-approve failed.
+         AskUserQuestion has its own submit UI (AskUserQuestionView) that sends answers
+         via sessionAllow, so it should never show the generic permission footer. */}
       {sessionId &&
         tool.permission &&
         tool.permission.status === "pending" &&
+        tool.name !== "AskUserQuestion" &&
         (!willAutoApprove || autoApproveFailed) && (
         <PermissionFooter
           permission={tool.permission}
