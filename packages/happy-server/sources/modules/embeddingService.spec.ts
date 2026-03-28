@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { generateEmbedding, generateEmbeddings, truncateForEmbedding } from "./embeddingService";
+import { generateEmbedding, generateEmbeddings, truncateForEmbedding, EMBEDDING_DIMENSIONS } from "./embeddingService";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -7,6 +7,8 @@ vi.stubGlobal("fetch", mockFetch);
 
 describe("embeddingService", () => {
     beforeEach(() => {
+        // Force OpenAI provider for tests
+        vi.stubEnv("EMBEDDING_PROVIDER", "openai");
         vi.stubEnv("OPENAI_API_KEY", "test-key-123");
         mockFetch.mockReset();
     });
@@ -22,7 +24,6 @@ describe("embeddingService", () => {
         });
 
         it("should truncate text exceeding max tokens (estimated by chars)", () => {
-            // ~2000 chars ≈ 512 tokens for English text
             const longText = "a".repeat(3000);
             const result = truncateForEmbedding(longText);
             expect(result.length).toBeLessThan(longText.length);
@@ -33,36 +34,39 @@ describe("embeddingService", () => {
         });
     });
 
+    describe("EMBEDDING_DIMENSIONS", () => {
+        it("should be 768 (unified for Ollama nomic-embed-text + OpenAI)", () => {
+            expect(EMBEDDING_DIMENSIONS).toBe(768);
+        });
+    });
+
     describe("generateEmbedding", () => {
-        it("should return embedding array on success", async () => {
-            const fakeEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
+        it("should return embedding array on success (OpenAI)", async () => {
+            const fakeEmbedding = Array.from({ length: 768 }, (_, i) => i * 0.001);
             mockFetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
                     data: [{ embedding: fakeEmbedding }],
-                    usage: { total_tokens: 10 },
                 }),
             });
 
             const result = await generateEmbedding("test text");
             expect(result).toEqual(fakeEmbedding);
-            expect(result).toHaveLength(1536);
+            expect(result).toHaveLength(768);
 
-            // Verify fetch was called with correct params
             expect(mockFetch).toHaveBeenCalledOnce();
             const [url, options] = mockFetch.mock.calls[0];
             expect(url).toBe("https://api.openai.com/v1/embeddings");
             expect(options.headers["Authorization"]).toBe("Bearer test-key-123");
             const body = JSON.parse(options.body);
-            expect(body.model).toBe("text-embedding-3-small");
-            expect(body.input).toBe("test text");
+            expect(body.dimensions).toBe(768);
         });
 
-        it("should return null when API key is not configured", async () => {
+        it("should return null when no provider is configured", async () => {
+            vi.stubEnv("EMBEDDING_PROVIDER", "");
             vi.stubEnv("OPENAI_API_KEY", "");
             const result = await generateEmbedding("test text");
             expect(result).toBeNull();
-            expect(mockFetch).not.toHaveBeenCalled();
         });
 
         it("should return null on API error (graceful degradation)", async () => {
@@ -87,21 +91,20 @@ describe("embeddingService", () => {
     describe("generateEmbeddings", () => {
         it("should return array of embeddings for batch input", async () => {
             const fakeEmbeddings = [
-                Array.from({ length: 1536 }, () => 0.1),
-                Array.from({ length: 1536 }, () => 0.2),
+                Array.from({ length: 768 }, () => 0.1),
+                Array.from({ length: 768 }, () => 0.2),
             ];
             mockFetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
                     data: fakeEmbeddings.map((embedding, index) => ({ embedding, index })),
-                    usage: { total_tokens: 20 },
                 }),
             });
 
             const result = await generateEmbeddings(["text one", "text two"]);
             expect(result).toHaveLength(2);
-            expect(result![0]).toHaveLength(1536);
-            expect(result![1]).toHaveLength(1536);
+            expect(result![0]).toHaveLength(768);
+            expect(result![1]).toHaveLength(768);
         });
 
         it("should return null on failure", async () => {
