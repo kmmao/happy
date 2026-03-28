@@ -8,6 +8,7 @@ import { storeKnowledgeEmbedding, findSimilarByEmbedding } from "@/modules/knowl
 import { fetchKnowledgeChain } from "@/modules/knowledgeChain";
 import { generateEmbedding, truncateForEmbedding } from "@/modules/embeddingService";
 import { regenerateProfile } from "@/modules/knowledgeProfileGenerator";
+import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 
 // Inline Zod schemas (mirrors @kmmao/happy-wire/knowledge.ts)
 // Server uses CommonJS resolution which can't import ESM-only wire values directly.
@@ -200,6 +201,7 @@ export function knowledgeRoutes(app: Fastify) {
 
             // Fire-and-forget: generate embedding for semantic search
             void storeKnowledgeEmbedding(entry.id, entry.title, entry.content);
+            trackKnowledgeCreation(id);
 
             return reply.code(201).send({
                 action: dedupAction.type,
