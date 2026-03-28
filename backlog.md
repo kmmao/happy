@@ -41,3 +41,38 @@ CLI 侧已完成 SDK 选项映射（commit aff7302c），以下三个功能需�
 ### Phase 5（未来）: 更多 Provider
 - [ ] Cloudflare Tunnel
 - [ ] FRP
+
+## 项目知识库 Phase 2（2026-03-28 完成）
+
+语义检索 + 知识演化链 + 跨项目搜索 + Supervisor 自动贡献 + 概要自动重写
+
+### ~~Phase 2.0: 基础设施~~ ✅ 已完成 (6647e111)
+- consolidate/serialize 模块提取 + embeddingService + relatedIds 字段
+
+### ~~Phase 2.1: 语义检索~~ ✅ 已完成 (6647e111)
+- pgvector/HNSW + OpenAI text-embedding-3-small + 语义 consolidate（回退关键词）
+
+### ~~Phase 2.2: 知识演化链~~ ✅ 已完成 (4e0db01c + f80d4b93)
+- Server: GET /projects/:id/knowledge/:entryId/chain
+- Wire: KnowledgeChainResponse 类型
+- App: EvolutionTimeline + KnowledgeEvolutionView + 路由
+
+### ~~Phase 2.3: 跨项目搜索~~ ✅ 已完成 (6647e111 + f80d4b93)
+- Server: GET /knowledge/search（语义 + 关键词回退）
+- Wire: CrossProjectSearchResponse 类型
+- App: useKnowledgeSearch + 搜索页 + 路由
+
+### ~~Phase 2.4: Supervisor 自动贡献~~ ✅ 已完成 (6647e111)
+- knowledgeContributor: severity 排序 → max 5/run → consolidate 去重 → inTx 写入
+
+### ~~Phase 2.5: 概要自动重写~~ ✅ 已完成 (6647e111 + f80d4b93)
+- Server: Haiku 4.5 + Zod 校验 + 3 次重试 + Prisma upsert
+- App: ProfileCard 重新生成按钮
+
+### Phase 2 验证 / 配置
+- [x] Phase 1 + 2 完整链路 E2E 验证 ✅ (2026-03-28)
+  - 创建 ✅ | Ollama Embedding(768维) ✅ | 语义去重(0.87) ✅ | 演化链 ✅ | 跨项目搜索(0.76) ✅ | 概要重写 ✅
+- [x] Server Docker 配置 OLLAMA_URL + PROFILE_PROVIDER=ollama ✅
+- [ ] （可选）配置 OPENAI_API_KEY / ANTHROPIC_API_KEY 作为云端备选
+- [ ] embedding backfill 脚本在真实数据上运行
+- [ ] 语义检索效果评估（积累真实数据后对比关键词匹配）
