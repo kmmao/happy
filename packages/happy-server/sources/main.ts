@@ -10,11 +10,13 @@ import { startDatabaseMetricsUpdater } from "@/app/monitoring/metrics2";
 import { initEncrypt } from "./modules/encrypt";
 import { initGithub } from "./modules/github";
 import { loadFiles } from "./storage/files";
+import { deduplicateProjects } from "./modules/projectDedup";
 
 async function main() {
 
     // Storage
     await db.$connect();
+    await deduplicateProjects();
     onShutdown('db', async () => {
         await db.$disconnect();
     });

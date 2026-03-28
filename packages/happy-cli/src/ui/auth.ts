@@ -294,13 +294,10 @@ export async function authAndSetupMachineIfNeeded(): Promise<{
 
     // Step 1: Handle authentication
     let credentials = await readCredentials();
-    let newAuth = false;
-
     if (!credentials && process.env.HAPPY_PROVISION_TOKEN) {
         // Headless auth for Docker containers
         logger.debug('[AUTH] Provision token detected, using headless auth...');
         credentials = await doProvisionAuth(process.env.HAPPY_PROVISION_TOKEN);
-        newAuth = true;
     } else if (!credentials) {
         logger.debug('[AUTH] No credentials found, starting authentication flow...');
         const authResult = await doAuth();
@@ -308,7 +305,6 @@ export async function authAndSetupMachineIfNeeded(): Promise<{
             throw new Error('Authentication failed or was cancelled');
         }
         credentials = authResult;
-        newAuth = true;
     } else {
         logger.debug('[AUTH] Using existing credentials');
     }
@@ -316,7 +312,7 @@ export async function authAndSetupMachineIfNeeded(): Promise<{
     // Make sure we have a machine ID
     // Server machine entity will be created either by the daemon or by the CLI
     const settings = await updateSettings(async s => {
-        if (newAuth || !s.machineId) {
+        if (!s.machineId) {
             return {
                 ...s,
                 machineId: randomUUID()
