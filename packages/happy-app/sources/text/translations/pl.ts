@@ -2386,6 +2386,10 @@ export const pl: TranslationStructure = {
     knowledgeSearchEmpty: "Nie znaleziono wyników",
     knowledgeSearchHint: "Szukaj odkryć, decyzji i konwencji",
     knowledgeSearchInProject: (params: { project: string }) => `w ${params.project}`,
+    knowledgeRefreshing: "Odświeżanie...",
+    knowledgeRefreshedJustNow: "Właśnie teraz",
+    knowledgeRefreshedSecondsAgo: (params: { seconds: number }) => `${params.seconds}s temu`,
+    knowledgeRefreshedMinutesAgo: (params: { minutes: number }) => `${params.minutes}m temu`,
   },
   project: {
     segments: {

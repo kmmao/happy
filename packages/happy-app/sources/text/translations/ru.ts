@@ -2383,6 +2383,10 @@ export const ru: TranslationStructure = {
     knowledgeSearchEmpty: "Результаты не найдены",
     knowledgeSearchHint: "Ищите открытия, решения и соглашения",
     knowledgeSearchInProject: (params: { project: string }) => `в ${params.project}`,
+    knowledgeRefreshing: "Обновление...",
+    knowledgeRefreshedJustNow: "Только что",
+    knowledgeRefreshedSecondsAgo: (params: { seconds: number }) => `${params.seconds} сек. назад`,
+    knowledgeRefreshedMinutesAgo: (params: { minutes: number }) => `${params.minutes} мин. назад`,
   },
   project: {
     segments: {

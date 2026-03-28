@@ -2365,6 +2365,10 @@ export const ca: TranslationStructure = {
     knowledgeSearchEmpty: "No s'han trobat resultats",
     knowledgeSearchHint: "Cerca descobriments, decisions i convencions",
     knowledgeSearchInProject: (params: { project: string }) => `a ${params.project}`,
+    knowledgeRefreshing: "Actualitzant...",
+    knowledgeRefreshedJustNow: "Ara mateix",
+    knowledgeRefreshedSecondsAgo: (params: { seconds: number }) => `fa ${params.seconds}s`,
+    knowledgeRefreshedMinutesAgo: (params: { minutes: number }) => `fa ${params.minutes}m`,
   },
   project: {
     segments: {

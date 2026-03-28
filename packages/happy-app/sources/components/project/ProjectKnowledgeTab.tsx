@@ -13,6 +13,7 @@ import { layout } from "@/components/layout";
 
 interface ProjectKnowledgeTabProps {
     projectServerId: string | undefined;
+    isActive: boolean;
 }
 
 const FILTER_KEYS = ["all", "discovery", "decision", "fix", "convention", "warning"] as const;
@@ -35,8 +36,10 @@ function filterLabel(key: FilterKey): string {
     }
 }
 
+const STALE_THRESHOLD_MS = 30_000;
+
 export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
-    ({ projectServerId }) => {
+    ({ projectServerId, isActive }) => {
         const { theme } = useUnistyles();
         const [activeFilter, setActiveFilter] = React.useState<FilterKey>("all");
 
@@ -44,7 +47,9 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             entries,
             profile,
             loading,
+            lastRefreshAt,
             refresh,
+            refreshIfStale,
             updateEntry,
             regenerateProfile,
         } = useProjectKnowledge(projectServerId);
@@ -52,6 +57,30 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
         const [refreshing, doRefresh] = useHappyAction(async () => {
             await refresh();
         });
+
+        // Auto-refresh when tab becomes active (with staleness threshold)
+        const wasActive = React.useRef(isActive);
+        React.useEffect(() => {
+            if (isActive && !wasActive.current) {
+                void refreshIfStale(STALE_THRESHOLD_MS);
+            }
+            wasActive.current = isActive;
+        }, [isActive, refreshIfStale]);
+
+        // Elapsed seconds since last refresh (ticks every second, paused when tab hidden)
+        const [elapsedSeconds, setElapsedSeconds] = React.useState<number | null>(null);
+        React.useEffect(() => {
+            if (!lastRefreshAt) {
+                setElapsedSeconds(null);
+                return;
+            }
+            setElapsedSeconds(Math.floor((Date.now() - lastRefreshAt) / 1000));
+            if (!isActive) return;
+            const timer = setInterval(() => {
+                setElapsedSeconds(Math.floor((Date.now() - lastRefreshAt) / 1000));
+            }, 1000);
+            return () => clearInterval(timer);
+        }, [lastRefreshAt, isActive]);
 
         const [regenerating, doRegenerate] = useHappyAction(async () => {
             await regenerateProfile();
@@ -89,6 +118,15 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             [],
         );
 
+        const refreshStatusText = React.useMemo(() => {
+            if (loading || refreshing) return t("projects.knowledgeRefreshing");
+            if (elapsedSeconds === null) return "";
+            if (elapsedSeconds < 5) return t("projects.knowledgeRefreshedJustNow");
+            if (elapsedSeconds < 60) return t("projects.knowledgeRefreshedSecondsAgo", { seconds: elapsedSeconds });
+            const minutes = Math.floor(elapsedSeconds / 60);
+            return t("projects.knowledgeRefreshedMinutesAgo", { minutes });
+        }, [loading, refreshing, elapsedSeconds]);
+
         const ListHeader = React.useMemo(
             () => (
                 <View>
@@ -100,14 +138,14 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                     {/* Filter bar */}
                     <View style={styles.filterRow}>
                         {FILTER_KEYS.map((key) => {
-                            const isActive = activeFilter === key;
+                            const isFilterActive = activeFilter === key;
                             return (
                                 <Pressable
                                     key={key}
                                     style={[
                                         styles.filterChip,
                                         {
-                                            backgroundColor: isActive
+                                            backgroundColor: isFilterActive
                                                 ? theme.colors.header.tint
                                                 : theme.colors.surface,
                                         },
@@ -118,7 +156,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                                         style={[
                                             styles.filterChipText,
                                             {
-                                                color: isActive
+                                                color: isFilterActive
                                                     ? "#FFFFFF"
                                                     : theme.colors.textSecondary,
                                             },
@@ -130,9 +168,27 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                             );
                         })}
                     </View>
+                    {/* Refresh status bar */}
+                    <View style={styles.refreshBar}>
+                        <Text style={[styles.refreshText, { color: theme.colors.textSecondary }]}>
+                            {refreshStatusText}
+                        </Text>
+                        <Pressable
+                            onPress={doRefresh}
+                            disabled={refreshing || loading}
+                            hitSlop={8}
+                            style={{ opacity: refreshing || loading ? 0.4 : 1 }}
+                        >
+                            <Ionicons
+                                name="refresh"
+                                size={16}
+                                color={theme.colors.textSecondary}
+                            />
+                        </Pressable>
+                    </View>
                 </View>
             ),
-            [profile, activeFilter, theme],
+            [profile, activeFilter, theme, refreshStatusText, refreshing, loading],
         );
 
         const EmptyComponent = React.useMemo(
@@ -196,6 +252,17 @@ const styles = StyleSheet.create((theme) => ({
     filterChipText: {
         ...Typography.default("semiBold"),
         fontSize: 12,
+    },
+    refreshBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+    },
+    refreshText: {
+        ...Typography.default("regular"),
+        fontSize: 11,
     },
     emptyContainer: {
         alignItems: "center",

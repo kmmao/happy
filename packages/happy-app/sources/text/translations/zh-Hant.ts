@@ -2282,6 +2282,10 @@ export const zhHant: TranslationStructure = {
     knowledgeSearchEmpty: "未找到結果",
     knowledgeSearchHint: "搜尋發現、決策和慣例",
     knowledgeSearchInProject: (params: { project: string }) => `在 ${params.project} 中`,
+    knowledgeRefreshing: "重新整理中...",
+    knowledgeRefreshedJustNow: "剛剛更新",
+    knowledgeRefreshedSecondsAgo: (params: { seconds: number }) => `${params.seconds} 秒前更新`,
+    knowledgeRefreshedMinutesAgo: (params: { minutes: number }) => `${params.minutes} 分鐘前更新`,
   },
   project: {
     segments: {

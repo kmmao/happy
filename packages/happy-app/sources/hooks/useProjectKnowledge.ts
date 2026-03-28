@@ -69,6 +69,8 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
     const [entries, setEntries] = React.useState<KnowledgeEntry[]>([]);
     const [profile, setProfile] = React.useState<ProjectProfile | null>(null);
     const [loading, setLoading] = React.useState(false);
+    const [lastRefreshAt, setLastRefreshAt] = React.useState<number | null>(null);
+    const lastRefreshAtRef = React.useRef<number | null>(null);
 
     const refresh = React.useCallback(async () => {
         if (!projectServerId) return;
@@ -112,6 +114,11 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
             }
             if (profileResult) {
                 setProfile(profileResult.profile);
+            }
+            if (knowledgeResult || profileResult) {
+                const now = Date.now();
+                lastRefreshAtRef.current = now;
+                setLastRefreshAt(now);
             }
         } finally {
             setLoading(false);
@@ -197,6 +204,14 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         [projectServerId],
     );
 
+    const refreshIfStale = React.useCallback(
+        async (thresholdMs: number) => {
+            if (lastRefreshAtRef.current && Date.now() - lastRefreshAtRef.current < thresholdMs) return;
+            await refresh();
+        },
+        [refresh],
+    );
+
     // Fetch data on mount and when projectServerId changes
     React.useEffect(() => {
         void refresh();
@@ -233,5 +248,5 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         }
     }, [projectServerId, refresh]);
 
-    return { entries, profile, loading, refresh, updateEntry, search, regenerateProfile };
+    return { entries, profile, loading, lastRefreshAt, refresh, refreshIfStale, updateEntry, search, regenerateProfile };
 }

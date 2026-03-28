@@ -2340,6 +2340,10 @@ export const ja: TranslationStructure = {
     knowledgeSearchEmpty: "結果が見つかりません",
     knowledgeSearchHint: "発見、決定、規約を検索",
     knowledgeSearchInProject: (params: { project: string }) => `${params.project} 内`,
+    knowledgeRefreshing: "更新中...",
+    knowledgeRefreshedJustNow: "たった今",
+    knowledgeRefreshedSecondsAgo: (params: { seconds: number }) => `${params.seconds}秒前`,
+    knowledgeRefreshedMinutesAgo: (params: { minutes: number }) => `${params.minutes}分前`,
   },
   project: {
     segments: {
