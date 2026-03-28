@@ -4,6 +4,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
+import { useRouter } from "expo-router";
 import { useProjectKnowledge } from "@/hooks/useProjectKnowledge";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { KnowledgeEntryCard } from "./KnowledgeEntryCard";
@@ -45,11 +46,25 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             loading,
             refresh,
             updateEntry,
+            regenerateProfile,
         } = useProjectKnowledge(projectServerId);
 
         const [refreshing, doRefresh] = useHappyAction(async () => {
             await refresh();
         });
+
+        const [regenerating, doRegenerate] = useHappyAction(async () => {
+            await regenerateProfile();
+        });
+
+        const router = useRouter();
+        const handleViewEvolution = React.useCallback(
+            (entryId: string) => {
+                if (!projectServerId) return;
+                router.push(`/project/${projectServerId}/knowledge/${entryId}/evolution` as any);
+            },
+            [projectServerId, router],
+        );
 
         const filteredEntries = React.useMemo(() => {
             if (activeFilter === "all") {
@@ -60,9 +75,13 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
 
         const renderItem = React.useCallback(
             ({ item }: { item: (typeof entries)[number] }) => (
-                <KnowledgeEntryCard entry={item} onUpdate={updateEntry} />
+                <KnowledgeEntryCard
+                    entry={item}
+                    onUpdate={updateEntry}
+                    onViewEvolution={handleViewEvolution}
+                />
             ),
-            [updateEntry],
+            [updateEntry, handleViewEvolution],
         );
 
         const keyExtractor = React.useCallback(
@@ -73,7 +92,11 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
         const ListHeader = React.useMemo(
             () => (
                 <View>
-                    <ProjectProfileCard profile={profile} />
+                    <ProjectProfileCard
+                        profile={profile}
+                        onRegenerate={doRegenerate}
+                        regenerating={regenerating}
+                    />
                     {/* Filter bar */}
                     <View style={styles.filterRow}>
                         {FILTER_KEYS.map((key) => {

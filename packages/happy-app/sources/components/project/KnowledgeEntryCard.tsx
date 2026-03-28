@@ -27,6 +27,7 @@ interface KnowledgeEntryCardProps {
         createdAt: number;
     };
     onUpdate: (entryId: string, data: { status?: string; pinned?: boolean }) => void;
+    onViewEvolution?: (entryId: string) => void;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -93,7 +94,7 @@ function soapLabel(field: string): string {
 }
 
 export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
-    ({ entry, onUpdate }) => {
+    ({ entry, onUpdate, onViewEvolution }) => {
         const { theme } = useUnistyles();
         const [expanded, setExpanded] = React.useState(false);
 
@@ -237,6 +238,22 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
                                 {t("projects.knowledgeArchive")}
                             </Text>
                         </Pressable>
+                        {onViewEvolution && (
+                            <Pressable
+                                onPress={() => onViewEvolution(entry.id)}
+                                style={styles.actionButton}
+                                hitSlop={8}
+                            >
+                                <Ionicons
+                                    name="git-branch-outline"
+                                    size={18}
+                                    color={theme.colors.textSecondary}
+                                />
+                                <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
+                                    {t("projects.knowledgeViewEvolution")}
+                                </Text>
+                            </Pressable>
+                        )}
                     </View>
                 </View>
             </View>

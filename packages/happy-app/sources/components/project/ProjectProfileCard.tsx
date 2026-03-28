@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
@@ -13,10 +13,12 @@ interface ProjectProfileCardProps {
         coreConventions: string[];
         lastUpdatedAt: number;
     } | null;
+    onRegenerate?: () => void;
+    regenerating?: boolean;
 }
 
 export const ProjectProfileCard = React.memo<ProjectProfileCardProps>(
-    ({ profile }) => {
+    ({ profile, onRegenerate, regenerating }) => {
         const { theme } = useUnistyles();
         const [expanded, setExpanded] = React.useState(false);
 
@@ -123,6 +125,31 @@ export const ProjectProfileCard = React.memo<ProjectProfileCardProps>(
                                 ))}
                             </View>
                         )}
+
+                        {/* Regenerate button */}
+                        {onRegenerate && (
+                            <View style={styles.regenerateRow}>
+                                <Pressable
+                                    onPress={onRegenerate}
+                                    disabled={regenerating}
+                                    style={[styles.regenerateButton, { backgroundColor: theme.colors.header.tint + "15" }]}
+                                    hitSlop={8}
+                                >
+                                    {regenerating ? (
+                                        <ActivityIndicator size="small" color={theme.colors.header.tint} />
+                                    ) : (
+                                        <Ionicons
+                                            name="refresh-outline"
+                                            size={16}
+                                            color={theme.colors.header.tint}
+                                        />
+                                    )}
+                                    <Text style={[styles.regenerateText, { color: theme.colors.header.tint }]}>
+                                        {t("projects.knowledgeRegenerateProfile")}
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        )}
                     </View>
                 )}
             </View>
@@ -198,5 +225,21 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 13,
         lineHeight: 18,
         flex: 1,
+    },
+    regenerateRow: {
+        alignItems: "flex-end",
+        marginTop: 4,
+    },
+    regenerateButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    regenerateText: {
+        ...Typography.default("semiBold"),
+        fontSize: 13,
     },
 }));

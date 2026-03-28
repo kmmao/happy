@@ -202,5 +202,36 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         void refresh();
     }, [refresh]);
 
-    return { entries, profile, loading, refresh, updateEntry, search };
+    const regenerateProfile = React.useCallback(async () => {
+        if (!projectServerId) return;
+        const credentials = await TokenStorage.getCredentials();
+        if (!credentials) return;
+
+        const API_ENDPOINT = getServerUrl();
+        try {
+            const response = await backoff(async () => {
+                const res = await fetch(
+                    `${API_ENDPOINT}/v1/projects/${projectServerId}/profile/regenerate`,
+                    {
+                        method: "POST",
+                        headers: authHeaders(credentials.token),
+                    },
+                );
+                if (!res.ok) {
+                    throw new Error(`Failed to regenerate profile: ${res.status}`);
+                }
+                return (await res.json()) as ProfileResponse;
+            });
+
+            if (response?.profile) {
+                setProfile(response.profile);
+            } else {
+                await refresh();
+            }
+        } catch {
+            await refresh();
+        }
+    }, [projectServerId, refresh]);
+
+    return { entries, profile, loading, refresh, updateEntry, search, regenerateProfile };
 }

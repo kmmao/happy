@@ -418,6 +418,20 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="project/[id]/knowledge/[entryId]/evolution"
+        options={{
+          headerTitle: t("projects.knowledgeEvolutionTitle"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="knowledge/search"
+        options={{
+          headerTitle: t("projects.knowledgeSearchTitle"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="openclaw/index"
         options={{
           headerShown: true,
