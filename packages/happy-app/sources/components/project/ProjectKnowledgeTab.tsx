@@ -158,9 +158,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                                         {
                                             backgroundColor: isFilterActive
                                                 ? theme.colors.header.tint
-                                                : theme.colors.groupped.background,
-                                            borderWidth: isFilterActive ? 0 : 1,
-                                            borderColor: theme.colors.divider,
+                                                : theme.colors.surfaceHighest,
                                         },
                                     ]}
                                     onPress={() => setActiveFilter(key)}
