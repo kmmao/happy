@@ -1327,6 +1327,31 @@ export async function claudeRemoteLauncher(
         }
         ongoingToolCalls.clear();
 
+        // Knowledge base: flush any pending turns before session teardown
+        if (turnCollector) {
+          const finalTurns = turnCollector.flush();
+          if (finalTurns) {
+            logger.debug(`[knowledge] Flushing ${finalTurns.length} pending turns on exit`);
+            for (const turn of finalTurns) {
+              session.client.submitKnowledge({
+                entryType: inferEntryType(turn.userMessage, turn.assistantText),
+                contributorType: "session",
+                action: "create",
+                title: turn.userMessage.split("\n")[0].slice(0, 200) || "Session activity",
+                content: turn.assistantText.slice(0, 2000),
+                request: turn.userMessage.slice(0, 500),
+                outcome: turn.fileEdits.length > 0
+                  ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
+                  : undefined,
+                tags: extractTags(turn.fileEdits),
+                confidence: turn.outputTokens > 1000 ? "high" : "medium",
+                model: turn.model,
+                affectedFiles: turn.fileEdits.map((f) => f.path),
+              });
+            }
+          }
+        }
+
         // Flush any remaining messages in the queue
         logger.debug("[remote]: flushing message queue");
         await messageQueue.flush();
