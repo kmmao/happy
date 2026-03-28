@@ -67,6 +67,7 @@ function authHeaders(token: string) {
 
 export function useProjectKnowledge(projectServerId: string | undefined) {
     const [entries, setEntries] = React.useState<KnowledgeEntry[]>([]);
+    const [archivedEntries, setArchivedEntries] = React.useState<KnowledgeEntry[]>([]);
     const [profile, setProfile] = React.useState<ProjectProfile | null>(null);
     const [loading, setLoading] = React.useState(false);
     const [lastRefreshAt, setLastRefreshAt] = React.useState<number | null>(null);
@@ -82,7 +83,7 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
 
         setLoading(true);
         try {
-            const [knowledgeResult, profileResult] = await Promise.all([
+            const [knowledgeResult, archivedResult, profileResult] = await Promise.all([
                 backoff(async () => {
                     const response = await fetch(
                         `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge`,
@@ -91,6 +92,18 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
                     if (!response.ok) {
                         throw new Error(
                             `Failed to fetch knowledge: ${response.status}`,
+                        );
+                    }
+                    return (await response.json()) as KnowledgeListResponse;
+                }).catch(() => null),
+                backoff(async () => {
+                    const response = await fetch(
+                        `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge?status=archived`,
+                        { headers },
+                    );
+                    if (!response.ok) {
+                        throw new Error(
+                            `Failed to fetch archived knowledge: ${response.status}`,
                         );
                     }
                     return (await response.json()) as KnowledgeListResponse;
@@ -111,6 +124,9 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
 
             if (knowledgeResult) {
                 setEntries(knowledgeResult.entries);
+            }
+            if (archivedResult) {
+                setArchivedEntries(archivedResult.entries);
             }
             if (profileResult) {
                 setProfile(profileResult.profile);
@@ -134,14 +150,35 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) return;
 
-            // Optimistic update
-            setEntries((prev) =>
-                prev.map((e) => (e.id === entryId ? { ...e, ...data } : e)),
-            );
+            const isArchiving = data.status === "archived";
+            const isRestoring = data.status === "active";
+
+            // Optimistic update: move between active/archived lists
+            if (isArchiving) {
+                setEntries((prev) => {
+                    const target = prev.find((e) => e.id === entryId);
+                    if (target) {
+                        setArchivedEntries((ap) => [{ ...target, ...data }, ...ap]);
+                    }
+                    return prev.filter((e) => e.id !== entryId);
+                });
+            } else if (isRestoring) {
+                setArchivedEntries((prev) => {
+                    const target = prev.find((e) => e.id === entryId);
+                    if (target) {
+                        setEntries((ep) => [{ ...target, ...data }, ...ep]);
+                    }
+                    return prev.filter((e) => e.id !== entryId);
+                });
+            } else {
+                setEntries((prev) =>
+                    prev.map((e) => (e.id === entryId ? { ...e, ...data } : e)),
+                );
+            }
 
             const API_ENDPOINT = getServerUrl();
             try {
-                const response = await backoff(async () => {
+                await backoff(async () => {
                     const res = await fetch(
                         `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge/${entryId}`,
                         {
@@ -157,15 +194,41 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
                     }
                     return (await res.json()) as UpdateEntryResponse;
                 });
-
-                // Replace with server-confirmed data
-                setEntries((prev) =>
-                    prev.map((e) =>
-                        e.id === entryId ? response.entry : e,
-                    ),
-                );
             } catch {
                 // Rollback optimistic update on failure
+                await refresh();
+            }
+        },
+        [projectServerId, refresh],
+    );
+
+    const deleteEntry = React.useCallback(
+        async (entryId: string) => {
+            if (!projectServerId) return;
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return;
+
+            // Optimistic removal
+            setArchivedEntries((prev) => prev.filter((e) => e.id !== entryId));
+            setEntries((prev) => prev.filter((e) => e.id !== entryId));
+
+            const API_ENDPOINT = getServerUrl();
+            try {
+                await backoff(async () => {
+                    const res = await fetch(
+                        `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge/${entryId}`,
+                        {
+                            method: "DELETE",
+                            headers: authHeaders(credentials.token),
+                        },
+                    );
+                    if (!res.ok) {
+                        throw new Error(
+                            `Failed to delete entry: ${res.status}`,
+                        );
+                    }
+                });
+            } catch {
                 await refresh();
             }
         },
@@ -248,5 +311,5 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         }
     }, [projectServerId, refresh]);
 
-    return { entries, profile, loading, lastRefreshAt, refresh, refreshIfStale, updateEntry, search, regenerateProfile };
+    return { entries, archivedEntries, profile, loading, lastRefreshAt, refresh, refreshIfStale, updateEntry, deleteEntry, search, regenerateProfile };
 }

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, LayoutAnimation } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
@@ -27,6 +27,8 @@ interface KnowledgeEntryCardProps {
         createdAt: number;
     };
     onUpdate: (entryId: string, data: { status?: string; pinned?: boolean }) => void;
+    onDelete?: (entryId: string) => void;
+    isArchived?: boolean;
     onViewEvolution?: (entryId: string) => void;
 }
 
@@ -94,7 +96,7 @@ function soapLabel(field: string): string {
 }
 
 export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
-    ({ entry, onUpdate, onViewEvolution }) => {
+    ({ entry, onUpdate, onDelete, isArchived, onViewEvolution }) => {
         const { theme } = useUnistyles();
         const [expanded, setExpanded] = React.useState(false);
 
@@ -106,8 +108,20 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
         }, [entry.id, entry.pinned, onUpdate]);
 
         const handleArchive = React.useCallback(() => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
             onUpdate(entry.id, { status: "archived" });
         }, [entry.id, onUpdate]);
+
+        const handleRestore = React.useCallback(() => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            onUpdate(entry.id, { status: "active" });
+        }, [entry.id, onUpdate]);
+
+        const handleDelete = React.useCallback(() => {
+            if (!onDelete) return;
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            onDelete(entry.id);
+        }, [entry.id, onDelete]);
 
         const soapFields = React.useMemo(() => {
             if (!entry.structured) {
@@ -210,49 +224,86 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
                         </Text>
                     </View>
                     <View style={styles.actionRow}>
-                        <Pressable
-                            onPress={handleTogglePin}
-                            style={styles.actionButton}
-                            hitSlop={8}
-                        >
-                            <Ionicons
-                                name={entry.pinned ? "pin" : "pin-outline"}
-                                size={18}
-                                color={entry.pinned ? theme.colors.header.tint : theme.colors.textSecondary}
-                            />
-                            <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
-                                {entry.pinned ? t("projects.knowledgeUnpin") : t("projects.knowledgePin")}
-                            </Text>
-                        </Pressable>
-                        <Pressable
-                            onPress={handleArchive}
-                            style={styles.actionButton}
-                            hitSlop={8}
-                        >
-                            <Ionicons
-                                name="archive-outline"
-                                size={18}
-                                color={theme.colors.textSecondary}
-                            />
-                            <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
-                                {t("projects.knowledgeArchive")}
-                            </Text>
-                        </Pressable>
-                        {onViewEvolution && (
-                            <Pressable
-                                onPress={() => onViewEvolution(entry.id)}
-                                style={styles.actionButton}
-                                hitSlop={8}
-                            >
-                                <Ionicons
-                                    name="git-branch-outline"
-                                    size={18}
-                                    color={theme.colors.textSecondary}
-                                />
-                                <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
-                                    {t("projects.knowledgeViewEvolution")}
-                                </Text>
-                            </Pressable>
+                        {isArchived ? (
+                            <>
+                                <Pressable
+                                    onPress={handleRestore}
+                                    style={styles.actionButton}
+                                    hitSlop={8}
+                                >
+                                    <Ionicons
+                                        name="arrow-undo-outline"
+                                        size={18}
+                                        color={theme.colors.textSecondary}
+                                    />
+                                    <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
+                                        {t("projects.knowledgeRestore")}
+                                    </Text>
+                                </Pressable>
+                                {onDelete && (
+                                    <Pressable
+                                        onPress={handleDelete}
+                                        style={styles.actionButton}
+                                        hitSlop={8}
+                                    >
+                                        <Ionicons
+                                            name="trash-outline"
+                                            size={18}
+                                            color="#EF4444"
+                                        />
+                                        <Text style={[styles.actionText, { color: "#EF4444" }]}>
+                                            {t("projects.knowledgeDelete")}
+                                        </Text>
+                                    </Pressable>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <Pressable
+                                    onPress={handleTogglePin}
+                                    style={styles.actionButton}
+                                    hitSlop={8}
+                                >
+                                    <Ionicons
+                                        name={entry.pinned ? "pin" : "pin-outline"}
+                                        size={18}
+                                        color={entry.pinned ? theme.colors.header.tint : theme.colors.textSecondary}
+                                    />
+                                    <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
+                                        {entry.pinned ? t("projects.knowledgeUnpin") : t("projects.knowledgePin")}
+                                    </Text>
+                                </Pressable>
+                                <Pressable
+                                    onPress={handleArchive}
+                                    style={styles.actionButton}
+                                    hitSlop={8}
+                                >
+                                    <Ionicons
+                                        name="archive-outline"
+                                        size={18}
+                                        color={theme.colors.textSecondary}
+                                    />
+                                    <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
+                                        {t("projects.knowledgeArchive")}
+                                    </Text>
+                                </Pressable>
+                                {onViewEvolution && (
+                                    <Pressable
+                                        onPress={() => onViewEvolution(entry.id)}
+                                        style={styles.actionButton}
+                                        hitSlop={8}
+                                    >
+                                        <Ionicons
+                                            name="git-branch-outline"
+                                            size={18}
+                                            color={theme.colors.textSecondary}
+                                        />
+                                        <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
+                                            {t("projects.knowledgeViewEvolution")}
+                                        </Text>
+                                    </Pressable>
+                                )}
+                            </>
                         )}
                     </View>
                 </View>

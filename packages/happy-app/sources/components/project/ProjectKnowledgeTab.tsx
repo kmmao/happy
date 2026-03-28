@@ -16,7 +16,7 @@ interface ProjectKnowledgeTabProps {
     isActive: boolean;
 }
 
-const FILTER_KEYS = ["all", "discovery", "decision", "fix", "convention", "warning"] as const;
+const FILTER_KEYS = ["all", "discovery", "decision", "fix", "convention", "warning", "archived"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
 function filterLabel(key: FilterKey): string {
@@ -33,6 +33,8 @@ function filterLabel(key: FilterKey): string {
             return t("projects.knowledgeFilterConvention");
         case "warning":
             return t("projects.knowledgeFilterWarning");
+        case "archived":
+            return t("projects.knowledgeFilterArchived");
     }
 }
 
@@ -45,12 +47,14 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
 
         const {
             entries,
+            archivedEntries,
             profile,
             loading,
             lastRefreshAt,
             refresh,
             refreshIfStale,
             updateEntry,
+            deleteEntry,
             regenerateProfile,
         } = useProjectKnowledge(projectServerId);
 
@@ -95,22 +99,29 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             [projectServerId, router],
         );
 
+        const isArchivedFilter = activeFilter === "archived";
+
         const filteredEntries = React.useMemo(() => {
+            if (isArchivedFilter) {
+                return archivedEntries;
+            }
             if (activeFilter === "all") {
                 return entries;
             }
             return entries.filter((e) => e.entryType === activeFilter);
-        }, [entries, activeFilter]);
+        }, [entries, archivedEntries, activeFilter, isArchivedFilter]);
 
         const renderItem = React.useCallback(
             ({ item }: { item: (typeof entries)[number] }) => (
                 <KnowledgeEntryCard
                     entry={item}
                     onUpdate={updateEntry}
+                    onDelete={isArchivedFilter ? deleteEntry : undefined}
+                    isArchived={isArchivedFilter}
                     onViewEvolution={handleViewEvolution}
                 />
             ),
-            [updateEntry, handleViewEvolution],
+            [updateEntry, deleteEntry, isArchivedFilter, handleViewEvolution],
         );
 
         const keyExtractor = React.useCallback(

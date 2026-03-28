@@ -22,22 +22,18 @@ async function resolveAndLinkProject(
     if (!machineId || !path) return;
 
     try {
-        // Use raw INSERT ... ON CONFLICT to avoid Prisma upsert race condition.
-        // Prisma's upsert does SELECT then INSERT, which under concurrent calls
-        // can both SELECT "not found" and both INSERT, creating duplicates.
-        await db.$executeRaw`
+        // Single atomic upsert via raw SQL to avoid Prisma's SELECT-then-INSERT race.
+        // ON CONFLICT DO UPDATE ensures we always get RETURNING id, even for existing rows.
+        // (DO NOTHING + separate SELECT had a gap where duplicates could slip through.)
+        const rows = await db.$queryRaw<{ id: string }[]>`
             INSERT INTO "Project" (id, "accountId", "machineId", path, "metadataVersion", "supervisorConfigVersion", "supervisorScheduleEnabled", "supervisorDailyRunCount", "supervisorPushTriggerEnabled", archived, "createdAt", "updatedAt")
             VALUES (gen_random_uuid()::text, ${accountId}, ${machineId}, ${path}, 0, 0, false, 0, false, false, NOW(), NOW())
-            ON CONFLICT ("accountId", "machineId", path) DO NOTHING
+            ON CONFLICT ("accountId", "machineId", path) DO UPDATE SET "updatedAt" = NOW()
+            RETURNING id
         `;
+        const projectId = rows[0].id;
         const project = await db.project.findUniqueOrThrow({
-            where: {
-                accountId_machineId_path: {
-                    accountId,
-                    machineId,
-                    path,
-                },
-            },
+            where: { id: projectId },
         });
 
         // Link session to project
