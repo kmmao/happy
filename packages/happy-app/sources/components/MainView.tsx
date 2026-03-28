@@ -108,6 +108,11 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
   },
+  headerButtonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
 }));
 
 // Tab header configuration
@@ -231,17 +236,30 @@ const HeaderRight = React.memo(
 
     if (activeTab === "project") {
       return (
-        <Pressable
-          onPress={() => router.push("/project/add")}
-          hitSlop={15}
-          style={styles.headerButton}
-        >
-          <Ionicons
-            name="add-outline"
-            size={28}
-            color={theme.colors.header.tint}
-          />
-        </Pressable>
+        <View style={styles.headerButtonRow}>
+          <Pressable
+            onPress={() => router.push("/knowledge/search" as any)}
+            hitSlop={15}
+            style={styles.headerButton}
+          >
+            <Ionicons
+              name="search-outline"
+              size={22}
+              color={theme.colors.header.tint}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push("/project/add")}
+            hitSlop={15}
+            style={styles.headerButton}
+          >
+            <Ionicons
+              name="add-outline"
+              size={28}
+              color={theme.colors.header.tint}
+            />
+          </Pressable>
+        </View>
       );
     }
 
