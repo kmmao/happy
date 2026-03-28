@@ -397,8 +397,19 @@ export async function claudeRemoteLauncher(
       if (turnCollector) {
         if (message.type === "user") {
           const uMsg = message as SDKUserMessage;
-          const text = typeof uMsg.message === "string" ? uMsg.message : "";
-          turnCollector.collectUserMessage(text);
+          const content = uMsg.message?.content;
+          let text = "";
+          if (typeof content === "string") {
+            text = content;
+          } else if (Array.isArray(content)) {
+            text = content
+              .filter((c: any) => c.type === "text" && typeof c.text === "string")
+              .map((c: any) => c.text)
+              .join("\n");
+          }
+          if (text) {
+            turnCollector.collectUserMessage(text);
+          }
         }
         if (message.type === "assistant") {
           const aMsg = message as SDKAssistantMessage;

@@ -22,7 +22,15 @@ async function resolveAndLinkProject(
     if (!machineId || !path) return;
 
     try {
-        const project = await db.project.upsert({
+        // Use raw INSERT ... ON CONFLICT to avoid Prisma upsert race condition.
+        // Prisma's upsert does SELECT then INSERT, which under concurrent calls
+        // can both SELECT "not found" and both INSERT, creating duplicates.
+        await db.$executeRaw`
+            INSERT INTO "Project" (id, "accountId", "machineId", path, "metadataVersion", "supervisorConfigVersion", "supervisorScheduleEnabled", "supervisorDailyRunCount", "supervisorPushTriggerEnabled", archived, "createdAt", "updatedAt")
+            VALUES (gen_random_uuid()::text, ${accountId}, ${machineId}, ${path}, 0, 0, false, 0, false, false, NOW(), NOW())
+            ON CONFLICT ("accountId", "machineId", path) DO NOTHING
+        `;
+        const project = await db.project.findUniqueOrThrow({
             where: {
                 accountId_machineId_path: {
                     accountId,
@@ -30,12 +38,6 @@ async function resolveAndLinkProject(
                     path,
                 },
             },
-            create: {
-                accountId,
-                machineId,
-                path,
-            },
-            update: {},
         });
 
         // Link session to project
