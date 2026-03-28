@@ -21,6 +21,7 @@ import { createIssueOnProvider } from "@/app/webhook/webhookProviderApi";
 import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
 import { decryptString } from "@/modules/encrypt";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
+import { contributeSupervisorKnowledge } from "@/modules/knowledgeContributor";
 
 const supervisorActionSchema = z.object({
     severity: z.enum(["critical", "high", "medium", "low"]),
@@ -241,6 +242,11 @@ export function supervisorRunStatusHandler(
                     { module: "supervisor" },
                     `supervisor-run-status: ${newActions.length} new, ${updatedIds.length} deduped, ${restoredIds.length} restored from skip, ${suppressedIds.length} suppressed by ignore`,
                 );
+
+                // Contribute supervisor findings to knowledge base (only on terminal status)
+                if (data.status === "completed") {
+                    void contributeSupervisorKnowledge(data.projectId, data.runId, data.actions);
+                }
             }
 
             log(

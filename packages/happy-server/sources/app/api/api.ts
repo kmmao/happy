@@ -37,6 +37,7 @@ import { v3SessionRoutes } from "./routes/v3SessionRoutes";
 import { webhookRoutes } from "./routes/webhookRoutes";
 import { provisionRoutes } from "./routes/provisionRoutes";
 import { knowledgeRoutes } from "./routes/knowledgeRoutes";
+import { knowledgeSearchRoutes } from "./routes/knowledgeSearchRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import * as path from "path";
 import * as fs from "fs";
@@ -121,6 +122,7 @@ export async function startApi() {
   v3SessionRoutes(typed);
   provisionRoutes(typed);
   knowledgeRoutes(typed);
+  knowledgeSearchRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

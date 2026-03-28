@@ -1,6 +1,30 @@
 import { Socket } from "socket.io";
+import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
+import { consolidate } from "@/modules/knowledgeConsolidate";
+import { parseProfileContent, safeParseJsonArray } from "@/modules/knowledgeSerialize";
+import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
+import { inTx } from "@/storage/inTx";
+
+// Zod schema for socket knowledge submissions (defense-in-depth)
+const SubmitKnowledgeSchema = z.object({
+    sid: z.string().min(1),
+    entry: z.object({
+        entryType: z.enum(["discovery", "decision", "fix", "convention", "warning"]).default("discovery"),
+        contributorType: z.enum(["session", "supervisor", "user"]).default("session"),
+        action: z.enum(["create", "amend", "supersede", "verify"]).default("create"),
+        title: z.string().min(1).max(200),
+        content: z.string().min(1).max(10000),
+        request: z.string().optional(),
+        outcome: z.string().optional(),
+        tags: z.array(z.string().max(50)).max(20).default([]),
+        confidence: z.enum(["high", "medium", "low"]).default("medium"),
+        model: z.string().optional(),
+        affectedFiles: z.array(z.string()).max(50).default([]),
+        relatedIds: z.array(z.string()).max(10).default([]),
+    }),
+});
 
 /**
  * Handle knowledge submissions from CLI sessions.
@@ -8,13 +32,15 @@ import { log } from "@/utils/log";
  * with Mem0-style deduplication (title + tag overlap).
  */
 export function knowledgeHandler(userId: string, socket: Socket) {
-    socket.on("submit-knowledge", async (data: any) => {
+    socket.on("submit-knowledge", async (data: unknown) => {
         try {
-            const { sid, entry } = data;
-            if (!sid || !entry?.title || !entry?.content) {
-                log({ module: "knowledge" }, "Invalid knowledge submission — missing fields");
+            const parsed = SubmitKnowledgeSchema.safeParse(data);
+            if (!parsed.success) {
+                log({ module: "knowledge" }, `Invalid knowledge submission: ${parsed.error.message.slice(0, 200)}`);
                 return;
             }
+
+            const { sid, entry } = parsed.data;
 
             // Find the session to get project association
             const session = await db.session.findFirst({
@@ -30,42 +56,53 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             const projectId = session.projectId;
 
             // Mem0-style dedup: check for similar active entries
-            const action = await consolidate(projectId, entry);
+            const action = await consolidate(projectId, {
+                title: entry.title,
+                entryType: entry.entryType,
+                tags: entry.tags,
+                content: entry.content,
+            });
 
             if (action.type === "noop") {
                 log({ module: "knowledge" }, `Knowledge dedup: NOOP for "${entry.title.slice(0, 50)}"`);
                 return;
             }
 
-            if (action.type === "update" && action.existingId) {
-                await db.projectKnowledge.update({
-                    where: { id: action.existingId },
-                    data: { status: "superseded" },
-                });
-            }
+            const created = await inTx(async (tx) => {
+                if (action.type === "update" && action.existingId) {
+                    await tx.projectKnowledge.update({
+                        where: { id: action.existingId },
+                        data: { status: "superseded" },
+                    });
+                }
 
-            await db.projectKnowledge.create({
-                data: {
-                    projectId,
-                    entryType: entry.entryType || "discovery",
-                    contributorType: entry.contributorType || "session",
-                    action: action.type === "update" ? "supersede" : (entry.action || "create"),
-                    title: String(entry.title).slice(0, 200),
-                    content: String(entry.content).slice(0, 10000),
-                    structured: entry.request || entry.outcome
-                        ? JSON.stringify({
-                            request: entry.request,
-                            outcome: entry.outcome,
-                        })
-                        : null,
-                    tags: JSON.stringify(Array.isArray(entry.tags) ? entry.tags.slice(0, 20) : []),
-                    confidence: entry.confidence || "medium",
-                    model: entry.model || null,
-                    sessionId: sid,
-                    affectedFiles: JSON.stringify(Array.isArray(entry.affectedFiles) ? entry.affectedFiles.slice(0, 50) : []),
-                    supersedesId: action.type === "update" ? action.existingId : null,
-                },
+                return tx.projectKnowledge.create({
+                    data: {
+                        projectId,
+                        entryType: entry.entryType,
+                        contributorType: entry.contributorType,
+                        action: action.type === "update" ? "supersede" : entry.action,
+                        title: entry.title,
+                        content: entry.content,
+                        structured: entry.request || entry.outcome
+                            ? JSON.stringify({
+                                request: entry.request,
+                                outcome: entry.outcome,
+                            })
+                            : null,
+                        tags: JSON.stringify(entry.tags),
+                        confidence: entry.confidence,
+                        model: entry.model ?? null,
+                        sessionId: sid,
+                        affectedFiles: JSON.stringify(entry.affectedFiles),
+                        relatedIds: JSON.stringify(entry.relatedIds),
+                        supersedesId: action.type === "update" ? action.existingId : null,
+                    },
+                });
             });
+
+            // Fire-and-forget: generate embedding for semantic search
+            void storeKnowledgeEmbedding(created.id, entry.title, entry.content);
 
             log({ module: "knowledge" }, `Knowledge ${action.type}: "${entry.title.slice(0, 50)}" for project ${projectId}`);
         } catch (err) {
@@ -98,14 +135,9 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             const profileRecord = await db.projectProfile.findUnique({
                 where: { projectId },
             });
-            let profile = null;
-            if (profileRecord) {
-                try {
-                    profile = JSON.parse(profileRecord.content);
-                } catch {
-                    // ignore parse errors
-                }
-            }
+            const profile = profileRecord
+                ? parseProfileContent(profileRecord.content)
+                : null;
 
             if (mode === "minimal") {
                 callback({ profile, entries: [] });
@@ -148,7 +180,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                     entryType: e.entryType,
                     title: e.title,
                     content: e.content,
-                    tags: JSON.parse(e.tags),
+                    tags: safeParseJsonArray(e.tags),
                     confidence: e.confidence,
                     createdAt: e.createdAt.toISOString(),
                 })),
@@ -160,53 +192,4 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             if (callback) callback({ profile: null, entries: [] });
         }
     });
-}
-
-/**
- * Mem0-style consolidation: title word overlap + tag overlap.
- */
-async function consolidate(
-    projectId: string,
-    entry: { title: string; entryType?: string; tags?: string[] },
-): Promise<{ type: "add" } | { type: "update"; existingId: string } | { type: "noop" }> {
-    const candidates = await db.projectKnowledge.findMany({
-        where: {
-            projectId,
-            entryType: entry.entryType || "discovery",
-            status: "active",
-        },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-    });
-
-    if (candidates.length === 0) return { type: "add" };
-
-    const newTitleWords = new Set(entry.title.toLowerCase().split(/\s+/));
-    const newTags = new Set((entry.tags ?? []).map((t: string) => t.toLowerCase()));
-
-    for (const candidate of candidates) {
-        const existingTitleWords = new Set(candidate.title.toLowerCase().split(/\s+/));
-        const existingTags = new Set(
-            (JSON.parse(candidate.tags) as string[]).map((t: string) => t.toLowerCase()),
-        );
-
-        const titleIntersection = [...newTitleWords].filter((w) => existingTitleWords.has(w));
-        const titleOverlap = titleIntersection.length / Math.max(newTitleWords.size, existingTitleWords.size);
-
-        const tagIntersection = [...newTags].filter((t) => existingTags.has(t));
-        const tagOverlap = newTags.size > 0 && existingTags.size > 0
-            ? tagIntersection.length / Math.max(newTags.size, existingTags.size)
-            : 0;
-
-        const similarity = titleOverlap * 0.6 + tagOverlap * 0.4;
-
-        if (similarity > 0.7) {
-            if (entry.title.length > candidate.title.length * 1.2) {
-                return { type: "update", existingId: candidate.id };
-            }
-            return { type: "noop" };
-        }
-    }
-
-    return { type: "add" };
 }

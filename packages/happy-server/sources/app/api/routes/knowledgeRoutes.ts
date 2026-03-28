@@ -1,6 +1,13 @@
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
+import { consolidate } from "@/modules/knowledgeConsolidate";
+import { inTx } from "@/storage/inTx";
+import { serializeKnowledgeEntry, parseProfileContent, safeParseJsonArray } from "@/modules/knowledgeSerialize";
+import { storeKnowledgeEmbedding, findSimilarByEmbedding } from "@/modules/knowledgeEmbedding";
+import { fetchKnowledgeChain } from "@/modules/knowledgeChain";
+import { generateEmbedding, truncateForEmbedding } from "@/modules/embeddingService";
+import { regenerateProfile } from "@/modules/knowledgeProfileGenerator";
 
 // Inline Zod schemas (mirrors @kmmao/happy-wire/knowledge.ts)
 // Server uses CommonJS resolution which can't import ESM-only wire values directly.
@@ -55,15 +62,6 @@ const QueryKnowledgeParamsSchema = z.object({
 const KnowledgeInjectionRequestSchema = z.object({
     mode: z.enum(["auto", "full", "minimal"]),
     contextHints: z.array(z.string()).optional(),
-});
-
-const ProjectProfileSchema = z.object({
-    techStack: z.array(z.string()),
-    architectureType: z.string().optional(),
-    knownPitfalls: z.array(z.string()),
-    coreConventions: z.array(z.string()),
-    lastUpdatedAt: z.number(),
-    lastUpdatedBy: z.string().optional(),
 });
 
 /**
@@ -121,7 +119,7 @@ export function knowledgeRoutes(app: Fastify) {
             // Filter by tags in application layer (JSON array stored as string)
             const filtered = tags && tags.length > 0
                 ? entries.filter((e) => {
-                    const entryTags: string[] = JSON.parse(e.tags);
+                    const entryTags = safeParseJsonArray(e.tags);
                     return tags.some((t) => entryTags.includes(t));
                 })
                 : entries;
@@ -164,39 +162,44 @@ export function knowledgeRoutes(app: Fastify) {
                 return reply.send({ action: "noop", reason: dedupAction.reason });
             }
 
-            if (dedupAction.type === "update") {
-                // Supersede old entry
-                await db.projectKnowledge.update({
-                    where: { id: dedupAction.existingId },
-                    data: { status: "superseded" },
-                });
-            }
+            const entry = await inTx(async (tx) => {
+                if (dedupAction.type === "update") {
+                    await tx.projectKnowledge.update({
+                        where: { id: dedupAction.existingId },
+                        data: { status: "superseded" },
+                    });
+                }
 
-            const entry = await db.projectKnowledge.create({
-                data: {
-                    projectId: id,
-                    entryType: body.entryType,
-                    contributorType: body.contributorType,
-                    action: dedupAction.type === "update" ? "supersede" : body.action,
-                    title: body.title,
-                    content: body.content,
-                    structured: body.request || body.findings || body.analysis || body.outcome || body.nextSteps
-                        ? JSON.stringify({
-                            request: body.request,
-                            findings: body.findings,
-                            analysis: body.analysis,
-                            outcome: body.outcome,
-                            nextSteps: body.nextSteps,
-                        })
-                        : null,
-                    tags: JSON.stringify(body.tags),
-                    confidence: body.confidence,
-                    model: body.model,
-                    sessionId: body.sessionId,
-                    affectedFiles: JSON.stringify(body.affectedFiles),
-                    supersedesId: dedupAction.type === "update" ? dedupAction.existingId : body.supersedesId,
-                },
+                return tx.projectKnowledge.create({
+                    data: {
+                        projectId: id,
+                        entryType: body.entryType,
+                        contributorType: body.contributorType,
+                        action: dedupAction.type === "update" ? "supersede" : body.action,
+                        title: body.title,
+                        content: body.content,
+                        structured: body.request || body.findings || body.analysis || body.outcome || body.nextSteps
+                            ? JSON.stringify({
+                                request: body.request,
+                                findings: body.findings,
+                                analysis: body.analysis,
+                                outcome: body.outcome,
+                                nextSteps: body.nextSteps,
+                            })
+                            : null,
+                        tags: JSON.stringify(body.tags),
+                        confidence: body.confidence,
+                        model: body.model,
+                        sessionId: body.sessionId,
+                        affectedFiles: JSON.stringify(body.affectedFiles),
+                        relatedIds: JSON.stringify(body.relatedIds),
+                        supersedesId: dedupAction.type === "update" ? dedupAction.existingId : body.supersedesId,
+                    },
+                });
             });
+
+            // Fire-and-forget: generate embedding for semantic search
+            void storeKnowledgeEmbedding(entry.id, entry.title, entry.content);
 
             return reply.code(201).send({
                 action: dedupAction.type,
@@ -272,7 +275,7 @@ export function knowledgeRoutes(app: Fastify) {
             }
 
             await db.projectKnowledge.delete({
-                where: { id: entryId },
+                where: { id: entryId, projectId: id },
             });
 
             return reply.send({ success: true });
@@ -336,34 +339,118 @@ export function knowledgeRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Project not found" });
             }
 
-            const existing = await db.projectProfile.findUnique({
+            if (expectedVersion !== undefined) {
+                // Atomic optimistic lock: update only if version matches
+                const result = await inTx(async (tx) => {
+                    const existing = await tx.projectProfile.findUnique({
+                        where: { projectId: id },
+                    });
+                    if (!existing) return null;
+                    if (existing.version !== expectedVersion) {
+                        return { conflict: true, currentVersion: existing.version };
+                    }
+                    return tx.projectProfile.update({
+                        where: { projectId: id },
+                        data: { content, version: { increment: 1 } },
+                    });
+                });
+
+                if (!result) {
+                    // No existing profile — create
+                    const created = await db.projectProfile.create({
+                        data: { projectId: id, content },
+                    });
+                    return reply.code(201).send({ profile: created, version: created.version });
+                }
+                if ("conflict" in result) {
+                    return reply.code(409).send({
+                        error: "version-mismatch",
+                        currentVersion: result.currentVersion,
+                    });
+                }
+                return reply.send({ profile: result, version: result.version });
+            }
+
+            // No version check — upsert
+            const result = await db.projectProfile.upsert({
+                where: { projectId: id },
+                create: { projectId: id, content },
+                update: { content, version: { increment: 1 } },
+            });
+            const isNew = result.version === 1;
+            return reply.code(isNew ? 201 : 200).send({ profile: result, version: result.version });
+        },
+    );
+
+    // ─── Knowledge evolution chain ───
+    app.get(
+        "/v1/projects/:id/knowledge/:entryId/chain",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string(), entryId: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id, entryId } = request.params;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const entry = await db.projectKnowledge.findFirst({
+                where: { id: entryId, projectId: id },
+            });
+            if (!entry) {
+                return reply.code(404).send({ error: "Knowledge entry not found" });
+            }
+
+            const result = await fetchKnowledgeChain(id, entryId);
+            return reply.send(result);
+        },
+    );
+
+    // ─── Regenerate project profile ───
+    app.post(
+        "/v1/projects/:id/profile/regenerate",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const result = await regenerateProfile(id);
+
+            if (!result.success) {
+                return reply.code(500).send({ error: result.error });
+            }
+
+            // Fetch the updated profile to return
+            const profile = await db.projectProfile.findUnique({
                 where: { projectId: id },
             });
 
-            if (existing) {
-                if (expectedVersion !== undefined && existing.version !== expectedVersion) {
-                    return reply.code(409).send({
-                        error: "version-mismatch",
-                        currentVersion: existing.version,
-                    });
-                }
-                const updated = await db.projectProfile.update({
-                    where: { projectId: id },
-                    data: {
-                        content,
-                        version: existing.version + 1,
-                    },
-                });
-                return reply.send({ profile: updated, version: updated.version });
-            }
-
-            const created = await db.projectProfile.create({
-                data: {
-                    projectId: id,
-                    content,
-                },
+            return reply.send({
+                profile: profile
+                    ? { ...profile, createdAt: profile.createdAt.getTime(), updatedAt: profile.updatedAt.getTime() }
+                    : null,
+                version: result.version,
             });
-            return reply.code(201).send({ profile: created, version: created.version });
         },
     );
 
@@ -406,23 +493,28 @@ export function knowledgeRoutes(app: Fastify) {
 
             let entries;
             if (contextHints && contextHints.length > 0) {
-                // Keyword-based relevance search
-                const allActive = await db.projectKnowledge.findMany({
-                    where: { projectId: id, status: "active" },
-                    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
-                    take: 100,
-                });
-                // Score by keyword match
-                const scored = allActive.map((e) => {
-                    const text = `${e.title} ${e.tags} ${e.content}`.toLowerCase();
-                    const score = contextHints.reduce(
-                        (acc, hint) => acc + (text.includes(hint.toLowerCase()) ? 1 : 0),
-                        0,
-                    );
-                    return { entry: e, score };
-                });
-                scored.sort((a, b) => b.score - a.score || b.entry.createdAt.getTime() - a.entry.createdAt.getTime());
-                entries = scored.slice(0, entryLimit).map((s) => s.entry);
+                // Try semantic search first, fall back to keyword matching
+                const semanticEntries = await trySemanticInjection(id, contextHints, entryLimit);
+                if (semanticEntries) {
+                    entries = semanticEntries;
+                } else {
+                    // Keyword-based relevance search (fallback)
+                    const allActive = await db.projectKnowledge.findMany({
+                        where: { projectId: id, status: "active" },
+                        orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+                        take: 100,
+                    });
+                    const scored = allActive.map((e) => {
+                        const text = `${e.title} ${e.tags} ${e.content}`.toLowerCase();
+                        const score = contextHints.reduce(
+                            (acc, hint) => acc + (text.includes(hint.toLowerCase()) ? 1 : 0),
+                            0,
+                        );
+                        return { entry: e, score };
+                    });
+                    scored.sort((a, b) => b.score - a.score || b.entry.createdAt.getTime() - a.entry.createdAt.getTime());
+                    entries = scored.slice(0, entryLimit).map((s) => s.entry);
+                }
             } else {
                 entries = await db.projectKnowledge.findMany({
                     where: { projectId: id, status: "active" },
@@ -438,7 +530,7 @@ export function knowledgeRoutes(app: Fastify) {
                     entryType: e.entryType,
                     title: e.title,
                     content: e.content,
-                    tags: JSON.parse(e.tags),
+                    tags: safeParseJsonArray(e.tags),
                     confidence: e.confidence,
                     createdAt: e.createdAt.toISOString(),
                 })),
@@ -447,114 +539,36 @@ export function knowledgeRoutes(app: Fastify) {
     );
 }
 
-// ─── Helpers ───
-
-function serializeKnowledgeEntry(entry: {
-    id: string;
-    projectId: string;
-    entryType: string;
-    contributorType: string;
-    action: string;
-    status: string;
-    title: string;
-    content: string;
-    structured: string | null;
-    tags: string;
-    confidence: string;
-    model: string | null;
-    sessionId: string | null;
-    affectedFiles: string;
-    supersedesId: string | null;
-    pinned: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-}) {
-    return {
-        id: entry.id,
-        projectId: entry.projectId,
-        entryType: entry.entryType,
-        contributorType: entry.contributorType,
-        action: entry.action,
-        status: entry.status,
-        title: entry.title,
-        content: entry.content,
-        structured: entry.structured ? JSON.parse(entry.structured) : null,
-        tags: JSON.parse(entry.tags),
-        confidence: entry.confidence,
-        model: entry.model,
-        sessionId: entry.sessionId,
-        affectedFiles: JSON.parse(entry.affectedFiles),
-        supersedesId: entry.supersedesId,
-        pinned: entry.pinned,
-        createdAt: entry.createdAt.getTime(),
-        updatedAt: entry.updatedAt.getTime(),
-    };
-}
-
-function parseProfileContent(content: string) {
+/**
+ * Try to use embedding-based search for knowledge injection.
+ * Returns null if embedding is unavailable (caller should fall back to keyword).
+ */
+async function trySemanticInjection(
+    projectId: string,
+    contextHints: string[],
+    limit: number,
+): Promise<Awaited<ReturnType<typeof db.projectKnowledge.findMany>> | null> {
     try {
-        const parsed = JSON.parse(content);
-        return ProjectProfileSchema.parse(parsed);
+        const queryText = truncateForEmbedding(contextHints.join(" "));
+        const queryEmbedding = await generateEmbedding(queryText);
+        if (!queryEmbedding) return null;
+
+        const similar = await findSimilarByEmbedding(projectId, queryEmbedding, limit);
+        if (similar.length === 0) return null;
+
+        // Fetch full entries for the matched IDs
+        const ids = similar.map((s) => s.id);
+        const entries = await db.projectKnowledge.findMany({
+            where: { id: { in: ids }, status: "active" },
+            orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+        });
+
+        // Re-sort by similarity order
+        const idOrder = new Map(ids.map((id, i) => [id, i]));
+        entries.sort((a, b) => (idOrder.get(a.id) ?? 999) - (idOrder.get(b.id) ?? 999));
+
+        return entries;
     } catch {
         return null;
     }
-}
-
-/**
- * Mem0-style consolidation: determine if a new entry should be
- * added, should update (supersede) an existing entry, or be skipped.
- */
-async function consolidate(
-    projectId: string,
-    body: { title: string; entryType: string; tags: readonly string[]; content: string },
-): Promise<
-    | { type: "add" }
-    | { type: "update"; existingId: string }
-    | { type: "noop"; reason: string }
-> {
-    // Find active entries of same type
-    const candidates = await db.projectKnowledge.findMany({
-        where: {
-            projectId,
-            entryType: body.entryType,
-            status: "active",
-        },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-    });
-
-    if (candidates.length === 0) {
-        return { type: "add" };
-    }
-
-    // Simple similarity: title overlap + tag overlap
-    const newTitleWords = new Set(body.title.toLowerCase().split(/\s+/));
-    const newTags = new Set(body.tags.map((t) => t.toLowerCase()));
-
-    for (const candidate of candidates) {
-        const existingTitleWords = new Set(candidate.title.toLowerCase().split(/\s+/));
-        const existingTags = new Set((JSON.parse(candidate.tags) as string[]).map((t: string) => t.toLowerCase()));
-
-        // Title word overlap ratio
-        const titleIntersection = [...newTitleWords].filter((w) => existingTitleWords.has(w));
-        const titleOverlap = titleIntersection.length / Math.max(newTitleWords.size, existingTitleWords.size);
-
-        // Tag overlap ratio
-        const tagIntersection = [...newTags].filter((t) => existingTags.has(t));
-        const tagOverlap = newTags.size > 0 && existingTags.size > 0
-            ? tagIntersection.length / Math.max(newTags.size, existingTags.size)
-            : 0;
-
-        const similarity = titleOverlap * 0.6 + tagOverlap * 0.4;
-
-        if (similarity > 0.7) {
-            // High similarity — check if new content adds value
-            if (body.content.length > candidate.content.length * 1.2) {
-                return { type: "update", existingId: candidate.id };
-            }
-            return { type: "noop", reason: "Similar entry already exists" };
-        }
-    }
-
-    return { type: "add" };
 }

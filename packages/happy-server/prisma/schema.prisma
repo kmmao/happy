@@ -668,6 +668,10 @@ model ProjectKnowledge {
     model           String?  // Model that generated this entry
     sessionId       String?  // Source session ID
     affectedFiles   String   @default("[]")  // JSON array
+    relatedIds      String   @default("[]")  // JSON array of related entry IDs
+
+    // Embedding (pgvector — Phase 2 semantic search)
+    embedding       Unsupported("vector(1536)")?
 
     // Relations (knowledge evolution)
     supersedesId    String?
