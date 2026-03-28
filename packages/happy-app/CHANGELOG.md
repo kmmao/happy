@@ -1,5 +1,48 @@
 # Changelog
 
+## 2.10.0 - 2026-03-28
+
+Project Knowledge Base with semantic search and evolution tracking, drag-and-drop file uploads, interactive AskUserQuestion step UI restored, and container management improvements.
+
+### Knowledge Base
+- Added Project Knowledge Base (experimental) — automatic extraction and storage of session insights
+- Added semantic search with vector embeddings (Ollama/OpenAI) and HNSW index for fast retrieval
+- Added knowledge evolution timeline — view how insights evolve across sessions
+- Added cross-project global knowledge search from project list header
+- Added profile summary auto-rewrite powered by Haiku 4.5
+- Added configurable sensitivity presets and trigger condition toggles
+- Added tab auto-refresh with timestamp display and manual refresh button
+- Fixed knowledge entry title generation and duplicate entry race condition
+
+### File Uploads
+- Added drag-and-drop file/image upload with frosted glass overlay and drop hint
+- Added file paste support when creating new sessions
+- Added attachment button with camera/photo library/file picker options
+- Fixed copied image files being misidentified as documents
+- Fixed new session image preview by adding .jpg extension to IDs
+
+### Interactive Q&A
+- Restored AskUserQuestion step tab interface — patched SDK deferred tools mechanism that prevented the model from calling this tool since SDK 0.2.81
+- Fixed generic permission footer showing under AskUserQuestion in YOLO mode (it has its own submit UI)
+
+### Container Management
+- Added container card collapse with online status detection and one-tap restart
+- Added container resource limits configuration (memory/CPU/sudo)
+- Added remote CLI version upgrade button on device page
+- Added automatic container status refresh every 15 seconds
+- Added automatic Docker container rebuild on token restore
+
+### SDK Integration
+- Added Claude Code SDK 0.2.84 features — taskBudget UI, seedReadState, workflowName
+- Added CLI installation guide in Settings > About
+
+### Permissions & UI
+- Fixed dark mode white-on-white text and hardcoded colors
+- Fixed default permission mode to show review list instead of auto-approve
+- Added approved operation revert-to-pending support
+- Added requires_action status triggering needs_attention reminder
+- Improved profile configuration page layout
+
 ## 2.9.0 - 2026-03-26
 
 Full Docker container lifecycle management with one-tap provisioning, HTTPS reverse proxy, network isolation, and AI Profile environment variable fix.

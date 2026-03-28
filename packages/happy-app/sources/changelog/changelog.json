@@ -2,6 +2,41 @@
   "entries": {
     "en": [
       {
+        "version": "2.10.0",
+        "date": "2026-03-28",
+        "summary": "Project Knowledge Base with semantic search and evolution tracking, drag-and-drop file uploads, interactive AskUserQuestion step UI restored, and container management improvements.",
+        "changes": [
+          "Added Project Knowledge Base (experimental) — automatic extraction and storage of session insights",
+          "Added semantic search with vector embeddings (Ollama/OpenAI) and HNSW index for fast retrieval",
+          "Added knowledge evolution timeline — view how insights evolve across sessions",
+          "Added cross-project global knowledge search from project list header",
+          "Added profile summary auto-rewrite powered by Haiku 4.5",
+          "Added configurable sensitivity presets and trigger condition toggles",
+          "Added tab auto-refresh with timestamp display and manual refresh button",
+          "Fixed knowledge entry title generation and duplicate entry race condition",
+          "Added drag-and-drop file/image upload with frosted glass overlay and drop hint",
+          "Added file paste support when creating new sessions",
+          "Added attachment button with camera/photo library/file picker options",
+          "Fixed copied image files being misidentified as documents",
+          "Fixed new session image preview by adding .jpg extension to IDs",
+          "Restored AskUserQuestion step tab interface — patched SDK deferred tools mechanism that prevented the model from calling this tool since SDK 0.2.81",
+          "Fixed generic permission footer showing under AskUserQuestion in YOLO mode (it has its own submit UI)",
+          "Added container card collapse with online status detection and one-tap restart",
+          "Added container resource limits configuration (memory/CPU/sudo)",
+          "Added remote CLI version upgrade button on device page",
+          "Added automatic container status refresh every 15 seconds",
+          "Added automatic Docker container rebuild on token restore",
+          "Added Claude Code SDK 0.2.84 features — taskBudget UI, seedReadState, workflowName",
+          "Added CLI installation guide in Settings > About",
+          "Fixed dark mode white-on-white text and hardcoded colors",
+          "Fixed default permission mode to show review list instead of auto-approve",
+          "Added approved operation revert-to-pending support",
+          "Added requires_action status triggering needs_attention reminder",
+          "Improved profile configuration page layout"
+        ],
+        "rawMarkdown": "## 2.10.0 - 2026-03-28\n\n\nProject Knowledge Base with semantic search and evolution tracking, drag-and-drop file uploads, interactive AskUserQuestion step UI restored, and container management improvements.\n\n### Knowledge Base\n- Added Project Knowledge Base (experimental) — automatic extraction and storage of session insights\n- Added semantic search with vector embeddings (Ollama/OpenAI) and HNSW index for fast retrieval\n- Added knowledge evolution timeline — view how insights evolve across sessions\n- Added cross-project global knowledge search from project list header\n- Added profile summary auto-rewrite powered by Haiku 4.5\n- Added configurable sensitivity presets and trigger condition toggles\n- Added tab auto-refresh with timestamp display and manual refresh button\n- Fixed knowledge entry title generation and duplicate entry race condition\n\n### File Uploads\n- Added drag-and-drop file/image upload with frosted glass overlay and drop hint\n- Added file paste support when creating new sessions\n- Added attachment button with camera/photo library/file picker options\n- Fixed copied image files being misidentified as documents\n- Fixed new session image preview by adding .jpg extension to IDs\n\n### Interactive Q&A\n- Restored AskUserQuestion step tab interface — patched SDK deferred tools mechanism that prevented the model from calling this tool since SDK 0.2.81\n- Fixed generic permission footer showing under AskUserQuestion in YOLO mode (it has its own submit UI)\n\n### Container Management\n- Added container card collapse with online status detection and one-tap restart\n- Added container resource limits configuration (memory/CPU/sudo)\n- Added remote CLI version upgrade button on device page\n- Added automatic container status refresh every 15 seconds\n- Added automatic Docker container rebuild on token restore\n\n### SDK Integration\n- Added Claude Code SDK 0.2.84 features — taskBudget UI, seedReadState, workflowName\n- Added CLI installation guide in Settings > About\n\n### Permissions & UI\n- Fixed dark mode white-on-white text and hardcoded colors\n- Fixed default permission mode to show review list instead of auto-approve\n- Added approved operation revert-to-pending support\n- Added requires_action status triggering needs_attention reminder\n- Improved profile configuration page layout"
+      },
+      {
         "version": "2.9.0",
         "date": "2026-03-26",
         "summary": "Full Docker container lifecycle management with one-tap provisioning, HTTPS reverse proxy, network isolation, and AI Profile environment variable fix.",
@@ -390,6 +425,41 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.10.0",
+        "date": "2026-03-28",
+        "summary": "项目知识库语义检索与演化追踪、拖放文件上传、AskUserQuestion 交互式 step 界面恢复、容器管理改进。",
+        "changes": [
+          "新增项目知识库（实验性）— 自动提取和存储会话洞察",
+          "新增语义检索 — 向量嵌入（Ollama/OpenAI）+ HNSW 索引加速检索",
+          "新增知识演化时间线 — 查看洞察在不同会话中的演变过程",
+          "新增跨项目全局知识搜索 — 从项目列表顶部入口进入",
+          "新增概要自动重写 — 由 Haiku 4.5 驱动",
+          "新增可配置灵敏度预设和触发条件开关",
+          "新增 tab 切换自动刷新 + 刷新时间显示 + 手动刷新按钮",
+          "修复知识条目标题生成为空 + 重复条目竞态问题",
+          "新增拖放文件/图片上传 — 毛玻璃遮罩 + 放置提示",
+          "新增新建会话时文件粘贴支持",
+          "新增附件按钮支持拍照/相册/文件三种方式",
+          "修复复制图片文件被误识别为文档的问题",
+          "修复新建会话图片预览 — 为 ID 添加 .jpg 扩展名",
+          "恢复 AskUserQuestion step tab 界面 — 修补 SDK deferred tools 机制，该机制自 SDK 0.2.81 起阻止模型调用此工具",
+          "修复 YOLO 模式下 AskUserQuestion 显示多余的通用权限审核栏（该工具有自己的提交 UI）",
+          "新增容器卡片折叠 — 在线状态检测 + 一键重启",
+          "新增容器资源限制配置（内存/CPU/sudo）",
+          "新增设备页 CLI 版本远程升级按钮",
+          "新增容器状态每 15 秒自动刷新",
+          "新增还原 Token 时自动重建 Docker 容器",
+          "新增 Claude Code SDK 0.2.84 功能 — taskBudget UI + seedReadState + workflowName",
+          "新增设置 > 关于页面中的 CLI 安装指南",
+          "修复暗黑模式下白底白字和硬编码颜色问题",
+          "修复 default 模式下自动批准改为显示权限审核列表",
+          "新增已批准操作支持还原到待处理",
+          "新增 requires_action 状态触发 needs_attention 提醒",
+          "改进配置文件页面布局"
+        ],
+        "rawMarkdown": "## 2.10.0 - 2026-03-28\n\n\n项目知识库语义检索与演化追踪、拖放文件上传、AskUserQuestion 交互式 step 界面恢复、容器管理改进。\n\n### 知识库\n- 新增项目知识库（实验性）— 自动提取和存储会话洞察\n- 新增语义检索 — 向量嵌入（Ollama/OpenAI）+ HNSW 索引加速检索\n- 新增知识演化时间线 — 查看洞察在不同会话中的演变过程\n- 新增跨项目全局知识搜索 — 从项目列表顶部入口进入\n- 新增概要自动重写 — 由 Haiku 4.5 驱动\n- 新增可配置灵敏度预设和触发条件开关\n- 新增 tab 切换自动刷新 + 刷新时间显示 + 手动刷新按钮\n- 修复知识条目标题生成为空 + 重复条目竞态问题\n\n### 文件上传\n- 新增拖放文件/图片上传 — 毛玻璃遮罩 + 放置提示\n- 新增新建会话时文件粘贴支持\n- 新增附件按钮支持拍照/相册/文件三种方式\n- 修复复制图片文件被误识别为文档的问题\n- 修复新建会话图片预览 — 为 ID 添加 .jpg 扩展名\n\n### 交互式问答\n- 恢复 AskUserQuestion step tab 界面 — 修补 SDK deferred tools 机制，该机制自 SDK 0.2.81 起阻止模型调用此工具\n- 修复 YOLO 模式下 AskUserQuestion 显示多余的通用权限审核栏（该工具有自己的提交 UI）\n\n### 容器管理\n- 新增容器卡片折叠 — 在线状态检测 + 一键重启\n- 新增容器资源限制配置（内存/CPU/sudo）\n- 新增设备页 CLI 版本远程升级按钮\n- 新增容器状态每 15 秒自动刷新\n- 新增还原 Token 时自动重建 Docker 容器\n\n### SDK 集成\n- 新增 Claude Code SDK 0.2.84 功能 — taskBudget UI + seedReadState + workflowName\n- 新增设置 > 关于页面中的 CLI 安装指南\n\n### 权限与 UI\n- 修复暗黑模式下白底白字和硬编码颜色问题\n- 修复 default 模式下自动批准改为显示权限审核列表\n- 新增已批准操作支持还原到待处理\n- 新增 requires_action 状态触发 needs_attention 提醒\n- 改进配置文件页面布局"
+      },
+      {
         "version": "2.9.0",
         "date": "2026-03-26",
         "summary": "完整的 Docker 容器生命周期管理：一键创建、HTTPS 反代、网络隔离、AI Profile 环境变量修复。",
@@ -777,7 +847,7 @@
       }
     ]
   },
-  "latestVersion": "2.9.0",
+  "latestVersion": "2.10.0",
   "availableLocales": [
     "en",
     "zh-Hans"
