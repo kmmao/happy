@@ -1,6 +1,6 @@
 {
   "name": "@kmmao/happy-coder",
-  "version": "0.50.0",
+  "version": "0.50.1",
   "description": "Mobile and Web client for Claude Code and Codex",
   "author": "kmmao",
   "license": "MIT",
@@ -66,7 +66,7 @@
     "dev:integration-test-env": "$npm_execpath run build && tsx --env-file .env.integration-test src/index.ts",
     "prepublishOnly": "$npm_execpath run build && $npm_execpath test",
     "release": "npx --no-install release-it",
-    "postinstall": "node scripts/unpack-tools.cjs",
+    "postinstall": "node scripts/unpack-tools.cjs && node scripts/patch-sdk-deferred-tools.cjs",
     "// ==== Dev/Stable Variant Management ====": "",
     "stable": "node scripts/env-wrapper.cjs stable",
     "dev:variant": "node scripts/env-wrapper.cjs dev",
