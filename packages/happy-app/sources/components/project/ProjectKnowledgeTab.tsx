@@ -157,7 +157,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                                         styles.filterChip,
                                         {
                                             backgroundColor: isFilterActive
-                                                ? theme.colors.header.tint
+                                                ? theme.colors.primary
                                                 : theme.colors.surfaceHighest,
                                         },
                                     ]}
