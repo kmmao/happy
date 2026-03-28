@@ -169,6 +169,31 @@ export const sessionStateChangedEventSchema = z.object({
   state: z.enum(["idle", "running", "requires_action"]),
 });
 
+export const sessionContextUsageCategorySchema = z.object({
+  name: z.string(),
+  tokens: z.number(),
+  color: z.string().optional(),
+});
+
+export const sessionContextUsageEventSchema = z.object({
+  t: z.literal("context-usage"),
+  totalTokens: z.number(),
+  maxTokens: z.number(),
+  percentage: z.number(),
+  model: z.string().optional(),
+  categories: z.array(sessionContextUsageCategorySchema).optional(),
+  isAutoCompactEnabled: z.boolean().optional(),
+  autoCompactThreshold: z.number().optional(),
+  messageBreakdown: z.object({
+    toolCallTokens: z.number(),
+    toolResultTokens: z.number(),
+    attachmentTokens: z.number(),
+    assistantMessageTokens: z.number(),
+    userMessageTokens: z.number(),
+  }).optional(),
+});
+export type SessionContextUsageEvent = z.infer<typeof sessionContextUsageEventSchema>;
+
 export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -187,6 +212,7 @@ export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionPromptSuggestionEventSchema,
   sessionNeedsContinueEventSchema,
   sessionStateChangedEventSchema,
+  sessionContextUsageEventSchema,
 ]);
 
 export type SessionEvent = z.infer<typeof sessionEventSchema>;
@@ -223,7 +249,8 @@ export const sessionEnvelopeSchema = z
         envelope.ev.t === "tool-progress" ||
         envelope.ev.t === "prompt-suggestion" ||
         envelope.ev.t === "needs-continue" ||
-        envelope.ev.t === "session-state-changed") &&
+        envelope.ev.t === "session-state-changed" ||
+        envelope.ev.t === "context-usage") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({

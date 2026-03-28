@@ -1022,6 +1022,7 @@ export const AgentInput = React.memo(
                 modelCode={props.currentModelCode}
                 sdkContextWindow={props.usageData.contextWindow}
                 theme={theme}
+                sdkContextUsage={props.sdkContextUsage}
               />
             ) : null}
 

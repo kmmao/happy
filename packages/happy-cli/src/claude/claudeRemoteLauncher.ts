@@ -1065,7 +1065,7 @@ export async function claudeRemoteLauncher(
             type: "user",
             message: { role: "user", content: item.message },
             parent_tool_use_id: null,
-            session_id: "",
+            session_id: undefined,
           });
         }
         logger.debug("[remote]: mid-turn drain stopped");
@@ -1243,6 +1243,24 @@ export async function claudeRemoteLauncher(
           },
           onResult: (data) => {
             lastResultData = data;
+          },
+          onContextUsage: (ctx) => {
+            const envelope = createEnvelope("agent", {
+              t: "context-usage" as const,
+              totalTokens: ctx.totalTokens,
+              maxTokens: ctx.maxTokens,
+              percentage: ctx.percentage,
+              model: ctx.model,
+              categories: ctx.categories?.map((c) => ({
+                name: c.name,
+                tokens: c.tokens,
+                ...(c.color ? { color: c.color } : {}),
+              })),
+              isAutoCompactEnabled: ctx.isAutoCompactEnabled,
+              autoCompactThreshold: ctx.autoCompactThreshold,
+              messageBreakdown: ctx.messageBreakdown,
+            });
+            session.client.sendSessionProtocolMessage(envelope);
           },
           onMaxTurnsReached: () => {
             logger.debug(

@@ -1928,6 +1928,15 @@ export function useSessionUsage(sessionId: string) {
   );
 }
 
+export function useSessionContextUsage(sessionId: string) {
+  return storage(
+    useShallow((state) => {
+      const session = state.sessionMessages[sessionId];
+      return session?.reducerState?.contextUsage ?? null;
+    }),
+  );
+}
+
 export function useSettings(): Settings {
   return storage(useShallow((state) => state.settings));
 }

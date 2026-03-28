@@ -19,7 +19,7 @@ export function formatClaudeMessageForInk(
             const sysMsg = message as SDKSystemMessage
             if (sysMsg.subtype === 'init') {
                 messageBuffer.addMessage('─'.repeat(40), 'status')
-                messageBuffer.addMessage(`🚀 Session initialized: ${sysMsg.session_id}`, 'system')
+                messageBuffer.addMessage(`🚀 Session initialized: ${sysMsg.session_id ?? 'pending'}`, 'system')
                 messageBuffer.addMessage(`  Model: ${sysMsg.model}`, 'status')
                 messageBuffer.addMessage(`  CWD: ${sysMsg.cwd}`, 'status')
                 if (sysMsg.tools && sysMsg.tools.length > 0) {

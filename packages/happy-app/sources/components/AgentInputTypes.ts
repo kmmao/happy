@@ -93,6 +93,22 @@ export interface AgentInputProps {
         contextWindow?: number;
     };
     alwaysShowContextSize?: boolean;
+    sdkContextUsage?: {
+        totalTokens: number;
+        maxTokens: number;
+        percentage: number;
+        model?: string;
+        categories?: Array<{ name: string; tokens: number; color?: string }>;
+        isAutoCompactEnabled?: boolean;
+        autoCompactThreshold?: number;
+        messageBreakdown?: {
+            toolCallTokens: number;
+            toolResultTokens: number;
+            attachmentTokens: number;
+            assistantMessageTokens: number;
+            userMessageTokens: number;
+        };
+    } | null;
     currentModelCode?: string | null;
     onFileViewerPress?: () => void;
     agentType?: "claude" | "codex" | "gemini";

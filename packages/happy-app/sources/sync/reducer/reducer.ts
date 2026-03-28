@@ -176,6 +176,23 @@ export type ReducerState = {
   latestAgentTextTime: number;
   resolvedModelId?: string; // Actual model ID from turn-end (e.g. "claude-opus-4-6")
   backgroundTaskIdToMessageId: Map<string, string>; // backgroundTaskId -> messageId
+  contextUsage?: {
+    totalTokens: number;
+    maxTokens: number;
+    percentage: number;
+    model?: string;
+    categories?: Array<{ name: string; tokens: number; color?: string }>;
+    isAutoCompactEnabled?: boolean;
+    autoCompactThreshold?: number;
+    messageBreakdown?: {
+      toolCallTokens: number;
+      toolResultTokens: number;
+      attachmentTokens: number;
+      assistantMessageTokens: number;
+      userMessageTokens: number;
+    };
+    timestamp: number;
+  };
 };
 
 export function createReducer(): ReducerState {
@@ -379,6 +396,23 @@ export function reducer(
           msg.content.durationMs,
         );
       }
+      continue;
+    }
+
+    // Context usage snapshot: update state for UI display, not rendered as chat message.
+    if (msg.role === "event" && msg.content.type === "context-usage") {
+      state.messageIds.set(msg.id, msg.id);
+      state.contextUsage = {
+        totalTokens: msg.content.totalTokens,
+        maxTokens: msg.content.maxTokens,
+        percentage: msg.content.percentage,
+        model: msg.content.model,
+        categories: msg.content.categories,
+        isAutoCompactEnabled: msg.content.isAutoCompactEnabled,
+        autoCompactThreshold: msg.content.autoCompactThreshold,
+        messageBreakdown: msg.content.messageBreakdown,
+        timestamp: msg.createdAt,
+      };
       continue;
     }
 

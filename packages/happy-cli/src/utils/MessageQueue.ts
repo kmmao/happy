@@ -41,7 +41,7 @@ export class MessageQueue implements AsyncIterable<SDKUserMessage> {
           content: message,
         },
         parent_tool_use_id: null,
-        session_id: "",
+        session_id: undefined,
       });
     } else {
       logger.debug(
@@ -54,7 +54,7 @@ export class MessageQueue implements AsyncIterable<SDKUserMessage> {
           content: message,
         },
         parent_tool_use_id: null,
-        session_id: "",
+        session_id: undefined,
       });
     }
 

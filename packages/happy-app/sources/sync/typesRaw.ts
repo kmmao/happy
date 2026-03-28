@@ -81,6 +81,27 @@ const agentEventSchema = z.discriminatedUnion("type", [
     }),
     durationMs: z.number().optional(),
   }),
+  z.object({
+    type: z.literal("context-usage"),
+    totalTokens: z.number(),
+    maxTokens: z.number(),
+    percentage: z.number(),
+    model: z.string().optional(),
+    categories: z.array(z.object({
+      name: z.string(),
+      tokens: z.number(),
+      color: z.string().optional(),
+    })).optional(),
+    isAutoCompactEnabled: z.boolean().optional(),
+    autoCompactThreshold: z.number().optional(),
+    messageBreakdown: z.object({
+      toolCallTokens: z.number(),
+      toolResultTokens: z.number(),
+      attachmentTokens: z.number(),
+      assistantMessageTokens: z.number(),
+      userMessageTokens: z.number(),
+    }).optional(),
+  }),
 ]);
 export type AgentEvent = z.infer<typeof agentEventSchema>;
 
@@ -240,6 +261,28 @@ const sessionStateChangedEventSchema = z.object({
   state: z.enum(["idle", "running", "requires_action"]),
 });
 
+const sessionContextUsageEventSchema = z.object({
+  t: z.literal("context-usage"),
+  totalTokens: z.number(),
+  maxTokens: z.number(),
+  percentage: z.number(),
+  model: z.string().optional(),
+  categories: z.array(z.object({
+    name: z.string(),
+    tokens: z.number(),
+    color: z.string().optional(),
+  })).optional(),
+  isAutoCompactEnabled: z.boolean().optional(),
+  autoCompactThreshold: z.number().optional(),
+  messageBreakdown: z.object({
+    toolCallTokens: z.number(),
+    toolResultTokens: z.number(),
+    attachmentTokens: z.number(),
+    assistantMessageTokens: z.number(),
+    userMessageTokens: z.number(),
+  }).optional(),
+});
+
 const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -258,6 +301,7 @@ const sessionEventSchema = z.discriminatedUnion("t", [
   sessionPromptSuggestionEventSchema,
   sessionNeedsContinueEventSchema,
   sessionStateChangedEventSchema,
+  sessionContextUsageEventSchema,
 ]);
 
 const sessionEnvelopeSchema = z
@@ -291,7 +335,8 @@ const sessionEnvelopeSchema = z
         envelope.ev.t === "task-end" ||
         envelope.ev.t === "tool-progress" ||
         envelope.ev.t === "prompt-suggestion" ||
-        envelope.ev.t === "session-state-changed") &&
+        envelope.ev.t === "session-state-changed" ||
+        envelope.ev.t === "context-usage") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({
@@ -957,6 +1002,28 @@ function normalizeSessionEnvelope(
         ...(envelope.ev.durationMs !== undefined
           ? { durationMs: envelope.ev.durationMs }
           : {}),
+      },
+      meta,
+    } satisfies NormalizedMessage;
+  }
+
+  if (envelope.ev.t === "context-usage") {
+    return {
+      id: messageId,
+      localId,
+      createdAt: messageCreatedAt,
+      role: "event",
+      isSidechain,
+      content: {
+        type: "context-usage",
+        totalTokens: envelope.ev.totalTokens,
+        maxTokens: envelope.ev.maxTokens,
+        percentage: envelope.ev.percentage,
+        ...(envelope.ev.model !== undefined ? { model: envelope.ev.model } : {}),
+        ...(envelope.ev.categories !== undefined ? { categories: envelope.ev.categories } : {}),
+        ...(envelope.ev.isAutoCompactEnabled !== undefined ? { isAutoCompactEnabled: envelope.ev.isAutoCompactEnabled } : {}),
+        ...(envelope.ev.autoCompactThreshold !== undefined ? { autoCompactThreshold: envelope.ev.autoCompactThreshold } : {}),
+        ...(envelope.ev.messageBreakdown !== undefined ? { messageBreakdown: envelope.ev.messageBreakdown } : {}),
       },
       meta,
     } satisfies NormalizedMessage;

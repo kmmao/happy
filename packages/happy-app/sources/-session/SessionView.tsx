@@ -49,6 +49,7 @@ import {
   useSession,
   useSessionMessages,
   useSessionUsage,
+  useSessionContextUsage,
   useSessionKnowledgeCount,
   useSetting,
 } from "@/sync/storage";
@@ -453,6 +454,7 @@ function SessionViewInner({
 
   const sessionStatus = useSessionStatus(session);
   const sessionUsage = useSessionUsage(sessionId);
+  const contextUsage = useSessionContextUsage(sessionId);
 
   // Clear queued message markers when AI finishes thinking
   const prevThinkingRef = React.useRef(session.thinking);
@@ -1022,6 +1024,7 @@ function SessionViewInner({
               : undefined
         }
         alwaysShowContextSize={alwaysShowContextSize}
+        sdkContextUsage={contextUsage}
         currentModelCode={effectiveModelCode}
         images={{
           onImagePaste: handleImagePaste,

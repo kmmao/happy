@@ -60,28 +60,58 @@ export const getProgressBarColor = (
     return theme.colors.success;
 };
 
+/** SDK-provided precise context usage data (from getContextUsage API) */
+export type ContextUsageData = {
+    totalTokens: number;
+    maxTokens: number;
+    percentage: number;
+    model?: string;
+    categories?: Array<{ name: string; tokens: number; color?: string }>;
+    isAutoCompactEnabled?: boolean;
+    autoCompactThreshold?: number;
+    messageBreakdown?: {
+        toolCallTokens: number;
+        toolResultTokens: number;
+        attachmentTokens: number;
+        assistantMessageTokens: number;
+        userMessageTokens: number;
+    };
+};
+
 export const ContextProgressBar: React.FC<{
     contextSize: number;
     alwaysShow: boolean;
     modelCode?: string | null;
     sdkContextWindow?: number;
     theme: Theme;
-}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme }) => {
-    // Use SDK-provided window size if available; fall back to model-aware heuristic
-    const knownWindowSize = getContextWindowSize(modelCode, sdkContextWindow);
-    const contextWindowSize =
-        contextSize > knownWindowSize ? 1_000_000 : knownWindowSize;
-    const percentageUsed = Math.min(100, (contextSize / contextWindowSize) * 100);
+    /** SDK-provided precise context usage (preferred over contextSize when available) */
+    sdkContextUsage?: ContextUsageData | null;
+}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme, sdkContextUsage }) => {
+    // Prefer SDK-provided precise data; fall back to estimated contextSize
+    const hasPreciseData = sdkContextUsage && sdkContextUsage.maxTokens > 0;
+    const percentageUsed = hasPreciseData
+        ? Math.min(100, sdkContextUsage.percentage)
+        : (() => {
+            const knownWindowSize = getContextWindowSize(modelCode, sdkContextWindow);
+            const contextWindowSize = contextSize > knownWindowSize ? 1_000_000 : knownWindowSize;
+            return Math.min(100, (contextSize / contextWindowSize) * 100);
+        })();
     const percentageRemaining = Math.max(0, 100 - percentageUsed);
     const shouldShow = alwaysShow || percentageRemaining <= 10;
 
-    // When context bar is hidden, return null — CompactStatus (InputFAB) already shows tokens/cost
     if (!shouldShow) {
         return null;
     }
 
     const barColor = getProgressBarColor(percentageRemaining, theme);
-    const label = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}`;
+    const usedTokens = hasPreciseData ? sdkContextUsage.totalTokens : contextSize;
+    const maxTokens = hasPreciseData
+        ? sdkContextUsage.maxTokens
+        : (() => {
+            const knownWindowSize = getContextWindowSize(modelCode, sdkContextWindow);
+            return contextSize > knownWindowSize ? 1_000_000 : knownWindowSize;
+        })();
+    const label = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(usedTokens)}/${formatTokenCountShort(maxTokens)}`;
 
     return (
         <View style={{ paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2 }}>

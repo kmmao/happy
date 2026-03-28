@@ -21,7 +21,7 @@ const userMsg = (
     message: { role: "user", content },
     parent_tool_use_id: null,
     session_id: "test",
-  }) as SDKUserMessage;
+  }) as unknown as SDKUserMessage;
 
 const assistantMsg = (
   content: Array<Record<string, unknown>>,
@@ -31,7 +31,7 @@ const assistantMsg = (
     message: { role: "assistant", content },
     parent_tool_use_id: null,
     session_id: "test",
-  }) as SDKAssistantMessage;
+  }) as unknown as SDKAssistantMessage;
 
 const systemMsg = (overrides: Record<string, unknown> = {}): SDKSystemMessage =>
   ({
@@ -51,7 +51,7 @@ const systemMsg = (overrides: Record<string, unknown> = {}): SDKSystemMessage =>
     plugins: [],
     uuid: "00000000-0000-0000-0000-000000000000" as `${string}-${string}-${string}-${string}-${string}`,
     ...overrides,
-  }) as SDKSystemMessage;
+  }) as unknown as SDKSystemMessage;
 
 const resultMsg = (overrides: Record<string, unknown> = {}): SDKResultMessage =>
   ({
@@ -75,7 +75,7 @@ const resultMsg = (overrides: Record<string, unknown> = {}): SDKResultMessage =>
     permission_denials: [],
     uuid: "00000000-0000-0000-0000-000000000000" as `${string}-${string}-${string}-${string}-${string}`,
     ...overrides,
-  }) as SDKResultMessage;
+  }) as unknown as SDKResultMessage;
 
 describe("SDKToLogConverter", () => {
   let converter: SDKToLogConverter;

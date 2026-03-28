@@ -110,6 +110,23 @@ export async function claudeRemote(opts: {
   ) => void;
   /** Called when the messages PushableAsyncIterable is ready, exposing mid-turn push capability */
   onMessagesReady?: (push: (msg: SDKUserMessage) => void) => void;
+  /** Called with context window usage breakdown after each turn completes */
+  onContextUsage?: (usage: {
+    totalTokens: number;
+    maxTokens: number;
+    percentage: number;
+    model: string;
+    categories?: Array<{ name: string; tokens: number; color: string }>;
+    isAutoCompactEnabled: boolean;
+    autoCompactThreshold?: number;
+    messageBreakdown?: {
+      toolCallTokens: number;
+      toolResultTokens: number;
+      attachmentTokens: number;
+      assistantMessageTokens: number;
+      userMessageTokens: number;
+    };
+  }) => void;
   /** Called with initialization info (supported models) after system init */
   onInitialized?: (info: {
     models?: Array<{
@@ -303,7 +320,7 @@ export async function claudeRemote(opts: {
         content: initial.message,
       },
       parent_tool_use_id: null,
-      session_id: "",
+      session_id: undefined,
     });
   }
 
@@ -458,6 +475,20 @@ export async function claudeRemote(opts: {
           });
         }
 
+        // Fetch context window usage breakdown (fire-and-forget, never blocks turn flow)
+        if (opts.onContextUsage) {
+          const officialQuery = (response as AdaptedQuery)._officialQuery;
+          officialQuery.getContextUsage?.()
+            .then((ctx) => {
+              if (ctx && !opts.signal?.aborted) {
+                opts.onContextUsage?.(ctx);
+              }
+            })
+            .catch((e) => {
+              logger.debug("[claudeRemote] Failed to get context usage:", e);
+            });
+        }
+
         // Feed turn usage data back to adaptive router BEFORE onReady resets it
         opts.onTurnComplete?.();
 
@@ -550,7 +581,7 @@ export async function claudeRemote(opts: {
           type: "user",
           message: { role: "user", content: next.message },
           parent_tool_use_id: null,
-          session_id: "",
+          session_id: undefined,
         });
       }
 

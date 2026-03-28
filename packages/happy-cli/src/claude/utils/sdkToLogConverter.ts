@@ -155,7 +155,7 @@ export class SDKToLogConverter {
         logMessage = {
           ...baseFields,
           type: "user",
-          message: userMsg.message,
+          message: { ...userMsg.message },
           ...(userMsg.parent_tool_use_id
             ? { parent_tool_use_id: userMsg.parent_tool_use_id }
             : {}),
@@ -187,7 +187,7 @@ export class SDKToLogConverter {
         logMessage = {
           ...baseFields,
           type: "assistant",
-          message: assistantMsg.message,
+          message: assistantMsg.message as unknown as Record<string, unknown>,
           // requestId is emitted at runtime but not in SDK type definitions
           requestId: assistantMsg.requestId,
           ...(assistantMsg.parent_tool_use_id

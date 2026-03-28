@@ -18,7 +18,7 @@ export function formatClaudeMessage(
             const sysMsg = message as SDKSystemMessage;
             if (sysMsg.subtype === 'init') {
                 logger.print(chalk.gray('─'.repeat(60)));
-                logger.print(chalk.blue.bold('🚀 Session initialized:'), chalk.cyan(sysMsg.session_id));
+                logger.print(chalk.blue.bold('🚀 Session initialized:'), chalk.cyan(sysMsg.session_id ?? 'pending'));
                 logger.print(chalk.gray(`  Model: ${sysMsg.model}`));
                 logger.print(chalk.gray(`  CWD: ${sysMsg.cwd}`));
                 if (sysMsg.tools && sysMsg.tools.length > 0) {
