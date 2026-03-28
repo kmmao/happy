@@ -32,6 +32,23 @@ interface KnowledgeEntryCardProps {
     onViewEvolution?: (entryId: string) => void;
 }
 
+function entryTypeLabel(entryType: string): string {
+    switch (entryType) {
+        case "discovery":
+            return t("projects.knowledgeFilterDiscovery");
+        case "decision":
+            return t("projects.knowledgeFilterDecision");
+        case "fix":
+            return t("projects.knowledgeFilterFix");
+        case "convention":
+            return t("projects.knowledgeFilterConvention");
+        case "warning":
+            return t("projects.knowledgeFilterWarning");
+        default:
+            return entryType;
+    }
+}
+
 const TYPE_COLORS: Record<string, string> = {
     discovery: "#3B82F6",
     decision: "#8B5CF6",
@@ -148,7 +165,7 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
                     <View style={styles.headerLeft}>
                         <View style={[styles.typeBadge, { backgroundColor: typeColor + "20" }]}>
                             <Text style={[styles.typeBadgeText, { color: typeColor }]}>
-                                {entry.entryType}
+                                {entryTypeLabel(entry.entryType)}
                             </Text>
                         </View>
                         <View style={[styles.confidenceBadge, { backgroundColor: confColor + "20" }]}>
