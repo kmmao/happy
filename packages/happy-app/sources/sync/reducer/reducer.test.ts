@@ -3085,7 +3085,7 @@ describe('reducer', () => {
             expect(entry!.outputFile).toBe('/tmp/bg-1.log');
         });
 
-        it('should create provisional entry when tool-result arrives before task-start', () => {
+        it('should create provisional entry as completed when tool-result arrives without task-start', () => {
             const state = createReducer();
             const msgs = bgToolMessages('tool-1', 'bg-1', {
                 command: 'npm run dev',
@@ -3093,23 +3093,23 @@ describe('reducer', () => {
             });
             reducer(state, msgs);
 
-            // Provisional entry should exist
+            // Provisional entry exists but is completed (no task-start = old session)
             const entry = state.backgroundTasks.get('bg-1');
             expect(entry).toBeDefined();
-            expect(entry!.status).toBe('running');
+            expect(entry!.status).toBe('completed');
             expect(entry!.command).toBe('npm run dev');
         });
 
         it('should handle full lifecycle: tool-result → task-start → task-progress → task-end', () => {
             const state = createReducer();
 
-            // 1. tool-result
+            // 1. tool-result — provisional entry is completed
             reducer(state, bgToolMessages('tool-1', 'bg-1', {
                 command: 'docker run app',
                 outputFile: '/tmp/bg-1.log',
                 createdAt: 1000,
             }));
-            expect(state.backgroundTasks.get('bg-1')!.status).toBe('running');
+            expect(state.backgroundTasks.get('bg-1')!.status).toBe('completed');
 
             // 2. task-start
             reducer(state, [taskStart('bg-1', 'Running Docker', { createdAt: 1100 })]);

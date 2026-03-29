@@ -995,10 +995,12 @@ export function reducer(
       const { taskId, toolUseId, description } = msg.taskStartInfo;
       const existing = state.backgroundTasks.get(taskId);
       if (existing) {
+        // task-start activates the entry — override provisional "completed" status
         state.backgroundTasks.set(taskId, {
           ...existing,
           toolUseId: toolUseId ?? existing.toolUseId,
           description,
+          status: "running",
         });
       } else {
         state.backgroundTasks.set(taskId, {
@@ -1300,17 +1302,11 @@ export function reducer(
         outputFile: entry.outputFile ?? outputFile,
       });
     } else {
-      // tool-result arrived before task-start — create provisional entry.
-      // For old sessions without task-start/end events: if the agent has sent
-      // text after this tool (latestAgentTextTime > tool.createdAt), the task
-      // is stale and should be marked completed. Otherwise it's still running.
-      const isStale = state.latestAgentTextTime > 0
-        && toolMsg.createdAt < state.latestAgentTextTime;
-      const toolState = toolMsg.tool.state;
-      const status: "running" | "completed" | "failed" | "stopped" =
-        toolState === "error" ? "failed" :
-        isStale ? "completed" :
-        "running";
+      // No task-start event created this entry — this is either:
+      // 1. An old session without SDK task lifecycle events → task is dead
+      // 2. A race where tool-result arrived before task-start in the same batch
+      //    → task-start will update the entry in Phase 3.5 on the next call
+      // Mark as completed since active tasks always have a task-start entry.
       state.backgroundTasks.set(taskId, {
         taskId,
         toolUseId: null,
@@ -1320,7 +1316,7 @@ export function reducer(
           : command,
         outputFile,
         startedAt: toolMsg.tool.startedAt ?? toolMsg.createdAt,
-        status,
+        status: "completed",
         summary: null,
       });
     }
