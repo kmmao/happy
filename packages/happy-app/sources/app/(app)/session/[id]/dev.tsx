@@ -13,6 +13,7 @@ import { DevServiceCard } from "@/components/DevServiceCard";
 import { DevServiceEditSheet } from "@/components/DevServiceEditSheet";
 import { serializeDevYml, type DevService, type DevConfig } from "@/utils/devYmlParser";
 import { sessionWriteFile } from "@/sync/ops";
+import { sync } from "@/sync/sync";
 
 export default React.memo(function DevScreen() {
     const { id: sessionId } = useLocalSearchParams<{ id: string }>();
@@ -182,8 +183,24 @@ export default React.memo(function DevScreen() {
                                 No dev configuration found
                             </Text>
                             <Text style={[styles.emptyHint, { color: theme.colors.textSecondary }]}>
-                                Type /dev in the session to auto-generate config
+                                Scan the project to auto-detect services and generate config
                             </Text>
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.installButton,
+                                    { backgroundColor: theme.colors.primary },
+                                    pressed && { opacity: 0.7 },
+                                ]}
+                                onPress={() => {
+                                    // Send /dev to the session — AI will scan and generate dev.yml
+                                    sync.sendMessage(sessionId, "/dev");
+                                    // Navigate back to the session to see progress
+                                    router.back();
+                                }}
+                            >
+                                <Ionicons name="scan-outline" size={18} color="#fff" />
+                                <Text style={styles.installButtonText}>Generate Config</Text>
+                            </Pressable>
                         </>
                     )}
                 </View>
