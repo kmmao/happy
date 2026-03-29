@@ -3176,13 +3176,18 @@ describe('reducer', () => {
 
             it('should update tool-call messages and return their IDs', () => {
                 const state = createReducer();
-                reducer(state, bgToolMessages('tool-1', 'bg-1'));
-                reducer(state, [taskStart('bg-1', 'Task 1')]);
+                // task-start first (earlier timestamp), then tool messages (later timestamp)
+                // so Phase 6 stale cleanup won't force-complete the tool
+                reducer(state, [taskStart('bg-1', 'Task 1', { createdAt: 100 })]);
+                reducer(state, bgToolMessages('tool-1', 'bg-1', { createdAt: 200 }));
+
+                // Verify tool is still running before stale cleanup
+                const toolMsgId = state.toolIdToMessageId.get('tool-1')!;
+                expect(state.messages.get(toolMsgId)!.tool!.state).toBe('running');
 
                 const affected = completeStaleBackgroundTasks(state);
 
                 expect(affected).toHaveLength(1);
-                const toolMsgId = state.toolIdToMessageId.get('tool-1')!;
                 expect(state.messages.get(toolMsgId)!.tool!.state).toBe('error');
                 expect(state.backgroundTasks.get('bg-1')!.status).toBe('stopped');
             });

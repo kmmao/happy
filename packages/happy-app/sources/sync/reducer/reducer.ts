@@ -1077,7 +1077,14 @@ export function reducer(
         outputFile: entry.outputFile ?? outputFile,
       });
     } else {
-      // tool-result arrived before task-start — create provisional entry
+      // tool-result arrived before task-start — create provisional entry.
+      // Derive status from the tool message state (handles old sessions where
+      // tasks completed/failed but never received task-end events).
+      const toolState = toolMsg.tool.state;
+      const status: "running" | "completed" | "failed" | "stopped" =
+        toolState === "running" ? "running" :
+        toolState === "error" ? "failed" :
+        "completed";
       state.backgroundTasks.set(taskId, {
         taskId,
         toolUseId: null,
@@ -1087,7 +1094,7 @@ export function reducer(
           : command,
         outputFile,
         startedAt: toolMsg.tool.startedAt ?? toolMsg.createdAt,
-        status: "running",
+        status,
         summary: null,
       });
     }
@@ -1305,10 +1312,11 @@ export function reducer(
         if (msg.tool.name === "Task" || msg.tool.name === "Agent") {
           continue;
         }
-        // Skip background tasks — they run independently of the conversation flow
-        if (msg.tool.backgroundTaskId) {
-          continue;
-        }
+        // Background tasks: allow Phase 6 to force-complete their tool messages.
+        // Active tasks have their status managed by the backgroundTasks registry
+        // (via task-start/end events), which is independent of tool.state.
+        // Old/orphaned tasks (no task-start event) need Phase 6 cleanup so the
+        // enrichment loop can derive the correct completed/failed status.
         msg.tool.state = "completed";
         msg.tool.completedAt = state.latestAgentTextTime;
         changed.add(messageId);
