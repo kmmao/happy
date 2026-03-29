@@ -2042,6 +2042,24 @@ export function useProjectGitStatus(projectId: string | null) {
   );
 }
 
+export function useProjectAliasMap(): Map<string, string> {
+  const projects = useProjects();
+  return React.useMemo(() => {
+    const map = new Map<string, string>();
+    projects.forEach((project) => {
+      if (project.serverMetadata && !map.has(project.key.path)) {
+        try {
+          const meta = JSON.parse(project.serverMetadata);
+          if (meta.alias) {
+            map.set(project.key.path, meta.alias);
+          }
+        } catch { /* ignore */ }
+      }
+    });
+    return map;
+  }, [projects]);
+}
+
 export function useSessionProjectGitStatus(sessionId: string | null) {
   return storage(
     useShallow((state) =>

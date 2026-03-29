@@ -26,6 +26,7 @@ import {
   useHasUnreadMessages,
   useMachine,
   useSetting,
+  useProjectAliasMap,
 } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
@@ -89,6 +90,24 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     letterSpacing: Platform.select({ ios: -0.08, default: 0.1 }),
     fontWeight: Platform.select({ ios: "normal", default: "500" }),
     flex: 1,
+  },
+  sectionHeaderNameGroup: {
+    flexDirection: "column",
+    flex: 1,
+  },
+  sectionHeaderAlias: {
+    ...Typography.default("semiBold"),
+    color: theme.colors.groupped.sectionTitle,
+    fontSize: Platform.select({ ios: 13, default: 14 }),
+    lineHeight: Platform.select({ ios: 18, default: 20 }),
+    letterSpacing: Platform.select({ ios: -0.08, default: 0.1 }),
+  },
+  sectionHeaderSubpath: {
+    ...Typography.default("regular"),
+    color: theme.colors.textSecondary,
+    fontSize: Platform.select({ ios: 11, default: 12 }),
+    lineHeight: Platform.select({ ios: 14, default: 16 }),
+    marginTop: 1,
   },
   sessionRow: {
     minHeight: 56,
@@ -301,6 +320,7 @@ export function ActiveSessionsGroupCompact({
   const styles = stylesheet;
   const realtimeSessionSort = useSetting("realtimeSessionSort");
   const machines = useAllMachines();
+  const projectAliasMap = useProjectAliasMap();
 
   const machinesMap = React.useMemo(() => {
     const map: Record<string, Machine> = {};
@@ -425,9 +445,20 @@ export function ActiveSessionsGroupCompact({
                     />
                   </View>
                 )}
-                <Text style={styles.sectionHeaderPath}>
-                  {projectGroup.displayPath}
-                </Text>
+                {projectAliasMap.has(projectPath) ? (
+                  <View style={styles.sectionHeaderNameGroup}>
+                    <Text style={styles.sectionHeaderAlias} numberOfLines={1}>
+                      {projectAliasMap.get(projectPath)}
+                    </Text>
+                    <Text style={styles.sectionHeaderSubpath} numberOfLines={1}>
+                      {projectGroup.displayPath}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.sectionHeaderPath}>
+                    {projectGroup.displayPath}
+                  </Text>
+                )}
               </View>
               {/* Show git status instead of machine name */}
               {firstSession ? (
