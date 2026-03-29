@@ -236,9 +236,9 @@ export const SessionView = React.memo((props: { id: string }) => {
                 : undefined
             }
             onChangesPress={hasChanges ? () => router.push(`/session/${sessionId}/changes`) : undefined}
-            devButtonState={hasDevConfig ? "idle" : "hidden"}
-            onDevPress={hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
-            onDevLongPress={hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
+            devButtonState={headerProps.isConnected ? "idle" : "hidden"}
+            onDevPress={headerProps.isConnected ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
+            onDevLongPress={headerProps.isConnected ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
           />
           {/* Voice status bar below header - not on tablet (shown in sidebar) */}
           {!isTablet && realtimeStatus !== "disconnected" && (
