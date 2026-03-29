@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { Session, Machine, GitStatus } from "./storageTypes";
-import { createReducer, reducer, ReducerState } from "./reducer/reducer";
+import { createReducer, reducer, completeStaleBackgroundTasks, ReducerState, BackgroundTaskEntry } from "./reducer/reducer";
 import { Message } from "./typesMessage";
 import { NormalizedMessage } from "./typesRaw";
 import { isMachineOnline } from "@/utils/machineUtils";
@@ -780,6 +780,39 @@ export const storage = create<StorageState>()((set, get) => {
                 },
               };
             }
+          }
+
+          // When a session goes offline, force-complete all running background tasks
+          // in the reducer state. The CLI process is no longer running, so these tasks
+          // are stale and should not be shown as "running" on reload.
+          const wasOnline = oldSession?.presence === "online";
+          const isNowOffline = newSession.presence !== "online";
+          if (wasOnline && isNowOffline && existingSessionMessages) {
+            const affected = completeStaleBackgroundTasks(
+              existingSessionMessages.reducerState,
+            );
+            // Always write a new sessionMessages entry so Zustand detects the
+            // backgroundTasks Map reference change (even when no tool-call messages
+            // were affected, e.g. task-start-only entries without tool-result).
+            const prev = updatedSessionMessages[session.id] ?? existingSessionMessages;
+            const mergedMessagesMap = { ...prev.messagesMap };
+            for (const msgId of affected) {
+              const msg = existingSessionMessages.reducerState.messages.get(msgId);
+              if (msg) {
+                mergedMessagesMap[msgId] = {
+                  ...mergedMessagesMap[msgId],
+                  tool: msg.tool ? { ...msg.tool } : null,
+                } as Message;
+              }
+            }
+            updatedSessionMessages[session.id] = {
+              messages: affected.length > 0
+                ? Object.values(mergedMessagesMap).sort((a, b) => b.createdAt - a.createdAt)
+                : prev.messages,
+              messagesMap: affected.length > 0 ? mergedMessagesMap : prev.messagesMap,
+              reducerState: prev.reducerState,
+              isLoaded: prev.isLoaded,
+            };
           }
         });
 
@@ -1894,6 +1927,19 @@ export function useSessionMessages(sessionId: string): {
         isLoaded: session?.isLoaded ?? false,
       };
     }),
+  );
+}
+
+const emptyBackgroundTasks: ReadonlyMap<string, BackgroundTaskEntry> = new Map();
+
+/** Returns the backgroundTasks Map from reducer state.
+ *  The Map reference is replaced (not mutated) on each change, so
+ *  Zustand's default reference-equality check triggers re-renders correctly. */
+export function useBackgroundTaskEntries(
+  sessionId: string,
+): ReadonlyMap<string, BackgroundTaskEntry> {
+  return storage(
+    (state) => state.sessionMessages[sessionId]?.reducerState.backgroundTasks ?? emptyBackgroundTasks,
   );
 }
 

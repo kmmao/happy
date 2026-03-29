@@ -2422,6 +2422,7 @@ export const zhHant: TranslationStructure = {
     running: "執行中",
     completed: "已完成",
     failed: "失敗",
+    stopped: "已停止",
     viewLog: "查看日誌",
     noOutput: "暫無輸出",
     foregroundHint: "程序監控",

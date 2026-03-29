@@ -2488,6 +2488,7 @@ export const ja: TranslationStructure = {
     running: "実行中",
     completed: "完了",
     failed: "失敗",
+    stopped: "停止済み",
     viewLog: "ログを表示",
     noOutput: "出力なし",
     foregroundHint: "プロセスモニター",

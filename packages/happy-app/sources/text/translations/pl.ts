@@ -2532,6 +2532,7 @@ export const pl: TranslationStructure = {
     running: "Uruchomiony",
     completed: "Zakończony",
     failed: "Błąd",
+    stopped: "Zatrzymano",
     viewLog: "Zobacz logi",
     noOutput: "Brak danych wyjściowych",
     foregroundHint: "Monitor procesu",

@@ -2507,6 +2507,7 @@ export const en = {
     running: "Running",
     completed: "Completed",
     failed: "Failed",
+    stopped: "Stopped",
     viewLog: "View Log",
     noOutput: "No output yet",
     foregroundHint: "Process monitor",

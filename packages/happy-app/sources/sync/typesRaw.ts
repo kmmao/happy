@@ -828,6 +828,20 @@ export type NormalizedMessage = (
   parentRef?: string | null; // Subagent/parent reference for sidechain linking (event messages)
   meta?: MessageMeta;
   usage?: UsageData;
+  /** Present on task-start messages to register a new background task */
+  taskStartInfo?: {
+    taskId: string;
+    toolUseId: string | null;
+    description: string;
+    taskType: string | null;
+  };
+  /** Present on task-progress messages to update background task status.
+   *  Only emitted when envelope.ev.summary is non-empty (guard in normalizer). */
+  taskProgressInfo?: {
+    taskId: string;
+    description: string;
+    summary: string;
+  };
   /** Present on task-end messages to link back to background tasks */
   taskEndInfo?: {
     taskId: string;
@@ -863,6 +877,7 @@ function normalizeSessionEnvelope(
   }
 
   // Task lifecycle events — rendered as service messages for visibility
+  // Also carry structured info for the reducer's backgroundTasks registry
   if (envelope.ev.t === "task-start") {
     return {
       id: messageId,
@@ -879,15 +894,20 @@ function normalizeSessionEnvelope(
         },
       ],
       meta,
+      taskStartInfo: {
+        taskId: envelope.ev.taskId,
+        toolUseId: envelope.ev.toolUseId ?? null,
+        description: envelope.ev.description,
+        taskType: envelope.ev.taskType ?? null,
+      },
     } satisfies NormalizedMessage;
   }
 
   if (envelope.ev.t === "task-progress") {
-    if (!envelope.ev.summary) {
-      // Skip progress updates without AI summary to avoid flooding chat
-      return null;
-    }
-    // Show AI-generated progress summary (~30s interval)
+    // Only emit when there's an AI summary (~30s interval).
+    // Progress events without summary carry only a description update,
+    // which is redundant with task-start — skip them entirely.
+    if (!envelope.ev.summary) return null;
     const usage = envelope.ev.usage;
     const metricsParts: string[] = [];
     if (usage) {
@@ -918,6 +938,11 @@ function normalizeSessionEnvelope(
         },
       ],
       meta,
+      taskProgressInfo: {
+        taskId: envelope.ev.taskId,
+        description: envelope.ev.description,
+        summary: envelope.ev.summary!,
+      },
     } satisfies NormalizedMessage;
   }
 

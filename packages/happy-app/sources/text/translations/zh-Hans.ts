@@ -2420,6 +2420,7 @@ export const zhHans: TranslationStructure = {
     running: "运行中",
     completed: "已完成",
     failed: "失败",
+    stopped: "已停止",
     viewLog: "查看日志",
     noOutput: "暂无输出",
     foregroundHint: "进程监控",

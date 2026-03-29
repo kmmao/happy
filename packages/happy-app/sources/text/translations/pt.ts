@@ -2514,6 +2514,7 @@ export const pt: TranslationStructure = {
     running: "Em execução",
     completed: "Concluído",
     failed: "Falhou",
+    stopped: "Parado",
     viewLog: "Ver registro",
     noOutput: "Sem saída ainda",
     foregroundHint: "Monitor de processo",

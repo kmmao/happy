@@ -49,6 +49,7 @@ import {
   useRealtimeStatus,
   useSession,
   useSessionMessages,
+  useBackgroundTaskEntries,
   useSessionUsage,
   useSessionContextUsage,
   useSessionKnowledgeCount,
@@ -346,8 +347,19 @@ function SessionViewInner({
   const [message, setMessage] = React.useState("");
   const realtimeStatus = useRealtimeStatus();
   const { messages, isLoaded } = useSessionMessages(sessionId);
-  const { tasks: backgroundTasks, dismissTask: dismissBackgroundTask } = useBackgroundTasks(messages);
+  const isConnected = session.presence === "online";
+  const backgroundTaskEntries = useBackgroundTaskEntries(sessionId);
+  const { tasks: backgroundTasks, dismissTask: dismissBackgroundTask } = useBackgroundTasks(backgroundTaskEntries, isConnected);
   const [viewingTask, setViewingTask] = React.useState<BackgroundTask | null>(null);
+
+  // Close the log sheet when the viewed task is no longer running (e.g. session went offline)
+  React.useEffect(() => {
+    if (!viewingTask) return;
+    const entry = backgroundTaskEntries.get(viewingTask.taskId);
+    if (!entry || entry.status !== "running") {
+      setViewingTask(null);
+    }
+  }, [viewingTask, backgroundTaskEntries]);
 
   const handleCloseTask = React.useCallback(
     async (task: BackgroundTask) => {

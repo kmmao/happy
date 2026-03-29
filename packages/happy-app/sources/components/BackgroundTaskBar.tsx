@@ -65,6 +65,8 @@ function statusInfo(
             return { color: colors.accentBlue, label: t("backgroundTasks.completed") };
         case "failed":
             return { color: colors.deleteAction, label: t("backgroundTasks.failed") };
+        case "stopped":
+            return { color: colors.deleteAction, label: t("backgroundTasks.stopped") };
     }
 }
 
@@ -234,10 +236,13 @@ function TaskItem({
                     </Pressable>
                 )}
             </View>
-            {lastLine.length > 0 && topRowWidth > 0 && (
+            {(task.summary || lastLine.length > 0) && topRowWidth > 0 && (
                 <MarqueeText
-                    text={lastLine}
-                    style={[styles.logLine, { color: theme.colors.textSecondary }]}
+                    text={task.summary ?? lastLine}
+                    style={[
+                        task.summary ? styles.summaryLine : styles.logLine,
+                        { color: theme.colors.textSecondary },
+                    ]}
                     maxWidth={topRowWidth}
                 />
             )}
@@ -335,6 +340,11 @@ const styles = StyleSheet.create(() => ({
         fontSize: 11,
         fontFamily: "monospace",
         opacity: 0.7,
+        paddingLeft: 20,
+    },
+    summaryLine: {
+        fontSize: 11,
+        opacity: 0.8,
         paddingLeft: 20,
     },
     previewButton: {

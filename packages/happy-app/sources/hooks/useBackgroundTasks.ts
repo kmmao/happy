@@ -1,28 +1,26 @@
 /**
- * Extracts active tasks from session messages for the BackgroundTaskBar.
+ * Provides the list of active background tasks from the reducer's
+ * SDK event-driven registry (task-start / task-progress / task-end).
  *
- * Two kinds of tasks are shown:
- * 1. **Background tasks** — Bash(run_in_background: true). These persist across
- *    states (running / completed / failed) and support log polling via outputFile.
- * 2. **Foreground commands** — Regular Bash/CodexBash calls that are still executing
- *    (tool.state === "running"). These disappear automatically once they complete.
- *
- * Supports manual dismissal of individual tasks via dismissTask().
+ * No longer scans messages — reads directly from ReducerState.backgroundTasks.
+ * Supports manual dismissal via dismissTask().
  */
 
 import * as React from "react";
-import { Message } from "@/sync/typesMessage";
+import { BackgroundTaskEntry } from "@/sync/reducer/reducer";
 
 export type BackgroundTask = {
     readonly taskId: string;
-    readonly callId: string;
     readonly command: string;
     readonly description: string;
     readonly outputFile: string | null;
     readonly startedAt: number;
-    readonly status: "running" | "completed" | "failed";
-    /** True for run_in_background tasks that have an output file for log polling */
-    readonly isBackground: boolean;
+    /** The hook filters to "running" only, but the broad union is needed because
+     *  BackgroundTaskLogSheet can observe status transitions while the sheet is open. */
+    readonly status: "running" | "completed" | "failed" | "stopped";
+    readonly summary: string | null;
+    /** Always true — only SDK background tasks are tracked here */
+    readonly isBackground: true;
 };
 
 export type BackgroundTasksResult = {
@@ -30,61 +28,43 @@ export type BackgroundTasksResult = {
     readonly dismissTask: (taskId: string) => void;
 };
 
-export function useBackgroundTasks(messages: readonly Message[]): BackgroundTasksResult {
+const EMPTY_TASKS: readonly BackgroundTask[] = [];
+
+export function useBackgroundTasks(
+    entries: ReadonlyMap<string, BackgroundTaskEntry>,
+    isConnected: boolean = true,
+): BackgroundTasksResult {
     const [dismissed, setDismissed] = React.useState<ReadonlySet<string>>(new Set());
 
-    const allTasks = React.useMemo(() => {
-        const tasks: BackgroundTask[] = [];
+    // Clean up dismissed IDs that no longer exist in the entries map
+    React.useEffect(() => {
+        setDismissed((prev) => {
+            if (prev.size === 0) return prev;
+            const next = new Set([...prev].filter((id) => entries.has(id)));
+            return next.size < prev.size ? next : prev;
+        });
+    }, [entries]);
 
-        for (const msg of messages) {
-            if (msg.kind !== "tool-call") continue;
-            const { tool } = msg;
+    const tasks = React.useMemo(() => {
+        if (!isConnected) return EMPTY_TASKS;
 
-            // Only Bash-like tools — Agent/Task tools have their own sidechain UI
-            if (tool.name !== "Bash" && tool.name !== "CodexBash") continue;
-
-            const isBackground = Boolean(tool.backgroundTaskId && tool.outputFile);
-
-            // Only show tasks that are still running
-            if (tool.state !== "running") continue;
-
-            const command =
-                typeof tool.input?.command === "string"
-                    ? tool.input.command
-                    : "unknown";
-            const description =
-                typeof tool.input?.description === "string"
-                    ? tool.input.description
-                    : command;
-
-            tasks.push({
-                taskId: tool.backgroundTaskId ?? msg.id,
-                callId: msg.id,
-                command,
-                description,
-                outputFile: tool.outputFile ?? null,
-                startedAt: tool.startedAt ?? msg.createdAt,
-                isBackground,
-                status: "running" as const,
+        const result: BackgroundTask[] = [];
+        for (const entry of entries.values()) {
+            if (entry.status !== "running") continue;
+            if (dismissed.has(entry.taskId)) continue;
+            result.push({
+                taskId: entry.taskId,
+                command: entry.command,
+                description: entry.description,
+                outputFile: entry.outputFile,
+                startedAt: entry.startedAt,
+                status: entry.status,
+                summary: entry.summary,
+                isBackground: true,
             });
         }
-
-        // Dedup: same command may appear multiple times (retries / Docker restarts).
-        // Keep only the latest (last) entry per command string.
-        const seen = new Map<string, number>();
-        for (let i = tasks.length - 1; i >= 0; i--) {
-            const key = tasks[i].command;
-            if (!seen.has(key)) {
-                seen.set(key, i);
-            }
-        }
-        return tasks.filter((_, i) => seen.get(tasks[i].command) === i);
-    }, [messages]);
-
-    const tasks = React.useMemo(
-        () => allTasks.filter((t) => !dismissed.has(t.taskId)),
-        [allTasks, dismissed],
-    );
+        return result;
+    }, [entries, isConnected, dismissed]);
 
     const dismissTask = React.useCallback((taskId: string) => {
         setDismissed((prev) => {

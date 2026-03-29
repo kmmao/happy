@@ -2516,6 +2516,7 @@ export const ca: TranslationStructure = {
     running: "En execució",
     completed: "Completat",
     failed: "Fallit",
+    stopped: "Aturat",
     viewLog: "Veure registre",
     noOutput: "Sense sortida encara",
     foregroundHint: "Monitor del procés",

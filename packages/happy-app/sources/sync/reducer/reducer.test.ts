@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { NormalizedMessage } from '../typesRaw';
-import { createReducer } from './reducer';
-import { reducer } from './reducer';
+import { createReducer, reducer, completeStaleBackgroundTasks } from './reducer';
 import { AgentState } from '../storageTypes';
 
 describe('reducer', () => {
@@ -2907,6 +2906,286 @@ describe('reducer', () => {
                     expect(result.messages[0].children[0].text).toBe('Subagent output');
                 }
             }
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // backgroundTasks registry (SDK event-driven)
+    // -----------------------------------------------------------------------
+
+    describe('backgroundTasks registry', () => {
+        // Helper: create a task-start NormalizedMessage
+        function taskStart(taskId: string, description: string, opts?: {
+            id?: string; createdAt?: number; toolUseId?: string;
+        }): NormalizedMessage {
+            return {
+                id: opts?.id ?? `ts-${taskId}`,
+                localId: null,
+                createdAt: opts?.createdAt ?? 1000,
+                role: 'agent',
+                isSidechain: false,
+                content: [{ type: 'text', text: `Task: ${description}`, uuid: `u-ts-${taskId}`, parentUUID: null }],
+                taskStartInfo: {
+                    taskId,
+                    toolUseId: opts?.toolUseId ?? null,
+                    description,
+                    taskType: null,
+                },
+            };
+        }
+
+        // Helper: create a task-progress NormalizedMessage
+        function taskProgress(taskId: string, summary: string, opts?: {
+            id?: string; createdAt?: number; description?: string;
+        }): NormalizedMessage {
+            return {
+                id: opts?.id ?? `tp-${taskId}`,
+                localId: null,
+                createdAt: opts?.createdAt ?? 2000,
+                role: 'agent',
+                isSidechain: false,
+                content: [{ type: 'text', text: `⏳ ${summary}`, uuid: `u-tp-${taskId}`, parentUUID: null }],
+                taskProgressInfo: {
+                    taskId,
+                    description: opts?.description ?? 'running',
+                    summary,
+                },
+            };
+        }
+
+        // Helper: create a task-end NormalizedMessage
+        function taskEnd(taskId: string, status: 'completed' | 'failed' | 'stopped', opts?: {
+            id?: string; createdAt?: number;
+        }): NormalizedMessage {
+            return {
+                id: opts?.id ?? `te-${taskId}`,
+                localId: null,
+                createdAt: opts?.createdAt ?? 5000,
+                role: 'agent',
+                isSidechain: false,
+                content: [{ type: 'text', text: `Task ${status}`, uuid: `u-te-${taskId}`, parentUUID: null }],
+                taskEndInfo: { taskId, status },
+            };
+        }
+
+        // Helper: create a tool-call + tool-result pair with backgroundTaskId
+        function bgToolMessages(toolId: string, backgroundTaskId: string, opts?: {
+            command?: string; outputFile?: string; createdAt?: number;
+        }): NormalizedMessage[] {
+            const t = opts?.createdAt ?? 500;
+            return [
+                {
+                    id: `tc-${toolId}`,
+                    localId: null,
+                    createdAt: t,
+                    role: 'agent',
+                    isSidechain: false,
+                    content: [{
+                        type: 'tool-call',
+                        id: toolId,
+                        name: 'Bash',
+                        input: { command: opts?.command ?? 'npm start', description: 'Start server' },
+                        description: 'Start server',
+                        uuid: `u-tc-${toolId}`,
+                        parentUUID: null,
+                    }],
+                },
+                {
+                    id: `tr-${toolId}`,
+                    localId: null,
+                    createdAt: t + 100,
+                    role: 'agent',
+                    isSidechain: false,
+                    content: [{
+                        type: 'tool-result',
+                        tool_use_id: toolId,
+                        content: `Command running in background with ID: ${backgroundTaskId}`,
+                        is_error: false,
+                        uuid: `u-tr-${toolId}`,
+                        parentUUID: null,
+                        backgroundTaskId,
+                        outputFile: opts?.outputFile ?? `/tmp/output-${backgroundTaskId}`,
+                    }],
+                },
+            ];
+        }
+
+        it('should create entry from task-start', () => {
+            const state = createReducer();
+            reducer(state, [taskStart('bg-1', 'Running npm start')]);
+
+            expect(state.backgroundTasks.size).toBe(1);
+            const entry = state.backgroundTasks.get('bg-1');
+            expect(entry).toBeDefined();
+            expect(entry!.status).toBe('running');
+            expect(entry!.description).toBe('Running npm start');
+            expect(entry!.command).toBe('');
+            expect(entry!.outputFile).toBeNull();
+        });
+
+        it('should update summary from task-progress', () => {
+            const state = createReducer();
+            reducer(state, [taskStart('bg-1', 'Running tests')]);
+            reducer(state, [taskProgress('bg-1', 'Tests 50% complete')]);
+
+            const entry = state.backgroundTasks.get('bg-1');
+            expect(entry!.summary).toBe('Tests 50% complete');
+        });
+
+        it('should mark completed from task-end', () => {
+            const state = createReducer();
+            reducer(state, [taskStart('bg-1', 'Build project')]);
+            reducer(state, [taskEnd('bg-1', 'completed')]);
+
+            const entry = state.backgroundTasks.get('bg-1');
+            expect(entry!.status).toBe('completed');
+        });
+
+        it('should mark failed from task-end', () => {
+            const state = createReducer();
+            reducer(state, [taskStart('bg-1', 'Build project')]);
+            reducer(state, [taskEnd('bg-1', 'failed')]);
+
+            const entry = state.backgroundTasks.get('bg-1');
+            expect(entry!.status).toBe('failed');
+        });
+
+        it('should enrich entry with outputFile/command from tool-result', () => {
+            const state = createReducer();
+            const msgs = bgToolMessages('tool-1', 'bg-1', {
+                command: 'node server.js',
+                outputFile: '/tmp/bg-1.log',
+            });
+            reducer(state, msgs);
+            reducer(state, [taskStart('bg-1', 'Start server')]);
+
+            const entry = state.backgroundTasks.get('bg-1');
+            expect(entry!.command).toBe('node server.js');
+            expect(entry!.outputFile).toBe('/tmp/bg-1.log');
+            expect(entry!.description).toBe('Start server');
+            expect(entry!.status).toBe('running');
+        });
+
+        it('should handle task-start arriving before tool-result (out of order)', () => {
+            const state = createReducer();
+            // task-start first
+            reducer(state, [taskStart('bg-1', 'Start server', { createdAt: 500 })]);
+            expect(state.backgroundTasks.get('bg-1')!.command).toBe('');
+
+            // tool-result later enriches command/outputFile
+            const msgs = bgToolMessages('tool-1', 'bg-1', {
+                command: 'node server.js',
+                outputFile: '/tmp/bg-1.log',
+                createdAt: 600,
+            });
+            reducer(state, msgs);
+
+            const entry = state.backgroundTasks.get('bg-1');
+            expect(entry!.command).toBe('node server.js');
+            expect(entry!.outputFile).toBe('/tmp/bg-1.log');
+        });
+
+        it('should create provisional entry when tool-result arrives before task-start', () => {
+            const state = createReducer();
+            const msgs = bgToolMessages('tool-1', 'bg-1', {
+                command: 'npm run dev',
+                outputFile: '/tmp/bg-1.log',
+            });
+            reducer(state, msgs);
+
+            // Provisional entry should exist
+            const entry = state.backgroundTasks.get('bg-1');
+            expect(entry).toBeDefined();
+            expect(entry!.status).toBe('running');
+            expect(entry!.command).toBe('npm run dev');
+        });
+
+        it('should handle full lifecycle: tool-result → task-start → task-progress → task-end', () => {
+            const state = createReducer();
+
+            // 1. tool-result
+            reducer(state, bgToolMessages('tool-1', 'bg-1', {
+                command: 'docker run app',
+                outputFile: '/tmp/bg-1.log',
+                createdAt: 1000,
+            }));
+            expect(state.backgroundTasks.get('bg-1')!.status).toBe('running');
+
+            // 2. task-start
+            reducer(state, [taskStart('bg-1', 'Running Docker', { createdAt: 1100 })]);
+            expect(state.backgroundTasks.get('bg-1')!.description).toBe('Running Docker');
+
+            // 3. task-progress
+            reducer(state, [taskProgress('bg-1', 'Container healthy', { createdAt: 2000 })]);
+            expect(state.backgroundTasks.get('bg-1')!.summary).toBe('Container healthy');
+
+            // 4. task-end
+            reducer(state, [taskEnd('bg-1', 'completed', { createdAt: 5000 })]);
+            expect(state.backgroundTasks.get('bg-1')!.status).toBe('completed');
+        });
+
+        it('should also update tool-call message state on task-end', () => {
+            const state = createReducer();
+
+            // Setup: tool-call + tool-result
+            reducer(state, bgToolMessages('tool-1', 'bg-1'));
+            // tool.state should be "running" (forced back by backgroundTaskId handling)
+            const toolMsgId = state.toolIdToMessageId.get('tool-1')!;
+            expect(state.messages.get(toolMsgId)!.tool!.state).toBe('running');
+
+            // task-end should update tool message too
+            reducer(state, [taskEnd('bg-1', 'failed')]);
+            expect(state.messages.get(toolMsgId)!.tool!.state).toBe('error');
+        });
+
+        it('should skip enrichment for already-enriched entries', () => {
+            const state = createReducer();
+
+            // First pass: create + enrich
+            reducer(state, bgToolMessages('tool-1', 'bg-1', {
+                command: 'npm start',
+                outputFile: '/tmp/bg-1.log',
+            }));
+            reducer(state, [taskStart('bg-1', 'Start')]);
+
+            const entry1 = state.backgroundTasks.get('bg-1');
+            expect(entry1!.command).toBe('npm start');
+
+            // Second pass: reducer called again with no new messages
+            // should not re-process (early exit)
+            reducer(state, []);
+            const entry2 = state.backgroundTasks.get('bg-1');
+            expect(entry2).toEqual(entry1);
+        });
+
+        describe('completeStaleBackgroundTasks', () => {
+            it('should mark all running tasks as stopped', () => {
+                const state = createReducer();
+                reducer(state, [taskStart('bg-1', 'Task 1')]);
+                reducer(state, [taskStart('bg-2', 'Task 2')]);
+                reducer(state, [taskEnd('bg-2', 'completed')]);
+
+                const affected = completeStaleBackgroundTasks(state);
+
+                // Only bg-1 was running
+                expect(state.backgroundTasks.get('bg-1')!.status).toBe('stopped');
+                expect(state.backgroundTasks.get('bg-2')!.status).toBe('completed');
+                // affected only contains tool-call message IDs (bg-1 had no tool messages)
+                expect(affected).toHaveLength(0);
+            });
+
+            it('should update tool-call messages and return their IDs', () => {
+                const state = createReducer();
+                reducer(state, bgToolMessages('tool-1', 'bg-1'));
+                reducer(state, [taskStart('bg-1', 'Task 1')]);
+
+                const affected = completeStaleBackgroundTasks(state);
+
+                expect(affected).toHaveLength(1);
+                const toolMsgId = state.toolIdToMessageId.get('tool-1')!;
+                expect(state.messages.get(toolMsgId)!.tool!.state).toBe('error');
+                expect(state.backgroundTasks.get('bg-1')!.status).toBe('stopped');
+            });
         });
     });
 });

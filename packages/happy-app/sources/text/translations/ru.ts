@@ -2530,6 +2530,7 @@ export const ru: TranslationStructure = {
     running: "Выполняется",
     completed: "Завершено",
     failed: "Ошибка",
+    stopped: "Остановлено",
     viewLog: "Просмотр логов",
     noOutput: "Нет вывода",
     foregroundHint: "Монитор процесса",

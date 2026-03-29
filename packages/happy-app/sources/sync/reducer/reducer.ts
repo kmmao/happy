@@ -128,6 +128,18 @@ import {
 } from "./reducerHelpers";
 import { log } from '@/log';
 
+/** SDK event-driven background task entry, maintained by task-start/progress/end events */
+export type BackgroundTaskEntry = {
+  readonly taskId: string;
+  readonly toolUseId: string | null;
+  readonly command: string;
+  readonly description: string;
+  readonly outputFile: string | null;
+  readonly startedAt: number;
+  readonly status: "running" | "completed" | "failed" | "stopped";
+  readonly summary: string | null;
+};
+
 export type ReducerState = {
   toolIdToMessageId: Map<string, string>; // toolId/permissionId -> messageId (since they're the same now)
   sidechainToolIdToMessageId: Map<string, string>; // toolId -> sidechain messageId (for dual tracking)
@@ -176,6 +188,8 @@ export type ReducerState = {
   latestAgentTextTime: number;
   resolvedModelId?: string; // Actual model ID from turn-end (e.g. "claude-opus-4-6")
   backgroundTaskIdToMessageId: Map<string, string>; // backgroundTaskId -> messageId
+  /** SDK event-driven background task registry, keyed by taskId */
+  backgroundTasks: Map<string, BackgroundTaskEntry>;
   contextUsage?: {
     totalTokens: number;
     maxTokens: number;
@@ -207,6 +221,7 @@ export function createReducer(): ReducerState {
     tracerState: createTracer(),
     latestAgentTextTime: 0,
     backgroundTaskIdToMessageId: new Map(),
+    backgroundTasks: new Map(),
     turnHadUsageStats: false,
   };
 }
@@ -964,22 +979,124 @@ export function reducer(
   }
 
   //
-  // Phase 3.5: Apply task-end status updates to background tasks
+  // Phase 3.5: Maintain backgroundTasks registry from SDK lifecycle events
+  // Also applies task-end status to tool-call messages (for tool bubble UI)
   // (must run after Phase 3 which populates backgroundTaskIdToMessageId)
   //
+  // IMPORTANT: backgroundTasks Map is mutated in-place below. After modifications,
+  // we must replace it with a new Map so Zustand detects the reference change.
+  let bgTasksDirty = false;
 
   for (const msg of nonSidechainMessages) {
-    if (msg.role !== "agent" || !msg.taskEndInfo) continue;
-    const bgMsgId = state.backgroundTaskIdToMessageId.get(msg.taskEndInfo.taskId);
-    if (!bgMsgId) continue;
-    const bgMessage = state.messages.get(bgMsgId);
-    if (!bgMessage?.tool) continue;
-    bgMessage.tool.state =
-      msg.taskEndInfo.status === "failed" ? "error" :
-      msg.taskEndInfo.status === "stopped" ? "error" :
-      "completed";
-    bgMessage.tool.completedAt = msg.createdAt;
-    changed.add(bgMsgId);
+    if (msg.role !== "agent") continue;
+
+    // task-start → create entry in backgroundTasks
+    if (msg.taskStartInfo) {
+      const { taskId, toolUseId, description } = msg.taskStartInfo;
+      const existing = state.backgroundTasks.get(taskId);
+      if (existing) {
+        state.backgroundTasks.set(taskId, {
+          ...existing,
+          toolUseId: toolUseId ?? existing.toolUseId,
+          description,
+        });
+      } else {
+        state.backgroundTasks.set(taskId, {
+          taskId,
+          toolUseId: toolUseId ?? null,
+          command: "",
+          description,
+          outputFile: null,
+          startedAt: msg.createdAt,
+          status: "running",
+          summary: null,
+        });
+      }
+      bgTasksDirty = true;
+    }
+
+    // task-progress → update summary
+    if (msg.taskProgressInfo) {
+      const entry = state.backgroundTasks.get(msg.taskProgressInfo.taskId);
+      if (entry) {
+        state.backgroundTasks.set(msg.taskProgressInfo.taskId, {
+          ...entry,
+          description: msg.taskProgressInfo.description,
+          summary: msg.taskProgressInfo.summary ?? entry.summary,
+        });
+        bgTasksDirty = true;
+      }
+    }
+
+    // task-end → update status in backgroundTasks + update tool-call message state
+    if (msg.taskEndInfo) {
+      const { taskId, status } = msg.taskEndInfo;
+      const entry = state.backgroundTasks.get(taskId);
+      if (entry) {
+        state.backgroundTasks.set(taskId, {
+          ...entry,
+          status,
+        });
+        bgTasksDirty = true;
+      }
+      // Also update the tool-call message for tool bubble UI
+      const bgMsgId = state.backgroundTaskIdToMessageId.get(taskId);
+      if (bgMsgId) {
+        const bgMessage = state.messages.get(bgMsgId);
+        if (bgMessage?.tool) {
+          bgMessage.tool.state =
+            status === "failed" ? "error" :
+            status === "stopped" ? "error" :
+            "completed";
+          bgMessage.tool.completedAt = msg.createdAt;
+          changed.add(bgMsgId);
+        }
+      }
+    }
+  }
+
+  // Enrich backgroundTasks with outputFile/command from tool-result metadata.
+  // tool-result may arrive before or after task-start; both must be handled.
+  for (const [taskId, messageId] of state.backgroundTaskIdToMessageId) {
+    const entry = state.backgroundTasks.get(taskId);
+    const toolMsg = state.messages.get(messageId);
+    if (!toolMsg?.tool) continue;
+    const command =
+      typeof toolMsg.tool.input?.command === "string"
+        ? toolMsg.tool.input.command
+        : "";
+    const outputFile = toolMsg.tool.outputFile ?? null;
+    if (entry) {
+      // Only update if tool-result has new info the entry doesn't have yet
+      const needsCommand = !entry.command && command;
+      const needsOutputFile = !entry.outputFile && outputFile;
+      if (!needsCommand && !needsOutputFile) continue;
+      state.backgroundTasks.set(taskId, {
+        ...entry,
+        command: entry.command || command,
+        outputFile: entry.outputFile ?? outputFile,
+      });
+    } else {
+      // tool-result arrived before task-start — create provisional entry
+      state.backgroundTasks.set(taskId, {
+        taskId,
+        toolUseId: null,
+        command,
+        description: typeof toolMsg.tool.input?.description === "string"
+          ? toolMsg.tool.input.description
+          : command,
+        outputFile,
+        startedAt: toolMsg.tool.startedAt ?? toolMsg.createdAt,
+        status: "running",
+        summary: null,
+      });
+    }
+    bgTasksDirty = true;
+  }
+
+  // Replace Map reference so Zustand detects the change
+  if (bgTasksDirty) {
+    state.backgroundTasks = new Map(state.backgroundTasks);
   }
 
   //
@@ -1244,6 +1361,43 @@ export function reducer(
       : undefined,
     hasReadyEvent: hasReadyEvent || undefined,
   };
+}
+
+/**
+ * Force-complete all running background tasks in the reducer state.
+ * Called when a session goes offline — the CLI process is no longer running,
+ * so background tasks cannot be monitored or controlled.
+ * Mutates both backgroundTasks registry and tool-call messages in-place.
+ * Returns affected tool-call message IDs for updating the message map.
+ */
+export function completeStaleBackgroundTasks(
+  state: ReducerState,
+): string[] {
+  const now = Date.now();
+  const affected: string[] = [];
+
+  // Update backgroundTasks registry — mark as stopped (not completed, since they were interrupted)
+  let bgDirty = false;
+  for (const [taskId, entry] of state.backgroundTasks) {
+    if (entry.status === "running") {
+      state.backgroundTasks.set(taskId, { ...entry, status: "stopped" });
+      bgDirty = true;
+    }
+  }
+  if (bgDirty) {
+    state.backgroundTasks = new Map(state.backgroundTasks);
+  }
+
+  // Update tool-call messages (tool.state only supports "running"|"completed"|"error",
+  // so stopped maps to "error" — consistent with Phase 3.5 task-end handling)
+  for (const messageId of state.backgroundTaskIdToMessageId.values()) {
+    const msg = state.messages.get(messageId);
+    if (!msg?.tool || msg.tool.state !== "running") continue;
+    msg.tool.state = "error";
+    msg.tool.completedAt = now;
+    affected.push(messageId);
+  }
+  return affected;
 }
 
 //

@@ -47,6 +47,8 @@ function statusColor(status: BackgroundTask["status"]): string {
             return "#2196F3";
         case "failed":
             return "#F44336";
+        case "stopped":
+            return "#FF9800";
     }
 }
 
@@ -99,7 +101,9 @@ function BackgroundTaskLogSheetInner({ sessionId, task, onClose, onStop, onPrevi
             ? t("backgroundTasks.running")
             : task.status === "completed"
               ? t("backgroundTasks.completed")
-              : t("backgroundTasks.failed");
+              : task.status === "stopped"
+                ? t("backgroundTasks.stopped")
+                : t("backgroundTasks.failed");
 
     return (
         <Modal
