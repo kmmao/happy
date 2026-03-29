@@ -1,9 +1,0 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-python-multipart==0.0.22
-faster-whisper>=1.1.0
-requests
-RealtimeSTT>=0.3.0
-websockets>=12.0
-supervisor>=4.2.0
-numpy

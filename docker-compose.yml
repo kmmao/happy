@@ -76,12 +76,6 @@ services:
       S3_BUCKET: handy
       # 客户端（浏览器/App）访问对象存储的地址，宿主机访问用 localhost
       S3_PUBLIC_URL: http://localhost:9000/handy
-      # STT 微服务地址（同 compose 网络内访问）
-      STT_BASE_URL: http://stt:8000
-      # STT WebSocket 地址（流式语音识别）
-      STT_WS_URL: ws://stt:8001/ws
-      # TTS 微服务地址（同 compose 网络内访问）
-      TTS_BASE_URL: http://tts:8000
       # Anthropic API: key 从 .env 读取，URL 通过宿主机 socat 转发到 Tailscale 代理
       # 宿主机 launchd: com.happy.anthropic-proxy → socat 0.0.0.0:8899 → 100.85.22.83:8899
       ANTHROPIC_BASE_URL: http://host.docker.internal:8899
@@ -92,10 +86,6 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-      stt:
-        condition: service_started
-      tts:
-        condition: service_started
     ports:
       - "3005:3005"
     command: >
@@ -103,42 +93,6 @@ services:
       cd /repo/packages/happy-server && npx prisma migrate deploy &&
       cd /repo && yarn --cwd packages/happy-server start
       "
-
-  stt:
-    build:
-      context: .
-      dockerfile: services/stt/Dockerfile
-      args:
-        STT_MODEL: turbo
-    environment:
-      # faster-whisper model size: tiny/base/small/medium/turbo/large-v3
-      STT_MODEL: turbo
-      STT_WS_PORT: "8001"
-    volumes:
-      # Persist downloaded Whisper models across container rebuilds
-      - happy_stt_models:/root/.cache/huggingface
-    ports:
-      # 宿主机端口改为更普通的 8082（容器内仍是 8000）
-      - "8082:8000"
-      # WebSocket 流式语音识别
-      - "8084:8001"
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  tts:
-    build:
-      context: .
-      dockerfile: services/tts/Dockerfile
-    ports:
-      - "8083:8000"
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
   caddy:
     build:
@@ -164,7 +118,6 @@ volumes:
   happy_pgdata:
   happy_redisdata:
   happy_miniodata:
-  happy_stt_models:
   happy_caddy_sites:
   happy_caddy_data:
   happy_caddy_config:

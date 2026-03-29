@@ -287,10 +287,6 @@ export const es: TranslationStructure = {
     showAgentActivity: "Actividad del agente",
     showAgentActivityEnabled: "Mostrar actividad del agente en tiempo real",
     showAgentActivityDisabled: "Detalles de actividad del agente ocultos",
-    sttCorrection: "Corrección de transcripción de voz",
-    sttCorrectionEnabled: "IA corrige errores de reconocimiento de voz",
-    sttCorrectionDisabled:
-      "Usando resultado de reconocimiento de voz sin procesar",
     knowledgeBase: "Base de conocimiento",
     knowledgeBaseEnabled: "Base de conocimiento del proyecto activa",
     knowledgeBaseDisabled: "Base de conocimiento desactivada",
@@ -1075,14 +1071,6 @@ export const es: TranslationStructure = {
         `${count} ${plural({ count, singular: "idioma", plural: "idiomas" })} disponibles`,
       autoDetect: "Detectar automáticamente",
     },
-    // TTS provider settings
-    ttsProviderTitle: "Proveedor TTS",
-    ttsProviderDescription:
-      "Elige entre Edge TTS gratuito o ElevenLabs TTS de pago con tu propia clave API.",
-    ttsProviderEdge: "Edge TTS (Gratis)",
-    ttsProviderEdgeSubtitle: "Microsoft Edge TTS, gratis e ilimitado",
-    ttsProviderElevenLabs: "ElevenLabs (De pago)",
-    ttsProviderElevenLabsSubtitle: "Alta calidad, requiere tu propia clave API",
     elevenLabsApiKey: "Clave API",
     elevenLabsApiKeyPlaceholder: "Introduce tu clave API de ElevenLabs",
     elevenLabsVoiceId: "Voice ID",

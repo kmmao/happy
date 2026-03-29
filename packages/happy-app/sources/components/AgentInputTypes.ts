@@ -18,7 +18,6 @@ export interface ReasoningProps {
 export interface SttProps {
     onSttPress?: () => void;
     isSttListening?: boolean;
-    isSttCorrecting?: boolean;
 }
 
 /** Image/file attachment handling */

@@ -260,10 +260,6 @@ export const ru: TranslationStructure = {
     showAgentActivity: "Активность агента",
     showAgentActivityEnabled: "Показывать активность агента в чате",
     showAgentActivityDisabled: "Детали активности агента скрыты",
-    sttCorrection: "Коррекция голосовой транскрипции",
-    sttCorrectionEnabled: "ИИ исправляет ошибки распознавания речи",
-    sttCorrectionDisabled:
-      "Используется необработанный результат распознавания",
     knowledgeBase: "База знаний",
     knowledgeBaseEnabled: "База знаний проекта активна",
     knowledgeBaseDisabled: "База знаний отключена",
@@ -1085,14 +1081,6 @@ export const ru: TranslationStructure = {
         `Доступно ${count} ${plural({ count, one: "язык", few: "языка", many: "языков" })}`,
       autoDetect: "Автоопределение",
     },
-    // TTS provider settings
-    ttsProviderTitle: "Провайдер TTS",
-    ttsProviderDescription:
-      "Выберите бесплатный Edge TTS или платный ElevenLabs TTS с вашим собственным API-ключом.",
-    ttsProviderEdge: "Edge TTS (бесплатно)",
-    ttsProviderEdgeSubtitle: "Microsoft Edge TTS, бесплатно и без ограничений",
-    ttsProviderElevenLabs: "ElevenLabs (платно)",
-    ttsProviderElevenLabsSubtitle: "Высокое качество, требуется ваш API-ключ",
     elevenLabsApiKey: "API-ключ",
     elevenLabsApiKeyPlaceholder: "Введите ваш API-ключ ElevenLabs",
     elevenLabsVoiceId: "Voice ID",

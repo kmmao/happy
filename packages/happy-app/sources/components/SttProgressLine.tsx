@@ -7,61 +7,30 @@ const LINE_HEIGHT = 2;
 
 const LISTENING_LINE_BG = "rgba(255, 59, 48, 0.15)";
 const LISTENING_SHIMMER = "rgba(255, 59, 48, 0.8)";
-const CORRECTING_LINE_BG = "rgba(88, 86, 214, 0.15)";
-const CORRECTING_SHIMMER = "rgba(88, 86, 214, 0.8)";
 
 /**
- * A thin progress shimmer that sweeps from left to right.
- * - In listening mode: sweeps once per `value` change (red).
- * - In correcting mode: loops continuously (purple).
+ * A thin progress shimmer that sweeps from left to right
+ * whenever the display text changes while STT is listening.
  */
 export const SttProgressLine = React.memo(function SttProgressLine({
     active,
     value,
-    correcting = false,
 }: {
     active: boolean;
     /** Pass the current display text — a shimmer triggers whenever it changes. */
     value: string;
-    /** When true, show a continuous looping shimmer in a different color. */
-    correcting?: boolean;
 }) {
     const { width: screenWidth } = useWindowDimensions();
     const shimmer = React.useRef(new Animated.Value(0)).current;
     const prevValueRef = React.useRef(value);
     const animRef = React.useRef<Animated.CompositeAnimation | null>(null);
 
-    // Continuous loop for correcting mode
+    // Single sweep per value change
     React.useEffect(() => {
-        if (!active || !correcting) return;
-
-        animRef.current?.stop();
-        shimmer.setValue(0);
-
-        const anim = Animated.loop(
-            Animated.timing(shimmer, {
-                toValue: 1,
-                duration: SHIMMER_DURATION,
-                useNativeDriver: true,
-            }),
-        );
-        animRef.current = anim;
-        anim.start();
-
-        return () => {
-            anim.stop();
+        if (!active) {
+            animRef.current?.stop();
             animRef.current = null;
-        };
-    }, [active, correcting, shimmer]);
-
-    // Single sweep per value change for listening mode
-    React.useEffect(() => {
-        if (!active || correcting) {
-            if (!correcting) {
-                animRef.current?.stop();
-                animRef.current = null;
-                shimmer.setValue(0);
-            }
+            shimmer.setValue(0);
             return;
         }
 
@@ -82,7 +51,7 @@ export const SttProgressLine = React.memo(function SttProgressLine({
         anim.start(({ finished }) => {
             if (finished) animRef.current = null;
         });
-    }, [active, correcting, value, shimmer]);
+    }, [active, value, shimmer]);
 
     // Cleanup on unmount
     React.useEffect(() => {
@@ -99,15 +68,12 @@ export const SttProgressLine = React.memo(function SttProgressLine({
 
     if (!active) return null;
 
-    const lineBg = correcting ? CORRECTING_LINE_BG : LISTENING_LINE_BG;
-    const shimmerColor = correcting ? CORRECTING_SHIMMER : LISTENING_SHIMMER;
-
     return (
         <View
             style={{
                 width: "100%",
                 height: LINE_HEIGHT,
-                backgroundColor: lineBg,
+                backgroundColor: LISTENING_LINE_BG,
                 overflow: "hidden",
                 borderBottomLeftRadius: 16,
                 borderBottomRightRadius: 16,
@@ -120,7 +86,7 @@ export const SttProgressLine = React.memo(function SttProgressLine({
                     left: 0,
                     width: shimmerWidth,
                     height: LINE_HEIGHT,
-                    backgroundColor: shimmerColor,
+                    backgroundColor: LISTENING_SHIMMER,
                     borderRadius: LINE_HEIGHT / 2,
                     transform: [{ translateX }],
                 }}

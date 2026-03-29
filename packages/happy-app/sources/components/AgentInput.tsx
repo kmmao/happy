@@ -1809,7 +1809,7 @@ export const AgentInput = React.memo(
               </View>
             </View>
             {/* STT progress shimmer — absolutely pinned to bottom edge of panel */}
-            {(props.stt?.isSttListening || props.stt?.isSttCorrecting) && (
+            {props.stt?.isSttListening && (
               <View
                 style={{
                   position: "absolute",
@@ -1819,9 +1819,8 @@ export const AgentInput = React.memo(
                 }}
               >
                 <SttProgressLine
-                  active={!!props.stt?.isSttListening || !!props.stt?.isSttCorrecting}
+                  active={!!props.stt?.isSttListening}
                   value={props.value}
-                  correcting={!!props.stt?.isSttCorrecting}
                 />
               </View>
             )}

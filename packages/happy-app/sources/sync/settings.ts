@@ -359,11 +359,6 @@ export const SettingsSchema = z.object({
     .describe(
       "Show real-time agent activity details in chat (thinking state, subagent info, tool descriptions)",
     ),
-  sttCorrection: z
-    .boolean()
-    .describe(
-      "Enable Haiku-based STT correction to fix homophones and punctuation errors in voice transcripts",
-    ),
   knowledgeBase: z
     .boolean()
     .describe("Enable project knowledge base (experimental)"),
@@ -676,7 +671,6 @@ export const settingsDefaults: Settings = {
   analyticsOptOut: false,
   experiments: false,
   showAgentActivity: true,
-  sttCorrection: false,
   knowledgeBase: false,
   knowledgeBaseMode: "auto" as const,
   knowledgeBaseSensitivity: "balanced" as const,

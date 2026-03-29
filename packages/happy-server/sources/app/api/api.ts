@@ -16,8 +16,6 @@ import { startSocket } from "./socket";
 import { machinesRoutes } from "./routes/machinesRoutes";
 import { devRoutes } from "./routes/devRoutes";
 import { versionRoutes } from "./routes/versionRoutes";
-import { sttRoutes, setupSttWebSocket } from "./routes/sttRoutes";
-import { ttsRoutes } from "./routes/ttsRoutes";
 import { artifactsRoutes } from "./routes/artifactsRoutes";
 import { accessKeysRoutes } from "./routes/accessKeysRoutes";
 import { enableMonitoring } from "./utils/enableMonitoring";
@@ -60,9 +58,6 @@ export async function startApi() {
   app.register(import("@fastify/multipart"), {
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max audio file
   });
-  // NOTE: Do NOT register @fastify/websocket here.
-  // It hijacks ALL WebSocket upgrade events and breaks Socket.IO (/v1/updates).
-  // STT WebSocket is handled manually via setupSttWebSocket() below.
   app.get("/", function (request, reply) {
     reply.send("Welcome to Happy Server!");
   });
@@ -108,8 +103,6 @@ export async function startApi() {
   accessKeysRoutes(typed);
   devRoutes(typed);
   versionRoutes(typed);
-  sttRoutes(typed);
-  ttsRoutes(typed);
   userRoutes(typed);
   feedRoutes(typed);
   kvRoutes(typed);
@@ -135,9 +128,6 @@ export async function startApi() {
 
   // Start Socket
   startSocket(typed);
-
-  // Start STT WebSocket proxy (raw ws, does not conflict with Socket.IO)
-  setupSttWebSocket(app.server);
 
   // End
   log("API ready on port http://localhost:" + port);

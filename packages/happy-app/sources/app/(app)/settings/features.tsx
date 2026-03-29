@@ -28,7 +28,6 @@ function FeaturesSettingsScreen() {
   );
   const [useEnhancedSessionWizard, setUseEnhancedSessionWizard] =
     useSettingMutable("useEnhancedSessionWizard");
-  const [sttCorrection, setSttCorrection] = useSettingMutable("sttCorrection");
   const [knowledgeBase, setKnowledgeBase] = useSettingMutable("knowledgeBase");
   const [knowledgeBaseMode, setKnowledgeBaseMode] = useSettingMutable("knowledgeBaseMode");
   const [knowledgeBaseSensitivity, setKnowledgeBaseSensitivity] = useSettingMutable("knowledgeBaseSensitivity");
@@ -99,19 +98,6 @@ function FeaturesSettingsScreen() {
               value={useEnhancedSessionWizard}
               onValueChange={setUseEnhancedSessionWizard}
             />
-          }
-          showChevron={false}
-        />
-        <Item
-          title={t("settingsFeatures.sttCorrection")}
-          subtitle={
-            sttCorrection
-              ? t("settingsFeatures.sttCorrectionEnabled")
-              : t("settingsFeatures.sttCorrectionDisabled")
-          }
-          icon={<Ionicons name="mic-outline" size={29} color={theme.colors.accentTeal} />}
-          rightElement={
-            <Switch value={sttCorrection} onValueChange={setSttCorrection} />
           }
           showChevron={false}
         />

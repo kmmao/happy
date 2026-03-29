@@ -60,8 +60,6 @@ import { t } from "@/text";
 import { tracking, trackMessageSent } from "@/track";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
-import { correctTranscript } from "@/sync/apiStt";
-import { TokenStorage } from "@/auth/tokenStorage";
 import { isRunningOnMac } from "@/utils/platform";
 import {
   useDeviceType,
@@ -550,8 +548,6 @@ function SessionViewInner({
 
   // Speech-to-text: append transcripts to the input field
   const voiceAssistantLanguage = useSetting("voiceAssistantLanguage");
-  const [isSttCorrecting, setIsSttCorrecting] = React.useState(false);
-
   const handleTranscript = React.useCallback((text: string) => {
     setMessage((prev) => {
       const trimmed = prev.trimEnd();
@@ -563,49 +559,6 @@ function SessionViewInner({
     handleTranscript,
     voiceAssistantLanguage ?? undefined,
   );
-
-  // Correct full input content when STT stops listening
-  const prevListeningRef = React.useRef(false);
-  const messageRef = React.useRef(message);
-  messageRef.current = message;
-  React.useEffect(() => {
-    const wasListening = prevListeningRef.current;
-    prevListeningRef.current = stt.isListening;
-    if (
-      wasListening &&
-      !stt.isListening &&
-      storage.getState().settings.sttCorrection
-    ) {
-      const text = messageRef.current.trim();
-      if (!text) return;
-      let cancelled = false;
-      setIsSttCorrecting(true);
-      (async () => {
-        try {
-          const credentials = await TokenStorage.getCredentials();
-          if (credentials && !cancelled) {
-            const corrected = await correctTranscript(
-              credentials,
-              text,
-              voiceAssistantLanguage ?? undefined,
-            );
-            if (!cancelled && corrected !== text) {
-              setMessage(corrected);
-            }
-          }
-        } catch {
-          // Keep original text
-        } finally {
-          if (!cancelled) {
-            setIsSttCorrecting(false);
-          }
-        }
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }
-  }, [stt.isListening, voiceAssistantLanguage]);
 
   // Collapsible input state
   const collapsibleInput = useCollapsibleInput({
@@ -985,7 +938,6 @@ function SessionViewInner({
         stt={{
           onSttPress: onSttToggle,
           isSttListening: stt.isListening,
-          isSttCorrecting: isSttCorrecting,
         }}
         onAbort={() => sessionInterrupt(sessionId)}
         showAbortButton={
