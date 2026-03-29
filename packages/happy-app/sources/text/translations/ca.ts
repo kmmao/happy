@@ -1089,6 +1089,7 @@ export const ca: TranslationStructure = {
     elevenLabsVoiceIdSubtitle:
       "Deixa buit per a la veu predeterminada (Rachel)",
     elevenLabsConfig: "ElevenLabs",
+    elevenLabsApiKeyDescription: "Introdueix la teva clau API d'ElevenLabs per habilitar converses de veu. Obtén-ne una a elevenlabs.io/app/settings/api-keys",
   },
 
   voiceStatusBar: {

@@ -119,6 +119,7 @@ export function voiceRoutes(app: Fastify) {
         schema: {
             body: z.object({
                 agentId: z.string(),
+                userApiKey: z.string().optional(),
             }),
             response: {
                 200: VoiceTokenResponseSchema,
@@ -129,40 +130,42 @@ export function voiceRoutes(app: Fastify) {
         },
     }, async (request, reply) => {
         const userId = request.userId;
-        const { agentId } = request.body;
+        const { agentId, userApiKey } = request.body;
 
-        log({ module: 'voice' }, `Voice token request from user ${userId}`);
+        log({ module: 'voice' }, `Voice token request from user ${userId}${userApiKey ? ' (own key)' : ''}`);
 
-        const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
+        // Prefer user's own API key, fall back to server-configured key
+        const elevenLabsApiKey = userApiKey || process.env.ELEVENLABS_API_KEY;
         if (!elevenLabsApiKey) {
-            log({ module: 'voice' }, 'Missing ELEVENLABS_API_KEY');
-            return reply.code(500).send({ error: 'Voice service not configured' });
+            log({ module: 'voice' }, 'No API key available (neither user nor server)');
+            return reply.code(500).send({ error: 'Voice service not configured. Please add your ElevenLabs API key in Settings → Voice.' });
         }
 
         const elevenUserId = deriveElevenUserId(userId);
 
-        // Check usage against ElevenLabs conversation history
-        let usedSeconds: number;
-        try {
-            usedSeconds = await getUsedVoiceSeconds(elevenLabsApiKey, elevenUserId);
-        } catch (error) {
-            log({ module: 'voice' }, `Failed to check voice usage for user ${userId}: ${error}`);
-            return reply.code(500).send({ error: 'Failed to check voice usage' });
-        }
+        // Only check usage and paywall when using server's key (not user's own)
+        let usedSeconds = 0;
+        if (!userApiKey) {
+            try {
+                usedSeconds = await getUsedVoiceSeconds(elevenLabsApiKey, elevenUserId);
+            } catch (error) {
+                log({ module: 'voice' }, `Failed to check voice usage for user ${userId}: ${error}`);
+                return reply.code(500).send({ error: 'Failed to check voice usage' });
+            }
 
-        log({ module: 'voice' }, `User ${userId} has used ${usedSeconds}s of ${VOICE_FREE_LIMIT_SECONDS}s`);
+            log({ module: 'voice' }, `User ${userId} has used ${usedSeconds}s of ${VOICE_FREE_LIMIT_SECONDS}s`);
 
-        // If over the free limit, check subscription
-        if (usedSeconds >= VOICE_FREE_LIMIT_SECONDS) {
-            const subscribed = await hasActiveSubscription(userId);
-            if (!subscribed) {
-                return reply.send({
-                    allowed: false as const,
-                    reason: 'voice_limit_reached' as const,
-                    usedSeconds,
-                    limitSeconds: VOICE_FREE_LIMIT_SECONDS,
-                    agentId,
-                });
+            if (usedSeconds >= VOICE_FREE_LIMIT_SECONDS) {
+                const subscribed = await hasActiveSubscription(userId);
+                if (!subscribed) {
+                    return reply.send({
+                        allowed: false as const,
+                        reason: 'voice_limit_reached' as const,
+                        usedSeconds,
+                        limitSeconds: VOICE_FREE_LIMIT_SECONDS,
+                        agentId,
+                    });
+                }
             }
         }
 
@@ -180,7 +183,11 @@ export function voiceRoutes(app: Fastify) {
             );
 
             if (!tokenResponse.ok) {
-                log({ module: 'voice' }, `Failed to get ElevenLabs token: ${tokenResponse.status}`);
+                const status = tokenResponse.status;
+                log({ module: 'voice' }, `Failed to get ElevenLabs token: ${status}`);
+                if (status === 401 || status === 403) {
+                    return reply.code(500).send({ error: 'Invalid ElevenLabs API key. Please check your key in Settings → Voice.' });
+                }
                 return reply.code(500).send({ error: 'Failed to get voice token' });
             }
 
@@ -193,7 +200,7 @@ export function voiceRoutes(app: Fastify) {
                 agentId,
                 elevenUserId,
                 usedSeconds,
-                limitSeconds: VOICE_FREE_LIMIT_SECONDS,
+                limitSeconds: userApiKey ? 0 : VOICE_FREE_LIMIT_SECONDS,
             });
         } catch (error) {
             log({ module: 'voice' }, `ElevenLabs token request error: ${error}`);

@@ -1069,6 +1069,7 @@ export const en = {
     elevenLabsVoiceIdPlaceholder: "Default: Rachel",
     elevenLabsVoiceIdSubtitle: "Leave empty for default voice (Rachel)",
     elevenLabsConfig: "ElevenLabs",
+    elevenLabsApiKeyDescription: "Enter your own ElevenLabs API key to enable voice conversations. Get one at elevenlabs.io/app/settings/api-keys",
   },
 
   voiceStatusBar: {

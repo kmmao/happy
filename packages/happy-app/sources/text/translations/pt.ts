@@ -1087,6 +1087,7 @@ export const pt: TranslationStructure = {
     elevenLabsVoiceIdPlaceholder: "Padrão: Rachel",
     elevenLabsVoiceIdSubtitle: "Deixe vazio para a voz padrão (Rachel)",
     elevenLabsConfig: "ElevenLabs",
+    elevenLabsApiKeyDescription: "Insira sua chave API do ElevenLabs para ativar conversas por voz. Obtenha em elevenlabs.io/app/settings/api-keys",
   },
 
   voiceStatusBar: {

@@ -1044,6 +1044,7 @@ export const zhHant: TranslationStructure = {
     elevenLabsVoiceIdPlaceholder: "預設：Rachel",
     elevenLabsVoiceIdSubtitle: "留空使用預設語音（Rachel）",
     elevenLabsConfig: "ElevenLabs",
+    elevenLabsApiKeyDescription: "輸入你的 ElevenLabs API 金鑰以啟用語音對話。在 elevenlabs.io/app/settings/api-keys 取得",
   },
 
   voiceStatusBar: {

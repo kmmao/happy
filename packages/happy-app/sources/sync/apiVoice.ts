@@ -1,6 +1,7 @@
 import { AuthCredentials } from '@/auth/tokenStorage';
 import { getServerUrl } from './serverConfig';
 import { config } from '@/config';
+import { storage } from './storage';
 
 export type VoiceTokenResponse =
     | { allowed: true; token: string; agentId: string; elevenUserId: string; usedSeconds: number; limitSeconds: number }
@@ -18,6 +19,9 @@ export async function fetchVoiceToken(
         throw new Error('Agent ID not configured');
     }
 
+    // User's own API key from settings (optional, bypasses server-side usage gating)
+    const userApiKey = storage.getState().settings.elevenLabsApiKey || undefined;
+
     const response = await fetch(`${serverUrl}/v1/voice/token`, {
         method: 'POST',
         headers: {
@@ -25,7 +29,8 @@ export async function fetchVoiceToken(
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            agentId
+            agentId,
+            ...(userApiKey ? { userApiKey } : {}),
         })
     });
 

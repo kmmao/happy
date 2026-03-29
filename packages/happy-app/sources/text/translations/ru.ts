@@ -1100,6 +1100,7 @@ export const ru: TranslationStructure = {
     elevenLabsVoiceIdSubtitle:
       "Оставьте пустым для голоса по умолчанию (Rachel)",
     elevenLabsConfig: "ElevenLabs",
+    elevenLabsApiKeyDescription: "Введите ваш API-ключ ElevenLabs для голосовых разговоров. Получите на elevenlabs.io/app/settings/api-keys",
   },
 
   voiceStatusBar: {

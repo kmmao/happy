@@ -1174,6 +1174,7 @@ export const it: TranslationStructure = {
     elevenLabsVoiceIdPlaceholder: "Predefinito: Rachel",
     elevenLabsVoiceIdSubtitle: "Lascia vuoto per la voce predefinita (Rachel)",
     elevenLabsConfig: "ElevenLabs",
+    elevenLabsApiKeyDescription: "Inserisci la tua chiave API ElevenLabs per abilitare le conversazioni vocali. Ottienila su elevenlabs.io/app/settings/api-keys",
   },
 
   voiceStatusBar: {
