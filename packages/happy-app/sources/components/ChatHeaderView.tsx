@@ -10,6 +10,8 @@ import { Typography } from "@/constants/Typography";
 import { useHeaderHeight } from "@/utils/responsive";
 import { layout } from "@/components/layout";
 import { useUnistyles } from "react-native-unistyles";
+import { DevButton } from "@/components/DevButton";
+import type { DevButtonState } from "@/hooks/useDevButton";
 
 interface ChatHeaderViewProps {
   title: string;
@@ -25,6 +27,11 @@ interface ChatHeaderViewProps {
   isConnected?: boolean;
   flavor?: string | null;
   knowledgeCount?: number;
+  devButtonState?: DevButtonState;
+  devRunningCount?: number;
+  devTotalCount?: number;
+  onDevPress?: () => void;
+  onDevLongPress?: () => void;
 }
 
 export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
@@ -39,6 +46,11 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   isConnected = true,
   flavor,
   knowledgeCount,
+  devButtonState,
+  devRunningCount,
+  devTotalCount,
+  onDevPress,
+  onDevLongPress,
 }) => {
   const { theme } = useUnistyles();
   const router = useRouter();
@@ -159,6 +171,17 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                 {knowledgeCount}
               </Text>
             </View>
+          )}
+
+          {devButtonState && devButtonState !== "hidden" && onDevPress && (
+            <DevButton
+              state={devButtonState}
+              runningCount={devRunningCount ?? 0}
+              totalCount={devTotalCount ?? 0}
+              onPress={onDevPress}
+              onLongPress={onDevLongPress}
+              tintColor={theme.colors.header.tint}
+            />
           )}
 
           {onRefreshPress && (

@@ -2513,6 +2513,19 @@ export const en: TranslationStructure = {
     stopConfirmMessage: "Are you sure you want to stop this background task?",
     stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Stop "${name}" on port ${port}?`,
     stopConfirmDetailNoPort: ({ name }: { name: string }) => `Stop "${name}"?`,
+    streaming: "Live",
+  },
+
+  devServices: {
+    title: "Dev Services",
+    noServices: "No running dev services",
+    starting: "Starting...",
+    healthy: "Healthy",
+    stopAll: "Stop All",
+    stopAllConfirm: "Stop all running dev services?",
+    viewLog: "View Log",
+    preview: "Preview",
+    port: ({ port }: { port: string }) => `:${port}`,
   },
 
   processManager: {

@@ -2433,6 +2433,19 @@ export const zhHant: TranslationStructure = {
     stopConfirmMessage: "確定要停止這個背景任務嗎？",
     stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `確定要停止「${name}」（連接埠 ${port}）嗎？`,
     stopConfirmDetailNoPort: ({ name }: { name: string }) => `確定要停止「${name}」嗎？`,
+    streaming: "即時",
+  },
+
+  devServices: {
+    title: "開發服務",
+    noServices: "沒有運行中的開發服務",
+    starting: "啟動中...",
+    healthy: "健康",
+    stopAll: "全部停止",
+    stopAllConfirm: "停止所有運行中的開發服務？",
+    viewLog: "檢視日誌",
+    preview: "預覽",
+    port: ({ port }: { port: string }) => `:${port}`,
   },
 
   processManager: {

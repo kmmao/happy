@@ -2527,6 +2527,19 @@ export const ca: TranslationStructure = {
     stopConfirmMessage: "Esteu segur que voleu aturar aquesta tasca en segon pla?",
     stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Aturar "${name}" al port ${port}?`,
     stopConfirmDetailNoPort: ({ name }: { name: string }) => `Aturar "${name}"?`,
+    streaming: "En directe",
+  },
+
+  devServices: {
+    title: "Serveis de desenvolupament",
+    noServices: "Cap servei de desenvolupament en execució",
+    starting: "Iniciant...",
+    healthy: "Saludable",
+    stopAll: "Atura tot",
+    stopAllConfirm: "Aturar tots els serveis de desenvolupament en execució?",
+    viewLog: "Veure registre",
+    preview: "Previsualització",
+    port: ({ port }: { port: string }) => `:${port}`,
   },
 
   processManager: {

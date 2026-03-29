@@ -2541,6 +2541,19 @@ export const ru: TranslationStructure = {
     stopConfirmMessage: "Вы уверены, что хотите остановить эту фоновую задачу?",
     stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Остановить «${name}» на порту ${port}?`,
     stopConfirmDetailNoPort: ({ name }: { name: string }) => `Остановить «${name}»?`,
+    streaming: "Прямой эфир",
+  },
+
+  devServices: {
+    title: "Сервисы разработки",
+    noServices: "Нет запущенных сервисов разработки",
+    starting: "Запуск...",
+    healthy: "Работает",
+    stopAll: "Остановить все",
+    stopAllConfirm: "Остановить все запущенные сервисы разработки?",
+    viewLog: "Просмотр лога",
+    preview: "Предпросмотр",
+    port: ({ port }: { port: string }) => `:${port}`,
   },
 
   processManager: {

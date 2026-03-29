@@ -56,11 +56,12 @@ function BackgroundTaskLogSheetInner({ sessionId, task, onClose, onStop, onPrevi
 
     const isForeground = task !== null && !task.outputFile;
 
-    // Background task log (polls outputFile)
+    // Background task log (real-time streaming with poll fallback)
     const bgLog = useBackgroundTaskLog(
         sessionId,
         task?.outputFile ?? null,
         task !== null && !isForeground,
+        task?.taskId,
     );
 
     // Foreground task monitor (polls process status via ps/grep)

@@ -2543,6 +2543,19 @@ export const pl: TranslationStructure = {
     stopConfirmMessage: "Czy na pewno chcesz zatrzymać to zadanie w tle?",
     stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Zatrzymać "${name}" na porcie ${port}?`,
     stopConfirmDetailNoPort: ({ name }: { name: string }) => `Zatrzymać "${name}"?`,
+    streaming: "Na żywo",
+  },
+
+  devServices: {
+    title: "Usługi deweloperskie",
+    noServices: "Brak uruchomionych usług deweloperskich",
+    starting: "Uruchamianie...",
+    healthy: "Zdrowy",
+    stopAll: "Zatrzymaj wszystko",
+    stopAllConfirm: "Zatrzymać wszystkie uruchomione usługi deweloperskie?",
+    viewLog: "Zobacz log",
+    preview: "Podgląd",
+    port: ({ port }: { port: string }) => `:${port}`,
   },
 
   processManager: {

@@ -311,6 +311,15 @@ export const ApiEphemeralKnowledgeCountSchema = z.object({
   count: z.number(),
 });
 
+export const ApiEphemeralTaskLogSchema = z.object({
+    type: z.literal("task-log"),
+    sessionId: z.string(),
+    taskId: z.string(),
+    outputFile: z.string(),
+    chunk: z.string(),
+    offset: z.number(),
+});
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
@@ -322,6 +331,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralSupervisorStatusSchema,
   ApiEphemeralSupervisorLoopStatusSchema,
   ApiEphemeralKnowledgeCountSchema,
+  ApiEphemeralTaskLogSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

@@ -236,6 +236,13 @@ export interface ClientToServerEvents {
       }[];
     }) => void,
   ) => void;
+  "task-log": (data: {
+    sid: string;
+    taskId: string;
+    outputFile: string;
+    chunk: string;
+    offset: number;
+  }) => void;
 }
 
 /**

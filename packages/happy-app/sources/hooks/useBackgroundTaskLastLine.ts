@@ -1,9 +1,8 @@
 /**
- * Lightweight hook that polls only the last line of a background task's output.
+ * Lightweight hook that provides the last line of a background task's output.
  *
- * Unlike useBackgroundTaskLog (which fetches 200 lines every 3s for the log sheet),
- * this hook reads only 1 line at a 5-second interval — designed for the compact
- * BackgroundTaskBar where we just need a live status glimpse.
+ * Primary: listens for task-log ephemeral events and extracts the last line.
+ * Fallback: polls tail -n 1 every 5s (for older CLI versions or non-background tasks).
  *
  * For Docker tasks, also checks if the container is still running via docker inspect.
  * Polling stops when `enabled` is false or the component unmounts.
@@ -11,6 +10,7 @@
 
 import * as React from "react";
 import { sessionBash } from "@/sync/ops";
+import { sync } from "@/sync/sync";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -19,10 +19,17 @@ function stripAnsi(line: string): string {
     return line.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").trim();
 }
 
-/** Extract Docker container name from a docker run command */
+/** Extract Docker container name from a docker run command (sanitized) */
 function extractDockerName(command: string): string | null {
     const match = command.match(/--name\s+(\S+)/);
-    return match ? match[1] : null;
+    if (!match) return null;
+    // Only allow safe container name characters to prevent command injection
+    return /^[a-zA-Z0-9_.-]+$/.test(match[1]) ? match[1] : null;
+}
+
+/** Escape a file path for safe shell interpolation via single quotes */
+function shellEscape(path: string): string {
+    return `'${path.replace(/'/g, "'\\''")}'`;
 }
 
 export type BackgroundTaskLineState = {
@@ -35,6 +42,7 @@ export function useBackgroundTaskLastLine(
     outputFile: string | null,
     command: string,
     enabled: boolean,
+    taskId?: string,
 ): BackgroundTaskLineState {
     const [state, setState] = React.useState<BackgroundTaskLineState>({
         lastLine: "",
@@ -45,6 +53,25 @@ export function useBackgroundTaskLastLine(
     const dockerName = React.useMemo(() => extractDockerName(command), [command]);
     const isDocker = /\bdocker\s+run\b/i.test(command);
 
+    // Listen for streaming chunks to extract last line
+    React.useEffect(() => {
+        if (!enabled || !taskId) return;
+
+        const unsubscribe = sync.onTaskLog((evSessionId, evTaskId, chunk) => {
+            if (evSessionId !== sessionId || evTaskId !== taskId) return;
+            // Extract the last non-empty line from the chunk
+            const lines = chunk.split("\n").filter((l) => l.trim().length > 0);
+            if (lines.length > 0) {
+                const raw = lines[lines.length - 1];
+                setState({ lastLine: stripAnsi(raw), isDead: false });
+                failCountRef.current = 0;
+            }
+        });
+
+        return unsubscribe;
+    }, [enabled, taskId, sessionId]);
+
+    // Fallback polling
     const fetchLastLine = React.useCallback(async () => {
         if (!outputFile) return;
 
@@ -66,7 +93,7 @@ export function useBackgroundTaskLastLine(
 
         try {
             const result = await sessionBash(sessionId, {
-                command: `tail -n 1 ${outputFile} 2>/dev/null`,
+                command: `tail -n 1 ${shellEscape(outputFile)} 2>/dev/null`,
             });
             const line = stripAnsi(result.stdout ?? "").trim();
             if (line.length > 0) {
@@ -88,12 +115,14 @@ export function useBackgroundTaskLastLine(
 
     React.useEffect(() => {
         if (!enabled || !outputFile) return;
+        // If we have a taskId, streaming handles real-time updates;
+        // use a slower poll just for liveness checking
+        const interval = taskId ? POLL_INTERVAL_MS * 6 : POLL_INTERVAL_MS;
 
         fetchLastLine();
-
-        const interval = setInterval(fetchLastLine, POLL_INTERVAL_MS);
-        return () => clearInterval(interval);
-    }, [enabled, outputFile, fetchLastLine]);
+        const timer = setInterval(fetchLastLine, interval);
+        return () => clearInterval(timer);
+    }, [enabled, outputFile, fetchLastLine, taskId]);
 
     return state;
 }

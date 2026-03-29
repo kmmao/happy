@@ -342,6 +342,14 @@ export type EphemeralEvent =
       id: string;
       count: number;
     }
+  | {
+      type: "task-log";
+      sessionId: string;
+      taskId: string;
+      outputFile: string;
+      chunk: string;
+      offset: number;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===

@@ -150,6 +150,7 @@ function TaskItem({
         task.outputFile,
         task.command,
         task.isBackground && task.status === "running",
+        task.isBackground ? task.taskId : undefined,
     );
 
     // Auto-dismiss when process exit is detected from log output

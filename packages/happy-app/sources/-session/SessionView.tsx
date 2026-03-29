@@ -30,6 +30,7 @@ import { useSessionIssueInfo } from "@/hooks/useSessionIssueInfo";
 import { useBackgroundTasks, BackgroundTask } from "@/hooks/useBackgroundTasks";
 import { BackgroundTaskBar } from "@/components/BackgroundTaskBar";
 import { BackgroundTaskLogSheet } from "@/components/BackgroundTaskLogSheet";
+import { useDevConfig } from "@/hooks/useDevConfig";
 import { buildSmartLabel, extractPort } from "@/utils/commandAnalysis";
 import { Modal } from "@/modal";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
@@ -121,6 +122,10 @@ export const SessionView = React.memo((props: { id: string }) => {
   const knowledgeCount = useSessionKnowledgeCount(sessionId);
 
   const showAgentActivity = useSetting("showAgentActivity");
+
+  // Dev environment: detect .happy/dev.yml on connected sessions
+  const sessionIsConnected = session?.presence === "online";
+  const { hasConfig: hasDevConfig } = useDevConfig(sessionId, sessionIsConnected);
 
   const hasChanges = storage((state) => {
     const msgs = state.sessionMessages[sessionId]?.messages;
@@ -231,6 +236,9 @@ export const SessionView = React.memo((props: { id: string }) => {
                 : undefined
             }
             onChangesPress={hasChanges ? () => router.push(`/session/${sessionId}/changes`) : undefined}
+            devButtonState={hasDevConfig ? "idle" : "hidden"}
+            onDevPress={hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
+            onDevLongPress={hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
           />
           {/* Voice status bar below header - not on tablet (shown in sidebar) */}
           {!isTablet && realtimeStatus !== "disconnected" && (

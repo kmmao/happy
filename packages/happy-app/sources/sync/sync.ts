@@ -187,6 +187,7 @@ class Sync {
     totalDimensions?: number;
   }) => void>();
   private researchConfigListeners = new Set<(event: ResearchConfigChange) => void>();
+  private taskLogListeners = new Set<(sessionId: string, taskId: string, chunk: string) => void>();
   private supervisorLoopStatusListeners = new Set<(event: {
     loopId: string;
     projectId: string;
@@ -2447,6 +2448,13 @@ class Sync {
       }));
     }
 
+    // Handle task-log: forward log chunks to task-log listeners
+    if (updateData.type === "task-log") {
+      for (const listener of this.taskLogListeners) {
+        listener(updateData.sessionId, updateData.taskId, updateData.chunk);
+      }
+    }
+
     // Handle supervisor-loop-status: notify listeners for real-time Loop status updates.
     if (updateData.type === "supervisor-loop-status") {
       const loopEvent = {
@@ -2701,6 +2709,13 @@ class Sync {
   }) => void): () => void {
     this.supervisorLoopStatusListeners.add(listener);
     return () => { this.supervisorLoopStatusListeners.delete(listener); };
+  }
+
+  // --- Task log streaming subscription ---
+
+  onTaskLog(listener: (sessionId: string, taskId: string, chunk: string) => void): () => void {
+    this.taskLogListeners.add(listener);
+    return () => { this.taskLogListeners.delete(listener); };
   }
 
   destroy() {

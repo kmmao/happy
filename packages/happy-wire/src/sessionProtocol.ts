@@ -175,6 +175,18 @@ export const sessionContextUsageCategorySchema = z.object({
   color: z.string().optional(),
 });
 
+export const sessionTaskLogEventSchema = z.object({
+  t: z.literal("task-log"),
+  /** Background task ID or tool call ID that owns this log stream */
+  taskId: z.string(),
+  /** Path to the output file on the CLI machine */
+  outputFile: z.string(),
+  /** Incremental log content (new lines since last push) */
+  chunk: z.string(),
+  /** Byte offset in the output file where this chunk starts */
+  offset: z.number(),
+});
+
 export const sessionContextUsageEventSchema = z.object({
   t: z.literal("context-usage"),
   totalTokens: z.number(),
@@ -213,6 +225,7 @@ export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionNeedsContinueEventSchema,
   sessionStateChangedEventSchema,
   sessionContextUsageEventSchema,
+  sessionTaskLogEventSchema,
 ]);
 
 export type SessionEvent = z.infer<typeof sessionEventSchema>;
@@ -250,7 +263,8 @@ export const sessionEnvelopeSchema = z
         envelope.ev.t === "prompt-suggestion" ||
         envelope.ev.t === "needs-continue" ||
         envelope.ev.t === "session-state-changed" ||
-        envelope.ev.t === "context-usage") &&
+        envelope.ev.t === "context-usage" ||
+        envelope.ev.t === "task-log") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({

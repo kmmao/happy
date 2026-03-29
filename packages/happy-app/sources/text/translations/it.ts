@@ -2522,6 +2522,19 @@ export const it: TranslationStructure = {
     stopConfirmMessage: "Sei sicuro di voler fermare questa attività in background?",
     stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `Fermare "${name}" sulla porta ${port}?`,
     stopConfirmDetailNoPort: ({ name }: { name: string }) => `Fermare "${name}"?`,
+    streaming: "In diretta",
+  },
+
+  devServices: {
+    title: "Servizi di sviluppo",
+    noServices: "Nessun servizio di sviluppo in esecuzione",
+    starting: "Avvio in corso...",
+    healthy: "Integro",
+    stopAll: "Ferma tutto",
+    stopAllConfirm: "Fermare tutti i servizi di sviluppo in esecuzione?",
+    viewLog: "Visualizza log",
+    preview: "Anteprima",
+    port: ({ port }: { port: string }) => `:${port}`,
   },
 
   processManager: {

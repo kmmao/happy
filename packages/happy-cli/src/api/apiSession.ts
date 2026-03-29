@@ -928,6 +928,21 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
+   * Emit a task-log chunk as an ephemeral event (not persisted to DB).
+   * Used for real-time log streaming from background tasks.
+   * Sent unencrypted since it's volatile data over an authenticated TLS connection.
+   */
+  emitTaskLog(taskId: string, outputFile: string, chunk: string, offset: number) {
+    this.socket.volatile.emit("task-log", {
+      sid: this.sessionId,
+      taskId,
+      outputFile,
+      chunk,
+      offset,
+    });
+  }
+
+  /**
    * Submit knowledge entry to the server for the project knowledge base.
    * Non-blocking: fires and forgets via socket.io.
    */

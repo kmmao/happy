@@ -191,6 +191,29 @@ export async function claudeRemoteLauncher(
   session.client.rpcHandlerManager.registerHandler("stopTask", doStopTask); // Stop background task
   // Removed catch-all stdin handler - now handled by RemoteModeDisplay keyboard handlers
 
+  // Task log streaming: subscribe/unsubscribe to real-time output file monitoring
+  session.client.rpcHandlerManager.registerHandler(
+    "subscribeTaskLog",
+    async (args: { taskId: string; outputFile: string }) => {
+      const { startWatching, isWatching } = await import("@/modules/taskLog/taskLogWatcher");
+      if (isWatching(args.taskId)) {
+        return { ok: true, already: true };
+      }
+      startWatching(args.taskId, args.outputFile, (chunk) => {
+        session.client.emitTaskLog(chunk.taskId, chunk.outputFile, chunk.chunk, chunk.offset);
+      });
+      return { ok: true };
+    },
+  );
+  session.client.rpcHandlerManager.registerHandler(
+    "unsubscribeTaskLog",
+    async (args: { taskId: string }) => {
+      const { stopWatching } = await import("@/modules/taskLog/taskLogWatcher");
+      stopWatching(args.taskId);
+      return { ok: true };
+    },
+  );
+
   // Register RPC handler to allow App to fetch the latest compaction summary
   // In remote mode, read from the JSONL file on demand (no scanner available)
   session.client.rpcHandlerManager.registerHandler(
@@ -1409,6 +1432,14 @@ export async function claudeRemoteLauncher(
           }
         } catch (err) {
           logger.debug(`[knowledge] Error flushing turns on exit: ${err}`);
+        }
+
+        // Stop all task-log watchers
+        try {
+          const { stopAll } = await import("@/modules/taskLog/taskLogWatcher");
+          stopAll();
+        } catch {
+          // ignore — module may not have been loaded
         }
 
         // Flush any remaining messages in the queue

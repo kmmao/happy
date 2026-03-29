@@ -2431,6 +2431,19 @@ export const zhHans: TranslationStructure = {
     stopConfirmMessage: "确定要停止这个后台任务吗？",
     stopConfirmDetail: ({ name, port }: { name: string; port: string }) => `确定要停止「${name}」（端口 ${port}）吗？`,
     stopConfirmDetailNoPort: ({ name }: { name: string }) => `确定要停止「${name}」吗？`,
+    streaming: "实时",
+  },
+
+  devServices: {
+    title: "开发服务",
+    noServices: "没有运行中的开发服务",
+    starting: "启动中...",
+    healthy: "健康",
+    stopAll: "全部停止",
+    stopAllConfirm: "停止所有运行中的开发服务？",
+    viewLog: "查看日志",
+    preview: "预览",
+    port: ({ port }: { port: string }) => `:${port}`,
   },
 
   processManager: {

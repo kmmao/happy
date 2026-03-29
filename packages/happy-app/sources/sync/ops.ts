@@ -983,6 +983,42 @@ export async function sessionBash(
 }
 
 /**
+ * Subscribe to real-time log streaming for a background task.
+ * CLI will start watching the output file and push incremental chunks.
+ */
+export async function subscribeTaskLog(
+    sessionId: string,
+    taskId: string,
+    outputFile: string,
+): Promise<{ ok: boolean; already?: boolean }> {
+    try {
+        return await apiSocket.sessionRPC<
+            { ok: boolean; already?: boolean },
+            { taskId: string; outputFile: string }
+        >(sessionId, "subscribeTaskLog", { taskId, outputFile });
+    } catch {
+        return { ok: false };
+    }
+}
+
+/**
+ * Unsubscribe from real-time log streaming for a background task.
+ */
+export async function unsubscribeTaskLog(
+    sessionId: string,
+    taskId: string,
+): Promise<{ ok: boolean }> {
+    try {
+        return await apiSocket.sessionRPC<
+            { ok: boolean },
+            { taskId: string }
+        >(sessionId, "unsubscribeTaskLog", { taskId });
+    } catch {
+        return { ok: false };
+    }
+}
+
+/**
  * Read a file from the session
  */
 export async function sessionReadFile(
