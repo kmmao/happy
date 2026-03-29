@@ -40,25 +40,50 @@ export default React.memo(function DevScreen() {
 
     /** Write updated config back to .happy/dev.yml on the remote machine */
     const writeConfig = React.useCallback(async (updatedConfig: DevConfig) => {
-        const yml = serializeDevYml(updatedConfig);
-        // Base64 encode → pipe through base64 decode → write file
-        // This avoids all shell escaping issues with heredoc
-        const bytes = new TextEncoder().encode(yml);
-        let binary = "";
-        for (const b of bytes) binary += String.fromCharCode(b);
-        const b64 = btoa(binary);
-        const result = await sessionBash(sessionId, {
-            command: `mkdir -p .happy && echo '${b64}' | base64 -d > .happy/dev.yml`,
-            timeout: 10000,
-        });
-        if (result.success) {
-            invalidateDevConfigCache(sessionId);
-            refresh();
-        } else {
-            await Modal.alert("Save Failed", result.error ?? result.stderr ?? "Unknown error");
+        try {
+            const yml = serializeDevYml(updatedConfig);
+            const bytes = new TextEncoder().encode(yml);
+            let binary = "";
+            for (const b of bytes) binary += String.fromCharCode(b);
+            const b64 = btoa(binary);
+            const result = await sessionBash(sessionId, {
+                command: `mkdir -p .happy && echo '${b64}' | base64 -d > .happy/dev.yml`,
+                timeout: 10000,
+            });
+            if (result.success) {
+                invalidateDevConfigCache(sessionId);
+                refresh();
+                return true;
+            }
+            Modal.alert("Save Failed", result.error ?? result.stderr ?? "Unknown error");
+            return false;
+        } catch (e: any) {
+            Modal.alert("Save Error", e?.message ?? "Unexpected error");
+            return false;
         }
-        return result.success;
     }, [sessionId, refresh]);
+
+    const handleSave = React.useCallback(async (updated: DevService) => {
+        let updatedConfig: DevConfig;
+        if (!config) {
+            updatedConfig = { version: 1, services: [updated] };
+        } else if (editingService) {
+            updatedConfig = {
+                ...config,
+                services: config.services.map((s) =>
+                    s.key === editingService.key ? updated : s,
+                ),
+            };
+        } else {
+            updatedConfig = {
+                ...config,
+                services: [...config.services, updated],
+            };
+        }
+        await writeConfig(updatedConfig);
+        setShowEditSheet(false);
+        setEditingService(null);
+    }, [config, editingService, writeConfig]);
 
     const handleDelete = React.useCallback(async (serviceKey: string) => {
         const confirmed = await Modal.confirm(
@@ -85,32 +110,6 @@ export default React.memo(function DevScreen() {
         setEditingService(null);
         setShowEditSheet(true);
     }, []);
-
-    const handleSave = React.useCallback(async (updated: DevService) => {
-        if (!config) {
-            // Creating first service in a new config
-            const newConfig: DevConfig = { version: 1, services: [updated] };
-            await writeConfig(newConfig);
-        } else if (editingService) {
-            // Editing existing service — replace by key
-            const updatedConfig: DevConfig = {
-                ...config,
-                services: config.services.map((s) =>
-                    s.key === editingService.key ? updated : s,
-                ),
-            };
-            await writeConfig(updatedConfig);
-        } else {
-            // Adding new service
-            const updatedConfig: DevConfig = {
-                ...config,
-                services: [...config.services, updated],
-            };
-            await writeConfig(updatedConfig);
-        }
-        setShowEditSheet(false);
-        setEditingService(null);
-    }, [config, editingService, writeConfig]);
 
     const handleCloseSheet = React.useCallback(() => {
         setShowEditSheet(false);
