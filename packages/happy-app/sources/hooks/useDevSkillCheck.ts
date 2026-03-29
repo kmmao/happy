@@ -47,7 +47,7 @@ const DEV_SKILL_CONTENT = `<!-- happy-dev-skill v${CURRENT_VERSION} -->
 3. 推断启动命令、端口、关联配置文件（configFiles）
 4. 检测可用的端口映射方案（Caddy/Tailscale）自动建议 expose 配置
 5. 读取 package.json scripts 确认启动命令
-6. 生成配置建议并展示给用户确认后写入 .happy/dev.yml
+6. 直接生成 .happy/dev.yml，不逐项询问用户确认，使用合理默认值（profile=dev，端口从配置提取）
 
 ### 2. 解析服务依赖关系
 
