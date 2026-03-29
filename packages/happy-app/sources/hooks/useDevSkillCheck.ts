@@ -19,14 +19,21 @@ export type DevSkillCheckResult = {
 };
 
 /** Current version — bump this when updating the skill content below */
-const CURRENT_VERSION = 1;
+const CURRENT_VERSION = 2;
 
 /** Version tag format in dev.md: <!-- happy-dev-skill v1 --> */
 const VERSION_REGEX = /<!--\s*happy-dev-skill\s+v(\d+)\s*-->/;
 
 /** Minimal /dev skill content to bootstrap on remote machines */
 const DEV_SKILL_CONTENT = `<!-- happy-dev-skill v${CURRENT_VERSION} -->
-自动识别并启动项目的开发环境服务
+识别项目结构并生成开发环境配置，或按配置启动指定服务
+
+## 核心规则
+
+- /dev（无参数）：只生成或显示配置，不启动任何服务
+- /dev <service>：启动指定服务
+- /dev stop：停止服务
+- 启动操作必须由用户明确指定
 
 ## 流程
 
