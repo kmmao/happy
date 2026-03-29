@@ -1291,34 +1291,18 @@ export function reducer(
         ? toolMsg.tool.input.command
         : "";
     const outputFile = toolMsg.tool.outputFile ?? null;
-    if (entry) {
-      // Only update if tool-result has new info the entry doesn't have yet
-      const needsCommand = !entry.command && command;
-      const needsOutputFile = !entry.outputFile && outputFile;
-      if (!needsCommand && !needsOutputFile) continue;
-      state.backgroundTasks.set(taskId, {
-        ...entry,
-        command: entry.command || command,
-        outputFile: entry.outputFile ?? outputFile,
-      });
-    } else {
-      // tool-result has backgroundTaskId but no task-start yet.
-      // Default to "running" — the UI layer handles offline/stale via:
-      // - useBackgroundTasks(isConnected=false) returns empty for offline sessions
-      // - completeStaleBackgroundTasks marks stopped on offline transition
-      state.backgroundTasks.set(taskId, {
-        taskId,
-        toolUseId: null,
-        command,
-        description: typeof toolMsg.tool.input?.description === "string"
-          ? toolMsg.tool.input.description
-          : command,
-        outputFile,
-        startedAt: toolMsg.tool.startedAt ?? toolMsg.createdAt,
-        status: "running",
-        summary: null,
-      });
-    }
+    // Only enrich existing entries (created by task-start in Phase 3.5).
+    // Never create provisional entries from tool-result alone — old sessions
+    // without task-start events should not show ghost tasks in the panel.
+    if (!entry) continue;
+    const needsCommand = !entry.command && command;
+    const needsOutputFile = !entry.outputFile && outputFile;
+    if (!needsCommand && !needsOutputFile) continue;
+    state.backgroundTasks.set(taskId, {
+      ...entry,
+      command: entry.command || command,
+      outputFile: entry.outputFile ?? outputFile,
+    });
     bgTasksDirty = true;
   }
 
