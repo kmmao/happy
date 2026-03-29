@@ -1,5 +1,25 @@
 # 更新日志
 
+## 2.11.0 - 2026-03-29
+
+统一语音输入为系统原生语音识别，移除 Docker STT/TTS 服务，改进 ElevenLabs 语音配置界面。
+
+### 语音输入
+- 移除 Docker Whisper STT 服务 — 所有平台统一使用系统原生语音识别（iOS Siri、Android Google、Web Speech API）
+- 移除 Haiku 语音转写纠错功能（sttCorrection 设置）
+- 移除 Edge TTS 服务及所有相关代码
+- Web 端语音转文字从 475 行精简到 45 行
+
+### 语音设置
+- 新增语音设置页保存按钮和配置状态反馈
+- 新增 ElevenLabs 账户余额和用量显示
+- 新增用户自填 ElevenLabs API Key 支持
+
+### 语音稳定性
+- 修复 ElevenLabs 客户端在缺少 error_event 时崩溃
+- 修复向非活跃语音会话发送上下文更新和文本消息的问题
+- 修复 handleErrorEvent 补丁改为静默忽略而非断开连接
+
 ## 2.10.0 - 2026-03-28
 
 项目知识库语义检索与演化追踪、拖放文件上传、AskUserQuestion 交互式 step 界面恢复、容器管理改进。

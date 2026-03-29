@@ -2,6 +2,24 @@
   "entries": {
     "en": [
       {
+        "version": "2.11.0",
+        "date": "2026-03-29",
+        "summary": "Unified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, and added ElevenLabs voice configuration UI improvements.",
+        "changes": [
+          "Removed Docker Whisper STT service — all platforms now use native speech recognition (iOS Siri, Android Google, Web Speech API)",
+          "Removed Haiku-based voice transcript correction feature (sttCorrection setting)",
+          "Removed Edge TTS service and all related code",
+          "Simplified web speech-to-text from 475 lines to 45 lines",
+          "Added save button and configuration status feedback on voice settings page",
+          "Added ElevenLabs account balance and usage display",
+          "Added user-provided ElevenLabs API Key support",
+          "Fixed ElevenLabs client crash on missing error_event",
+          "Fixed contextual update and text message sent to inactive voice session",
+          "Fixed handleErrorEvent patch to silently ignore rather than disconnect"
+        ],
+        "rawMarkdown": "## 2.11.0 - 2026-03-29\n\n\nUnified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, and added ElevenLabs voice configuration UI improvements.\n\n### Voice Input\n- Removed Docker Whisper STT service — all platforms now use native speech recognition (iOS Siri, Android Google, Web Speech API)\n- Removed Haiku-based voice transcript correction feature (sttCorrection setting)\n- Removed Edge TTS service and all related code\n- Simplified web speech-to-text from 475 lines to 45 lines\n\n### Voice Settings\n- Added save button and configuration status feedback on voice settings page\n- Added ElevenLabs account balance and usage display\n- Added user-provided ElevenLabs API Key support\n\n### Voice Stability\n- Fixed ElevenLabs client crash on missing error_event\n- Fixed contextual update and text message sent to inactive voice session\n- Fixed handleErrorEvent patch to silently ignore rather than disconnect"
+      },
+      {
         "version": "2.10.0",
         "date": "2026-03-28",
         "summary": "Project Knowledge Base with semantic search and evolution tracking, drag-and-drop file uploads, interactive AskUserQuestion step UI restored, and container management improvements.",
@@ -425,6 +443,24 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.11.0",
+        "date": "2026-03-29",
+        "summary": "统一语音输入为系统原生语音识别，移除 Docker STT/TTS 服务，改进 ElevenLabs 语音配置界面。",
+        "changes": [
+          "移除 Docker Whisper STT 服务 — 所有平台统一使用系统原生语音识别（iOS Siri、Android Google、Web Speech API）",
+          "移除 Haiku 语音转写纠错功能（sttCorrection 设置）",
+          "移除 Edge TTS 服务及所有相关代码",
+          "Web 端语音转文字从 475 行精简到 45 行",
+          "新增语音设置页保存按钮和配置状态反馈",
+          "新增 ElevenLabs 账户余额和用量显示",
+          "新增用户自填 ElevenLabs API Key 支持",
+          "修复 ElevenLabs 客户端在缺少 error_event 时崩溃",
+          "修复向非活跃语音会话发送上下文更新和文本消息的问题",
+          "修复 handleErrorEvent 补丁改为静默忽略而非断开连接"
+        ],
+        "rawMarkdown": "## 2.11.0 - 2026-03-29\n\n\n统一语音输入为系统原生语音识别，移除 Docker STT/TTS 服务，改进 ElevenLabs 语音配置界面。\n\n### 语音输入\n- 移除 Docker Whisper STT 服务 — 所有平台统一使用系统原生语音识别（iOS Siri、Android Google、Web Speech API）\n- 移除 Haiku 语音转写纠错功能（sttCorrection 设置）\n- 移除 Edge TTS 服务及所有相关代码\n- Web 端语音转文字从 475 行精简到 45 行\n\n### 语音设置\n- 新增语音设置页保存按钮和配置状态反馈\n- 新增 ElevenLabs 账户余额和用量显示\n- 新增用户自填 ElevenLabs API Key 支持\n\n### 语音稳定性\n- 修复 ElevenLabs 客户端在缺少 error_event 时崩溃\n- 修复向非活跃语音会话发送上下文更新和文本消息的问题\n- 修复 handleErrorEvent 补丁改为静默忽略而非断开连接"
+      },
+      {
         "version": "2.10.0",
         "date": "2026-03-28",
         "summary": "项目知识库语义检索与演化追踪、拖放文件上传、AskUserQuestion 交互式 step 界面恢复、容器管理改进。",
@@ -847,7 +883,7 @@
       }
     ]
   },
-  "latestVersion": "2.10.0",
+  "latestVersion": "2.11.0",
   "availableLocales": [
     "en",
     "zh-Hans"

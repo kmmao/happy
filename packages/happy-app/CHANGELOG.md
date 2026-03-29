@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.11.0 - 2026-03-29
+
+Unified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, and added ElevenLabs voice configuration UI improvements.
+
+### Voice Input
+- Removed Docker Whisper STT service — all platforms now use native speech recognition (iOS Siri, Android Google, Web Speech API)
+- Removed Haiku-based voice transcript correction feature (sttCorrection setting)
+- Removed Edge TTS service and all related code
+- Simplified web speech-to-text from 475 lines to 45 lines
+
+### Voice Settings
+- Added save button and configuration status feedback on voice settings page
+- Added ElevenLabs account balance and usage display
+- Added user-provided ElevenLabs API Key support
+
+### Voice Stability
+- Fixed ElevenLabs client crash on missing error_event
+- Fixed contextual update and text message sent to inactive voice session
+- Fixed handleErrorEvent patch to silently ignore rather than disconnect
+
 ## 2.10.0 - 2026-03-28
 
 Project Knowledge Base with semantic search and evolution tracking, drag-and-drop file uploads, interactive AskUserQuestion step UI restored, and container management improvements.
