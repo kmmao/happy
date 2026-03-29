@@ -1302,11 +1302,10 @@ export function reducer(
         outputFile: entry.outputFile ?? outputFile,
       });
     } else {
-      // No task-start event created this entry — this is either:
-      // 1. An old session without SDK task lifecycle events → task is dead
-      // 2. A race where tool-result arrived before task-start in the same batch
-      //    → task-start will update the entry in Phase 3.5 on the next call
-      // Mark as completed since active tasks always have a task-start entry.
+      // tool-result has backgroundTaskId but no task-start yet.
+      // Default to "running" — the UI layer handles offline/stale via:
+      // - useBackgroundTasks(isConnected=false) returns empty for offline sessions
+      // - completeStaleBackgroundTasks marks stopped on offline transition
       state.backgroundTasks.set(taskId, {
         taskId,
         toolUseId: null,
@@ -1316,7 +1315,7 @@ export function reducer(
           : command,
         outputFile,
         startedAt: toolMsg.tool.startedAt ?? toolMsg.createdAt,
-        status: "completed",
+        status: "running",
         summary: null,
       });
     }
