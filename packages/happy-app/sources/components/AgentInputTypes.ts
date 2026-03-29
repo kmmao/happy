@@ -14,12 +14,6 @@ export interface ReasoningProps {
     onTaskBudgetTokensChange?: (tokens: number | null) => void;
 }
 
-/** Speech-to-text state */
-export interface SttProps {
-    onSttPress?: () => void;
-    isSttListening?: boolean;
-}
-
 /** Image/file attachment handling */
 export interface ImageProps {
     onImagePaste?: (blob: Blob) => void;
@@ -53,7 +47,6 @@ export interface AgentInputProps {
     sendIcon?: React.ReactNode;
     onMicPress?: () => void;
     isMicActive?: boolean;
-    stt?: SttProps;
     permissionMode?: PermissionMode | null;
     availableModes?: PermissionMode[];
     onPermissionModeChange?: (mode: PermissionMode) => void;

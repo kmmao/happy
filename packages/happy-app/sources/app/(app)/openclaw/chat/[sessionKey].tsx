@@ -28,7 +28,6 @@ import { MultiTextInput } from "@/components/MultiTextInput";
 import { hapticsLight } from "@/components/haptics";
 import { pickImagesAsBase64 } from "@/utils/imageUpload";
 import { MAX_IMAGES } from "@/utils/imageUpload.shared";
-import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { OpenClawMessageBubble } from "@/components/openclaw/OpenClawMessageBubble";
 import { OpenClawTypingIndicator } from "@/components/openclaw/OpenClawTypingIndicator";
 
@@ -55,16 +54,6 @@ export default React.memo(function OpenClawChatScreen() {
   const [isPickingImage, setIsPickingImage] = React.useState(false);
   const flatListRef = React.useRef<FlatList>(null);
   const lastProcessedIndexRef = React.useRef(-1);
-
-  // STT hook
-  const handleTranscript = React.useCallback((text: string) => {
-    setInputText((prev) => {
-      const separator = prev.length > 0 ? " " : "";
-      return prev + separator + text;
-    });
-  }, []);
-
-  const stt = useSpeechToText(handleTranscript);
 
   // Set navigation title
   React.useEffect(() => {
@@ -150,22 +139,9 @@ export default React.memo(function OpenClawChatScreen() {
     setPendingImages((prev) => prev.filter((img) => img.id !== id));
   }, []);
 
-  // STT toggle
-  const handleSttToggle = React.useCallback(() => {
-    if (stt.isListening) {
-      stt.stopListening();
-    } else {
-      stt.startListening();
-    }
-  }, [stt]);
-
   // Send message
   const handleSend = React.useCallback(async () => {
     if (!sessionKey || !canSend || isSending) return;
-
-    if (stt.isListening) {
-      stt.stopListening();
-    }
 
     const userMessage = inputText.trim();
     const imagesToSend = [...pendingImages];
@@ -202,7 +178,7 @@ export default React.memo(function OpenClawChatScreen() {
     } catch {
       setIsSending(false);
     }
-  }, [sessionKey, inputText, pendingImages, canSend, isSending, stt, dispatch]);
+  }, [sessionKey, inputText, pendingImages, canSend, isSending, dispatch]);
 
   const handleAbort = React.useCallback(async () => {
     if (!sessionKey || !currentRunId) return;
@@ -256,11 +232,6 @@ export default React.memo(function OpenClawChatScreen() {
       </View>
     );
   }
-
-  // Combine input text with interim STT transcript for display
-  const displayText = stt.interimTranscript
-    ? inputText + (inputText.length > 0 ? " " : "") + stt.interimTranscript
-    : inputText;
 
   // Footer: streaming content + typing indicator (avoids FlatList full-list diff)
   const listFooter =
@@ -367,7 +338,7 @@ export default React.memo(function OpenClawChatScreen() {
             {/* Input field */}
             <View style={styles.inputFieldContainer}>
               <MultiTextInput
-                value={displayText}
+                value={inputText}
                 onChangeText={setInputText}
                 placeholder={t("openclaw.messagePlaceholder")}
                 paddingTop={Platform.OS === "web" ? 10 : 8}
@@ -439,22 +410,6 @@ export default React.memo(function OpenClawChatScreen() {
                   )}
                 </Pressable>
 
-                <Pressable
-                  onPress={handleSttToggle}
-                  style={(p) => [
-                    styles.actionButton,
-                    p.pressed && styles.buttonPressed,
-                    stt.isListening && styles.sttActiveButton,
-                  ]}
-                >
-                  <Ionicons
-                    name={stt.isListening ? "mic" : "mic-outline"}
-                    size={20}
-                    color={
-                      stt.isListening ? "#FF3B30" : theme.colors.textSecondary
-                    }
-                  />
-                </Pressable>
               </View>
 
               <View
@@ -502,7 +457,6 @@ export default React.memo(function OpenClawChatScreen() {
               </View>
             </View>
 
-            {stt.isListening && <View style={styles.sttIndicatorLine} />}
           </View>
         </View>
       </View>
@@ -614,9 +568,6 @@ const styles = StyleSheet.create(() => ({
   actionButtonDisabled: {
     opacity: 0.4,
   },
-  sttActiveButton: {
-    backgroundColor: "rgba(255, 59, 48, 0.1)",
-  },
   imageBadge: {
     position: "absolute",
     top: 0,
@@ -650,12 +601,5 @@ const styles = StyleSheet.create(() => ({
   },
   buttonPressed: {
     opacity: 0.7,
-  },
-  sttIndicatorLine: {
-    height: 2,
-    backgroundColor: "#FF3B30",
-    borderRadius: 1,
-    marginHorizontal: 8,
-    marginTop: 4,
   },
 }));

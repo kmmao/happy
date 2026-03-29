@@ -59,7 +59,6 @@ import { sync } from "@/sync/sync";
 import { t } from "@/text";
 import { tracking, trackMessageSent } from "@/track";
 import { useImageUpload } from "@/hooks/useImageUpload";
-import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { isRunningOnMac } from "@/utils/platform";
 import {
   useDeviceType,
@@ -546,45 +545,15 @@ function SessionViewInner({
     removeImageByPath,
   } = useImageUpload(sessionId);
 
-  // Speech-to-text: append transcripts to the input field
-  const voiceAssistantLanguage = useSetting("voiceAssistantLanguage");
-  const handleTranscript = React.useCallback((text: string) => {
-    setMessage((prev) => {
-      const trimmed = prev.trimEnd();
-      return trimmed ? `${trimmed} ${text}` : text;
-    });
-  }, []);
-
-  const stt = useSpeechToText(
-    handleTranscript,
-    voiceAssistantLanguage ?? undefined,
-  );
-
   // Collapsible input state
   const collapsibleInput = useCollapsibleInput({
     sessionId,
     hasMessages: messages.length > 0,
     promptSuggestion,
     needsContinue,
-    isSttListening: stt.isListening,
+    isSttListening: false,
     hasPendingImages: pendingImagePaths.length > 0,
   });
-
-  // Compute display value: message + real-time interim speech text
-  const displayMessage = stt.interimTranscript
-    ? message.trimEnd()
-      ? `${message.trimEnd()} ${stt.interimTranscript}`
-      : stt.interimTranscript
-    : message;
-
-  // STT toggle: tap to start/stop
-  const onSttToggle = React.useCallback(() => {
-    if (stt.isListening) {
-      stt.stopListening();
-    } else {
-      stt.startListening();
-    }
-  }, [stt]);
 
   // Guard against double-tap send — 300ms debounce covers the realistic fat-finger window.
   // queueMicrotask was insufficient because RN bridge batching can deliver two taps in separate frames.
@@ -844,7 +813,7 @@ function SessionViewInner({
       />
       <AgentInput
         placeholder={t("session.inputPlaceholder")}
-        value={displayMessage}
+        value={message}
         onChangeText={setMessage}
         sessionId={sessionId}
         permissionMode={permissionMode}
@@ -886,16 +855,7 @@ function SessionViewInner({
             sendingRef.current = false;
           }, 300);
 
-          // Use displayMessage to capture any active STT interim transcript.
-          // If the user presses send while STT is still listening, we commit
-          // the full display value (committed text + interim) rather than just
-          // the committed state, which may not yet include the latest utterance.
-          const textToSend = stt.isListening ? displayMessage : message;
-          if (stt.isListening) {
-            stt.stopListening();
-          }
-
-          const text = textToSend.trim();
+          const text = message.trim();
           // Special commands (/compact, /clear) don't support images — send command only
           const isSpecialCommand = /^\/(compact|clear)\b/.test(text);
 
@@ -935,10 +895,6 @@ function SessionViewInner({
         }}
         onMicPress={micButtonState.onMicPress}
         isMicActive={micButtonState.isMicActive}
-        stt={{
-          onSttPress: onSttToggle,
-          isSttListening: stt.isListening,
-        }}
         onAbort={() => sessionInterrupt(sessionId)}
         showAbortButton={
           sessionStatus.state === "thinking" ||

@@ -39,8 +39,6 @@ import { getAllCommands } from "@/sync/suggestionCommands";
 import { t } from "@/text";
 import { getBuiltInProfile } from "@/sync/profileUtils";
 import { AnimatedTokensCost } from "./AnimatedTokensCost";
-import { SttWaveIndicator } from "./SttWaveIndicator";
-import { SttProgressLine } from "./SttProgressLine";
 import { GitBrowseTab } from "./git/GitBrowseTab";
 
 import type { AgentInputProps } from "./AgentInputTypes";
@@ -53,7 +51,6 @@ import { log } from '@/log';
 
 export type {
   ReasoningProps,
-  SttProps,
   ImageProps,
   CommandProps,
   AgentInputProps,
@@ -1689,43 +1686,6 @@ export const AgentInput = React.memo(
                       />
                     )}
 
-                    {/* STT (Speech-to-Text) button */}
-                    {props.stt?.onSttPress && (
-                      <Pressable
-                        onPress={() => {
-                          hapticsLight();
-                          props.stt?.onSttPress?.();
-                        }}
-                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
-                        style={(p) => ({
-                          flexDirection: "row",
-                          alignItems: "center",
-                          borderRadius: Platform.select({
-                            default: 16,
-                            android: 20,
-                          }),
-                          paddingHorizontal: 8,
-                          paddingVertical: 6,
-                          justifyContent: "center",
-                          height: 32,
-                          opacity: p.pressed ? 0.7 : 1,
-                          backgroundColor: props.stt?.isSttListening
-                            ? "#FF3B30"
-                            : undefined,
-                        })}
-                      >
-                        {props.stt?.isSttListening ? (
-                          <SttWaveIndicator />
-                        ) : (
-                          <Ionicons
-                            name="mic-outline"
-                            size={16}
-                            color={theme.colors.button.secondary.tint}
-                          />
-                        )}
-                      </Pressable>
-                    )}
-
                     {/* Git Status Badge */}
                     <GitStatusButton
                       sessionId={props.sessionId}
@@ -1808,22 +1768,6 @@ export const AgentInput = React.memo(
                 </View>
               </View>
             </View>
-            {/* STT progress shimmer — absolutely pinned to bottom edge of panel */}
-            {props.stt?.isSttListening && (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                }}
-              >
-                <SttProgressLine
-                  active={!!props.stt?.isSttListening}
-                  value={props.value}
-                />
-              </View>
-            )}
           </View>
         </View>
       </View>

@@ -56,7 +56,6 @@ import { getBuiltInProfile, DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { AgentInput } from "@/components/AgentInput";
 import { getSuggestions } from "@/components/autocomplete/suggestions";
 import { randomUUID } from "expo-crypto";
-import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import {
   pickImagesAsBase64,
@@ -356,26 +355,6 @@ function NewSessionWizard() {
   });
   const [isCreating, setIsCreating] = React.useState(false);
 
-  // STT (Speech-to-Text)
-  const voiceAssistantLanguage = useSetting("voiceAssistantLanguage");
-  const handleTranscript = React.useCallback((text: string) => {
-    setSessionPrompt((prev) => {
-      const trimmed = prev.trimEnd();
-      return trimmed ? `${trimmed} ${text}` : text;
-    });
-  }, []);
-  const stt = useSpeechToText(
-    handleTranscript,
-    voiceAssistantLanguage ?? undefined,
-  );
-  const onSttToggle = React.useCallback(() => {
-    if (stt.isListening) {
-      stt.stopListening();
-    } else {
-      stt.startListening();
-    }
-  }, [stt]);
-
   // Slash command popover
   const [showCommandList, setShowCommandList] = React.useState(false);
   const handleCommandSelect = React.useCallback((command: string) => {
@@ -385,13 +364,6 @@ function NewSessionWizard() {
     });
     setShowCommandList(false);
   }, []);
-  const sttDisplayValue =
-    stt.isListening && stt.interimTranscript
-      ? sessionPrompt.trimEnd()
-        ? `${sessionPrompt.trimEnd()} ${stt.interimTranscript}`
-        : stt.interimTranscript
-      : sessionPrompt;
-
   // Image/file picking (deferred upload — happens after session creation)
   // Each pending item stores base64 + optional fileName (for non-image files)
   const [pendingImages, setPendingImages] = React.useState<
@@ -1165,13 +1137,7 @@ function NewSessionWizard() {
       return;
     }
 
-    // Use sttDisplayValue to capture any active STT interim transcript.
-    // If the user sends while STT is still listening, commit the full display
-    // value (committed text + interim) rather than just the committed state.
-    const effectivePrompt = stt.isListening ? sttDisplayValue : sessionPrompt;
-    if (stt.isListening) {
-      stt.stopListening();
-    }
+    const effectivePrompt = sessionPrompt;
 
     setIsCreating(true);
 
@@ -1393,9 +1359,6 @@ function NewSessionWizard() {
     selectedMachineId,
     selectedPath,
     sessionPrompt,
-    sttDisplayValue,
-    stt.isListening,
-    stt.stopListening,
     sessionType,
     experimentsEnabled,
     agentType,
@@ -1676,7 +1639,7 @@ function NewSessionWizard() {
               }}
             >
               <AgentInput
-                value={sttDisplayValue}
+                value={sessionPrompt}
                 onChangeText={setSessionPrompt}
                 onSend={handleCreateSession}
                 isSendDisabled={!canCreate}
@@ -1711,10 +1674,6 @@ function NewSessionWizard() {
                   showCommandList,
                   onCommandSelect: handleCommandSelect,
                   onCommandListClose: () => setShowCommandList(false),
-                }}
-                stt={{
-                  onSttPress: onSttToggle,
-                  isSttListening: stt.isListening,
                 }}
                 images={{
                   onImagePaste: handleNewSessionImagePaste,
@@ -2653,7 +2612,7 @@ function NewSessionWizard() {
             }}
           >
             <AgentInput
-              value={sttDisplayValue}
+              value={sessionPrompt}
               onChangeText={setSessionPrompt}
               onSend={handleCreateSession}
               isSendDisabled={!canCreate}
@@ -2690,10 +2649,6 @@ function NewSessionWizard() {
                 showCommandList,
                 onCommandSelect: handleCommandSelect,
                 onCommandListClose: () => setShowCommandList(false),
-              }}
-              stt={{
-                onSttPress: onSttToggle,
-                isSttListening: stt.isListening,
               }}
               images={{
                 onImagePaste: handleNewSessionImagePaste,
