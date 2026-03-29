@@ -22,6 +22,7 @@ type Props = {
     readonly onDelete: (serviceKey: string) => void;
     readonly onConfigFilePress: (path: string) => void;
     readonly onStart?: (serviceKey: string) => void;
+    readonly onStop?: (serviceKey: string) => void;
     readonly isRunning?: boolean;
 };
 
@@ -32,6 +33,7 @@ export const DevServiceCard = React.memo(function DevServiceCard({
     onDelete,
     onConfigFilePress,
     onStart,
+    onStop,
     isRunning,
 }: Props) {
     const { theme } = useUnistyles();
@@ -185,7 +187,15 @@ export const DevServiceCard = React.memo(function DevServiceCard({
                     <Ionicons name="create-outline" size={15} color={theme.colors.textLink} />
                     <Text style={[styles.actionText, { color: theme.colors.textLink }]}>Edit</Text>
                 </Pressable>
-                {onStart && !isRunning && (
+                {isRunning && onStop ? (
+                    <Pressable
+                        style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+                        onPress={() => onStop(service.key)}
+                    >
+                        <Ionicons name="stop" size={14} color="#F44336" />
+                        <Text style={[styles.actionText, { color: "#F44336", fontWeight: "600" }]}>Stop</Text>
+                    </Pressable>
+                ) : onStart && !isRunning ? (
                     <Pressable
                         style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
                         onPress={() => onStart(service.key)}
@@ -193,7 +203,7 @@ export const DevServiceCard = React.memo(function DevServiceCard({
                         <Ionicons name="play" size={14} color="#4CAF50" />
                         <Text style={[styles.actionText, { color: "#4CAF50", fontWeight: "600" }]}>Start</Text>
                     </Pressable>
-                )}
+                ) : null}
                 <Pressable
                     style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
                     onPress={() => onDelete(service.key)}

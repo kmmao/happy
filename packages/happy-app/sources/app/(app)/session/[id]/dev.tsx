@@ -12,7 +12,8 @@ import { useDevSkillCheck } from "@/hooks/useDevSkillCheck";
 import { DevServiceCard } from "@/components/DevServiceCard";
 import { DevServiceEditSheet } from "@/components/DevServiceEditSheet";
 import { serializeDevYml, type DevService, type DevConfig } from "@/utils/devYmlParser";
-import { sessionBash } from "@/sync/ops";
+import { sessionBash, sessionStopTask } from "@/sync/ops";
+import { useBackgroundTaskEntries } from "@/sync/storage";
 import { sync } from "@/sync/sync";
 
 export default React.memo(function DevScreen() {
@@ -30,6 +31,23 @@ export default React.memo(function DevScreen() {
         () => services.map((s) => s.key),
         [services],
     );
+
+    // Match running background tasks to dev services by command substring
+    const backgroundTasks = useBackgroundTaskEntries(sessionId);
+    const runningServiceMap = React.useMemo(() => {
+        const map = new Map<string, string>(); // serviceKey → taskId
+        for (const service of services) {
+            for (const [, entry] of backgroundTasks) {
+                if (entry.status !== "running") continue;
+                // Match by command: the background task command should contain the service command
+                if (entry.command && service.command && entry.command.includes(service.command)) {
+                    map.set(service.key, entry.taskId);
+                    break;
+                }
+            }
+        }
+        return map;
+    }, [services, backgroundTasks]);
 
     const handleEdit = React.useCallback((service: DevService) => {
         setEditingService(service);
@@ -208,9 +226,20 @@ export default React.memo(function DevScreen() {
                                 onEdit={handleEdit}
                                 onDelete={handleDelete}
                                 onConfigFilePress={handleConfigFilePress}
+                                isRunning={runningServiceMap.has(service.key)}
                                 onStart={(key: string) => {
                                     sync.sendMessage(sessionId, `/dev ${key}`);
                                     router.back();
+                                }}
+                                onStop={async (key: string) => {
+                                    const taskId = runningServiceMap.get(key);
+                                    if (taskId) {
+                                        try {
+                                            await sessionStopTask(sessionId, taskId);
+                                        } catch {
+                                            // Best effort
+                                        }
+                                    }
                                 }}
                             />
                         ))}
