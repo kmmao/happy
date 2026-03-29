@@ -12,7 +12,6 @@ import { useDevSkillCheck } from "@/hooks/useDevSkillCheck";
 import { DevServiceCard } from "@/components/DevServiceCard";
 import { DevServiceEditSheet } from "@/components/DevServiceEditSheet";
 import { serializeDevYml, type DevService, type DevConfig } from "@/utils/devYmlParser";
-import { sessionBash } from "@/sync/ops";
 import { sync } from "@/sync/sync";
 
 export default React.memo(function DevScreen() {
@@ -38,52 +37,27 @@ export default React.memo(function DevScreen() {
 
     const router = useRouter();
 
-    /** Write updated config back to .happy/dev.yml on the remote machine */
-    const writeConfig = React.useCallback(async (updatedConfig: DevConfig) => {
-        try {
-            const yml = serializeDevYml(updatedConfig);
-            const bytes = new TextEncoder().encode(yml);
-            let binary = "";
-            for (const b of bytes) binary += String.fromCharCode(b);
-            const b64 = btoa(binary);
-            const result = await sessionBash(sessionId, {
-                command: `mkdir -p .happy && echo '${b64}' | base64 -d > .happy/dev.yml`,
-                timeout: 10000,
-            });
-            if (result.success) {
-                invalidateDevConfigCache(sessionId);
-                refresh();
-                return true;
-            }
-            Modal.alert("Save Failed", result.error ?? result.stderr ?? "Unknown error");
-            return false;
-        } catch (e: any) {
-            Modal.alert("Save Error", e?.message ?? "Unexpected error");
-            return false;
-        }
-    }, [sessionId, refresh]);
-
+    /** Save by sending instruction to AI — more reliable than direct file write */
     const handleSave = React.useCallback(async (updated: DevService) => {
-        let updatedConfig: DevConfig;
-        if (!config) {
-            updatedConfig = { version: 1, services: [updated] };
-        } else if (editingService) {
-            updatedConfig = {
-                ...config,
-                services: config.services.map((s) =>
-                    s.key === editingService.key ? updated : s,
-                ),
-            };
-        } else {
-            updatedConfig = {
-                ...config,
-                services: [...config.services, updated],
-            };
-        }
-        await writeConfig(updatedConfig);
+        const yml = serializeDevYml({
+            version: config?.version ?? 1,
+            services: !config
+                ? [updated]
+                : editingService
+                    ? config.services.map((s) => s.key === editingService.key ? updated : s)
+                    : [...config.services, updated],
+        });
+
+        // Send the full yml content as a message to the session
+        const instruction = editingService
+            ? `请更新 .happy/dev.yml 中服务 "${updated.key}" 的配置为以下内容，完整替换文件：\n\n\`\`\`yaml\n${yml}\n\`\`\``
+            : `请将以下内容写入 .happy/dev.yml（如文件已存在则替换）：\n\n\`\`\`yaml\n${yml}\n\`\`\``;
+
+        sync.sendMessage(sessionId, instruction);
         setShowEditSheet(false);
         setEditingService(null);
-    }, [config, editingService, writeConfig]);
+        router.back();
+    }, [config, editingService, sessionId, router]);
 
     const handleDelete = React.useCallback(async (serviceKey: string) => {
         const confirmed = await Modal.confirm(
@@ -93,12 +67,15 @@ export default React.memo(function DevScreen() {
         );
         if (!confirmed || !config) return;
 
-        const updated: DevConfig = {
+        const updatedConfig: DevConfig = {
             ...config,
             services: config.services.filter((s) => s.key !== serviceKey),
         };
-        await writeConfig(updated);
-    }, [config, writeConfig]);
+        const yml = serializeDevYml(updatedConfig);
+        sync.sendMessage(sessionId, `请将以下内容写入 .happy/dev.yml（替换原文件）：\n\n\`\`\`yaml\n${yml}\n\`\`\``);
+        invalidateDevConfigCache(sessionId);
+        router.back();
+    }, [config, sessionId, router]);
 
     const handleConfigFilePress = React.useCallback((filePath: string) => {
         // file.tsx expects base64-encoded path
