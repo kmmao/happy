@@ -12,7 +12,7 @@ import { useDevSkillCheck } from "@/hooks/useDevSkillCheck";
 import { DevServiceCard } from "@/components/DevServiceCard";
 import { DevServiceEditSheet } from "@/components/DevServiceEditSheet";
 import { serializeDevYml, type DevService, type DevConfig } from "@/utils/devYmlParser";
-import { sessionWriteFile } from "@/sync/ops";
+import { sessionWriteFile, sessionReadFile } from "@/sync/ops";
 import { sync } from "@/sync/sync";
 
 export default React.memo(function DevScreen() {
@@ -46,7 +46,38 @@ export default React.memo(function DevScreen() {
         let binary = "";
         for (const b of bytes) binary += String.fromCharCode(b);
         const base64 = btoa(binary);
-        const result = await sessionWriteFile(sessionId, ".happy/dev.yml", base64);
+
+        // Read existing file hash — needed for writeFile RPC to overwrite
+        // (null = new file, hash string = overwrite existing)
+        let expectedHash: string | null = null;
+        try {
+            const existing = await sessionReadFile(sessionId, ".happy/dev.yml");
+            if (existing.success && existing.content) {
+                // The hash is returned by writeFile, but we need to compute it from content
+                // Actually, sessionWriteFile expects the hash of the existing file
+                // Use a simple approach: read then write with the hash from read response
+                expectedHash = (existing as any).hash ?? "overwrite";
+            }
+        } catch {
+            // File doesn't exist — will create new
+        }
+
+        // If file exists but we couldn't get hash, use sessionBash to compute it
+        if (expectedHash === "overwrite") {
+            try {
+                const { sessionBash } = await import("@/sync/ops");
+                const hashResult = await sessionBash(sessionId, {
+                    command: "sha256sum .happy/dev.yml 2>/dev/null | cut -d' ' -f1",
+                    timeout: 5000,
+                });
+                const hash = (hashResult.stdout ?? "").trim();
+                expectedHash = hash.length === 64 ? hash : null;
+            } catch {
+                expectedHash = null;
+            }
+        }
+
+        const result = await sessionWriteFile(sessionId, ".happy/dev.yml", base64, expectedHash);
         if (result.success) {
             invalidateDevConfigCache(sessionId);
             refresh();
