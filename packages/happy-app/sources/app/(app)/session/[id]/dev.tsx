@@ -41,14 +41,21 @@ export default React.memo(function DevScreen() {
     /** Write updated config back to .happy/dev.yml on the remote machine */
     const writeConfig = React.useCallback(async (updatedConfig: DevConfig) => {
         const yml = serializeDevYml(updatedConfig);
-        // Use sessionBash with heredoc to write file directly — avoids writeFile hash issues
+        // Base64 encode → pipe through base64 decode → write file
+        // This avoids all shell escaping issues with heredoc
+        const bytes = new TextEncoder().encode(yml);
+        let binary = "";
+        for (const b of bytes) binary += String.fromCharCode(b);
+        const b64 = btoa(binary);
         const result = await sessionBash(sessionId, {
-            command: `mkdir -p .happy && cat > .happy/dev.yml << 'HAPPY_DEV_YML_EOF'\n${yml}\nHAPPY_DEV_YML_EOF`,
+            command: `mkdir -p .happy && echo '${b64}' | base64 -d > .happy/dev.yml`,
             timeout: 10000,
         });
         if (result.success) {
             invalidateDevConfigCache(sessionId);
             refresh();
+        } else {
+            await Modal.alert("Save Failed", result.error ?? result.stderr ?? "Unknown error");
         }
         return result.success;
     }, [sessionId, refresh]);
