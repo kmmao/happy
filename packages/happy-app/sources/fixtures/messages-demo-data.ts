@@ -30,13 +30,14 @@ const createReadToolCall = (id: string, filePath: string, startLine: number, end
 
 // Helper function to create user messages that serve as descriptions
 function createSectionTitle(id: string, text: string, timeOffset: number = 0): Message {
-    return { id, localId: null, createdAt: Date.now() - timeOffset, kind: 'user-text', text }
+    return { id, realId: null, localId: null, createdAt: Date.now() - timeOffset, kind: 'user-text', text }
 }
 
 export const debugMessages: Message[] = [
     // User message
     {
         id: 'user-1',
+        realId: null,
         localId: null,
         createdAt: Date.now() - 200000,
         kind: 'user-text',

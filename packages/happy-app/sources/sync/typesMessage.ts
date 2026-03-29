@@ -30,6 +30,8 @@ export type ToolCall = {
 export type UserTextMessage = {
   kind: "user-text";
   id: string;
+  /** SDK real message UUID — used for rewindFiles RPC */
+  realId: string | null;
   localId: string | null;
   createdAt: number;
   text: string;

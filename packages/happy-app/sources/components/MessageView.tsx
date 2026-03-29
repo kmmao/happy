@@ -139,9 +139,14 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
   const [rewinding, setRewinding] = React.useState(false);
   const handleRewind = React.useCallback(async () => {
     if (rewinding) return;
+    const rewindId = props.message.realId;
+    if (!rewindId) {
+      Modal.alert(t("session.rewindFailed"), t("session.rewindUnavailable"));
+      return;
+    }
     setRewinding(true);
     try {
-      const preview = await sessionRewindFiles(props.sessionId, props.message.id, true);
+      const preview = await sessionRewindFiles(props.sessionId, rewindId, true);
       if (!preview.canRewind) {
         Modal.alert(t("session.rewindFailed"), preview.error ?? t("session.rewindUnavailable"));
         return;
@@ -160,7 +165,7 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
       );
       if (!confirmed) return;
 
-      const result = await sessionRewindFiles(props.sessionId, props.message.id, false);
+      const result = await sessionRewindFiles(props.sessionId, rewindId, false);
       if (result.canRewind) {
         Modal.toast(t("session.rewindSuccess"));
       } else {
@@ -169,7 +174,7 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
     } finally {
       setRewinding(false);
     }
-  }, [props.sessionId, props.message.id, rewinding]);
+  }, [props.sessionId, props.message.realId, rewinding]);
 
   const parsed = React.useMemo(
     () => parseImageRefs(props.message.text),

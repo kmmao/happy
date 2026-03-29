@@ -1301,6 +1301,7 @@ function convertReducerMessageToMessage(
   if (reducerMsg.role === "user" && reducerMsg.text !== null) {
     return {
       id: reducerMsg.id,
+      realId: reducerMsg.realID,
       localId: null,
       createdAt: reducerMsg.createdAt,
       kind: "user-text",
