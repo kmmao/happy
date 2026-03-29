@@ -89,13 +89,21 @@ class RealtimeVoiceSessionImpl implements VoiceSession {
     }
 
     sendTextMessage(message: string): void {
-        if (!conversationRef) return;
-        conversationRef.sendUserMessage(message);
+        if (!conversationRef || conversationRef.status !== 'connected') return;
+        try {
+            conversationRef.sendUserMessage(message);
+        } catch {
+            // Session not yet active, ignore
+        }
     }
 
     sendContextualUpdate(update: string): void {
-        if (!conversationRef) return;
-        conversationRef.sendContextualUpdate(update);
+        if (!conversationRef || conversationRef.status !== 'connected') return;
+        try {
+            conversationRef.sendContextualUpdate(update);
+        } catch {
+            // Session not yet active, ignore
+        }
     }
 }
 
