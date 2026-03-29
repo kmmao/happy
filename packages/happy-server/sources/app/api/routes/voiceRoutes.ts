@@ -92,7 +92,7 @@ Rules:
         },
         tts: {
             model_id: "eleven_v3_conversational",
-            voice_id: "EXAVITQu4vr4xnSDxMaL", // Sarah (premade, available on all accounts)
+            voice_id: "gU2KtIu9OZWy3KqiqNj6",
         },
         conversation: {
             max_duration_seconds: 600,
