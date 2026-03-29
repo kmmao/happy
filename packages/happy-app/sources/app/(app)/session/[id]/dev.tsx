@@ -256,7 +256,11 @@ export default React.memo(function DevScreen() {
                                 { backgroundColor: theme.colors.surfaceHigh },
                                 pressed && { opacity: 0.6 },
                             ]}
-                            onPress={refresh}
+                            onPress={() => {
+                                sync.sendMessage(sessionId, "/dev scan");
+                                invalidateDevConfigCache(sessionId);
+                                router.back();
+                            }}
                         >
                             <Ionicons name="refresh" size={18} color={theme.colors.textSecondary} />
                             <Text style={[styles.bottomButtonText, { color: theme.colors.textSecondary }]}>
