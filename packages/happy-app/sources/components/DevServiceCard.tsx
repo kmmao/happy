@@ -1,18 +1,12 @@
 /**
- * Card displaying a single dev service from dev.yml configuration.
- *
- * Shows service name, command, port, config files, and expose mappings.
- * Uses ItemGroup/Item for consistent iOS settings-style layout.
+ * Compact card displaying a single dev service from dev.yml configuration.
+ * Uses custom layout instead of ItemGroup/Item for tighter spacing.
  */
 
 import * as React from "react";
-import { View, Pressable } from "react-native";
+import { View, Pressable, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { Text } from "@/components/StyledText";
-import { Item } from "@/components/Item";
-import { ItemGroup } from "@/components/ItemGroup";
-import { Typography } from "@/constants/Typography";
 import type { DevService } from "@/utils/devYmlParser";
 
 type Props = {
@@ -27,7 +21,6 @@ type Props = {
 
 export const DevServiceCard = React.memo(function DevServiceCard({
     service,
-    sessionId,
     onEdit,
     onDelete,
     onConfigFilePress,
@@ -36,230 +29,232 @@ export const DevServiceCard = React.memo(function DevServiceCard({
 }: Props) {
     const { theme } = useUnistyles();
 
-    const statusIcon = isRunning ? "play-circle" : "play-circle-outline";
     const statusColor = isRunning ? "#4CAF50" : theme.colors.textSecondary;
-
     const hasConfigFiles = (service.configFiles?.length ?? 0) > 0;
     const hasExpose = service.expose?.caddy || service.expose?.tailscale;
 
-    const titleElement = (
-        <View style={styles.titleRow}>
-            <Ionicons name={statusIcon as any} size={16} color={statusColor} />
-            <Text style={[styles.serviceName, { color: theme.colors.text }]}>
-                {service.name}
+    return (
+        <View style={[styles.card, { backgroundColor: theme.colors.surfaceHigh, borderColor: theme.colors.divider }]}>
+            {/* Header: name + port */}
+            <View style={styles.header}>
+                <Ionicons
+                    name={isRunning ? "radio-button-on" : "ellipse-outline"}
+                    size={12}
+                    color={statusColor}
+                />
+                <Text style={[styles.name, { color: theme.colors.text }]}>{service.name}</Text>
+                {service.port != null && (
+                    <View style={[styles.portBadge, { backgroundColor: `${theme.colors.textLink}15` }]}>
+                        <Text style={[styles.portText, { color: theme.colors.textLink }]}>:{service.port}</Text>
+                    </View>
+                )}
+            </View>
+
+            {/* Command */}
+            <Text
+                style={[styles.command, { color: theme.colors.textSecondary }]}
+                numberOfLines={2}
+                selectable
+            >
+                $ {service.command}
             </Text>
-            {service.port != null && (
-                <View style={[styles.portBadge, { backgroundColor: `${theme.colors.textLink}15` }]}>
-                    <Text style={[styles.portText, { color: theme.colors.textLink }]}>
-                        :{service.port}
+
+            {/* Config files — compact list */}
+            {hasConfigFiles && (
+                <View style={[styles.section, { borderTopColor: theme.colors.divider }]}>
+                    {service.configFiles!.map((cf) => (
+                        <Pressable
+                            key={cf.path}
+                            style={({ pressed }) => [styles.fileRow, pressed && { opacity: 0.6 }]}
+                            onPress={() => onConfigFilePress(cf.path)}
+                        >
+                            <Ionicons name="document-text-outline" size={13} color={theme.colors.textSecondary} />
+                            <Text style={[styles.fileLabel, { color: theme.colors.text }]} numberOfLines={1}>
+                                {cf.label || cf.path.split("/").pop()}
+                            </Text>
+                            <Text style={[styles.filePath, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                                {cf.path}
+                            </Text>
+                            <Ionicons name="chevron-forward" size={12} color={theme.colors.textSecondary} />
+                        </Pressable>
+                    ))}
+                </View>
+            )}
+
+            {/* Expose — compact */}
+            {hasExpose && (
+                <View style={[styles.section, { borderTopColor: theme.colors.divider }]}>
+                    {service.expose?.caddy && (
+                        <View style={styles.exposeRow}>
+                            <Ionicons name="globe-outline" size={13} color="#4CAF50" />
+                            <Text style={[styles.exposeText, { color: theme.colors.text }]}>
+                                {service.expose.caddy.hostname}
+                            </Text>
+                            <View style={[styles.tag, { backgroundColor: "#4CAF5015" }]}>
+                                <Text style={[styles.tagText, { color: "#4CAF50" }]}>HTTPS</Text>
+                            </View>
+                        </View>
+                    )}
+                    {service.expose?.tailscale && (
+                        <View style={styles.exposeRow}>
+                            <Ionicons name="swap-horizontal-outline" size={13} color={theme.colors.textLink} />
+                            <Text style={[styles.exposeText, { color: theme.colors.text }]}>
+                                Tailscale :{service.expose.tailscale.httpsPort ?? 443}
+                            </Text>
+                            {service.expose.tailscale.funnel && (
+                                <View style={[styles.tag, { backgroundColor: `${theme.colors.textLink}15` }]}>
+                                    <Text style={[styles.tagText, { color: theme.colors.textLink }]}>Funnel</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </View>
+            )}
+
+            {/* Dependencies — inline */}
+            {(service.depends_on?.length ?? 0) > 0 && (
+                <View style={[styles.depsRow, { borderTopColor: theme.colors.divider }]}>
+                    <Ionicons name="git-branch-outline" size={12} color={theme.colors.textSecondary} />
+                    <Text style={[styles.depsText, { color: theme.colors.textSecondary }]}>
+                        {service.depends_on!.join(" → ")}
                     </Text>
                 </View>
             )}
-        </View>
-    );
 
-    return (
-        <ItemGroup title={titleElement}>
-            {/* Command */}
-            <Item
-                title={service.command}
-                titleStyle={{
-                    fontFamily: "Menlo",
-                    fontSize: 12,
-                    color: theme.colors.textSecondary,
-                }}
-                icon={
-                    <Ionicons
-                        name="terminal-outline"
-                        size={18}
-                        color={theme.colors.textSecondary}
-                    />
-                }
-                showChevron={false}
-                copy={service.command}
-            />
-
-            {/* Config files section */}
-            {hasConfigFiles && (
-                <>
-                    {service.configFiles!.map((cf) => (
-                        <Item
-                            key={cf.path}
-                            title={cf.label || cf.path}
-                            subtitle={cf.path}
-                            subtitleStyle={{
-                                fontFamily: "Menlo",
-                                fontSize: 11,
-                            }}
-                            icon={
-                                <Ionicons
-                                    name="document-text-outline"
-                                    size={18}
-                                    color={theme.colors.textSecondary}
-                                />
-                            }
-                            onPress={() => onConfigFilePress(cf.path)}
-                            showChevron
-                        />
-                    ))}
-                </>
-            )}
-
-            {/* Expose / port mapping section */}
-            {hasExpose && (
-                <>
-                    {service.expose?.caddy && (
-                        <Item
-                            title={`Caddy -> ${service.expose.caddy.hostname}`}
-                            titleStyle={{ fontSize: 13 }}
-                            icon={
-                                <Ionicons
-                                    name="globe-outline"
-                                    size={18}
-                                    color={theme.colors.success}
-                                />
-                            }
-                            rightElement={
-                                <View style={styles.httpsTag}>
-                                    <Ionicons
-                                        name="lock-closed"
-                                        size={10}
-                                        color={theme.colors.success}
-                                    />
-                                    <Text style={[styles.httpsText, { color: theme.colors.success }]}>
-                                        HTTPS
-                                    </Text>
-                                </View>
-                            }
-                            showChevron={false}
-                        />
-                    )}
-                    {service.expose?.tailscale && (
-                        <Item
-                            title={`Tailscale Funnel${service.expose.tailscale.httpsPort ? ` :${service.expose.tailscale.httpsPort}` : " :443"}`}
-                            titleStyle={{ fontSize: 13 }}
-                            icon={
-                                <Ionicons
-                                    name="swap-horizontal-outline"
-                                    size={18}
-                                    color={theme.colors.textLink}
-                                />
-                            }
-                            rightElement={
-                                service.expose.tailscale.funnel ? (
-                                    <View style={[styles.funnelBadge, { backgroundColor: `${theme.colors.textLink}15` }]}>
-                                        <Text style={[styles.funnelText, { color: theme.colors.textLink }]}>
-                                            Funnel ON
-                                        </Text>
-                                    </View>
-                                ) : undefined
-                            }
-                            showChevron={false}
-                        />
-                    )}
-                </>
-            )}
-
-            {/* Dependencies */}
-            {(service.depends_on?.length ?? 0) > 0 && (
-                <Item
-                    title={`Depends on: ${service.depends_on!.join(", ")}`}
-                    titleStyle={{ fontSize: 12, color: theme.colors.textSecondary }}
-                    icon={
-                        <Ionicons
-                            name="git-branch-outline"
-                            size={18}
-                            color={theme.colors.textSecondary}
-                        />
-                    }
-                    showChevron={false}
-                />
-            )}
-
-            {/* Actions — compact horizontal row */}
-            <View style={styles.actionsRow}>
+            {/* Actions — compact horizontal */}
+            <View style={[styles.actions, { borderTopColor: theme.colors.divider }]}>
                 <Pressable
-                    style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+                    style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.5 }]}
                     onPress={() => onEdit(service)}
                 >
-                    <Ionicons name="create-outline" size={15} color={theme.colors.textLink} />
-                    <Text style={[styles.actionText, { color: theme.colors.textLink }]}>Edit</Text>
+                    <Ionicons name="create-outline" size={14} color={theme.colors.textLink} />
+                    <Text style={[styles.actionLabel, { color: theme.colors.textLink }]}>Edit</Text>
                 </Pressable>
                 {onStart && !isRunning && (
                     <Pressable
-                        style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+                        style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.5 }]}
                         onPress={() => onStart(service.key)}
                     >
-                        <Ionicons name="play" size={14} color="#4CAF50" />
-                        <Text style={[styles.actionText, { color: "#4CAF50", fontWeight: "600" }]}>Start</Text>
+                        <Ionicons name="play" size={13} color="#4CAF50" />
+                        <Text style={[styles.actionLabel, { color: "#4CAF50", fontWeight: "600" }]}>Start</Text>
                     </Pressable>
                 )}
                 <Pressable
-                    style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+                    style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.5 }]}
                     onPress={() => onDelete(service.key)}
                 >
-                    <Ionicons name="trash-outline" size={14} color={theme.colors.textSecondary} />
-                    <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>Delete</Text>
+                    <Ionicons name="trash-outline" size={13} color={theme.colors.textSecondary} />
+                    <Text style={[styles.actionLabel, { color: theme.colors.textSecondary }]}>Delete</Text>
                 </Pressable>
             </View>
-        </ItemGroup>
+        </View>
     );
 });
 
-const styles = StyleSheet.create((theme) => ({
-    titleRow: {
+const styles = StyleSheet.create({
+    card: {
+        marginHorizontal: 16,
+        marginVertical: 6,
+        borderRadius: 12,
+        borderWidth: 1,
+        overflow: "hidden",
+    },
+    header: {
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
+        paddingHorizontal: 14,
+        paddingTop: 12,
+        paddingBottom: 4,
     },
-    serviceName: {
+    name: {
         fontSize: 15,
         fontWeight: "600",
-        ...Typography.default("semiBold"),
+        flex: 1,
     },
     portBadge: {
         paddingHorizontal: 6,
-        paddingVertical: 2,
+        paddingVertical: 1,
         borderRadius: 4,
     },
     portText: {
         fontSize: 11,
         fontWeight: "600",
-        fontFamily: "Menlo",
+        fontFamily: "monospace",
     },
-    httpsTag: {
+    command: {
+        fontFamily: "monospace",
+        fontSize: 11,
+        lineHeight: 16,
+        paddingHorizontal: 14,
+        paddingBottom: 8,
+    },
+    section: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        paddingVertical: 4,
+    },
+    fileRow: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 3,
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 5,
     },
-    httpsText: {
-        fontSize: 11,
+    fileLabel: {
+        fontSize: 12,
+        fontWeight: "500",
+    },
+    filePath: {
+        fontSize: 10,
+        fontFamily: "monospace",
+        flex: 1,
+        textAlign: "right",
+    },
+    exposeRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 4,
+    },
+    exposeText: {
+        fontSize: 12,
+        flex: 1,
+    },
+    tag: {
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 3,
+    },
+    tagText: {
+        fontSize: 10,
         fontWeight: "600",
     },
-    funnelBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 4,
+    depsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderTopWidth: StyleSheet.hairlineWidth,
     },
-    funnelText: {
+    depsText: {
         fontSize: 11,
-        fontWeight: "600",
     },
-    actionsRow: {
+    actions: {
         flexDirection: "row",
         justifyContent: "flex-end",
-        gap: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
+        gap: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderTopWidth: StyleSheet.hairlineWidth,
     },
     actionBtn: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 4,
-        paddingVertical: 4,
-        paddingHorizontal: 4,
+        gap: 3,
     },
-    actionText: {
-        fontSize: 13,
+    actionLabel: {
+        fontSize: 12,
     },
-}));
+});
