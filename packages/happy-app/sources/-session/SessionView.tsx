@@ -711,8 +711,8 @@ function SessionViewInner({
     }
     if (realtimeStatus === "disconnected" || realtimeStatus === "error") {
       try {
-        voiceHooks.onVoiceStarted(sessionId);
-        await startRealtimeSession(sessionId);
+        const initialContext = voiceHooks.onVoiceStarted(sessionId);
+        await startRealtimeSession(sessionId, initialContext);
         tracking?.capture("voice_session_started", { sessionId });
       } catch (error) {
         log.error("Failed to start realtime session:", error);

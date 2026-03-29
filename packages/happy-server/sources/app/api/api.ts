@@ -38,6 +38,7 @@ import { webhookRoutes } from "./routes/webhookRoutes";
 import { provisionRoutes } from "./routes/provisionRoutes";
 import { knowledgeRoutes } from "./routes/knowledgeRoutes";
 import { knowledgeSearchRoutes } from "./routes/knowledgeSearchRoutes";
+import { voiceRoutes } from "./routes/voiceRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import * as path from "path";
 import * as fs from "fs";
@@ -123,6 +124,7 @@ export async function startApi() {
   provisionRoutes(typed);
   knowledgeRoutes(typed);
   knowledgeSearchRoutes(typed);
+  voiceRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

@@ -1,86 +1,148 @@
+import { getCurrentRealtimeSessionId, getVoiceSession, isVoiceSessionStarted } from '../RealtimeSession';
 import {
-  getCurrentRealtimeSessionId,
-  isVoiceSessionStarted,
-} from "../RealtimeSession";
-import { realtimeStore } from "../realtimeStore";
-import { Message } from "@/sync/typesMessage";
-import { t } from "@/text";
-import { preprocessTtsText } from "@/utils/ttsTextPreprocess";
-import { splitIntoSentences } from "@/utils/sentenceSplitter";
+    formatNewMessages,
+    formatPermissionRequest,
+    formatReadyEvent,
+    formatSessionFocus,
+    formatSessionFull,
+    formatSessionOffline,
+    formatSessionOnline
+} from './contextFormatters';
+import { storage } from '@/sync/storage';
+import { Message } from '@/sync/typesMessage';
+import { VOICE_CONFIG } from '../voiceConfig';
 
 /**
- * Voice hooks for the direct pipeline architecture.
- * Routes agent-text messages to Edge TTS for audio playback.
+ * Centralized voice assistant hooks for multi-session context updates.
+ * These hooks route app events to the voice assistant with formatted context updates.
  */
 
+interface SessionMetadata {
+    summary?: { text?: string };
+    path?: string;
+    machineId?: string;
+    [key: string]: any;
+}
+
+const shownSessions = new Set<string>();
+let lastFocusSession: string | null = null;
+
+function reportContextualUpdate(update: string | null | undefined) {
+    if (VOICE_CONFIG.ENABLE_DEBUG_LOGGING) {
+        console.log('Voice: Reporting contextual update:', update);
+    }
+    if (!update) return;
+    const voice = getVoiceSession();
+    if (!voice || !isVoiceSessionStarted()) return;
+    voice.sendContextualUpdate(update);
+}
+
+function reportTextUpdate(update: string | null | undefined) {
+    if (VOICE_CONFIG.ENABLE_DEBUG_LOGGING) {
+        console.log('Voice: Reporting text update:', update);
+    }
+    if (!update) return;
+    const voice = getVoiceSession();
+    if (!voice || !isVoiceSessionStarted()) return;
+    voice.sendTextMessage(update);
+}
+
+function reportSession(sessionId: string) {
+    if (shownSessions.has(sessionId)) return;
+    shownSessions.add(sessionId);
+    const session = storage.getState().sessions[sessionId];
+    if (!session) return;
+    const messages = storage.getState().sessionMessages[sessionId]?.messages ?? [];
+    const contextUpdate = formatSessionFull(session, messages);
+    reportContextualUpdate(contextUpdate);
+}
+
 export const voiceHooks = {
-  onSessionOnline(_sessionId: string, _metadata?: Record<string, any>) {
-    // No-op in direct pipeline mode
-  },
 
-  onSessionOffline(_sessionId: string, _metadata?: Record<string, any>) {
-    // No-op in direct pipeline mode
-  },
+    /**
+     * Called when a session comes online/connects
+     */
+    onSessionOnline(sessionId: string, metadata?: SessionMetadata) {
+        if (VOICE_CONFIG.DISABLE_SESSION_STATUS) return;
 
-  onSessionFocus(_sessionId: string, _metadata?: Record<string, any>) {
-    // No-op in direct pipeline mode
-  },
+        reportSession(sessionId);
+        const contextUpdate = formatSessionOnline(sessionId, metadata);
+        reportContextualUpdate(contextUpdate);
+    },
 
-  onPermissionRequested(
-    sessionId: string,
-    _requestId: string,
-    toolName: string,
-    _toolArgs: any,
-  ) {
-    if (!isVoiceSessionStarted()) return;
-    if (getCurrentRealtimeSessionId() !== sessionId) return;
+    /**
+     * Called when a session goes offline/disconnects
+     */
+    onSessionOffline(sessionId: string, metadata?: SessionMetadata) {
+        if (VOICE_CONFIG.DISABLE_SESSION_STATUS) return;
 
-    const { ttsEnqueue } = realtimeStore.getState();
-    if (ttsEnqueue) {
-      ttsEnqueue(
-        t("voiceStatusBar.permissionRequested", { toolName }),
-        `perm_${_requestId}`,
-      );
-    }
-  },
+        reportSession(sessionId);
+        const contextUpdate = formatSessionOffline(sessionId, metadata);
+        reportContextualUpdate(contextUpdate);
+    },
 
-  onMessages(sessionId: string, messages: Message[]) {
-    if (!isVoiceSessionStarted()) return;
-    if (getCurrentRealtimeSessionId() !== sessionId) return;
+    /**
+     * Called when user navigates to/views a session
+     */
+    onSessionFocus(sessionId: string, metadata?: SessionMetadata) {
+        if (VOICE_CONFIG.DISABLE_SESSION_FOCUS) return;
+        if (lastFocusSession === sessionId) return;
+        lastFocusSession = sessionId;
+        reportSession(sessionId);
+        reportContextualUpdate(formatSessionFocus(sessionId, metadata));
+    },
 
-    const { ttsEnqueue } = realtimeStore.getState();
-    if (!ttsEnqueue) return;
+    /**
+     * Called when Claude requests permission for a tool use
+     */
+    onPermissionRequested(sessionId: string, requestId: string, toolName: string, toolArgs: any) {
+        if (VOICE_CONFIG.DISABLE_PERMISSION_REQUESTS) return;
 
-    // Only speak agent-text messages (Claude Code responses)
-    const agentMessages = messages
-      .filter(
-        (m): m is Extract<Message, { kind: "agent-text" }> =>
-          m.kind === "agent-text" && !m.isThinking,
-      )
-      .sort((a, b) => a.createdAt - b.createdAt);
+        reportSession(sessionId);
+        reportTextUpdate(formatPermissionRequest(sessionId, requestId, toolName, toolArgs));
+    },
 
-    for (const msg of agentMessages) {
-      const cleaned = preprocessTtsText(msg.text);
-      if (cleaned) {
-        // Split into sentence-level segments for streaming TTS playback
-        const sentences = splitIntoSentences(cleaned);
-        for (let i = 0; i < sentences.length; i++) {
-          ttsEnqueue(sentences[i], `${msg.id}_s${i}`);
+    /**
+     * Called when agent sends a message/response
+     */
+    onMessages(sessionId: string, messages: Message[]) {
+        if (VOICE_CONFIG.DISABLE_MESSAGES) return;
+
+        reportSession(sessionId);
+        reportContextualUpdate(formatNewMessages(sessionId, messages));
+    },
+
+    /**
+     * Called when voice session starts
+     */
+    onVoiceStarted(sessionId: string): string {
+        if (VOICE_CONFIG.ENABLE_DEBUG_LOGGING) {
+            console.log('Voice session started for:', sessionId);
         }
-      }
+        shownSessions.clear();
+        let prompt = '';
+        prompt += 'THIS IS AN ACTIVE SESSION: \n\n' + formatSessionFull(storage.getState().sessions[sessionId], storage.getState().sessionMessages[sessionId]?.messages ?? []);
+        shownSessions.add(sessionId);
+        return prompt;
+    },
+
+    /**
+     * Called when Claude Code finishes processing (ready event)
+     */
+    onReady(sessionId: string) {
+        if (VOICE_CONFIG.DISABLE_READY_EVENTS) return;
+
+        reportSession(sessionId);
+        reportTextUpdate(formatReadyEvent(sessionId));
+    },
+
+    /**
+     * Called when voice session stops
+     */
+    onVoiceStopped() {
+        if (VOICE_CONFIG.ENABLE_DEBUG_LOGGING) {
+            console.log('Voice session stopped');
+        }
+        shownSessions.clear();
     }
-  },
-
-  onVoiceStarted(_sessionId: string): string {
-    // No initial prompt needed in direct pipeline mode
-    return "";
-  },
-
-  onReady(_sessionId: string) {
-    // No TTS prompt on ready — the user already heard the full reply.
-  },
-
-  onVoiceStopped() {
-    // Cleanup handled by RealtimeVoiceSession.endSession()
-  },
 };

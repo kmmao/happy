@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useConversation } from '@elevenlabs/react-native';
+import { useConversation } from '@elevenlabs/react';
 import { registerVoiceSession } from './RealtimeSession';
 import { storage } from '@/sync/storage';
 import { realtimeClientTools } from './realtimeClientTools';
@@ -21,6 +21,15 @@ class RealtimeVoiceSessionImpl implements VoiceSession {
         try {
             storage.getState().setRealtimeStatus('connecting');
 
+            // Request microphone permission first (web)
+            try {
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (error) {
+                console.error('Failed to get microphone permission:', error);
+                storage.getState().setRealtimeStatus('error');
+                return;
+            }
+
             const userLanguagePreference = storage.getState().settings.voiceAssistantLanguage;
             const elevenLabsLanguage = getElevenLabsCodeFromPreference(userLanguagePreference);
 
@@ -30,6 +39,7 @@ class RealtimeVoiceSessionImpl implements VoiceSession {
 
             conversationRef.startSession({
                 clientTools: realtimeClientTools,
+                connectionType: 'webrtc',
                 dynamicVariables: {
                     sessionId: config.sessionId,
                     initialConversationContext: config.initialContext || ''

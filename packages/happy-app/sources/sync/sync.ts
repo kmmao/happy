@@ -102,7 +102,6 @@ import { projectManager } from "./projectManager";
 import { AsyncLock } from "@/utils/lock";
 import { NonRetryableError } from "@/utils/time";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
-import { realtimeStore } from "@/realtime/realtimeStore";
 import { Message } from "./typesMessage";
 import { EncryptionCache } from "./encryption/encryptionCache";
 import { systemPrompt } from "./prompt/systemPrompt";
@@ -625,11 +624,8 @@ class Sync {
     storage.getState().setPromptSuggestion(sessionId, null);
     storage.getState().setNeedsContinue(sessionId, false);
 
-    // Interrupt TTS if voice session is active (user typed while AI was speaking)
-    const rt = realtimeStore.getState();
-    if (rt.isActive) {
-      rt.interruptTts?.();
-    }
+    // In ElevenLabs Conversational AI mode, TTS interruption is handled
+    // automatically by the ElevenLabs SDK when the user speaks.
 
     // Get encryption
     const encryption = this.encryption.getSessionEncryption(sessionId);

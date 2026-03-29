@@ -187,6 +187,7 @@ export default {
         revenueCatAppleKey: process.env.EXPO_PUBLIC_REVENUE_CAT_APPLE,
         revenueCatGoogleKey: process.env.EXPO_PUBLIC_REVENUE_CAT_GOOGLE,
         revenueCatStripeKey: process.env.EXPO_PUBLIC_REVENUE_CAT_STRIPE,
+        elevenLabsAgentId: process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID,
       },
     },
     // 使用当前登录账号时注释 owner；若在 bulkacorp 团队内且有权限可改回 "bulkacorp"
