@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Animated, View, Text, Pressable, LayoutAnimation, ActivityIndicator, Easing } from "react-native";
+import { BlurView } from "expo-blur";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
@@ -118,32 +119,62 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
         const { theme } = useUnistyles();
         const [expanded, setExpanded] = React.useState(false);
         const [refining, setRefining] = React.useState(false);
-        const pulseAnim = React.useRef(new Animated.Value(1)).current;
+        const glowAnim = React.useRef(new Animated.Value(0)).current;
+        const breatheAnim = React.useRef(new Animated.Value(0)).current;
 
         React.useEffect(() => {
             if (refining) {
-                const loop = Animated.loop(
+                glowAnim.setValue(0);
+                breatheAnim.setValue(0);
+                const colorLoop = Animated.loop(
+                    Animated.timing(glowAnim, {
+                        toValue: 1,
+                        duration: 2000,
+                        easing: Easing.linear,
+                        useNativeDriver: false,
+                    }),
+                );
+                const breatheLoop = Animated.loop(
                     Animated.sequence([
-                        Animated.timing(pulseAnim, {
-                            toValue: 0.45,
-                            duration: 800,
+                        Animated.timing(breatheAnim, {
+                            toValue: 1,
+                            duration: 600,
                             easing: Easing.inOut(Easing.ease),
                             useNativeDriver: true,
                         }),
-                        Animated.timing(pulseAnim, {
-                            toValue: 1,
-                            duration: 800,
+                        Animated.timing(breatheAnim, {
+                            toValue: 0,
+                            duration: 600,
                             easing: Easing.inOut(Easing.ease),
                             useNativeDriver: true,
                         }),
                     ]),
                 );
-                loop.start();
-                return () => loop.stop();
+                colorLoop.start();
+                breatheLoop.start();
+                return () => { colorLoop.stop(); breatheLoop.stop(); };
             } else {
-                pulseAnim.setValue(1);
+                glowAnim.setValue(0);
+                breatheAnim.setValue(0);
             }
-        }, [refining, pulseAnim]);
+        }, [refining, glowAnim, breatheAnim]);
+
+        const glowColor = glowAnim.interpolate({
+            inputRange: [0, 0.2, 0.4, 0.6, 0.8, 1],
+            outputRange: ["#6366F1", "#A855F7", "#EC4899", "#F97316", "#3B82F6", "#6366F1"],
+        });
+        const titleScale = breatheAnim.interpolate({
+            inputRange: [0, 0.5, 1],
+            outputRange: [1, 1.015, 1],
+        });
+        const titleTranslateX = breatheAnim.interpolate({
+            inputRange: [0, 0.25, 0.5, 0.75, 1],
+            outputRange: [0, -0.5, 0, 0.5, 0],
+        });
+        const shimmerOpacity = breatheAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.15, 0.08],
+        });
 
         const typeColor = TYPE_COLORS[entry.entryType] ?? theme.colors.textSecondary;
         const confColor = CONFIDENCE_COLORS[entry.confidence] ?? "#9CA3AF";
@@ -184,7 +215,34 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
         }, [entry.structured]);
 
         return (
-            <Animated.View style={[styles.card, { backgroundColor: theme.colors.surface, opacity: pulseAnim }]}>
+            <Animated.View style={[
+                styles.card,
+                { backgroundColor: theme.colors.surface },
+                refining && {
+                    borderWidth: 1.5,
+                    borderColor: glowColor as unknown as string,
+                    shadowColor: glowColor as unknown as string,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.6,
+                    shadowRadius: 8,
+                    elevation: 8,
+                },
+            ]}>
+                {/* Frosted glass overlay when refining */}
+                {refining && (
+                    <BlurView
+                        intensity={15}
+                        tint="default"
+                        style={{
+                            position: "absolute",
+                            top: 0, left: 0, right: 0, bottom: 0,
+                            borderRadius: 12,
+                            overflow: "hidden",
+                            zIndex: 0,
+                        }}
+                    />
+                )}
+
                 {/* Header row: type badge + title + pinned */}
                 <Pressable
                     style={styles.headerRow}
@@ -217,43 +275,71 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
                 </Pressable>
 
                 {/* Title */}
-                <Text
-                    style={[styles.title, { color: theme.colors.text }]}
-                    numberOfLines={expanded ? undefined : 2}
-                >
-                    {entry.title}
-                </Text>
-
-                {/* Expanded: SOAP fields */}
-                {expanded && soapFields.length > 0 && (
-                    <View style={styles.soapSection}>
-                        {soapFields.map((field) => (
-                            <View key={field.key} style={styles.soapField}>
-                                <Text style={[styles.soapLabel, { color: theme.colors.textSecondary }]}>
-                                    {soapLabel(field.key)}
-                                </Text>
-                                <Text style={[styles.soapValue, { color: theme.colors.text }]}>
-                                    {field.value}
-                                </Text>
-                            </View>
-                        ))}
-                    </View>
+                {refining ? (
+                    <Animated.Text
+                        style={[styles.title, {
+                            color: glowColor as unknown as string,
+                            transform: [{ scale: titleScale }, { translateX: titleTranslateX }],
+                        }]}
+                        numberOfLines={expanded ? undefined : 2}
+                    >
+                        {entry.title}
+                    </Animated.Text>
+                ) : (
+                    <Text
+                        style={[styles.title, { color: theme.colors.text }]}
+                        numberOfLines={expanded ? undefined : 2}
+                    >
+                        {entry.title}
+                    </Text>
                 )}
 
-                {/* Tags */}
-                {entry.tags.length > 0 && (
-                    <View style={styles.tagsRow}>
-                        {entry.tags.map((tag) => (
-                            <View
-                                key={tag}
-                                style={[styles.tagBadge, { backgroundColor: theme.colors.groupped.background }]}
-                            >
-                                <Text style={[styles.tagText, { color: theme.colors.textSecondary }]}>
-                                    {tag}
-                                </Text>
+                {refining ? (
+                    /* Skeleton lines while refining */
+                    <Animated.View style={[styles.soapSection, { opacity: shimmerOpacity }]}>
+                        <Animated.View style={{ width: "90%", height: 13, borderRadius: 4, backgroundColor: glowColor as unknown as string, marginBottom: 6 }} />
+                        <Animated.View style={{ width: "75%", height: 13, borderRadius: 4, backgroundColor: glowColor as unknown as string, marginBottom: 6 }} />
+                        <Animated.View style={{ width: "60%", height: 13, borderRadius: 4, backgroundColor: glowColor as unknown as string, marginBottom: 6 }} />
+                        <View style={[styles.tagsRow, { marginTop: 4 }]}>
+                            <Animated.View style={{ width: 50, height: 16, borderRadius: 4, backgroundColor: glowColor as unknown as string }} />
+                            <Animated.View style={{ width: 65, height: 16, borderRadius: 4, backgroundColor: glowColor as unknown as string }} />
+                            <Animated.View style={{ width: 45, height: 16, borderRadius: 4, backgroundColor: glowColor as unknown as string }} />
+                        </View>
+                    </Animated.View>
+                ) : (
+                    <>
+                        {/* Expanded: SOAP fields */}
+                        {expanded && soapFields.length > 0 && (
+                            <View style={styles.soapSection}>
+                                {soapFields.map((field) => (
+                                    <View key={field.key} style={styles.soapField}>
+                                        <Text style={[styles.soapLabel, { color: theme.colors.textSecondary }]}>
+                                            {soapLabel(field.key)}
+                                        </Text>
+                                        <Text style={[styles.soapValue, { color: theme.colors.text }]}>
+                                            {field.value}
+                                        </Text>
+                                    </View>
+                                ))}
                             </View>
-                        ))}
-                    </View>
+                        )}
+
+                        {/* Tags */}
+                        {entry.tags.length > 0 && (
+                            <View style={styles.tagsRow}>
+                                {entry.tags.map((tag) => (
+                                    <View
+                                        key={tag}
+                                        style={[styles.tagBadge, { backgroundColor: theme.colors.groupped.background }]}
+                                    >
+                                        <Text style={[styles.tagText, { color: theme.colors.textSecondary }]}>
+                                            {tag}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </>
                 )}
 
                 {/* Footer: timestamp + contributor + actions */}
