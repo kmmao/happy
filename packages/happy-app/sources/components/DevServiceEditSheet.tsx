@@ -72,9 +72,9 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
         setBrowseLoading(true);
         setShowBrowse(true);
         try {
-            const cwd = service?.cwd ?? ".";
+            // Search from project root, exclude common noise directories
             const result = await sessionBash(sessionId, {
-                command: `find ${cwd.replace(/'/g, "'\\''")} -maxdepth 3 -type f \\( -name "*.yml" -o -name "*.yaml" -o -name "*.properties" -o -name "*.json" -o -name "*.env*" -o -name "*.config.*" -o -name "*.xml" -o -name "Dockerfile" -o -name "docker-compose*" -o -name "*.toml" -o -name "Makefile" \\) 2>/dev/null | head -30`,
+                command: `find . -maxdepth 4 -type f \\( -name "*.yml" -o -name "*.yaml" -o -name "*.properties" -o -name "*.json" -o -name ".env*" -o -name "*.config.*" -o -name "*.xml" -o -name "Dockerfile" -o -name "docker-compose*" -o -name "*.toml" -o -name "Makefile" \\) -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/target/*" -not -path "*/build/*" -not -path "*/.idea/*" 2>/dev/null | sort | head -50`,
                 timeout: 10000,
             });
             const files = (result.stdout ?? "")
