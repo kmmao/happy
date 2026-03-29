@@ -930,6 +930,9 @@ export function reducer(
     }
   }
 
+  // Track whether backgroundTasks Map was modified (used in Phase 3, 3.5, 6.5)
+  let bgTasksDirty = false;
+
   //
   // Phase 3: Process non-sidechain tool results
   //
@@ -965,6 +968,26 @@ export function reducer(
             // Background tasks stay "running" until task-end event arrives
             message.tool.state = "running";
             state.backgroundTaskIdToMessageId.set(c.backgroundTaskId, messageId);
+
+            // Create backgroundTasks entry if not already present (from task-start).
+            // This ensures tasks are visible on message replay even if task-start
+            // events are not persisted in the message history.
+            if (!state.backgroundTasks.has(c.backgroundTaskId)) {
+              const cmd = typeof message.tool.input?.command === "string"
+                ? message.tool.input.command : "";
+              state.backgroundTasks.set(c.backgroundTaskId, {
+                taskId: c.backgroundTaskId,
+                toolUseId: null,
+                command: cmd,
+                description: typeof message.tool.input?.description === "string"
+                  ? message.tool.input.description : cmd,
+                outputFile: c.outputFile ?? null,
+                startedAt: message.tool.startedAt ?? message.createdAt,
+                status: "running",
+                summary: null,
+              });
+              bgTasksDirty = true;
+            }
           }
 
           // Update permission data if provided by backend
@@ -983,10 +1006,6 @@ export function reducer(
   // Also applies task-end status to tool-call messages (for tool bubble UI)
   // (must run after Phase 3 which populates backgroundTaskIdToMessageId)
   //
-  // IMPORTANT: backgroundTasks Map is mutated in-place below. After modifications,
-  // we must replace it with a new Map so Zustand detects the reference change.
-  let bgTasksDirty = false;
-
   for (const msg of nonSidechainMessages) {
     if (msg.role !== "agent") continue;
 
