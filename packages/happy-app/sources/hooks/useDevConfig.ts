@@ -57,8 +57,11 @@ export function useDevConfig(
                 return;
             }
 
-            // sessionReadFile returns base64 content
-            const decoded = atob(result.content);
+            // sessionReadFile returns base64 content — decode UTF-8 properly
+            const binary = atob(result.content);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const decoded = new TextDecoder().decode(bytes);
             const config = parseDevYml(decoded);
             configCache.set(sessionId, config);
             setState({

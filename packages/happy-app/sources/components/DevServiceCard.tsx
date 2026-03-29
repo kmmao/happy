@@ -176,36 +176,32 @@ export const DevServiceCard = React.memo(function DevServiceCard({
                 />
             )}
 
-            {/* Actions */}
-            <Item
-                title="Edit"
-                titleStyle={{ color: theme.colors.textLink }}
-                icon={
-                    <Ionicons
-                        name="create-outline"
-                        size={18}
-                        color={theme.colors.textLink}
-                    />
-                }
-                onPress={() => onEdit(service)}
-                showChevron={false}
-            />
-            {onStart && !isRunning && (
-                <Item
-                    title="Start"
-                    titleStyle={{ color: "#4CAF50", fontSize: 13, fontWeight: "600" }}
-                    icon={<Ionicons name="play" size={16} color="#4CAF50" />}
-                    onPress={() => onStart(service.key)}
-                    showChevron={false}
-                />
-            )}
-            <Item
-                title="Delete"
-                titleStyle={{ color: theme.colors.textSecondary, fontSize: 13 }}
-                onPress={() => onDelete(service.key)}
-                showChevron={false}
-                destructive
-            />
+            {/* Actions — compact horizontal row */}
+            <View style={styles.actionsRow}>
+                <Pressable
+                    style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+                    onPress={() => onEdit(service)}
+                >
+                    <Ionicons name="create-outline" size={15} color={theme.colors.textLink} />
+                    <Text style={[styles.actionText, { color: theme.colors.textLink }]}>Edit</Text>
+                </Pressable>
+                {onStart && !isRunning && (
+                    <Pressable
+                        style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+                        onPress={() => onStart(service.key)}
+                    >
+                        <Ionicons name="play" size={14} color="#4CAF50" />
+                        <Text style={[styles.actionText, { color: "#4CAF50", fontWeight: "600" }]}>Start</Text>
+                    </Pressable>
+                )}
+                <Pressable
+                    style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+                    onPress={() => onDelete(service.key)}
+                >
+                    <Ionicons name="trash-outline" size={14} color={theme.colors.textSecondary} />
+                    <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>Delete</Text>
+                </Pressable>
+            </View>
         </ItemGroup>
     );
 });
@@ -248,5 +244,22 @@ const styles = StyleSheet.create((theme) => ({
     funnelText: {
         fontSize: 11,
         fontWeight: "600",
+    },
+    actionsRow: {
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        gap: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+    },
+    actionBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingVertical: 4,
+        paddingHorizontal: 4,
+    },
+    actionText: {
+        fontSize: 13,
     },
 }));
