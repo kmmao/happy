@@ -39,7 +39,7 @@ import {
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
 import { gitStatusSync } from "@/sync/gitStatusSync";
-import { sessionAbort, sessionInterrupt, sessionBash } from "@/sync/ops";
+import { sessionAbort, sessionInterrupt, sessionStopTask } from "@/sync/ops";
 import {
   storage,
   useIsDataReady,
@@ -378,20 +378,7 @@ function SessionViewInner({
         if (!confirmed) return;
 
         try {
-          // Docker containers: extract --name and use docker stop
-          const dockerNameMatch = task.command.match(/--name\s+(\S+)/);
-          const isDocker = /\bdocker\s+run\b/i.test(task.command);
-          // Strip "cd /path && " prefix for matching the actual process
-          const actualCmd = task.command.replace(/^cd\s+\S+\s*[;&|]+\s*/i, "");
-          let killCmd: string;
-          if (isDocker && dockerNameMatch) {
-            killCmd = `docker stop ${dockerNameMatch[1]} 2>/dev/null || true`;
-          } else if (port) {
-            killCmd = `lsof -ti :${port} | xargs kill 2>/dev/null || true`;
-          } else {
-            killCmd = `pkill -f ${JSON.stringify(actualCmd.slice(0, 80))} 2>/dev/null || true`;
-          }
-          await sessionBash(sessionId, { command: killCmd });
+          await sessionStopTask(sessionId, task.taskId);
         } catch {
           // Best effort — task may have already exited
         }
