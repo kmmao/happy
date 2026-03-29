@@ -1,0 +1,15 @@
+diff --git a/node_modules/@elevenlabs/client/dist/BaseConversation.js b/node_modules/@elevenlabs/client/dist/BaseConversation.js
+index 2280124..ab2985a 100644
+--- a/node_modules/@elevenlabs/client/dist/BaseConversation.js
++++ b/node_modules/@elevenlabs/client/dist/BaseConversation.js
+@@ -238,6 +238,10 @@ export class BaseConversation {
+         }
+     }
+     handleErrorEvent(event) {
++        if (!event.error_event) {
++            this.onError("Server error: unknown error (missing error_event)", {});
++            return;
++        }
+         const errorType = event.error_event.error_type;
+         const message = event.error_event.message || event.error_event.reason || "Unknown error";
+         if (errorType === "max_duration_exceeded") {
