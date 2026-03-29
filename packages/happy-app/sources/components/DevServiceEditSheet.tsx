@@ -74,9 +74,15 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
         try {
             // Search from project root, exclude common noise directories
             const result = await sessionBash(sessionId, {
-                command: `find . -maxdepth 4 -type f \\( -name "*.yml" -o -name "*.yaml" -o -name "*.properties" -o -name "*.json" -o -name ".env*" -o -name "*.config.*" -o -name "*.xml" -o -name "Dockerfile" -o -name "docker-compose*" -o -name "*.toml" -o -name "Makefile" \\) -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/target/*" -not -path "*/build/*" -not -path "*/.idea/*" 2>/dev/null | sort | head -50`,
+                command: 'find . -maxdepth 4 -type f \\( -name "*.yml" -o -name "*.yaml" -o -name "*.properties" -o -name "*.json" -o -name ".env*" -o -name "*.config.js" -o -name "*.config.ts" -o -name "*.xml" -o -name "Dockerfile" -o -name "docker-compose*" -o -name "*.toml" -o -name "Makefile" \\) ! -path "*/node_modules/*" ! -path "*/.git/*" ! -path "*/target/*" ! -path "*/build/*" ! -path "*/.idea/*" 2>/dev/null | sort | head -50',
                 timeout: 10000,
             });
+            if (!result.success) {
+                // RPC failed — session may not be connected
+                setBrowseFiles([]);
+                setBrowseLoading(false);
+                return;
+            }
             const files = (result.stdout ?? "")
                 .split("\n")
                 .map((f) => f.trim())
