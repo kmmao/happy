@@ -50,6 +50,8 @@ export function WebAlertModal({
       ]
     : config.buttons || [{ text: "OK", style: "default" as const }];
 
+  const isVertical = buttons.length > 2;
+
   const styles = StyleSheet.create({
     container: {
       backgroundColor: theme.colors.surface,
@@ -88,10 +90,10 @@ export function WebAlertModal({
     buttonContainer: {
       borderTopWidth: 1,
       borderTopColor: theme.colors.divider,
-      flexDirection: "row",
+      flexDirection: isVertical ? "column" : "row",
     },
     button: {
-      flex: 1,
+      flex: isVertical ? undefined : 1,
       paddingVertical: 11,
       alignItems: "center",
       justifyContent: "center",
@@ -100,7 +102,8 @@ export function WebAlertModal({
       backgroundColor: theme.colors.divider,
     },
     buttonSeparator: {
-      width: 1,
+      width: isVertical ? undefined : 1,
+      height: isVertical ? 1 : undefined,
       backgroundColor: theme.colors.divider,
     },
     buttonText: {
