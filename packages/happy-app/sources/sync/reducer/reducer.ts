@@ -190,6 +190,8 @@ export type ReducerState = {
   backgroundTaskIdToMessageId: Map<string, string>; // backgroundTaskId -> messageId
   /** SDK event-driven background task registry, keyed by taskId */
   backgroundTasks: Map<string, BackgroundTaskEntry>;
+  /** Task IDs that received a task-start event (SDK-managed lifecycle) */
+  sdkManagedTaskIds: Set<string>;
   contextUsage?: {
     totalTokens: number;
     maxTokens: number;
@@ -222,6 +224,7 @@ export function createReducer(): ReducerState {
     latestAgentTextTime: 0,
     backgroundTaskIdToMessageId: new Map(),
     backgroundTasks: new Map(),
+    sdkManagedTaskIds: new Set(),
     turnHadUsageStats: false,
   };
 }
@@ -1006,12 +1009,15 @@ export function reducer(
   // Also applies task-end status to tool-call messages (for tool bubble UI)
   // (must run after Phase 3 which populates backgroundTaskIdToMessageId)
   //
+  //
+
   for (const msg of nonSidechainMessages) {
     if (msg.role !== "agent") continue;
 
     // task-start → create entry in backgroundTasks
     if (msg.taskStartInfo) {
       const { taskId, toolUseId, description } = msg.taskStartInfo;
+      state.sdkManagedTaskIds.add(taskId);
       const existing = state.backgroundTasks.get(taskId);
       if (existing) {
         // task-start activates the entry — override provisional "completed" status
@@ -1282,12 +1288,21 @@ export function reducer(
         if (msg.tool.name === "Task" || msg.tool.name === "Agent") {
           continue;
         }
-        // Skip background tasks — their tool.state must stay "running" so the
-        // enrichment loop (Phase 6.5) correctly creates "running" entries.
-        // Task lifecycle is managed by task-start/end events, not tool.state.
-        // For old sessions without task events, Phase 6.5 handles the fallback.
-        if (msg.tool.backgroundTaskId) {
+        // Background tasks managed by SDK (received task-start) — skip Phase 6.
+        // Their lifecycle is controlled by task-end events, not agent text timing.
+        if (msg.tool.backgroundTaskId && state.sdkManagedTaskIds.has(msg.tool.backgroundTaskId)) {
           continue;
+        }
+        // Unmanaged background tasks (old sessions, no task-start): clean up entry too.
+        if (msg.tool.backgroundTaskId) {
+          const entry = state.backgroundTasks.get(msg.tool.backgroundTaskId);
+          if (entry && entry.status === "running") {
+            state.backgroundTasks.set(msg.tool.backgroundTaskId, {
+              ...entry,
+              status: "completed",
+            });
+            bgTasksDirty = true;
+          }
         }
         msg.tool.state = "completed";
         msg.tool.completedAt = state.latestAgentTextTime;
