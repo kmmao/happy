@@ -209,16 +209,18 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose }: 
                                 autoFocus={isNew}
                             />
                         </View>
-                        <View style={[styles.fieldRow, { borderBottomColor: theme.colors.divider }]}>
+                        <View style={[styles.fieldColumn, { borderBottomColor: theme.colors.divider }]}>
                             <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Command</Text>
                             <TextInput
-                                style={[styles.fieldInput, { color: theme.colors.text, fontFamily: "Menlo", fontSize: 13 }]}
+                                style={[styles.fieldInputMultiline, { color: theme.colors.text }]}
                                 value={command}
                                 onChangeText={setCommand}
                                 placeholder="mvn spring-boot:run"
                                 placeholderTextColor={theme.colors.textSecondary}
                                 autoCapitalize="none"
                                 autoCorrect={false}
+                                multiline
+                                numberOfLines={3}
                             />
                         </View>
                         <View style={[styles.fieldRow, { borderBottomColor: theme.colors.divider }]}>
@@ -487,6 +489,19 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 15,
         textAlign: "right",
         paddingVertical: 0,
+    },
+    fieldColumn: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    fieldInputMultiline: {
+        fontSize: 13,
+        fontFamily: "Menlo",
+        paddingVertical: 6,
+        marginTop: 6,
+        minHeight: 60,
+        textAlignVertical: "top",
     },
     tagsContainer: {
         flexDirection: "row",
