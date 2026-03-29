@@ -28,13 +28,13 @@ const VOICE_FREE_LIMIT_SECONDS = 3600;
  * Must match the centrally managed Agent on the platform ElevenLabs account.
  */
 const AGENT_TEMPLATE = {
-    name: "Happy Coder Voice Assistant",
+    name: "Sangreal Coder Voice Assistant",
     conversation_config: {
         agent: {
             first_message: "Hey! I'm connected to your coding session. What would you like me to tell Claude Code?",
             language: "zh",
             prompt: {
-                prompt: `You are the voice interface for Happy Coder, a tool that controls Claude Code remotely.
+                prompt: `You are the voice interface for Sangreal Coder, a tool that controls Claude Code remotely.
 
 Your role:
 - Relay user's voice commands to Claude Code via the messageClaudeCode tool
@@ -116,7 +116,7 @@ async function getOrCreateUserAgent(userApiKey: string): Promise<string> {
     const cached = userAgentCache.get(keyHash);
     if (cached) return cached;
 
-    // Check if user already has a Happy Coder agent
+    // Check if user already has a Sangreal Coder agent
     try {
         const listResp = await fetch("https://api.elevenlabs.io/v1/convai/agents?page_size=100", {
             headers: { "xi-api-key": userApiKey },
