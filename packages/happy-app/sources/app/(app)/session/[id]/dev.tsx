@@ -233,11 +233,21 @@ export default React.memo(function DevScreen() {
                                 }}
                                 onStop={async (key: string) => {
                                     const taskId = runningServiceMap.get(key);
-                                    if (taskId) {
+                                    const service = services.find((s) => s.key === key);
+                                    if (!taskId) return;
+                                    try {
+                                        await sessionStopTask(sessionId, taskId);
+                                    } catch {
+                                        // stopTask fails when idle — fallback to port/command kill
                                         try {
-                                            await sessionStopTask(sessionId, taskId);
+                                            const port = service?.port;
+                                            const cmd = service?.command ?? "";
+                                            const killCmd = port
+                                                ? `lsof -ti :${port} | xargs kill 2>/dev/null || true`
+                                                : `pkill -f ${JSON.stringify(cmd.slice(0, 80))} 2>/dev/null || true`;
+                                            await sessionBash(sessionId, { command: killCmd });
                                         } catch {
-                                            // Best effort — CLI handles fallback task-end when idle
+                                            // Best effort
                                         }
                                     }
                                 }}
