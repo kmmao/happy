@@ -1045,6 +1045,13 @@ export const zhHans: TranslationStructure = {
     elevenLabsVoiceIdSubtitle: "留空使用默认语音（Rachel）",
     elevenLabsConfig: "ElevenLabs",
     elevenLabsApiKeyDescription: "输入你的 ElevenLabs API 密钥以启用语音对话。在 elevenlabs.io/app/settings/api-keys 获取",
+    elevenLabsInvalidKey: "API 密钥无效",
+    elevenLabsNetworkError: "检查订阅失败",
+    elevenLabsChecking: "正在检查订阅...",
+    elevenLabsPlan: "套餐",
+    elevenLabsRemaining: "剩余",
+    elevenLabsResetIn: "重置倒计时",
+    elevenLabsResetNow: "即将重置",
   },
 
   voiceStatusBar: {

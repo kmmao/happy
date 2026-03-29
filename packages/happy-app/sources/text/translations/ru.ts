@@ -1101,6 +1101,13 @@ export const ru: TranslationStructure = {
       "Оставьте пустым для голоса по умолчанию (Rachel)",
     elevenLabsConfig: "ElevenLabs",
     elevenLabsApiKeyDescription: "Введите ваш API-ключ ElevenLabs для голосовых разговоров. Получите на elevenlabs.io/app/settings/api-keys",
+    elevenLabsInvalidKey: "Недействительный API-ключ",
+    elevenLabsNetworkError: "Не удалось проверить подписку",
+    elevenLabsChecking: "Проверка подписки...",
+    elevenLabsPlan: "Тариф",
+    elevenLabsRemaining: "Осталось",
+    elevenLabsResetIn: "Сброс через",
+    elevenLabsResetNow: "Сбрасывается",
   },
 
   voiceStatusBar: {

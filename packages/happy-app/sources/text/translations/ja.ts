@@ -1160,6 +1160,13 @@ export const ja: TranslationStructure = {
     elevenLabsVoiceIdSubtitle: "空欄でデフォルト音声（Rachel）を使用",
     elevenLabsConfig: "ElevenLabs",
     elevenLabsApiKeyDescription: "ElevenLabs APIキーを入力して音声会話を有効にします。elevenlabs.io/app/settings/api-keysで取得",
+    elevenLabsInvalidKey: "APIキーが無効です",
+    elevenLabsNetworkError: "サブスクリプションの確認に失敗しました",
+    elevenLabsChecking: "サブスクリプションを確認中...",
+    elevenLabsPlan: "プラン",
+    elevenLabsRemaining: "残り",
+    elevenLabsResetIn: "リセットまで",
+    elevenLabsResetNow: "リセット中",
   },
 
   voiceStatusBar: {

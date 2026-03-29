@@ -1099,6 +1099,13 @@ export const pl: TranslationStructure = {
     elevenLabsVoiceIdSubtitle: "Pozostaw puste dla domyślnego głosu (Rachel)",
     elevenLabsConfig: "ElevenLabs",
     elevenLabsApiKeyDescription: "Wprowadź klucz API ElevenLabs, aby włączyć rozmowy głosowe. Uzyskaj go na elevenlabs.io/app/settings/api-keys",
+    elevenLabsInvalidKey: "Nieprawidłowy klucz API",
+    elevenLabsNetworkError: "Nie udało się sprawdzić subskrypcji",
+    elevenLabsChecking: "Sprawdzanie subskrypcji...",
+    elevenLabsPlan: "Plan",
+    elevenLabsRemaining: "Pozostało",
+    elevenLabsResetIn: "Reset za",
+    elevenLabsResetNow: "Resetowanie",
   },
 
   voiceStatusBar: {
