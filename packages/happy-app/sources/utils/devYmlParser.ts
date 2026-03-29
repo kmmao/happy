@@ -85,6 +85,11 @@ export function parseDevYml(content: string): DevConfig | null {
             if (indent === 2 && trimmed.endsWith(":") && !trimmed.includes(" ")) {
                 // Save previous service
                 if (currentServiceKey) {
+                    // Flush pending configFile item
+                    if (configFileItem && configFileItem.path) {
+                        currentService.configFiles = currentService.configFiles ?? [];
+                        currentService.configFiles.push({ ...configFileItem });
+                    }
                     const svc = buildService(currentServiceKey, currentService);
                     if (svc) services.push(svc);
                 }
@@ -287,6 +292,11 @@ function parseInlineArray(val: string): string[] {
     return inner.split(",").map((s) => stripQuotes(s.trim()));
 }
 
+/** Escape a string value for YAML double-quoted context */
+function yamlEscape(val: string): string {
+    return val.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 /**
  * Serialize a DevConfig back to YAML string.
  */
@@ -295,21 +305,21 @@ export function serializeDevYml(config: DevConfig): string {
 
     for (const svc of config.services) {
         lines.push(`  ${svc.key}:`);
-        lines.push(`    name: "${svc.name}"`);
-        lines.push(`    command: "${svc.command}"`);
-        if (svc.cwd) lines.push(`    cwd: "${svc.cwd}"`);
+        lines.push(`    name: "${yamlEscape(svc.name)}"`);
+        lines.push(`    command: "${yamlEscape(svc.command)}"`);
+        if (svc.cwd) lines.push(`    cwd: "${yamlEscape(svc.cwd)}"`);
         if (svc.port != null) lines.push(`    port: ${svc.port}`);
 
         if (svc.healthCheck) {
             lines.push("    healthCheck:");
-            if (svc.healthCheck.url) lines.push(`      url: "${svc.healthCheck.url}"`);
+            if (svc.healthCheck.url) lines.push(`      url: "${yamlEscape(svc.healthCheck.url)}"`);
             if (svc.healthCheck.timeout != null) lines.push(`      timeout: ${svc.healthCheck.timeout}`);
         }
 
         if (svc.env && Object.keys(svc.env).length > 0) {
             lines.push("    env:");
             for (const [k, v] of Object.entries(svc.env)) {
-                lines.push(`      ${k}: "${v}"`);
+                lines.push(`      ${k}: "${yamlEscape(v)}"`);
             }
         }
 
@@ -318,8 +328,8 @@ export function serializeDevYml(config: DevConfig): string {
         if (svc.configFiles && svc.configFiles.length > 0) {
             lines.push("    configFiles:");
             for (const cf of svc.configFiles) {
-                lines.push(`      - path: "${cf.path}"`);
-                lines.push(`        label: "${cf.label}"`);
+                lines.push(`      - path: "${yamlEscape(cf.path)}"`);
+                lines.push(`        label: "${yamlEscape(cf.label)}"`);
             }
         }
 
@@ -327,7 +337,7 @@ export function serializeDevYml(config: DevConfig): string {
             lines.push("    expose:");
             if (svc.expose.caddy) {
                 lines.push("      caddy:");
-                lines.push(`        hostname: "${svc.expose.caddy.hostname}"`);
+                lines.push(`        hostname: "${yamlEscape(svc.expose.caddy.hostname)}"`);
             }
             if (svc.expose.tailscale) {
                 lines.push("      tailscale:");
