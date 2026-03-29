@@ -175,13 +175,26 @@ export async function claudeRemoteLauncher(
 
   async function doStopTask(args: { taskId: string }) {
     logger.debug(`[remote]: doStopTask — taskId=${args.taskId}`);
-    if (currentQuery && args.taskId) {
+    if (!args.taskId) return;
+
+    if (currentQuery) {
       try {
         await currentQuery.stopTask(args.taskId);
+        return; // SDK will emit task_notification(stopped) which gets persisted
       } catch (e) {
-        logger.debug("[remote]: stopTask() failed", e);
+        logger.debug("[remote]: stopTask() failed, falling back to manual task-end", e);
       }
     }
+
+    // Fallback: when agent is idle (currentQuery is null) or stopTask failed,
+    // manually emit a task-end envelope so the status is persisted to the server.
+    const envelope = createEnvelope("agent", {
+      t: "task-end",
+      taskId: args.taskId,
+      status: "stopped" as const,
+      summary: "Task stopped by user",
+    });
+    session.client.sendSessionProtocolMessage(envelope);
   }
 
   // When to abort
