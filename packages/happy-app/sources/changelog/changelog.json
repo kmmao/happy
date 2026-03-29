@@ -3,9 +3,16 @@
     "en": [
       {
         "version": "2.11.0",
-        "date": "2026-03-29",
-        "summary": "Unified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, and added ElevenLabs voice configuration UI improvements.",
+        "date": "2026-03-30",
+        "summary": "Unified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, added ElevenLabs voice configuration UI improvements, and refactored background task panel to SDK event-driven architecture.",
         "changes": [
+          "Refactored task tracking from message scanning to SDK event-driven registry (task-start/progress/end)",
+          "Added AI progress summary display in task bar (from task-progress events)",
+          "Added automatic cleanup when session goes offline — stale tasks marked as stopped",
+          "Added `stopped` status with distinct label and color across 11 languages",
+          "Fixed stale tasks persisting after page refresh or session reconnect",
+          "Fixed old session tasks permanently showing as running",
+          "Fixed log sheet staying open after task ends or session disconnects",
           "Removed Docker Whisper STT service — all platforms now use native speech recognition (iOS Siri, Android Google, Web Speech API)",
           "Removed Haiku-based voice transcript correction feature (sttCorrection setting)",
           "Removed Edge TTS service and all related code",
@@ -17,7 +24,7 @@
           "Fixed contextual update and text message sent to inactive voice session",
           "Fixed handleErrorEvent patch to silently ignore rather than disconnect"
         ],
-        "rawMarkdown": "## 2.11.0 - 2026-03-29\n\n\nUnified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, and added ElevenLabs voice configuration UI improvements.\n\n### Voice Input\n- Removed Docker Whisper STT service — all platforms now use native speech recognition (iOS Siri, Android Google, Web Speech API)\n- Removed Haiku-based voice transcript correction feature (sttCorrection setting)\n- Removed Edge TTS service and all related code\n- Simplified web speech-to-text from 475 lines to 45 lines\n\n### Voice Settings\n- Added save button and configuration status feedback on voice settings page\n- Added ElevenLabs account balance and usage display\n- Added user-provided ElevenLabs API Key support\n\n### Voice Stability\n- Fixed ElevenLabs client crash on missing error_event\n- Fixed contextual update and text message sent to inactive voice session\n- Fixed handleErrorEvent patch to silently ignore rather than disconnect"
+        "rawMarkdown": "## 2.11.0 - 2026-03-30\n\n\nUnified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, added ElevenLabs voice configuration UI improvements, and refactored background task panel to SDK event-driven architecture.\n\n### Background Task Panel\n- Refactored task tracking from message scanning to SDK event-driven registry (task-start/progress/end)\n- Added AI progress summary display in task bar (from task-progress events)\n- Added automatic cleanup when session goes offline — stale tasks marked as stopped\n- Added `stopped` status with distinct label and color across 11 languages\n- Fixed stale tasks persisting after page refresh or session reconnect\n- Fixed old session tasks permanently showing as running\n- Fixed log sheet staying open after task ends or session disconnects\n\n### Voice Input\n- Removed Docker Whisper STT service — all platforms now use native speech recognition (iOS Siri, Android Google, Web Speech API)\n- Removed Haiku-based voice transcript correction feature (sttCorrection setting)\n- Removed Edge TTS service and all related code\n- Simplified web speech-to-text from 475 lines to 45 lines\n\n### Voice Settings\n- Added save button and configuration status feedback on voice settings page\n- Added ElevenLabs account balance and usage display\n- Added user-provided ElevenLabs API Key support\n\n### Voice Stability\n- Fixed ElevenLabs client crash on missing error_event\n- Fixed contextual update and text message sent to inactive voice session\n- Fixed handleErrorEvent patch to silently ignore rather than disconnect"
       },
       {
         "version": "2.10.0",

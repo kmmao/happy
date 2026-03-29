@@ -1,8 +1,17 @@
 # Changelog
 
-## 2.11.0 - 2026-03-29
+## 2.11.0 - 2026-03-30
 
-Unified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, and added ElevenLabs voice configuration UI improvements.
+Unified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, added ElevenLabs voice configuration UI improvements, and refactored background task panel to SDK event-driven architecture.
+
+### Background Task Panel
+- Refactored task tracking from message scanning to SDK event-driven registry (task-start/progress/end)
+- Added AI progress summary display in task bar (from task-progress events)
+- Added automatic cleanup when session goes offline — stale tasks marked as stopped
+- Added `stopped` status with distinct label and color across 11 languages
+- Fixed stale tasks persisting after page refresh or session reconnect
+- Fixed old session tasks permanently showing as running
+- Fixed log sheet staying open after task ends or session disconnects
 
 ### Voice Input
 - Removed Docker Whisper STT service — all platforms now use native speech recognition (iOS Siri, Android Google, Web Speech API)
