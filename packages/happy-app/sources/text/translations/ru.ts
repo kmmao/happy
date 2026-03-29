@@ -1108,6 +1108,10 @@ export const ru: TranslationStructure = {
     elevenLabsRemaining: "Осталось",
     elevenLabsResetIn: "Сброс через",
     elevenLabsResetNow: "Сбрасывается",
+    elevenLabsSave: "Сохранить и настроить",
+    elevenLabsSetupChecking: "Настройка...",
+    elevenLabsSetupReady: "Готово",
+    elevenLabsSetupSuccess: "Голосовой ассистент настроен и готов к использованию",
   },
 
   voiceStatusBar: {

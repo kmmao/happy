@@ -1052,6 +1052,10 @@ export const zhHant: TranslationStructure = {
     elevenLabsRemaining: "剩餘",
     elevenLabsResetIn: "重置倒數",
     elevenLabsResetNow: "即將重置",
+    elevenLabsSave: "儲存並設定",
+    elevenLabsSetupChecking: "設定中...",
+    elevenLabsSetupReady: "已就緒",
+    elevenLabsSetupSuccess: "語音助手已設定完成，可以使用",
   },
 
   voiceStatusBar: {

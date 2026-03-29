@@ -1167,6 +1167,10 @@ export const ja: TranslationStructure = {
     elevenLabsRemaining: "残り",
     elevenLabsResetIn: "リセットまで",
     elevenLabsResetNow: "リセット中",
+    elevenLabsSave: "保存して設定",
+    elevenLabsSetupChecking: "設定中...",
+    elevenLabsSetupReady: "準備完了",
+    elevenLabsSetupSuccess: "音声アシスタントの設定が完了しました",
   },
 
   voiceStatusBar: {

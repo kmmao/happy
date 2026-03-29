@@ -1097,6 +1097,10 @@ export const ca: TranslationStructure = {
     elevenLabsRemaining: "Restant",
     elevenLabsResetIn: "Es renova en",
     elevenLabsResetNow: "Renovant ara",
+    elevenLabsSave: "Desa i configura",
+    elevenLabsSetupChecking: "Configurant...",
+    elevenLabsSetupReady: "Preparat",
+    elevenLabsSetupSuccess: "Assistent de veu configurat i preparat per usar",
   },
 
   voiceStatusBar: {

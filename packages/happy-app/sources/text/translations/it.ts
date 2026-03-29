@@ -1182,6 +1182,10 @@ export const it: TranslationStructure = {
     elevenLabsRemaining: "Rimanenti",
     elevenLabsResetIn: "Reset tra",
     elevenLabsResetNow: "In fase di reset",
+    elevenLabsSave: "Salva e configura",
+    elevenLabsSetupChecking: "Configurazione...",
+    elevenLabsSetupReady: "Pronto",
+    elevenLabsSetupSuccess: "Assistente vocale configurato e pronto all'uso",
   },
 
   voiceStatusBar: {
