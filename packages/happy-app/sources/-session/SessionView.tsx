@@ -39,7 +39,7 @@ import {
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
 import { gitStatusSync } from "@/sync/gitStatusSync";
-import { sessionAbort, sessionInterrupt, sessionStopTask } from "@/sync/ops";
+import { sessionAbort, sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
 import {
   storage,
   useIsDataReady,
@@ -380,7 +380,17 @@ function SessionViewInner({
         try {
           await sessionStopTask(sessionId, task.taskId);
         } catch {
-          // Best effort — task may have already exited
+          // stopTask fails when agent is idle (currentQuery is null).
+          // Fallback: kill by port or command pattern via sessionBash.
+          try {
+            const actualCmd = task.command.replace(/^cd\s+\S+\s*[;&|]+\s*/i, "");
+            const killCmd = port
+              ? `lsof -ti :${port} | xargs kill 2>/dev/null || true`
+              : `pkill -f ${JSON.stringify(actualCmd.slice(0, 80))} 2>/dev/null || true`;
+            await sessionBash(sessionId, { command: killCmd });
+          } catch {
+            // Best effort
+          }
         }
       }
       dismissBackgroundTask(task.taskId);
