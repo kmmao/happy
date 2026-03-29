@@ -256,9 +256,17 @@ export default React.memo(function DevScreen() {
                                 { backgroundColor: theme.colors.surfaceHigh },
                                 pressed && { opacity: 0.6 },
                             ]}
-                            onPress={() => {
-                                sync.sendMessage(sessionId, "/dev scan");
+                            onPress={async () => {
+                                const confirmed = await Modal.confirm(
+                                    "Rescan",
+                                    "Delete current config and regenerate from project scan?",
+                                    { confirmText: "Rescan", destructive: true },
+                                );
+                                if (!confirmed) return;
+                                // Delete existing config and regenerate
+                                await sessionBash(sessionId, { command: "rm -f .happy/dev.yml" });
                                 invalidateDevConfigCache(sessionId);
+                                sync.sendMessage(sessionId, "/dev");
                                 router.back();
                             }}
                         >
