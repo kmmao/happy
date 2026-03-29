@@ -378,16 +378,18 @@ function SessionViewInner({
         if (!confirmed) return;
 
         try {
-          // Docker containers: extract --name and use docker stop (killing the port proxy crashes Docker Desktop)
+          // Docker containers: extract --name and use docker stop
           const dockerNameMatch = task.command.match(/--name\s+(\S+)/);
           const isDocker = /\bdocker\s+run\b/i.test(task.command);
+          // Strip "cd /path && " prefix for matching the actual process
+          const actualCmd = task.command.replace(/^cd\s+\S+\s*[;&|]+\s*/i, "");
           let killCmd: string;
           if (isDocker && dockerNameMatch) {
             killCmd = `docker stop ${dockerNameMatch[1]} 2>/dev/null || true`;
           } else if (port) {
             killCmd = `lsof -ti :${port} | xargs kill 2>/dev/null || true`;
           } else {
-            killCmd = `pkill -f ${JSON.stringify(task.command.slice(0, 60))} 2>/dev/null || true`;
+            killCmd = `pkill -f ${JSON.stringify(actualCmd.slice(0, 80))} 2>/dev/null || true`;
           }
           await sessionBash(sessionId, { command: killCmd });
         } catch {

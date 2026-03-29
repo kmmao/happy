@@ -25,15 +25,24 @@ export const categoryColor: Record<TaskCategory, string> = {
     generic: "#78909C",
 };
 
+/** Strip cd/path prefix and env vars from a compound command for analysis */
+function stripCommandPrefix(command: string): string {
+    // Remove leading "cd /path && " or "cd /path ;"
+    const stripped = command.replace(/^cd\s+\S+\s*[;&|]+\s*/i, "");
+    // Remove leading env var assignments (KEY=val ...)
+    return stripped.replace(/^(\s*\w+=\S+\s+)*/, "");
+}
+
 export function detectCategory(command: string): TaskCategory {
-    const lower = command.toLowerCase();
+    const lower = stripCommandPrefix(command).toLowerCase();
 
     if (
         /\b(serve|server|dev|start|preview|http\.server|uvicorn|gunicorn|flask run|rails s|php -S)\b/.test(lower) ||
         /\bnext\b/.test(lower) ||
         /\bnuxt\b/.test(lower) ||
         /\bvite\b(?!st)/.test(lower) ||
-        /\bdocker\s+run\b/.test(lower)
+        /\bdocker\s+run\b/.test(lower) ||
+        /\b(mvn|gradle)\b.*\b(spring-boot:run|bootRun)\b/.test(lower)
     ) {
         return "server";
     }
@@ -61,21 +70,35 @@ export function extractPort(command: string): string | null {
     const flagMatch = command.match(/(?:--port|--Port|-p|-P)[=\s]+(\d{2,5})\b/);
     if (flagMatch) return flagMatch[1];
 
+    // Spring Boot: -Dserver.port=9090
+    const springPortMatch = command.match(/-Dserver\.port[=:](\d{2,5})\b/);
+    if (springPortMatch) return springPortMatch[1];
+
     const httpServerMatch = command.match(/http\.server\s+(\d{2,5})\b/);
     if (httpServerMatch) return httpServerMatch[1];
 
     const colonMatch = command.match(/:(\d{2,5})(?:\s|$|\/)/);
     if (colonMatch) return colonMatch[1];
 
+    // Well-known default ports for common frameworks
+    const lower = command.toLowerCase();
+    if (/\bspring-boot:run\b|\bbootRun\b/.test(lower)) return "8080";
+
     return null;
 }
 
 export function extractCommandName(command: string): string {
-    const stripped = command.replace(/^(\s*\w+=\S+\s+)*/, "");
+    const stripped = stripCommandPrefix(command);
     const match = stripped.match(/^(npx|yarn|pnpm|npm)\s+(run\s+)?(\S+)/);
     if (match) return match[3];
     const pyMatch = stripped.match(/python[23]?\s+-m\s+(\S+)/);
     if (pyMatch) return pyMatch[1];
+    // Maven: mvn spring-boot:run → spring-boot:run
+    const mvnMatch = stripped.match(/mvn\s+(\S+)/);
+    if (mvnMatch) return mvnMatch[1];
+    // Gradle: ./gradlew bootRun → bootRun
+    const gradleMatch = stripped.match(/gradle[w]?\s+(\S+)/);
+    if (gradleMatch) return gradleMatch[1];
     const first = stripped.split(/\s+/)[0];
     return first.split("/").pop() ?? first;
 }
@@ -85,14 +108,15 @@ export function extractCommandName(command: string): string {
  * Falls back to "Bash" for unrecognized commands.
  */
 export function detectToolTag(command: string): string {
-    const lower = command.toLowerCase();
+    // Strip cd prefix to avoid matching path components (e.g. /git/ in path)
+    const lower = stripCommandPrefix(command).toLowerCase();
     if (/\bdocker\b/.test(lower)) return "Docker";
-    if (/\bgit\b/.test(lower)) return "Git";
+    if (/\b(mvn|gradle|java)\b/.test(lower)) return "Java";
     if (/\b(node|npx|npm|yarn|pnpm|bun)\b/.test(lower)) return "Node";
     if (/\b(python[23]?|pip|uv|poetry)\b/.test(lower)) return "Python";
     if (/\b(cargo|rustc)\b/.test(lower)) return "Rust";
     if (/\bgo\b/.test(lower)) return "Go";
-    if (/\b(java|mvn|gradle)\b/.test(lower)) return "Java";
+    if (/\bgit\b/.test(lower)) return "Git";
     if (/\b(curl|wget|http)\b/.test(lower)) return "HTTP";
     if (/\b(ssh|scp|rsync)\b/.test(lower)) return "SSH";
     if (/\b(make|cmake)\b/.test(lower)) return "Make";

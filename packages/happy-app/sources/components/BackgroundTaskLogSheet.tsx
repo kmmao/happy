@@ -89,7 +89,9 @@ function BackgroundTaskLogSheetInner({ sessionId, task, onClose, onStop, onPrevi
 
     if (!task) return null;
 
-    const label = buildSmartLabel(task.command);
+    const label = task.description && task.description !== task.command
+        ? task.description
+        : buildSmartLabel(task.command);
     const category = detectCategory(task.command);
     const icon = categoryIcon[category];
     const iconTint = categoryColor[category];
