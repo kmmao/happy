@@ -16,7 +16,6 @@ import {
     TextInput,
     Modal,
     SafeAreaView,
-    Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -30,9 +29,10 @@ type Props = {
     readonly allServiceKeys: readonly string[];
     readonly onSave: (updated: DevService) => void;
     readonly onClose: () => void;
+    readonly onBrowse?: () => void;
 };
 
-function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose }: Props) {
+function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, onBrowse }: Props) {
     const { theme } = useUnistyles();
     const isNew = service === null;
 
@@ -57,17 +57,9 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose }: 
     const [newFilePath, setNewFilePath] = React.useState("");
     const [newFileLabel, setNewFileLabel] = React.useState("");
 
-    // Expose
+    // Expose (Caddy only)
     const [caddyHostname, setCaddyHostname] = React.useState(
         service?.expose?.caddy?.hostname ?? "",
-    );
-    const [funnelEnabled, setFunnelEnabled] = React.useState(
-        service?.expose?.tailscale?.funnel ?? false,
-    );
-    const [funnelPortText, setFunnelPortText] = React.useState(
-        service?.expose?.tailscale?.httpsPort != null
-            ? String(service.expose.tailscale.httpsPort)
-            : "",
     );
 
     // Available deps: all service keys except self
@@ -99,25 +91,10 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose }: 
 
     const handleSave = React.useCallback(() => {
         const port = parseInt(portText, 10);
-        const funnelPort = parseInt(funnelPortText, 10);
 
         const expose: DevExposeConfig | undefined =
-            caddyHostname.trim() || funnelEnabled
-                ? {
-                      ...(caddyHostname.trim()
-                          ? { caddy: { hostname: caddyHostname.trim() } }
-                          : {}),
-                      ...(funnelEnabled
-                          ? {
-                                tailscale: {
-                                    funnel: true,
-                                    ...(Number.isInteger(funnelPort) && funnelPort > 0
-                                        ? { httpsPort: funnelPort }
-                                        : {}),
-                                },
-                            }
-                          : {}),
-                  }
+            caddyHostname.trim()
+                ? { caddy: { hostname: caddyHostname.trim() } }
                 : undefined;
 
         const updated: DevService = {
@@ -134,8 +111,7 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose }: 
         onSave(updated);
     }, [
         isNew, service, key, name, command, cwd, portText,
-        selectedDeps, configFiles, caddyHostname, funnelEnabled,
-        funnelPortText, onSave,
+        selectedDeps, configFiles, caddyHostname, onSave,
     ]);
 
     const isValid = name.trim().length > 0 && command.trim().length > 0;
@@ -325,15 +301,24 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose }: 
                             </View>
                         ))}
                         <View style={styles.addConfigSection}>
-                            <TextInput
-                                style={[styles.configInput, { borderColor: theme.colors.divider, color: theme.colors.text, backgroundColor: theme.colors.surface }]}
-                                value={newFilePath}
-                                onChangeText={setNewFilePath}
-                                placeholder="File path (e.g. .env)"
-                                placeholderTextColor={theme.colors.textSecondary}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                            />
+                            <View style={styles.pathInputRow}>
+                                <TextInput
+                                    style={[styles.configInput, { flex: 1, borderColor: theme.colors.divider, color: theme.colors.text, backgroundColor: theme.colors.surface }]}
+                                    value={newFilePath}
+                                    onChangeText={setNewFilePath}
+                                    placeholder="File path (e.g. .env)"
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                                <Pressable
+                                    style={[styles.browseButton, { backgroundColor: `${theme.colors.textLink}12` }]}
+                                    onPress={onBrowse}
+                                    hitSlop={4}
+                                >
+                                    <Ionicons name="folder-open-outline" size={16} color={theme.colors.textLink} />
+                                </Pressable>
+                            </View>
                             <TextInput
                                 style={[styles.configInput, { borderColor: theme.colors.divider, color: theme.colors.text, backgroundColor: theme.colors.surface }]}
                                 value={newFileLabel}
@@ -375,7 +360,7 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose }: 
                         PORT MAPPING
                     </Text>
                     <View style={[styles.formGroup, { backgroundColor: theme.colors.surfaceHigh }]}>
-                        <View style={[styles.fieldRow, { borderBottomColor: theme.colors.divider }]}>
+                        <View style={styles.fieldRowLast}>
                             <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
                                 Caddy Hostname
                             </Text>
@@ -389,30 +374,6 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose }: 
                                 autoCorrect={false}
                             />
                         </View>
-                        <View style={[styles.fieldRow, { borderBottomColor: theme.colors.divider }]}>
-                            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
-                                Tailscale Funnel
-                            </Text>
-                            <Switch
-                                value={funnelEnabled}
-                                onValueChange={setFunnelEnabled}
-                            />
-                        </View>
-                        {funnelEnabled && (
-                            <View style={styles.fieldRowLast}>
-                                <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
-                                    HTTPS Port
-                                </Text>
-                                <TextInput
-                                    style={[styles.fieldInput, { color: theme.colors.text }]}
-                                    value={funnelPortText}
-                                    onChangeText={setFunnelPortText}
-                                    placeholder="443"
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    keyboardType="number-pad"
-                                />
-                            </View>
-                        )}
                     </View>
 
                     <View style={styles.bottomSpacer} />
@@ -546,6 +507,18 @@ const styles = StyleSheet.create((theme) => ({
     addConfigSection: {
         padding: 12,
         gap: 8,
+    },
+    pathInputRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    browseButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        alignItems: "center",
+        justifyContent: "center",
     },
     configInput: {
         borderWidth: 1,
