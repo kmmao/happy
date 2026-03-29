@@ -80,10 +80,6 @@ export function extractPort(command: string): string | null {
     const colonMatch = command.match(/:(\d{2,5})(?:\s|$|\/)/);
     if (colonMatch) return colonMatch[1];
 
-    // Well-known default ports for common frameworks
-    const lower = command.toLowerCase();
-    if (/\bspring-boot:run\b|\bbootRun\b/.test(lower)) return "8080";
-
     return null;
 }
 
