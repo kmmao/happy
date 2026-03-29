@@ -16,13 +16,12 @@ import {
     TextInput,
     Modal,
     SafeAreaView,
-    ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
-import { sessionBash } from "@/sync/ops";
+import { FilePickerModal } from "@/components/FilePickerModal";
 import type { DevService, DevConfigFile, DevExposeConfig } from "@/utils/devYmlParser";
 
 type Props = {
@@ -63,36 +62,8 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
         service?.expose?.caddy?.hostname ?? "",
     );
 
-    // File browser
-    const [browseFiles, setBrowseFiles] = React.useState<string[]>([]);
-    const [showBrowse, setShowBrowse] = React.useState(false);
-    const [browseLoading, setBrowseLoading] = React.useState(false);
-
-    const handleBrowse = React.useCallback(async () => {
-        setBrowseLoading(true);
-        setShowBrowse(true);
-        try {
-            // Search from project root, exclude common noise directories
-            const result = await sessionBash(sessionId, {
-                command: 'find . -maxdepth 4 -type f \\( -name "*.yml" -o -name "*.yaml" -o -name "*.properties" -o -name "*.json" -o -name ".env*" -o -name "*.config.js" -o -name "*.config.ts" -o -name "*.xml" -o -name "Dockerfile" -o -name "docker-compose*" -o -name "*.toml" -o -name "Makefile" \\) ! -path "*/node_modules/*" ! -path "*/.git/*" ! -path "*/target/*" ! -path "*/build/*" ! -path "*/.idea/*" 2>/dev/null | sort | head -50',
-                timeout: 10000,
-            });
-            if (!result.success) {
-                // RPC failed — session may not be connected
-                setBrowseFiles([]);
-                setBrowseLoading(false);
-                return;
-            }
-            const files = (result.stdout ?? "")
-                .split("\n")
-                .map((f) => f.trim())
-                .filter((f) => f.length > 0);
-            setBrowseFiles(files);
-        } catch {
-            setBrowseFiles([]);
-        }
-        setBrowseLoading(false);
-    }, [sessionId, service?.cwd]);
+    // File picker
+    const [showFilePicker, setShowFilePicker] = React.useState(false);
 
     // Available deps: all service keys except self
     const availableDeps = React.useMemo(
@@ -345,48 +316,12 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
                                 />
                                 <Pressable
                                     style={[styles.browseButton, { backgroundColor: `${theme.colors.textLink}12` }]}
-                                    onPress={handleBrowse}
+                                    onPress={() => setShowFilePicker(true)}
                                     hitSlop={4}
                                 >
                                     <Ionicons name="folder-open-outline" size={16} color={theme.colors.textLink} />
                                 </Pressable>
                             </View>
-                            {/* File browser results */}
-                            {showBrowse && (
-                                <View style={[styles.browseList, { backgroundColor: theme.colors.surface, borderColor: theme.colors.divider }]}>
-                                    {browseLoading ? (
-                                        <ActivityIndicator size="small" color={theme.colors.textSecondary} style={{ padding: 12 }} />
-                                    ) : browseFiles.length === 0 ? (
-                                        <Text style={[styles.browseEmpty, { color: theme.colors.textSecondary }]}>
-                                            No config files found
-                                        </Text>
-                                    ) : (
-                                        <ScrollView style={styles.browseScroll} nestedScrollEnabled>
-                                            {browseFiles.map((file) => (
-                                                <Pressable
-                                                    key={file}
-                                                    style={({ pressed }) => [
-                                                        styles.browseItem,
-                                                        { borderBottomColor: theme.colors.divider },
-                                                        pressed && { backgroundColor: `${theme.colors.textLink}08` },
-                                                    ]}
-                                                    onPress={() => {
-                                                        setNewFilePath(file);
-                                                        const filename = file.split("/").pop() ?? file;
-                                                        setNewFileLabel(filename.replace(/\.[^.]+$/, ""));
-                                                        setShowBrowse(false);
-                                                    }}
-                                                >
-                                                    <Ionicons name="document-outline" size={14} color={theme.colors.textSecondary} />
-                                                    <Text style={[styles.browseItemText, { color: theme.colors.text }]} numberOfLines={1}>
-                                                        {file}
-                                                    </Text>
-                                                </Pressable>
-                                            ))}
-                                        </ScrollView>
-                                    )}
-                                </View>
-                            )}
                             <TextInput
                                 style={[styles.configInput, { borderColor: theme.colors.divider, color: theme.colors.text, backgroundColor: theme.colors.surface }]}
                                 value={newFileLabel}
@@ -446,6 +381,19 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
 
                     <View style={styles.bottomSpacer} />
                 </ScrollView>
+
+                {/* File picker overlay */}
+                <FilePickerModal
+                    visible={showFilePicker}
+                    sessionId={sessionId}
+                    onSelect={(filePath) => {
+                        setNewFilePath(filePath);
+                        const filename = filePath.split("/").pop() ?? filePath;
+                        setNewFileLabel(filename.replace(/\.[^.]+$/, ""));
+                        setShowFilePicker(false);
+                    }}
+                    onClose={() => setShowFilePicker(false)}
+                />
             </SafeAreaView>
         </Modal>
     );
@@ -587,33 +535,6 @@ const styles = StyleSheet.create((theme) => ({
         borderRadius: 8,
         alignItems: "center",
         justifyContent: "center",
-    },
-    browseList: {
-        borderWidth: 1,
-        borderRadius: 8,
-        maxHeight: 200,
-        overflow: "hidden",
-    },
-    browseScroll: {
-        maxHeight: 200,
-    },
-    browseItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    browseItemText: {
-        fontSize: 12,
-        fontFamily: "monospace",
-        flex: 1,
-    },
-    browseEmpty: {
-        fontSize: 13,
-        textAlign: "center",
-        padding: 12,
     },
     configInput: {
         borderWidth: 1,
