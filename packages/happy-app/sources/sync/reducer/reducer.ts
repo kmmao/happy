@@ -1055,57 +1055,6 @@ export function reducer(
     }
   }
 
-  // Enrich backgroundTasks with outputFile/command from tool-result metadata.
-  // tool-result may arrive before or after task-start; both must be handled.
-  for (const [taskId, messageId] of state.backgroundTaskIdToMessageId) {
-    const entry = state.backgroundTasks.get(taskId);
-    const toolMsg = state.messages.get(messageId);
-    if (!toolMsg?.tool) continue;
-    const command =
-      typeof toolMsg.tool.input?.command === "string"
-        ? toolMsg.tool.input.command
-        : "";
-    const outputFile = toolMsg.tool.outputFile ?? null;
-    if (entry) {
-      // Only update if tool-result has new info the entry doesn't have yet
-      const needsCommand = !entry.command && command;
-      const needsOutputFile = !entry.outputFile && outputFile;
-      if (!needsCommand && !needsOutputFile) continue;
-      state.backgroundTasks.set(taskId, {
-        ...entry,
-        command: entry.command || command,
-        outputFile: entry.outputFile ?? outputFile,
-      });
-    } else {
-      // tool-result arrived before task-start — create provisional entry.
-      // Derive status from the tool message state (handles old sessions where
-      // tasks completed/failed but never received task-end events).
-      const toolState = toolMsg.tool.state;
-      const status: "running" | "completed" | "failed" | "stopped" =
-        toolState === "running" ? "running" :
-        toolState === "error" ? "failed" :
-        "completed";
-      state.backgroundTasks.set(taskId, {
-        taskId,
-        toolUseId: null,
-        command,
-        description: typeof toolMsg.tool.input?.description === "string"
-          ? toolMsg.tool.input.description
-          : command,
-        outputFile,
-        startedAt: toolMsg.tool.startedAt ?? toolMsg.createdAt,
-        status,
-        summary: null,
-      });
-    }
-    bgTasksDirty = true;
-  }
-
-  // Replace Map reference so Zustand detects the change
-  if (bgTasksDirty) {
-    state.backgroundTasks = new Map(state.backgroundTasks);
-  }
-
   //
   // Phase 4: Process sidechains and store them in state
   //
@@ -1322,6 +1271,59 @@ export function reducer(
         changed.add(messageId);
       }
     }
+  }
+
+  //
+  // Phase 6.5: Enrich backgroundTasks with outputFile/command from tool-result metadata.
+  // MUST run after Phase 6 so that tool.state reflects stale-cleanup results.
+  // tool-result may arrive before or after task-start; both must be handled.
+  //
+  for (const [taskId, messageId] of state.backgroundTaskIdToMessageId) {
+    const entry = state.backgroundTasks.get(taskId);
+    const toolMsg = state.messages.get(messageId);
+    if (!toolMsg?.tool) continue;
+    const command =
+      typeof toolMsg.tool.input?.command === "string"
+        ? toolMsg.tool.input.command
+        : "";
+    const outputFile = toolMsg.tool.outputFile ?? null;
+    if (entry) {
+      // Only update if tool-result has new info the entry doesn't have yet
+      const needsCommand = !entry.command && command;
+      const needsOutputFile = !entry.outputFile && outputFile;
+      if (!needsCommand && !needsOutputFile) continue;
+      state.backgroundTasks.set(taskId, {
+        ...entry,
+        command: entry.command || command,
+        outputFile: entry.outputFile ?? outputFile,
+      });
+    } else {
+      // tool-result arrived before task-start — create provisional entry.
+      // Derive status from tool.state (after Phase 6 stale-cleanup).
+      const toolState = toolMsg.tool.state;
+      const status: "running" | "completed" | "failed" | "stopped" =
+        toolState === "running" ? "running" :
+        toolState === "error" ? "failed" :
+        "completed";
+      state.backgroundTasks.set(taskId, {
+        taskId,
+        toolUseId: null,
+        command,
+        description: typeof toolMsg.tool.input?.description === "string"
+          ? toolMsg.tool.input.description
+          : command,
+        outputFile,
+        startedAt: toolMsg.tool.startedAt ?? toolMsg.createdAt,
+        status,
+        summary: null,
+      });
+    }
+    bgTasksDirty = true;
+  }
+
+  // Replace Map reference so Zustand detects the change
+  if (bgTasksDirty) {
+    state.backgroundTasks = new Map(state.backgroundTasks);
   }
 
   //
