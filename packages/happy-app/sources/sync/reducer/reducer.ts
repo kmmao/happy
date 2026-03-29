@@ -1261,11 +1261,13 @@ export function reducer(
         if (msg.tool.name === "Task" || msg.tool.name === "Agent") {
           continue;
         }
-        // Background tasks: allow Phase 6 to force-complete their tool messages.
-        // Active tasks have their status managed by the backgroundTasks registry
-        // (via task-start/end events), which is independent of tool.state.
-        // Old/orphaned tasks (no task-start event) need Phase 6 cleanup so the
-        // enrichment loop can derive the correct completed/failed status.
+        // Skip background tasks — their tool.state must stay "running" so the
+        // enrichment loop (Phase 6.5) correctly creates "running" entries.
+        // Task lifecycle is managed by task-start/end events, not tool.state.
+        // For old sessions without task events, Phase 6.5 handles the fallback.
+        if (msg.tool.backgroundTaskId) {
+          continue;
+        }
         msg.tool.state = "completed";
         msg.tool.completedAt = state.latestAgentTextTime;
         changed.add(messageId);
@@ -1299,12 +1301,16 @@ export function reducer(
       });
     } else {
       // tool-result arrived before task-start — create provisional entry.
-      // Derive status from tool.state (after Phase 6 stale-cleanup).
+      // For old sessions without task-start/end events: if the agent has sent
+      // text after this tool (latestAgentTextTime > tool.createdAt), the task
+      // is stale and should be marked completed. Otherwise it's still running.
+      const isStale = state.latestAgentTextTime > 0
+        && toolMsg.createdAt < state.latestAgentTextTime;
       const toolState = toolMsg.tool.state;
       const status: "running" | "completed" | "failed" | "stopped" =
-        toolState === "running" ? "running" :
         toolState === "error" ? "failed" :
-        "completed";
+        isStale ? "completed" :
+        "running";
       state.backgroundTasks.set(taskId, {
         taskId,
         toolUseId: null,
