@@ -12,6 +12,7 @@ import { useDevSkillCheck } from "@/hooks/useDevSkillCheck";
 import { DevServiceCard } from "@/components/DevServiceCard";
 import { DevServiceEditSheet } from "@/components/DevServiceEditSheet";
 import { serializeDevYml, type DevService, type DevConfig } from "@/utils/devYmlParser";
+import { sessionBash } from "@/sync/ops";
 import { sync } from "@/sync/sync";
 
 export default React.memo(function DevScreen() {
@@ -37,27 +38,37 @@ export default React.memo(function DevScreen() {
 
     const router = useRouter();
 
-    /** Save by sending instruction to AI — more reliable than direct file write */
+    /** Write dev.yml to remote machine via sessionBash + python3 base64 decode */
+    const writeDevYml = React.useCallback(async (updatedConfig: DevConfig): Promise<boolean> => {
+        const yml = serializeDevYml(updatedConfig);
+        const bytes = new TextEncoder().encode(yml);
+        let bin = "";
+        for (const b of bytes) bin += String.fromCharCode(b);
+        const b64 = btoa(bin);
+        const result = await sessionBash(sessionId, {
+            command: `mkdir -p .happy && python3 -c "import base64,sys; sys.stdout.buffer.write(base64.b64decode('${b64}'))" > .happy/dev.yml`,
+            timeout: 10000,
+        });
+        if (result.success) {
+            invalidateDevConfigCache(sessionId);
+            refresh();
+        }
+        return result.success;
+    }, [sessionId, refresh]);
+
     const handleSave = React.useCallback(async (updated: DevService) => {
-        const yml = serializeDevYml({
+        const updatedConfig: DevConfig = {
             version: config?.version ?? 1,
             services: !config
                 ? [updated]
                 : editingService
                     ? config.services.map((s) => s.key === editingService.key ? updated : s)
                     : [...config.services, updated],
-        });
-
-        // Send the full yml content as a message to the session
-        const instruction = editingService
-            ? `请更新 .happy/dev.yml 中服务 "${updated.key}" 的配置为以下内容，完整替换文件：\n\n\`\`\`yaml\n${yml}\n\`\`\``
-            : `请将以下内容写入 .happy/dev.yml（如文件已存在则替换）：\n\n\`\`\`yaml\n${yml}\n\`\`\``;
-
-        sync.sendMessage(sessionId, instruction);
+        };
+        await writeDevYml(updatedConfig);
         setShowEditSheet(false);
         setEditingService(null);
-        router.back();
-    }, [config, editingService, sessionId, router]);
+    }, [config, editingService, writeDevYml]);
 
     const handleDelete = React.useCallback(async (serviceKey: string) => {
         const confirmed = await Modal.confirm(
@@ -71,11 +82,8 @@ export default React.memo(function DevScreen() {
             ...config,
             services: config.services.filter((s) => s.key !== serviceKey),
         };
-        const yml = serializeDevYml(updatedConfig);
-        sync.sendMessage(sessionId, `请将以下内容写入 .happy/dev.yml（替换原文件）：\n\n\`\`\`yaml\n${yml}\n\`\`\``);
-        invalidateDevConfigCache(sessionId);
-        router.back();
-    }, [config, sessionId, router]);
+        await writeDevYml(updatedConfig);
+    }, [config, writeDevYml]);
 
     const handleConfigFilePress = React.useCallback((filePath: string) => {
         // file.tsx expects base64-encoded path
