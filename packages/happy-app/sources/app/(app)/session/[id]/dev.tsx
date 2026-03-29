@@ -283,7 +283,7 @@ export default React.memo(function DevScreen() {
                     allServiceKeys={allServiceKeys}
                     onSave={handleSave}
                     onClose={handleCloseSheet}
-                    onBrowse={() => router.push(`/session/${sessionId}/files` as any)}
+                    sessionId={sessionId}
                 />
             )}
         </View>
