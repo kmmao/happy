@@ -218,10 +218,33 @@ export default React.memo(function DevScreen() {
                                 onEdit={handleEdit}
                                 onDelete={handleDelete}
                                 onConfigFilePress={handleConfigFilePress}
+                                onStart={(key: string) => {
+                                    sync.sendMessage(sessionId, `/dev ${key}`);
+                                    router.back();
+                                }}
                             />
                         ))}
                     </ScrollView>
 
+                    {/* Start All button — prominent */}
+                    <View style={[styles.startBar, { borderTopColor: theme.colors.divider }]}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.startAllButton,
+                                { backgroundColor: "#4CAF50" },
+                                pressed && { opacity: 0.7 },
+                            ]}
+                            onPress={() => {
+                                sync.sendMessage(sessionId, "/dev");
+                                router.back();
+                            }}
+                        >
+                            <Ionicons name="play" size={18} color="#fff" />
+                            <Text style={styles.startAllText}>Start All</Text>
+                        </Pressable>
+                    </View>
+
+                    {/* Secondary actions */}
                     <View style={[styles.bottomBar, { borderTopColor: theme.colors.divider }]}>
                         <Pressable
                             style={({ pressed }) => [
@@ -327,6 +350,25 @@ const styles = StyleSheet.create((theme) => ({
     installButtonText: {
         color: "#fff",
         fontSize: 15,
+        fontWeight: "600",
+    },
+    startBar: {
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 4,
+        borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    startAllButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        paddingVertical: 12,
+        borderRadius: 10,
+    },
+    startAllText: {
+        color: "#fff",
+        fontSize: 16,
         fontWeight: "600",
     },
 }));

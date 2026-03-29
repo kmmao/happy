@@ -21,6 +21,7 @@ type Props = {
     readonly onEdit: (service: DevService) => void;
     readonly onDelete: (serviceKey: string) => void;
     readonly onConfigFilePress: (path: string) => void;
+    readonly onStart?: (serviceKey: string) => void;
     readonly isRunning?: boolean;
 };
 
@@ -30,6 +31,7 @@ export const DevServiceCard = React.memo(function DevServiceCard({
     onEdit,
     onDelete,
     onConfigFilePress,
+    onStart,
     isRunning,
 }: Props) {
     const { theme } = useUnistyles();
@@ -188,6 +190,15 @@ export const DevServiceCard = React.memo(function DevServiceCard({
                 onPress={() => onEdit(service)}
                 showChevron={false}
             />
+            {onStart && !isRunning && (
+                <Item
+                    title="Start"
+                    titleStyle={{ color: "#4CAF50", fontSize: 13, fontWeight: "600" }}
+                    icon={<Ionicons name="play" size={16} color="#4CAF50" />}
+                    onPress={() => onStart(service.key)}
+                    showChevron={false}
+                />
+            )}
             <Item
                 title="Delete"
                 titleStyle={{ color: theme.colors.textSecondary, fontSize: 13 }}
