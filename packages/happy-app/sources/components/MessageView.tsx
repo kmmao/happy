@@ -433,6 +433,7 @@ function AgentEventBlock(props: {
   };
   hasTurnsWithThinking?: boolean;
 }) {
+  const { theme } = useUnistyles();
   if (props.event.type === "switch") {
     return (
       <View style={styles.agentEventContainer}>
@@ -524,36 +525,104 @@ function AgentEventBlock(props: {
     const sessionCost =
       props.event.totalCostUsd ?? props.sessionUsage?.totalCostUsd;
 
-    const parts: string[] = [];
-    if (props.hasTurnsWithThinking) {
-      parts.push(t("message.thinkingMarker"));
-    }
-    if (modelStr) parts.push(modelStr);
-    if (durationStr) parts.push(durationStr);
-    if (props.event.numTurns !== undefined && props.event.numTurns > 0) {
-      parts.push(t("message.turnCount", { count: props.event.numTurns }));
-    }
-    if (sessionTotalTokens !== null) {
-      const summary = t("message.sessionSummary", {
-        tokens: formatTokenCount(sessionTotalTokens),
-      });
-      if (sessionCacheHitRate !== null) {
-        parts.push(`${summary} (↓${sessionCacheHitRate}%)`);
-      } else {
-        parts.push(summary);
-      }
-    }
-    if (sessionCost !== undefined && sessionCost > 0) {
-      parts.push(formatCost(sessionCost));
-    }
+    const hasParts =
+      props.hasTurnsWithThinking ||
+      modelStr ||
+      durationStr ||
+      (props.event.numTurns !== undefined && props.event.numTurns > 0) ||
+      sessionTotalTokens !== null ||
+      (sessionCost !== undefined && sessionCost > 0);
 
-    if (parts.length === 0) {
+    if (!hasParts) {
       return null;
     }
 
     return (
       <View style={styles.turnStatsContainer}>
-        <Text style={styles.turnStatsText}>{parts.join(" · ")}</Text>
+        {props.hasTurnsWithThinking && (
+          <View style={styles.turnStatBadge}>
+            <Text style={styles.turnStatBadgeText}>
+              {t("message.thinkingMarker")}
+            </Text>
+          </View>
+        )}
+        {modelStr && (
+          <View
+            style={[
+              styles.turnStatBadge,
+              { backgroundColor: theme.colors.accentPurple + "15" },
+            ]}
+          >
+            <Text
+              style={[
+                styles.turnStatBadgeText,
+                { color: theme.colors.accentPurple },
+              ]}
+            >
+              {modelStr}
+            </Text>
+          </View>
+        )}
+        {durationStr && (
+          <View
+            style={[
+              styles.turnStatBadge,
+              { backgroundColor: theme.colors.accentOrange + "15" },
+            ]}
+          >
+            <Text
+              style={[
+                styles.turnStatBadgeText,
+                { color: theme.colors.accentOrange },
+              ]}
+            >
+              {durationStr}
+            </Text>
+          </View>
+        )}
+        {props.event.numTurns !== undefined && props.event.numTurns > 0 && (
+          <View style={styles.turnStatBadge}>
+            <Text style={styles.turnStatBadgeText}>
+              {t("message.turnCount", { count: props.event.numTurns })}
+            </Text>
+          </View>
+        )}
+        {sessionTotalTokens !== null && (
+          <View
+            style={[
+              styles.turnStatBadge,
+              { backgroundColor: theme.colors.accentTeal + "15" },
+            ]}
+          >
+            <Text
+              style={[
+                styles.turnStatBadgeText,
+                { color: theme.colors.accentTeal },
+              ]}
+            >
+              {t("message.sessionSummary", {
+                tokens: formatTokenCount(sessionTotalTokens),
+              })}
+            </Text>
+            {sessionCacheHitRate !== null && (
+              <Text
+                style={[
+                  styles.turnStatBadgeText,
+                  { color: theme.colors.success, marginLeft: 3 },
+                ]}
+              >
+                ↓{sessionCacheHitRate}%
+              </Text>
+            )}
+          </View>
+        )}
+        {sessionCost !== undefined && sessionCost > 0 && (
+          <View style={styles.turnStatBadge}>
+            <Text style={styles.turnStatBadgeText}>
+              {formatCost(sessionCost)}
+            </Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -715,11 +784,28 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
   },
   turnStatsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 4,
     marginHorizontal: 8,
     marginTop: 2,
     marginBottom: 8,
-    alignItems: "flex-start",
     paddingLeft: 40,
+  },
+  turnStatBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    backgroundColor: theme.colors.agentEventText + "14",
+    gap: 3,
+  },
+  turnStatBadgeText: {
+    fontSize: 11,
+    fontFamily: "monospace",
+    color: theme.colors.agentEventText,
   },
   turnStatsText: {
     color: theme.colors.agentEventText,
