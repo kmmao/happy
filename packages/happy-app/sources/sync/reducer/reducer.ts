@@ -952,29 +952,18 @@ export function reducer(
             continue;
           }
 
-          if (message.tool.state !== "running") {
-            continue;
-          }
-
-          // Update tool state and result
-          message.tool.state = c.is_error ? "error" : "completed";
-          message.tool.result = c.content;
-          message.tool.completedAt = msg.createdAt;
-
-          // Propagate background task metadata
+          // tool-call-end with backgroundTaskId may arrive AFTER the real tool-result
+          // has already set state to "completed". Handle it before the state guard.
           if (c.backgroundTaskId) {
             message.tool.backgroundTaskId = c.backgroundTaskId;
             message.tool.outputFile = c.outputFile;
-            // Bash tool completes normally (state set at line 960).
-            // The background task lifecycle is managed separately via backgroundTasks Map.
             state.backgroundTaskIdToMessageId.set(c.backgroundTaskId, messageId);
 
-            // Create or enrich backgroundTasks entry with tool-result metadata.
+            // Create or enrich backgroundTasks entry
             const cmd = typeof message.tool.input?.command === "string"
               ? message.tool.input.command : "";
             const existing = state.backgroundTasks.get(c.backgroundTaskId);
             if (existing) {
-              // Enrich: task-start may have created entry with empty command
               if ((!existing.command && cmd) || (!existing.outputFile && c.outputFile)) {
                 state.backgroundTasks.set(c.backgroundTaskId, {
                   ...existing,
@@ -998,6 +987,15 @@ export function reducer(
               bgTasksDirty = true;
             }
           }
+
+          if (message.tool.state !== "running") {
+            continue;
+          }
+
+          // Update tool state and result
+          message.tool.state = c.is_error ? "error" : "completed";
+          message.tool.result = c.content;
+          message.tool.completedAt = msg.createdAt;
 
           // Update permission data if provided by backend
           if (c.permissions) {
