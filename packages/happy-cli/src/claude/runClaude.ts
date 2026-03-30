@@ -708,8 +708,8 @@ export async function runClaude(
       return;
     }
 
-    // Perf tracking: capture timing from socket layer
-    const perfSocketReceivedAt = (message as Record<string, unknown>).__perfSocketReceivedAt as number | undefined;
+    // Perf tracking: capture timing from socket layer (stored by ApiSessionClient before Zod strips it)
+    const perfSocketReceivedAt = session.lastPerfSocketReceivedAt;
     const perfQueuedAt = Date.now();
     if (perfSocketReceivedAt) {
       logger.debug(`[perf] socket_received → queued: ${perfQueuedAt - perfSocketReceivedAt}ms (meta processing)`);

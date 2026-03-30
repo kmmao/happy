@@ -191,6 +191,8 @@ export class ApiSessionClient extends EventEmitter {
   private pendingMessages: UserMessage[] = [];
   private pendingMessageCallback: ((message: UserMessage) => void) | null =
     null;
+  /** Perf tracking: socket received timestamp for the most recently routed message */
+  lastPerfSocketReceivedAt: number | undefined;
   readonly rpcHandlerManager: RpcHandlerManager;
   private agentStateLock = new AsyncLock();
   private metadataLock = new AsyncLock();
@@ -421,8 +423,11 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   private routeIncomingMessage(message: unknown) {
+    // Extract perf timestamp before Zod strips unknown fields
+    const perfTs = (message as Record<string, unknown>)?.__perfSocketReceivedAt as number | undefined;
     const userResult = UserMessageSchema.safeParse(message);
     if (userResult.success) {
+      this.lastPerfSocketReceivedAt = perfTs;
       if (this.pendingMessageCallback) {
         this.pendingMessageCallback(userResult.data);
       } else {
