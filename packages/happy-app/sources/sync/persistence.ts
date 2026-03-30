@@ -19,6 +19,7 @@ import { log } from '@/log';
 
 const mmkv = new MMKV();
 const NEW_SESSION_DRAFT_KEY = "new-session-draft-v1";
+const DISMISSED_TASKS_PREFIX = "dismissed-tasks:";
 
 export type NewSessionAgentType = "claude" | "codex" | "gemini";
 export type NewSessionSessionType = "simple" | "worktree";
@@ -496,6 +497,27 @@ export function saveHiddenProcesses(machineId: string, names: readonly string[])
     mmkv.delete(`${HIDDEN_PROCESSES_PREFIX}${machineId}`);
   } else {
     mmkv.set(`${HIDDEN_PROCESSES_PREFIX}${machineId}`, JSON.stringify(names));
+  }
+}
+
+export function loadDismissedTasks(sessionId: string): ReadonlySet<string> {
+  const raw = mmkv.getString(`${DISMISSED_TASKS_PREFIX}${sessionId}`);
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    } catch {
+      // ignore
+    }
+  }
+  return new Set();
+}
+
+export function saveDismissedTasks(sessionId: string, taskIds: ReadonlySet<string>) {
+  if (taskIds.size === 0) {
+    mmkv.delete(`${DISMISSED_TASKS_PREFIX}${sessionId}`);
+  } else {
+    mmkv.set(`${DISMISSED_TASKS_PREFIX}${sessionId}`, JSON.stringify([...taskIds]));
   }
 }
 
