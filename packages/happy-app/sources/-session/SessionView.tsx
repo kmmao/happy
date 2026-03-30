@@ -392,7 +392,7 @@ function SessionViewInner({
             // SDK stopTask stops tracking but Docker containers keep running
             if (isDocker && dockerName) {
               sessionBash(sessionId, {
-                command: `docker stop ${dockerName} 2>/dev/null || true`,
+                command: `docker stop ${dockerName} 2>/dev/null; docker rm ${dockerName} 2>/dev/null || true`,
               }).catch(() => {});
             }
           })
@@ -400,7 +400,7 @@ function SessionViewInner({
             // stopTask fails when idle — fallback to direct kill
             if (isDocker && dockerName) {
               sessionBash(sessionId, {
-                command: `docker stop ${dockerName} 2>/dev/null || true`,
+                command: `docker stop ${dockerName} 2>/dev/null; docker rm ${dockerName} 2>/dev/null || true`,
               }).catch(() => {});
             } else if (port) {
               sessionBash(sessionId, {
