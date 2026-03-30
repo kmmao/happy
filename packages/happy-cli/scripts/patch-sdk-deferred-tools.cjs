@@ -13,8 +13,9 @@
  *   `RD`) to short-circuit for AskUserQuestion, keeping it always available.
  *
  * How it works:
- *   Original:  function RD(A){if(A.isMcp===!0)return!0; ...}
- *   Patched:   function RD(A){if(A.name==="AskUserQuestion")return!1;if(A.isMcp===!0)return!0; ...}
+ *   Locates the isDeferredTool function by matching known signatures and
+ *   injects an early return for AskUserQuestion before any other checks.
+ *   Supports multiple SDK versions (function name changes across minified builds).
  *
  * This runs as a postinstall hook — safe to re-run, idempotent.
  */
@@ -27,33 +28,34 @@ const SDK_CLI_PATH = path.resolve(
     '../node_modules/@anthropic-ai/claude-agent-sdk/cli.js',
 );
 
-const ORIGINAL = 'function RD(A){if(A.isMcp===!0)return!0;';
-const PATCHED = 'function RD(A){if(A.name==="AskUserQuestion")return!1;if(A.isMcp===!0)return!0;';
+// Regex matching isDeferredTool by its unique .isMcp===!0 check pattern.
+// Captures: function name, param name, any preamble checks before isMcp.
+const IS_DEFERRED_RE = /function\s+(\w+)\((\w+)\)\{((?:if\(\2\.\w+===!0\)return![01];)*)if\(\2\.isMcp===!0\)return!0;/;
+const ALREADY_PATCHED_RE = /\.name==="AskUserQuestion"\)return!1;.{0,120}\.isMcp===!0\)return!0;/;
 
 function patch() {
     if (!fs.existsSync(SDK_CLI_PATH)) {
-        // SDK not installed yet — skip silently (first install, deps not ready)
         return;
     }
 
     const content = fs.readFileSync(SDK_CLI_PATH, 'utf8');
 
-    if (content.includes(PATCHED)) {
+    if (ALREADY_PATCHED_RE.test(content)) {
         console.log('[patch-sdk] AskUserQuestion already patched — skipping');
         return;
     }
 
-    if (!content.includes(ORIGINAL)) {
-        console.warn(
-            '[patch-sdk] WARNING: isDeferredTool signature changed — patch may need updating',
-        );
-        console.warn('[patch-sdk] Expected:', ORIGINAL);
+    const match = content.match(IS_DEFERRED_RE);
+    if (!match) {
+        console.warn('[patch-sdk] WARNING: isDeferredTool not found — patch may need updating');
         return;
     }
 
-    const patched = content.replace(ORIGINAL, PATCHED);
-    fs.writeFileSync(SDK_CLI_PATH, patched, 'utf8');
-    console.log('[patch-sdk] Patched isDeferredTool — AskUserQuestion is now always available');
+    const [original, funcName, paramName, preamble] = match;
+    const patched = `function ${funcName}(${paramName}){if(${paramName}.name==="AskUserQuestion")return!1;${preamble}if(${paramName}.isMcp===!0)return!0;`;
+
+    fs.writeFileSync(SDK_CLI_PATH, content.replace(original, patched), 'utf8');
+    console.log(`[patch-sdk] Patched isDeferredTool (fn=${funcName}) — AskUserQuestion is now always available`);
 }
 
 patch();
