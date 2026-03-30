@@ -2436,6 +2436,7 @@ export const ru: TranslationStructure = {
     knowledgeConfigMerge: "Умное слияние",
     knowledgeConfigMergeHint: "Поиск записей с ≥75% сходством, объединение 2-5 в кластере (макс. 3 кластера/запуск). Исходные записи становятся «заменёнными». Каждые 6 часов",
     knowledgeConfigResetToDefault: "Сбросить настройки",
+    knowledgeConfigResetConfirm: "Сбросить все настройки базы знаний для этого проекта?",
     knowledgeConfigInheritingDefaults: "Используются настройки по умолчанию. Измените любой параметр для настройки проекта.",
     knowledgePin: "Закрепить",
     knowledgeUnpin: "Открепить",

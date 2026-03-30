@@ -2336,6 +2336,7 @@ export const zhHant: TranslationStructure = {
     knowledgeConfigMerge: "智慧合併",
     knowledgeConfigMergeHint: "尋找相似度 ≥75% 的條目，每簇合併 2-5 條（每次最多 3 簇），由 AI 執行。來源條目變為「已替代」。每 6 小時執行",
     knowledgeConfigResetToDefault: "恢復預設",
+    knowledgeConfigResetConfirm: "確定將此專案的知識庫設定恢復為預設值嗎？",
     knowledgeConfigInheritingDefaults: "正在使用預設設定。更改任意選項即可自訂此專案。",
     knowledgePin: "置頂",
     knowledgeUnpin: "取消置頂",

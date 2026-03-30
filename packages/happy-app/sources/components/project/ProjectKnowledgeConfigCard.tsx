@@ -4,6 +4,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { Switch } from "@/components/Switch";
+import { Modal } from "@/modal";
 import { t } from "@/text";
 import type { KnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
 
@@ -50,7 +51,18 @@ export const ProjectKnowledgeConfigCard = React.memo<Props>(
                     </View>
                     <View style={styles.headerRight}>
                         {isCustomized && !collapsed && (
-                            <Pressable onPress={onReset} disabled={saving} hitSlop={8}>
+                            <Pressable
+                                onPress={async () => {
+                                    const confirmed = await Modal.confirm(
+                                        t("projects.knowledgeConfigResetToDefault"),
+                                        t("projects.knowledgeConfigResetConfirm"),
+                                        { confirmText: t("common.reset"), cancelText: t("common.cancel") },
+                                    );
+                                    if (confirmed) onReset();
+                                }}
+                                disabled={saving}
+                                hitSlop={8}
+                            >
                                 <Text style={[styles.resetText, { color: theme.colors.header.tint }]}>
                                     {t("projects.knowledgeConfigResetToDefault")}
                                 </Text>

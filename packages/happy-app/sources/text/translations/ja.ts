@@ -2394,6 +2394,7 @@ export const ja: TranslationStructure = {
     knowledgeConfigMerge: "スマートマージ",
     knowledgeConfigMergeHint: "類似度≥75%のエントリを検索、クラスタごとに2-5件統合（最大3クラスタ/回）。元エントリは「置換済み」に。6時間ごとに実行",
     knowledgeConfigResetToDefault: "デフォルトに戻す",
+    knowledgeConfigResetConfirm: "このプロジェクトのナレッジベース設定をデフォルトにリセットしますか？",
     knowledgeConfigInheritingDefaults: "デフォルト設定を使用中。いずれかを変更するとカスタマイズされます。",
     knowledgePin: "ピン留め",
     knowledgeUnpin: "ピン解除",

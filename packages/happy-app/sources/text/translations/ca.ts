@@ -2418,6 +2418,7 @@ export const ca: TranslationStructure = {
     knowledgeConfigMerge: "Fusió intel·ligent",
     knowledgeConfigMergeHint: "Cerca entrades amb ≥75% similitud, fusiona 2-5 per clúster (màx. 3 clústers/execució). Les fonts passen a 'reemplaçades'. Cada 6 hores",
     knowledgeConfigResetToDefault: "Restaurar valors predeterminats",
+    knowledgeConfigResetConfirm: "Restablir la configuració de la base de coneixement als valors predeterminats?",
     knowledgeConfigInheritingDefaults: "Usant configuració predeterminada. Canvieu qualsevol opció per personalitzar aquest projecte.",
     knowledgePin: "Fixa",
     knowledgeUnpin: "Desfixa",

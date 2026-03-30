@@ -2440,6 +2440,7 @@ export const pl: TranslationStructure = {
     knowledgeConfigMerge: "Inteligentne scalanie",
     knowledgeConfigMergeHint: "Wyszukuje wpisy o ≥75% podobieństwie, łączy 2-5 na klaster (maks. 3 klastry/uruchomienie). Źródłowe stają się «zastąpione». Co 6 godzin",
     knowledgeConfigResetToDefault: "Przywróć domyślne",
+    knowledgeConfigResetConfirm: "Zresetować ustawienia bazy wiedzy do domyślnych?",
     knowledgeConfigInheritingDefaults: "Używane są ustawienia domyślne. Zmień dowolną opcję, aby dostosować projekt.",
     knowledgePin: "Przypnij",
     knowledgeUnpin: "Odepnij",

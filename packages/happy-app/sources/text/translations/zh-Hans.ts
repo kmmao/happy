@@ -2335,6 +2335,7 @@ export const zhHans: TranslationStructure = {
     knowledgeConfigMerge: "智能合并",
     knowledgeConfigMergeHint: "查找相似度 ≥75% 的条目，每簇合并 2-5 条（每次最多 3 簇），由 AI 执行。源条目变为「已替代」。每 6 小时执行",
     knowledgeConfigResetToDefault: "恢复默认",
+    knowledgeConfigResetConfirm: "确定将此项目的知识库设置恢复为默认值吗？",
     knowledgeConfigInheritingDefaults: "正在使用默认设置。更改任意选项即可自定义此项目。",
     knowledgePin: "置顶",
     knowledgeUnpin: "取消置顶",

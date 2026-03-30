@@ -2415,6 +2415,7 @@ export const es: TranslationStructure = {
     knowledgeConfigMerge: "Fusión inteligente",
     knowledgeConfigMergeHint: "Busca entradas con ≥75% similitud, fusiona 2-5 por clúster (máx. 3 clústeres/ejecución). Las fuentes pasan a 'reemplazadas'. Cada 6 horas",
     knowledgeConfigResetToDefault: "Restaurar valores predeterminados",
+    knowledgeConfigResetConfirm: "¿Restablecer la configuración de la base de conocimiento a los valores predeterminados?",
     knowledgeConfigInheritingDefaults: "Usando configuración predeterminada. Cambie cualquier opción para personalizar este proyecto.",
     knowledgePin: "Fijar",
     knowledgeUnpin: "Desfijar",

@@ -2410,6 +2410,7 @@ export const en = {
     knowledgeConfigMerge: "Smart Merge",
     knowledgeConfigMergeHint: "Find entries with ≥75% similarity, merge 2-5 per cluster (max 3 clusters/run) using AI. Source entries become 'superseded'. Runs every 6 hours",
     knowledgeConfigResetToDefault: "Reset to Default",
+    knowledgeConfigResetConfirm: "Reset all knowledge base settings for this project to defaults?",
     knowledgeConfigInheritingDefaults: "Using default settings. Change any option to customize for this project.",
     knowledgePin: "Pin",
     knowledgeUnpin: "Unpin",

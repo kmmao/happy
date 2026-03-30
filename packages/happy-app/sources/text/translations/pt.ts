@@ -2418,6 +2418,7 @@ export const pt: TranslationStructure = {
     knowledgeConfigMerge: "Fusão inteligente",
     knowledgeConfigMergeHint: "Busca entradas com ≥75% de similaridade, mescla 2-5 por cluster (máx. 3 clusters/execução). As fontes tornam-se 'substituídas'. A cada 6 horas",
     knowledgeConfigResetToDefault: "Restaurar padrão",
+    knowledgeConfigResetConfirm: "Redefinir as configurações da base de conhecimento para os padrões?",
     knowledgeConfigInheritingDefaults: "Usando configurações padrão. Altere qualquer opção para personalizar este projeto.",
     knowledgePin: "Fixar",
     knowledgeUnpin: "Desafixar",
