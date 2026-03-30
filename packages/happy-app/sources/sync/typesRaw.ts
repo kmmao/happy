@@ -855,9 +855,15 @@ function normalizeSessionEnvelope(
   createdAt: number,
   meta: MessageMeta | undefined,
 ): NormalizedMessage | null {
-  // Session protocol requires turn id on all agent-originated envelopes.
+  // Session protocol requires turn id on most agent-originated envelopes.
   // Drop malformed agent events without turn to avoid attaching stray messages.
-  if (envelope.role === "agent" && !envelope.turn) {
+  // Exception: task lifecycle events (task-start/progress/end) may arrive without
+  // a turn (e.g. manual task-end from idle stopTask fallback).
+  const isTaskLifecycleEvent =
+    envelope.ev.t === "task-start" ||
+    envelope.ev.t === "task-progress" ||
+    envelope.ev.t === "task-end";
+  if (envelope.role === "agent" && !envelope.turn && !isTaskLifecycleEvent) {
     return null;
   }
 

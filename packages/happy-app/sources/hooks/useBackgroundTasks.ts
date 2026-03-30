@@ -3,12 +3,11 @@
  * SDK event-driven registry (task-start / task-progress / task-end).
  *
  * No longer scans messages — reads directly from ReducerState.backgroundTasks.
- * Dismissed task IDs are persisted to MMKV so they survive page refresh.
+ * Supports manual dismissal via dismissTask().
  */
 
 import * as React from "react";
 import { BackgroundTaskEntry } from "@/sync/reducer/reducer";
-import { loadDismissedTasks, saveDismissedTasks } from "@/sync/persistence";
 
 export type BackgroundTask = {
     readonly taskId: string;
@@ -32,27 +31,10 @@ export type BackgroundTasksResult = {
 const EMPTY_TASKS: readonly BackgroundTask[] = [];
 
 export function useBackgroundTasks(
-    sessionId: string,
     entries: ReadonlyMap<string, BackgroundTaskEntry>,
     isConnected: boolean = true,
 ): BackgroundTasksResult {
-    const [dismissed, setDismissed] = React.useState<ReadonlySet<string>>(
-        () => loadDismissedTasks(sessionId),
-    );
-
-    // Persist dismissed set to MMKV on change
-    React.useEffect(() => {
-        saveDismissedTasks(sessionId, dismissed);
-    }, [sessionId, dismissed]);
-
-    // Clean up dismissed IDs that no longer exist in the entries map
-    React.useEffect(() => {
-        setDismissed((prev) => {
-            if (prev.size === 0) return prev;
-            const next = new Set([...prev].filter((id) => entries.has(id)));
-            return next.size < prev.size ? next : prev;
-        });
-    }, [entries]);
+    const [dismissed, setDismissed] = React.useState<ReadonlySet<string>>(new Set());
 
     const tasks = React.useMemo(() => {
         if (!isConnected) return EMPTY_TASKS;
