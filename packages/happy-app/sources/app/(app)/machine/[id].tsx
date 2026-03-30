@@ -163,27 +163,27 @@ function MachineDetailScreen() {
   const handleStopDaemon = async () => {
     // Show confirmation modal using alert with buttons
     Modal.alert(
-      "Stop Daemon?",
-      "You will not be able to spawn new sessions on this machine until you restart the daemon on your computer again. Your current sessions will stay alive.",
+      t("machine.stopDaemonTitle"),
+      t("machine.stopDaemonMessage"),
       [
         {
-          text: "Cancel",
+          text: t("common.cancel"),
           style: "cancel",
         },
         {
-          text: "Stop Daemon",
+          text: t("machine.stopDaemonButton"),
           style: "destructive",
           onPress: async () => {
             setIsStoppingDaemon(true);
             try {
               const result = await machineStopDaemon(machineId!);
-              Modal.alert("Daemon Stopped", result.message);
+              Modal.alert(t("machine.daemonStopped"), result.message);
               // Refresh to get updated metadata
               await sync.refreshMachines();
             } catch (error) {
               Modal.alert(
                 t("common.error"),
-                "Failed to stop daemon. It may not be running.",
+                t("machine.failedToStopDaemon"),
               );
             } finally {
               setIsStoppingDaemon(false);
@@ -245,11 +245,11 @@ function MachineDetailScreen() {
     if (!machine || !machineId) return;
 
     const newDisplayName = await Modal.prompt(
-      "Rename Machine",
-      "Give this machine a custom name. Leave empty to use the default hostname.",
+      t("machine.renameMachineTitle"),
+      t("machine.renameMachineDescription"),
       {
         defaultValue: machine.metadata?.displayName || "",
-        placeholder: machine.metadata?.host || "Enter machine name",
+        placeholder: machine.metadata?.host || "",
         cancelText: t("common.cancel"),
         confirmText: t("common.rename"),
       },
@@ -269,11 +269,11 @@ function MachineDetailScreen() {
           machine.metadataVersion,
         );
 
-        Modal.alert(t("common.success"), "Machine renamed successfully");
+        Modal.alert(t("common.success"), t("machine.renameMachineSuccess"));
       } catch (error) {
         Modal.alert(
-          "Error",
-          error instanceof Error ? error.message : "Failed to rename machine",
+          t("common.error"),
+          error instanceof Error ? error.message : t("machine.renameMachineFailed"),
         );
         // Refresh to get latest state
         await sync.refreshMachines();
@@ -309,8 +309,8 @@ function MachineDetailScreen() {
           break;
         case "requestToApproveDirectoryCreation": {
           const approved = await Modal.confirm(
-            "Create Directory?",
-            `The directory '${result.directory}' does not exist. Would you like to create it?`,
+            t("machine.createDirectoryTitle"),
+            t("machine.createDirectoryMessage", { directory: result.directory }),
             { cancelText: t("common.cancel"), confirmText: t("common.create") },
           );
           if (approved) {
@@ -323,8 +323,7 @@ function MachineDetailScreen() {
           break;
       }
     } catch (error) {
-      let errorMessage =
-        "Failed to start session. Make sure the daemon is running on the target machine.";
+      let errorMessage = t("machine.failedToStartSession");
       if (
         error instanceof Error &&
         !error.message.includes("Failed to spawn session")

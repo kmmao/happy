@@ -361,9 +361,9 @@ export default React.memo(function GitHostsScreen() {
                   }}
                 >
                   {entry.provider === "github" ? "GitHub" : "Gitea"}
-                  {entry.apiToken ? " · Token" : ""}
+                  {entry.apiToken ? ` · ${t("gitHosts.tokenSuffix")}` : ""}
                   {(entry.webhookRepos ?? []).length > 0
-                    ? ` · ${(entry.webhookRepos ?? []).length} Webhook`
+                    ? ` · ${t("gitHosts.webhookCount", { count: (entry.webhookRepos ?? []).length })}`
                     : ""}
                 </Text>
               </View>

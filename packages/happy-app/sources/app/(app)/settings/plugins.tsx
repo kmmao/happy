@@ -652,7 +652,7 @@ function PluginsSettingsScreen() {
                                 t("settingsPlugins.addMarketplace"),
                                 t("settingsPlugins.addMarketplaceDescription"),
                                 {
-                                    placeholder: "owner/repo",
+                                    placeholder: t("settingsPlugins.addMarketplacePlaceholder"),
                                     confirmText: t("settingsPlugins.addMarketplace"),
                                 },
                             );

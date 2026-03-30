@@ -496,12 +496,12 @@ function ProvisionSettingsScreen() {
             {/* API Configuration */}
             <ItemGroup title={t("provision.apiConfig")}>
                 <Item
-                    title="API Base URL"
+                    title={t("provision.apiBaseUrlTitle")}
                     subtitle={apiBaseUrl || t("provision.apiNotSet")}
                     subtitleStyle={apiBaseUrl ? { fontFamily: "Menlo", fontSize: 12 } : { color: theme.colors.textSecondary, fontSize: 13 }}
                     icon={<Ionicons name="server-outline" size={20} color={theme.colors.textSecondary} />}
                     onPress={async () => {
-                        const val = await Modal.prompt("API Base URL", t("provision.apiBaseUrlDescription"), {
+                        const val = await Modal.prompt(t("provision.apiBaseUrlTitle"), t("provision.apiBaseUrlDescription"), {
                             placeholder: "https://api.anthropic.com",
                             defaultValue: apiBaseUrl,
                         });
@@ -513,12 +513,12 @@ function ProvisionSettingsScreen() {
                     showChevron={false}
                 />
                 <Item
-                    title="API Key"
+                    title={t("provision.apiKeyTitle")}
                     subtitle={apiKey ? `${apiKey.slice(0, 10)}...` : t("provision.apiNotSet")}
                     subtitleStyle={apiKey ? { fontFamily: "Menlo", fontSize: 12 } : { color: theme.colors.textSecondary, fontSize: 13 }}
                     icon={<Ionicons name="key-outline" size={20} color={theme.colors.textSecondary} />}
                     onPress={async () => {
-                        const val = await Modal.prompt("API Key", t("provision.apiKeyDescription"), {
+                        const val = await Modal.prompt(t("provision.apiKeyTitle"), t("provision.apiKeyDescription"), {
                             placeholder: "sk-ant-...",
                             defaultValue: apiKey,
                         });

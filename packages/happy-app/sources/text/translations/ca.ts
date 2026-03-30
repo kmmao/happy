@@ -76,6 +76,7 @@ export const ca: TranslationStructure = {
     removeFavoriteConfirm: ({ name, section }: { name: string; section: string }) =>
       `Eliminar "${name}" de ${section}?`,
     optional: "Opcional",
+    openSettings: "Obrir configuració",
   },
 
   profile: {
@@ -452,6 +453,10 @@ export const ca: TranslationStructure = {
       enterDirectoryPlaceholder: "Introduïu la ruta del directori (p. ex. /home/user/my-project)",
       initialMessage: "Missatge inicial",
       initialMessageDescription: "Escriviu el vostre primer missatge a l'agent d'IA",
+      createProfileTitle: "Crear nou perfil",
+      createProfileDescription: "Introduïu un nom per al nou perfil:",
+      defaultProfileName: "El meu perfil personalitzat",
+      customProfileDescription: "Perfil d'IA personalitzat",
     },
     machinePicker: {
       title: "Seleccionar màquina",
@@ -1202,6 +1207,8 @@ export const ca: TranslationStructure = {
     disableSudo: "Desactivar sudo",
     sudoDisabled: "Desactivat — l'usuari no pot instal·lar paquets",
     sudoEnabled: "Activat — l'usuari té accés sudo complet",
+    apiBaseUrlTitle: "URL base de l'API",
+    apiKeyTitle: "Clau API",
     apiConfig: "Configuració API",
     apiNotSet: "No configurat (opcional)",
     apiBaseUrlDescription: "Adreça API personalitzada (deixa buit per ometre)",
@@ -1424,6 +1431,18 @@ export const ca: TranslationStructure = {
       `Actualitzar @kmmao/happy-coder a v${version}? El dimoni es reiniciarà automàticament després de l'actualització.`,
     upgradeCliSuccess: "CLI actualitzat correctament. El dimoni es reiniciarà automàticament en 60 segons.",
     upgradeCliFailed: "Error en actualitzar CLI",
+    stopDaemonTitle: "Aturar el dimoni?",
+    stopDaemonMessage: "No podreu crear noves sessions en aquesta màquina fins que reinicieu el dimoni. Les sessions actuals continuaran actives.",
+    stopDaemonButton: "Aturar dimoni",
+    daemonStopped: "Dimoni aturat",
+    failedToStopDaemon: "No s'ha pogut aturar el dimoni. Pot ser que no s'estigui executant.",
+    renameMachineTitle: "Reanomenar màquina",
+    renameMachineDescription: "Doneu un nom personalitzat a aquesta màquina. Deixeu-ho buit per usar el nom d'amfitrió predeterminat.",
+    renameMachineSuccess: "Màquina reanomenada correctament",
+    renameMachineFailed: "No s'ha pogut reanomenar la màquina",
+    createDirectoryTitle: "Crear directori?",
+    createDirectoryMessage: (params: { directory: string }) => `El directori '${params.directory}' no existeix. Voleu crear-lo?`,
+    failedToStartSession: "No s'ha pogut iniciar la sessió. Assegureu-vos que el dimoni s'estigui executant a la màquina de destí.",
     untitledSession: "Sessió sense títol",
     back: "Enrere",
     previousSessions: "Sessions anteriors",
@@ -2028,6 +2047,7 @@ export const ca: TranslationStructure = {
     addMarketplace: "Afegir marketplace",
     addMarketplaceHint: "Afegir un marketplace des d'un repositori de GitHub",
     addMarketplaceDescription: "Introdueix el repositori de GitHub (p. ex. owner/repo)",
+    addMarketplacePlaceholder: "owner/repo",
     addMarketplaceSuccess: "Marketplace afegit",
     noResults: "No s'han trobat connectors coincidents",
     restartHint: "Els canvis de plugins s'apliquen a noves sessions. Les sessions existents s'han de reiniciar.",
@@ -2061,6 +2081,12 @@ export const ca: TranslationStructure = {
     searchServers: "Cercar servidors...",
     install: "Instal·lar",
     addServerCustom: "Introduir nom i comanda manualment",
+    categoryDevelopment: "Desenvolupament",
+    categoryKnowledge: "Coneixement",
+    categorySearch: "Cerca",
+    categoryDatabase: "Base de dades",
+    categoryUtility: "Utilitat",
+    categoryPlatform: "Plataforma",
   },
 
   gitHosts: {
@@ -2145,6 +2171,8 @@ export const ca: TranslationStructure = {
     webhookSaveHostFirst: "Primer desa el Git Host",
     webhookRepoDeleted: "Webhook eliminat",
     webhookDeleteConfirm: "Eliminar aquest Webhook i la ruta del servidor?",
+    tokenSuffix: "Token",
+    webhookCount: (params: { count: number }) => `${params.count} Webhook`,
   },
 
   quickCommands: {
@@ -2353,6 +2381,16 @@ export const ca: TranslationStructure = {
     knowledgeLifecycleRelations: "Relacions",
     knowledgeRunDecay: "Arxivar",
     knowledgeRunMerge: "Fusionar",
+    knowledgeDecayResult: (params: { count: number }) => `${params.count} entrades arxivades`,
+    knowledgeDecayNone: "No hi ha entrades per arxivar",
+    knowledgeMergeResult: (params: { count: number; clusters: number }) => `${params.count} entrades fusionades en ${params.clusters} grups`,
+    knowledgeMergeNone: "No s'han trobat entrades similars per fusionar",
+    knowledgeModeAuto: "Auto",
+    knowledgeModeFull: "Complet",
+    knowledgeModeMinimal: "Mínim",
+    knowledgeSensitivityConservative: "Conservador",
+    knowledgeSensitivityBalanced: "Equilibrat",
+    knowledgeSensitivityAggressive: "Agressiu",
     knowledgeConfig: "Configuració de la base de coneixement",
     knowledgeConfigEnabled: "Activar base de coneixement",
     knowledgeConfigMode: "Mode d'injecció",
@@ -2917,6 +2955,12 @@ export const ca: TranslationStructure = {
   stopFailure: {
     title: "La sessió s'ha aturat inesperadament",
     lastMessage: "Últim missatge de l'assistent",
+  },
+  permissions: {
+    microphoneTitle: "Es requereix accés al micròfon",
+    microphoneCanAsk: "Happy necessita accés al vostre micròfon per al xat de veu. Concediu el permís quan se us demani.",
+    microphoneSettings: "Happy necessita accés al vostre micròfon per al xat de veu. Activeu l'accés al micròfon a la configuració del dispositiu.",
+    microphoneWeb: "Permeteu l'accés al micròfon a la configuració del navegador. Pot ser que hàgiu de fer clic a la icona del cadenat a la barra d'adreces i activar el permís del micròfon per a aquest lloc.",
   },
 } as const;
 

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Modal } from "@/modal";
+import { t } from "@/text";
 import { HappyError } from "@/utils/errors";
 
 export function useHappyAction(action: () => Promise<void>) {
@@ -27,14 +28,14 @@ export function useHappyAction(action: () => Promise<void>) {
               //     await alert('Error', e.message, [{ text: 'OK', style: 'cancel' }]);
               //     break;
               // }
-              Modal.alert("Error", e.message, [
-                { text: "OK", style: "cancel" },
+              Modal.alert(t("common.error"), e.message, [
+                { text: t("common.ok"), style: "cancel" },
               ]);
               break;
             } else {
               const detail = e instanceof Error ? e.message : String(e);
-              Modal.alert("Error", `Unknown error: ${detail}`, [
-                { text: "OK", style: "cancel" },
+              Modal.alert(t("common.error"), detail, [
+                { text: t("common.ok"), style: "cancel" },
               ]);
               break;
             }

@@ -89,6 +89,7 @@ export const ru: TranslationStructure = {
     removeFavoriteConfirm: ({ name, section }: { name: string; section: string }) =>
       `Удалить «${name}» из ${section}?`,
     optional: "необязательно",
+    openSettings: "Открыть настройки",
   },
 
   connect: {
@@ -422,6 +423,10 @@ export const ru: TranslationStructure = {
       enterDirectoryPlaceholder: "Введите путь к каталогу (напр. /home/user/my-project)",
       initialMessage: "Начальное сообщение",
       initialMessageDescription: "Напишите первое сообщение ИИ-агенту",
+      createProfileTitle: "Создать новый профиль",
+      createProfileDescription: "Введите имя нового профиля:",
+      defaultProfileName: "Мой профиль",
+      customProfileDescription: "Пользовательский профиль ИИ",
     },
     machinePicker: {
       title: "Выбрать машину",
@@ -1199,6 +1204,8 @@ export const ru: TranslationStructure = {
     disableSudo: "Отключить sudo",
     sudoDisabled: "Отключено — пользователь не может устанавливать пакеты",
     sudoEnabled: "Включено — пользователь имеет полный доступ sudo",
+    apiBaseUrlTitle: "Базовый URL API",
+    apiKeyTitle: "API-ключ",
     apiConfig: "Настройки API",
     apiNotSet: "Не задано (необязательно)",
     apiBaseUrlDescription: "Пользовательский адрес API (оставьте пустым для пропуска)",
@@ -1419,6 +1426,18 @@ export const ru: TranslationStructure = {
       `Обновить @kmmao/happy-coder до v${version}? Демон автоматически перезапустится после обновления.`,
     upgradeCliSuccess: "CLI успешно обновлён. Демон автоматически перезапустится в течение 60 секунд.",
     upgradeCliFailed: "Не удалось обновить CLI",
+    stopDaemonTitle: "Остановить демон?",
+    stopDaemonMessage: "Вы не сможете создавать новые сессии на этой машине, пока не перезапустите демон. Текущие сессии останутся активными.",
+    stopDaemonButton: "Остановить демон",
+    daemonStopped: "Демон остановлен",
+    failedToStopDaemon: "Не удалось остановить демон. Возможно, он не запущен.",
+    renameMachineTitle: "Переименовать машину",
+    renameMachineDescription: "Задайте пользовательское имя для этой машины. Оставьте пустым для использования имени хоста по умолчанию.",
+    renameMachineSuccess: "Машина успешно переименована",
+    renameMachineFailed: "Не удалось переименовать машину",
+    createDirectoryTitle: "Создать каталог?",
+    createDirectoryMessage: (params: { directory: string }) => `Каталог '${params.directory}' не существует. Создать его?`,
+    failedToStartSession: "Не удалось запустить сессию. Убедитесь, что демон запущен на целевой машине.",
     untitledSession: "Безымянная сессия",
     back: "Назад",
     previousSessions: "Предыдущие сессии",
@@ -2050,6 +2069,7 @@ export const ru: TranslationStructure = {
     addMarketplace: "Добавить маркетплейс",
     addMarketplaceHint: "Добавить маркетплейс из репозитория GitHub",
     addMarketplaceDescription: "Введите репозиторий GitHub (например, owner/repo)",
+    addMarketplacePlaceholder: "owner/repo",
     addMarketplaceSuccess: "Маркетплейс добавлен",
     noResults: "Подходящие плагины не найдены",
     restartHint: "Изменения плагинов вступают в силу в новых сессиях. Существующие сессии необходимо перезапустить.",
@@ -2083,6 +2103,12 @@ export const ru: TranslationStructure = {
     searchServers: "Поиск серверов...",
     install: "Установить",
     addServerCustom: "Ввести имя и команду вручную",
+    categoryDevelopment: "Разработка",
+    categoryKnowledge: "Знания",
+    categorySearch: "Поиск",
+    categoryDatabase: "База данных",
+    categoryUtility: "Утилиты",
+    categoryPlatform: "Платформа",
   },
 
   gitHosts: {
@@ -2165,6 +2191,8 @@ export const ru: TranslationStructure = {
     webhookSaveHostFirst: "Сначала сохраните Git Host",
     webhookRepoDeleted: "Webhook удалён",
     webhookDeleteConfirm: "Удалить этот Webhook и маршрут на сервере?",
+    tokenSuffix: "Token",
+    webhookCount: (params: { count: number }) => `${params.count} Webhook`,
   },
 
   quickCommands: {
@@ -2371,6 +2399,16 @@ export const ru: TranslationStructure = {
     knowledgeLifecycleRelations: "Связи",
     knowledgeRunDecay: "Архивировать",
     knowledgeRunMerge: "Объединить",
+    knowledgeDecayResult: (params: { count: number }) => `Архивировано записей: ${params.count}`,
+    knowledgeDecayNone: "Нет записей для архивации",
+    knowledgeMergeResult: (params: { count: number; clusters: number }) => `Объединено ${params.count} записей в ${params.clusters} групп`,
+    knowledgeMergeNone: "Похожие записи для объединения не найдены",
+    knowledgeModeAuto: "Авто",
+    knowledgeModeFull: "Полный",
+    knowledgeModeMinimal: "Минимальный",
+    knowledgeSensitivityConservative: "Консервативная",
+    knowledgeSensitivityBalanced: "Сбалансированная",
+    knowledgeSensitivityAggressive: "Агрессивная",
     knowledgeConfig: "Настройки базы знаний",
     knowledgeConfigEnabled: "Включить базу знаний",
     knowledgeConfigMode: "Режим инъекции",
@@ -2931,6 +2969,12 @@ export const ru: TranslationStructure = {
   stopFailure: {
     title: "Сессия неожиданно остановлена",
     lastMessage: "Последнее сообщение ассистента",
+  },
+  permissions: {
+    microphoneTitle: "Требуется доступ к микрофону",
+    microphoneCanAsk: "Happy нужен доступ к вашему микрофону для голосового чата. Пожалуйста, предоставьте разрешение при запросе.",
+    microphoneSettings: "Happy нужен доступ к вашему микрофону для голосового чата. Включите доступ к микрофону в настройках устройства.",
+    microphoneWeb: "Разрешите доступ к микрофону в настройках браузера. Возможно, вам нужно нажать на значок замка в адресной строке и включить разрешение на микрофон для этого сайта.",
   },
 } as const;
 

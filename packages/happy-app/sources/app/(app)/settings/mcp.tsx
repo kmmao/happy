@@ -27,14 +27,17 @@ function findOnlineMachineId(): string | null {
 }
 
 /** Category labels */
-const CATEGORY_LABELS: Record<string, string> = {
-    dev: "Development",
-    knowledge: "Knowledge",
-    search: "Search",
-    database: "Database",
-    utility: "Utility",
-    platform: "Platform",
-};
+function getCategoryLabel(category: string): string {
+    switch (category) {
+        case "dev": return t("settingsMcp.categoryDevelopment");
+        case "knowledge": return t("settingsMcp.categoryKnowledge");
+        case "search": return t("settingsMcp.categorySearch");
+        case "database": return t("settingsMcp.categoryDatabase");
+        case "utility": return t("settingsMcp.categoryUtility");
+        case "platform": return t("settingsMcp.categoryPlatform");
+        default: return category;
+    }
+}
 
 function McpSettingsScreen() {
     const { theme } = useUnistyles();
@@ -456,7 +459,7 @@ function McpSettingsScreen() {
                             title={server.name}
                             subtitle={server.description}
                             detail={
-                                CATEGORY_LABELS[server.category] ??
+                                getCategoryLabel(server.category) ??
                                 server.category
                             }
                             icon={
@@ -471,7 +474,7 @@ function McpSettingsScreen() {
                                     server.description,
                                     "",
                                     `Package: ${server.pkg}`,
-                                    `Category: ${CATEGORY_LABELS[server.category] ?? server.category}`,
+                                    `Category: ${getCategoryLabel(server.category) ?? server.category}`,
                                     server.envHint
                                         ? `\n⚠️ Requires: ${server.envHint}`
                                         : "",

@@ -76,6 +76,7 @@ export const es: TranslationStructure = {
     removeFavoriteConfirm: ({ name, section }: { name: string; section: string }) =>
       `¿Eliminar "${name}" de ${section}?`,
     optional: "opcional",
+    openSettings: "Abrir ajustes",
   },
 
   profile: {
@@ -454,6 +455,10 @@ export const es: TranslationStructure = {
       enterDirectoryPlaceholder: "Ingresa la ruta del directorio (ej. /home/user/my-project)",
       initialMessage: "Mensaje inicial",
       initialMessageDescription: "Escribe tu primer mensaje al agente de IA",
+      createProfileTitle: "Crear nuevo perfil",
+      createProfileDescription: "Introduzca un nombre para su nuevo perfil:",
+      defaultProfileName: "Mi perfil personalizado",
+      customProfileDescription: "Perfil de IA personalizado",
     },
     machinePicker: {
       title: "Seleccionar máquina",
@@ -1202,6 +1207,8 @@ export const es: TranslationStructure = {
     disableSudo: "Desactivar sudo",
     sudoDisabled: "Desactivado — el usuario no puede instalar paquetes",
     sudoEnabled: "Activado — el usuario tiene acceso sudo completo",
+    apiBaseUrlTitle: "URL base de API",
+    apiKeyTitle: "Clave API",
     apiConfig: "Configuración API",
     apiNotSet: "No configurado (opcional)",
     apiBaseUrlDescription: "Dirección API personalizada (dejar vacío para omitir)",
@@ -1424,6 +1431,18 @@ export const es: TranslationStructure = {
       `¿Actualizar @kmmao/happy-coder a v${version}? El daemon se reiniciará automáticamente después de la actualización.`,
     upgradeCliSuccess: "CLI actualizado correctamente. El daemon se reiniciará automáticamente en 60 segundos.",
     upgradeCliFailed: "Error al actualizar CLI",
+    stopDaemonTitle: "¿Detener el daemon?",
+    stopDaemonMessage: "No podrás crear nuevas sesiones en esta máquina hasta que reinicies el daemon. Tus sesiones actuales seguirán activas.",
+    stopDaemonButton: "Detener daemon",
+    daemonStopped: "Daemon detenido",
+    failedToStopDaemon: "No se pudo detener el daemon. Es posible que no esté en ejecución.",
+    renameMachineTitle: "Renombrar máquina",
+    renameMachineDescription: "Dale un nombre personalizado a esta máquina. Déjalo vacío para usar el nombre de host predeterminado.",
+    renameMachineSuccess: "Máquina renombrada con éxito",
+    renameMachineFailed: "Error al renombrar la máquina",
+    createDirectoryTitle: "¿Crear directorio?",
+    createDirectoryMessage: (params: { directory: string }) => `El directorio '${params.directory}' no existe. ¿Desea crearlo?`,
+    failedToStartSession: "Error al iniciar la sesión. Asegúrese de que el daemon esté ejecutándose en la máquina de destino.",
     untitledSession: "Sesión sin título",
     back: "Atrás",
     previousSessions: "Sesiones anteriores",
@@ -2028,6 +2047,7 @@ export const es: TranslationStructure = {
     addMarketplace: "Añadir marketplace",
     addMarketplaceHint: "Añadir un marketplace desde un repositorio de GitHub",
     addMarketplaceDescription: "Introduce el repositorio de GitHub (ej. owner/repo)",
+    addMarketplacePlaceholder: "owner/repo",
     addMarketplaceSuccess: "Marketplace añadido",
     noResults: "No se encontraron plugins coincidentes",
     restartHint: "Los cambios de plugins se aplican en nuevas sesiones. Las sesiones existentes deben reiniciarse.",
@@ -2061,6 +2081,12 @@ export const es: TranslationStructure = {
     searchServers: "Buscar servidores...",
     install: "Instalar",
     addServerCustom: "Introducir nombre y comando manualmente",
+    categoryDevelopment: "Desarrollo",
+    categoryKnowledge: "Conocimiento",
+    categorySearch: "Búsqueda",
+    categoryDatabase: "Base de datos",
+    categoryUtility: "Utilidad",
+    categoryPlatform: "Plataforma",
   },
 
   gitHosts: {
@@ -2143,6 +2169,8 @@ export const es: TranslationStructure = {
     webhookSaveHostFirst: "Primero guarda el Git Host",
     webhookRepoDeleted: "Webhook eliminado",
     webhookDeleteConfirm: "¿Eliminar este Webhook y la ruta del servidor?",
+    tokenSuffix: "Token",
+    webhookCount: (params: { count: number }) => `${params.count} Webhook`,
   },
 
   quickCommands: {
@@ -2350,6 +2378,16 @@ export const es: TranslationStructure = {
     knowledgeLifecycleRelations: "Relaciones",
     knowledgeRunDecay: "Archivar",
     knowledgeRunMerge: "Fusionar",
+    knowledgeDecayResult: (params: { count: number }) => `${params.count} entradas archivadas`,
+    knowledgeDecayNone: "No hay entradas para archivar",
+    knowledgeMergeResult: (params: { count: number; clusters: number }) => `${params.count} entradas fusionadas en ${params.clusters} grupos`,
+    knowledgeMergeNone: "No se encontraron entradas similares para fusionar",
+    knowledgeModeAuto: "Auto",
+    knowledgeModeFull: "Completo",
+    knowledgeModeMinimal: "Mínimo",
+    knowledgeSensitivityConservative: "Conservador",
+    knowledgeSensitivityBalanced: "Equilibrado",
+    knowledgeSensitivityAggressive: "Agresivo",
     knowledgeConfig: "Configuración de la base de conocimiento",
     knowledgeConfigEnabled: "Activar base de conocimiento",
     knowledgeConfigMode: "Modo de inyección",
@@ -2912,6 +2950,12 @@ export const es: TranslationStructure = {
   stopFailure: {
     title: "La sesión se detuvo inesperadamente",
     lastMessage: "Último mensaje del asistente",
+  },
+  permissions: {
+    microphoneTitle: "Se requiere acceso al micrófono",
+    microphoneCanAsk: "Happy necesita acceso a su micrófono para el chat de voz. Por favor, conceda el permiso cuando se le solicite.",
+    microphoneSettings: "Happy necesita acceso a su micrófono para el chat de voz. Active el acceso al micrófono en los ajustes del dispositivo.",
+    microphoneWeb: "Permita el acceso al micrófono en la configuración de su navegador. Es posible que deba hacer clic en el icono del candado en la barra de direcciones y habilitar el permiso del micrófono para este sitio.",
   },
 } as const;
 

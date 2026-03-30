@@ -1,5 +1,6 @@
 import { Platform, Linking } from 'react-native';
 import { Modal } from '@/modal';
+import { t } from '@/text';
 import { AudioModule } from 'expo-audio';
 import { log } from '@/log';
 
@@ -83,25 +84,23 @@ export async function checkMicrophonePermission(): Promise<MicrophonePermissionR
  * Show appropriate error message when permission is denied
  */
 export function showMicrophonePermissionDeniedAlert(canAskAgain: boolean = false) {
-  const title = 'Microphone Access Required';
+  const title = t('permissions.microphoneTitle');
   const message = canAskAgain
-    ? 'Happy needs access to your microphone for voice chat. Please grant permission when prompted.'
-    : 'Happy needs access to your microphone for voice chat. Please enable microphone access in your device settings.';
+    ? t('permissions.microphoneCanAsk')
+    : t('permissions.microphoneSettings');
 
   if (Platform.OS === 'web') {
-    // Web: Show browser-specific instructions
     Modal.alert(
       title,
-      'Please allow microphone access in your browser settings. You may need to click the lock icon in the address bar and enable microphone permission for this site.',
-      [{ text: 'OK' }]
+      t('permissions.microphoneWeb'),
+      [{ text: t('common.ok') }]
     );
   } else {
     Modal.alert(title, message, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Open Settings',
+        text: t('common.openSettings'),
         onPress: () => {
-          // Opens app settings on iOS/Android
           Linking.openSettings();
         }
       }

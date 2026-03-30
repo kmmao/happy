@@ -18,16 +18,16 @@ interface Props {
 type ModeKey = KnowledgeConfig["mode"];
 type SensitivityKey = KnowledgeConfig["sensitivity"];
 
-const MODE_OPTIONS: { key: ModeKey; label: string; icon: string }[] = [
-    { key: "auto", label: "Auto", icon: "flash-outline" },
-    { key: "full", label: "Full", icon: "server-outline" },
-    { key: "minimal", label: "Minimal", icon: "leaf-outline" },
+const MODE_OPTIONS: { key: ModeKey; labelKey: "knowledgeModeAuto" | "knowledgeModeFull" | "knowledgeModeMinimal"; icon: string }[] = [
+    { key: "auto", labelKey: "knowledgeModeAuto", icon: "flash-outline" },
+    { key: "full", labelKey: "knowledgeModeFull", icon: "server-outline" },
+    { key: "minimal", labelKey: "knowledgeModeMinimal", icon: "leaf-outline" },
 ];
 
-const SENSITIVITY_OPTIONS: { key: SensitivityKey; label: string; icon: string }[] = [
-    { key: "conservative", label: "Conservative", icon: "shield-outline" },
-    { key: "balanced", label: "Balanced", icon: "options-outline" },
-    { key: "aggressive", label: "Aggressive", icon: "rocket-outline" },
+const SENSITIVITY_OPTIONS: { key: SensitivityKey; labelKey: "knowledgeSensitivityConservative" | "knowledgeSensitivityBalanced" | "knowledgeSensitivityAggressive"; icon: string }[] = [
+    { key: "conservative", labelKey: "knowledgeSensitivityConservative", icon: "shield-outline" },
+    { key: "balanced", labelKey: "knowledgeSensitivityBalanced", icon: "options-outline" },
+    { key: "aggressive", labelKey: "knowledgeSensitivityAggressive", icon: "rocket-outline" },
 ];
 
 export const ProjectKnowledgeConfigCard = React.memo<Props>(
@@ -97,7 +97,7 @@ export const ProjectKnowledgeConfigCard = React.memo<Props>(
                                         styles.segmentedText,
                                         { color: config.mode === opt.key ? "#FFF" : theme.colors.textSecondary },
                                     ]}>
-                                        {opt.label}
+                                        {t(`projects.${opt.labelKey}`)}
                                     </Text>
                                 </Pressable>
                             ))}
@@ -130,7 +130,7 @@ export const ProjectKnowledgeConfigCard = React.memo<Props>(
                                         styles.segmentedText,
                                         { color: config.sensitivity === opt.key ? "#FFF" : theme.colors.textSecondary },
                                     ]}>
-                                        {opt.label}
+                                        {t(`projects.${opt.labelKey}`)}
                                     </Text>
                                 </Pressable>
                             ))}

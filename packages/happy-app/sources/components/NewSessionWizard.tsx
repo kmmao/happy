@@ -329,16 +329,16 @@ export function NewSessionWizard({
 
   // Handler for "Create New Profile"
   const handleCreateProfile = () => {
-    Modal.prompt("Create New Profile", "Enter a name for your new profile:", {
-      defaultValue: "My Custom Profile",
-      confirmText: "Create",
-      cancelText: "Cancel",
+    Modal.prompt(t("newSession.wizard.createProfileTitle"), t("newSession.wizard.createProfileDescription"), {
+      defaultValue: t("newSession.wizard.defaultProfileName"),
+      confirmText: t("common.create"),
+      cancelText: t("common.cancel"),
     }).then((profileName) => {
       if (profileName && profileName.trim()) {
         const newProfile: AIBackendProfile = {
           id: crypto.randomUUID(),
           name: profileName.trim(),
-          description: "Custom AI profile",
+          description: t("newSession.wizard.customProfileDescription"),
           anthropicConfig: {},
           environmentVariables: [],
           compatibility: { claude: true, codex: true, gemini: true },
@@ -1596,7 +1596,7 @@ export function NewSessionWizard({
           onPress={handleBack}
         >
           <Text style={[styles.buttonText, styles.buttonTextSecondary]}>
-            {isFirstStep ? "Cancel" : "Back"}
+            {isFirstStep ? t("common.cancel") : t("common.back")}
           </Text>
         </Pressable>
 

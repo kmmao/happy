@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { useProjectKnowledge, type LifecycleStats } from "@/hooks/useProjectKnowledge";
 import { useProjectKnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
 import { useHappyAction } from "@/hooks/useHappyAction";
+import { Modal } from "@/modal";
 import { KnowledgeEntryCard } from "./KnowledgeEntryCard";
 import { ProjectProfileCard } from "./ProjectProfileCard";
 import { ProjectKnowledgeConfigCard } from "./ProjectKnowledgeConfigCard";
@@ -88,6 +89,11 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             if (result) {
                 const updated = await fetchLifecycle();
                 if (updated) setLifecycleStats(updated);
+                if (result.archived > 0) {
+                    Modal.toast(t("projects.knowledgeDecayResult", { count: result.archived }));
+                } else {
+                    Modal.toast(t("projects.knowledgeDecayNone"));
+                }
             }
         });
 
@@ -96,6 +102,11 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             if (result) {
                 const updated = await fetchLifecycle();
                 if (updated) setLifecycleStats(updated);
+                if (result.merged > 0) {
+                    Modal.toast(t("projects.knowledgeMergeResult", { count: result.merged, clusters: result.clusters }));
+                } else {
+                    Modal.toast(t("projects.knowledgeMergeNone"));
+                }
             }
         });
 

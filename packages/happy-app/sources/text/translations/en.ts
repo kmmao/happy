@@ -91,6 +91,7 @@ export const en: TranslationStructure = {
     removeFavoriteConfirm: ({ name, section }: { name: string; section: string }) =>
       `Remove "${name}" from ${section}?`,
     optional: "optional",
+    openSettings: "Open Settings",
   },
 
   profile: {
@@ -452,6 +453,10 @@ export const en: TranslationStructure = {
       enterDirectoryPlaceholder: "Enter directory path (e.g. /home/user/my-project)",
       initialMessage: "Initial Message",
       initialMessageDescription: "Write your first message to the AI agent",
+      createProfileTitle: "Create New Profile",
+      createProfileDescription: "Enter a name for your new profile:",
+      defaultProfileName: "My Custom Profile",
+      customProfileDescription: "Custom AI profile",
     },
     machinePicker: {
       title: "Select Machine",
@@ -1196,6 +1201,8 @@ export const en: TranslationStructure = {
     disableSudo: "Disable sudo",
     sudoDisabled: "Disabled — user cannot install packages",
     sudoEnabled: "Enabled — user has full sudo access",
+    apiBaseUrlTitle: "API Base URL",
+    apiKeyTitle: "API Key",
     apiConfig: "API Configuration",
     apiNotSet: "Not set (optional)",
     apiBaseUrlDescription: "Custom API endpoint (leave empty to skip)",
@@ -1417,6 +1424,18 @@ export const en: TranslationStructure = {
       `Upgrade @kmmao/happy-coder to v${version}? The daemon will restart automatically after upgrade.`,
     upgradeCliSuccess: "CLI upgraded successfully. The daemon will restart automatically within 60 seconds.",
     upgradeCliFailed: "CLI upgrade failed",
+    stopDaemonTitle: "Stop Daemon?",
+    stopDaemonMessage: "You will not be able to spawn new sessions on this machine until you restart the daemon on your computer again. Your current sessions will stay alive.",
+    stopDaemonButton: "Stop Daemon",
+    daemonStopped: "Daemon Stopped",
+    failedToStopDaemon: "Failed to stop daemon. It may not be running.",
+    renameMachineTitle: "Rename Machine",
+    renameMachineDescription: "Give this machine a custom name. Leave empty to use the default hostname.",
+    renameMachineSuccess: "Machine renamed successfully",
+    renameMachineFailed: "Failed to rename machine",
+    createDirectoryTitle: "Create Directory?",
+    createDirectoryMessage: (params: { directory: string }) => `The directory '${params.directory}' does not exist. Would you like to create it?`,
+    failedToStartSession: "Failed to start session. Make sure the daemon is running on the target machine.",
     untitledSession: "Untitled Session",
     back: "Back",
     previousSessions: "Previous Sessions",
@@ -2019,6 +2038,7 @@ export const en: TranslationStructure = {
     addMarketplace: "Add Marketplace",
     addMarketplaceHint: "Add a marketplace from GitHub repo",
     addMarketplaceDescription: "Enter GitHub repo (e.g. owner/repo)",
+    addMarketplacePlaceholder: "owner/repo",
     addMarketplaceSuccess: "Marketplace added",
     noResults: "No matching plugins found",
     restartHint: "Plugin changes take effect on new sessions. Existing sessions need to be restarted.",
@@ -2052,6 +2072,12 @@ export const en: TranslationStructure = {
     searchServers: "Search servers...",
     install: "Install",
     addServerCustom: "Enter name and command manually",
+    categoryDevelopment: "Development",
+    categoryKnowledge: "Knowledge",
+    categorySearch: "Search",
+    categoryDatabase: "Database",
+    categoryUtility: "Utility",
+    categoryPlatform: "Platform",
   },
 
   gitHosts: {
@@ -2134,6 +2160,8 @@ export const en: TranslationStructure = {
     webhookSaveHostFirst: "Please save the Git Host first",
     webhookRepoDeleted: "Webhook deleted",
     webhookDeleteConfirm: "Remove this webhook repo and delete server route?",
+    tokenSuffix: "Token",
+    webhookCount: (params: { count: number }) => `${params.count} Webhook`,
   },
 
   quickCommands: {
@@ -2342,6 +2370,16 @@ export const en: TranslationStructure = {
     knowledgeLifecycleRelations: "Relations",
     knowledgeRunDecay: "Run Archive",
     knowledgeRunMerge: "Run Merge",
+    knowledgeDecayResult: (params: { count: number }) => `Archived ${params.count} entries`,
+    knowledgeDecayNone: "No entries need archiving yet",
+    knowledgeMergeResult: (params: { count: number; clusters: number }) => `Merged ${params.count} entries into ${params.clusters} groups`,
+    knowledgeMergeNone: "No similar entries found to merge",
+    knowledgeModeAuto: "Auto",
+    knowledgeModeFull: "Full",
+    knowledgeModeMinimal: "Minimal",
+    knowledgeSensitivityConservative: "Conservative",
+    knowledgeSensitivityBalanced: "Balanced",
+    knowledgeSensitivityAggressive: "Aggressive",
     knowledgeConfig: "Knowledge Config",
     knowledgeConfigEnabled: "Enable Knowledge Base",
     knowledgeConfigMode: "Injection Mode",
@@ -2911,6 +2949,12 @@ export const en: TranslationStructure = {
   stopFailure: {
     title: "Session Stopped Unexpectedly",
     lastMessage: "Last assistant message",
+  },
+  permissions: {
+    microphoneTitle: "Microphone Access Required",
+    microphoneCanAsk: "Happy needs access to your microphone for voice chat. Please grant permission when prompted.",
+    microphoneSettings: "Happy needs access to your microphone for voice chat. Please enable microphone access in your device settings.",
+    microphoneWeb: "Please allow microphone access in your browser settings. You may need to click the lock icon in the address bar and enable microphone permission for this site.",
   },
 } as const;
 
