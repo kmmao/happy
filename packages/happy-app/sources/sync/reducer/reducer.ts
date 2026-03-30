@@ -969,12 +969,21 @@ export function reducer(
             message.tool.state = "running";
             state.backgroundTaskIdToMessageId.set(c.backgroundTaskId, messageId);
 
-            // Create backgroundTasks entry if not already present (from task-start).
-            // This ensures tasks are visible on message replay even if task-start
-            // events are not persisted in the message history.
-            if (!state.backgroundTasks.has(c.backgroundTaskId)) {
-              const cmd = typeof message.tool.input?.command === "string"
-                ? message.tool.input.command : "";
+            // Create or enrich backgroundTasks entry with tool-result metadata.
+            const cmd = typeof message.tool.input?.command === "string"
+              ? message.tool.input.command : "";
+            const existing = state.backgroundTasks.get(c.backgroundTaskId);
+            if (existing) {
+              // Enrich: task-start may have created entry with empty command
+              if ((!existing.command && cmd) || (!existing.outputFile && c.outputFile)) {
+                state.backgroundTasks.set(c.backgroundTaskId, {
+                  ...existing,
+                  command: existing.command || cmd,
+                  outputFile: existing.outputFile ?? c.outputFile ?? null,
+                });
+                bgTasksDirty = true;
+              }
+            } else {
               state.backgroundTasks.set(c.backgroundTaskId, {
                 taskId: c.backgroundTaskId,
                 toolUseId: null,
