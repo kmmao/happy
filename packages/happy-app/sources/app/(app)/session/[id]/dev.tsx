@@ -305,7 +305,7 @@ export default React.memo(function DevScreen() {
                                 // Delete existing config and regenerate
                                 await sessionBash(sessionId, { command: "rm -f .happy/dev.yml" });
                                 invalidateDevConfigCache(sessionId);
-                                sync.sendMessage(sessionId, "/dev");
+                                sync.sendMessage(sessionId, "已删除 .happy/dev.yml，请重新执行 /dev 全量扫描项目（包括 Docker Compose 服务），生成新的配置文件");
                                 router.back();
                             }}
                         >

@@ -81,10 +81,12 @@ export function useDevConfig(
         }
     }, [sessionId]);
 
-    // Auto-fetch on mount if not cached
+    // Auto-fetch on mount — always re-check if previously no config (null cache)
     React.useEffect(() => {
         if (!enabled) return;
-        if (configCache.has(sessionId)) return;
+        const cached = configCache.get(sessionId);
+        // Skip fetch only if we have a valid config cached
+        if (cached !== undefined && cached !== null) return;
         fetchConfig();
     }, [enabled, sessionId, fetchConfig]);
 
