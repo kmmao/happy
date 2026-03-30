@@ -678,6 +678,14 @@ model ProjectKnowledge {
     supersedes      ProjectKnowledge? @relation("KnowledgeSupersession", fields: [supersedesId], references: [id])
     supersededBy    ProjectKnowledge[] @relation("KnowledgeSupersession")
 
+    // Graph relations (Phase 3 — replaces relatedIds JSON array)
+    relationsFrom   KnowledgeRelation[] @relation("RelationFrom")
+    relationsTo     KnowledgeRelation[] @relation("RelationTo")
+
+    // Lifecycle (Phase 2 — decay & archive)
+    lastAccessedAt  DateTime?
+    accessCount     Int      @default(0)
+
     // User curation
     pinned          Boolean  @default(false)
 
@@ -687,6 +695,31 @@ model ProjectKnowledge {
     @@index([projectId, status])
     @@index([projectId, entryType])
     @@index([projectId, createdAt])
+    @@index([projectId, status, lastAccessedAt])
+}
+
+//
+// Knowledge Relation Graph (Phase 3 — multi-type relations)
+//
+
+model KnowledgeRelation {
+    id             String   @id @default(cuid())
+
+    fromEntryId    String
+    fromEntry      ProjectKnowledge @relation("RelationFrom", fields: [fromEntryId], references: [id], onDelete: Cascade)
+
+    toEntryId      String
+    toEntry        ProjectKnowledge @relation("RelationTo", fields: [toEntryId], references: [id], onDelete: Cascade)
+
+    relationType   String   // "related" | "contradicts" | "refines" | "combines"
+    metadata       String?  // Optional JSON (e.g. LLM merge reasoning)
+
+    createdAt      DateTime @default(now())
+
+    @@unique([fromEntryId, toEntryId, relationType])
+    @@index([fromEntryId])
+    @@index([toEntryId])
+    @@index([relationType])
 }
 
 model ProjectProfile {

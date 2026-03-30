@@ -9,6 +9,7 @@ import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 import { buildKnowledgeCountEphemeral, eventRouter } from "@/app/events/eventRouter";
 import { inTx } from "@/storage/inTx";
+import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 
 // Zod schema for socket knowledge submissions (defense-in-depth)
 const SubmitKnowledgeSchema = z.object({
@@ -120,6 +121,25 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             });
             trackKnowledgeCreation(projectId);
 
+            // Dual-write: persist relatedIds to KnowledgeRelation table
+            if (entry.relatedIds.length > 0) {
+                void addRelations(
+                    entry.relatedIds.map((toId) => ({
+                        fromId: created.id,
+                        toId,
+                        relationType: "related" as KnowledgeRelationType,
+                    })),
+                );
+            }
+            // If this is a supersede action, also create a "refines" relation
+            if (action.type === "update" && action.existingId) {
+                void addRelations([{
+                    fromId: created.id,
+                    toId: action.existingId,
+                    relationType: "refines" as KnowledgeRelationType,
+                }]);
+            }
+
             // Push knowledge count to App (ephemeral, user-scoped only)
             const knowledgeCount = await db.projectKnowledge.count({
                 where: { sessionId: sid, status: "active" },
@@ -196,6 +216,18 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                     where: { projectId, status: "active" },
                     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
                     take: entryLimit,
+                });
+            }
+
+            // Fire-and-forget: update lastAccessedAt for injected entries
+            if (entries.length > 0) {
+                const ids = entries.map((e) => e.id);
+                void db.projectKnowledge.updateMany({
+                    where: { id: { in: ids } },
+                    data: {
+                        lastAccessedAt: new Date(),
+                        accessCount: { increment: 1 },
+                    },
                 });
             }
 

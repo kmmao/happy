@@ -1,5 +1,6 @@
 import { db } from "@/storage/db";
 import { safeParseJsonArray } from "./knowledgeSerialize";
+import { getProjectRelations, type KnowledgeRelationRow } from "./knowledgeRelation";
 
 const MAX_CHAIN_DEPTH = 10;
 
@@ -16,14 +17,16 @@ export interface ChainEntry {
     tags: string;
     confidence: string;
     supersedesId: string | null;
-    relatedIds: string;
+    relatedIds: string; // Kept for backward compat (deprecated — prefer KnowledgeRelation table)
     createdAt: Date;
 }
+
+export type ChainRelationType = "supersedes" | "related" | "contradicts" | "refines" | "combines";
 
 interface ChainRelation {
     from: string;
     to: string;
-    type: "supersedes" | "related";
+    type: ChainRelationType;
 }
 
 interface SerializedChainEntry {
@@ -45,16 +48,32 @@ interface SerializedChainEntry {
  * Build a knowledge evolution chain from a set of entries.
  * Pure function — no DB access, easy to test.
  *
- * Walks the supersession chain (up and down) and includes related entries.
+ * Walks the supersession chain (up and down) and graph relations.
+ * Falls back to relatedIds JSON for entries not yet migrated.
  * Limited to MAX_CHAIN_DEPTH to prevent infinite loops.
  */
 export function buildChain(
     entryId: string,
     allEntries: ChainEntry[],
+    graphRelations?: KnowledgeRelationRow[],
 ): { chain: SerializedChainEntry[]; relations: ChainRelation[] } {
     const entryMap = new Map(allEntries.map((e) => [e.id, e]));
     const collected = new Set<string>();
     const relations: ChainRelation[] = [];
+
+    // Build adjacency from KnowledgeRelation rows (graph relations)
+    const graphByEntry = new Map<string, { peerId: string; type: ChainRelationType }[]>();
+    if (graphRelations) {
+        for (const gr of graphRelations) {
+            const fromList = graphByEntry.get(gr.fromEntryId) ?? [];
+            fromList.push({ peerId: gr.toEntryId, type: gr.relationType as ChainRelationType });
+            graphByEntry.set(gr.fromEntryId, fromList);
+
+            const toList = graphByEntry.get(gr.toEntryId) ?? [];
+            toList.push({ peerId: gr.fromEntryId, type: gr.relationType as ChainRelationType });
+            graphByEntry.set(gr.toEntryId, toList);
+        }
+    }
 
     function collect(id: string, depth: number) {
         if (depth >= MAX_CHAIN_DEPTH || collected.has(id) || collected.size >= MAX_CHAIN_DEPTH) return;
@@ -77,12 +96,25 @@ export function buildChain(
             }
         }
 
-        // Related entries
-        const relatedIds = safeParseJsonArray(entry.relatedIds);
-        for (const relatedId of relatedIds) {
-            if (!collected.has(relatedId)) {
-                relations.push({ from: id, to: relatedId, type: "related" });
-                collect(relatedId, depth + 1);
+        // Graph relations (from KnowledgeRelation table)
+        const peers = graphByEntry.get(id);
+        if (peers) {
+            for (const { peerId, type } of peers) {
+                if (!collected.has(peerId)) {
+                    relations.push({ from: id, to: peerId, type });
+                    collect(peerId, depth + 1);
+                }
+            }
+        }
+
+        // Fallback: legacy relatedIds JSON (for entries not yet migrated)
+        if (!peers || peers.length === 0) {
+            const relatedIds = safeParseJsonArray(entry.relatedIds);
+            for (const relatedId of relatedIds) {
+                if (!collected.has(relatedId)) {
+                    relations.push({ from: id, to: relatedId, type: "related" });
+                    collect(relatedId, depth + 1);
+                }
             }
         }
     }
@@ -113,6 +145,7 @@ export function buildChain(
 /**
  * Fetch the evolution chain for a knowledge entry from the database.
  * Fetches all entries in the same project and builds the chain graph.
+ * Uses KnowledgeRelation table with fallback to relatedIds JSON.
  *
  * PRECONDITION: caller must verify project belongs to the requesting user.
  */
@@ -120,26 +153,28 @@ export async function fetchKnowledgeChain(
     projectId: string,
     entryId: string,
 ): Promise<{ chain: SerializedChainEntry[]; relations: ChainRelation[] }> {
-    // Fetch all entries in the project (chains can span across types)
-    // In practice, most projects have <200 entries, so this is fine.
-    const allEntries = await db.projectKnowledge.findMany({
-        where: { projectId },
-        select: {
-            id: true,
-            entryType: true,
-            action: true,
-            status: true,
-            title: true,
-            content: true,
-            tags: true,
-            confidence: true,
-            supersedesId: true,
-            relatedIds: true,
-            createdAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-        take: 200,
-    });
+    // Fetch entries + graph relations in parallel
+    const [allEntries, graphRelations] = await Promise.all([
+        db.projectKnowledge.findMany({
+            where: { projectId },
+            select: {
+                id: true,
+                entryType: true,
+                action: true,
+                status: true,
+                title: true,
+                content: true,
+                tags: true,
+                confidence: true,
+                supersedesId: true,
+                relatedIds: true,
+                createdAt: true,
+            },
+            orderBy: { createdAt: "desc" },
+            take: 200,
+        }),
+        getProjectRelations(projectId),
+    ]);
 
-    return buildChain(entryId, allEntries);
+    return buildChain(entryId, allEntries, graphRelations);
 }

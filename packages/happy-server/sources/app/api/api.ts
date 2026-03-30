@@ -38,6 +38,7 @@ import { knowledgeRoutes } from "./routes/knowledgeRoutes";
 import { knowledgeSearchRoutes } from "./routes/knowledgeSearchRoutes";
 import { voiceRoutes } from "./routes/voiceRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
+import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -128,6 +129,12 @@ export async function startApi() {
 
   // Start Socket
   startSocket(typed);
+
+  // Start knowledge lifecycle scheduler (decay/merge jobs)
+  startKnowledgeLifecycleScheduler();
+  onShutdown("knowledge-lifecycle", async () => {
+    stopKnowledgeLifecycleScheduler();
+  });
 
   // End
   log("API ready on port http://localhost:" + port);

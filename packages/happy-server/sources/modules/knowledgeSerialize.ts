@@ -45,6 +45,8 @@ export function serializeKnowledgeEntry(entry: ProjectKnowledge) {
         relatedIds: safeParseJsonArray(entry.relatedIds),
         supersedesId: entry.supersedesId,
         pinned: entry.pinned,
+        lastAccessedAt: entry.lastAccessedAt?.getTime() ?? null,
+        accessCount: entry.accessCount,
         createdAt: entry.createdAt.getTime(),
         updatedAt: entry.updatedAt.getTime(),
     };
