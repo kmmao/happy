@@ -3129,11 +3129,11 @@ describe('reducer', () => {
 
             // Setup: tool-call + tool-result
             reducer(state, bgToolMessages('tool-1', 'bg-1'));
-            // tool.state should be "running" (forced back by backgroundTaskId handling)
+            // tool.state is "completed" — Bash tool finishes normally
             const toolMsgId = state.toolIdToMessageId.get('tool-1')!;
-            expect(state.messages.get(toolMsgId)!.tool!.state).toBe('running');
+            expect(state.messages.get(toolMsgId)!.tool!.state).toBe('completed');
 
-            // task-end should update tool message too
+            // task-end should still update tool message state
             reducer(state, [taskEnd('bg-1', 'failed')]);
             expect(state.messages.get(toolMsgId)!.tool!.state).toBe('error');
         });
@@ -3181,14 +3181,14 @@ describe('reducer', () => {
                 reducer(state, [taskStart('bg-1', 'Task 1', { createdAt: 100 })]);
                 reducer(state, bgToolMessages('tool-1', 'bg-1', { createdAt: 200 }));
 
-                // Verify tool is still running before stale cleanup
+                // Bash tool completes normally (no longer forced to "running")
                 const toolMsgId = state.toolIdToMessageId.get('tool-1')!;
-                expect(state.messages.get(toolMsgId)!.tool!.state).toBe('running');
+                expect(state.messages.get(toolMsgId)!.tool!.state).toBe('completed');
 
                 const affected = completeStaleBackgroundTasks(state);
 
-                expect(affected).toHaveLength(1);
-                expect(state.messages.get(toolMsgId)!.tool!.state).toBe('error');
+                // No tool-call messages affected (already completed)
+                expect(affected).toHaveLength(0);
                 expect(state.backgroundTasks.get('bg-1')!.status).toBe('stopped');
             });
         });

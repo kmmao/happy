@@ -965,8 +965,8 @@ export function reducer(
           if (c.backgroundTaskId) {
             message.tool.backgroundTaskId = c.backgroundTaskId;
             message.tool.outputFile = c.outputFile;
-            // Background tasks stay "running" until task-end event arrives
-            message.tool.state = "running";
+            // Bash tool completes normally (state set at line 960).
+            // The background task lifecycle is managed separately via backgroundTasks Map.
             state.backgroundTaskIdToMessageId.set(c.backgroundTaskId, messageId);
 
             // Create or enrich backgroundTasks entry with tool-result metadata.
