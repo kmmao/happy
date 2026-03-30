@@ -170,9 +170,12 @@ function TaskItem({
         return () => clearInterval(interval);
     }, [task.startedAt, task.status]);
 
-    const category = detectCategory(task.command);
-    const toolTag = detectToolTag(task.command);
-    const port = extractPort(task.command);
+    // Use command for analysis; fall back to description when command is empty
+    // (task-start arrives before tool-result enriches the command)
+    const analyzeText = task.command || task.description;
+    const category = detectCategory(analyzeText);
+    const toolTag = detectToolTag(analyzeText);
+    const port = extractPort(analyzeText);
     const baseLabel = task.description !== task.command ? task.description : buildSmartLabel(task.command);
     // Always append port if detected and not already in the label
     const label = port && !baseLabel.includes(`:${port}`) ? `${baseLabel} :${port}` : baseLabel;
