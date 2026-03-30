@@ -54,6 +54,22 @@ export function useBackgroundTasks(
                 isBackground: true,
             });
         }
+        // Dedup: same command keeps only the latest (by startedAt)
+        const seen = new Map<string, number>();
+        for (let i = 0; i < result.length; i++) {
+            const key = result[i].command || result[i].description;
+            const prev = seen.get(key);
+            if (prev !== undefined) {
+                // Keep the newer one
+                if (result[i].startedAt > result[prev].startedAt) {
+                    result[prev] = result[i];
+                }
+                result.splice(i, 1);
+                i--;
+            } else {
+                seen.set(key, i);
+            }
+        }
         return result;
     }, [entries, isConnected, dismissed]);
 
