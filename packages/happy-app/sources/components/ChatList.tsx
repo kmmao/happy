@@ -16,6 +16,7 @@ import { Metadata, Session } from "@/sync/storageTypes";
 import { ChatFooter } from "./ChatFooter";
 import { Message } from "@/sync/typesMessage";
 import { knownTools } from "./tools/knownTools";
+import { TypingBubble } from "./TypingBubble";
 
 type DisplayItem = Message;
 
@@ -67,10 +68,25 @@ const ListHeader = React.memo(() => {
 
 const ListFooter = React.memo((props: { sessionId: string }) => {
   const session = useSession(props.sessionId)!;
+  const { messages } = useSessionMessages(props.sessionId);
+  const isThinking =
+    session.sdkSessionState != null
+      ? session.sdkSessionState === "running"
+      : session.thinking === true;
+  const lastMsg = messages.length > 0 ? messages[0] : undefined;
+  const showTyping =
+    isThinking &&
+    lastMsg?.kind !== "agent-text" &&
+    lastMsg?.kind !== "agent-event";
   return (
-    <ChatFooter
-      controlledByUser={session.agentState?.controlledByUser || false}
-    />
+    <>
+      {showTyping && (
+        <TypingBubble />
+      )}
+      <ChatFooter
+        controlledByUser={session.agentState?.controlledByUser || false}
+      />
+    </>
   );
 });
 
