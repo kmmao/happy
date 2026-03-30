@@ -1,5 +1,48 @@
 # Changelog
 
+## 2.12.0 - 2026-03-30
+
+Dev environment management with live log streaming, project-level Knowledge Base configuration with lifecycle UI, task display overhaul with colored badges and collapsible results, and extensive background task stability fixes.
+
+### Dev Environment Management
+- Added `/dev` skill for scanning and generating project dev configurations
+- Added Dev configuration page with service cards, Start All and per-service start/stop buttons
+- Added live log streaming for running services
+- Added file browser popup for selecting config files
+- Added Docker container stop preserves container for reuse (no auto-remove)
+- Added Rescan button that deletes and regenerates dev.yml from scratch
+- Fixed Dev config page re-detects services on every entry
+- Fixed Chinese character encoding in Dev config page
+- Fixed dev.yml save failures with base64 encoding workaround
+
+### Knowledge Base Configuration
+- Added project-level Knowledge Base configuration and lifecycle management UI
+- Added per-project feature toggles independent from .env global settings
+
+### Task Display
+- Added colored badge statistics for task status overview
+- Added inline metrics for subtasks (progress indicators)
+- Added collapsible result sections for subtask output summaries
+- Added collapsible result display for sub-agent summaries
+
+### Background Task Stability
+- Refactored background task kill to use SDK native stopTask RPC
+- Added dismissed task state persisted to MMKV (survives page refresh)
+- Added panel deduplication — only shows latest task per command
+- Added automatic task-end message for idle tasks on stop
+- Added fallback kill when stopTask fails on idle tasks
+- Fixed background task panel disappearing after page refresh
+- Fixed Bash tool permanently showing running state after completion
+- Fixed task-start entry creation from existing tool message data
+- Fixed old session stale tasks incorrectly showing as running
+- Fixed task-end message lost when normalizer discards turnless envelopes
+- Fixed backgroundTaskId processing skipped by state guard
+
+### Web & UI
+- Added automatic vertical button layout for alerts with more than 2 buttons (iOS ActionSheet style)
+- Removed microphone STT voice-to-text input feature
+- Fixed voice debug logging flooding console in non-voice mode
+
 ## 2.11.0 - 2026-03-30
 
 Unified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, added ElevenLabs voice configuration UI improvements, and refactored background task panel to SDK event-driven architecture.

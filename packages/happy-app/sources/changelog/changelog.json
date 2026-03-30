@@ -2,6 +2,43 @@
   "entries": {
     "en": [
       {
+        "version": "2.12.0",
+        "date": "2026-03-30",
+        "summary": "Dev environment management with live log streaming, project-level Knowledge Base configuration with lifecycle UI, task display overhaul with colored badges and collapsible results, and extensive background task stability fixes.",
+        "changes": [
+          "Added `/dev` skill for scanning and generating project dev configurations",
+          "Added Dev configuration page with service cards, Start All and per-service start/stop buttons",
+          "Added live log streaming for running services",
+          "Added file browser popup for selecting config files",
+          "Added Docker container stop preserves container for reuse (no auto-remove)",
+          "Added Rescan button that deletes and regenerates dev.yml from scratch",
+          "Fixed Dev config page re-detects services on every entry",
+          "Fixed Chinese character encoding in Dev config page",
+          "Fixed dev.yml save failures with base64 encoding workaround",
+          "Added project-level Knowledge Base configuration and lifecycle management UI",
+          "Added per-project feature toggles independent from .env global settings",
+          "Added colored badge statistics for task status overview",
+          "Added inline metrics for subtasks (progress indicators)",
+          "Added collapsible result sections for subtask output summaries",
+          "Added collapsible result display for sub-agent summaries",
+          "Refactored background task kill to use SDK native stopTask RPC",
+          "Added dismissed task state persisted to MMKV (survives page refresh)",
+          "Added panel deduplication — only shows latest task per command",
+          "Added automatic task-end message for idle tasks on stop",
+          "Added fallback kill when stopTask fails on idle tasks",
+          "Fixed background task panel disappearing after page refresh",
+          "Fixed Bash tool permanently showing running state after completion",
+          "Fixed task-start entry creation from existing tool message data",
+          "Fixed old session stale tasks incorrectly showing as running",
+          "Fixed task-end message lost when normalizer discards turnless envelopes",
+          "Fixed backgroundTaskId processing skipped by state guard",
+          "Added automatic vertical button layout for alerts with more than 2 buttons (iOS ActionSheet style)",
+          "Removed microphone STT voice-to-text input feature",
+          "Fixed voice debug logging flooding console in non-voice mode"
+        ],
+        "rawMarkdown": "## 2.12.0 - 2026-03-30\n\n\nDev environment management with live log streaming, project-level Knowledge Base configuration with lifecycle UI, task display overhaul with colored badges and collapsible results, and extensive background task stability fixes.\n\n### Dev Environment Management\n- Added `/dev` skill for scanning and generating project dev configurations\n- Added Dev configuration page with service cards, Start All and per-service start/stop buttons\n- Added live log streaming for running services\n- Added file browser popup for selecting config files\n- Added Docker container stop preserves container for reuse (no auto-remove)\n- Added Rescan button that deletes and regenerates dev.yml from scratch\n- Fixed Dev config page re-detects services on every entry\n- Fixed Chinese character encoding in Dev config page\n- Fixed dev.yml save failures with base64 encoding workaround\n\n### Knowledge Base Configuration\n- Added project-level Knowledge Base configuration and lifecycle management UI\n- Added per-project feature toggles independent from .env global settings\n\n### Task Display\n- Added colored badge statistics for task status overview\n- Added inline metrics for subtasks (progress indicators)\n- Added collapsible result sections for subtask output summaries\n- Added collapsible result display for sub-agent summaries\n\n### Background Task Stability\n- Refactored background task kill to use SDK native stopTask RPC\n- Added dismissed task state persisted to MMKV (survives page refresh)\n- Added panel deduplication — only shows latest task per command\n- Added automatic task-end message for idle tasks on stop\n- Added fallback kill when stopTask fails on idle tasks\n- Fixed background task panel disappearing after page refresh\n- Fixed Bash tool permanently showing running state after completion\n- Fixed task-start entry creation from existing tool message data\n- Fixed old session stale tasks incorrectly showing as running\n- Fixed task-end message lost when normalizer discards turnless envelopes\n- Fixed backgroundTaskId processing skipped by state guard\n\n### Web & UI\n- Added automatic vertical button layout for alerts with more than 2 buttons (iOS ActionSheet style)\n- Removed microphone STT voice-to-text input feature\n- Fixed voice debug logging flooding console in non-voice mode"
+      },
+      {
         "version": "2.11.0",
         "date": "2026-03-30",
         "summary": "Unified voice input to use native system speech recognition across all platforms, removed Docker STT/TTS services, added ElevenLabs voice configuration UI improvements, and refactored background task panel to SDK event-driven architecture.",
@@ -450,6 +487,43 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.12.0",
+        "date": "2026-03-30",
+        "summary": "Dev 开发环境管理与实时日志流、知识库项目级配置与生命周期管理 UI、任务展示全面优化（彩色徽章 + 折叠结果）、大量后台任务稳定性修复。",
+        "changes": [
+          "新增 `/dev` skill — 扫描并生成项目开发环境配置",
+          "新增 Dev 配置页面 — 服务卡片、一键全部启动及单服务启停按钮",
+          "新增服务实时日志流查看",
+          "新增文件浏览器弹窗 — 用于选择配置文件",
+          "新增 Docker 容器 stop 后保留容器复用（不自动删除）",
+          "新增 Rescan 按钮 — 删除并重新生成 dev.yml",
+          "修复 Dev 配置页面每次进入重新检测服务",
+          "修复 Dev 配置页面中文乱码问题",
+          "修复 dev.yml 保存失败 — 改用 base64 编码写入",
+          "新增项目级知识库配置和生命周期管理 UI",
+          "新增每个项目独立功能开关，不依赖 .env 全局设置",
+          "新增彩色徽章统计 — 任务状态一目了然",
+          "新增子任务内联指标（进度指示器）",
+          "新增子任务结果折叠展示",
+          "新增 sub-agent 摘要折叠显示",
+          "重构后台任务终止 — 改用 SDK 原生 stopTask RPC",
+          "新增 dismissed 状态持久化到 MMKV（刷新后不再重现）",
+          "新增面板去重 — 相同 command 只显示最新任务",
+          "新增 idle 任务 stop 时自动发送 task-end 消息",
+          "新增 stopTask 失败时 fallback 到 kill 命令",
+          "修复刷新后后台任务面板丢失",
+          "修复 Bash 工具完成后仍显示 running 状态",
+          "修复 task-start 从已有 tool message 获取 command 数据",
+          "修复旧会话残留任务错误显示为运行中",
+          "修复 normalizer 丢弃无 turn 的 envelope 导致 task-end 消息丢失",
+          "修复 backgroundTaskId 处理被 state guard 跳过",
+          "新增 alert 弹窗按钮超过 2 个时自动切换竖排布局（类 iOS ActionSheet）",
+          "移除小话筒 STT 语音转文字输入功能",
+          "修复非语音模式下 voice 调试日志刷屏"
+        ],
+        "rawMarkdown": "## 2.12.0 - 2026-03-30\n\n\nDev 开发环境管理与实时日志流、知识库项目级配置与生命周期管理 UI、任务展示全面优化（彩色徽章 + 折叠结果）、大量后台任务稳定性修复。\n\n### Dev 开发环境管理\n- 新增 `/dev` skill — 扫描并生成项目开发环境配置\n- 新增 Dev 配置页面 — 服务卡片、一键全部启动及单服务启停按钮\n- 新增服务实时日志流查看\n- 新增文件浏览器弹窗 — 用于选择配置文件\n- 新增 Docker 容器 stop 后保留容器复用（不自动删除）\n- 新增 Rescan 按钮 — 删除并重新生成 dev.yml\n- 修复 Dev 配置页面每次进入重新检测服务\n- 修复 Dev 配置页面中文乱码问题\n- 修复 dev.yml 保存失败 — 改用 base64 编码写入\n\n### 知识库配置\n- 新增项目级知识库配置和生命周期管理 UI\n- 新增每个项目独立功能开关，不依赖 .env 全局设置\n\n### 任务展示\n- 新增彩色徽章统计 — 任务状态一目了然\n- 新增子任务内联指标（进度指示器）\n- 新增子任务结果折叠展示\n- 新增 sub-agent 摘要折叠显示\n\n### 后台任务稳定性\n- 重构后台任务终止 — 改用 SDK 原生 stopTask RPC\n- 新增 dismissed 状态持久化到 MMKV（刷新后不再重现）\n- 新增面板去重 — 相同 command 只显示最新任务\n- 新增 idle 任务 stop 时自动发送 task-end 消息\n- 新增 stopTask 失败时 fallback 到 kill 命令\n- 修复刷新后后台任务面板丢失\n- 修复 Bash 工具完成后仍显示 running 状态\n- 修复 task-start 从已有 tool message 获取 command 数据\n- 修复旧会话残留任务错误显示为运行中\n- 修复 normalizer 丢弃无 turn 的 envelope 导致 task-end 消息丢失\n- 修复 backgroundTaskId 处理被 state guard 跳过\n\n### Web 与 UI\n- 新增 alert 弹窗按钮超过 2 个时自动切换竖排布局（类 iOS ActionSheet）\n- 移除小话筒 STT 语音转文字输入功能\n- 修复非语音模式下 voice 调试日志刷屏"
+      },
+      {
         "version": "2.11.0",
         "date": "2026-03-29",
         "summary": "统一语音输入为系统原生语音识别，移除 Docker STT/TTS 服务，改进 ElevenLabs 语音配置界面。",
@@ -890,7 +964,7 @@
       }
     ]
   },
-  "latestVersion": "2.11.0",
+  "latestVersion": "2.12.0",
   "availableLocales": [
     "en",
     "zh-Hans"
