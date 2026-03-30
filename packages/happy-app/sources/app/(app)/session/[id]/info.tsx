@@ -577,6 +577,13 @@ function SessionInfoContent({ session }: { session: Session }) {
               onPress={handleDeleteSession}
             />
           )}
+          <Item
+            title="Task Debug"
+            subtitle="View raw background task data"
+            icon={<Ionicons name="bug-outline" size={29} color="#FF9500" />}
+            onPress={() => router.push(`/session/${session.id}/debug-tasks` as any)}
+            showChevron
+          />
         </ItemGroup>
 
         {/* Metadata */}
