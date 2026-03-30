@@ -405,7 +405,18 @@ export async function claudeRemoteLauncher(
     >;
   } | null = null;
 
+  // Perf tracking: end-to-end timing from socket to first assistant response
+  let _perfTurnSocketReceivedAt: number | undefined;
+  let _perfTurnFirstResponseLogged = false;
+
   function onMessage(message: SDKMessage) {
+    // End-to-end perf: log total latency on first assistant response per turn
+    if (!_perfTurnFirstResponseLogged && message.type === "assistant" && _perfTurnSocketReceivedAt) {
+      _perfTurnFirstResponseLogged = true;
+      const e2e = Date.now() - _perfTurnSocketReceivedAt;
+      logger.debug(`[perf] E2E socket_received → first_assistant: ${e2e}ms`);
+    }
+
     // Write to message log
     formatClaudeMessageForInk(message, messageBuffer);
 
@@ -1145,14 +1156,22 @@ export async function claudeRemoteLauncher(
             if (pending) {
               let p = pending;
               pending = null;
+              // Reset E2E perf tracking for new turn
+              _perfTurnSocketReceivedAt = p.mode._perfSocketReceivedAt;
+              _perfTurnFirstResponseLogged = false;
               permissionHandler.handleModeChange(p.mode.permissionMode);
               startMidTurnDrain();
               return p;
             }
 
+            const dequeueStartAt = Date.now();
             let msg = await session.queue.waitForMessagesAndGetAsString(
               controller.signal,
             );
+            const dequeuedAt = Date.now();
+            if (msg) {
+              logger.debug(`[perf] nextMessage: dequeue took ${dequeuedAt - dequeueStartAt}ms, msg=${msg.message.substring(0, 80)}`);
+            }
 
             if (msg) {
               // Check if mode has changed
@@ -1188,6 +1207,9 @@ export async function claudeRemoteLauncher(
                   );
                   modeHash = msg.hash;
                   mode = msg.mode;
+                  // Reset E2E perf tracking for hot-swap turn
+                  _perfTurnSocketReceivedAt = msg.mode._perfSocketReceivedAt;
+                  _perfTurnFirstResponseLogged = false;
                   permissionHandler.handleModeChange(mode.permissionMode);
                   startMidTurnDrain();
                   return {
@@ -1207,6 +1229,9 @@ export async function claudeRemoteLauncher(
               modeHash = msg.hash;
               mode = msg.mode;
               currentColdHash = coldModeHash(mode);
+              // Reset E2E perf tracking for new turn
+              _perfTurnSocketReceivedAt = msg.mode._perfSocketReceivedAt;
+              _perfTurnFirstResponseLogged = false;
               permissionHandler.handleModeChange(mode.permissionMode);
               startMidTurnDrain();
 

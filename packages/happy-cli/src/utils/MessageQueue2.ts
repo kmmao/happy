@@ -6,6 +6,7 @@ interface QueueItem<T> {
   modeHash: string;
   isolate?: boolean; // If true, this message must be processed alone
   localKey?: string; // App-assigned ID for targeted cancellation
+  _perfPushTime?: number; // Perf tracking: timestamp when pushed to queue
 }
 
 /**
@@ -45,6 +46,7 @@ export class MessageQueue2<T> {
     }
 
     const modeHash = this.modeHasher(mode);
+    const pushTime = Date.now();
     logger.debug(`[MessageQueue2] push() called with mode hash: ${modeHash}${localKey ? `, localKey: ${localKey}` : ""}`);
 
     this.queue.push({
@@ -53,6 +55,7 @@ export class MessageQueue2<T> {
       modeHash,
       isolate: false,
       localKey,
+      _perfPushTime: pushTime,
     });
 
     // Trigger message handler if set
@@ -319,9 +322,11 @@ export class MessageQueue2<T> {
     const targetModeHash = firstItem.modeHash;
 
     // If the first message requires isolation, only process it alone
+    let earliestPushTime: number | undefined;
     if (firstItem.isolate) {
       const item = this.queue.shift()!;
       sameModeMessages.push(item.message);
+      earliestPushTime = item._perfPushTime;
       logger.debug(
         `[MessageQueue2] Collected isolated message with mode hash: ${targetModeHash}`,
       );
@@ -334,10 +339,16 @@ export class MessageQueue2<T> {
       ) {
         const item = this.queue.shift()!;
         sameModeMessages.push(item.message);
+        if (item._perfPushTime && (!earliestPushTime || item._perfPushTime < earliestPushTime)) {
+          earliestPushTime = item._perfPushTime;
+        }
       }
       logger.debug(
         `[MessageQueue2] Collected batch of ${sameModeMessages.length} messages with mode hash: ${targetModeHash}`,
       );
+    }
+    if (earliestPushTime) {
+      logger.debug(`[perf] queue_wait: ${Date.now() - earliestPushTime}ms (push → collectBatch, batch=${sameModeMessages.length})`);
     }
 
     // Join all messages with newlines

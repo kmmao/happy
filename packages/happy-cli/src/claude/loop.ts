@@ -49,6 +49,8 @@ export interface EnhancedMode {
   plugins?: SdkPluginConfig[];
   /** Additional directories Claude can access */
   additionalDirectories?: string[];
+  /** Perf tracking: timestamp when socket first received this message */
+  _perfSocketReceivedAt?: number;
 }
 
 interface LoopOptions {

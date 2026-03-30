@@ -316,6 +316,7 @@ export class ApiSessionClient extends EventEmitter {
         }
 
         if (data.body.t === "new-message") {
+          const socketReceivedAt = Date.now();
           const messageSeq = data.body.message?.seq;
           if (this.lastSeq === 0) {
             this.receiveSync.invalidate();
@@ -334,7 +335,13 @@ export class ApiSessionClient extends EventEmitter {
             this.encryptionVariant,
             decodeBase64(data.body.message.content.c),
           );
+          const decryptedAt = Date.now();
+          logger.debug(`[perf] socket_received → decrypted: ${decryptedAt - socketReceivedAt}ms (seq=${messageSeq})`);
           logger.debugLargeJson("[SOCKET] [UPDATE] Received update:", body);
+          // Attach timing for downstream perf tracking
+          if (body && typeof body === "object") {
+            (body as Record<string, unknown>).__perfSocketReceivedAt = socketReceivedAt;
+          }
           this.routeIncomingMessage(body);
           this.lastSeq = messageSeq;
         } else if (data.body.t === "update-session") {

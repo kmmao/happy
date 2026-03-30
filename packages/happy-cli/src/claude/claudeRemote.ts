@@ -332,10 +332,16 @@ export async function claudeRemote(opts: {
   // regardless of whether the for-await loop is blocked (e.g., at nextMessage).
   // This ensures messages from YOLO-mode auto-continuations are synced even
   // when the loop is waiting for user input after a result message.
+  const sdkCallAt = Date.now();
+  let firstResponseLogged = false;
   const response = query({
     prompt: messages,
     options: sdkOptions,
     onMessageReceived: (message) => {
+      if (!firstResponseLogged) {
+        firstResponseLogged = true;
+        logger.debug(`[perf] sdk_call → first_response: ${Date.now() - sdkCallAt}ms (type=${message.type})`);
+      }
       logger.debugLargeJson(
         `[claudeRemote] onMessageReceived ${message.type}`,
         message,
@@ -343,6 +349,7 @@ export async function claudeRemote(opts: {
       opts.onMessage(message);
     },
   });
+  logger.debug(`[perf] sdk query() call completed (sync part): ${Date.now() - sdkCallAt}ms`);
 
   // Expose the underlying SDK Query for runtime control (interrupt, stopTask, etc.)
   opts.onQueryReady?.((response as AdaptedQuery)._officialQuery);

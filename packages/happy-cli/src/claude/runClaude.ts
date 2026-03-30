@@ -708,6 +708,13 @@ export async function runClaude(
       return;
     }
 
+    // Perf tracking: capture timing from socket layer
+    const perfSocketReceivedAt = (message as Record<string, unknown>).__perfSocketReceivedAt as number | undefined;
+    const perfQueuedAt = Date.now();
+    if (perfSocketReceivedAt) {
+      logger.debug(`[perf] socket_received → queued: ${perfQueuedAt - perfSocketReceivedAt}ms (meta processing)`);
+    }
+
     // Push with resolved permission mode, model, system prompts, and tools
     const enhancedMode: EnhancedMode = {
       permissionMode: messagePermissionMode || "default",
@@ -724,6 +731,7 @@ export async function runClaude(
       locale: messageLocale,
       ...(messageContinue && { continue: true }),
       ...(sdkPlugins.length > 0 && { plugins: sdkPlugins }),
+      ...(perfSocketReceivedAt && { _perfSocketReceivedAt: perfSocketReceivedAt }),
     };
     messageQueue.push(message.content.text, enhancedMode, message.localKey);
     logger.debugLargeJson("User message pushed to queue:", message);
