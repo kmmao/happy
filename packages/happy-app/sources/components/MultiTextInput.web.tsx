@@ -163,43 +163,79 @@ export const MultiTextInput = React.forwardRef<
         onSelectionChange(selection);
       }
       if (onStateChange) {
-        onStateChange({ text: value, selection });
+        // Read text from DOM directly to avoid stale closure on `value` prop
+        // which can lag behind during paste operations
+        onStateChange({ text: target.value, selection });
       }
     },
-    [value, onSelectionChange, onStateChange],
+    [onSelectionChange, onStateChange],
   );
 
-  // Intercept clipboard paste to detect images and files
+  // Intercept clipboard paste to detect images/files and handle text explicitly
   const handlePaste = React.useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      if (!onImagePaste && !onFilePaste) return;
       const items = e.clipboardData?.items;
-      if (!items) return;
 
-      const IMAGE_EXTS = /\.(jpe?g|png|gif|webp|bmp|heic|heif|svg)$/i;
+      // Check for file/image paste first
+      if (items && (onImagePaste || onFilePaste)) {
+        const IMAGE_EXTS = /\.(jpe?g|png|gif|webp|bmp|heic|heif|svg)$/i;
 
-      for (const item of Array.from(items)) {
-        if (item.kind !== "file") continue;
-        const file = item.getAsFile();
-        if (!file) continue;
+        for (const item of Array.from(items)) {
+          if (item.kind !== "file") continue;
+          const file = item.getAsFile();
+          if (!file) continue;
 
-        // Detect images by MIME type or file extension
-        const isImage = item.type.startsWith("image/") || IMAGE_EXTS.test(file.name);
+          const isImage = item.type.startsWith("image/") || IMAGE_EXTS.test(file.name);
 
-        if (isImage && onImagePaste) {
-          e.preventDefault();
-          onImagePaste(file);
-          return;
-        }
-        if (!isImage && onFilePaste) {
-          e.preventDefault();
-          onFilePaste(file);
-          return;
+          if (isImage && onImagePaste) {
+            e.preventDefault();
+            onImagePaste(file);
+            return;
+          }
+          if (!isImage && onFilePaste) {
+            e.preventDefault();
+            onFilePaste(file);
+            return;
+          }
         }
       }
-      // If no file found, let default text paste proceed
+
+      // Explicitly handle text paste to avoid browser/React controlled-component
+      // race condition where stale value prop overwrites pasted content.
+      // All clipboardData reads must happen synchronously (before any await).
+      const pastedText =
+        e.clipboardData?.getData("text/plain") ||
+        e.clipboardData?.getData("text/html")?.replace(/<[^>]*>/g, "") ||
+        "";
+
+      e.preventDefault();
+
+      if (!pastedText) return;
+
+      const textarea = e.currentTarget;
+
+      // Use execCommand to preserve browser undo/redo history and trigger
+      // TextareaAutosize height recalculation via native input event.
+      // execCommand is deprecated but is the only way to insert text while
+      // preserving undo stack — still supported in all major browsers.
+      textarea.focus();
+      // eslint-disable-next-line @typescript-eslint/no-deprecated
+      document.execCommand("insertText", false, pastedText);
+
+      // Sync React state with the DOM result
+      const newValue = textarea.value;
+      const newCursorPos = textarea.selectionStart;
+      onChangeText(newValue);
+
+      const selection = { start: newCursorPos, end: newCursorPos };
+      if (onStateChange) {
+        onStateChange({ text: newValue, selection });
+      }
+      if (onSelectionChange) {
+        onSelectionChange(selection);
+      }
     },
-    [onImagePaste, onFilePaste],
+    [onImagePaste, onFilePaste, onChangeText, onStateChange, onSelectionChange],
   );
 
   // Imperative handle for direct control
