@@ -411,34 +411,17 @@ export async function startDaemon(): Promise<void> {
           "AWS_ACCESS_KEY_ID",
         ]);
 
-        // ── Trust check: Does the GUI profile match a locally configured profile? ──
-        // If the operator configured this profile in local settings (built-in or custom),
-        // it's trusted and operator-only env vars are allowed through.
-        // This enables custom API providers (MiniMax, DeepSeek, etc.) to override
-        // ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN when the operator has set them up.
-        let profileTrusted = false;
-        if (options.profileId) {
-          try {
-            const settings = await readSettings();
-            const localProfile = settings.profiles.find(
-              (p) => p.id === options.profileId,
-            );
-            if (localProfile) {
-              profileTrusted = true;
-              logger.info(
-                `[DAEMON RUN] Profile "${localProfile.name}" (${options.profileId}) found in local settings — trusted, operator-only env vars allowed`,
-              );
-            } else {
-              logger.warn(
-                `[DAEMON RUN] Profile ${options.profileId} NOT found in local settings — untrusted, operator-only env vars will be filtered`,
-              );
-            }
-          } catch (error) {
-            logger.debug(
-              `[DAEMON RUN] Failed to read settings for profile trust check:`,
-              error,
-            );
-          }
+        // ── Trust check: Does the GUI provide a profileId? ──
+        // If profileId is present, the request came from the App's profile system
+        // (built-in or user-configured). The RPC channel is E2E encrypted, so only
+        // authorized App users can send requests. Trust the profile and allow
+        // operator-only env vars (ANTHROPIC_BASE_URL, etc.) to pass through.
+        // Without profileId, ad-hoc env vars are still filtered for safety.
+        const profileTrusted = !!options.profileId;
+        if (profileTrusted) {
+          logger.info(
+            `[DAEMON RUN] Profile ${options.profileId} provided — trusted (E2E encrypted channel), operator-only env vars allowed`,
+          );
         }
 
         if (guiProfileProvided) {
