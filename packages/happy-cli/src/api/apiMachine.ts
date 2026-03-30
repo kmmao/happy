@@ -264,6 +264,7 @@ export class ApiMachineClient {
           token,
           environmentVariables,
           happySessionId,
+          profileId,
         } = params || {};
         logger.debug(
           `[API MACHINE] Spawning session with params: ${JSON.stringify(params)}`,
@@ -282,6 +283,7 @@ export class ApiMachineClient {
           token,
           environmentVariables,
           happySessionId,
+          profileId,
         });
 
         switch (result.type) {

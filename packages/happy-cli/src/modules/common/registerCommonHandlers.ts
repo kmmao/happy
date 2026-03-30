@@ -137,6 +137,8 @@ export interface SpawnSessionOptions {
   token?: string;
   /** Happy session ID for reconnecting to an existing session */
   happySessionId?: string;
+  /** Profile ID from GUI — if it matches a locally configured profile, operator-only env vars are trusted */
+  profileId?: string;
   environmentVariables?: {
     // Anthropic Claude API configuration
     ANTHROPIC_BASE_URL?: string; // Custom API endpoint (overrides default)

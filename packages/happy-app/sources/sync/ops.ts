@@ -147,6 +147,9 @@ export interface SpawnSessionOptions {
   claudeSessionId?: string;
   // Happy session ID for reconnecting to the same Happy session (preserves message history)
   happySessionId?: string;
+  // Profile ID — sent to daemon so it can verify trust (profile exists in local settings)
+  // Trusted profiles are allowed to override operator-only env vars (ANTHROPIC_BASE_URL, etc.)
+  profileId?: string;
   // Environment variables from AI backend profile
   // Accepts any environment variables - daemon will pass them to the agent process
   // Common variables include:
@@ -176,6 +179,7 @@ export async function machineSpawnNewSession(
     agent,
     claudeSessionId,
     happySessionId,
+    profileId,
     environmentVariables,
   } = options;
 
@@ -203,6 +207,7 @@ export async function machineSpawnNewSession(
         agent?: "codex" | "claude" | "gemini";
         sessionId?: string;
         happySessionId?: string;
+        profileId?: string;
         environmentVariables?: Record<string, string>;
       }
     >(machineId, "spawn-happy-session", {
@@ -213,6 +218,7 @@ export async function machineSpawnNewSession(
       agent,
       sessionId: claudeSessionId,
       happySessionId,
+      profileId,
       environmentVariables: mergedEnvironmentVariables,
     });
     return result;

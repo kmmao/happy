@@ -1219,6 +1219,7 @@ function NewSessionWizard() {
         directory: actualPath,
         approvedNewDirectoryCreation: true,
         agent: agentType,
+        profileId: resolvedProfile?.id,
         environmentVariables,
       });
 
