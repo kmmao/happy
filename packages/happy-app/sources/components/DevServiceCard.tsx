@@ -1,12 +1,12 @@
 /**
  * Card displaying a single dev service from dev.yml configuration.
  *
- * Shows service name, command, port, config files, and expose mappings.
- * Uses ItemGroup/Item for consistent iOS settings-style layout.
+ * Shows service name, command, port, config files, expose mappings,
+ * and mode tabs when multiple launch modes are available.
  */
 
 import * as React from "react";
-import { View, Pressable } from "react-native";
+import { View, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
@@ -14,35 +14,40 @@ import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { Typography } from "@/constants/Typography";
 import type { DevService } from "@/utils/devYmlParser";
+import { getActiveCommand, getActivePort } from "@/utils/devYmlParser";
 
 type Props = {
     readonly service: DevService;
-    readonly sessionId: string;
     readonly onEdit: (service: DevService) => void;
     readonly onDelete: (serviceKey: string) => void;
     readonly onConfigFilePress: (path: string) => void;
     readonly onStart?: (serviceKey: string) => void;
     readonly onStop?: (serviceKey: string) => void;
     readonly isRunning?: boolean;
+    readonly onModeChange?: (serviceKey: string, modeKey: string) => void;
 };
 
 export const DevServiceCard = React.memo(function DevServiceCard({
     service,
-    sessionId,
     onEdit,
     onDelete,
     onConfigFilePress,
     onStart,
     onStop,
     isRunning,
+    onModeChange,
 }: Props) {
     const { theme } = useUnistyles();
 
     const statusIcon = isRunning ? "play-circle" : "play-circle-outline";
     const statusColor = isRunning ? "#4CAF50" : theme.colors.textSecondary;
 
+    const activeCommand = getActiveCommand(service);
+    const activePort = getActivePort(service);
     const hasConfigFiles = (service.configFiles?.length ?? 0) > 0;
     const hasExpose = service.expose?.caddy || service.expose?.tailscale;
+    const modeKeys = service.modes ? Object.keys(service.modes) : [];
+    const showTabs = modeKeys.length >= 2;
 
     const titleElement = (
         <View style={styles.titleRow}>
@@ -50,10 +55,10 @@ export const DevServiceCard = React.memo(function DevServiceCard({
             <Text style={[styles.serviceName, { color: theme.colors.text }]}>
                 {service.name}
             </Text>
-            {service.port != null && (
+            {activePort != null && (
                 <View style={[styles.portBadge, { backgroundColor: `${theme.colors.textLink}15` }]}>
                     <Text style={[styles.portText, { color: theme.colors.textLink }]}>
-                        :{service.port}
+                        :{activePort}
                     </Text>
                 </View>
             )}
@@ -62,9 +67,61 @@ export const DevServiceCard = React.memo(function DevServiceCard({
 
     return (
         <ItemGroup title={titleElement}>
+            {/* Mode tabs */}
+            {showTabs && (
+                <View style={[styles.tabContainer, { borderBottomColor: theme.colors.divider }]}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+                        {modeKeys.map((modeKey) => {
+                            const mode = service.modes![modeKey];
+                            const isActive = modeKey === service.activeMode;
+                            return (
+                                <Pressable
+                                    key={modeKey}
+                                    style={[
+                                        styles.tab,
+                                        {
+                                            backgroundColor: isActive
+                                                ? `${theme.colors.textLink}15`
+                                                : "transparent",
+                                            borderColor: isActive
+                                                ? theme.colors.textLink
+                                                : theme.colors.divider,
+                                        },
+                                    ]}
+                                    onPress={() => {
+                                        if (!isActive && onModeChange) {
+                                            onModeChange(service.key, modeKey);
+                                        }
+                                    }}
+                                >
+                                    <Ionicons
+                                        name={modeKey === "docker" ? "cube-outline" : "desktop-outline"}
+                                        size={13}
+                                        color={isActive ? theme.colors.textLink : theme.colors.textSecondary}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.tabText,
+                                            {
+                                                color: isActive
+                                                    ? theme.colors.textLink
+                                                    : theme.colors.textSecondary,
+                                                fontWeight: isActive ? "600" : "400",
+                                            },
+                                        ]}
+                                    >
+                                        {mode.label}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+            )}
+
             {/* Command */}
             <Item
-                title={service.command}
+                title={activeCommand}
                 titleStyle={{
                     fontFamily: "Menlo",
                     fontSize: 12,
@@ -78,7 +135,7 @@ export const DevServiceCard = React.memo(function DevServiceCard({
                     />
                 }
                 showChevron={false}
-                copy={service.command}
+                copy={activeCommand}
             />
 
             {/* Config files section */}
@@ -236,6 +293,26 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 11,
         fontWeight: "600",
         fontFamily: "Menlo",
+    },
+    tabContainer: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    tabScroll: {
+        gap: 8,
+    },
+    tab: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    tabText: {
+        fontSize: 13,
     },
     httpsTag: {
         flexDirection: "row",

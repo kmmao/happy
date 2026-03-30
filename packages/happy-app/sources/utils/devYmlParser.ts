@@ -1,14 +1,11 @@
 /**
- * Lightweight parser for .happy/dev.yml files.
+ * Parser and serializer for .happy/dev.yml files.
  *
- * Only supports the subset of YAML needed by dev.yml:
- * - Top-level keys (version, services)
- * - Nested object properties (string, number, boolean)
- * - Simple arrays (depends_on, configFiles)
- * - No anchors, aliases, multiline strings, or flow syntax
- *
- * If the format gets more complex, replace with js-yaml.
+ * Uses js-yaml for robust parsing (supports full YAML spec).
+ * Hand-written serializer to maintain consistent formatting.
  */
+
+import yaml from "js-yaml";
 
 export type DevConfigFile = {
     readonly path: string;
@@ -25,20 +22,30 @@ export type DevExposeConfig = {
     };
 };
 
+export type DevServiceMode = {
+    readonly label: string;
+    readonly command: string;
+    readonly cwd?: string;
+    readonly port?: number;
+    readonly env?: Readonly<Record<string, string>>;
+};
+
 export type DevService = {
     readonly key: string;
     readonly name: string;
-    readonly command: string;
+    readonly command?: string;
     readonly cwd?: string;
     readonly port?: number;
     readonly healthCheck?: {
         readonly url?: string;
         readonly timeout?: number;
     };
-    readonly env?: Record<string, string>;
+    readonly env?: Readonly<Record<string, string>>;
     readonly depends_on?: readonly string[];
     readonly configFiles?: readonly DevConfigFile[];
     readonly expose?: DevExposeConfig;
+    readonly modes?: Readonly<Record<string, DevServiceMode>>;
+    readonly activeMode?: string;
 };
 
 export type DevConfig = {
@@ -47,204 +54,79 @@ export type DevConfig = {
 };
 
 /**
+ * Get the effective command for a service, considering modes.
+ * If modes exist and activeMode is set, returns that mode's command.
+ * Falls back to the service-level command.
+ */
+export function getActiveCommand(service: DevService): string {
+    if (service.modes && service.activeMode) {
+        const mode = service.modes[service.activeMode];
+        if (mode?.command) return mode.command;
+    }
+    return service.command ?? "";
+}
+
+/**
+ * Get the effective cwd for a service, considering modes.
+ * Mode-level cwd overrides service-level cwd.
+ */
+export function getActiveCwd(service: DevService): string | undefined {
+    if (service.modes && service.activeMode) {
+        const mode = service.modes[service.activeMode];
+        if (mode?.cwd) return mode.cwd;
+    }
+    return service.cwd;
+}
+
+/**
+ * Get the effective port for a service, considering modes.
+ * Mode-level port overrides service-level port.
+ */
+export function getActivePort(service: DevService): number | undefined {
+    if (service.modes && service.activeMode) {
+        const mode = service.modes[service.activeMode];
+        if (mode?.port != null) return mode.port;
+    }
+    return service.port;
+}
+
+/**
+ * Get the effective env for a service, considering modes.
+ * Mode-level env merges over service-level env.
+ */
+export function getActiveEnv(service: DevService): Record<string, string> | undefined {
+    const baseEnv = service.env;
+    if (service.modes && service.activeMode) {
+        const mode = service.modes[service.activeMode];
+        if (mode?.env) {
+            return baseEnv ? { ...baseEnv, ...mode.env } : { ...mode.env };
+        }
+    }
+    return baseEnv ? { ...baseEnv } : undefined;
+}
+
+/**
  * Parse dev.yml content into a structured DevConfig.
  * Returns null if parsing fails or content is invalid.
  */
 export function parseDevYml(content: string): DevConfig | null {
     try {
-        // Use a simple line-by-line parser for the YAML subset
-        const lines = content.split("\n");
-        let version = 1;
+        const doc = yaml.load(content) as Record<string, any> | null;
+        if (!doc || typeof doc !== "object") return null;
+
+        const version = typeof doc.version === "number" ? doc.version : 1;
+        const rawServices = doc.services;
+        if (!rawServices || typeof rawServices !== "object") return null;
+
         const services: DevService[] = [];
 
-        let currentServiceKey: string | null = null;
-        let currentService: Record<string, any> = {};
-        let currentSection: string | null = null; // healthCheck, env, expose, configFiles, etc.
-        let currentSubSection: string | null = null; // caddy, tailscale
-        let configFileItem: Record<string, string> | null = null;
-
-        for (const rawLine of lines) {
-            const line = rawLine.replace(/\r$/, "");
-
-            // Skip empty lines and comments
-            if (line.trim() === "" || line.trim().startsWith("#")) continue;
-
-            const indent = line.length - line.trimStart().length;
-            const trimmed = line.trim();
-
-            // version: N
-            if (indent === 0 && trimmed.startsWith("version:")) {
-                version = parseInt(trimmed.split(":")[1].trim(), 10) || 1;
-                continue;
-            }
-
-            // services: (top-level section header)
-            if (indent === 0 && trimmed === "services:") continue;
-
-            // Service key (indent 2)
-            if (indent === 2 && trimmed.endsWith(":") && !trimmed.includes(" ")) {
-                // Save previous service
-                if (currentServiceKey) {
-                    // Flush pending configFile item
-                    if (configFileItem && configFileItem.path) {
-                        currentService.configFiles = currentService.configFiles ?? [];
-                        currentService.configFiles.push({ ...configFileItem });
-                    }
-                    const svc = buildService(currentServiceKey, currentService);
-                    if (svc) services.push(svc);
-                }
-                currentServiceKey = trimmed.slice(0, -1);
-                currentService = {};
-                currentSection = null;
-                currentSubSection = null;
-                configFileItem = null;
-                continue;
-            }
-
-            // Service properties (indent 4)
-            if (indent === 4 && currentServiceKey) {
-                // Section headers
-                if (trimmed === "healthCheck:" || trimmed === "env:" || trimmed === "expose:" || trimmed === "configFiles:") {
-                    currentSection = trimmed.slice(0, -1);
-                    currentSubSection = null;
-                    if (currentSection === "configFiles") {
-                        currentService.configFiles = currentService.configFiles ?? [];
-                    }
-                    if (currentSection === "env") {
-                        currentService.env = currentService.env ?? {};
-                    }
-                    if (currentSection === "healthCheck") {
-                        currentService.healthCheck = currentService.healthCheck ?? {};
-                    }
-                    if (currentSection === "expose") {
-                        currentService.expose = currentService.expose ?? {};
-                    }
-                    continue;
-                }
-
-                // depends_on: [] or depends_on:
-                if (trimmed.startsWith("depends_on:")) {
-                    const val = trimmed.split(":").slice(1).join(":").trim();
-                    if (val === "[]" || val === "") {
-                        currentService.depends_on = [];
-                    } else {
-                        // Inline array: ["a", "b"]
-                        currentService.depends_on = parseInlineArray(val);
-                    }
-                    currentSection = trimmed.endsWith(":") && !val ? "depends_on" : null;
-                    continue;
-                }
-
-                // Simple key: value
-                currentSection = null;
-                const colonIdx = trimmed.indexOf(":");
-                if (colonIdx > 0) {
-                    const key = trimmed.slice(0, colonIdx).trim();
-                    const val = trimmed.slice(colonIdx + 1).trim();
-                    currentService[key] = parseYamlValue(val);
-                }
-                continue;
-            }
-
-            // Section content (indent 6)
-            if (indent === 6 && currentServiceKey && currentSection) {
-                if (currentSection === "healthCheck") {
-                    const colonIdx = trimmed.indexOf(":");
-                    if (colonIdx > 0) {
-                        const key = trimmed.slice(0, colonIdx).trim();
-                        const val = trimmed.slice(colonIdx + 1).trim();
-                        currentService.healthCheck = currentService.healthCheck ?? {};
-                        currentService.healthCheck[key] = parseYamlValue(val);
-                    }
-                } else if (currentSection === "env") {
-                    const colonIdx = trimmed.indexOf(":");
-                    if (colonIdx > 0) {
-                        const key = trimmed.slice(0, colonIdx).trim();
-                        const val = trimmed.slice(colonIdx + 1).trim();
-                        currentService.env = currentService.env ?? {};
-                        currentService.env[key] = stripQuotes(val);
-                    }
-                } else if (currentSection === "expose") {
-                    // Subsection headers: caddy:, tailscale:
-                    if (trimmed.endsWith(":") && !trimmed.includes(" ")) {
-                        currentSubSection = trimmed.slice(0, -1);
-                        currentService.expose = currentService.expose ?? {};
-                        currentService.expose[currentSubSection] = currentService.expose[currentSubSection] ?? {};
-                        continue;
-                    }
-                } else if (currentSection === "configFiles") {
-                    // Array item: - path: "..."
-                    if (trimmed.startsWith("- ")) {
-                        // Save previous item
-                        if (configFileItem && configFileItem.path) {
-                            currentService.configFiles.push({ ...configFileItem });
-                        }
-                        configFileItem = {};
-                        const rest = trimmed.slice(2);
-                        const colonIdx = rest.indexOf(":");
-                        if (colonIdx > 0) {
-                            const key = rest.slice(0, colonIdx).trim();
-                            const val = rest.slice(colonIdx + 1).trim();
-                            configFileItem[key] = stripQuotes(val);
-                        }
-                        continue;
-                    }
-                    // Continuation of current item
-                    if (configFileItem) {
-                        const colonIdx = trimmed.indexOf(":");
-                        if (colonIdx > 0) {
-                            const key = trimmed.slice(0, colonIdx).trim();
-                            const val = trimmed.slice(colonIdx + 1).trim();
-                            configFileItem[key] = stripQuotes(val);
-                        }
-                    }
-                } else if (currentSection === "depends_on") {
-                    if (trimmed.startsWith("- ")) {
-                        currentService.depends_on = currentService.depends_on ?? [];
-                        currentService.depends_on.push(stripQuotes(trimmed.slice(2).trim()));
-                    }
-                }
-                continue;
-            }
-
-            // Expose subsection content (indent 8)
-            if (indent === 8 && currentSection === "expose" && currentSubSection) {
-                const colonIdx = trimmed.indexOf(":");
-                if (colonIdx > 0) {
-                    const key = trimmed.slice(0, colonIdx).trim();
-                    const val = trimmed.slice(colonIdx + 1).trim();
-                    currentService.expose = currentService.expose ?? {};
-                    currentService.expose[currentSubSection] = currentService.expose[currentSubSection] ?? {};
-                    currentService.expose[currentSubSection][key] = parseYamlValue(val);
-                }
-                continue;
-            }
-
-            // configFiles item continuation (indent 8)
-            if (indent === 8 && currentSection === "configFiles" && configFileItem) {
-                const colonIdx = trimmed.indexOf(":");
-                if (colonIdx > 0) {
-                    const key = trimmed.slice(0, colonIdx).trim();
-                    const val = trimmed.slice(colonIdx + 1).trim();
-                    configFileItem[key] = stripQuotes(val);
-                }
-                continue;
-            }
-        }
-
-        // Save last service
-        if (currentServiceKey) {
-            // Flush last configFile item
-            if (configFileItem && configFileItem.path) {
-                currentService.configFiles = currentService.configFiles ?? [];
-                currentService.configFiles.push({ ...configFileItem });
-            }
-            const svc = buildService(currentServiceKey, currentService);
+        for (const [key, raw] of Object.entries(rawServices)) {
+            if (!raw || typeof raw !== "object") continue;
+            const svc = buildService(key, raw as Record<string, any>);
             if (svc) services.push(svc);
         }
 
         if (services.length === 0) return null;
-
         return { version, services };
     } catch {
         return null;
@@ -252,45 +134,81 @@ export function parseDevYml(content: string): DevConfig | null {
 }
 
 function buildService(key: string, raw: Record<string, any>): DevService | null {
-    const command = typeof raw.command === "string" ? raw.command.trim() : "";
-    if (command.length === 0) return null; // Skip services without a command
+    // Parse modes if present
+    const modes = buildModes(raw.modes);
+    const activeMode = typeof raw.activeMode === "string" ? raw.activeMode : getFirstModeKey(modes);
+
+    // A service needs either a command or at least one mode with a command
+    const command = typeof raw.command === "string" ? raw.command.trim() : undefined;
+    const hasValidMode = modes != null && Object.values(modes).some((m) => m.command.length > 0);
+    if (!command && !hasValidMode) return null;
 
     return {
         key,
         name: typeof raw.name === "string" ? raw.name : key,
-        command,
-        cwd: typeof raw.cwd === "string" ? raw.cwd : undefined,
-        port: typeof raw.port === "number" ? raw.port : undefined,
-        healthCheck: raw.healthCheck ?? undefined,
-        env: raw.env ?? undefined,
-        depends_on: Array.isArray(raw.depends_on) ? raw.depends_on : undefined,
-        configFiles: Array.isArray(raw.configFiles) ? raw.configFiles : undefined,
-        expose: raw.expose ?? undefined,
+        ...(command ? { command } : {}),
+        ...(typeof raw.cwd === "string" ? { cwd: raw.cwd } : {}),
+        ...(typeof raw.port === "number" ? { port: raw.port } : {}),
+        ...(raw.healthCheck && typeof raw.healthCheck === "object" ? { healthCheck: raw.healthCheck } : {}),
+        ...(raw.env && typeof raw.env === "object" ? { env: raw.env } : {}),
+        ...(Array.isArray(raw.depends_on) ? { depends_on: raw.depends_on } : {}),
+        ...(Array.isArray(raw.configFiles) ? { configFiles: buildConfigFiles(raw.configFiles) } : {}),
+        ...(raw.expose && typeof raw.expose === "object" ? { expose: buildExpose(raw.expose) } : {}),
+        ...(modes ? { modes, activeMode } : {}),
     };
 }
 
-function stripQuotes(val: string): string {
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        return val.slice(1, -1);
+function buildModes(raw: unknown): Record<string, DevServiceMode> | undefined {
+    if (!raw || typeof raw !== "object") return undefined;
+    const modes: Record<string, DevServiceMode> = {};
+    let count = 0;
+    for (const [modeKey, modeVal] of Object.entries(raw)) {
+        if (!modeVal || typeof modeVal !== "object") continue;
+        const m = modeVal as Record<string, any>;
+        const command = typeof m.command === "string" ? m.command.trim() : "";
+        if (command.length === 0) continue;
+        modes[modeKey] = {
+            label: typeof m.label === "string" ? m.label : modeKey,
+            command,
+            ...(typeof m.cwd === "string" ? { cwd: m.cwd } : {}),
+            ...(typeof m.port === "number" ? { port: m.port } : {}),
+            ...(m.env && typeof m.env === "object" ? { env: m.env } : {}),
+        };
+        count++;
     }
-    return val;
+    return count > 0 ? modes : undefined;
 }
 
-function parseYamlValue(val: string): string | number | boolean {
-    const stripped = stripQuotes(val);
-    if (stripped === "true") return true;
-    if (stripped === "false") return false;
-    const num = Number(stripped);
-    if (!isNaN(num) && stripped.length > 0 && stripped !== "") return num;
-    return stripped;
+function getFirstModeKey(modes: Record<string, DevServiceMode> | undefined): string | undefined {
+    if (!modes) return undefined;
+    const keys = Object.keys(modes);
+    return keys.length > 0 ? keys[0] : undefined;
 }
 
-function parseInlineArray(val: string): string[] {
-    // Parse ["a", "b"] or [a, b]
-    const inner = val.replace(/^\[/, "").replace(/\]$/, "").trim();
-    if (inner === "") return [];
-    return inner.split(",").map((s) => stripQuotes(s.trim()));
+function buildConfigFiles(raw: any[]): DevConfigFile[] {
+    return raw
+        .filter((item) => item && typeof item === "object" && typeof item.path === "string")
+        .map((item) => ({
+            path: item.path,
+            label: typeof item.label === "string" ? item.label : item.path,
+        }));
 }
+
+function buildExpose(raw: Record<string, any>): DevExposeConfig {
+    const expose: Record<string, any> = {};
+    if (raw.caddy && typeof raw.caddy === "object" && typeof raw.caddy.hostname === "string") {
+        expose.caddy = { hostname: raw.caddy.hostname };
+    }
+    if (raw.tailscale && typeof raw.tailscale === "object") {
+        expose.tailscale = {
+            ...(typeof raw.tailscale.funnel === "boolean" ? { funnel: raw.tailscale.funnel } : {}),
+            ...(typeof raw.tailscale.httpsPort === "number" ? { httpsPort: raw.tailscale.httpsPort } : {}),
+        };
+    }
+    return expose;
+}
+
+// ─── Serialization ──────────────────────────────────────────────────────────────
 
 /** Escape a string value for YAML double-quoted context */
 function yamlEscape(val: string): string {
@@ -299,6 +217,7 @@ function yamlEscape(val: string): string {
 
 /**
  * Serialize a DevConfig back to YAML string.
+ * Hand-written for consistent formatting.
  */
 export function serializeDevYml(config: DevConfig): string {
     const lines: string[] = [`version: ${config.version}`, "", "services:"];
@@ -306,7 +225,31 @@ export function serializeDevYml(config: DevConfig): string {
     for (const svc of config.services) {
         lines.push(`  ${svc.key}:`);
         lines.push(`    name: "${yamlEscape(svc.name)}"`);
-        lines.push(`    command: "${yamlEscape(svc.command)}"`);
+
+        // Modes-based format
+        if (svc.modes && Object.keys(svc.modes).length > 0) {
+            if (svc.activeMode) {
+                lines.push(`    activeMode: "${yamlEscape(svc.activeMode)}"`);
+            }
+            lines.push("    modes:");
+            for (const [modeKey, mode] of Object.entries(svc.modes)) {
+                lines.push(`      ${modeKey}:`);
+                lines.push(`        label: "${yamlEscape(mode.label)}"`);
+                lines.push(`        command: "${yamlEscape(mode.command)}"`);
+                if (mode.cwd) lines.push(`        cwd: "${yamlEscape(mode.cwd)}"`);
+                if (mode.port != null) lines.push(`        port: ${mode.port}`);
+                if (mode.env && Object.keys(mode.env).length > 0) {
+                    lines.push("        env:");
+                    for (const [k, v] of Object.entries(mode.env)) {
+                        lines.push(`          ${k}: "${yamlEscape(v)}"`);
+                    }
+                }
+            }
+        } else if (svc.command) {
+            // Legacy flat format
+            lines.push(`    command: "${yamlEscape(svc.command)}"`);
+        }
+
         if (svc.cwd) lines.push(`    cwd: "${yamlEscape(svc.cwd)}"`);
         if (svc.port != null) lines.push(`    port: ${svc.port}`);
 

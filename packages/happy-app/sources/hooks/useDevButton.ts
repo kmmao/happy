@@ -9,6 +9,7 @@
 
 import * as React from "react";
 import type { DevConfig } from "@/utils/devYmlParser";
+import { getActiveCommand } from "@/utils/devYmlParser";
 import type { BackgroundTask } from "@/hooks/useBackgroundTasks";
 import { extractPort } from "@/utils/commandAnalysis";
 
@@ -43,7 +44,7 @@ export function useDevButton(
                 }
 
                 // Match by command substring
-                const svcCore = extractCommandCore(svc.command);
+                const svcCore = extractCommandCore(getActiveCommand(svc));
                 if (svcCore && task.command.includes(svcCore)) return true;
 
                 return false;

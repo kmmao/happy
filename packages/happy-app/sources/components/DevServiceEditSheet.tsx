@@ -2,7 +2,8 @@
  * Modal sheet for editing or creating a dev service configuration.
  *
  * Presented as a pageSheet modal with sectioned form:
- * - Basic info (name, command, cwd, port)
+ * - Basic info (name, port)
+ * - Launch modes (multiple modes with command/cwd/port/env each)
  * - Dependencies (multi-select tags)
  * - Config files (list + add)
  * - Port mapping (Caddy hostname, Tailscale funnel toggle)
@@ -22,7 +23,14 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { FilePickerModal } from "@/components/FilePickerModal";
-import type { DevService, DevConfigFile, DevExposeConfig } from "@/utils/devYmlParser";
+import type { DevService, DevConfigFile, DevExposeConfig, DevServiceMode } from "@/utils/devYmlParser";
+
+type ModeEditState = {
+    readonly label: string;
+    readonly command: string;
+    readonly cwd: string;
+    readonly port: string;
+};
 
 type Props = {
     readonly service: DevService | null;
@@ -32,6 +40,30 @@ type Props = {
     readonly sessionId: string;
 };
 
+function initModes(service: DevService | null): Record<string, ModeEditState> {
+    if (service?.modes && Object.keys(service.modes).length > 0) {
+        const result: Record<string, ModeEditState> = {};
+        for (const [k, m] of Object.entries(service.modes)) {
+            result[k] = {
+                label: m.label,
+                command: m.command,
+                cwd: m.cwd ?? "",
+                port: m.port != null ? String(m.port) : "",
+            };
+        }
+        return result;
+    }
+    // Legacy single-command service → convert to one "local" mode
+    return {
+        local: {
+            label: "Local",
+            command: service?.command ?? "",
+            cwd: service?.cwd ?? "",
+            port: "",
+        },
+    };
+}
+
 function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, sessionId }: Props) {
     const { theme } = useUnistyles();
     const isNew = service === null;
@@ -39,10 +71,17 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
     // Form state
     const [key, setKey] = React.useState(service?.key ?? "");
     const [name, setName] = React.useState(service?.name ?? "");
-    const [command, setCommand] = React.useState(service?.command ?? "");
-    const [cwd, setCwd] = React.useState(service?.cwd ?? "");
     const [portText, setPortText] = React.useState(
         service?.port != null ? String(service.port) : "",
+    );
+
+    // Modes
+    const [modes, setModes] = React.useState<Record<string, ModeEditState>>(() => initModes(service));
+    const [activeMode, setActiveMode] = React.useState<string>(
+        service?.activeMode ?? Object.keys(initModes(service))[0] ?? "local",
+    );
+    const [expandedMode, setExpandedMode] = React.useState<string | null>(
+        Object.keys(initModes(service))[0] ?? null,
     );
 
     // Dependencies
@@ -71,6 +110,8 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
         [allServiceKeys, service, key],
     );
 
+    const modeKeys = Object.keys(modes);
+
     const toggleDep = React.useCallback((dep: string) => {
         setSelectedDeps((prev) =>
             prev.includes(dep) ? prev.filter((d) => d !== dep) : [...prev, dep],
@@ -92,6 +133,37 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
         setConfigFiles((prev) => prev.filter((_, i) => i !== index));
     }, []);
 
+    const updateMode = React.useCallback((modeKey: string, field: keyof ModeEditState, value: string) => {
+        setModes((prev) => ({
+            ...prev,
+            [modeKey]: { ...prev[modeKey], [field]: value },
+        }));
+    }, []);
+
+    const handleAddMode = React.useCallback(() => {
+        const newKey = `mode${modeKeys.length + 1}`;
+        setModes((prev) => ({
+            ...prev,
+            [newKey]: { label: "Docker", command: "", cwd: "", port: "" },
+        }));
+        setExpandedMode(newKey);
+    }, [modeKeys.length]);
+
+    const handleRemoveMode = React.useCallback((modeKey: string) => {
+        setModes((prev) => {
+            const next = { ...prev };
+            delete next[modeKey];
+            return next;
+        });
+        if (activeMode === modeKey) {
+            const remaining = modeKeys.filter((k) => k !== modeKey);
+            setActiveMode(remaining[0] ?? "");
+        }
+        if (expandedMode === modeKey) {
+            setExpandedMode(null);
+        }
+    }, [activeMode, modeKeys, expandedMode]);
+
     const handleSave = React.useCallback(() => {
         const port = parseInt(portText, 10);
 
@@ -100,11 +172,36 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
                 ? { caddy: { hostname: caddyHostname.trim() } }
                 : undefined;
 
+        // Build modes for the service
+        const builtModes: Record<string, DevServiceMode> = {};
+        for (const [mk, ms] of Object.entries(modes)) {
+            if (!ms.command.trim()) continue;
+            const modePort = parseInt(ms.port, 10);
+            builtModes[mk] = {
+                label: ms.label.trim() || mk,
+                command: ms.command.trim(),
+                ...(ms.cwd.trim() ? { cwd: ms.cwd.trim() } : {}),
+                ...(Number.isInteger(modePort) && modePort > 0 ? { port: modePort } : {}),
+            };
+        }
+
+        const validModeKeys = Object.keys(builtModes);
+        const useModes = validModeKeys.length >= 2;
+        const singleMode = validModeKeys.length === 1 ? builtModes[validModeKeys[0]] : null;
+
         const updated: DevService = {
             key: isNew ? key.trim() || name.trim().toLowerCase().replace(/\s+/g, "-") : service!.key,
             name: name.trim(),
-            command: command.trim(),
-            ...(cwd.trim() ? { cwd: cwd.trim() } : {}),
+            // Single mode → flat format; multi mode → modes format
+            ...(useModes
+                ? {
+                    modes: builtModes,
+                    activeMode: validModeKeys.includes(activeMode) ? activeMode : validModeKeys[0],
+                }
+                : {
+                    command: singleMode?.command ?? "",
+                    ...(singleMode?.cwd ? { cwd: singleMode.cwd } : {}),
+                }),
             ...(Number.isInteger(port) && port > 0 ? { port } : {}),
             ...(selectedDeps.length > 0 ? { depends_on: selectedDeps } : {}),
             ...(configFiles.length > 0 ? { configFiles } : {}),
@@ -113,11 +210,11 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
 
         onSave(updated);
     }, [
-        isNew, service, key, name, command, cwd, portText,
+        isNew, service, key, name, portText, modes, activeMode,
         selectedDeps, configFiles, caddyHostname, onSave,
     ]);
 
-    const isValid = name.trim().length > 0 && command.trim().length > 0;
+    const isValid = name.trim().length > 0 && Object.values(modes).some((m) => m.command.trim().length > 0);
 
     return (
         <Modal
@@ -188,43 +285,146 @@ function DevServiceEditSheetInner({ service, allServiceKeys, onSave, onClose, se
                                 autoFocus={isNew}
                             />
                         </View>
-                        <View style={[styles.fieldColumn, { borderBottomColor: theme.colors.divider }]}>
-                            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Command</Text>
-                            <TextInput
-                                style={[styles.fieldInputMultiline, { color: theme.colors.text }]}
-                                value={command}
-                                onChangeText={setCommand}
-                                placeholder="mvn spring-boot:run"
-                                placeholderTextColor={theme.colors.textSecondary}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                multiline
-                                numberOfLines={3}
-                            />
-                        </View>
-                        <View style={[styles.fieldRow, { borderBottomColor: theme.colors.divider }]}>
-                            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Working Dir</Text>
-                            <TextInput
-                                style={[styles.fieldInput, { color: theme.colors.text, fontFamily: "Menlo", fontSize: 13 }]}
-                                value={cwd}
-                                onChangeText={setCwd}
-                                placeholder="./backend"
-                                placeholderTextColor={theme.colors.textSecondary}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                            />
-                        </View>
                         <View style={styles.fieldRowLast}>
                             <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Port</Text>
                             <TextInput
                                 style={[styles.fieldInput, { color: theme.colors.text }]}
                                 value={portText}
                                 onChangeText={setPortText}
-                                placeholder="8080"
+                                placeholder="8080 (shared default)"
                                 placeholderTextColor={theme.colors.textSecondary}
                                 keyboardType="number-pad"
                             />
                         </View>
+                    </View>
+
+                    {/* Launch Modes */}
+                    <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
+                        LAUNCH MODES
+                    </Text>
+                    <View style={[styles.formGroup, { backgroundColor: theme.colors.surfaceHigh }]}>
+                        {modeKeys.map((modeKey, idx) => {
+                            const mode = modes[modeKey];
+                            const isExpanded = expandedMode === modeKey;
+                            const isActive = modeKey === activeMode;
+                            const isLast = idx === modeKeys.length - 1;
+                            const canDelete = modeKeys.length > 1;
+
+                            return (
+                                <View key={modeKey}>
+                                    {/* Mode header — tap to expand/collapse */}
+                                    <Pressable
+                                        style={[
+                                            styles.modeHeader,
+                                            !isExpanded && !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
+                                        ]}
+                                        onPress={() => setExpandedMode(isExpanded ? null : modeKey)}
+                                    >
+                                        <Pressable
+                                            style={[
+                                                styles.modeRadio,
+                                                {
+                                                    borderColor: isActive ? theme.colors.textLink : theme.colors.divider,
+                                                    backgroundColor: isActive ? theme.colors.textLink : "transparent",
+                                                },
+                                            ]}
+                                            onPress={() => setActiveMode(modeKey)}
+                                        >
+                                            {isActive && (
+                                                <View style={styles.modeRadioInner} />
+                                            )}
+                                        </Pressable>
+                                        <View style={styles.modeHeaderText}>
+                                            <Text style={[styles.modeKey, { color: theme.colors.text }]}>
+                                                {modeKey}
+                                            </Text>
+                                            <Text style={[styles.modeLabel, { color: theme.colors.textSecondary }]}>
+                                                {mode.label || modeKey}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.modeHeaderRight}>
+                                            {canDelete && (
+                                                <Pressable
+                                                    onPress={() => handleRemoveMode(modeKey)}
+                                                    hitSlop={8}
+                                                >
+                                                    <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
+                                                </Pressable>
+                                            )}
+                                            <Ionicons
+                                                name={isExpanded ? "chevron-up" : "chevron-down"}
+                                                size={16}
+                                                color={theme.colors.textSecondary}
+                                            />
+                                        </View>
+                                    </Pressable>
+
+                                    {/* Expanded mode fields */}
+                                    {isExpanded && (
+                                        <View style={[styles.modeFields, { borderBottomColor: isLast ? "transparent" : theme.colors.divider }]}>
+                                            <View style={[styles.modeFieldRow, { borderBottomColor: theme.colors.divider }]}>
+                                                <Text style={[styles.modeFieldLabel, { color: theme.colors.textSecondary }]}>Label</Text>
+                                                <TextInput
+                                                    style={[styles.fieldInput, { color: theme.colors.text }]}
+                                                    value={mode.label}
+                                                    onChangeText={(v) => updateMode(modeKey, "label", v)}
+                                                    placeholder="Local Dev"
+                                                    placeholderTextColor={theme.colors.textSecondary}
+                                                />
+                                            </View>
+                                            <View style={[styles.modeFieldColumn, { borderBottomColor: theme.colors.divider }]}>
+                                                <Text style={[styles.modeFieldLabel, { color: theme.colors.textSecondary }]}>Command</Text>
+                                                <TextInput
+                                                    style={[styles.fieldInputMultiline, { color: theme.colors.text }]}
+                                                    value={mode.command}
+                                                    onChangeText={(v) => updateMode(modeKey, "command", v)}
+                                                    placeholder="yarn serve"
+                                                    placeholderTextColor={theme.colors.textSecondary}
+                                                    autoCapitalize="none"
+                                                    autoCorrect={false}
+                                                    multiline
+                                                    numberOfLines={2}
+                                                />
+                                            </View>
+                                            <View style={[styles.modeFieldRow, { borderBottomColor: theme.colors.divider }]}>
+                                                <Text style={[styles.modeFieldLabel, { color: theme.colors.textSecondary }]}>Working Dir</Text>
+                                                <TextInput
+                                                    style={[styles.fieldInput, { color: theme.colors.text, fontFamily: "Menlo", fontSize: 13 }]}
+                                                    value={mode.cwd}
+                                                    onChangeText={(v) => updateMode(modeKey, "cwd", v)}
+                                                    placeholder="./backend"
+                                                    placeholderTextColor={theme.colors.textSecondary}
+                                                    autoCapitalize="none"
+                                                    autoCorrect={false}
+                                                />
+                                            </View>
+                                            <View style={styles.modeFieldRowLast}>
+                                                <Text style={[styles.modeFieldLabel, { color: theme.colors.textSecondary }]}>Port</Text>
+                                                <TextInput
+                                                    style={[styles.fieldInput, { color: theme.colors.text }]}
+                                                    value={mode.port}
+                                                    onChangeText={(v) => updateMode(modeKey, "port", v)}
+                                                    placeholder="Override"
+                                                    placeholderTextColor={theme.colors.textSecondary}
+                                                    keyboardType="number-pad"
+                                                />
+                                            </View>
+                                        </View>
+                                    )}
+                                </View>
+                            );
+                        })}
+
+                        {/* Add mode button */}
+                        <Pressable
+                            style={[styles.addModeButton, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.divider }]}
+                            onPress={handleAddMode}
+                        >
+                            <Ionicons name="add" size={16} color={theme.colors.textLink} />
+                            <Text style={{ fontSize: 13, color: theme.colors.textLink }}>
+                                Add Mode
+                            </Text>
+                        </Pressable>
                     </View>
 
                     {/* Dependencies */}
@@ -467,18 +667,86 @@ const styles = StyleSheet.create((theme) => ({
         textAlign: "right",
         paddingVertical: 0,
     },
-    fieldColumn: {
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-    },
     fieldInputMultiline: {
         fontSize: 13,
         fontFamily: "Menlo",
         paddingVertical: 6,
-        marginTop: 6,
-        minHeight: 60,
+        marginTop: 4,
+        minHeight: 44,
         textAlignVertical: "top",
+    },
+    // Mode editing styles
+    modeHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        gap: 10,
+    },
+    modeRadio: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 2,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    modeRadioInner: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: "#fff",
+    },
+    modeHeaderText: {
+        flex: 1,
+    },
+    modeKey: {
+        fontSize: 14,
+        fontWeight: "600",
+        ...Typography.default("semiBold"),
+    },
+    modeLabel: {
+        fontSize: 12,
+        marginTop: 1,
+    },
+    modeHeaderRight: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    modeFields: {
+        paddingLeft: 46,
+        paddingRight: 16,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    modeFieldRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 8,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    modeFieldRowLast: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 8,
+    },
+    modeFieldColumn: {
+        paddingVertical: 8,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    modeFieldLabel: {
+        fontSize: 13,
+        width: 80,
+        flexShrink: 0,
+    },
+    addModeButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+        paddingVertical: 10,
     },
     tagsContainer: {
         flexDirection: "row",

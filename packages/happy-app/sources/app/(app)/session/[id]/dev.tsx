@@ -11,7 +11,7 @@ import { useDevConfig, invalidateDevConfigCache } from "@/hooks/useDevConfig";
 import { useDevSkillCheck } from "@/hooks/useDevSkillCheck";
 import { DevServiceCard } from "@/components/DevServiceCard";
 import { DevServiceEditSheet } from "@/components/DevServiceEditSheet";
-import { serializeDevYml, type DevService, type DevConfig } from "@/utils/devYmlParser";
+import { serializeDevYml, getActiveCommand, type DevService, type DevConfig } from "@/utils/devYmlParser";
 import { sessionBash, sessionStopTask } from "@/sync/ops";
 import { useBackgroundTaskEntries } from "@/sync/storage";
 import { sync } from "@/sync/sync";
@@ -37,10 +37,11 @@ export default React.memo(function DevScreen() {
     const runningServiceMap = React.useMemo(() => {
         const map = new Map<string, string>(); // serviceKey → taskId
         for (const service of services) {
+            const cmd = getActiveCommand(service);
             for (const [, entry] of backgroundTasks) {
                 if (entry.status !== "running") continue;
                 // Match by command: the background task command should contain the service command
-                if (entry.command && service.command && entry.command.includes(service.command)) {
+                if (entry.command && cmd && entry.command.includes(cmd)) {
                     map.set(service.key, entry.taskId);
                     break;
                 }
@@ -113,6 +114,17 @@ export default React.memo(function DevScreen() {
         setEditingService(null);
         setShowEditSheet(true);
     }, []);
+
+    const handleModeChange = React.useCallback(async (serviceKey: string, modeKey: string) => {
+        if (!config) return;
+        const updatedConfig: DevConfig = {
+            ...config,
+            services: config.services.map((s) =>
+                s.key === serviceKey ? { ...s, activeMode: modeKey } : s,
+            ),
+        };
+        await writeDevYml(updatedConfig);
+    }, [config, writeDevYml]);
 
     const handleCloseSheet = React.useCallback(() => {
         setShowEditSheet(false);
@@ -222,26 +234,26 @@ export default React.memo(function DevScreen() {
                             <DevServiceCard
                                 key={service.key}
                                 service={service}
-                                sessionId={sessionId}
                                 onEdit={handleEdit}
                                 onDelete={handleDelete}
                                 onConfigFilePress={handleConfigFilePress}
                                 isRunning={runningServiceMap.has(service.key)}
+                                onModeChange={handleModeChange}
                                 onStart={(key: string) => {
                                     sync.sendMessage(sessionId, `/dev ${key}`);
                                     router.back();
                                 }}
                                 onStop={async (key: string) => {
                                     const taskId = runningServiceMap.get(key);
-                                    const service = services.find((s) => s.key === key);
+                                    const svc = services.find((s) => s.key === key);
                                     if (!taskId) return;
                                     try {
                                         await sessionStopTask(sessionId, taskId);
                                     } catch {
                                         // stopTask fails when idle — fallback to port/command kill
                                         try {
-                                            const port = service?.port;
-                                            const cmd = service?.command ?? "";
+                                            const port = svc?.port;
+                                            const cmd = svc ? getActiveCommand(svc) : "";
                                             const killCmd = port
                                                 ? `lsof -ti :${port} | xargs kill 2>/dev/null || true`
                                                 : `pkill -f ${JSON.stringify(cmd.slice(0, 80))} 2>/dev/null || true`;

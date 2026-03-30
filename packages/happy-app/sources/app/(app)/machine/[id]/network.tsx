@@ -14,6 +14,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { ItemGroup } from "@/components/ItemGroup";
 import { Item } from "@/components/Item";
+import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { useMachine } from "@/sync/storage";
 import { TailscaleServeContent } from "@/components/machine/TailscaleServeSection";
@@ -196,6 +197,9 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surface,
     },
     content: {
+        maxWidth: layout.maxWidth,
+        width: "100%",
+        alignSelf: "center",
         paddingBottom: 40,
     },
     empty: {
