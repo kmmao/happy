@@ -1,5 +1,6 @@
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
+import { parseKnowledgeConfig, mergeWithDefaults } from "./knowledgeConfigResolver";
 
 // ─── Configuration (overridable via env) ───
 
@@ -121,7 +122,7 @@ export async function runGlobalDecayArchive(): Promise<{
     let projectsProcessed = 0;
 
     try {
-        // Get distinct project IDs with active entries older than min age
+        // Get distinct project IDs with knowledgeConfig in one query (avoids N+1)
         const minCreatedAt = new Date(Date.now() - DECAY_MIN_AGE_DAYS * 24 * 60 * 60 * 1000);
         const projects = await db.projectKnowledge.findMany({
             where: {
@@ -129,11 +130,17 @@ export async function runGlobalDecayArchive(): Promise<{
                 pinned: false,
                 createdAt: { lt: minCreatedAt },
             },
-            select: { projectId: true },
+            select: {
+                projectId: true,
+                project: { select: { knowledgeConfig: true } },
+            },
             distinct: ["projectId"],
         });
 
-        for (const { projectId } of projects) {
+        for (const { projectId, project } of projects) {
+            const config = mergeWithDefaults(parseKnowledgeConfig(project.knowledgeConfig));
+            if (!config.decayEnabled) continue;
+
             const result = await runDecayArchive(projectId);
             totalArchived += result.archived;
             projectsProcessed++;

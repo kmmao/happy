@@ -1,6 +1,7 @@
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { storeKnowledgeEmbedding } from "./knowledgeEmbedding";
+import { resolveKnowledgeConfig } from "./knowledgeConfigResolver";
 import { z } from "zod";
 
 /**
@@ -31,6 +32,7 @@ export interface RefineInput {
     tags: string;
     confidence: string;
     structured: string | null;
+    projectId?: string;
 }
 
 interface FilterResult {
@@ -243,7 +245,16 @@ function buildRefinePrompt(input: RefineInput): string {
  * Fire-and-forget: failures are logged, original data preserved.
  */
 export async function refineKnowledgeEntry(input: RefineInput): Promise<void> {
-    if (process.env.KNOWLEDGE_REFINE === "false") return;
+    // Check project-level config first, fall back to env var
+    if (input.projectId) {
+        const config = await resolveKnowledgeConfig(input.projectId);
+        if (!config.refineEnabled) {
+            log({ module: "knowledge-refine" }, `Refine disabled for project ${input.projectId}`);
+            return;
+        }
+    } else if (process.env.KNOWLEDGE_REFINE === "false") {
+        return;
+    }
 
     try {
         const filter = shouldRefine(input);

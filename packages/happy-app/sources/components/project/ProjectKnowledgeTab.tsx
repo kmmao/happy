@@ -1,14 +1,16 @@
 import * as React from "react";
-import { View, Text, FlatList, Pressable, RefreshControl } from "react-native";
+import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { useRouter } from "expo-router";
-import { useProjectKnowledge } from "@/hooks/useProjectKnowledge";
+import { useProjectKnowledge, type LifecycleStats } from "@/hooks/useProjectKnowledge";
+import { useProjectKnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { KnowledgeEntryCard } from "./KnowledgeEntryCard";
 import { ProjectProfileCard } from "./ProjectProfileCard";
+import { ProjectKnowledgeConfigCard } from "./ProjectKnowledgeConfigCard";
 import { layout } from "@/components/layout";
 
 interface ProjectKnowledgeTabProps {
@@ -57,7 +59,45 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             deleteEntry,
             refineEntry,
             regenerateProfile,
+            fetchLifecycle,
+            runDecay,
+            runMerge,
         } = useProjectKnowledge(projectServerId);
+
+        const {
+            config: knowledgeConfig,
+            isCustomized: configIsCustomized,
+            saving: configSaving,
+            update: updateConfig,
+            resetToDefaults: resetConfig,
+        } = useProjectKnowledgeConfig(projectServerId);
+
+        const decayEnabled = knowledgeConfig?.decayEnabled ?? false;
+        const mergeEnabled = knowledgeConfig?.mergeEnabled ?? false;
+        const showLifecycle = decayEnabled || mergeEnabled;
+
+        const [lifecycleStats, setLifecycleStats] = React.useState<LifecycleStats | null>(null);
+        React.useEffect(() => {
+            if (showLifecycle && isActive) {
+                void fetchLifecycle().then((s) => { if (s) setLifecycleStats(s); });
+            }
+        }, [showLifecycle, isActive, fetchLifecycle]);
+
+        const [decaying, doDecay] = useHappyAction(async () => {
+            const result = await runDecay();
+            if (result) {
+                const updated = await fetchLifecycle();
+                if (updated) setLifecycleStats(updated);
+            }
+        });
+
+        const [merging, doMerge] = useHappyAction(async () => {
+            const result = await runMerge();
+            if (result) {
+                const updated = await fetchLifecycle();
+                if (updated) setLifecycleStats(updated);
+            }
+        });
 
         const [refreshing, doRefresh] = useHappyAction(async () => {
             await refresh();
@@ -143,11 +183,98 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
         const ListHeader = React.useMemo(
             () => (
                 <View>
+                    {/* Project-level knowledge config */}
+                    {knowledgeConfig && (
+                        <ProjectKnowledgeConfigCard
+                            config={knowledgeConfig}
+                            isCustomized={configIsCustomized}
+                            saving={configSaving}
+                            onUpdate={updateConfig}
+                            onReset={resetConfig}
+                        />
+                    )}
                     <ProjectProfileCard
                         profile={profile}
                         onRegenerate={doRegenerate}
                         regenerating={regenerating}
                     />
+                    {/* Lifecycle stats + actions */}
+                    {showLifecycle && lifecycleStats && (
+                        <View style={[styles.lifecycleCard, { backgroundColor: theme.colors.surface }]}>
+                            <View style={styles.lifecycleHeader}>
+                                <Ionicons name="pulse-outline" size={16} color={theme.colors.header.tint} />
+                                <Text style={[styles.lifecycleTitle, { color: theme.colors.text }]}>
+                                    {t("projects.knowledgeLifecycle")}
+                                </Text>
+                            </View>
+                            <View style={styles.lifecycleStats}>
+                                <View style={styles.lifecycleStat}>
+                                    <Text style={[styles.lifecycleStatValue, { color: theme.colors.success }]}>
+                                        {lifecycleStats.active}
+                                    </Text>
+                                    <Text style={[styles.lifecycleStatLabel, { color: theme.colors.textSecondary }]}>
+                                        {t("projects.knowledgeLifecycleActive")}
+                                    </Text>
+                                </View>
+                                <View style={styles.lifecycleStat}>
+                                    <Text style={[styles.lifecycleStatValue, { color: theme.colors.accentOrange }]}>
+                                        {lifecycleStats.superseded}
+                                    </Text>
+                                    <Text style={[styles.lifecycleStatLabel, { color: theme.colors.textSecondary }]}>
+                                        {t("projects.knowledgeLifecycleSuperseded")}
+                                    </Text>
+                                </View>
+                                <View style={styles.lifecycleStat}>
+                                    <Text style={[styles.lifecycleStatValue, { color: theme.colors.textSecondary }]}>
+                                        {lifecycleStats.archived}
+                                    </Text>
+                                    <Text style={[styles.lifecycleStatLabel, { color: theme.colors.textSecondary }]}>
+                                        {t("projects.knowledgeLifecycleArchived")}
+                                    </Text>
+                                </View>
+                                <View style={styles.lifecycleStat}>
+                                    <Text style={[styles.lifecycleStatValue, { color: theme.colors.accentPurple }]}>
+                                        {lifecycleStats.totalRelations}
+                                    </Text>
+                                    <Text style={[styles.lifecycleStatLabel, { color: theme.colors.textSecondary }]}>
+                                        {t("projects.knowledgeLifecycleRelations")}
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.lifecycleActions}>
+                                {decayEnabled && (
+                                    <Pressable
+                                        style={[styles.lifecycleButton, { backgroundColor: theme.colors.surfaceHighest }]}
+                                        onPress={doDecay}
+                                        disabled={decaying}
+                                    >
+                                        {decaying
+                                            ? <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                            : <Ionicons name="timer-outline" size={14} color={theme.colors.textSecondary} />
+                                        }
+                                        <Text style={[styles.lifecycleButtonText, { color: theme.colors.textSecondary }]}>
+                                            {t("projects.knowledgeRunDecay")}
+                                        </Text>
+                                    </Pressable>
+                                )}
+                                {mergeEnabled && (
+                                    <Pressable
+                                        style={[styles.lifecycleButton, { backgroundColor: theme.colors.surfaceHighest }]}
+                                        onPress={doMerge}
+                                        disabled={merging}
+                                    >
+                                        {merging
+                                            ? <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                            : <Ionicons name="git-merge-outline" size={14} color={theme.colors.textSecondary} />
+                                        }
+                                        <Text style={[styles.lifecycleButtonText, { color: theme.colors.textSecondary }]}>
+                                            {t("projects.knowledgeRunMerge")}
+                                        </Text>
+                                    </Pressable>
+                                )}
+                            </View>
+                        </View>
+                    )}
                     {/* Filter bar */}
                     <View style={styles.filterRow}>
                         {FILTER_KEYS.map((key) => {
@@ -201,7 +328,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                     </View>
                 </View>
             ),
-            [profile, activeFilter, theme, refreshStatusText, refreshing, loading],
+            [profile, activeFilter, theme, refreshStatusText, refreshing, loading, showLifecycle, lifecycleStats, decayEnabled, mergeEnabled, decaying, merging, knowledgeConfig, configIsCustomized, configSaving, updateConfig, resetConfig],
         );
 
         const EmptyComponent = React.useMemo(
@@ -293,5 +420,55 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 13,
         textAlign: "center",
         paddingHorizontal: 40,
+    },
+    lifecycleCard: {
+        marginHorizontal: 16,
+        marginTop: 8,
+        padding: 14,
+        borderRadius: 12,
+    },
+    lifecycleHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 10,
+    },
+    lifecycleTitle: {
+        ...Typography.default("semiBold"),
+        fontSize: 13,
+    },
+    lifecycleStats: {
+        flexDirection: "row",
+        justifyContent: "space-around",
+        marginBottom: 12,
+    },
+    lifecycleStat: {
+        alignItems: "center",
+        gap: 2,
+    },
+    lifecycleStatValue: {
+        ...Typography.default("semiBold"),
+        fontSize: 18,
+    },
+    lifecycleStatLabel: {
+        ...Typography.default("regular"),
+        fontSize: 10,
+    },
+    lifecycleActions: {
+        flexDirection: "row",
+        gap: 8,
+    },
+    lifecycleButton: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    lifecycleButtonText: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
     },
 }));

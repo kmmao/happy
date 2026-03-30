@@ -5,6 +5,7 @@ import { storeKnowledgeEmbedding, findSimilarByEmbedding } from "./knowledgeEmbe
 import { generateEmbedding, truncateForEmbedding } from "./embeddingService";
 import { addRelations } from "./knowledgeRelation";
 import { trackKnowledgeCreation } from "./knowledgeAutoProfile";
+import { parseKnowledgeConfig, mergeWithDefaults } from "./knowledgeConfigResolver";
 import { z } from "zod";
 
 // ─── Configuration ───
@@ -418,7 +419,18 @@ export async function runGlobalMergeJob(): Promise<{
             },
         });
 
+        // Batch-fetch project configs to avoid N+1
+        const projectIds = projectCounts.map((p) => p.projectId);
+        const projectConfigs = await db.project.findMany({
+            where: { id: { in: projectIds } },
+            select: { id: true, knowledgeConfig: true },
+        });
+        const configMap = new Map(projectConfigs.map((p) => [p.id, p.knowledgeConfig]));
+
         for (const { projectId } of projectCounts) {
+            const config = mergeWithDefaults(parseKnowledgeConfig(configMap.get(projectId) ?? null));
+            if (!config.mergeEnabled) continue;
+
             const result = await runMergeJob(projectId);
             totalMerged += result.merged;
             if (result.clusters > 0) projectsProcessed++;

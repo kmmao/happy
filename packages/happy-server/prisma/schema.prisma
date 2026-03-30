@@ -426,6 +426,10 @@ model Project {
     supervisorCustomRules             String?   // User-defined analysis rules (plaintext, appended to prompt)
     fixStrategy                       String?   // "direct" | "pr" — null means "direct" (default)
 
+    // Knowledge base configuration (project-level overrides)
+    // null = inherit hardcoded defaults (enabled:false, mode:auto, sensitivity:balanced)
+    knowledgeConfig                   String?   // JSON: KnowledgeConfig
+
     // Lifecycle
     archived        Boolean   @default(false)
     createdAt       DateTime  @default(now())

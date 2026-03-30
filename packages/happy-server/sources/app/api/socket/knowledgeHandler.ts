@@ -10,8 +10,15 @@ import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 import { buildKnowledgeCountEphemeral, eventRouter } from "@/app/events/eventRouter";
 import { inTx } from "@/storage/inTx";
 import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
+import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
 
-// Zod schema for socket knowledge submissions (defense-in-depth)
+// Zod schemas for socket knowledge events (defense-in-depth)
+const FetchKnowledgeSchema = z.object({
+    sid: z.string().min(1),
+    mode: z.enum(["auto", "full", "minimal"]).default("auto"),
+    contextHints: z.array(z.string().max(200)).max(20).optional(),
+});
+
 const SubmitKnowledgeSchema = z.object({
     sid: z.string().min(1),
     entry: z.object({
@@ -118,6 +125,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 structured: entry.request || entry.outcome
                     ? JSON.stringify({ request: entry.request, outcome: entry.outcome })
                     : null,
+                projectId,
             });
             trackKnowledgeCreation(projectId);
 
@@ -158,12 +166,18 @@ export function knowledgeHandler(userId: string, socket: Socket) {
 
     // Fetch knowledge for injection into new sessions (emitWithAck pattern)
     socket.on("fetch-knowledge", async (
-        data: { sid: string; mode: "auto" | "full" | "minimal"; contextHints?: string[] },
+        data: unknown,
         callback: (response: any) => void,
     ) => {
         try {
-            const { sid, mode, contextHints } = data;
-            if (!sid || !callback) return;
+            if (!callback) return;
+            const parsed = FetchKnowledgeSchema.safeParse(data);
+            if (!parsed.success) {
+                log({ module: "knowledge" }, `Invalid fetch-knowledge request: ${parsed.error.message.slice(0, 200)}`);
+                callback({ profile: null, entries: [] });
+                return;
+            }
+            const { sid, mode, contextHints } = parsed.data;
 
             const session = await db.session.findFirst({
                 where: { id: sid, accountId: userId },
@@ -231,6 +245,9 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 });
             }
 
+            // Resolve project-level knowledge config for CLI
+            const knowledgeConfig = await resolveKnowledgeConfig(projectId);
+
             callback({
                 profile,
                 entries: entries.map((e) => ({
@@ -242,6 +259,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                     confidence: e.confidence,
                     createdAt: e.createdAt.toISOString(),
                 })),
+                knowledgeConfig,
             });
 
             log({ module: "knowledge" }, `Injected ${entries.length} entries for session ${sid} (mode=${mode})`);

@@ -36,6 +36,8 @@ import { webhookRoutes } from "./routes/webhookRoutes";
 import { provisionRoutes } from "./routes/provisionRoutes";
 import { knowledgeRoutes } from "./routes/knowledgeRoutes";
 import { knowledgeSearchRoutes } from "./routes/knowledgeSearchRoutes";
+import { knowledgeConfigRoutes } from "./routes/knowledgeConfigRoutes";
+import { knowledgeLifecycleRoutes } from "./routes/knowledgeLifecycleRoutes";
 import { voiceRoutes } from "./routes/voiceRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
@@ -118,6 +120,8 @@ export async function startApi() {
   provisionRoutes(typed);
   knowledgeRoutes(typed);
   knowledgeSearchRoutes(typed);
+  knowledgeConfigRoutes(typed);
+  knowledgeLifecycleRoutes(typed);
   voiceRoutes(typed);
 
   // Start HTTP

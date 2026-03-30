@@ -26,7 +26,7 @@ export interface ChainEntry {
 export interface ChainRelation {
     from: string;
     to: string;
-    type: "supersedes" | "related";
+    type: "supersedes" | "related" | "contradicts" | "refines" | "combines";
 }
 
 interface ChainResponse {

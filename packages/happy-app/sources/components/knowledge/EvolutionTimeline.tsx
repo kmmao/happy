@@ -31,15 +31,35 @@ function formatDate(iso: string): string {
     });
 }
 
-function getRelationLabel(
+const RELATION_COLORS: Record<string, string> = {
+    supersedes: "#EF4444",
+    related: "#3B82F6",
+    contradicts: "#F97316",
+    refines: "#8B5CF6",
+    combines: "#22C55E",
+};
+
+function getRelationInfo(
     entryId: string,
     relations: ChainRelation[],
-): string | null {
+): { label: string; color: string } | null {
     for (const rel of relations) {
         if (rel.from === entryId) {
-            return rel.type === "supersedes"
-                ? t("projects.knowledgeEvolutionSupersedes")
-                : t("projects.knowledgeEvolutionRelated");
+            const label = (() => {
+                switch (rel.type) {
+                    case "supersedes":
+                        return t("projects.knowledgeEvolutionSupersedes");
+                    case "contradicts":
+                        return t("projects.knowledgeEvolutionContradicts");
+                    case "refines":
+                        return t("projects.knowledgeEvolutionRefines");
+                    case "combines":
+                        return t("projects.knowledgeEvolutionCombines");
+                    default:
+                        return t("projects.knowledgeEvolutionRelated");
+                }
+            })();
+            return { label, color: RELATION_COLORS[rel.type] ?? "#3B82F6" };
         }
     }
     return null;
@@ -55,7 +75,7 @@ export const EvolutionTimeline = React.memo<EvolutionTimelineProps>(
                     const isCurrent = entry.id === currentEntryId;
                     const isLast = index === chain.length - 1;
                     const typeColor = TYPE_COLORS[entry.entryType] ?? theme.colors.textSecondary;
-                    const relationLabel = getRelationLabel(entry.id, relations);
+                    const relationInfo = getRelationInfo(entry.id, relations);
 
                     return (
                         <View key={entry.id} style={styles.nodeRow}>
@@ -115,10 +135,12 @@ export const EvolutionTimeline = React.memo<EvolutionTimelineProps>(
                                             </Text>
                                         </View>
                                     )}
-                                    {relationLabel && (
-                                        <Text style={[styles.relationLabel, { color: theme.colors.textSecondary }]}>
-                                            {relationLabel}
-                                        </Text>
+                                    {relationInfo && (
+                                        <View style={[styles.relationBadge, { backgroundColor: relationInfo.color + "20" }]}>
+                                            <Text style={[styles.relationBadgeText, { color: relationInfo.color }]}>
+                                                {relationInfo.label}
+                                            </Text>
+                                        </View>
                                     )}
                                 </View>
 
@@ -208,10 +230,14 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
         fontSize: 10,
     },
-    relationLabel: {
-        ...Typography.default("regular"),
+    relationBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    relationBadgeText: {
+        ...Typography.default("semiBold"),
         fontSize: 10,
-        fontStyle: "italic",
     },
     nodeTitle: {
         ...Typography.default("semiBold"),

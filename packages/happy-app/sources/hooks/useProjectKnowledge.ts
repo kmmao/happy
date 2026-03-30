@@ -54,6 +54,14 @@ interface ProfileResponse {
     profile: ProjectProfile | null;
 }
 
+export interface LifecycleStats {
+    active: number;
+    superseded: number;
+    archived: number;
+    total: number;
+    totalRelations: number;
+}
+
 interface UpdateEntryResponse {
     entry: KnowledgeEntry;
 }
@@ -345,5 +353,55 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         [projectServerId],
     );
 
-    return { entries, archivedEntries, profile, loading, lastRefreshAt, refresh, refreshIfStale, updateEntry, deleteEntry, refineEntry, search, regenerateProfile };
+    const fetchLifecycle = React.useCallback(async () => {
+        if (!projectServerId) return null;
+        const credentials = await TokenStorage.getCredentials();
+        if (!credentials) return null;
+
+        const API_ENDPOINT = getServerUrl();
+        try {
+            const res = await fetch(
+                `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge/lifecycle`,
+                { headers: authHeaders(credentials.token) },
+            );
+            if (!res.ok) return null;
+            return (await res.json()) as LifecycleStats;
+        } catch {
+            return null;
+        }
+    }, [projectServerId]);
+
+    const runDecay = React.useCallback(async () => {
+        if (!projectServerId) return null;
+        const credentials = await TokenStorage.getCredentials();
+        if (!credentials) return null;
+
+        const API_ENDPOINT = getServerUrl();
+        const res = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge/decay`,
+            { method: "POST", headers: authHeaders(credentials.token) },
+        );
+        if (!res.ok) throw new Error(`Decay failed: ${res.status}`);
+        const result = (await res.json()) as { archived: number };
+        await refresh();
+        return result;
+    }, [projectServerId, refresh]);
+
+    const runMerge = React.useCallback(async () => {
+        if (!projectServerId) return null;
+        const credentials = await TokenStorage.getCredentials();
+        if (!credentials) return null;
+
+        const API_ENDPOINT = getServerUrl();
+        const res = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge/merge`,
+            { method: "POST", headers: authHeaders(credentials.token) },
+        );
+        if (!res.ok) throw new Error(`Merge failed: ${res.status}`);
+        const result = (await res.json()) as { merged: number; clusters: number };
+        await refresh();
+        return result;
+    }, [projectServerId, refresh]);
+
+    return { entries, archivedEntries, profile, loading, lastRefreshAt, refresh, refreshIfStale, updateEntry, deleteEntry, refineEntry, search, regenerateProfile, fetchLifecycle, runDecay, runMerge };
 }
