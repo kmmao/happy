@@ -1033,12 +1033,19 @@ export function reducer(
           status: "running",
         });
       } else {
+        // Try to get command/outputFile from tool message if it was processed
+        // in a previous reducer call (tool-result may arrive before task-start)
+        const toolMsgId = state.backgroundTaskIdToMessageId.get(taskId);
+        const toolMsg = toolMsgId ? state.messages.get(toolMsgId) : null;
+        const cmd = toolMsg?.tool?.input?.command
+          ? String(toolMsg.tool.input.command) : "";
+        const outFile = toolMsg?.tool?.outputFile ?? null;
         state.backgroundTasks.set(taskId, {
           taskId,
           toolUseId: toolUseId ?? null,
-          command: "",
+          command: cmd,
           description,
-          outputFile: null,
+          outputFile: outFile,
           startedAt: msg.createdAt,
           status: "running",
           summary: null,
