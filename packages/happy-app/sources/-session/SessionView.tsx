@@ -384,14 +384,35 @@ function SessionViewInner({
         }
 
         // Stop process async — don't block UI
-        sessionStopTask(sessionId, task.taskId).catch(() => {
-          // stopTask fails when idle — fallback to port/command kill
-          const actualCmd = task.command.replace(/^cd\s+\S+\s*[;&|]+\s*/i, "");
-          const killCmd = port
-            ? `lsof -ti :${port} | xargs kill 2>/dev/null || true`
-            : `pkill -f ${JSON.stringify(actualCmd.slice(0, 80))} 2>/dev/null || true`;
-          sessionBash(sessionId, { command: killCmd }).catch(() => {});
-        });
+        const isDocker = /\bdocker\s+run\b/i.test(task.command);
+        const dockerName = task.command.match(/--name\s+(\S+)/)?.[1];
+
+        sessionStopTask(sessionId, task.taskId)
+          .then(() => {
+            // SDK stopTask stops tracking but Docker containers keep running
+            if (isDocker && dockerName) {
+              sessionBash(sessionId, {
+                command: `docker stop ${dockerName} 2>/dev/null || true`,
+              }).catch(() => {});
+            }
+          })
+          .catch(() => {
+            // stopTask fails when idle — fallback to direct kill
+            if (isDocker && dockerName) {
+              sessionBash(sessionId, {
+                command: `docker stop ${dockerName} 2>/dev/null || true`,
+              }).catch(() => {});
+            } else if (port) {
+              sessionBash(sessionId, {
+                command: `lsof -ti :${port} | xargs kill 2>/dev/null || true`,
+              }).catch(() => {});
+            } else {
+              const actualCmd = task.command.replace(/^cd\s+\S+\s*[;&|]+\s*/i, "");
+              sessionBash(sessionId, {
+                command: `pkill -f ${JSON.stringify(actualCmd.slice(0, 80))} 2>/dev/null || true`,
+              }).catch(() => {});
+            }
+          });
         return;
       }
       dismissBackgroundTask(task.taskId);
