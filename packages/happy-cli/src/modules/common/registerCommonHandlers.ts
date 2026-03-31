@@ -854,6 +854,98 @@ export function registerCommonHandlers(
     };
   }
 
+  function parseLinkHeader(linkHeader: string | null): Record<string, string> {
+    if (!linkHeader) return {};
+    const links: Record<string, string> = {};
+    for (const part of linkHeader.split(",")) {
+      const section = part.trim();
+      const match = section.match(/^<([^>]+)>;\s*rel="([^"]+)"$/);
+      if (match) {
+        links[match[2]] = match[1];
+      }
+    }
+    return links;
+  }
+
+  async function fetchPaginatedJson<T>(
+    firstUrl: string,
+    headers: Record<string, string>,
+  ): Promise<T[]> {
+    const maxPages = 100;
+    const items: T[] = [];
+    const seenUrls = new Set<string>();
+    let nextUrl: string | null = firstUrl;
+    let page = 0;
+
+    while (nextUrl && page < maxPages) {
+      if (seenUrls.has(nextUrl)) break;
+      seenUrls.add(nextUrl);
+      page += 1;
+
+      const response = await fetch(nextUrl, { headers });
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const pageItems = (await response.json()) as T[];
+      items.push(...pageItems);
+
+      if (pageItems.length === 0) {
+        break;
+      }
+
+      const links = parseLinkHeader(response.headers.get("link"));
+      nextUrl = links.next ?? null;
+
+      if (!nextUrl) {
+        const current = new URL(response.url);
+        const currentPage = Number(current.searchParams.get("page") || "1");
+        const currentPerPage = Number(
+          current.searchParams.get("per_page") ||
+            current.searchParams.get("limit") ||
+            "100",
+        );
+        if (pageItems.length >= currentPerPage) {
+          current.searchParams.set("page", String(currentPage + 1));
+          nextUrl = current.toString();
+        }
+      }
+    }
+
+    return items;
+  }
+
+  function normalizeRemoteRepoEntries(
+    pageRepos: Array<{
+      name?: string;
+      full_name?: string;
+      clone_url?: string;
+      html_url?: string;
+      private?: boolean;
+      updated_at?: string;
+      owner?: { login?: string; username?: string };
+    }>,
+  ): RemoteGitRepoEntry[] {
+    return pageRepos
+      .filter((repo) => !!repo.name)
+      .map((repo) => {
+        const owner = repo.owner?.login || repo.owner?.username || "";
+        const fullName = repo.full_name || (owner ? `${owner}/${repo.name}` : repo.name || "");
+        const htmlUrl = repo.html_url || "";
+        const cloneUrl = repo.clone_url || (htmlUrl ? `${htmlUrl}.git` : "");
+        return {
+          name: repo.name || fullName,
+          fullName,
+          cloneUrl,
+          htmlUrl,
+          private: !!repo.private,
+          updatedAt: repo.updated_at ? Date.parse(repo.updated_at) : null,
+        };
+      })
+      .filter((repo) => !!repo.cloneUrl);
+  }
+
   rpcHandlerManager.registerHandler<
     ListRemoteGitReposRequest,
     ListRemoteGitReposResponse
@@ -875,24 +967,16 @@ export function registerCommonHandlers(
       const baseUrl = buildGitApiBase(data.provider, data.host);
       const headers = buildGitApiHeaders(data.apiToken);
       const repos: RemoteGitRepoEntry[] = [];
-      const maxPages = 3;
+      const seenRepoKeys = new Set<string>();
+      const requestedPageSize = 100;
 
-      for (let page = 1; page <= maxPages; page += 1) {
-        const url =
-          data.provider === "github"
-            ? `${baseUrl}/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator,organization_member`
-            : `${baseUrl}/user/repos?limit=100&page=${page}&sort=updated`;
+      const userReposUrl =
+        data.provider === "github"
+          ? `${baseUrl}/user/repos?per_page=${requestedPageSize}&page=1&sort=updated&affiliation=owner,collaborator,organization_member`
+          : `${baseUrl}/user/repos?limit=${requestedPageSize}&page=1&sort=updated`;
 
-        const response = await fetch(url, { headers });
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => "");
-          return {
-            success: false,
-            error: `HTTP ${response.status}: ${errorText}`,
-          };
-        }
-
-        const pageRepos = (await response.json()) as Array<{
+      const userRepos = normalizeRemoteRepoEntries(
+        await fetchPaginatedJson<{
           name?: string;
           full_name?: string;
           clone_url?: string;
@@ -900,34 +984,52 @@ export function registerCommonHandlers(
           private?: boolean;
           updated_at?: string;
           owner?: { login?: string; username?: string };
-        }>;
+        }>(userReposUrl, headers),
+      );
+      repos.push(...userRepos);
+      userRepos.forEach((repo) => seenRepoKeys.add(repo.cloneUrl || repo.fullName));
 
-        const normalized = pageRepos
-          .filter((repo) => !!repo.name)
-          .map((repo) => {
-            const owner = repo.owner?.login || repo.owner?.username || "";
-            const fullName = repo.full_name || (owner ? `${owner}/${repo.name}` : repo.name || "");
-            const htmlUrl = repo.html_url || "";
-            const cloneUrl = repo.clone_url || (htmlUrl ? `${htmlUrl}.git` : "");
-            return {
-              name: repo.name || fullName,
-              fullName,
-              cloneUrl,
-              htmlUrl,
-              private: !!repo.private,
-              updatedAt: repo.updated_at ? Date.parse(repo.updated_at) : null,
-            };
-          })
-          .filter((repo) => !!repo.cloneUrl);
+      const orgsUrl =
+        data.provider === "github"
+          ? `${baseUrl}/user/orgs?per_page=${requestedPageSize}&page=1`
+          : `${baseUrl}/user/orgs?limit=${requestedPageSize}&page=1`;
 
-        repos.push(...normalized);
+      const orgs = await fetchPaginatedJson<{
+        login?: string;
+        username?: string;
+        name?: string;
+      }>(orgsUrl, headers);
 
-        if (pageRepos.length < 100) {
-          break;
+      for (const org of orgs) {
+        const orgName = org.login || org.username || org.name;
+        if (!orgName) continue;
+
+        const orgReposUrl =
+          data.provider === "github"
+            ? `${baseUrl}/orgs/${encodeURIComponent(orgName)}/repos?type=all&per_page=${requestedPageSize}&page=1&sort=updated`
+            : `${baseUrl}/orgs/${encodeURIComponent(orgName)}/repos?limit=${requestedPageSize}&page=1`;
+
+        const orgRepos = normalizeRemoteRepoEntries(
+          await fetchPaginatedJson<{
+            name?: string;
+            full_name?: string;
+            clone_url?: string;
+            html_url?: string;
+            private?: boolean;
+            updated_at?: string;
+            owner?: { login?: string; username?: string };
+          }>(orgReposUrl, headers),
+        );
+
+        for (const repo of orgRepos) {
+          const key = repo.cloneUrl || repo.fullName;
+          if (seenRepoKeys.has(key)) continue;
+          seenRepoKeys.add(key);
+          repos.push(repo);
         }
       }
 
-            repos.sort((a, b) => {
+      repos.sort((a, b) => {
         const updatedDiff = (b.updatedAt || 0) - (a.updatedAt || 0);
         if (updatedDiff !== 0) return updatedDiff;
         return a.fullName.localeCompare(b.fullName);
