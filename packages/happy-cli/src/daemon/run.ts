@@ -44,8 +44,13 @@ import {
   formatTmuxSessionIdentifier,
 } from "@/utils/tmux";
 import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
-import { handleWebhookTrigger } from "@/webhook/handleWebhookTrigger";
-import { handleSupervisorTrigger, cleanupFixWorktree, getFixWorktreeInfo } from "@/supervisor/handleSupervisorTrigger";
+import { cleanupFixWorktree, getFixWorktreeInfo } from "@/supervisor/handleSupervisorTrigger";
+import { AutomationStore } from "@/automation/AutomationStore";
+import { GuardianSessionRegistry } from "@/automation/GuardianSessionRegistry";
+import { AutomationAuditStore } from "@/automation/AutomationAuditStore";
+import { deriveAutomationAuditStats, deriveAutomationGuardianUsage } from "@/automation/AutomationAudit";
+import { AutomationScheduler } from "@/automation/AutomationScheduler";
+import type { AutomationAuditEvent, AutomationJob } from "@/automation/types";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
 import { detectTailscale, detectTailscaleServe } from "@/utils/tailscale";
 import { TunnelManager, TailscaleProvider, UpnpProvider, CaddyProvider } from "@/tunnel";
@@ -224,6 +229,184 @@ export async function startDaemon(): Promise<void> {
 
     // Session spawning awaiter system
     const pidToAwaiter = new Map<number, (session: TrackedSession) => void>();
+    const guardianSessionRegistry = new GuardianSessionRegistry(
+      join(configuration.happyHomeDir, "guardian-sessions.json"),
+    );
+    await guardianSessionRegistry.load();
+    const automationAuditStore = new AutomationAuditStore(
+      join(configuration.happyHomeDir, "automation-audit-log.json"),
+    );
+    await automationAuditStore.load();
+
+    const formatDurationMs = (value: number) => {
+      if (value < 60_000) {
+        return `${Math.round(value / 1_000)}s`;
+      }
+      if (value < 3_600_000) {
+        return `${Math.round(value / 60_000)}m`;
+      }
+      return `${(value / 3_600_000).toFixed(1)}h`;
+    };
+
+    let scheduleAutomationStatePublish = () => {};
+
+    const recordAutomationAuditEvent = async (
+      event: Omit<AutomationAuditEvent, "id" | "occurredAt"> & { occurredAt?: number },
+    ) => {
+      await automationAuditStore.append({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        occurredAt: event.occurredAt ?? Date.now(),
+        ...event,
+      });
+      scheduleAutomationStatePublish();
+    };
+
+    const findTrackedSessionByHappySessionId = (sessionId: string) => {
+      for (const entry of pidToTrackedSession.values()) {
+        if (entry.happySessionId === sessionId) {
+          return entry;
+        }
+      }
+      return undefined;
+    };
+
+    const requestTrackedSessionTermination = (
+      pid: number,
+      session: TrackedSession,
+      options: {
+        reason: string;
+        terminalStatus?: "completed" | "failed" | "cancelled";
+        terminalError?: string;
+      },
+    ): boolean => {
+      session.terminationRequestedAt = Date.now();
+      session.terminationReason = options.reason;
+      void recordAutomationAuditEvent({
+        kind: options.reason.startsWith("watchdog:") ? "watchdog_stopped" : "session_stop_requested",
+        sessionId: session.happySessionId,
+        projectId: session.automationContext?.projectId,
+        runId: session.automationContext?.runId,
+        loopId: session.automationContext?.loopId,
+        trigger: session.automationContext?.trigger,
+        dedupeKey: session.automationContext?.dedupeKey,
+        status: options.terminalStatus,
+        message: options.terminalError ?? options.reason,
+      });
+      if (session.happySessionId && options.terminalStatus) {
+        void automationScheduler?.markJobTerminalBySession(
+          session.happySessionId,
+          options.terminalStatus,
+          options.terminalError,
+        );
+      }
+
+      if (session.tmuxSessionId) {
+        const [tmuxSession] = session.tmuxSessionId.split(":");
+        const { execFile: execFileCb } = require("child_process");
+        execFileCb("tmux", ["kill-session", "-t", tmuxSession], (err: any) => {
+          if (err) {
+            logger.debug(
+              `[DAEMON RUN] Failed to kill tmux session ${tmuxSession}: ${err.message}`,
+            );
+            try {
+              process.kill(pid, "SIGTERM");
+            } catch (killError) {
+              logger.debug(
+                `[DAEMON RUN] Failed to kill fallback PID ${pid}:`,
+                killError,
+              );
+            }
+          }
+        });
+        return true;
+      }
+
+      if (session.startedBy === "daemon" && session.childProcess) {
+        try {
+          session.childProcess.kill("SIGTERM");
+          return true;
+        } catch (error) {
+          logger.debug(
+            `[DAEMON RUN] Failed to kill session ${session.happySessionId ?? `PID-${pid}`}:`,
+            error,
+          );
+          return false;
+        }
+      }
+
+      try {
+        process.kill(pid, "SIGTERM");
+        return true;
+      } catch (error) {
+        logger.debug(`[DAEMON RUN] Failed to kill external session PID ${pid}:`, error);
+        return false;
+      }
+    };
+
+    const runAutomationWatchdog = async () => {
+      if (!automationScheduler) {
+        return;
+      }
+
+      const maxRuntimeMs = parseInt(
+        process.env.HAPPY_AUTOMATION_WATCHDOG_MAX_RUNTIME_MS ?? `${45 * 60_000}`,
+      );
+      const maxInactivityMs = parseInt(
+        process.env.HAPPY_AUTOMATION_WATCHDOG_MAX_INACTIVITY_MS ?? `${10 * 60_000}`,
+      );
+      if (maxRuntimeMs <= 0 || maxInactivityMs <= 0) {
+        return;
+      }
+
+      const now = Date.now();
+      for (const job of automationScheduler.getJobsSnapshot()) {
+        if (
+          job.kind !== "supervisor" ||
+          job.status !== "running" ||
+          job.payload.trigger === "fix" ||
+          !job.sessionId
+        ) {
+          continue;
+        }
+
+        const trackedSession = findTrackedSessionByHappySessionId(job.sessionId);
+        if (!trackedSession) {
+          continue;
+        }
+
+        const runtimeSince = trackedSession.startedAt ?? job.dispatchedAt ?? job.createdAt;
+        const activitySince =
+          trackedSession.lastActivityAt ??
+          trackedSession.lastOutputAt ??
+          trackedSession.startedAt ??
+          job.dispatchedAt ??
+          job.createdAt;
+        const runtimeMs = now - runtimeSince;
+        const inactivityMs = now - activitySince;
+        if (runtimeMs <= maxRuntimeMs && inactivityMs <= maxInactivityMs) {
+          continue;
+        }
+
+        const failureReason = runtimeMs > maxRuntimeMs
+          ? `Automation watchdog aborted session after ${formatDurationMs(runtimeMs)} of runtime`
+          : `Automation watchdog aborted session after ${formatDurationMs(inactivityMs)} of inactivity`;
+        logger.warn(
+          `[DAEMON RUN] Automation watchdog stopping session ${job.sessionId} for job ${job.id}: ${failureReason}`,
+        );
+        await guardianSessionRegistry.forgetSession(job.sessionId).catch((error) => {
+          logger.debug(`[DAEMON RUN] Failed to forget guardian session ${job.sessionId}: ${error}`);
+        });
+        requestTrackedSessionTermination(
+          trackedSession.pid,
+          trackedSession,
+          {
+            reason: `watchdog:${job.id}`,
+            terminalStatus: "failed",
+            terminalError: failureReason,
+          },
+        );
+      }
+    };
 
     // Helper functions
     const getCurrentChildren = () => Array.from(pidToTrackedSession.values());
@@ -257,6 +440,7 @@ export async function startDaemon(): Promise<void> {
         // Update daemon-spawned session with reported data
         existingSession.happySessionId = sessionId;
         existingSession.happySessionMetadataFromLocalWebhook = sessionMetadata;
+        existingSession.lastActivityAt = Date.now();
         logger.debug(
           `[DAEMON RUN] Updated daemon-spawned session ${sessionId} with metadata`,
         );
@@ -275,6 +459,8 @@ export async function startDaemon(): Promise<void> {
           happySessionId: sessionId,
           happySessionMetadataFromLocalWebhook: sessionMetadata,
           pid,
+          startedAt: Date.now(),
+          lastActivityAt: Date.now(),
         };
         pidToTrackedSession.set(pid, trackedSession);
         logger.debug(
@@ -295,6 +481,7 @@ export async function startDaemon(): Promise<void> {
         machineId,
         approvedNewDirectoryCreation = true,
         happySessionId,
+        automationContext,
       } = options;
       let directoryCreated = false;
 
@@ -666,6 +853,9 @@ export async function startDaemon(): Promise<void> {
               startedBy: "daemon",
               pid: tmuxResult.pid, // Real PID from tmux -P flag
               tmuxSessionId: tmuxResult.sessionId,
+              startedAt: Date.now(),
+              lastActivityAt: Date.now(),
+              automationContext,
               directoryCreated,
               message: directoryCreated
                 ? `The path '${directory}' did not exist. We created a new folder and spawned a new session in tmux session '${tmuxSessionName}'. Use 'tmux attach -t ${tmuxSessionName}' to view the session.`
@@ -792,15 +982,30 @@ export async function startDaemon(): Promise<void> {
             },
           });
 
-          // Log output for debugging
-          if (process.env.DEBUG) {
-            happyProcess.stdout?.on("data", (data) => {
+          happyProcess.stdout?.on("data", (data) => {
+            const trackedSession = happyProcess.pid
+              ? pidToTrackedSession.get(happyProcess.pid)
+              : undefined;
+            if (trackedSession) {
+              trackedSession.lastOutputAt = Date.now();
+              trackedSession.lastActivityAt = Date.now();
+            }
+            if (process.env.DEBUG) {
               logger.debug(`[DAEMON RUN] Child stdout: ${data.toString()}`);
-            });
-            happyProcess.stderr?.on("data", (data) => {
+            }
+          });
+          happyProcess.stderr?.on("data", (data) => {
+            const trackedSession = happyProcess.pid
+              ? pidToTrackedSession.get(happyProcess.pid)
+              : undefined;
+            if (trackedSession) {
+              trackedSession.lastOutputAt = Date.now();
+              trackedSession.lastActivityAt = Date.now();
+            }
+            if (process.env.DEBUG) {
               logger.debug(`[DAEMON RUN] Child stderr: ${data.toString()}`);
-            });
-          }
+            }
+          });
 
           if (!happyProcess.pid) {
             logger.debug(
@@ -820,6 +1025,9 @@ export async function startDaemon(): Promise<void> {
             startedBy: "daemon",
             pid: happyProcess.pid,
             childProcess: happyProcess,
+            startedAt: Date.now(),
+            lastActivityAt: Date.now(),
+            automationContext,
             directoryCreated,
             message: directoryCreated
               ? `The path '${directory}' did not exist. We created a new folder and spawned a new session there.`
@@ -833,14 +1041,14 @@ export async function startDaemon(): Promise<void> {
               `[DAEMON RUN] Child PID ${happyProcess.pid} exited with code ${code}, signal ${signal}`,
             );
             if (happyProcess.pid) {
-              onChildExited(happyProcess.pid);
+              onChildExited(happyProcess.pid, code, signal);
             }
           });
 
           happyProcess.on("error", (error) => {
             logger.debug(`[DAEMON RUN] Child process error:`, error);
             if (happyProcess.pid) {
-              onChildExited(happyProcess.pid);
+              onChildExited(happyProcess.pid, null, null);
             }
           });
 
@@ -898,45 +1106,21 @@ export async function startDaemon(): Promise<void> {
     const stopSession = (sessionId: string): boolean => {
       logger.debug(`[DAEMON RUN] Attempting to stop session ${sessionId}`);
 
-      // Try to find by sessionId first
       for (const [pid, session] of pidToTrackedSession.entries()) {
         if (
           session.happySessionId === sessionId ||
           (sessionId.startsWith("PID-") &&
             pid === parseInt(sessionId.replace("PID-", "")))
         ) {
-          if (session.startedBy === "daemon" && session.childProcess) {
-            try {
-              session.childProcess.kill("SIGTERM");
-              logger.debug(
-                `[DAEMON RUN] Sent SIGTERM to daemon-spawned session ${sessionId}`,
-              );
-            } catch (error) {
-              logger.debug(
-                `[DAEMON RUN] Failed to kill session ${sessionId}:`,
-                error,
-              );
-            }
-          } else {
-            // For externally started sessions, try to kill by PID
-            try {
-              process.kill(pid, "SIGTERM");
-              logger.debug(
-                `[DAEMON RUN] Sent SIGTERM to external session PID ${pid}`,
-              );
-            } catch (error) {
-              logger.debug(
-                `[DAEMON RUN] Failed to kill external session PID ${pid}:`,
-                error,
-              );
-            }
+          const stopped = requestTrackedSessionTermination(pid, session, {
+            reason: "user-stop",
+            terminalStatus: "cancelled",
+            terminalError: "Cancelled from daemon session stop",
+          });
+          if (stopped) {
+            logger.debug(`[DAEMON RUN] Termination requested for session ${sessionId}`);
           }
-
-          pidToTrackedSession.delete(pid);
-          logger.debug(
-            `[DAEMON RUN] Removed session ${sessionId} from tracking`,
-          );
-          return true;
+          return stopped;
         }
       }
 
@@ -945,19 +1129,53 @@ export async function startDaemon(): Promise<void> {
     };
 
     // Handle child process exit
-    const onChildExited = (pid: number) => {
+    const onChildExited = (pid: number, code?: number | null, signal?: NodeJS.Signals | null) => {
       logger.debug(
         `[DAEMON RUN] Removing exited process PID ${pid} from tracking`,
       );
       const session = pidToTrackedSession.get(pid);
       pidToTrackedSession.delete(pid);
+      pidToAwaiter.delete(pid);
 
-      if (!session?.happySessionId) return;
+      if (!session?.happySessionId) {
+        return;
+      }
 
-      // Check if this was a fix session — diagnose and auto-report if status was never updated
+      const terminationWasRequested = session.terminationRequestedAt != null;
+      const terminalStatus = session.terminationReason?.startsWith("watchdog:")
+        ? "failed"
+        : terminationWasRequested || signal === "SIGTERM" || signal === "SIGINT"
+          ? "cancelled"
+          : code != null && code !== 0
+            ? "failed"
+            : "completed";
+      const terminalError = terminalStatus === "failed"
+        ? session.terminationReason?.startsWith("watchdog:")
+          ? session.terminationReason
+          : `Session exited with code ${code ?? "unknown"}${signal ? ` (signal ${signal})` : ""}`
+        : undefined;
+      void automationScheduler?.markJobTerminalBySession(
+        session.happySessionId,
+        terminalStatus,
+        terminalError,
+      );
+      void recordAutomationAuditEvent({
+        kind: "job_terminal",
+        sessionId: session.happySessionId,
+        projectId: session.automationContext?.projectId,
+        runId: session.automationContext?.runId,
+        loopId: session.automationContext?.loopId,
+        trigger: session.automationContext?.trigger,
+        dedupeKey: session.automationContext?.dedupeKey,
+        status: terminalStatus,
+        message: terminalError,
+      });
+      void guardianSessionRegistry.forgetSession(session.happySessionId).catch((error) => {
+        logger.debug(`[DAEMON RUN] Failed to forget guardian session ${session.happySessionId}: ${error}`);
+      });
+
       const fixInfo = getFixWorktreeInfo(session.happySessionId);
       if (fixInfo) {
-        // Wait briefly for any in-flight curl from the session to reach the server
         setTimeout(() => {
           diagnoseAndReportFixStatus({
             sessionId: session.happySessionId!,
@@ -967,7 +1185,7 @@ export async function startDaemon(): Promise<void> {
             actionId: fixInfo.actionId,
             projectId: fixInfo.projectId,
             fixMode: fixInfo.fixMode,
-            emitFixStatus: (data) => apiMachine.emitSupervisorFixStatus(data),
+            emitFixStatus: (data) => emitSupervisorFixStatus(data),
           }).catch((err) => {
             logger.debug(`[DAEMON RUN] Fix status diagnosis failed: ${err}`);
           }).finally(() => {
@@ -977,11 +1195,65 @@ export async function startDaemon(): Promise<void> {
           });
         }, 3_000);
       } else {
-        // Not a fix session, just clean up
         cleanupFixWorktree(session.happySessionId).catch((err) => {
           logger.warn(`[DAEMON RUN] Fix worktree cleanup failed for session ${session.happySessionId}: ${err.message}`);
         });
       }
+    };
+
+    const emptyAutomationCounts = () => ({
+      queued: 0,
+      dispatching: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
+      cancelled: 0,
+    });
+
+    let automationScheduler: AutomationScheduler | null = null;
+    const getAutomationStatusSnapshot = () => {
+      const jobs = automationScheduler?.getJobsSnapshot() ?? [];
+      const attachedSessionIds = new Set(
+        Array.from(pidToTrackedSession.values())
+          .map((session) => session.happySessionId)
+          .filter((sessionId): sessionId is string => Boolean(sessionId)),
+      );
+      const guardians = guardianSessionRegistry.getSnapshot().map((guardian) => ({
+        ...guardian,
+        attached: attachedSessionIds.has(guardian.sessionId),
+      }));
+      const allAuditEvents = automationAuditStore.getAll();
+      const recentAuditEvents = allAuditEvents.slice(0, 50);
+      const guardianUsage = deriveAutomationGuardianUsage(allAuditEvents, guardians);
+      const auditStats = deriveAutomationAuditStats(allAuditEvents, guardians);
+      const counts = jobs.reduce<Record<string, number>>((acc, job) => {
+        acc[job.status] = (acc[job.status] ?? 0) + 1;
+        return acc;
+      }, emptyAutomationCounts());
+      return { counts, jobs, guardians, guardianUsage, auditStats, recentAuditEvents };
+    };
+    const getAutomationStateSummary = () => {
+      const { counts, jobs, guardians, guardianUsage, auditStats, recentAuditEvents } = getAutomationStatusSnapshot();
+      return {
+        updatedAt: Date.now(),
+        counts: {
+          queued: counts.queued ?? 0,
+          dispatching: counts.dispatching ?? 0,
+          running: counts.running ?? 0,
+          completed: counts.completed ?? 0,
+          failed: counts.failed ?? 0,
+          cancelled: counts.cancelled ?? 0,
+        },
+        recentJobs: jobs
+          .slice()
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, 10)
+          .map(({ payload, ...job }) => job),
+        guardians,
+        guardianUsage,
+        auditStats,
+        recentAuditEvents: recentAuditEvents.slice(0, 20),
+      };
     };
 
     // Start control server
@@ -992,6 +1264,63 @@ export async function startDaemon(): Promise<void> {
         spawnSession,
         requestShutdown: () => requestShutdown("happy-cli"),
         onHappySessionWebhook,
+        getAutomationStatus: () => getAutomationStatusSnapshot(),
+        cancelAutomationJob: async (jobId) => {
+          if (!automationScheduler) {
+            return {
+              success: false,
+              errorMessage: "Automation scheduler is not ready",
+            };
+          }
+          return automationScheduler.cancelJob(jobId);
+        },
+        retryAutomationJob: async (jobId) => {
+          if (!automationScheduler) {
+            return {
+              success: false,
+              errorMessage: "Automation scheduler is not ready",
+            };
+          }
+          return automationScheduler.retryJob(jobId);
+        },
+        clearAutomationJobs: async () => {
+          if (!automationScheduler) {
+            return {
+              success: false,
+              errorMessage: "Automation scheduler is not ready",
+            };
+          }
+          return automationScheduler.clearTerminalJobs();
+        },
+        clearAutomationGuardians: async (params) => {
+          try {
+            if (params?.clearAll) {
+              await guardianSessionRegistry.clear();
+              await recordAutomationAuditEvent({ kind: "guardian_cleared", message: "Cleared all guardian sessions" });
+            } else if (params?.key) {
+              await guardianSessionRegistry.forgetKey(params.key);
+              await recordAutomationAuditEvent({ kind: "guardian_cleared", guardianKey: params.key, sessionId: params.sessionId, message: `Cleared guardian ${params.key}` });
+            } else if (params?.sessionId) {
+              await guardianSessionRegistry.forgetSession(params.sessionId);
+              await recordAutomationAuditEvent({ kind: "guardian_cleared", sessionId: params.sessionId, message: `Cleared guardian session ${params.sessionId}` });
+            } else {
+              return { success: false, errorMessage: "No guardian clear target provided" };
+            }
+            scheduleAutomationStatePublish();
+            return { success: true };
+          } catch (error) {
+            return { success: false, errorMessage: error instanceof Error ? error.message : String(error) };
+          }
+        },
+        clearAutomationAudit: async () => {
+          try {
+            await automationAuditStore.clear();
+            scheduleAutomationStatePublish();
+            return { success: true };
+          } catch (error) {
+            return { success: false, errorMessage: error instanceof Error ? error.message : String(error) };
+          }
+        },
       });
 
     // Write initial daemon state (no lock needed for state file)
@@ -1023,9 +1352,12 @@ export async function startDaemon(): Promise<void> {
       status: "offline",
       pid: process.pid,
       httpPort: controlPort,
+      startTime: Date.now(),
       startedAt: Date.now(),
+      startedWithCliVersion: packageJson.version,
       tailscale: tailscaleInfo,
       tunnels: tunnelState,
+      automation: getAutomationStateSummary(),
     };
 
     // Create API client
@@ -1049,31 +1381,262 @@ export async function startDaemon(): Promise<void> {
       spawnSession,
       stopSession,
       requestShutdown: () => requestShutdown("happy-app"),
+      getAutomationStatus: () => getAutomationStatusSnapshot(),
+      cancelAutomationJob: async (jobId) => {
+        if (!automationScheduler) {
+          return { success: false, errorMessage: "Automation scheduler is not ready" };
+        }
+        return automationScheduler.cancelJob(jobId);
+      },
+      retryAutomationJob: async (jobId) => {
+        if (!automationScheduler) {
+          return { success: false, errorMessage: "Automation scheduler is not ready" };
+        }
+        return automationScheduler.retryJob(jobId);
+      },
+      clearAutomationJobs: async () => {
+        if (!automationScheduler) {
+          return { success: false, errorMessage: "Automation scheduler is not ready" };
+        }
+        return automationScheduler.clearTerminalJobs();
+      },
+      clearAutomationGuardians: async (params) => {
+        try {
+          if (params?.clearAll) {
+            await guardianSessionRegistry.clear();
+            await recordAutomationAuditEvent({ kind: "guardian_cleared", message: "Cleared all guardian sessions" });
+          } else if (params?.key) {
+            await guardianSessionRegistry.forgetKey(params.key);
+            await recordAutomationAuditEvent({ kind: "guardian_cleared", guardianKey: params.key, sessionId: params.sessionId, message: `Cleared guardian ${params.key}` });
+          } else if (params?.sessionId) {
+            await guardianSessionRegistry.forgetSession(params.sessionId);
+            await recordAutomationAuditEvent({ kind: "guardian_cleared", sessionId: params.sessionId, message: `Cleared guardian session ${params.sessionId}` });
+          } else {
+            return { success: false, errorMessage: "No guardian clear target provided" };
+          }
+          scheduleAutomationStatePublish();
+          return { success: true };
+        } catch (error) {
+          return { success: false, errorMessage: error instanceof Error ? error.message : String(error) };
+        }
+      },
+      clearAutomationAudit: async () => {
+        try {
+          await automationAuditStore.clear();
+          scheduleAutomationStatePublish();
+          return { success: true };
+        } catch (error) {
+          return { success: false, errorMessage: error instanceof Error ? error.message : String(error) };
+        }
+      },
     });
 
     // Connect to server
     apiMachine.connect();
 
+    let automationPublishTimer: NodeJS.Timeout | null = null;
+    const publishAutomationState = async () => {
+      try {
+        await apiMachine.updateDaemonState((state: DaemonState | null) => ({
+          ...state,
+          status: state?.status ?? "running",
+          automation: getAutomationStateSummary(),
+        }));
+      } catch (error) {
+        logger.debug("[DAEMON RUN] Failed to publish automation state", error);
+      }
+    };
+    scheduleAutomationStatePublish = () => {
+      if (automationPublishTimer) {
+        return;
+      }
+      automationPublishTimer = setTimeout(() => {
+        automationPublishTimer = null;
+        void publishAutomationState();
+      }, 250);
+    };
+
+    const emitWebhookStatus = (statusData: {
+      webhookEventId: string;
+      status: "dispatched" | "completed" | "failed";
+      sessionId?: string;
+      errorMessage?: string;
+    }) => {
+      apiMachine.emitWebhookStatus(statusData);
+      if (statusData.status === "completed" && statusData.sessionId) {
+        void recordAutomationAuditEvent({
+          kind: "job_session_started",
+          dedupeKey: `webhook:${statusData.webhookEventId}`,
+          sessionId: statusData.sessionId,
+          trigger: "webhook",
+          status: "running",
+        });
+      }
+      if (statusData.status === "failed") {
+        void automationScheduler?.markJobTerminalByDedupeKey(
+          "webhook:" + statusData.webhookEventId,
+          "failed",
+          statusData.errorMessage,
+        );
+      }
+    };
+    const emitSupervisorRunStatus = (statusData: {
+      runId: string;
+      projectId: string;
+      status: "queued" | "running" | "completed" | "failed" | "cancelled";
+      sessionId?: string;
+      actionsCount?: number;
+      issuesCreated?: number;
+      errorMessage?: string;
+      currentDimension?: string;
+      dimensionIndex?: number;
+      totalDimensions?: number;
+      actions?: readonly {
+        severity: "critical" | "high" | "medium" | "low";
+        category: string;
+        title: string;
+        description: string;
+        suggestedFix?: string;
+      }[];
+    }) => {
+      apiMachine.emitSupervisorRunStatus(statusData);
+      if (statusData.status === "running" && statusData.sessionId) {
+        void recordAutomationAuditEvent({
+          kind: "job_session_started",
+          dedupeKey: `supervisor:${statusData.runId}`,
+          sessionId: statusData.sessionId,
+          projectId: statusData.projectId,
+          runId: statusData.runId,
+          status: statusData.status,
+        });
+      }
+      if (statusData.status === "completed" || statusData.status === "failed" || statusData.status === "cancelled") {
+        void automationScheduler?.markJobTerminalByDedupeKey(
+          "supervisor:" + statusData.runId,
+          statusData.status,
+          statusData.errorMessage,
+        );
+      }
+    };
+    const emitSupervisorFixStatus = (statusData: {
+      actionId: string;
+      projectId: string;
+      fixStatus: "queued" | "running" | "completed" | "failed" | "cancelled" | "analyzed";
+      fixSessionId?: string;
+    }) => {
+      apiMachine.emitSupervisorFixStatus(statusData);
+      if (statusData.fixStatus === "completed" || statusData.fixStatus === "failed" || statusData.fixStatus === "cancelled" || statusData.fixStatus === "analyzed") {
+        void automationScheduler?.markJobTerminalByDedupeKey(
+          "supervisor:" + statusData.actionId,
+          statusData.fixStatus === "failed" ? "failed" : statusData.fixStatus === "cancelled" ? "cancelled" : "completed",
+        );
+      }
+    };
+
+    const automationStore = new AutomationStore(
+      join(configuration.happyHomeDir, "automation-jobs.json"),
+    );
+    automationScheduler = new AutomationScheduler({
+      store: automationStore,
+      runnerDeps: {
+        webhook: {
+          spawnSession,
+          emitWebhookStatus,
+        },
+        supervisor: {
+          spawnSession,
+          emitSupervisorRunStatus,
+          emitSupervisorFixStatus,
+          serverUrl: configuration.serverUrl,
+          authToken: credentials.token,
+          resolveGuardianSessionId: (data) => {
+            const resolved = guardianSessionRegistry.resolveForSupervisor(data);
+            if (resolved) {
+              const guardianKey = data.loopId ? `loop:${data.loopId}` : `project:${data.projectId}`;
+              void recordAutomationAuditEvent({
+                kind: "guardian_reused",
+                projectId: data.projectId,
+                runId: data.runId,
+                loopId: data.loopId,
+                trigger: data.trigger,
+                sessionId: resolved,
+                guardianKey,
+                guardianSessionId: resolved,
+                message: `Reused guardian session ${resolved}`,
+              });
+            }
+            return resolved;
+          },
+          rememberGuardianSession: (data, sessionId) => {
+            const guardianKey = data.loopId ? `loop:${data.loopId}` : `project:${data.projectId}`;
+            void recordAutomationAuditEvent({
+              kind: "guardian_remembered",
+              projectId: data.projectId,
+              runId: data.runId,
+              loopId: data.loopId,
+              trigger: data.trigger,
+              sessionId,
+              guardianKey,
+              guardianSessionId: sessionId,
+              message: `Remembered guardian session ${sessionId}`,
+            });
+            return guardianSessionRegistry.rememberForSupervisor(data, sessionId);
+          },
+        },
+      },
+      onChange: () => scheduleAutomationStatePublish(),
+    });
+    const automationRecovery = await automationScheduler.start();
+    scheduleAutomationStatePublish();
+    setTimeout(() => {
+      void publishAutomationState();
+    }, 1_000);
+    logger.debug(
+      `[DAEMON RUN] Automation scheduler started (requeued=${automationRecovery.requeued}, retainedTerminal=${automationRecovery.retainedTerminal})`,
+    );
+
     // Set up webhook trigger handler
     apiMachine.setWebhookHandler((data) => {
-      handleWebhookTrigger(data, {
-        spawnSession,
-        emitWebhookStatus: (statusData) =>
-          apiMachine.emitWebhookStatus(statusData),
-      });
+      void automationScheduler!
+        .enqueueWebhook(data)
+        .then((result) => {
+          if (!result.deduped) {
+            void recordAutomationAuditEvent({
+              kind: "job_enqueued",
+              jobId: result.job.id,
+              dedupeKey: result.job.dedupeKey,
+              status: result.job.status,
+              message: result.job.label,
+            });
+          }
+        })
+        .catch((error) => {
+          logger.debug(`[DAEMON RUN] Failed to enqueue webhook job: ${error}`);
+        });
     });
 
     // Set up supervisor trigger handler
     apiMachine.setSupervisorHandler((data) => {
-      handleSupervisorTrigger(data, {
-        spawnSession,
-        emitSupervisorRunStatus: (statusData) =>
-          apiMachine.emitSupervisorRunStatus(statusData),
-        emitSupervisorFixStatus: (statusData) =>
-          apiMachine.emitSupervisorFixStatus(statusData),
-        serverUrl: configuration.serverUrl,
-        authToken: credentials.token,
-      });
+      void automationScheduler!
+        .enqueueSupervisor(data)
+        .then((result) => {
+          if (!result.deduped) {
+            void recordAutomationAuditEvent({
+              kind: "job_enqueued",
+              jobId: result.job.id,
+              dedupeKey: result.job.dedupeKey,
+              projectId: result.job.projectId,
+              runId: result.job.runId,
+              loopId: result.job.loopId,
+              trigger: data.trigger,
+              status: result.job.status,
+              message: result.job.label,
+            });
+          }
+        })
+        .catch((error) => {
+          logger.debug(`[DAEMON RUN] Failed to enqueue supervisor job: ${error}`);
+        });
     });
 
 
@@ -1086,27 +1649,27 @@ export async function startDaemon(): Promise<void> {
       // Find the tracked session by happySessionId
       for (const [pid, session] of pidToTrackedSession.entries()) {
         if (session.happySessionId === data.fixSessionId) {
+          void automationScheduler?.markJobTerminalBySession(
+            data.fixSessionId,
+            data.fixStatus === "failed"
+              ? "failed"
+              : data.fixStatus === "cancelled"
+                ? "cancelled"
+                : "completed",
+          );
           logger.debug(
             `[DAEMON RUN] Killing fix session PID ${pid} (session ${data.fixSessionId})`,
           );
           // Kill the tmux session if applicable, otherwise kill the process
-          if (session.tmuxSessionId) {
-            const [tmuxSession] = session.tmuxSessionId.split(":");
-            const { execFile: execFileCb } = require("child_process");
-            execFileCb("tmux", ["kill-session", "-t", tmuxSession], (err: any) => {
-              if (err) {
-                logger.debug(
-                  `[DAEMON RUN] Failed to kill tmux session ${tmuxSession}: ${err.message}`,
-                );
-                // Fallback: kill the process directly
-                try { process.kill(pid, "SIGTERM"); } catch { /* best-effort */ }
-              }
-            });
-          } else if (session.childProcess) {
-            session.childProcess.kill("SIGTERM");
-          } else {
-            try { process.kill(pid, "SIGTERM"); } catch { /* best-effort */ }
-          }
+          requestTrackedSessionTermination(pid, session, {
+            reason: `fix-kill:${data.fixStatus}`,
+            terminalStatus:
+              data.fixStatus === "failed"
+                ? "failed"
+                : data.fixStatus === "cancelled"
+                  ? "cancelled"
+                  : "completed",
+          });
           break;
         }
       }
@@ -1133,17 +1696,17 @@ export async function startDaemon(): Promise<void> {
         );
       }
 
+      await runAutomationWatchdog();
+
       // Prune stale sessions
-      for (const [pid, _] of pidToTrackedSession.entries()) {
+      for (const [pid, session] of pidToTrackedSession.entries()) {
         try {
-          // Check if process is still alive (signal 0 doesn't kill, just checks)
           process.kill(pid, 0);
         } catch (error) {
-          // Process is dead, remove from tracking
           logger.debug(
             `[DAEMON RUN] Removing stale session with PID ${pid} (process no longer exists)`,
           );
-          pidToTrackedSession.delete(pid);
+          onChildExited(pid, null, session.terminationRequestedAt ? "SIGTERM" : null);
         }
       }
 
@@ -1266,6 +1829,12 @@ export async function startDaemon(): Promise<void> {
 
       // Give time for metadata update to send
       await new Promise((resolve) => setTimeout(resolve, 100));
+
+      if (automationPublishTimer) {
+        clearTimeout(automationPublishTimer);
+        automationPublishTimer = null;
+      }
+      await automationScheduler?.stop();
 
       apiMachine.shutdown();
       await stopControlServer();

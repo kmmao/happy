@@ -442,9 +442,14 @@ export async function runClaude(
     try {
       const promptContent = await readFile(initialPromptFile, "utf-8");
       if (promptContent.trim()) {
-        messageQueue.push(promptContent, {
-          permissionMode: "bypassPermissions",
-        } as EnhancedMode);
+        messageQueue.push(
+          promptContent,
+          {
+            permissionMode: "bypassPermissions",
+          } as EnhancedMode,
+          undefined,
+          { priority: "background", kind: "automation", source: "initial-prompt-file" },
+        );
         logger.debug(
           `[START] Injected initial prompt from ${initialPromptFile} (${promptContent.length} chars)`,
         );
@@ -673,6 +678,7 @@ export async function runClaude(
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
         enhancedMode,
+        { priority: "urgent", kind: "isolated", source: "user" },
       );
       logger.debugLargeJson(
         "[start] /compact command pushed to queue:",
@@ -700,6 +706,7 @@ export async function runClaude(
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
         enhancedMode,
+        { priority: "urgent", kind: "isolated", source: "user" },
       );
       logger.debugLargeJson(
         "[start] /compact command pushed to queue:",
@@ -733,7 +740,16 @@ export async function runClaude(
       ...(sdkPlugins.length > 0 && { plugins: sdkPlugins }),
       ...(perfSocketReceivedAt && { _perfSocketReceivedAt: perfSocketReceivedAt }),
     };
-    messageQueue.push(message.content.text, enhancedMode, message.localKey);
+    messageQueue.push(
+      message.content.text,
+      enhancedMode,
+      message.localKey,
+      {
+        priority: "user",
+        kind: messageContinue ? "continue" : "prompt",
+        source: "user",
+      },
+    );
     logger.debugLargeJson("User message pushed to queue:", message);
   });
 

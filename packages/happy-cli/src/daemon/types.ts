@@ -10,6 +10,19 @@ import { ChildProcess } from 'child_process';
  */
 export interface TrackedSession {
   startedBy: 'daemon' | string;
+  startedAt?: number;
+  lastActivityAt?: number;
+  lastOutputAt?: number;
+  terminationRequestedAt?: number;
+  terminationReason?: string;
+  automationContext?: {
+    kind: "supervisor" | "webhook";
+    trigger?: string;
+    projectId?: string;
+    runId?: string;
+    loopId?: string;
+    dedupeKey?: string;
+  };
   happySessionId?: string;
   happySessionMetadataFromLocalWebhook?: Metadata;
   pid: number;

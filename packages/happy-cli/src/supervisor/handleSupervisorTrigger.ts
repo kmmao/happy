@@ -48,6 +48,8 @@ export interface SupervisorHandlerDeps {
   readonly emitSupervisorFixStatus: (data: SupervisorFixStatusData) => void;
   readonly serverUrl: string;
   readonly authToken: string;
+  readonly resolveGuardianSessionId?: (data: SupervisorTriggerData) => string | undefined;
+  readonly rememberGuardianSession?: (data: SupervisorTriggerData, sessionId: string) => Promise<void> | void;
 }
 
 // Track in-flight supervisor runs to prevent duplicate processing
@@ -130,7 +132,7 @@ export async function cleanupFixWorktree(
 export async function handleSupervisorTrigger(
   data: SupervisorTriggerData,
   deps: SupervisorHandlerDeps,
-): Promise<void> {
+): Promise<{ success: boolean; errorMessage?: string; sessionId?: string }> {
   const {
     runId,
     projectId,
@@ -172,7 +174,7 @@ export async function handleSupervisorTrigger(
     logger.debug(
       `[SUPERVISOR] Run ${runId} already being processed, skipping`,
     );
-    return;
+    return { success: false, errorMessage: "Run already processing" };
   }
   processingRuns.add(runId);
 
@@ -225,23 +227,29 @@ export async function handleSupervisorTrigger(
         });
       }
     }
-    return;
+    return { success: false, errorMessage: error instanceof ConcurrencyAbortedError ? "Concurrency acquisition cancelled" : "Slot acquisition failed" };
   }
 
+  let dispatchedSessionId: string | undefined;
   let fixSpawnedSuccessfully = false;
+  let executionSucceeded = false;
+  let executionErrorMessage: string | undefined;
   try {
     if (trigger === "fix" && fixAction) {
       // Fix trigger uses worktree — no preflight needed
-      fixSpawnedSuccessfully = await handleFixTrigger(
-        runId,
-        projectId,
-        repoPath,
+      dispatchedSessionId = await handleFixTrigger(
+        data,
         fixAction,
         fixStrategy ?? "direct",
         fixMode ?? "fix",
         analyzeAutoFix ?? false,
         deps,
       );
+      fixSpawnedSuccessfully = Boolean(dispatchedSessionId);
+      executionSucceeded = fixSpawnedSuccessfully;
+      if (!fixSpawnedSuccessfully) {
+        executionErrorMessage = "Fix session failed to dispatch";
+      }
     } else {
       // Analysis and research: run preflight sync first
       const preflightStepMap: Record<string, { dimension: string; index: number; total: number }> = {
@@ -288,7 +296,8 @@ export async function handleSupervisorTrigger(
           status: "failed",
           errorMessage: preflightResult.error ?? "Preflight sync failed",
         });
-        return;
+        executionErrorMessage = preflightResult.error ?? "Preflight sync failed";
+        return { success: false, errorMessage: executionErrorMessage };
       }
 
       if (preflightResult.pulled) {
@@ -299,19 +308,14 @@ export async function handleSupervisorTrigger(
 
       // Dispatch to analysis or research
       if (trigger === "research") {
-        await handleResearchTrigger(
-          runId,
-          projectId,
-          repoPath,
+        dispatchedSessionId = await handleResearchTrigger(
+          data,
           researchParams,
           deps,
         );
       } else {
-        await handleAnalysisTrigger(
-          runId,
-          projectId,
-          repoPath,
-          trigger,
+        dispatchedSessionId = await handleAnalysisTrigger(
+          data,
           mode,
           dimensions,
           changedFiles,
@@ -321,6 +325,7 @@ export async function handleSupervisorTrigger(
           deps,
         );
       }
+      executionSucceeded = true;
     }
   } catch (error) {
     const errorMessage =
@@ -342,6 +347,7 @@ export async function handleSupervisorTrigger(
         errorMessage,
       });
     }
+    executionErrorMessage = errorMessage;
   } finally {
     // Fix sessions that spawned successfully hold the slot until the session exits
     // (released in cleanupFixWorktree). All other cases release immediately.
@@ -350,6 +356,10 @@ export async function handleSupervisorTrigger(
       logger.info(
         `[SUPERVISOR-CONCURRENCY] HOLDING slot until session exit: type=${slotType} runId=${runId} active=${poolHeld.active}/${poolHeld.max} queued=${poolHeld.queued}`,
       );
+      executionSucceeded = fixSpawnedSuccessfully;
+      if (!fixSpawnedSuccessfully) {
+        executionErrorMessage = "Fix session failed to dispatch";
+      }
     } else {
       releaseSlot(slotType);
       const poolFinal = getPoolStatus(slotType);
@@ -359,13 +369,14 @@ export async function handleSupervisorTrigger(
     }
     processingRuns.delete(runId);
   }
+
+  return executionSucceeded
+    ? { success: true, sessionId: dispatchedSessionId }
+    : { success: false, errorMessage: executionErrorMessage ?? "Supervisor job failed" };
 }
 
 async function handleAnalysisTrigger(
-  runId: string,
-  projectId: string,
-  repoPath: string,
-  trigger: string,
+  data: SupervisorTriggerData,
   mode: string | undefined,
   dimensions: readonly string[] | undefined,
   changedFiles: readonly string[] | undefined,
@@ -373,9 +384,12 @@ async function handleAnalysisTrigger(
   existingActions: SupervisorTriggerData["existingActions"],
   maxFindings: number | undefined,
   deps: SupervisorHandlerDeps,
-): Promise<void> {
+): Promise<string | undefined> {
+  const { runId, projectId, repoPath, trigger } = data;
+  const guardianSessionId = deps.resolveGuardianSessionId?.(data);
+
   logger.debug(
-    `[SUPERVISOR] Processing analysis ${runId} for project ${projectId} at ${repoPath} (mode: ${mode ?? "suggest"})`,
+    `[SUPERVISOR] Processing analysis ${runId} for project ${projectId} at ${repoPath} (mode: ${mode ?? "suggest"})${guardianSessionId ? ` reusing=${guardianSessionId}` : ""}`,
   );
 
   // 1. Report running status
@@ -408,8 +422,18 @@ async function handleAnalysisTrigger(
     directory: repoPath,
     approvedNewDirectoryCreation: false,
     agent: "claude",
+    happySessionId: guardianSessionId,
+    automationContext: {
+      kind: "supervisor",
+      trigger,
+      projectId,
+      runId,
+      loopId: data.loopId,
+      dedupeKey: `supervisor:${runId}`,
+    },
     environmentVariables: {
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
+      HAPPY_SUPERVISOR_GUARDIAN_SESSION: guardianSessionId ?? "",
       HAPPY_SUPERVISOR_RUN_ID: runId,
       HAPPY_SUPERVISOR_PROJECT_ID: projectId,
       HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
@@ -442,17 +466,20 @@ async function handleAnalysisTrigger(
     status: "running",
     sessionId: spawnResult.sessionId,
   });
+  await deps.rememberGuardianSession?.(data, spawnResult.sessionId);
+  return spawnResult.sessionId;
 }
 
 async function handleResearchTrigger(
-  runId: string,
-  projectId: string,
-  repoPath: string,
+  data: SupervisorTriggerData,
   researchParams: string | undefined,
   deps: SupervisorHandlerDeps,
-): Promise<void> {
+): Promise<string | undefined> {
+  const { runId, projectId, repoPath, trigger } = data;
+  const guardianSessionId = deps.resolveGuardianSessionId?.(data);
+
   logger.debug(
-    `[SUPERVISOR] Processing research ${runId} for project ${projectId} at ${repoPath}`,
+    `[SUPERVISOR] Processing research ${runId} for project ${projectId} at ${repoPath}${guardianSessionId ? ` reusing=${guardianSessionId}` : ""}`,
   );
 
   // 1. Report running status
@@ -479,8 +506,18 @@ async function handleResearchTrigger(
     directory: repoPath,
     approvedNewDirectoryCreation: false,
     agent: "claude",
+    happySessionId: guardianSessionId,
+    automationContext: {
+      kind: "supervisor",
+      trigger,
+      projectId,
+      runId,
+      loopId: data.loopId,
+      dedupeKey: `supervisor:${runId}`,
+    },
     environmentVariables: {
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
+      HAPPY_SUPERVISOR_GUARDIAN_SESSION: guardianSessionId ?? "",
       HAPPY_SUPERVISOR_RUN_ID: runId,
       HAPPY_SUPERVISOR_PROJECT_ID: projectId,
       HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
@@ -513,23 +550,23 @@ async function handleResearchTrigger(
     status: "running",
     sessionId: spawnResult.sessionId,
   });
+  await deps.rememberGuardianSession?.(data, spawnResult.sessionId);
+  return spawnResult.sessionId;
 }
 
 async function handleFixTrigger(
-  actionId: string,
-  projectId: string,
-  repoPath: string,
+  data: SupervisorTriggerData,
   fixAction: NonNullable<SupervisorTriggerData["fixAction"]>,
   fixStrategy: "direct" | "pr",
   fixMode: "fix" | "analyze-first",
   analyzeAutoFix: boolean,
   deps: SupervisorHandlerDeps,
-): Promise<boolean> {
+): Promise<string | undefined> {
+  const { runId: actionId, projectId, repoPath, trigger, loopId } = data;
   logger.debug(
     `[SUPERVISOR] Processing fix ${actionId} for project ${projectId}: "${fixAction.title}"`,
   );
 
-  // 1. Fetch latest remote state and create worktree from it
   const parentBranch = await resolveParentBranch(repoPath);
   const fetchOk = await fetchOriginBranch(repoPath, parentBranch);
   const startPoint = fetchOk ? `origin/${parentBranch}` : undefined;
@@ -551,21 +588,19 @@ async function handleFixTrigger(
       projectId,
       fixStatus: "failed",
     });
-    return false;
+    return undefined;
   }
 
   logger.debug(
     `[SUPERVISOR] Worktree created: ${worktreeResult.worktreePath} (branch: ${worktreeResult.branchName})`,
   );
 
-  // 2. Report running status
   deps.emitSupervisorFixStatus({
     actionId,
     projectId,
     fixStatus: "running",
   });
 
-  // 3. Build the fix prompt with worktree info
   const prompt = buildFixPrompt({
     projectId,
     actionId,
@@ -584,18 +619,24 @@ async function handleFixTrigger(
     analyzeAutoFix,
   });
 
-  // 4. Write prompt to temp file in the worktree
   const promptDir = join(worktreeResult.worktreePath, ".claude");
   await mkdir(promptDir, { recursive: true });
   const promptFilePath = join(promptDir, `supervisor-prompt-fix-${actionId}.txt`);
   await writeFile(promptFilePath, prompt, "utf-8");
   logger.debug(`[SUPERVISOR] Wrote fix prompt to ${promptFilePath}`);
 
-  // 5. Spawn fix session in worktree directory
   const spawnResult = await spawnSessionWithRetry(deps.spawnSession, {
     directory: worktreeResult.worktreePath,
     approvedNewDirectoryCreation: true,
     agent: "claude",
+    automationContext: {
+      kind: "supervisor",
+      trigger,
+      projectId,
+      runId: actionId,
+      loopId,
+      dedupeKey: `supervisor:${actionId}`,
+    },
     environmentVariables: {
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
       HAPPY_SUPERVISOR_ACTION_ID: actionId,
@@ -616,13 +657,11 @@ async function handleFixTrigger(
       projectId,
       fixStatus: "failed",
     });
-    // Clean up prompt file and worktree on failure
     try { await unlink(promptFilePath); } catch { /* best-effort */ }
     try { await removeWorktreeForced(repoPath, worktreeResult.branchName); } catch { /* best-effort */ }
-    return false;
+    return undefined;
   }
 
-  // 6. Track worktree for cleanup on session exit
   fixWorktrees.set(spawnResult.sessionId, {
     repoPath,
     branchName: worktreeResult.branchName,
@@ -641,7 +680,7 @@ async function handleFixTrigger(
     fixStatus: "running",
     fixSessionId: spawnResult.sessionId,
   });
-  return true;
+  return spawnResult.sessionId;
 }
 
 async function writePromptFile(

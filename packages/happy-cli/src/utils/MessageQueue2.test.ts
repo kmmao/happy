@@ -479,6 +479,7 @@ describe("MessageQueue2", () => {
       mode: { type: "A" },
       modeHash: "A",
       isolate: true,
+      priority: "user",
     });
 
     // Add more regular messages
@@ -533,6 +534,36 @@ describe("MessageQueue2", () => {
 
   // ─── Mid-turn methods ───
 
+
+
+  it("should prioritize urgent messages over normal queued messages", async () => {
+    const queue = new MessageQueue2<string>((mode) => mode);
+
+    queue.push("normal", "A", undefined, { priority: "user" });
+    queue.push("background", "A", undefined, { priority: "background" });
+    queue.unshift("urgent", "B", { priority: "urgent" });
+
+    const result1 = await queue.waitForMessagesAndGetAsString();
+    expect(result1?.message).toBe("urgent");
+    expect(result1?.priority).toBe("urgent");
+
+    const result2 = await queue.waitForMessagesAndGetAsString();
+    expect(result2?.message).toBe("normal");
+    expect(result2?.priority).toBe("user");
+
+    const result3 = await queue.waitForMessagesAndGetAsString();
+    expect(result3?.message).toBe("background");
+    expect(result3?.priority).toBe("background");
+  });
+
+  it("peekIsolate checks the highest-priority item", () => {
+    const queue = new MessageQueue2<string>((mode) => mode);
+
+    queue.push("normal", "A", undefined, { priority: "user" });
+    queue.pushIsolateAndClear("isolated", "B", { priority: "urgent" });
+
+    expect(queue.peekIsolate()).toBe(true);
+  });
   describe("tryTakeForMidTurn", () => {
     const coldHasher = (mode: { type: string; cold?: string }) =>
       mode.cold ?? mode.type;

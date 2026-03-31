@@ -8,7 +8,7 @@
 import chalk from 'chalk'
 import { configuration } from '@/configuration'
 import { readSettings, readCredentials } from '@/persistence'
-import { checkDaemonStatus } from '@/daemon/controlClient'
+import { checkDaemonStatus, getDaemonAutomationStatus } from '@/daemon/controlClient'
 import { findRunawayHappyProcesses, findAllHappyProcesses } from '@/daemon/doctor'
 import { readDaemonState } from '@/persistence'
 import { existsSync, readdirSync, statSync } from 'node:fs'
@@ -17,6 +17,7 @@ import { join } from 'node:path'
 import { projectPath } from '@/projectPath'
 import { logger } from '@/ui/logger'
 import packageJson from '../../package.json'
+import type { AutomationJob } from '@/automation/types'
 
 /**
  * Get relevant environment information for debugging
@@ -162,6 +163,24 @@ export async function runDoctorCommand(filter?: 'all' | 'daemon'): Promise<void>
         }
 
         const state = await readDaemonState();
+
+        const automationStatus = await getDaemonAutomationStatus();
+        if (automationStatus && (automationStatus.jobs.length > 0 || (automationStatus.guardians?.length ?? 0) > 0)) {
+            logger.print(chalk.bold('\n⚙️  Automation Jobs'));
+            const countEntries = Object.entries(automationStatus.counts).sort(([a], [b]) => a.localeCompare(b));
+            if (countEntries.length > 0) {
+                logger.print(`  Counts: ${countEntries.map(([key, value]) => `${key}=${value}`).join(', ')}`);
+            }
+            if ((automationStatus.guardians?.length ?? 0) > 0) {
+                logger.print(`  Guardians: ${automationStatus.guardians!.map((guardian) => `${guardian.key}→${guardian.sessionId}`).join(', ')}`);
+            }
+            automationStatus.jobs.slice(0, 10).forEach((job: AutomationJob) => {
+                logger.print(`  - ${job.kind} ${job.status} ${job.priority} attempt=${job.attempt}/${job.maxAttempts} id=${job.id} label=${job.label ?? job.dedupeKey}${job.projectId ? ` project=${job.projectId}` : ""}${job.loopId ? ` loop=${job.loopId}` : ""}${job.sessionId ? ` session=${job.sessionId}` : ""}`);
+            });
+            if (automationStatus.jobs.length > 10) {
+                logger.print(chalk.gray(`  ... and ${automationStatus.jobs.length - 10} more jobs`));
+            }
+        }
 
         // Show daemon state file
         if (state) {

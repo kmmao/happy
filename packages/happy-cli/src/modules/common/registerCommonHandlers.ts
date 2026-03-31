@@ -177,6 +177,14 @@ export interface SpawnSessionOptions {
   happySessionId?: string;
   /** Profile ID from GUI — if it matches a locally configured profile, operator-only env vars are trusted */
   profileId?: string;
+  automationContext?: {
+    kind: "supervisor" | "webhook";
+    trigger?: string;
+    projectId?: string;
+    runId?: string;
+    loopId?: string;
+    dedupeKey?: string;
+  };
   environmentVariables?: {
     // Anthropic Claude API configuration
     ANTHROPIC_BASE_URL?: string; // Custom API endpoint (overrides default)
@@ -989,43 +997,46 @@ export function registerCommonHandlers(
       repos.push(...userRepos);
       userRepos.forEach((repo) => seenRepoKeys.add(repo.cloneUrl || repo.fullName));
 
-      const orgsUrl =
-        data.provider === "github"
-          ? `${baseUrl}/user/orgs?per_page=${requestedPageSize}&page=1`
-          : `${baseUrl}/user/orgs?limit=${requestedPageSize}&page=1`;
+      if (data.provider === "gitea") {
+        const orgsUrl = `${baseUrl}/user/orgs?limit=${requestedPageSize}&page=1`;
+        const orgs = await fetchPaginatedJson<{
+          login?: string;
+          username?: string;
+          name?: string;
+        }>(orgsUrl, headers);
 
-      const orgs = await fetchPaginatedJson<{
-        login?: string;
-        username?: string;
-        name?: string;
-      }>(orgsUrl, headers);
+        const orgNames = orgs
+          .map((org) => org.login || org.username || org.name)
+          .filter((orgName): orgName is string => !!orgName);
 
-      for (const org of orgs) {
-        const orgName = org.login || org.username || org.name;
-        if (!orgName) continue;
+        const concurrency = 4;
+        for (let index = 0; index < orgNames.length; index += concurrency) {
+          const batch = orgNames.slice(index, index + concurrency);
+          const batchResults = await Promise.all(
+            batch.map(async (orgName) => {
+              const orgReposUrl = `${baseUrl}/orgs/${encodeURIComponent(orgName)}/repos?limit=${requestedPageSize}&page=1`;
+              return normalizeRemoteRepoEntries(
+                await fetchPaginatedJson<{
+                  name?: string;
+                  full_name?: string;
+                  clone_url?: string;
+                  html_url?: string;
+                  private?: boolean;
+                  updated_at?: string;
+                  owner?: { login?: string; username?: string };
+                }>(orgReposUrl, headers),
+              );
+            }),
+          );
 
-        const orgReposUrl =
-          data.provider === "github"
-            ? `${baseUrl}/orgs/${encodeURIComponent(orgName)}/repos?type=all&per_page=${requestedPageSize}&page=1&sort=updated`
-            : `${baseUrl}/orgs/${encodeURIComponent(orgName)}/repos?limit=${requestedPageSize}&page=1`;
-
-        const orgRepos = normalizeRemoteRepoEntries(
-          await fetchPaginatedJson<{
-            name?: string;
-            full_name?: string;
-            clone_url?: string;
-            html_url?: string;
-            private?: boolean;
-            updated_at?: string;
-            owner?: { login?: string; username?: string };
-          }>(orgReposUrl, headers),
-        );
-
-        for (const repo of orgRepos) {
-          const key = repo.cloneUrl || repo.fullName;
-          if (seenRepoKeys.has(key)) continue;
-          seenRepoKeys.add(key);
-          repos.push(repo);
+          for (const orgRepos of batchResults) {
+            for (const repo of orgRepos) {
+              const key = repo.cloneUrl || repo.fullName;
+              if (seenRepoKeys.has(key)) continue;
+              seenRepoKeys.add(key);
+              repos.push(repo);
+            }
+          }
         }
       }
 

@@ -39,6 +39,7 @@ import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
 import { TurnCollector } from "@/knowledge";
 import type { TurnCollectorConfig } from "@/knowledge";
+import { ExecutionGuard } from "@/automation/ExecutionGuard";
 
 interface PermissionsField {
   date: number;
@@ -99,6 +100,41 @@ export async function claudeRemoteLauncher(
   let exitReason: "switch" | "exit" | null = null;
   let abortController: AbortController | null = null;
   let abortFuture: Future<void> | null = null;
+  const executionGuard = new ExecutionGuard(({ from, to }) => {
+    logger.debug(
+      `[remote]: execution guard ${from.state} -> ${to.state}${to.activeReason ? ` (${to.activeReason})` : ""} [gen=${to.generation}]`,
+    );
+  });
+  let activeTurnGeneration: number | null = null;
+
+  const dispatchTurn = (reason: "user_message" | "continue" | "isolated_command" | "mode_change") => {
+    if (!executionGuard.reserve(reason)) {
+      const snapshot = executionGuard.getSnapshot();
+      logger.debug(
+        `[remote]: execution guard reserve skipped (state=${snapshot.state}, gen=${snapshot.generation})`,
+      );
+    }
+    const generation = executionGuard.start();
+    if (generation !== null) {
+      activeTurnGeneration = generation;
+    }
+  };
+
+  const finishTurn = () => {
+    if (activeTurnGeneration === null) {
+      executionGuard.cancelReservation();
+      return;
+    }
+    if (executionGuard.end(activeTurnGeneration)) {
+      activeTurnGeneration = null;
+    }
+  };
+
+  const reasonForQueuedMessage = (msg: { isolate?: boolean; mode: EnhancedMode }) => {
+    if (msg.isolate) return "isolated_command" as const;
+    if (msg.mode.continue) return "continue" as const;
+    return "user_message" as const;
+  };
 
   async function abort() {
     if (abortController && !abortController.signal.aborted) {
@@ -109,11 +145,13 @@ export async function claudeRemoteLauncher(
 
   async function doAbort() {
     logger.debug("[remote]: doAbort");
+    executionGuard.abort("abort");
     await abort();
   }
 
   async function doSwitch() {
     logger.debug("[remote]: doSwitch");
+    executionGuard.abort("switch_transport");
     if (!exitReason) {
       exitReason = "switch";
     }
@@ -1043,7 +1081,10 @@ export async function claudeRemoteLauncher(
               logger.debug(
                 "[remote]: mid-turn drain — isolate detected, interrupting",
               );
+              executionGuard.interrupt("isolated_command");
               await doInterrupt();
+            } else {
+              executionGuard.requestRestart("mode_change");
             }
             // For other non-mid-turn cases (cold hash change, continue),
             // just stop draining and let nextMessage() handle after turn ends.
@@ -1148,7 +1189,9 @@ export async function claudeRemoteLauncher(
           isAborted: (toolCallId: string) => {
             return permissionHandler.isAborted(toolCallId);
           },
-          onTurnComplete: () => {},
+          onTurnComplete: () => {
+            finishTurn();
+          },
           nextMessage: async () => {
             // Stop any running mid-turn drain from the previous turn
             stopMidTurnDrain();
@@ -1156,6 +1199,7 @@ export async function claudeRemoteLauncher(
             if (pending) {
               let p = pending;
               pending = null;
+              dispatchTurn(reasonForQueuedMessage(p));
               // Reset E2E perf tracking for new turn
               _perfTurnSocketReceivedAt = p.mode._perfSocketReceivedAt;
               _perfTurnFirstResponseLogged = false;
@@ -1177,6 +1221,7 @@ export async function claudeRemoteLauncher(
               // Check if mode has changed
               if (msg.isolate) {
                 logger.debug("[remote]: isolate requested, pending message");
+                executionGuard.requestRestart("isolated_command");
                 pending = msg;
                 return null;
               }
@@ -1186,6 +1231,7 @@ export async function claudeRemoteLauncher(
                 logger.debug(
                   "[remote]: continue flag detected, forcing restart for new query",
                 );
+                executionGuard.requestRestart("continue");
                 pending = msg;
                 return null;
               }
@@ -1205,6 +1251,7 @@ export async function claudeRemoteLauncher(
                   logger.debug(
                     `[remote]: hot-swap detected (${changed || "unknown"}), no restart needed`,
                   );
+                  dispatchTurn(reasonForQueuedMessage(msg));
                   modeHash = msg.hash;
                   mode = msg.mode;
                   // Reset E2E perf tracking for hot-swap turn
@@ -1222,10 +1269,12 @@ export async function claudeRemoteLauncher(
                 logger.debug(
                   "[remote]: non-model mode change detected, pending message for restart",
                 );
+                executionGuard.requestRestart("mode_change");
                 pending = msg;
                 return null;
               }
 
+              dispatchTurn(reasonForQueuedMessage(msg));
               modeHash = msg.hash;
               mode = msg.mode;
               currentColdHash = coldModeHash(mode);
@@ -1533,6 +1582,8 @@ export async function claudeRemoteLauncher(
       // Just in case of error
       abortFuture.resolve(undefined);
     }
+
+    executionGuard.close();
   }
 
   return exitReason || "exit";

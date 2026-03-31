@@ -25,14 +25,190 @@ import { install } from "./daemon/install";
 import { uninstall } from "./daemon/uninstall";
 import { ApiClient } from "./api/api";
 import { runDoctorCommand } from "./ui/doctor";
-import { listDaemonSessions, stopDaemonSession } from "./daemon/controlClient";
+import {
+  cancelDaemonAutomationJob,
+  clearDaemonAutomationAudit,
+  clearDaemonAutomationGuardians,
+  clearDaemonAutomationJobs,
+  getDaemonAutomationStatus,
+  listDaemonSessions,
+  retryDaemonAutomationJob,
+  stopDaemonSession,
+} from "./daemon/controlClient";
 import { handleAuthCommand } from "./commands/auth";
 import { handleConnectCommand } from "./commands/connect";
 import { handleSandboxCommand } from "./commands/sandbox";
+import { handleSupervisorCommand } from "./commands/supervisor";
 import { spawnHappyCLI } from "./utils/spawnHappyCLI";
 import { claudeCliPath } from "./claude/claudeLocal";
 import { execFileSync } from "node:child_process";
 import { extractNoSandboxFlag } from "./utils/sandboxFlags";
+
+type AutomationTimelineEntry = {
+  timestamp: number;
+  type: "queued" | "dispatched" | "running" | "terminal";
+  jobId: string;
+  label: string;
+  subtitle: string;
+};
+
+function buildAutomationTimeline(
+  jobs: Array<{
+    id: string;
+    label?: string;
+    dedupeKey: string;
+    status: string;
+    createdAt: number;
+    dispatchedAt?: number;
+    updatedAt: number;
+    completedAt?: number;
+    errorMessage?: string;
+    sessionId?: string;
+  }>,
+): AutomationTimelineEntry[] {
+  const entries: AutomationTimelineEntry[] = [];
+  for (const job of jobs) {
+    const label = job.label ?? job.dedupeKey;
+    entries.push({
+      timestamp: job.createdAt,
+      type: "queued",
+      jobId: job.id,
+      label,
+      subtitle: "queued",
+    });
+    if (job.dispatchedAt) {
+      entries.push({
+        timestamp: job.dispatchedAt,
+        type: "dispatched",
+        jobId: job.id,
+        label,
+        subtitle: "dispatched",
+      });
+    }
+    if (job.status === "running") {
+      entries.push({
+        timestamp: job.updatedAt,
+        type: "running",
+        jobId: job.id,
+        label,
+        subtitle: job.sessionId ? `running in ${job.sessionId}` : "running",
+      });
+    }
+    if (job.completedAt) {
+      entries.push({
+        timestamp: job.completedAt,
+        type: "terminal",
+        jobId: job.id,
+        label,
+        subtitle: job.errorMessage ? `${job.status}: ${job.errorMessage}` : job.status,
+      });
+    }
+  }
+  return entries.sort((a, b) => b.timestamp - a.timestamp);
+}
+
+function formatAutomationRate(value?: number): string {
+  if (value == null || Number.isNaN(value)) {
+    return "0%";
+  }
+  return `${(value * 100).toFixed(value > 0 && value < 0.1 ? 1 : 0)}%`;
+}
+
+function describeAutomationAuditEvent(event: {
+  kind: string;
+  status?: string;
+  guardianKey?: string;
+  guardianSessionId?: string;
+  sessionId?: string;
+  jobId?: string;
+  message?: string;
+}): string {
+  switch (event.kind) {
+    case "job_enqueued":
+      return event.message ?? "job enqueued";
+    case "job_session_started":
+      return event.sessionId ? `session started in ${event.sessionId}` : "session started";
+    case "job_terminal":
+      return event.message ? `${event.status ?? "terminal"}: ${event.message}` : (event.status ?? "terminal");
+    case "guardian_reused":
+      return event.guardianKey
+        ? `reused ${event.guardianKey}${event.guardianSessionId ? ` -> ${event.guardianSessionId}` : ""}`
+        : "guardian reused";
+    case "guardian_remembered":
+      return event.guardianKey
+        ? `remembered ${event.guardianKey}${event.guardianSessionId ? ` -> ${event.guardianSessionId}` : ""}`
+        : "guardian remembered";
+    case "guardian_cleared":
+      return event.guardianKey ? `cleared ${event.guardianKey}` : (event.message ?? "guardian cleared");
+    case "watchdog_stopped":
+      return event.message ?? "watchdog stopped session";
+    case "session_stop_requested":
+      return event.message ?? "stop requested";
+    default:
+      return event.message ?? event.kind;
+  }
+}
+
+
+type AutomationFilters = {
+  projectId?: string;
+  loopId?: string;
+  kind?: "supervisor" | "webhook";
+  jobMode?: "running" | "failed" | "terminal";
+  guardianState?: "attached" | "persisted";
+  auditMode?: "anomalies" | "guardian" | "jobs";
+};
+
+function readFlagValue(args: string[], flag: string): string | undefined {
+  const index = args.indexOf(flag);
+  if (index === -1) return undefined;
+  const value = args[index + 1];
+  return !value || value.startsWith("--") ? undefined : value;
+}
+
+function parseAutomationFilters(args: string[]): AutomationFilters {
+  return {
+    projectId: readFlagValue(args, "--project"),
+    loopId: readFlagValue(args, "--loop"),
+    kind: readFlagValue(args, "--kind") as "supervisor" | "webhook" | undefined,
+    jobMode: args.includes("--running") ? "running" : args.includes("--failed") ? "failed" : args.includes("--terminal") ? "terminal" : undefined,
+    guardianState: args.includes("--attached") ? "attached" : args.includes("--persisted") ? "persisted" : undefined,
+    auditMode: args.includes("--anomalies") ? "anomalies" : args.includes("--guardian") ? "guardian" : args.includes("--jobs") ? "jobs" : undefined,
+  };
+}
+
+function filterAutomationJobs<T extends { status: string; projectId?: string; loopId?: string; kind: string }>(entries: T[], filters: AutomationFilters): T[] {
+  return entries.filter((entry) => {
+    if (filters.projectId && entry.projectId !== filters.projectId) return false;
+    if (filters.loopId && entry.loopId !== filters.loopId) return false;
+    if (filters.kind && entry.kind !== filters.kind) return false;
+    if (filters.jobMode === "running") return entry.status === "running" || entry.status === "dispatching";
+    if (filters.jobMode === "failed") return entry.status === "failed";
+    if (filters.jobMode === "terminal") return entry.status === "completed" || entry.status === "failed" || entry.status === "cancelled";
+    return true;
+  });
+}
+
+function filterAutomationGuardians<T extends { projectId?: string; loopId?: string; attached?: boolean }>(entries: T[], filters: AutomationFilters): T[] {
+  return entries.filter((entry) => {
+    if (filters.projectId && entry.projectId !== filters.projectId) return false;
+    if (filters.loopId && entry.loopId !== filters.loopId) return false;
+    if (filters.guardianState === "attached" && entry.attached !== true) return false;
+    if (filters.guardianState === "persisted" && entry.attached !== false) return false;
+    return true;
+  });
+}
+
+function filterAutomationAudit<T extends { kind: string; status?: string; projectId?: string; loopId?: string }>(entries: T[], filters: AutomationFilters): T[] {
+  return entries.filter((entry) => {
+    if (filters.projectId && entry.projectId !== filters.projectId) return false;
+    if (filters.loopId && entry.loopId !== filters.loopId) return false;
+    if (filters.auditMode === "anomalies") return entry.kind === "watchdog_stopped" || entry.kind === "session_stop_requested" || entry.kind === "guardian_cleared" || entry.status === "failed" || entry.status === "cancelled";
+    if (filters.auditMode === "guardian") return entry.kind.startsWith("guardian_");
+    if (filters.auditMode === "jobs") return entry.kind.startsWith("job_") || entry.kind === "watchdog_stopped" || entry.kind === "session_stop_requested";
+    return true;
+  });
+}
 
 (async () => {
   const args = process.argv.slice(2);
@@ -96,6 +272,18 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
         error instanceof Error ? error.message : "Unknown error",
       );
       logger.debug("Sandbox command error:", error);
+      process.exit(1);
+    }
+    return;
+  } else if (subcommand === "supervisor") {
+    try {
+      await handleSupervisorCommand(args.slice(1));
+    } catch (error) {
+      logger.printError(
+        chalk.red("Error:"),
+        error instanceof Error ? error.message : "Unknown error",
+      );
+      logger.debug("Supervisor command error:", error);
       process.exit(1);
     }
     return;
@@ -481,8 +669,339 @@ import { extractNoSandboxFlag } from "./utils/sandboxFlags";
     }
     return;
   } else if (subcommand === "daemon") {
-    // Show daemon management help
     const daemonSubcommand = args[1];
+
+    if (daemonSubcommand === "automation") {
+      const automationSubcommand = args[2] ?? "list";
+      const jsonOutput = args.includes("--json");
+
+      if (automationSubcommand === "list" || automationSubcommand === "status") {
+        const filters = parseAutomationFilters(args);
+        const automationStatus = await getDaemonAutomationStatus();
+        if (!automationStatus) {
+          logger.print("No daemon running");
+          return;
+        }
+
+        if (jsonOutput) {
+          logger.print(JSON.stringify(automationStatus, null, 2));
+          return;
+        }
+
+        const jobs = filterAutomationJobs(automationStatus.jobs
+          .slice()
+          .sort((a, b) => b.updatedAt - a.updatedAt), filters);
+        const guardians = filterAutomationGuardians(automationStatus.guardians ?? [], filters);
+        const derivedCounts = jobs.reduce<Record<string, number>>((acc, job) => {
+          acc[job.status] = (acc[job.status] ?? 0) + 1;
+          return acc;
+        }, {});
+        const countEntries = Object.entries(derivedCounts)
+          .filter(([, value]) => value > 0)
+          .sort(([a], [b]) => a.localeCompare(b));
+
+        logger.print("Automation jobs:");
+        logger.print(
+          countEntries.length > 0
+            ? `Counts: ${countEntries.map(([key, value]) => `${key}=${value}`).join(", ")}`
+            : "Counts: none",
+        );
+        if (guardians.length > 0) {
+          logger.print("Guardians:");
+          guardians.forEach((guardian) => {
+            logger.print(
+              `- ${guardian.key} session=${guardian.sessionId}` +
+                (guardian.attached === false ? ` state=persisted` : guardian.attached === true ? ` state=attached` : "") +
+                (guardian.projectId ? ` project=${guardian.projectId}` : "") +
+                (guardian.loopId ? ` loop=${guardian.loopId}` : "") +
+                (guardian.lastRunId ? ` run=${guardian.lastRunId}` : ""),
+            );
+          });
+        }
+        if (automationStatus.auditStats) {
+          const stats = automationStatus.auditStats;
+          logger.print(
+            `Stats: events=${stats.totalEvents} reuse=${stats.guardianReuseCount} reuseRate=${formatAutomationRate(stats.guardianReuseRate)} resets=${stats.guardianResetCount} watchdogStops=${stats.watchdogStopCount} stopRequests=${stats.stopRequestCount}`,
+          );
+        }
+
+        if (jobs.length === 0) {
+          logger.print("No automation jobs");
+          return;
+        }
+
+        jobs.forEach((job) => {
+          logger.print(
+            `- ${job.id} ${job.kind} ${job.status} ${job.priority} attempt=${job.attempt}/${job.maxAttempts} label=${job.label ?? job.dedupeKey}` +
+              (job.projectId ? ` project=${job.projectId}` : "") +
+              (job.loopId ? ` loop=${job.loopId}` : "") +
+              (job.sessionId ? ` session=${job.sessionId}` : "") +
+              (job.continuityKey ? ` continuity=${job.continuityKey}` : "") +
+              (job.errorMessage ? ` error=${job.errorMessage}` : ""),
+          );
+        });
+        return;
+      }
+
+      if (automationSubcommand === "guardians") {
+        const action = args[3] ?? "list";
+        const filters = parseAutomationFilters(args);
+        const automationStatus = await getDaemonAutomationStatus();
+        if (!automationStatus) {
+          logger.print("No daemon running");
+          return;
+        }
+
+        if (action === "list") {
+          const guardians = filterAutomationGuardians(automationStatus.guardians ?? [], filters);
+          if (jsonOutput) {
+            logger.print(JSON.stringify({ guardians }, null, 2));
+            return;
+          }
+          if (guardians.length === 0) {
+            logger.print("No guardian sessions");
+            return;
+          }
+          logger.print("Guardian sessions:");
+          guardians.forEach((guardian) => {
+            logger.print(
+              `- ${guardian.key} session=${guardian.sessionId}` +
+                (guardian.attached === false ? ` state=persisted` : guardian.attached === true ? ` state=attached` : "") +
+                (guardian.projectId ? ` project=${guardian.projectId}` : "") +
+                (guardian.loopId ? ` loop=${guardian.loopId}` : "") +
+                (guardian.lastRunId ? ` run=${guardian.lastRunId}` : ""),
+            );
+          });
+          return;
+        }
+
+        if (action === "clear") {
+          const clearAll = args.includes("--all");
+          const key = clearAll ? undefined : args[4];
+          if (!clearAll && !key) {
+            logger.printError("Guardian key required, or use --all");
+            process.exit(1);
+          }
+          const result = await clearDaemonAutomationGuardians(clearAll ? { clearAll: true } : { key });
+          if (!result.success) {
+            logger.printError(result.errorMessage || "Failed to clear guardian sessions");
+            process.exit(1);
+          }
+          logger.print(clearAll ? "Cleared all guardian sessions" : `Cleared guardian ${key}`);
+          return;
+        }
+
+        logger.printError(`Unknown guardian action: ${action}`);
+        process.exit(1);
+      }
+
+      if (automationSubcommand === "stop") {
+        const jobId = args[3];
+        if (!jobId) {
+          logger.printError("Job ID required");
+          process.exit(1);
+        }
+        const automationStatus = await getDaemonAutomationStatus();
+        if (!automationStatus) {
+          logger.print("No daemon running");
+          return;
+        }
+        const job = automationStatus.jobs.find((entry) => entry.id === jobId);
+        if (!job) {
+          logger.printError(`Automation job ${jobId} not found`);
+          process.exit(1);
+        }
+        if (!job.sessionId) {
+          logger.printError(`Automation job ${jobId} has no running session`);
+          process.exit(1);
+        }
+        const stopped = await stopDaemonSession(job.sessionId);
+        if (!stopped) {
+          logger.printError(`Failed to stop automation job ${jobId}`);
+          process.exit(1);
+        }
+        logger.print(`Stopped automation job ${jobId} (session ${job.sessionId})`);
+        return;
+      }
+
+      if (automationSubcommand === "cancel") {
+        const jobId = args[3];
+        if (!jobId) {
+          logger.printError("Job ID required");
+          process.exit(1);
+        }
+        const result = await cancelDaemonAutomationJob(jobId);
+        if (!result.success) {
+          logger.printError(result.errorMessage || "Failed to cancel automation job");
+          process.exit(1);
+        }
+        logger.print(`Cancelled automation job ${jobId}`);
+        return;
+      }
+
+      if (automationSubcommand === "clear") {
+        const result = await clearDaemonAutomationJobs();
+        if (!result.success) {
+          logger.printError(result.errorMessage || "Failed to clear automation jobs");
+          process.exit(1);
+        }
+        logger.print("Cleared terminal automation jobs");
+        return;
+      }
+
+      if (automationSubcommand === "timeline") {
+        const filters = parseAutomationFilters(args);
+        const automationStatus = await getDaemonAutomationStatus();
+        if (!automationStatus) {
+          logger.print("No daemon running");
+          return;
+        }
+        const timeline = buildAutomationTimeline(filterAutomationJobs(automationStatus.jobs, filters));
+        if (jsonOutput) {
+          logger.print(JSON.stringify({ timeline, guardians: automationStatus.guardians ?? [] }, null, 2));
+          return;
+        }
+        logger.print("Automation timeline:");
+        if (timeline.length === 0) {
+          logger.print("No automation activity");
+          return;
+        }
+        timeline.slice(0, 50).forEach((entry) => {
+          logger.print(`- ${new Date(entry.timestamp).toLocaleString()} ${entry.label} ${entry.subtitle} job=${entry.jobId}`);
+        });
+        return;
+      }
+
+      if (automationSubcommand === "stats") {
+        const filters = parseAutomationFilters(args);
+        const automationStatus = await getDaemonAutomationStatus();
+        if (!automationStatus) {
+          logger.print("No daemon running");
+          return;
+        }
+
+        const stats = automationStatus.auditStats;
+        const guardianUsage = (automationStatus.guardianUsage ?? [])
+          .filter((entry) => (!filters.projectId || entry.projectId === filters.projectId) && (!filters.loopId || entry.loopId === filters.loopId))
+          .slice().sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+        if (jsonOutput) {
+          logger.print(JSON.stringify({ auditStats: stats ?? null, guardianUsage }, null, 2));
+          return;
+        }
+        if (!stats) {
+          logger.print("No automation audit stats yet");
+          return;
+        }
+
+        logger.print("Automation stats:");
+        logger.print(`- total events: ${stats.totalEvents}`);
+        logger.print(`- guardian reuse: ${stats.guardianReuseCount}`);
+        logger.print(`- guardian reuse rate: ${formatAutomationRate(stats.guardianReuseRate)}`);
+        logger.print(`- guardian remembered: ${stats.guardianRememberCount}`);
+        logger.print(`- guardian resets: ${stats.guardianResetCount}`);
+        logger.print(`- watchdog stops: ${stats.watchdogStopCount}`);
+        logger.print(`- stop requests: ${stats.stopRequestCount}`);
+        logger.print(`- queued jobs: ${stats.queuedCount}`);
+        logger.print(`- sessions started: ${stats.sessionStartedCount}`);
+        logger.print(`- terminal: completed=${stats.terminalCompletedCount} failed=${stats.terminalFailedCount} cancelled=${stats.terminalCancelledCount}`);
+        logger.print(`- active guardians: ${stats.activeGuardianCount}`);
+        if (stats.lastEventAt) {
+          logger.print(`- last event: ${new Date(stats.lastEventAt).toLocaleString()}`);
+        }
+        if (guardianUsage.length > 0) {
+          logger.print("Guardian usage:");
+          guardianUsage.slice(0, 10).forEach((entry) => {
+            logger.print(
+              `- ${entry.key} reuse=${entry.reuseCount} remember=${entry.rememberCount} reset=${entry.resetCount}` +
+                (entry.currentSessionId ? ` session=${entry.currentSessionId}` : "") +
+                ` last=${new Date(entry.lastUsedAt).toLocaleString()}`,
+            );
+          });
+        }
+        return;
+      }
+
+      if (automationSubcommand === "audit") {
+        const filters = parseAutomationFilters(args);
+        const automationStatus = await getDaemonAutomationStatus();
+        if (!automationStatus) {
+          logger.print("No daemon running");
+          return;
+        }
+
+        const action = args[3] ?? "list";
+        if (action === "clear") {
+          const result = await clearDaemonAutomationAudit();
+          if (!result.success) {
+            logger.printError(result.errorMessage || "Failed to clear automation audit log");
+            process.exit(1);
+          }
+          logger.print("Cleared automation audit log");
+          return;
+        }
+
+        const recentAuditEvents = filterAutomationAudit(automationStatus.recentAuditEvents ?? [], filters);
+        if (jsonOutput) {
+          logger.print(JSON.stringify({ recentAuditEvents }, null, 2));
+          return;
+        }
+        logger.print("Automation audit:");
+        if (recentAuditEvents.length === 0) {
+          logger.print("No automation audit events");
+          return;
+        }
+        recentAuditEvents.slice(0, 50).forEach((event) => {
+          logger.print(
+            `- ${new Date(event.occurredAt).toLocaleString()} ${event.kind} ${describeAutomationAuditEvent(event)}` +
+              (event.jobId ? ` job=${event.jobId}` : "") +
+              (event.sessionId ? ` session=${event.sessionId}` : "") +
+              (event.projectId ? ` project=${event.projectId}` : "") +
+              (event.loopId ? ` loop=${event.loopId}` : ""),
+          );
+        });
+        return;
+      }
+
+
+      if (automationSubcommand === "retry") {
+        const jobId = args[3];
+        if (!jobId) {
+          logger.printError("Job ID required");
+          process.exit(1);
+        }
+        const result = await retryDaemonAutomationJob(jobId);
+        if (!result.success) {
+          logger.printError(result.errorMessage || "Failed to retry automation job");
+          process.exit(1);
+        }
+        logger.print(`Re-queued automation job ${jobId}`);
+        return;
+      }
+
+      logger.print(`
+${chalk.bold("happy daemon automation")} - Automation job management
+
+${chalk.bold("Usage:")}
+  happy daemon automation list [--json] [--running|--failed|--terminal] [--project <id>] [--loop <id>] [--kind <kind>]
+                                               List automation jobs
+  happy daemon automation stats [--json] [--project <id>] [--loop <id>]
+                                               Show audit + guardian metrics
+  happy daemon automation audit [--json] [--anomalies|--guardian|--jobs] [--project <id>] [--loop <id>]
+                                               Show recent audit events
+  happy daemon automation audit clear           Clear audit history
+  happy daemon automation timeline [--json] [--running|--failed|--terminal] [--project <id>] [--loop <id>] [--kind <kind>]
+                                               Show derived automation timeline
+  happy daemon automation guardians [--json] [--attached|--persisted] [--project <id>] [--loop <id>]
+                                               List guardian sessions
+  happy daemon automation guardians clear <key> Clear one guardian
+  happy daemon automation guardians clear --all Clear all guardians
+  happy daemon automation stop <jobId>          Stop a running automation job
+  happy daemon automation retry <jobId>         Retry a job now
+  happy daemon automation cancel <jobId>        Cancel a queued job
+  happy daemon automation clear                 Clear terminal jobs
+`);
+      return;
+    }
 
     if (daemonSubcommand === "list") {
       try {
@@ -588,6 +1107,8 @@ ${chalk.bold("Usage:")}
   happy daemon stop               Stop the daemon (sessions stay alive)
   happy daemon status             Show daemon status
   happy daemon list               List active sessions
+  happy daemon automation list    List automation jobs
+  happy supervisor loop status    Show active autonomous loop
 
   If you want to kill all happy related processes run 
   ${chalk.cyan("happy doctor clean")}
@@ -723,6 +1244,7 @@ ${chalk.bold("Usage:")}
   happy acp               Start a generic ACP-compatible agent
   happy connect           Connect AI vendor API keys
   happy sandbox           Configure and manage OS-level sandboxing
+  happy supervisor        Manage supervisor summary, config, and autonomous loops
   happy notify            Send push notification
   happy daemon            Manage background service that allows
                             to spawn new sessions away from your computer
@@ -745,6 +1267,10 @@ ${chalk.bold("Examples:")}
                            Print raw ACP backend/envelope events
   happy auth login --force Authenticate
   happy doctor             Run diagnostics
+  happy supervisor summary --path ~/repo
+                           Inspect health, schedule, and active loop
+  happy supervisor loop start --path ~/repo --max-iterations 8
+                           Start an autonomous maintenance loop
 
 ${chalk.bold("Happy supports ALL Claude options!")}
   Use any claude flag with happy as you would with claude. Our favorite:

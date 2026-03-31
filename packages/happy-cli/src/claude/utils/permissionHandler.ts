@@ -103,11 +103,11 @@ export class PermissionHandler {
         ) {
           this.session.queue.unshift(PLAN_FAKE_RESTART, {
             permissionMode: response.mode,
-          });
+          }, { priority: "urgent", kind: "notification", source: "permission-handler" });
         } else {
           this.session.queue.unshift(PLAN_FAKE_RESTART, {
             permissionMode: "default",
-          });
+          }, { priority: "urgent", kind: "notification", source: "permission-handler" });
         }
         pending.resolve({ behavior: "deny", message: PLAN_FAKE_REJECT });
       } else {
@@ -376,7 +376,7 @@ export class PermissionHandler {
     // Queue PLAN_FAKE_RESTART to trigger session restart in the outer loop
     this.session.queue.unshift(PLAN_FAKE_RESTART, {
       permissionMode: this.permissionMode,
-    });
+    }, { priority: "urgent", kind: "notification", source: "permission-handler" });
 
     // Update agent state to mark as auto-approved (so App shows correct status)
     this.session.client.updateAgentState((currentState) => ({

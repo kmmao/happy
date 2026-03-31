@@ -38,7 +38,7 @@ const processingEvents = new Set<string>();
 export async function handleWebhookTrigger(
   data: WebhookTriggerData,
   deps: WebhookHandlerDeps,
-): Promise<void> {
+): Promise<{ success: boolean; errorMessage?: string; sessionId?: string }> {
   const { webhookEventId, issueNumber, repoPath, provider, repoUrl } = data;
 
   // Guard against duplicate processing
@@ -46,7 +46,7 @@ export async function handleWebhookTrigger(
     logger.debug(
       `[WEBHOOK] Event ${webhookEventId} already being processed, skipping`,
     );
-    return;
+    return { success: false, errorMessage: "Event already processing" };
   }
   processingEvents.add(webhookEventId);
 
@@ -67,7 +67,7 @@ export async function handleWebhookTrigger(
         status: "failed",
         errorMessage,
       });
-      return;
+      return { success: false, errorMessage };
     }
 
     logger.debug(
@@ -137,6 +137,10 @@ export async function handleWebhookTrigger(
       directory: worktreeResult.worktreePath,
       approvedNewDirectoryCreation: true,
       agent: "claude",
+      automationContext: {
+        kind: "webhook",
+        dedupeKey: `webhook:${webhookEventId}`,
+      },
       environmentVariables,
     });
 
@@ -162,7 +166,7 @@ export async function handleWebhookTrigger(
       } catch {
         // best-effort
       }
-      return;
+      return { success: false, errorMessage };
     }
 
     // 6. Report success
@@ -174,6 +178,7 @@ export async function handleWebhookTrigger(
       status: "completed",
       sessionId: spawnResult.sessionId,
     });
+    return { success: true, sessionId: spawnResult.sessionId };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.debug(
@@ -192,6 +197,7 @@ export async function handleWebhookTrigger(
         // best-effort
       }
     }
+    return { success: false, errorMessage };
   } finally {
     processingEvents.delete(webhookEventId);
   }

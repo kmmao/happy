@@ -18,6 +18,7 @@ import {
   SpawnSessionOptions,
   SpawnSessionResult,
 } from "../modules/common/registerCommonHandlers";
+import type { AutomationJob, AutomationMutationResult } from "@/automation/types";
 import { encodeBase64, decodeBase64, encrypt, decrypt } from "./encryption";
 import { backoff } from "@/utils/time";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
@@ -111,6 +112,19 @@ type MachineRpcHandlers = {
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
   stopSession: (sessionId: string) => boolean;
   requestShutdown: () => void;
+  getAutomationStatus: () => {
+    jobs: AutomationJob[];
+    counts: Record<string, number>;
+    guardians?: Array<{ key: string; projectId: string; loopId?: string; sessionId: string; updatedAt: number; lastRunId?: string; attached?: boolean }>;
+    guardianUsage?: Array<{ key: string; projectId?: string; loopId?: string; reuseCount: number; rememberCount: number; resetCount: number; lastUsedAt: number; currentSessionId?: string }>;
+    auditStats?: { totalEvents: number; lastEventAt?: number; queuedCount: number; sessionStartedCount: number; terminalCompletedCount: number; terminalFailedCount: number; terminalCancelledCount: number; guardianReuseCount: number; guardianRememberCount: number; guardianResetCount: number; watchdogStopCount: number; stopRequestCount: number; guardianEligibleRunCount: number; guardianReuseRate: number; activeGuardianCount: number };
+    recentAuditEvents?: Array<{ id: string; occurredAt: number; kind: string; jobId?: string; dedupeKey?: string; sessionId?: string; projectId?: string; runId?: string; loopId?: string; trigger?: string; status?: string; guardianKey?: string; guardianSessionId?: string; message?: string }>;
+  };
+  cancelAutomationJob: (jobId: string) => Promise<AutomationMutationResult>;
+  retryAutomationJob: (jobId: string) => Promise<AutomationMutationResult>;
+  clearAutomationJobs: () => Promise<AutomationMutationResult>;
+  clearAutomationGuardians: (params?: { key?: string; sessionId?: string; clearAll?: boolean }) => Promise<{ success: boolean; errorMessage?: string }>;
+  clearAutomationAudit: () => Promise<{ success: boolean; errorMessage?: string }>;
 };
 
 export type WebhookTriggerData = {
@@ -250,6 +264,12 @@ export class ApiMachineClient {
     spawnSession,
     stopSession,
     requestShutdown,
+    getAutomationStatus,
+    cancelAutomationJob,
+    retryAutomationJob,
+    clearAutomationJobs,
+    clearAutomationGuardians,
+    clearAutomationAudit,
   }: MachineRpcHandlers) {
     // Register spawn session handler
     this.rpcHandlerManager.registerHandler(
@@ -324,6 +344,38 @@ export class ApiMachineClient {
     });
 
     // Register stop daemon handler
+    this.rpcHandlerManager.registerHandler("automation-status", async () => {
+      return getAutomationStatus();
+    });
+
+    this.rpcHandlerManager.registerHandler("automation-cancel", async (params: any) => {
+      const { jobId } = params || {};
+      if (!jobId) {
+        throw new Error("Job ID is required");
+      }
+      return cancelAutomationJob(jobId);
+    });
+
+    this.rpcHandlerManager.registerHandler("automation-retry", async (params: any) => {
+      const { jobId } = params || {};
+      if (!jobId) {
+        throw new Error("Job ID is required");
+      }
+      return retryAutomationJob(jobId);
+    });
+
+    this.rpcHandlerManager.registerHandler("automation-clear", async () => {
+      return clearAutomationJobs();
+    });
+
+    this.rpcHandlerManager.registerHandler("automation-guardian-clear", async (params: any) => {
+      return clearAutomationGuardians(params || {});
+    });
+
+    this.rpcHandlerManager.registerHandler("automation-audit-clear", async () => {
+      return clearAutomationAudit();
+    });
+
     this.rpcHandlerManager.registerHandler("stop-daemon", () => {
       logger.debug("[API MACHINE] Received stop-daemon RPC request");
 
