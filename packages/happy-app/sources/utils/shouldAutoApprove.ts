@@ -39,6 +39,10 @@ export function shouldAutoApprove(
     }
 
     switch (permissionModeKey) {
+        case "yolo":
+            // Codex YOLO: auto-approve everything except AskUserQuestion
+            return true;
+
         case "bypassPermissions":
             // Auto-approve everything except AskUserQuestion (handled above)
             return true;

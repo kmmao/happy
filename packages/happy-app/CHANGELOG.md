@@ -41,6 +41,7 @@ Dev environment management with live log streaming, project-level Knowledge Base
 ### Web & UI
 - Added automatic vertical button layout for alerts with more than 2 buttons (iOS ActionSheet style)
 - Removed microphone STT voice-to-text input feature
+- Fixed Codex YOLO sessions auto-approve flow so GPT/Codex permission requests no longer stall on manual review
 - Fixed voice debug logging flooding console in non-voice mode
 
 ## 2.11.0 - 2026-03-30

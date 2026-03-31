@@ -2,11 +2,25 @@ import { describe, it, expect } from "vitest";
 import { shouldAutoApprove } from "./shouldAutoApprove";
 
 describe("shouldAutoApprove", () => {
+    describe("yolo mode", () => {
+        it.each(["Bash", "CodexBash", "Edit", "Write", "Read", "Grep"])(
+            "auto-approves %s",
+            (tool) => {
+                expect(shouldAutoApprove("yolo", tool)).toBe(true);
+            },
+        );
+
+        it("does not auto-approve AskUserQuestion", () => {
+            expect(shouldAutoApprove("yolo", "AskUserQuestion")).toBe(false);
+        });
+    });
+
     // AskUserQuestion: never auto-approve in any mode
     describe("AskUserQuestion", () => {
         it.each([
             "default",
             "bypassPermissions",
+            "yolo",
             "plan",
             "acceptEdits",
             null,
