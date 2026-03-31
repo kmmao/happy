@@ -273,6 +273,65 @@ export MINIMAX_SMALL_FAST_MODEL="MiniMax-M2.7-highspeed"
 # export MINIMAX_SONNET_MODEL="MiniMax-M2.7"
 # export MINIMAX_HAIKU_MODEL="MiniMax-M2.7-highspeed"`,
       };
+    case "kimi":
+      return {
+        setupGuideUrl: "https://platform.moonshot.ai/docs/guide/agent-support.en-US",
+        description:
+          "Kimi K2.5 API proxied through Anthropic-compatible interface",
+        environmentVariables: [
+          {
+            name: "KIMI_BASE_URL",
+            expectedValue: "https://api.moonshot.ai/anthropic",
+            description: "Kimi API endpoint (Anthropic-compatible)",
+            isSecret: false,
+          },
+          {
+            name: "KIMI_AUTH_TOKEN",
+            expectedValue: "sk-...",
+            description: "Your Kimi (Moonshot) API key",
+            isSecret: true,
+          },
+          {
+            name: "KIMI_API_TIMEOUT_MS",
+            expectedValue: "3000000",
+            description: "API timeout (50 minutes)",
+            isSecret: false,
+          },
+          {
+            name: "KIMI_MODEL",
+            expectedValue: "kimi-k2.5",
+            description: "Default model",
+            isSecret: false,
+          },
+          {
+            name: "KIMI_SMALL_FAST_MODEL",
+            expectedValue: "kimi-k2.5",
+            description: "Fast model for quick responses",
+            isSecret: false,
+          },
+          {
+            name: "KIMI_ENABLE_TOOL_SEARCH",
+            expectedValue: "false",
+            description:
+              "Disable tool search by default to align with Moonshot guide",
+            isSecret: false,
+          },
+        ],
+        shellConfigExample: `# Add to ~/.zshrc or ~/.bashrc:
+export KIMI_BASE_URL="https://api.moonshot.ai/anthropic"
+export KIMI_AUTH_TOKEN="sk-YOUR_KIMI_API_KEY"
+export KIMI_API_TIMEOUT_MS="3000000"
+export KIMI_MODEL="kimi-k2.5"
+export KIMI_SMALL_FAST_MODEL="kimi-k2.5"
+export KIMI_ENABLE_TOOL_SEARCH="false"
+
+# Model tier mappings (Opus/Sonnet/Haiku → Kimi models):
+# These are set automatically by the profile via ANTHROPIC_DEFAULT_*_MODEL env vars.
+# Override if needed:
+# export KIMI_OPUS_MODEL="kimi-k2.5"
+# export KIMI_SONNET_MODEL="kimi-k2.5"
+# export KIMI_HAIKU_MODEL="kimi-k2.5"`,
+      };
     default:
       return null;
   }
@@ -294,7 +353,7 @@ export MINIMAX_SMALL_FAST_MODEL="MiniMax-M2.7-highspeed"
  * - Switch backends by selecting different profiles
  * - Each profile maps daemon env vars to what CLI expects
  *
- * @param id - The profile ID (anthropic, deepseek, zai, openai, azure-openai, together)
+ * @param id - The profile ID (anthropic, deepseek, zai, openai, azure-openai, minimax, kimi)
  * @returns The complete profile configuration, or null if not found
  */
 export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
@@ -481,6 +540,58 @@ export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
         updatedAt: Date.now(),
         version: "1.0.0",
       };
+    case "kimi":
+      // Kimi profile: Uses Anthropic-compatible endpoint from Moonshot.
+      // Launch daemon with: KIMI_AUTH_TOKEN=sk-... KIMI_BASE_URL=https://api.moonshot.ai/anthropic
+      return {
+        id: "kimi",
+        name: "Kimi (K2.5)",
+        anthropicConfig: {},
+        environmentVariables: [
+          {
+            name: "ANTHROPIC_BASE_URL",
+            value: "${KIMI_BASE_URL:-https://api.moonshot.ai/anthropic}",
+          },
+          {
+            name: "ANTHROPIC_AUTH_TOKEN",
+            value: "${KIMI_AUTH_TOKEN}",
+          },
+          {
+            name: "API_TIMEOUT_MS",
+            value: "${KIMI_API_TIMEOUT_MS:-3000000}",
+          },
+          {
+            name: "ANTHROPIC_MODEL",
+            value: "${KIMI_MODEL:-kimi-k2.5}",
+          },
+          {
+            name: "ANTHROPIC_SMALL_FAST_MODEL",
+            value: "${KIMI_SMALL_FAST_MODEL:-kimi-k2.5}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_OPUS_MODEL",
+            value: "${KIMI_OPUS_MODEL:-kimi-k2.5}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            value: "${KIMI_SONNET_MODEL:-kimi-k2.5}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            value: "${KIMI_HAIKU_MODEL:-kimi-k2.5}",
+          },
+          {
+            name: "ENABLE_TOOL_SEARCH",
+            value: "${KIMI_ENABLE_TOOL_SEARCH:-false}",
+          },
+        ],
+        defaultPermissionMode: "default",
+        compatibility: { claude: true, codex: false, gemini: false },
+        isBuiltIn: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        version: "1.0.0",
+      };
     default:
       return null;
   }
@@ -519,6 +630,11 @@ export const DEFAULT_PROFILES = [
   {
     id: "minimax",
     name: "MiniMax (M2.7)",
+    isBuiltIn: true,
+  },
+  {
+    id: "kimi",
+    name: "Kimi (K2.5)",
     isBuiltIn: true,
   },
 ];

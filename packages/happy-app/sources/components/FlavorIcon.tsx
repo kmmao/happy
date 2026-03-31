@@ -10,6 +10,7 @@ const flavorIcons = {
     deepseek: require("@/assets/images/icon-deepseek.png"),
     zai: require("@/assets/images/icon-zai.png"),
     minimax: require("@/assets/images/icon-minimax.png"),
+    kimi: require("@/assets/images/icon-kimi.png"),
     "azure-openai": require("@/assets/images/icon-azure-openai.png"),
     opencode: require("@/assets/images/openclaw-icon-color.png"),
     acp: require("@/assets/images/openclaw-icon-color.png"),
@@ -28,6 +29,9 @@ function normalizeProviderKey(value: string | null | undefined): keyof typeof fl
     }
     if (key === "minimax") {
         return "minimax";
+    }
+    if (key === "kimi" || key.includes("moonshot")) {
+        return "kimi";
     }
     if (key === "azure-openai" || (key.includes("azure") && key.includes("openai"))) {
         return "azure-openai";

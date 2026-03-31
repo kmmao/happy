@@ -84,7 +84,15 @@ export function NewSessionWizard({
 
   // Combined profiles
   const allProfiles = useMemo(() => {
-    return [...builtInProfiles, ...profiles];
+    // Merge by id so a built-in override replaces the built-in entry
+    // instead of creating duplicate options.
+    const mergedProfiles = new Map<string, AIBackendProfile>(
+      builtInProfiles.map((profile) => [profile.id, profile]),
+    );
+    profiles.forEach((profile) => {
+      mergedProfiles.set(profile.id, profile);
+    });
+    return Array.from(mergedProfiles.values());
   }, [profiles, builtInProfiles]);
 
   const [selectedMachineId, setSelectedMachineId] = useState<string>(() => {

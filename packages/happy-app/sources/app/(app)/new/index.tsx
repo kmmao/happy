@@ -161,10 +161,19 @@ function NewSessionWizard() {
 
   // Combined profiles (built-in + custom)
   const allProfiles = React.useMemo(() => {
-    const builtInProfiles = DEFAULT_PROFILES.map(
-      (bp) => getBuiltInProfile(bp.id)!,
+    const builtInProfiles = DEFAULT_PROFILES.map((bp) =>
+      getBuiltInProfile(bp.id),
+    ).filter((profile): profile is AIBackendProfile => Boolean(profile));
+
+    // Merge by id so built-in overrides replace the built-in entry
+    // instead of appearing as a duplicate option.
+    const mergedProfiles = new Map<string, AIBackendProfile>(
+      builtInProfiles.map((profile) => [profile.id, profile]),
     );
-    return [...builtInProfiles, ...profiles];
+    profiles.forEach((profile) => {
+      mergedProfiles.set(profile.id, profile);
+    });
+    return Array.from(mergedProfiles.values());
   }, [profiles]);
 
   const profileMap = useProfileMap(allProfiles);

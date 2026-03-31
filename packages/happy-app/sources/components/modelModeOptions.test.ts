@@ -73,6 +73,32 @@ describe("modelModeOptions", () => {
     ]);
   });
 
+  it("deduplicates custom models by key and keeps a single default option", () => {
+    const models = getAvailableModels(
+      "claude",
+      null,
+      translate,
+      [
+        { id: "default", name: "Default (Custom)", description: "dup default" },
+        { id: "sonnet", name: "Sonnet", description: "first" },
+        { id: "sonnet", name: "Sonnet Duplicate", description: "second" },
+      ],
+    );
+
+    expect(models).toEqual([
+      {
+        key: "default",
+        name: "Default",
+        description: "Use CLI configured model",
+      },
+      {
+        key: "sonnet",
+        name: "Sonnet",
+        description: "first",
+      },
+    ]);
+  });
+
   it("keeps codex permission modes hardcoded even when metadata modes exist", () => {
     const modes = getAvailablePermissionModes(
       "codex",

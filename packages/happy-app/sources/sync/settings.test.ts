@@ -665,6 +665,12 @@ describe("settings", () => {
       expect(() => AIBackendProfileSchema.parse(profile)).not.toThrow();
     });
 
+    it("validates built-in Kimi profile", () => {
+      const profile = getBuiltInProfile("kimi");
+      expect(profile).not.toBeNull();
+      expect(() => AIBackendProfileSchema.parse(profile)).not.toThrow();
+    });
+
     it("accepts all 7 permission modes", () => {
       const modes = [
         "default",

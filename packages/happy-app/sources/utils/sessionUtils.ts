@@ -257,6 +257,9 @@ export function getSessionProviderKey(session: Session): string {
       return "zai";
     }
     if (candidate.includes("minimax")) return "minimax";
+    if (candidate.includes("kimi") || candidate.includes("moonshot")) {
+      return "kimi";
+    }
     if (candidate.includes("azure-openai")) return "azure-openai";
     if (candidate.includes("azure") && candidate.includes("openai")) {
       return "azure-openai";
@@ -316,6 +319,8 @@ export function getSessionProviderLabel(session: Session): string {
       return "Z.AI";
     case "minimax":
       return "MiniMax";
+    case "kimi":
+      return "Kimi";
     case "azure-openai":
       return "Azure OpenAI";
     case "opencode":

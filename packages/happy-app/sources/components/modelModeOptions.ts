@@ -285,6 +285,24 @@ export type CustomModel = {
   description?: string | null;
 };
 
+function dedupeModeOptions(options: ModeOption[]): ModeOption[] {
+  const seen = new Set<string>();
+  const result: ModeOption[] = [];
+  for (const option of options) {
+    const key = option.key?.trim();
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push({
+      key,
+      name: option.name,
+      description: option.description ?? null,
+    });
+  }
+  return result;
+}
+
 export function getAvailableModels(
   flavor: AgentFlavor,
   metadata: Metadata | null | undefined,
@@ -296,14 +314,18 @@ export function getAvailableModels(
   if (flavor === "claude" || flavor === undefined) {
     // Priority 1: Profile custom models (e.g., MiniMax, DeepSeek)
     if (customModels && customModels.length > 0) {
-      return [
-        { key: "default", name: "Default", description: "Use CLI configured model" },
+      return dedupeModeOptions([
+        {
+          key: "default",
+          name: "Default",
+          description: "Use CLI configured model",
+        },
         ...customModels.map((m) => ({
           key: m.id,
           name: m.name,
           description: m.description ?? null,
         })),
-      ];
+      ]);
     }
 
     // Priority 2: Hardcoded Claude models
@@ -311,21 +333,21 @@ export function getAvailableModels(
   }
 
   // Priority 1 (non-Claude): CLI dynamically reported models
-  const metadataModels = mapMetadataOptions(metadata?.models);
+  const metadataModels = dedupeModeOptions(mapMetadataOptions(metadata?.models));
   if (metadataModels.length > 0) {
     return metadataModels;
   }
 
   // Priority 2 (non-Claude): Profile custom models
   if (customModels && customModels.length > 0) {
-    return [
+    return dedupeModeOptions([
       { key: "default", name: "Default", description: "Use CLI settings" },
       ...customModels.map((m) => ({
         key: m.id,
         name: m.name,
         description: m.description ?? null,
       })),
-    ];
+    ]);
   }
 
   // Priority 3 (non-Claude): Hardcoded defaults

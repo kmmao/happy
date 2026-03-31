@@ -15,6 +15,7 @@ const flavorColors: Record<string, string> = {
     deepseek: "#4D6BFE",
     zai: "#0EA5E9",
     minimax: "#8B5CF6",
+    kimi: "#22C55E",
     "azure-openai": "#0078D4",
     opencode: "#14B8A6",
     acp: "#14B8A6",

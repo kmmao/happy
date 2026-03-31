@@ -7,6 +7,7 @@ export const PROFILES_NEEDING_KEYS = [
     "zai",
     "microsoft",
     "deepseek",
+    "kimi",
 ];
 
 export function profileNeedsConfiguration(
@@ -79,6 +80,15 @@ export function getProfileRequiredFields(
                     key: "ANTHROPIC_AUTH_TOKEN",
                     label: "Z.ai API Key",
                     placeholder: "Z_AI_API_KEY",
+                    isPassword: true,
+                },
+            ];
+        case "kimi":
+            return [
+                {
+                    key: "ANTHROPIC_AUTH_TOKEN",
+                    label: "Kimi API Key",
+                    placeholder: "KIMI_API_KEY",
                     isPassword: true,
                 },
             ];
@@ -229,6 +239,24 @@ export const BUILT_IN_PROFILES: AIBackendProfile[] = [
         },
         environmentVariables: [],
         compatibility: { claude: false, codex: true, gemini: false },
+        isBuiltIn: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        version: "1.0.0",
+    },
+    {
+        id: "kimi",
+        name: "Kimi (K2.5)",
+        description: "Moonshot Kimi model with Anthropic-compatible endpoint",
+        anthropicConfig: {
+            baseUrl: "https://api.moonshot.ai/anthropic",
+            model: "kimi-k2.5",
+        },
+        environmentVariables: [
+            { name: "API_TIMEOUT_MS", value: "3000000" },
+            { name: "ENABLE_TOOL_SEARCH", value: "false" },
+        ],
+        compatibility: { claude: true, codex: false, gemini: false },
         isBuiltIn: true,
         createdAt: Date.now(),
         updatedAt: Date.now(),
