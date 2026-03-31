@@ -37,6 +37,7 @@ interface CloneRepoModalProps {
   }[];
   readonly onLoadRepos: (
     host: GitHostMapping,
+    options?: { forceRefresh?: boolean },
   ) => Promise<readonly RemoteGitRepoEntry[]>;
   readonly onClone: (input: {
     repoUrl: string;
@@ -304,13 +305,13 @@ export const CloneRepoModal = React.memo(function CloneRepoModal({
     });
   }, [recentRemoteRepos, repoSearch, repos, selectedHost?.host, visibilityFilter]);
 
-  const handleLoadRepos = useCallback(async () => {
+  const handleLoadRepos = useCallback(async (options?: { forceRefresh?: boolean }) => {
     if (!selectedHost) return;
     setLoadingRepos(true);
     setLoadError(null);
     setSelectedRepoUrl("");
     try {
-      const remoteRepos = await onLoadRepos(selectedHost);
+      const remoteRepos = await onLoadRepos(selectedHost, options);
       setRepos(remoteRepos);
     } catch (loadReposError) {
       setRepos([]);
@@ -488,7 +489,7 @@ export const CloneRepoModal = React.memo(function CloneRepoModal({
         </Text>
         {selectedHost && (
           <Pressable
-            onPress={handleLoadRepos}
+            onPress={() => handleLoadRepos({ forceRefresh: true })}
             disabled={loadingRepos}
             style={({ pressed }) => [
               styles.smallButton,

@@ -61,6 +61,15 @@ interface ProjectHealthTabProps {
     project: Project;
 }
 
+function formatCompactDuration(durationMs: number): string {
+    const diffMins = Math.floor(durationMs / 60000);
+    if (diffMins < 60) return `${Math.max(diffMins, 1)}m`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d`;
+}
+
 export const ProjectHealthTab = React.memo(
     ({ project }: ProjectHealthTabProps) => {
         const { theme } = useUnistyles();
@@ -296,6 +305,89 @@ export const ProjectHealthTab = React.memo(
             activeRun ? activeRun.createdAt : null,
         );
 
+        const currentLoopPhaseLabel = activeLoop
+            ? activeLoop.currentPhase === "analyzing"
+                ? t("supervisor.loopPhase_analyzing")
+                : activeLoop.currentPhase === "fixing"
+                    ? t("supervisor.loopPhase_fixing")
+                    : activeLoop.currentPhase === "deciding"
+                        ? t("supervisor.loopPhase_deciding")
+                        : t("supervisor.loopPhase_idle")
+            : null;
+
+        const autonomyBanner = React.useMemo(() => {
+            if (activeLoop && (activeLoop.status === "running" || activeLoop.status === "paused")) {
+                return {
+                    icon: activeLoop.status === "paused" ? "pause-circle-outline" as const : "sync-outline" as const,
+                    color: activeLoop.status === "paused" ? "#FF9500" : "#0A84FF",
+                    title: activeLoop.status === "paused"
+                        ? t("supervisor.autonomyBannerLoopPaused", { iteration: activeLoop.currentIteration })
+                        : t("supervisor.autonomyBannerLoopRunning", { iteration: activeLoop.currentIteration }),
+                    subtitle: t("supervisor.autonomyBannerLoopDetail", {
+                        phase: currentLoopPhaseLabel ?? t("supervisor.loopPhase_idle"),
+                    }),
+                    action: t("supervisor.viewActiveLoop", { iteration: activeLoop.currentIteration }),
+                    onPress: () =>
+                        router.push({
+                            pathname: "/project/[id]/supervisor-loop/[loopId]",
+                            params: { id: serverId!, loopId: activeLoop.id },
+                        }),
+                };
+            }
+
+            if (activeRun) {
+                return {
+                    icon: "pulse-outline" as const,
+                    color: "#0A84FF",
+                    title: t("supervisor.autonomyBannerRunActive"),
+                    subtitle: activeRunSession && activeRun.sessionId
+                        ? `${t("supervisor.viewSession")}: ${activeRun.sessionId}`
+                        : t("supervisor.statusAnalyzing"),
+                    action: activeRun.sessionId ? t("supervisor.viewSession") : undefined,
+                    onPress: activeRun.sessionId
+                        ? () => router.push(`/session/${activeRun.sessionId}` as any)
+                        : undefined,
+                };
+            }
+
+            if (summary?.scheduleOverdueByMs != null) {
+                return {
+                    icon: "warning-outline" as const,
+                    color: "#FF9500",
+                    title: t("supervisor.autonomyBannerOverdue", {
+                        duration: formatCompactDuration(summary.scheduleOverdueByMs),
+                    }),
+                    subtitle: summary.scheduleMissedRuns > 0
+                        ? t("supervisor.scheduleMissedRuns", { count: summary.scheduleMissedRuns })
+                        : t("supervisor.autonomyBannerScheduled", { hours: summary.scheduleIntervalHours ?? 24 }),
+                    action: t("supervisor.settings"),
+                    onPress: () => router.push(`/project/${project.id}/supervisor-settings` as any),
+                };
+            }
+
+            if (summary?.scheduleEnabled) {
+                return {
+                    icon: "calendar-outline" as const,
+                    color: "#34C759",
+                    title: t("supervisor.autonomyBannerScheduled", { hours: summary.scheduleIntervalHours ?? 24 }),
+                    subtitle: summary.nextRunAt
+                        ? `${t("supervisor.nextRun")}: ${new Date(summary.nextRunAt).toLocaleString()}`
+                        : t("supervisor.autonomyBannerHealthy"),
+                    action: t("supervisor.settings"),
+                    onPress: () => router.push(`/project/${project.id}/supervisor-settings` as any),
+                };
+            }
+
+            return {
+                icon: "scan-outline" as const,
+                color: theme.colors.textSecondary,
+                title: t("supervisor.autonomyBannerManualOnly"),
+                subtitle: t("supervisor.autonomyBannerManualOnlyDetail"),
+                action: t("supervisor.settings"),
+                onPress: () => router.push(`/project/${project.id}/supervisor-settings` as any),
+            };
+        }, [activeLoop, activeRun, activeRunSession, currentLoopPhaseLabel, project.id, router, serverId, summary, theme.colors.textSecondary]);
+
         const [triggerLoading, doTrigger] = useHappyAction(
             React.useCallback(async () => {
                 if (!serverId) return;
@@ -405,6 +497,31 @@ export const ProjectHealthTab = React.memo(
                         <Text style={styles.headerDescription}>
                             {t("supervisor.description")}
                         </Text>
+
+                        <Pressable
+                            style={[styles.autonomyBanner, { borderColor: `${autonomyBanner.color}33` }]}
+                            onPress={autonomyBanner.onPress}
+                        >
+                            <View style={[styles.autonomyIconWrap, { backgroundColor: `${autonomyBanner.color}18` }]}>
+                                <Ionicons
+                                    name={autonomyBanner.icon}
+                                    size={18}
+                                    color={autonomyBanner.color}
+                                />
+                            </View>
+                            <View style={styles.autonomyContent}>
+                                <Text style={styles.autonomyTitle}>{autonomyBanner.title}</Text>
+                                <Text style={styles.autonomySubtitle}>{autonomyBanner.subtitle}</Text>
+                            </View>
+                            {autonomyBanner.action ? (
+                                <View style={styles.autonomyActionWrap}>
+                                    <Text style={[styles.autonomyActionText, { color: autonomyBanner.color }]}>
+                                        {autonomyBanner.action}
+                                    </Text>
+                                    <Ionicons name="chevron-forward" size={14} color={autonomyBanner.color} />
+                                </View>
+                            ) : null}
+                        </Pressable>
 
                         {/* Action buttons */}
                         <View style={styles.actionRow}>
@@ -608,7 +725,20 @@ export const ProjectHealthTab = React.memo(
                 {/* Health Summary */}
                 {summary && (
                     <ItemGroup>
-                        <SupervisorSummaryCard summary={summary} scoreDelta={scoreDelta} />
+                        <SupervisorSummaryCard
+                            summary={summary}
+                            scoreDelta={scoreDelta}
+                            activeLoop={activeLoop}
+                            onPressLoop={activeLoop ? () =>
+                                router.push({
+                                    pathname: "/project/[id]/supervisor-loop/[loopId]",
+                                    params: { id: serverId!, loopId: activeLoop.id },
+                                }) : undefined
+                            }
+                            onPressSettings={() =>
+                                router.push(`/project/${project.id}/supervisor-settings` as any)
+                            }
+                        />
                     </ItemGroup>
                 )}
 
@@ -819,6 +949,47 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         textAlign: "center",
         lineHeight: 20,
+    },
+    autonomyBanner: {
+        width: "100%",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        backgroundColor: theme.colors.surface,
+    },
+    autonomyIconWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    autonomyContent: {
+        flex: 1,
+        gap: 2,
+    },
+    autonomyTitle: {
+        ...Typography.default("semiBold"),
+        fontSize: 14,
+        color: theme.colors.text,
+    },
+    autonomySubtitle: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+    },
+    autonomyActionWrap: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 2,
+    },
+    autonomyActionText: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
     },
     actionRow: {
         flexDirection: "row",

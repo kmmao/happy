@@ -37,6 +37,7 @@ import {
   type MultiTextInputHandle,
 } from "@/components/MultiTextInput";
 import { NetworkServicesSummaryItem } from "@/components/machine/NetworkServicesSection";
+import { AutomationSummarySection } from "@/components/machine/AutomationSummarySection";
 
 const styles = StyleSheet.create((theme) => ({
   pathInputContainer: {
@@ -675,6 +676,8 @@ function MachineDetailScreen() {
             subtitle={String(machine.daemonStateVersion)}
           />
         </ItemGroup>
+
+        <AutomationSummarySection machine={machine} machineId={machineId} />
 
         {/* Network Services */}
         <NetworkServicesSummaryItem machineId={machineId} machine={machine} />

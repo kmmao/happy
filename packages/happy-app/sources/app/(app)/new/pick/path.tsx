@@ -30,6 +30,8 @@ import {
   machineListRemoteGitRepos,
 } from "@/sync/ops";
 
+const remoteRepoCache = new Map<string, readonly import("@/sync/ops").RemoteGitRepoEntry[]>();
+
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
@@ -195,10 +197,23 @@ function PathPickerScreen() {
         gitHosts,
         lastUsedGitHost,
         recentRemoteRepos,
-        onLoadRepos: async (host: (typeof gitHosts)[number]) => {
+        onLoadRepos: async (
+          host: (typeof gitHosts)[number],
+          options?: { forceRefresh?: boolean },
+        ) => {
           if (!host.apiToken) {
             throw new Error(t("newSession.gitRepos.noConfiguredHosts"));
           }
+
+          const cacheKey = `${machineId}:${host.provider}:${host.host}`;
+          if (!options?.forceRefresh) {
+            const cachedRepos = remoteRepoCache.get(cacheKey);
+            if (cachedRepos) {
+              sync.applySettings({ lastUsedGitHost: host.host });
+              return cachedRepos;
+            }
+          }
+
           const result = await machineListRemoteGitRepos({
             machineId,
             provider: host.provider,
@@ -213,8 +228,10 @@ function PathPickerScreen() {
                 }),
             );
           }
+          const repos = result.repos || [];
+          remoteRepoCache.set(cacheKey, repos);
           sync.applySettings({ lastUsedGitHost: host.host });
-          return result.repos || [];
+          return repos;
         },
         onClone: async ({
           repoUrl,

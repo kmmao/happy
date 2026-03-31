@@ -1,5 +1,6 @@
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
+import { computeScheduledRunRecoveryWindow } from "@/modules/supervisorScheduler";
 import { z } from "zod";
 import {
     type SeverityCounts,
@@ -158,6 +159,7 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
                     id: true,
                     supervisorNextRunAt: true,
                     supervisorScheduleEnabled: true,
+                    supervisorScheduleIntervalHours: true,
                 },
             });
 
@@ -236,6 +238,13 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
                 },
             });
 
+            const scheduleWindow = project.supervisorScheduleEnabled
+                ? computeScheduledRunRecoveryWindow({
+                    nextRunAt: project.supervisorNextRunAt,
+                    intervalHours: project.supervisorScheduleIntervalHours,
+                })
+                : null;
+
             const nextRunAt =
                 project.supervisorScheduleEnabled && project.supervisorNextRunAt
                     ? project.supervisorNextRunAt.getTime()
@@ -249,6 +258,10 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
                 lastScanAt,
                 totalRuns30d,
                 nextRunAt,
+                scheduleEnabled: project.supervisorScheduleEnabled,
+                scheduleIntervalHours: project.supervisorScheduleIntervalHours,
+                scheduleOverdueByMs: scheduleWindow?.due ? scheduleWindow.overdueByMs : null,
+                scheduleMissedRuns: scheduleWindow?.missedRuns ?? 0,
             });
         },
     );

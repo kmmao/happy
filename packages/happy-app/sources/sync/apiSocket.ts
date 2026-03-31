@@ -127,6 +127,7 @@ class ApiSocket {
       "getDirectoryTree",
       "writeFile",
       "listGitRepos",
+      "listRemoteGitRepos",
       "createRemoteWebhook",
       "deleteRemoteWebhook",
     ];

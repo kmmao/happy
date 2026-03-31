@@ -246,6 +246,171 @@ export async function machineStopDaemon(
   return result;
 }
 
+
+export async function machineStopSession(
+  machineId: string,
+  sessionId: string,
+): Promise<{ message: string }> {
+  return apiSocket.machineRPC<{ message: string }, { sessionId: string }>(
+    machineId,
+    "stop-session",
+    { sessionId },
+  );
+}
+
+
+
+export interface MachineAutomationGuardian {
+  key: string;
+  projectId: string;
+  loopId?: string;
+  sessionId: string;
+  updatedAt: number;
+  lastRunId?: string;
+  attached?: boolean;
+}
+
+export interface MachineAutomationGuardianUsage {
+  key: string;
+  projectId?: string;
+  loopId?: string;
+  reuseCount: number;
+  rememberCount: number;
+  resetCount: number;
+  lastUsedAt: number;
+  currentSessionId?: string;
+}
+
+export interface MachineAutomationAuditEvent {
+  id: string;
+  occurredAt: number;
+  kind: string;
+  jobId?: string;
+  dedupeKey?: string;
+  sessionId?: string;
+  projectId?: string;
+  runId?: string;
+  loopId?: string;
+  trigger?: string;
+  status?: string;
+  guardianKey?: string;
+  guardianSessionId?: string;
+  message?: string;
+}
+
+export interface MachineAutomationAuditStats {
+  totalEvents: number;
+  lastEventAt?: number;
+  queuedCount: number;
+  sessionStartedCount: number;
+  terminalCompletedCount: number;
+  terminalFailedCount: number;
+  terminalCancelledCount: number;
+  guardianReuseCount: number;
+  guardianRememberCount: number;
+  guardianResetCount: number;
+  watchdogStopCount: number;
+  stopRequestCount: number;
+  guardianEligibleRunCount: number;
+  guardianReuseRate: number;
+  activeGuardianCount: number;
+}
+
+export interface MachineAutomationJob {
+  id: string;
+  kind: "supervisor" | "webhook";
+  status: "queued" | "dispatching" | "running" | "completed" | "failed" | "cancelled";
+  priority: "urgent" | "user" | "background";
+  dedupeKey: string;
+  attempt: number;
+  maxAttempts: number;
+  createdAt: number;
+  updatedAt: number;
+  nextRunAt?: number;
+  dispatchedAt?: number;
+  completedAt?: number;
+  sessionId?: string;
+  label?: string;
+  projectId?: string;
+  runId?: string;
+  loopId?: string;
+  loopIteration?: number;
+  continuityKey?: string;
+  errorMessage?: string;
+}
+
+export interface MachineAutomationStatus {
+  counts: Record<string, number>;
+  jobs: MachineAutomationJob[];
+  guardians?: MachineAutomationGuardian[];
+  guardianUsage?: MachineAutomationGuardianUsage[];
+  auditStats?: MachineAutomationAuditStats;
+  recentAuditEvents?: MachineAutomationAuditEvent[];
+}
+
+export async function machineAutomationStatus(
+  machineId: string,
+): Promise<MachineAutomationStatus> {
+  return apiSocket.machineRPC<MachineAutomationStatus, {}>(
+    machineId,
+    "automation-status",
+    {},
+  );
+}
+
+export async function machineRetryAutomationJob(
+  machineId: string,
+  jobId: string,
+): Promise<{ success: boolean; errorMessage?: string; job?: MachineAutomationJob }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "automation-retry",
+    { jobId },
+  );
+}
+
+export async function machineCancelAutomationJob(
+  machineId: string,
+  jobId: string,
+): Promise<{ success: boolean; errorMessage?: string; job?: MachineAutomationJob }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "automation-cancel",
+    { jobId },
+  );
+}
+
+export async function machineClearAutomationJobs(
+  machineId: string,
+): Promise<{ success: boolean; errorMessage?: string }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "automation-clear",
+    {},
+  );
+}
+
+export async function machineClearAutomationGuardians(
+  machineId: string,
+  params: { key?: string; sessionId?: string; clearAll?: boolean },
+): Promise<{ success: boolean; errorMessage?: string }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "automation-guardian-clear",
+    params,
+  );
+}
+
+export async function machineClearAutomationAudit(
+  machineId: string,
+): Promise<{ success: boolean; errorMessage?: string }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "automation-audit-clear",
+    {},
+  );
+}
+
 /**
  * Upgrade the CLI on a specific machine by running npm install -g.
  * Uses the bash RPC with a 3-minute timeout since npm install can be slow.

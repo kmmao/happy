@@ -6,6 +6,62 @@ import {
 } from "@/app/events/eventRouter";
 import { checkDailyRunLimit, incrementDailyRunCount } from "./supervisorLimits";
 
+const DEFAULT_SCHEDULE_INTERVAL_HOURS = 24;
+
+export interface ScheduledRunRecoveryWindow {
+    due: boolean;
+    intervalHours: number;
+    overdueByMs: number;
+    totalDueRuns: number;
+    missedRuns: number;
+    nextRunAt: Date | null;
+}
+
+export function computeScheduledRunRecoveryWindow(input: {
+    nextRunAt: Date | null;
+    intervalHours: number | null;
+    now?: Date;
+}): ScheduledRunRecoveryWindow {
+    const intervalHours = input.intervalHours ?? DEFAULT_SCHEDULE_INTERVAL_HOURS;
+    const intervalMs = intervalHours * 60 * 60 * 1000;
+    const now = input.now ?? new Date();
+
+    if (!input.nextRunAt) {
+        return {
+            due: false,
+            intervalHours,
+            overdueByMs: 0,
+            totalDueRuns: 0,
+            missedRuns: 0,
+            nextRunAt: null,
+        };
+    }
+
+    const overdueByMs = now.getTime() - input.nextRunAt.getTime();
+    if (overdueByMs < 0) {
+        return {
+            due: false,
+            intervalHours,
+            overdueByMs: 0,
+            totalDueRuns: 0,
+            missedRuns: 0,
+            nextRunAt: input.nextRunAt,
+        };
+    }
+
+    const totalDueRuns = Math.floor(overdueByMs / intervalMs) + 1;
+    const missedRuns = Math.max(0, totalDueRuns - 1);
+
+    return {
+        due: true,
+        intervalHours,
+        overdueByMs,
+        totalDueRuns,
+        missedRuns,
+        nextRunAt: new Date(input.nextRunAt.getTime() + totalDueRuns * intervalMs),
+    };
+}
+
 /**
  * Check for projects that are due for a scheduled supervisor run and trigger them.
  * Called periodically from the machine heartbeat handler (throttled to ~5 min).
@@ -16,7 +72,6 @@ export async function checkAndTriggerScheduledRuns(
 ): Promise<void> {
     const now = new Date();
 
-    // Find projects on this machine that are due for a scheduled run
     const dueProjects = await db.project.findMany({
         where: {
             accountId: userId,
@@ -34,6 +89,7 @@ export async function checkAndTriggerScheduledRuns(
             supervisorEnabledDimensions: true,
             supervisorCustomRules: true,
             supervisorConfig: true,
+            supervisorNextRunAt: true,
         },
         orderBy: { supervisorNextRunAt: "asc" },
         take: 50,
@@ -43,77 +99,85 @@ export async function checkAndTriggerScheduledRuns(
 
     for (const project of dueProjects) {
         try {
-            // Check daily run limit
+            const recoveryWindow = computeScheduledRunRecoveryWindow({
+                nextRunAt: project.supervisorNextRunAt,
+                intervalHours: project.supervisorScheduleIntervalHours,
+                now,
+            });
+
+            if (!recoveryWindow.due || !recoveryWindow.nextRunAt || !project.supervisorNextRunAt) {
+                continue;
+            }
+
             const limitCheck = await checkDailyRunLimit(project.id);
             if (!limitCheck.allowed) {
                 log(
                     { module: "supervisor" },
                     `Skipping scheduled run for project ${project.id}: daily limit reached (${limitCheck.currentCount}/${limitCheck.limit})`,
                 );
-                // Push nextRunAt forward to avoid re-checking every 5 min
-                const intervalHours = project.supervisorScheduleIntervalHours ?? 24;
                 await db.project.update({
                     where: { id: project.id },
                     data: {
-                        supervisorNextRunAt: new Date(
-                            now.getTime() + intervalHours * 60 * 60 * 1000,
-                        ),
+                        supervisorNextRunAt: recoveryWindow.nextRunAt,
                     },
                 });
                 continue;
             }
 
-            // Check no active run exists (atomically create in transaction)
-            let run;
-            try {
-                run = await db.$transaction(async (tx) => {
-                    const existing = await tx.supervisorRun.findFirst({
-                        where: {
-                            projectId: project.id,
-                            accountId: userId,
-                            status: { in: ["pending", "running"] },
-                        },
-                        select: { id: true },
-                    });
-
-                    if (existing) return null;
-
-                    return tx.supervisorRun.create({
-                        data: {
-                            projectId: project.id,
-                            accountId: userId,
-                            trigger: "scheduled",
-                            status: "pending",
-                        },
-                    });
+            const claimed = await db.$transaction(async (tx) => {
+                const existing = await tx.supervisorRun.findFirst({
+                    where: {
+                        projectId: project.id,
+                        accountId: userId,
+                        status: { in: ["pending", "running"] },
+                    },
+                    select: { id: true },
                 });
-            } catch {
-                continue;
-            }
 
-            if (!run) {
-                log(
-                    { module: "supervisor" },
-                    `Skipping scheduled run for project ${project.id}: active run exists`,
-                );
-                continue;
-            }
+                if (existing) {
+                    return { status: "active-run" as const };
+                }
 
-            // Increment daily count
-            await incrementDailyRunCount(project.id);
+                const claim = await tx.project.updateMany({
+                    where: {
+                        id: project.id,
+                        accountId: userId,
+                        supervisorScheduleEnabled: true,
+                        supervisorNextRunAt: project.supervisorNextRunAt,
+                    },
+                    data: {
+                        supervisorNextRunAt: recoveryWindow.nextRunAt,
+                    },
+                });
 
-            // Atomically advance nextRunAt to prevent duplicate triggers
-            const intervalHours = project.supervisorScheduleIntervalHours ?? 24;
-            await db.project.update({
-                where: { id: project.id },
-                data: {
-                    supervisorNextRunAt: new Date(
-                        now.getTime() + intervalHours * 60 * 60 * 1000,
-                    ),
-                },
+                if (claim.count === 0) {
+                    return { status: "already-claimed" as const };
+                }
+
+                const run = await tx.supervisorRun.create({
+                    data: {
+                        projectId: project.id,
+                        accountId: userId,
+                        trigger: "scheduled",
+                        status: "pending",
+                    },
+                });
+
+                return { status: "claimed" as const, run };
             });
 
-            // Emit trigger event to CLI daemon
+            if (claimed.status !== "claimed") {
+                if (claimed.status === "active-run") {
+                    log(
+                        { module: "supervisor" },
+                        `Skipping scheduled run for project ${project.id}: active run exists`,
+                    );
+                }
+                continue;
+            }
+
+            await incrementDailyRunCount(project.id);
+
             const dimensions = project.supervisorEnabledDimensions
                 ? project.supervisorEnabledDimensions.split(",").map((d) => d.trim()).filter(Boolean)
                 : undefined;
@@ -122,13 +186,15 @@ export async function checkAndTriggerScheduledRuns(
             try {
                 const cfg = project.supervisorConfig ? JSON.parse(project.supervisorConfig) : null;
                 maxFindings = typeof cfg?.maxFindings === "number" ? cfg.maxFindings : undefined;
-            } catch { /* ignore */ }
+            } catch {
+                // ignore malformed config and proceed with defaults
+            }
 
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildSupervisorTriggerEphemeral({
                     projectId: project.id,
-                    runId: run.id,
+                    runId: claimed.run.id,
                     trigger: "scheduled",
                     machineId,
                     repoPath: project.path,
@@ -145,7 +211,7 @@ export async function checkAndTriggerScheduledRuns(
 
             log(
                 { module: "supervisor" },
-                `Triggered scheduled supervisor run ${run.id} for project ${project.id}`,
+                `Triggered scheduled supervisor run ${claimed.run.id} for project ${project.id} (missedRuns=${recoveryWindow.missedRuns}, overdueMs=${recoveryWindow.overdueByMs})`,
             );
         } catch (error) {
             log(

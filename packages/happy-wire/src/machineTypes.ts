@@ -7,10 +7,6 @@
 
 import * as z from "zod";
 
-// ---------------------------------------------------------------------------
-// Machine metadata — static information (rarely changes)
-// ---------------------------------------------------------------------------
-
 export const MachineMetadataSchema = z.object({
   host: z.string(),
   platform: z.string(),
@@ -21,10 +17,6 @@ export const MachineMetadataSchema = z.object({
 });
 
 export type MachineMetadata = z.infer<typeof MachineMetadataSchema>;
-
-// ---------------------------------------------------------------------------
-// Tailscale
-// ---------------------------------------------------------------------------
 
 export const TailscaleServeEntrySchema = z.object({
   port: z.number(),
@@ -49,30 +41,16 @@ export const TailscaleInfoSchema = z.object({
 
 export type TailscaleInfo = z.infer<typeof TailscaleInfoSchema>;
 
-// ---------------------------------------------------------------------------
-// Tunnel — unified multi-provider tunnel abstraction
-// ---------------------------------------------------------------------------
-
 export const TunnelEntrySchema = z.object({
-  /** Provider identifier: "tailscale" | "upnp" | "cloudflare" | "frp" */
   provider: z.string(),
-  /** Local port the service is running on */
   localPort: z.number(),
-  /** Remote/public port (e.g. UPnP external port, Tailscale HTTPS port) */
   remotePort: z.number().optional(),
-  /** Protocol: "HTTPS" | "HTTP" | "TCP" | "UDP" */
   protocol: z.string(),
-  /** Mount path (Tailscale serve path, e.g. "/api") */
   path: z.string().optional(),
-  /** Proxy target URL "http://127.0.0.1:3000" */
   target: z.string(),
-  /** Full public access URL if available */
   publicUrl: z.string().optional(),
-  /** Access scope */
   accessScope: z.enum(["public", "private", "tailnet"]),
-  /** Hostname (Tailscale MagicDNS, Cloudflare domain, etc.) */
   hostname: z.string().optional(),
-  /** Provider-specific extra info */
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
@@ -83,7 +61,6 @@ export const TunnelProviderInfoSchema = z.object({
   status: z.enum(["available", "unavailable", "not-installed"]),
   version: z.string().optional(),
   entries: z.array(TunnelEntrySchema),
-  /** Provider-level info (e.g. Tailscale ipv4/hostname, UPnP external IP) */
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
@@ -95,27 +72,154 @@ export const TunnelStateSchema = z.object({
 
 export type TunnelState = z.infer<typeof TunnelStateSchema>;
 
-// ---------------------------------------------------------------------------
-// Daemon state — dynamic runtime information (frequently updated)
-// ---------------------------------------------------------------------------
+export const AutomationPrioritySchema = z.enum(["urgent", "user", "background"]);
+export type AutomationPriority = z.infer<typeof AutomationPrioritySchema>;
+
+export const AutomationJobKindSchema = z.enum(["supervisor", "webhook"]);
+export type AutomationJobKind = z.infer<typeof AutomationJobKindSchema>;
+
+export const AutomationJobStatusSchema = z.enum([
+  "queued",
+  "dispatching",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+export type AutomationJobStatus = z.infer<typeof AutomationJobStatusSchema>;
+
+export const AutomationJobSummarySchema = z.object({
+  id: z.string(),
+  kind: AutomationJobKindSchema,
+  status: AutomationJobStatusSchema,
+  priority: AutomationPrioritySchema,
+  dedupeKey: z.string(),
+  attempt: z.number(),
+  maxAttempts: z.number(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  dispatchedAt: z.number().optional(),
+  completedAt: z.number().optional(),
+  nextRunAt: z.number().optional(),
+  sessionId: z.string().optional(),
+  label: z.string().optional(),
+  projectId: z.string().optional(),
+  runId: z.string().optional(),
+  loopId: z.string().optional(),
+  loopIteration: z.number().optional(),
+  continuityKey: z.string().optional(),
+  errorMessage: z.string().optional(),
+});
+
+export type AutomationJobSummary = z.infer<typeof AutomationJobSummarySchema>;
+
+export const AutomationGuardianSummarySchema = z.object({
+  key: z.string(),
+  projectId: z.string(),
+  loopId: z.string().optional(),
+  sessionId: z.string(),
+  updatedAt: z.number(),
+  lastRunId: z.string().optional(),
+  attached: z.boolean().optional(),
+});
+
+export type AutomationGuardianSummary = z.infer<typeof AutomationGuardianSummarySchema>;
+
+export const AutomationGuardianUsageSummarySchema = z.object({
+  key: z.string(),
+  projectId: z.string().optional(),
+  loopId: z.string().optional(),
+  reuseCount: z.number(),
+  rememberCount: z.number(),
+  resetCount: z.number(),
+  lastUsedAt: z.number(),
+  currentSessionId: z.string().optional(),
+});
+
+export type AutomationGuardianUsageSummary = z.infer<typeof AutomationGuardianUsageSummarySchema>;
+
+export const AutomationAuditEventSummarySchema = z.object({
+  id: z.string(),
+  occurredAt: z.number(),
+  kind: z.string(),
+  jobId: z.string().optional(),
+  dedupeKey: z.string().optional(),
+  sessionId: z.string().optional(),
+  projectId: z.string().optional(),
+  runId: z.string().optional(),
+  loopId: z.string().optional(),
+  trigger: z.string().optional(),
+  status: z.string().optional(),
+  guardianKey: z.string().optional(),
+  guardianSessionId: z.string().optional(),
+  message: z.string().optional(),
+});
+
+export type AutomationAuditEventSummary = z.infer<typeof AutomationAuditEventSummarySchema>;
+
+export const AutomationAuditStatsSchema = z.object({
+  totalEvents: z.number(),
+  lastEventAt: z.number().optional(),
+  queuedCount: z.number(),
+  sessionStartedCount: z.number(),
+  terminalCompletedCount: z.number(),
+  terminalFailedCount: z.number(),
+  terminalCancelledCount: z.number(),
+  guardianReuseCount: z.number(),
+  guardianRememberCount: z.number(),
+  guardianResetCount: z.number(),
+  watchdogStopCount: z.number(),
+  stopRequestCount: z.number(),
+  guardianEligibleRunCount: z.number(),
+  guardianReuseRate: z.number(),
+  activeGuardianCount: z.number(),
+});
+
+export type AutomationAuditStats = z.infer<typeof AutomationAuditStatsSchema>;
+
+export const AutomationCountsSchema = z.object({
+  queued: z.number(),
+  dispatching: z.number(),
+  running: z.number(),
+  completed: z.number(),
+  failed: z.number(),
+  cancelled: z.number(),
+});
+
+export type AutomationCounts = z.infer<typeof AutomationCountsSchema>;
+
+export const AutomationStateSchema = z.object({
+  updatedAt: z.number(),
+  counts: AutomationCountsSchema,
+  recentJobs: z.array(AutomationJobSummarySchema),
+  guardians: z.array(AutomationGuardianSummarySchema).optional(),
+  guardianUsage: z.array(AutomationGuardianUsageSummarySchema).optional(),
+  auditStats: AutomationAuditStatsSchema.optional(),
+  recentAuditEvents: z.array(AutomationAuditEventSummarySchema).optional(),
+});
+
+export type AutomationState = z.infer<typeof AutomationStateSchema>;
 
 export const DaemonStateSchema = z.object({
   status: z.union([
     z.enum(["running", "shutting-down"]),
-    z.string(), // Forward compatibility
+    z.string(),
   ]),
   pid: z.number().optional(),
   httpPort: z.number().optional(),
+  startTime: z.union([z.number(), z.string()]).optional(),
   startedAt: z.number().optional(),
+  startedWithCliVersion: z.string().optional(),
   shutdownRequestedAt: z.number().optional(),
   shutdownSource: z
     .union([
       z.enum(["mobile-app", "cli", "os-signal", "unknown"]),
-      z.string(), // Forward compatibility
+      z.string(),
     ])
     .optional(),
   tailscale: TailscaleInfoSchema.optional(),
   tunnels: TunnelStateSchema.optional(),
+  automation: AutomationStateSchema.optional(),
 });
 
 export type DaemonState = z.infer<typeof DaemonStateSchema>;

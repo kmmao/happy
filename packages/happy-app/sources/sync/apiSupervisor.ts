@@ -769,6 +769,10 @@ export interface SupervisorSummary {
     lastScanAt: number | null;
     totalRuns30d: number;
     nextRunAt: number | null;
+    scheduleEnabled: boolean;
+    scheduleIntervalHours: number | null;
+    scheduleOverdueByMs: number | null;
+    scheduleMissedRuns: number;
 }
 
 /**
