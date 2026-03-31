@@ -26,6 +26,7 @@ interface ChatHeaderViewProps {
   tintColor?: string;
   isConnected?: boolean;
   flavor?: string | null;
+  provider?: string | null;
   knowledgeCount?: number;
   devButtonState?: DevButtonState;
   devRunningCount?: number;
@@ -45,6 +46,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   avatarId,
   isConnected = true,
   flavor,
+  provider,
   knowledgeCount,
   devButtonState,
   devRunningCount,
@@ -239,6 +241,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                 size={32}
                 monochrome={!isConnected}
                 flavor={flavor}
+                provider={provider}
               />
             </Pressable>
           )}

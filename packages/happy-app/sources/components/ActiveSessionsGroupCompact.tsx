@@ -17,6 +17,8 @@ import {
   getSessionAvatarId,
   formatPathRelativeToHome,
   getSessionProjectPath,
+  getSessionProviderKey,
+  getSessionProviderLabel,
 } from "@/utils/sessionUtils";
 import { Avatar } from "./Avatar";
 import { Typography } from "@/constants/Typography";
@@ -25,6 +27,7 @@ import {
   useAllMachines,
   useHasUnreadMessages,
   useMachine,
+  useSession,
   useSetting,
   useProjectAliasMap,
 } from "@/sync/storage";
@@ -33,7 +36,6 @@ import { isMachineOnline } from "@/utils/machineUtils";
 import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
 import { machineSpawnNewSession, sessionKill, sessionDelete } from "@/sync/ops";
 import { resolveAbsolutePath } from "@/utils/pathUtils";
-import { storage } from "@/sync/storage";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 import { formatTokenCountShort } from "@/utils/formatUsage";
@@ -510,11 +512,13 @@ const ProjectHeaderAvatar = React.memo(
     sessionId: string;
   }) => {
     const hasUnreadMessages = useHasUnreadMessages(sessionId);
+    const session = useSession(sessionId);
     return (
       <Avatar
         id={avatarId}
         size={24}
         flavor={flavor}
+        provider={session ? getSessionProviderKey(session) : undefined}
         hasUnreadMessages={hasUnreadMessages}
       />
     );
@@ -744,6 +748,11 @@ const CompactSessionRow = React.memo(
                   {session.metadata?.worktree?.isWorktree
                     ? t("sessionInfo.tagBranch")
                     : t("sessionInfo.tagMain")}
+                </Text>
+              </View>
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>
+                  {getSessionProviderLabel(session)}
                 </Text>
               </View>
               {(machine?.metadata?.displayName || session.metadata?.host) && (

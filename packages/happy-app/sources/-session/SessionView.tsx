@@ -72,6 +72,7 @@ import {
   formatPathRelativeToHome,
   getSessionAvatarId,
   getSessionName,
+  getSessionProviderKey,
   useSessionStatus,
 } from "@/utils/sessionUtils";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
@@ -149,6 +150,7 @@ export const SessionView = React.memo((props: { id: string }) => {
         onAvatarPress: undefined,
         isConnected: false,
         flavor: null,
+        provider: null,
       };
     }
 
@@ -161,6 +163,7 @@ export const SessionView = React.memo((props: { id: string }) => {
         onAvatarPress: undefined,
         isConnected: false,
         flavor: null,
+        provider: null,
       };
     }
 
@@ -186,6 +189,7 @@ export const SessionView = React.memo((props: { id: string }) => {
       onAvatarPress: () => router.push(`/session/${sessionId}/info`),
       isConnected: isConnected,
       flavor: session.metadata?.flavor || null,
+      provider: getSessionProviderKey(session),
       tintColor: isConnected ? theme.colors.text : theme.colors.textSecondary,
     };
   }, [session, isDataReady, sessionId, router, showAgentActivity, theme]);

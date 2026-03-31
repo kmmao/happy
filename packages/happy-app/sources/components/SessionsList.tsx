@@ -22,6 +22,8 @@ import {
   getSessionSubtitle,
   getSessionAvatarId,
   formatLastSeen,
+  getSessionProviderKey,
+  getSessionProviderLabel,
 } from "@/utils/sessionUtils";
 import { Avatar } from "./Avatar";
 import { ActiveSessionsGroup } from "./ActiveSessionsGroup";
@@ -667,6 +669,7 @@ const SessionItem = React.memo(
                 size={44}
                 monochrome={!sessionStatus.isConnected}
                 flavor={session.metadata?.flavor}
+                provider={getSessionProviderKey(session)}
                 hasUnreadMessages={hasUnreadMessages}
               />
               {session.draft && (
@@ -811,6 +814,11 @@ const SessionItem = React.memo(
                 {session.metadata?.worktree?.isWorktree
                   ? t("sessionInfo.tagBranch")
                   : t("sessionInfo.tagMain")}
+              </Text>
+            </View>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>
+                {getSessionProviderLabel(session)}
               </Text>
             </View>
             {(machine?.metadata?.displayName || session.metadata?.host) && (

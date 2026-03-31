@@ -17,6 +17,8 @@ import {
   getSessionAvatarId,
   formatPathRelativeToHome,
   getSessionProjectPath,
+  getSessionProviderKey,
+  getSessionProviderLabel,
 } from "@/utils/sessionUtils";
 import { Avatar } from "./Avatar";
 import { Typography } from "@/constants/Typography";
@@ -672,6 +674,7 @@ const CompactSessionRow = React.memo(
                 size={36}
                 monochrome={!sessionStatus.isConnected}
                 flavor={session.metadata?.flavor}
+                provider={getSessionProviderKey(session)}
                 hasUnreadMessages={hasUnreadMessages}
               />
             </View>
@@ -792,6 +795,11 @@ const CompactSessionRow = React.memo(
                 {session.metadata?.worktree?.isWorktree
                   ? t("sessionInfo.tagBranch")
                   : t("sessionInfo.tagMain")}
+              </Text>
+            </View>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>
+                {getSessionProviderLabel(session)}
               </Text>
             </View>
             {(machine?.metadata?.displayName || session.metadata?.host) && (

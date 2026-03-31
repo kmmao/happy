@@ -239,6 +239,98 @@ export function getSessionSubtitle(session: Session): string {
 }
 
 /**
+ * Resolves the canonical provider key for a session.
+ */
+export function getSessionProviderKey(session: Session): string {
+  const profileCandidates = [
+    session.profileId?.toLowerCase(),
+    session.profileName?.toLowerCase(),
+  ].filter(Boolean) as string[];
+
+  for (const candidate of profileCandidates) {
+    if (candidate.includes("deepseek")) return "deepseek";
+    if (
+      candidate === "zai" ||
+      candidate.includes("z.ai") ||
+      candidate.includes("chatglm")
+    ) {
+      return "zai";
+    }
+    if (candidate.includes("minimax")) return "minimax";
+    if (candidate.includes("azure-openai")) return "azure-openai";
+    if (candidate.includes("azure") && candidate.includes("openai")) {
+      return "azure-openai";
+    }
+    if (
+      candidate.includes("openai") ||
+      candidate.includes("codex") ||
+      candidate.includes("gpt")
+    ) {
+      return "codex";
+    }
+    if (candidate.includes("gemini")) return "gemini";
+    if (
+      candidate.includes("anthropic") ||
+      candidate.includes("claude")
+    ) {
+      return "claude";
+    }
+    if (candidate.includes("opencode")) return "opencode";
+    if (candidate === "acp") return "acp";
+  }
+
+  const flavor = session.metadata?.flavor?.toLowerCase();
+  switch (flavor) {
+    case "gpt":
+    case "openai":
+      return "codex";
+    case "codex":
+    case "gemini":
+    case "opencode":
+    case "acp":
+      return flavor;
+    case "claude":
+    case undefined:
+    case null:
+      return "claude";
+    default:
+      return (flavor || "claude").trim() || "claude";
+  }
+}
+
+/**
+ * Returns the human-readable AI provider for a session.
+ */
+export function getSessionProviderLabel(session: Session): string {
+  const key = getSessionProviderKey(session);
+  switch (key) {
+    case "codex":
+      return t("agentInput.agent.codex");
+    case "gemini":
+      return t("agentInput.agent.gemini");
+    case "claude":
+      return t("agentInput.agent.claude");
+    case "deepseek":
+      return "DeepSeek";
+    case "zai":
+      return "Z.AI";
+    case "minimax":
+      return "MiniMax";
+    case "azure-openai":
+      return "Azure OpenAI";
+    case "opencode":
+      return "OpenCode";
+    case "acp":
+      return "ACP";
+    default:
+      if (session.profileName && session.profileName.trim().length > 0) {
+        return session.profileName;
+      }
+      return key.charAt(0).toUpperCase() + key.slice(1);
+  }
+}
+
+/**
  * Returns the project path for grouping.
  * Worktree sessions use parentRepoPath so they group with their parent project.
  */

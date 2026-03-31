@@ -14,6 +14,8 @@ import {
   formatOSPlatform,
   formatPathRelativeToHome,
   getSessionAvatarId,
+  getSessionProviderKey,
+  getSessionProviderLabel,
 } from "@/utils/sessionUtils";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
@@ -357,6 +359,7 @@ function SessionInfoContent({ session }: { session: Session }) {
               size={80}
               monochrome={!sessionStatus.isConnected}
               flavor={session.metadata?.flavor}
+              provider={getSessionProviderKey(session)}
             />
             <Text
               style={{
@@ -649,13 +652,7 @@ function SessionInfoContent({ session }: { session: Session }) {
             )}
             <Item
               title={t("sessionInfo.aiProvider")}
-              subtitle={(() => {
-                const flavor = session.metadata.flavor || "claude";
-                if (flavor === "claude") return "Claude";
-                if (flavor === "gpt" || flavor === "openai") return "Codex";
-                if (flavor === "gemini") return "Gemini";
-                return flavor;
-              })()}
+              subtitle={getSessionProviderLabel(session)}
               icon={
                 <Ionicons name="sparkles-outline" size={29} color="#5856D6" />
               }

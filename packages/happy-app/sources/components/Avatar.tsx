@@ -14,6 +14,7 @@ interface AvatarProps {
   size?: number;
   monochrome?: boolean;
   flavor?: string | null;
+  provider?: string | null;
   imageUrl?: string | null;
   thumbhash?: string | null;
   hasUnreadMessages?: boolean;
@@ -23,7 +24,60 @@ const flavorIcons = {
   claude: require("@/assets/images/icon-claude.png"),
   codex: require("@/assets/images/icon-gpt.png"),
   gemini: require("@/assets/images/icon-gemini.png"),
+  deepseek: require("@/assets/images/icon-deepseek.png"),
+  zai: require("@/assets/images/icon-zai.png"),
+  minimax: require("@/assets/images/icon-minimax.png"),
+  "azure-openai": require("@/assets/images/icon-azure-openai.png"),
+  opencode: require("@/assets/images/openclaw-icon-color.png"),
+  acp: require("@/assets/images/openclaw-icon-color.png"),
 };
+
+function normalizeProviderKey(
+  value: string | null | undefined,
+): keyof typeof flavorIcons | null {
+  const key = value?.toLowerCase();
+  if (!key || key.trim().length === 0) {
+    return null;
+  }
+  if (key === "deepseek") {
+    return "deepseek";
+  }
+  if (key === "zai" || key === "z.ai" || key.includes("chatglm")) {
+    return "zai";
+  }
+  if (key === "minimax") {
+    return "minimax";
+  }
+  if (key === "azure-openai" || (key.includes("azure") && key.includes("openai"))) {
+    return "azure-openai";
+  }
+  if (key === "openai" || key === "gpt") {
+    return "codex";
+  }
+  if (key === "codex") {
+    return "codex";
+  }
+  if (key === "claude" || key === "anthropic") {
+    return "claude";
+  }
+  if (key === "opencode") {
+    return "opencode";
+  }
+  if (key === "acp") {
+    return "acp";
+  }
+  if (key === "gemini") {
+    return "gemini";
+  }
+  return null;
+}
+
+function resolveIconKey(
+  provider: string | null | undefined,
+  flavor: string | null | undefined,
+): keyof typeof flavorIcons {
+  return normalizeProviderKey(provider) ?? normalizeProviderKey(flavor) ?? "claude";
+}
 
 const styles = StyleSheet.create((theme) => ({
   container: {
@@ -35,6 +89,7 @@ const styles = StyleSheet.create((theme) => ({
     right: -2,
     backgroundColor: theme.colors.surface,
     borderRadius: 100,
+    overflow: "hidden",
     padding: 2,
     shadowColor: theme.colors.shadow.color,
     shadowOffset: { width: 0, height: 1 },
@@ -51,11 +106,21 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 1.5,
     borderColor: theme.colors.surface,
   },
+  iconMask: {
+    borderRadius: 999,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconFill: {
+    borderRadius: 999,
+  },
 }));
 
 export const Avatar = React.memo((props: AvatarProps) => {
   const {
     flavor,
+    provider,
     size = 48,
     imageUrl,
     thumbhash,
@@ -91,17 +156,15 @@ export const Avatar = React.memo((props: AvatarProps) => {
       />
     );
 
-    const showFlavorOverlay = showFlavorIcons && flavor;
+    const showFlavorOverlay = showFlavorIcons && (provider || flavor);
     if (showFlavorOverlay || hasUnreadMessages) {
-      const effectiveFlavor = flavor || "claude";
-      const flavorIcon =
-        flavorIcons[effectiveFlavor as keyof typeof flavorIcons] ||
-        flavorIcons.claude;
+      const normalizedFlavor = resolveIconKey(provider, flavor);
+      const flavorIcon = flavorIcons[normalizedFlavor];
       const circleSize = Math.round(size * 0.35);
       const iconSize =
-        effectiveFlavor === "codex"
+        normalizedFlavor === "codex"
           ? Math.round(size * 0.25)
-          : effectiveFlavor === "claude"
+          : normalizedFlavor === "claude"
             ? Math.round(size * 0.28)
             : Math.round(size * 0.35);
 
@@ -120,14 +183,16 @@ export const Avatar = React.memo((props: AvatarProps) => {
                 },
               ]}
             >
-              <Image
-                source={flavorIcon}
-                style={{ width: iconSize, height: iconSize }}
-                contentFit="contain"
-                tintColor={
-                  effectiveFlavor === "codex" ? theme.colors.text : undefined
-                }
-              />
+              <View style={[styles.iconMask, { width: iconSize, height: iconSize }]}>
+                <Image
+                  source={flavorIcon}
+                  style={[styles.iconFill, { width: iconSize, height: iconSize }]}
+                  contentFit="contain"
+                  tintColor={
+                    normalizedFlavor === "codex" ? theme.colors.text : undefined
+                  }
+                />
+              </View>
             </View>
           )}
           {unreadBadgeElement}
@@ -150,17 +215,15 @@ export const Avatar = React.memo((props: AvatarProps) => {
   }
 
   // Determine flavor icon for generated avatars
-  const effectiveFlavor = flavor || "claude";
-  const flavorIcon =
-    flavorIcons[effectiveFlavor as keyof typeof flavorIcons] ||
-    flavorIcons.claude;
+  const normalizedFlavor = resolveIconKey(provider, flavor);
+  const flavorIcon = flavorIcons[normalizedFlavor];
   // Make icons smaller while keeping same circle size
   // Claude slightly bigger than codex
   const circleSize = Math.round(size * 0.35);
   const iconSize =
-    effectiveFlavor === "codex"
+    normalizedFlavor === "codex"
       ? Math.round(size * 0.25)
-      : effectiveFlavor === "claude"
+      : normalizedFlavor === "claude"
         ? Math.round(size * 0.28)
         : Math.round(size * 0.35);
 
@@ -180,14 +243,16 @@ export const Avatar = React.memo((props: AvatarProps) => {
               },
             ]}
           >
-            <Image
-              source={flavorIcon}
-              style={{ width: iconSize, height: iconSize }}
-              contentFit="contain"
-              tintColor={
-                effectiveFlavor === "codex" ? theme.colors.text : undefined
-              }
-            />
+            <View style={[styles.iconMask, { width: iconSize, height: iconSize }]}>
+              <Image
+                source={flavorIcon}
+                style={[styles.iconFill, { width: iconSize, height: iconSize }]}
+                contentFit="contain"
+                tintColor={
+                  normalizedFlavor === "codex" ? theme.colors.text : undefined
+                }
+              />
+            </View>
           </View>
         )}
         {unreadBadgeElement}
