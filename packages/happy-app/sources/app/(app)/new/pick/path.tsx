@@ -13,15 +13,22 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { Item } from "@/components/Item";
 import { Typography } from "@/constants/Typography";
 import { useAllMachines, useSessions, useSetting } from "@/sync/storage";
+import { sync } from "@/sync/sync";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
+import { Modal } from "@/modal";
 import {
   MultiTextInput,
   MultiTextInputHandle,
 } from "@/components/MultiTextInput";
 import { useGitRepoScanner } from "@/hooks/useGitRepoScanner";
+import { CloneRepoModal } from "@/components/CloneRepoModal";
+import {
+  machineCloneGitRepo,
+  machineListRemoteGitRepos,
+} from "@/sync/ops";
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -82,6 +89,9 @@ function PathPickerScreen() {
   const sessions = useSessions();
   const inputRef = useRef<MultiTextInputHandle>(null);
   const recentMachinePaths = useSetting("recentMachinePaths");
+  const recentRemoteRepos = useSetting("recentRemoteRepos");
+  const lastUsedGitHost = useSetting("lastUsedGitHost");
+  const gitHosts = useSetting("gitHosts") || [];
 
   const [customPath, setCustomPath] = useState(params.selectedPath || "");
 
@@ -174,6 +184,93 @@ function PathPickerScreen() {
     router.back();
   }, [customPath, router, machine, navigation]);
 
+  const handleCloneRepo = React.useCallback(() => {
+    const machineId = params.machineId;
+    if (!machineId) return;
+
+    Modal.show({
+      component: CloneRepoModal,
+      props: {
+        initialTargetDir: customPath.trim() || machine?.metadata?.homeDir || "/home",
+        gitHosts,
+        lastUsedGitHost,
+        recentRemoteRepos,
+        onLoadRepos: async (host: (typeof gitHosts)[number]) => {
+          if (!host.apiToken) {
+            throw new Error(t("newSession.gitRepos.noConfiguredHosts"));
+          }
+          const result = await machineListRemoteGitRepos({
+            machineId,
+            provider: host.provider,
+            apiToken: host.apiToken,
+            host: host.host,
+          });
+          if (!result.success) {
+            throw new Error(
+              result.error ||
+                t("newSession.gitRepos.loadReposFailed", {
+                  error: "Unknown error",
+                }),
+            );
+          }
+          sync.applySettings({ lastUsedGitHost: host.host });
+          return result.repos || [];
+        },
+        onClone: async ({
+          repoUrl,
+          targetDir,
+          provider,
+          apiToken,
+          host,
+        }: {
+          repoUrl: string;
+          targetDir: string;
+          provider?: "github" | "gitea";
+          apiToken?: string;
+          host?: string;
+        }) => {
+          const result = await machineCloneGitRepo({
+            machineId,
+            repoUrl,
+            targetDirectory: targetDir,
+            provider,
+            apiToken,
+            host,
+          });
+
+          if (!result.success || !result.repoPath) {
+            throw new Error(
+              result.stderr?.trim() ||
+                result.error ||
+                t("newSession.gitRepos.cloneFailed", {
+                  error: "Unknown error",
+                }),
+            );
+          }
+
+          const updatedRecentRemoteRepos = [
+            {
+              host: host || "",
+              repoUrl,
+              fullName: repoUrl.replace(/\.git$/, "").split("/").slice(-2).join("/"),
+            },
+            ...recentRemoteRepos.filter(
+              (entry) => !(entry.host === (host || "") && entry.repoUrl === repoUrl),
+            ),
+          ].slice(0, 12);
+
+          sync.applySettings({
+            lastUsedGitHost: host || null,
+            recentRemoteRepos: updatedRecentRemoteRepos,
+          });
+          setCustomPath(result.repoPath);
+          setTimeout(() => inputRef.current?.focus(), 50);
+          Modal.toast(t("newSession.gitRepos.cloneSuccess"));
+        },
+      },
+    });
+  }, [customPath, gitHosts, lastUsedGitHost, machine?.metadata?.homeDir, params.machineId, recentRemoteRepos]);
+
   if (!machine) {
     return (
       <>
@@ -262,6 +359,20 @@ function PathPickerScreen() {
             </ItemGroup>
 
             <ItemGroup title={t("newSession.gitRepos.title")}>
+              <Item
+                title={t("newSession.gitRepos.cloneRepo")}
+                subtitle={t("newSession.gitRepos.cloneDescription")}
+                leftElement={
+                  <Ionicons
+                    name="cloud-download-outline"
+                    size={18}
+                    color={theme.colors.textLink}
+                  />
+                }
+                onPress={handleCloneRepo}
+                titleStyle={{ color: theme.colors.textLink }}
+                showDivider
+              />
               <Item
                 title={
                   scanning ? t("gitHosts.scanning") : t("gitHosts.scanRepos")

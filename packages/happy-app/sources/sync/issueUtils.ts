@@ -19,6 +19,26 @@ const GITHUB_HOSTS = new Set(["github.com", "www.github.com"]);
 const SAFE_SLUG = /^[a-zA-Z0-9._-]+$/;
 
 /**
+ * Extract the host portion from a git remote URL.
+ * Supports git@host:owner/repo.git, ssh://git@host/owner/repo.git, and https://host/owner/repo.git.
+ */
+export function extractGitRemoteHost(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  const sshMatch = trimmed.match(SSH_REGEX);
+  if (sshMatch) return sshMatch[1];
+
+  const sshUrlMatch = trimmed.match(SSH_URL_REGEX);
+  if (sshUrlMatch) return sshUrlMatch[1];
+
+  const httpsMatch = trimmed.match(HTTPS_REGEX);
+  if (httpsMatch) return httpsMatch[1];
+
+  return null;
+}
+
+/**
  * Strip protocol prefix from a host string if present.
  * "http://10.10.10.234:8418" → { bare: "10.10.10.234:8418", protocol: "http" }
  * "10.10.10.234:8418" → { bare: "10.10.10.234:8418", protocol: null }

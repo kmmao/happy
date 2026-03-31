@@ -453,6 +453,21 @@ export const SettingsSchema = z.object({
     .describe(
       "Last 10 machine-path combinations, ordered by most recent first",
     ),
+  recentRemoteRepos: z
+    .array(
+      z.object({
+        host: z.string(),
+        repoUrl: z.string(),
+        fullName: z.string(),
+      }),
+    )
+    .describe(
+      "Last selected remote repositories, ordered by most recent first",
+    ),
+  lastUsedGitHost: z
+    .string()
+    .nullable()
+    .describe("Last selected Git host for remote repo cloning"),
   lastUsedAgent: z
     .string()
     .nullable()
@@ -695,6 +710,8 @@ export const settingsDefaults: Settings = {
   elevenLabsVoiceId: null,
   preferredLanguage: null,
   recentMachinePaths: [],
+  recentRemoteRepos: [],
+  lastUsedGitHost: null,
   lastUsedAgent: null,
   lastUsedPermissionMode: null,
   lastUsedModelMode: null,

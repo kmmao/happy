@@ -278,6 +278,45 @@ export interface GitRepoEntry {
   readonly name: string;
 }
 
+export interface CloneGitRepoOptions {
+  readonly machineId: string;
+  readonly repoUrl: string;
+  readonly targetDirectory: string;
+  readonly provider?: "github" | "gitea";
+  readonly apiToken?: string;
+  readonly host?: string;
+}
+
+export interface CloneGitRepoResult {
+  readonly success: boolean;
+  readonly repoPath?: string;
+  readonly stdout?: string;
+  readonly stderr?: string;
+  readonly error?: string;
+}
+
+export interface RemoteGitRepoEntry {
+  readonly name: string;
+  readonly fullName: string;
+  readonly cloneUrl: string;
+  readonly htmlUrl: string;
+  readonly private: boolean;
+  readonly updatedAt?: number | null;
+}
+
+export interface ListRemoteGitReposOptions {
+  readonly machineId: string;
+  readonly provider: "github" | "gitea";
+  readonly apiToken: string;
+  readonly host: string;
+}
+
+export interface ListRemoteGitReposResult {
+  readonly success: boolean;
+  readonly repos?: readonly RemoteGitRepoEntry[];
+  readonly error?: string;
+}
+
 export async function machineListGitRepos(
   machineId: string,
   scanPaths?: readonly string[],
@@ -291,6 +330,52 @@ export async function machineListGitRepos(
     throw new Error(result.error ?? "Failed to scan git repos");
   }
   return result.repos ?? [];
+}
+
+export async function machineCloneGitRepo(
+  options: CloneGitRepoOptions,
+): Promise<CloneGitRepoResult> {
+  try {
+    const result = await apiSocket.machineRPC<
+      CloneGitRepoResult,
+      Omit<CloneGitRepoOptions, "machineId">
+    >(options.machineId, "cloneGitRepo", {
+      repoUrl: options.repoUrl,
+      targetDirectory: options.targetDirectory,
+      provider: options.provider,
+      apiToken: options.apiToken,
+      host: options.host,
+    });
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: getErrorMessage(error, "Failed to clone repository"),
+    };
+  }
+}
+
+export async function machineListRemoteGitRepos(
+  options: ListRemoteGitReposOptions,
+): Promise<ListRemoteGitReposResult> {
+  try {
+    const result = await apiSocket.machineRPC<
+      ListRemoteGitReposResult,
+      Omit<ListRemoteGitReposOptions, "machineId">
+    >(options.machineId, "listRemoteGitRepos", {
+      provider: options.provider,
+      apiToken: options.apiToken,
+      host: options.host,
+    });
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: getErrorMessage(error, "Failed to load remote repositories"),
+    };
+  }
 }
 
 export interface CreateRemoteWebhookParams {
