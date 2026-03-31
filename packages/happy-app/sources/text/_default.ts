@@ -770,6 +770,9 @@ export const en = {
     },
     codexModel: {
       title: "CODEX MODEL",
+      gpt54: "GPT-5.4",
+      gpt54Pro: "GPT-5.4 Pro",
+      gpt54Mini: "GPT-5.4 Mini",
       gpt53Codex: "GPT-5.3 Codex",
       gpt53CodexSpark: "GPT-5.3 Codex Spark",
       gpt52Codex: "GPT-5.2 Codex",

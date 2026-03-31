@@ -1283,6 +1283,24 @@ export function NewSessionWizard({
                   ] as const)
                 : ([
                     {
+                      value: "gpt-5.4",
+                      label: "GPT-5.4",
+                      description: "Latest general-purpose model",
+                      icon: "diamond-outline",
+                    },
+                    {
+                      value: "gpt-5.4-pro",
+                      label: "GPT-5.4 Pro",
+                      description: "Most capable for complex tasks",
+                      icon: "sparkles-outline",
+                    },
+                    {
+                      value: "gpt-5.4-mini",
+                      label: "GPT-5.4 Mini",
+                      description: "Fast and cost-efficient",
+                      icon: "flash-outline",
+                    },
+                    {
                       value: "gpt-5.3-codex",
                       label: "GPT-5.3 Codex",
                       description: "Most capable coding model",

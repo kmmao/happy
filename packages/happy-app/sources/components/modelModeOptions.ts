@@ -217,6 +217,21 @@ export function getClaudeModelModes(): ModelMode[] {
 export function getCodexModelModes(translate: Translate): ModelMode[] {
   return [
     {
+      key: "gpt-5.4",
+      name: translate("agentInput.codexModel.gpt54"),
+      description: null,
+    },
+    {
+      key: "gpt-5.4-pro",
+      name: translate("agentInput.codexModel.gpt54Pro"),
+      description: null,
+    },
+    {
+      key: "gpt-5.4-mini",
+      name: translate("agentInput.codexModel.gpt54Mini"),
+      description: null,
+    },
+    {
       key: "gpt-5.3-codex",
       name: translate("agentInput.codexModel.gpt53Codex"),
       description: null,
@@ -396,7 +411,7 @@ export function resolveCurrentOption<T extends ModeOption>(
 
 export function getDefaultModelKey(flavor: AgentFlavor): string {
   if (flavor === "codex") {
-    return "gpt-5.3-codex";
+    return "gpt-5.4";
   }
   if (flavor === "gemini") {
     return "gemini-3-flash-preview";
