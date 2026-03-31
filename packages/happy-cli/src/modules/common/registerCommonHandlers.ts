@@ -1,5 +1,5 @@
 import { logger } from "@/ui/logger";
-import { exec, ExecOptions } from "child_process";
+import { exec, execFile, ExecFileOptions, ExecOptions } from "child_process";
 import { promisify } from "util";
 import { readFile, writeFile, readdir, stat, mkdir } from "fs/promises";
 import { createHash } from "crypto";
@@ -11,6 +11,7 @@ import { RpcHandlerManager } from "../../api/rpc/RpcHandlerManager";
 import { validatePath } from "./pathSecurity";
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /** Scoped temp directory for uploads from the mobile app. Allowed in addition to workingDirectory. */
 const UPLOAD_TEMP_DIR = join(tmpdir(), "happy", "uploads");
@@ -123,6 +124,43 @@ interface GetUploadDirResponse {
   error?: string;
 }
 
+interface CloneGitRepoRequest {
+  repoUrl: string;
+  targetDirectory: string;
+  provider?: "github" | "gitea";
+  apiToken?: string;
+  host?: string;
+}
+
+interface CloneGitRepoResponse {
+  success: boolean;
+  repoPath?: string;
+  stdout?: string;
+  stderr?: string;
+  error?: string;
+}
+
+interface RemoteGitRepoEntry {
+  name: string;
+  fullName: string;
+  cloneUrl: string;
+  htmlUrl: string;
+  private: boolean;
+  updatedAt?: number | null;
+}
+
+interface ListRemoteGitReposRequest {
+  provider: "github" | "gitea";
+  apiToken: string;
+  host: string;
+}
+
+interface ListRemoteGitReposResponse {
+  success: boolean;
+  repos?: RemoteGitRepoEntry[];
+  error?: string;
+}
+
 /*
  * Spawn Session Options and Result
  * This rpc type is used by the daemon, all other RPCs here are for sessions
@@ -175,6 +213,7 @@ export function registerCommonHandlers(
 ) {
   // Sanitize sessionId to prevent path traversal when used in filesystem paths
   const safeSessionId = sessionId.replace(/[^a-zA-Z0-9-]/g, "");
+  let gitReposCache: { repos: GitRepoEntry[]; expiry: number } | null = null;
 
   // ── Security: Block commands that can leak secrets via bash RPC ──────────
   // These patterns prevent remote (mobile/web) users from extracting
@@ -727,8 +766,271 @@ export function registerCommonHandlers(
     return parent && parent !== "." ? `${parent}/${self}` : self;
   }
 
-  let gitReposCache: { repos: GitRepoEntry[]; expiry: number } | null = null;
   const CACHE_TTL = 120_000; // 120 seconds
+
+  function parseHostEntry(host: string): {
+    bare: string;
+    protocol: string | null;
+  } {
+    const match = host.match(/^(https?):\/\/(.+)/);
+    if (match) {
+      return { bare: match[2].replace(/\/$/, ""), protocol: match[1] };
+    }
+    return { bare: host.replace(/\/$/, ""), protocol: null };
+  }
+
+  function parseCloneCoordinates(repoUrl: string): {
+    host: string;
+    owner: string;
+    repo: string;
+  } | null {
+    const trimmed = repoUrl.trim();
+    const sshMatch = trimmed.match(/^git@([^:]+):([^/]+)\/([^/.]+?)(?:\.git)?$/);
+    if (sshMatch) {
+      return { host: sshMatch[1], owner: sshMatch[2], repo: sshMatch[3] };
+    }
+
+    const sshUrlMatch = trimmed.match(/^ssh:\/\/[^@]+@([^/]+)\/([^/]+)\/([^/.]+?)(?:\.git)?$/);
+    if (sshUrlMatch) {
+      return { host: sshUrlMatch[1], owner: sshUrlMatch[2], repo: sshUrlMatch[3] };
+    }
+
+    const httpsMatch = trimmed.match(/^https?:\/\/([^/]+)\/([^/]+)\/([^/.]+?)(?:\.git)?$/);
+    if (httpsMatch) {
+      return { host: httpsMatch[1], owner: httpsMatch[2], repo: httpsMatch[3] };
+    }
+
+    return null;
+  }
+
+  function resolveCloneUrl(repoUrl: string, configuredHost?: string): string {
+    if (/^https?:\/\//.test(repoUrl)) {
+      return repoUrl;
+    }
+
+    const coords = parseCloneCoordinates(repoUrl);
+    if (!coords) return repoUrl;
+
+    const hostEntry = configuredHost ? parseHostEntry(configuredHost) : null;
+    const protocol = hostEntry?.protocol ?? "https";
+    const bareHost = hostEntry?.bare ?? coords.host;
+    return `${protocol}://${bareHost}/${coords.owner}/${coords.repo}.git`;
+  }
+
+  function buildCloneAuthEnv(
+    provider: "github" | "gitea" | undefined,
+    apiToken: string | undefined,
+  ): NodeJS.ProcessEnv | undefined {
+    if (!apiToken) return undefined;
+    const username = provider === "github" ? "x-access-token" : "oauth2";
+    const authValue = Buffer.from(`${username}:${apiToken}`).toString("base64");
+    return {
+      ...process.env,
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "http.extraHeader",
+      GIT_CONFIG_VALUE_0: `Authorization: Basic ${authValue}`,
+    };
+  }
+
+  function buildGitApiBase(
+    provider: "github" | "gitea",
+    host: string,
+  ): string {
+    const { bare, protocol } = parseHostEntry(host);
+    const normalizedProtocol = protocol ?? "https";
+    const origin = `${normalizedProtocol}://${bare}`;
+    const isGitHubCom = bare === "github.com" || bare === "www.github.com";
+    if (provider === "github") {
+      return isGitHubCom ? "https://api.github.com" : `${origin}/api/v3`;
+    }
+    return `${origin}/api/v1`;
+  }
+
+  function buildGitApiHeaders(apiToken: string): Record<string, string> {
+    return {
+      Authorization: `token ${apiToken}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+  }
+
+  rpcHandlerManager.registerHandler<
+    ListRemoteGitReposRequest,
+    ListRemoteGitReposResponse
+  >("listRemoteGitRepos", async (data) => {
+    logger.debug("listRemoteGitRepos request:", {
+      provider: data.provider,
+      host: data.host,
+      hasToken: !!data.apiToken,
+    });
+
+    if (!data.apiToken) {
+      return { success: false, error: "API token is required" };
+    }
+    if (!data.host?.trim()) {
+      return { success: false, error: "Host is required" };
+    }
+
+    try {
+      const baseUrl = buildGitApiBase(data.provider, data.host);
+      const headers = buildGitApiHeaders(data.apiToken);
+      const repos: RemoteGitRepoEntry[] = [];
+      const maxPages = 3;
+
+      for (let page = 1; page <= maxPages; page += 1) {
+        const url =
+          data.provider === "github"
+            ? `${baseUrl}/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator,organization_member`
+            : `${baseUrl}/user/repos?limit=100&page=${page}&sort=updated`;
+
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "");
+          return {
+            success: false,
+            error: `HTTP ${response.status}: ${errorText}`,
+          };
+        }
+
+        const pageRepos = (await response.json()) as Array<{
+          name?: string;
+          full_name?: string;
+          clone_url?: string;
+          html_url?: string;
+          private?: boolean;
+          updated_at?: string;
+          owner?: { login?: string; username?: string };
+        }>;
+
+        const normalized = pageRepos
+          .filter((repo) => !!repo.name)
+          .map((repo) => {
+            const owner = repo.owner?.login || repo.owner?.username || "";
+            const fullName = repo.full_name || (owner ? `${owner}/${repo.name}` : repo.name || "");
+            const htmlUrl = repo.html_url || "";
+            const cloneUrl = repo.clone_url || (htmlUrl ? `${htmlUrl}.git` : "");
+            return {
+              name: repo.name || fullName,
+              fullName,
+              cloneUrl,
+              htmlUrl,
+              private: !!repo.private,
+              updatedAt: repo.updated_at ? Date.parse(repo.updated_at) : null,
+            };
+          })
+          .filter((repo) => !!repo.cloneUrl);
+
+        repos.push(...normalized);
+
+        if (pageRepos.length < 100) {
+          break;
+        }
+      }
+
+            repos.sort((a, b) => {
+        const updatedDiff = (b.updatedAt || 0) - (a.updatedAt || 0);
+        if (updatedDiff !== 0) return updatedDiff;
+        return a.fullName.localeCompare(b.fullName);
+      });
+      return { success: true, repos };
+    } catch (error) {
+      logger.debug("listRemoteGitRepos failed:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to load remote repositories",
+      };
+    }
+  });
+
+  rpcHandlerManager.registerHandler<CloneGitRepoRequest, CloneGitRepoResponse>(
+    "cloneGitRepo",
+    async (data) => {
+      logger.debug("cloneGitRepo request:", {
+        repoUrl: data.repoUrl,
+        targetDirectory: data.targetDirectory,
+        provider: data.provider,
+        host: data.host,
+        hasToken: !!data.apiToken,
+      });
+
+      if (!data.repoUrl?.trim()) {
+        return { success: false, error: "Repository URL is required" };
+      }
+      if (!data.targetDirectory?.trim()) {
+        return { success: false, error: "Target directory is required" };
+      }
+      if (!data.targetDirectory.startsWith("/")) {
+        return {
+          success: false,
+          error: "Target directory must be an absolute path",
+        };
+      }
+
+      const coords = parseCloneCoordinates(data.repoUrl);
+      if (!coords) {
+        return { success: false, error: "Invalid repository URL" };
+      }
+
+      const repoPath = join(resolve(data.targetDirectory), coords.repo);
+
+      try {
+        await mkdir(resolve(data.targetDirectory), { recursive: true });
+
+        try {
+          const existing = await stat(repoPath);
+          if (existing.isDirectory()) {
+            return {
+              success: false,
+              error: `Destination already exists: ${repoPath}`,
+            };
+          }
+        } catch {
+          // Destination does not exist yet.
+        }
+
+        const cloneUrl = resolveCloneUrl(data.repoUrl, data.host);
+        const options: ExecFileOptions = {
+          cwd: resolve(data.targetDirectory),
+          timeout: 300_000,
+          maxBuffer: 4 * 1024 * 1024,
+          env: buildCloneAuthEnv(data.provider, data.apiToken),
+        };
+
+        const { stdout, stderr } = await execFileAsync(
+          "git",
+          ["clone", cloneUrl, repoPath],
+          options,
+        );
+
+        gitReposCache = null;
+        return {
+          success: true,
+          repoPath,
+          stdout: stdout ? stdout.toString() : "",
+          stderr: stderr ? stderr.toString() : "",
+        };
+      } catch (error) {
+        const execError = error as NodeJS.ErrnoException & {
+          stdout?: string;
+          stderr?: string;
+        };
+        logger.debug("cloneGitRepo failed:", {
+          message: execError.message,
+          stderr: execError.stderr,
+        });
+        return {
+          success: false,
+          repoPath,
+          stdout: execError.stdout || "",
+          stderr: execError.stderr || "",
+          error: execError.message || "Failed to clone repository",
+        };
+      }
+    },
+  );
 
   rpcHandlerManager.registerHandler<ListGitReposRequest, ListGitReposResponse>(
     "listGitRepos",
