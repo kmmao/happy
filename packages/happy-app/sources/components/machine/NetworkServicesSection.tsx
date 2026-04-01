@@ -5,9 +5,7 @@
 
 import React, { useMemo } from "react";
 import { useRouter } from "expo-router";
-import { ItemGroup } from "@/components/ItemGroup";
-import { Item } from "@/components/Item";
-import { Ionicons } from "@expo/vector-icons";
+import { MachineNavigationSummaryItem } from "@/components/machine/MachineNavigationSummaryItem";
 import { useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import type { Machine } from "@/sync/storageTypes";
@@ -72,20 +70,13 @@ export const NetworkServicesSummaryItem = React.memo(function NetworkServicesSum
     if (!hasAny) return null;
 
     return (
-        <ItemGroup title={t("machine.networkServices")}>
-            <Item
-                title={t("machine.networkServices")}
-                subtitle={subtitle}
-                icon={
-                    <Ionicons
-                        name="globe-outline"
-                        size={20}
-                        color={theme.colors.textLink}
-                    />
-                }
-                onPress={() => router.push(`/machine/${machineId}/network` as any)}
-                showChevron
-            />
-        </ItemGroup>
+        <MachineNavigationSummaryItem
+            groupTitle={t("machine.networkServices")}
+            title={t("machine.networkServices")}
+            subtitle={subtitle}
+            iconName="globe-outline"
+            iconColor={theme.colors.textLink}
+            onPress={() => router.push(`/machine/${machineId}/network` as any)}
+        />
     );
 });

@@ -1,11 +1,13 @@
 import * as React from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { layout } from "@/components/layout";
 import { Modal } from "@/modal";
+import { BaseModal } from "@/modal/components/BaseModal";
 import {
     machineCreateAgentLoop,
     machineEmitAgentLoopEvent,
@@ -39,6 +41,7 @@ import {
     type MachineAutoDreamProfile,
 } from "@/sync/ops";
 import { t } from "@/text";
+import { useMachine } from "@/sync/storage";
 import { utf8ToBase64 } from "@/utils/stringUtils";
 
 function parseIntervalMs(raw: string): number | null {
@@ -76,6 +79,10 @@ function getLoopMemoryPath(loop: MachineAgentLoop): string {
 
 function getLoopContextPath(loop: MachineAgentLoop): string {
     return `${loop.directory}/.happy/agent-loops/${loop.id}/context.md`;
+}
+
+function isRpcMethodUnavailableError(error: unknown): boolean {
+    return error instanceof Error && error.message === "RPC method not available";
 }
 
 function parseEnvironmentVariables(raw: string): Record<string, string> | undefined {
@@ -478,6 +485,8 @@ export default React.memo(function MachineLoopsPage() {
     const machineId = typeof machineIdParam === "string" ? machineIdParam : undefined;
     const router = useRouter();
     const { theme } = useUnistyles();
+    const machine = useMachine(machineId ?? "");
+    const rpcReady = machine?.rpcReady ?? false;
     const [loops, setLoops] = React.useState<MachineAgentLoop[]>([]);
     const upstreamLoopIdsByLoopId = React.useMemo(() => {
         const mapping: Record<string, string[]> = {};
@@ -551,6 +560,9 @@ export default React.memo(function MachineLoopsPage() {
     const [downstreamLoopText, setDownstreamLoopText] = React.useState("");
     const [downstreamTriggerText, setDownstreamTriggerText] = React.useState("");
     const [environmentText, setEnvironmentText] = React.useState("");
+    const [loopEditorVisible, setLoopEditorVisible] = React.useState(false);
+    const [bootstrapProfileEditorVisible, setBootstrapProfileEditorVisible] = React.useState(false);
+    const [autoDreamProfileEditorVisible, setAutoDreamProfileEditorVisible] = React.useState(false);
     const focusedLoopRef = React.useRef<string | null>(null);
 
     const resetForm = React.useCallback(() => {
@@ -607,6 +619,36 @@ export default React.memo(function MachineLoopsPage() {
         setAutoDreamLimit("");
     }, []);
 
+    const closeLoopEditor = React.useCallback(() => {
+        setLoopEditorVisible(false);
+        resetForm();
+    }, [resetForm]);
+
+    const openCreateLoopEditor = React.useCallback(() => {
+        resetForm();
+        setLoopEditorVisible(true);
+    }, [resetForm]);
+
+    const closeBootstrapProfileEditor = React.useCallback(() => {
+        setBootstrapProfileEditorVisible(false);
+        resetBootstrapProfileForm();
+    }, [resetBootstrapProfileForm]);
+
+    const openCreateBootstrapProfileEditor = React.useCallback(() => {
+        resetBootstrapProfileForm();
+        setBootstrapProfileEditorVisible(true);
+    }, [resetBootstrapProfileForm]);
+
+    const closeAutoDreamProfileEditor = React.useCallback(() => {
+        setAutoDreamProfileEditorVisible(false);
+        resetAutoDreamProfileForm();
+    }, [resetAutoDreamProfileForm]);
+
+    const openCreateAutoDreamProfileEditor = React.useCallback(() => {
+        resetAutoDreamProfileForm();
+        setAutoDreamProfileEditorVisible(true);
+    }, [resetAutoDreamProfileForm]);
+
     const load = React.useCallback(async (kind: "initial" | "refresh") => {
         if (!machineId) {
             return;
@@ -617,6 +659,9 @@ export default React.memo(function MachineLoopsPage() {
             setRefreshing(true);
         }
         try {
+            if (!rpcReady) {
+                return;
+            }
             const [result, bootstrapResult, autoDreamResult] = await Promise.all([
                 machineListAgentLoops(machineId),
                 machineListAgentLoopBootstrapProfiles(machineId),
@@ -626,7 +671,9 @@ export default React.memo(function MachineLoopsPage() {
             setBootstrapProfiles(bootstrapResult.profiles ?? []);
             setAutoDreamProfiles(autoDreamResult.profiles ?? []);
         } catch (error) {
-            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            if (!isRpcMethodUnavailableError(error)) {
+                Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            }
         } finally {
             if (kind === "initial") {
                 setLoading(false);
@@ -634,7 +681,7 @@ export default React.memo(function MachineLoopsPage() {
                 setRefreshing(false);
             }
         }
-    }, [machineId]);
+    }, [machineId, rpcReady]);
 
     const mutateLoop = React.useCallback(async (loop: MachineAgentLoop, action: "pause" | "resume" | "run-now" | "remove" | "event") => {
         if (!machineId) {
@@ -660,6 +707,7 @@ export default React.memo(function MachineLoopsPage() {
                 throw new Error(result.errorMessage || t("common.error"));
             }
             if (editingLoopId === loop.id && action === "remove") {
+                setLoopEditorVisible(false);
                 resetForm();
             }
             await load("refresh");
@@ -700,6 +748,7 @@ export default React.memo(function MachineLoopsPage() {
         setDownstreamTriggerText(formatDownstreamTriggers(loop.downstreamTriggerOn));
         setEnvironmentText(formatEnvironmentVariables(loop.environmentVariables));
         setShowAdvanced(Boolean(loop.projectId || loop.profileId || loop.environmentVariables || loop.agent !== "claude" || loop.fileWatchEnabled || loop.githubBridgeEnabled || loop.ciBridgeEnabled || loop.eventSourceAllowlist?.length || loop.eventKeywordFilters?.length || loop.goal || loop.currentFocus || loop.workingMemory || loop.lastReflectionSummary || loop.maxConsecutiveFailures || loop.retryBackoffMs || loop.cooldownMs || loop.quietHoursStart || loop.quietHoursEnd || loop.maxAutoRunsPerDay || loop.maxIterations || loop.stopOnSuccess || loop.downstreamLoopIds?.length || loop.downstreamTriggerOn?.length));
+        setLoopEditorVisible(true);
     }, []);
 
     const openMachineFileViewer = React.useCallback((title: string, filePath: string) => {
@@ -896,6 +945,7 @@ export default React.memo(function MachineLoopsPage() {
             if (!result.success) {
                 throw new Error(result.errorMessage || t("common.error"));
             }
+            setBootstrapProfileEditorVisible(false);
             resetBootstrapProfileForm();
             await load("refresh");
         } catch (error) {
@@ -916,6 +966,7 @@ export default React.memo(function MachineLoopsPage() {
         setBootstrapProfileIdValue(profile.profileId ?? "");
         setBootstrapProjectId(profile.projectId ?? "");
         setBootstrapAutoRunCreated(Boolean(profile.autoRunCreatedLoops));
+        setBootstrapProfileEditorVisible(true);
     }, []);
 
     const mutateBootstrapProfile = React.useCallback(async (profile: MachineAgentLoopBootstrapProfile, action: "pause" | "resume" | "run-now" | "remove") => {
@@ -935,6 +986,7 @@ export default React.memo(function MachineLoopsPage() {
                 throw new Error(result.errorMessage || t("common.error"));
             }
             if (editingBootstrapProfileId === profile.id && action === "remove") {
+                setBootstrapProfileEditorVisible(false);
                 resetBootstrapProfileForm();
             }
             await load("refresh");
@@ -1013,6 +1065,7 @@ export default React.memo(function MachineLoopsPage() {
             if (!result.success) {
                 throw new Error(result.errorMessage || t("common.error"));
             }
+            setAutoDreamProfileEditorVisible(false);
             resetAutoDreamProfileForm();
             await load("refresh");
         } catch (error) {
@@ -1029,6 +1082,7 @@ export default React.memo(function MachineLoopsPage() {
         setAutoDreamInterval(formatIntervalMs(profile.intervalMs));
         setAutoDreamMaxDepth(profile.maxDepth != null ? String(profile.maxDepth) : "");
         setAutoDreamLimit(profile.limit != null ? String(profile.limit) : "");
+        setAutoDreamProfileEditorVisible(true);
     }, []);
 
     const mutateAutoDreamProfile = React.useCallback(async (profile: MachineAutoDreamProfile, action: "pause" | "resume" | "run-now" | "remove") => {
@@ -1048,6 +1102,7 @@ export default React.memo(function MachineLoopsPage() {
                 throw new Error(result.errorMessage || t("common.error"));
             }
             if (editingAutoDreamProfileId === profile.id && action === "remove") {
+                setAutoDreamProfileEditorVisible(false);
                 resetAutoDreamProfileForm();
             }
             await load("refresh");
@@ -1356,6 +1411,7 @@ export default React.memo(function MachineLoopsPage() {
             if (!result.success) {
                 throw new Error(result.errorMessage || (editingLoopId ? t("machine.agentLoopUpdateFailed") : t("machine.agentLoopCreateFailed")));
             }
+            setLoopEditorVisible(false);
             resetForm();
             await load("refresh");
         } catch (error) {
@@ -1387,6 +1443,542 @@ export default React.memo(function MachineLoopsPage() {
     }, [loops, searchQuery]);
 
     const enabledCount = React.useMemo(() => loops.filter((loop) => loop.enabled).length, [loops]);
+    const suggestionCreatableCount = React.useMemo(() => suggestions.filter((suggestion) => !suggestion.alreadyConfigured).length, [suggestions]);
+    const bootstrapCreatableCount = React.useMemo(() => bootstrapEntries.reduce((total, entry) => total + entry.suggestions.filter((suggestion) => !suggestion.alreadyConfigured).length, 0), [bootstrapEntries]);
+
+    const handleSuggestAction = React.useCallback(() => {
+        if (!directory.trim()) {
+            openCreateLoopEditor();
+            return;
+        }
+        void loadSuggestions();
+    }, [directory, loadSuggestions, openCreateLoopEditor]);
+
+    const renderSectionBanner = (title: string, subtitle: string, badge?: string, icon?: React.ComponentProps<typeof Ionicons>["name"]) => (
+        <View style={[styles.sectionBanner, { borderBottomColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}> 
+            <View style={styles.sectionBannerLeading}>
+                {icon ? <Ionicons name={icon} size={18} color={theme.colors.textSecondary} /> : null}
+                <View style={styles.sectionBannerTextWrap}>
+                    <Text style={[styles.sectionBannerTitle, { color: theme.colors.text }]}>{title}</Text>
+                    <Text style={[styles.sectionBannerSubtitle, { color: theme.colors.textSecondary }]}>{subtitle}</Text>
+                </View>
+            </View>
+            {badge ? (
+                <View style={[styles.sectionBadge, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}> 
+                    <Text style={[styles.sectionBadgeText, { color: theme.colors.text }]}>{badge}</Text>
+                </View>
+            ) : null}
+        </View>
+    );
+
+
+    const renderEmptyStateCard = (icon: React.ComponentProps<typeof Ionicons>["name"], title: string, subtitle?: string) => (
+        <View style={[styles.emptyStateCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+            <Ionicons name={icon} size={20} color={theme.colors.textSecondary} />
+            <View style={styles.emptyStateTextWrap}>
+                <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>{title}</Text>
+                {subtitle ? <Text style={[styles.emptyStateSubtitle, { color: theme.colors.textSecondary }]}>{subtitle}</Text> : null}
+            </View>
+        </View>
+    );
+
+    const renderLoopEditorForm = () => (
+                            <View style={styles.formSection}>
+                                <View style={[styles.modalInfoBanner, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                                    <Text style={[styles.modalInfoTitle, { color: theme.colors.text }]}>{`${t("machine.agentLoopEnabled")}: ${enabledCount} / ${loops.length}`}</Text>
+                                    <Text style={[styles.modalInfoText, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopsViewAllHint")}</Text>
+                                </View>
+                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopName")}</Text>
+                                <TextInput
+                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                    placeholder={t("machine.agentLoopNamePlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={name}
+                                    onChangeText={setName}
+                                />
+                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopPath")}</Text>
+                                <TextInput
+                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                    placeholder={t("machine.agentLoopPathPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={directory}
+                                    onChangeText={setDirectory}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                                <Pressable
+                                    style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: suggesting ? 0.6 : 1 }]}
+                                    onPress={() => void loadSuggestions()}
+                                    disabled={suggesting}
+                                >
+                                    {suggesting ? (
+                                        <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    ) : (
+                                        <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopSuggest")}</Text>
+                                    )}
+                                </Pressable>
+                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopInterval")}</Text>
+                                <TextInput
+                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                    placeholder={t("machine.agentLoopIntervalPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={interval}
+                                    onChangeText={setInterval}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopPrompt")}</Text>
+                                <TextInput
+                                    style={[styles.input, styles.promptInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                    placeholder={t("machine.agentLoopPromptPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={prompt}
+                                    onChangeText={setPrompt}
+                                    multiline
+                                    textAlignVertical="top"
+                                />
+
+                                <Pressable
+                                    style={[styles.advancedToggleButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}
+                                    onPress={() => setShowAdvanced((current) => !current)}
+                                >
+                                    <Ionicons name={showAdvanced ? "chevron-up-outline" : "chevron-down-outline"} size={16} color={theme.colors.textSecondary} />
+                                    <Text style={[styles.advancedToggle, { color: theme.colors.textSecondary }]}>
+                                        {showAdvanced ? t("machine.agentLoopAdvancedHide") : t("machine.agentLoopAdvancedShow")}
+                                    </Text>
+                                </Pressable>
+
+                                {showAdvanced ? (
+                                    <View style={[styles.advancedSection, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopAgent")}</Text>
+                                        <View style={styles.agentRow}>
+                                            {(["claude", "codex", "gemini"] as const).map((option) => {
+                                                const active = agent === option;
+                                                return (
+                                                    <Pressable
+                                                        key={option}
+                                                        style={[
+                                                            styles.agentButton,
+                                                            {
+                                                                borderColor: active ? theme.colors.button.primary.background : theme.colors.divider,
+                                                                backgroundColor: active ? theme.colors.button.primary.background : theme.colors.surface,
+                                                            },
+                                                        ]}
+                                                        onPress={() => setAgent(option)}
+                                                    >
+                                                        <Text style={{ color: active ? theme.colors.button.primary.tint : theme.colors.text }}>{option}</Text>
+                                                    </Pressable>
+                                                );
+                                            })}
+                                        </View>
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.automationAuditProject")}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopProjectPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={projectId}
+                                            onChangeText={setProjectId}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopProfile")}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopProfilePlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={profileId}
+                                            onChangeText={setProfileId}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopFileWatch")}</Text>
+                                        <Pressable
+                                            style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            onPress={() => setFileWatchEnabled((current) => !current)}
+                                        >
+                                            <Text style={{ color: theme.colors.text }}>
+                                                {fileWatchEnabled ? t("machine.agentLoopFileWatchEnabled") : t("machine.agentLoopFileWatchDisabled")}
+                                            </Text>
+                                        </Pressable>
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopGithubBridge")}</Text>
+                                        <Pressable
+                                            style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            onPress={() => setGithubBridgeEnabled((current) => !current)}
+                                        >
+                                            <Text style={{ color: theme.colors.text }}>
+                                                {githubBridgeEnabled ? t("machine.agentLoopGithubBridgeEnabled") : t("machine.agentLoopGithubBridgeDisabled")}
+                                            </Text>
+                                        </Pressable>
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCiBridge")}</Text>
+                                        <Pressable
+                                            style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            onPress={() => setCiBridgeEnabled((current) => !current)}
+                                        >
+                                            <Text style={{ color: theme.colors.text }}>
+                                                {ciBridgeEnabled ? t("machine.agentLoopCiBridgeEnabled") : t("machine.agentLoopCiBridgeDisabled")}
+                                            </Text>
+                                        </Pressable>
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxFailures")}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopMaxFailuresPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={maxFailures}
+                                            onChangeText={setMaxFailures}
+                                            keyboardType="number-pad"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopRetryBackoff")}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopRetryBackoffPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={retryBackoff}
+                                            onChangeText={setRetryBackoff}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCooldown")}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopCooldownPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={cooldown}
+                                            onChangeText={setCooldown}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopQuietHours")}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopQuietHoursStart")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={quietStart}
+                                            onChangeText={setQuietStart}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopQuietHoursEnd")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={quietEnd}
+                                            onChangeText={setQuietEnd}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxAutoRuns")}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopMaxAutoRunsPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={maxAutoRuns}
+                                            onChangeText={setMaxAutoRuns}
+                                            keyboardType="number-pad"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxIterations")}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopMaxIterationsPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={maxIterations}
+                                            onChangeText={setMaxIterations}
+                                            keyboardType="number-pad"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopStopOnSuccess")}</Text>
+                                        <Pressable
+                                            style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            onPress={() => setStopOnSuccess((current) => !current)}
+                                        >
+                                            <Text style={{ color: theme.colors.text }}>
+                                                {stopOnSuccess ? t("machine.agentLoopStopOnSuccessEnabled") : t("machine.agentLoopStopOnSuccessDisabled")}
+                                            </Text>
+                                        </Pressable>
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopEventSources")}</Text>
+                                        <TextInput
+                                            style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopEventSourcesPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={eventSourceText}
+                                            onChangeText={setEventSourceText}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                            multiline
+                                            textAlignVertical="top"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopEventKeywords")}</Text>
+                                        <TextInput
+                                            style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopEventKeywordsPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={eventKeywordText}
+                                            onChangeText={setEventKeywordText}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                            multiline
+                                            textAlignVertical="top"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopGoal")}</Text>
+                                        <TextInput
+                                            style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopGoalPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={goal}
+                                            onChangeText={setGoal}
+                                            multiline
+                                            textAlignVertical="top"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCurrentFocus")}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopCurrentFocusPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={currentFocus}
+                                            onChangeText={setCurrentFocus}
+                                            multiline
+                                            textAlignVertical="top"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopWorkingMemory")}</Text>
+                                        <TextInput
+                                            style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopWorkingMemoryPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={workingMemory}
+                                            onChangeText={setWorkingMemory}
+                                            multiline
+                                            textAlignVertical="top"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopReflectionSummary")}</Text>
+                                        <TextInput
+                                            style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopReflectionSummaryPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={reflectionSummary}
+                                            onChangeText={setReflectionSummary}
+                                            multiline
+                                            textAlignVertical="top"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopDownstreamLoops")}</Text>
+                                        <TextInput
+                                            style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopDownstreamLoopsPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={downstreamLoopText}
+                                            onChangeText={setDownstreamLoopText}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                            multiline
+                                            textAlignVertical="top"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopDownstreamTriggers")}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopDownstreamTriggersPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={downstreamTriggerText}
+                                            onChangeText={setDownstreamTriggerText}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                            multiline
+                                            textAlignVertical="top"
+                                        />
+                                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopEnvironment")}</Text>
+                                        <TextInput
+                                            style={[styles.input, styles.envInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            placeholder={t("machine.agentLoopEnvironmentPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={environmentText}
+                                            onChangeText={setEnvironmentText}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                            multiline
+                                            textAlignVertical="top"
+                                        />
+                                    </View>
+                                ) : null}
+
+                                <View style={styles.buttonRow}>
+                                    <Pressable
+                                        style={[styles.createButton, { backgroundColor: theme.colors.button.primary.background, opacity: saving ? 0.6 : 1 }]}
+                                        onPress={() => void saveLoop()}
+                                        disabled={saving}
+                                    >
+                                        {saving ? (
+                                            <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
+                                        ) : (
+                                            <Text style={[styles.createButtonText, { color: theme.colors.button.primary.tint }]}>
+        {editingLoopId ? t("common.save") : t("machine.agentLoopCreate")}
+                                            </Text>
+                                        )}
+                                    </Pressable>
+                                    {editingLoopId ? (
+                                        <Pressable
+                                            style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                            onPress={resetForm}
+                                            disabled={saving}
+                                        >
+                                            <Text style={{ color: theme.colors.text }}>{t("common.cancel")}</Text>
+                                        </Pressable>
+                                    ) : null}
+                                </View>
+                            </View>
+    );
+
+    const renderBootstrapProfileEditorForm = () => (
+        <View style={styles.formSection}>
+            <View style={[styles.modalInfoBanner, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}> 
+                <Text style={[styles.modalInfoTitle, { color: theme.colors.text }]}>{t("machine.agentLoopBootstrap")}</Text>
+                <Text style={[styles.modalInfoText, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapHint")}</Text>
+            </View>
+            <TextInput
+                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                placeholder={t("machine.agentLoopNameOptional")}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={bootstrapProfileName}
+                onChangeText={setBootstrapProfileName}
+            />
+            <TextInput
+                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                placeholder={t("machine.agentLoopPathPlaceholder")}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={bootstrapRootDirectory}
+                onChangeText={setBootstrapRootDirectory}
+                autoCapitalize="none"
+                autoCorrect={false}
+            />
+            <TextInput
+                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                placeholder={t("machine.agentLoopIntervalPlaceholder")}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={bootstrapInterval}
+                onChangeText={setBootstrapInterval}
+                autoCapitalize="none"
+                autoCorrect={false}
+            />
+            <TextInput
+                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                placeholder={t("machine.agentLoopBootstrapMaxDepth")}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={bootstrapMaxDepth}
+                onChangeText={setBootstrapMaxDepth}
+                keyboardType="number-pad"
+            />
+            <TextInput
+                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                placeholder={t("machine.agentLoopBootstrapLimit")}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={bootstrapLimit}
+                onChangeText={setBootstrapLimit}
+                keyboardType="number-pad"
+            />
+            <TextInput
+                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                placeholder={t("machine.automationAuditProject")}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={bootstrapProjectId}
+                onChangeText={setBootstrapProjectId}
+                autoCapitalize="none"
+                autoCorrect={false}
+            />
+            <TextInput
+                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                placeholder={t("machine.agentLoopProfile")}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={bootstrapProfileIdValue}
+                onChangeText={setBootstrapProfileIdValue}
+                autoCapitalize="none"
+                autoCorrect={false}
+            />
+            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapAutoRunCreated")}</Text>
+            <Pressable
+                style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                onPress={() => setBootstrapAutoRunCreated((current) => !current)}
+            >
+                <Text style={{ color: theme.colors.text }}>{bootstrapAutoRunCreated ? t("common.yes") : t("common.no")}</Text>
+            </Pressable>
+            <View style={styles.buttonRow}>
+                <Pressable
+                    style={[styles.createButton, { backgroundColor: theme.colors.primary, opacity: bootstrapSaving ? 0.7 : 1 }]}
+                    onPress={() => void saveBootstrapProfile()}
+                    disabled={bootstrapSaving}
+                >
+                    {bootstrapSaving ? <ActivityIndicator size="small" color={theme.colors.button.primary.tint} /> : <Text style={[styles.createButtonText, { color: theme.colors.button.primary.tint }]}>{editingBootstrapProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>}
+                </Pressable>
+                <Pressable
+                    style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                    onPress={resetBootstrapProfileForm}
+                >
+                    <Text style={{ color: theme.colors.textSecondary }}>{t("common.reset")}</Text>
+                </Pressable>
+            </View>
+        </View>
+    );
+
+    const renderAutoDreamProfileEditorForm = () => (
+        <View style={styles.formSection}>
+            <View style={[styles.modalInfoBanner, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}> 
+                <Text style={[styles.modalInfoTitle, { color: theme.colors.text }]}>{t("machine.autoDreamProfiles")}</Text>
+                <Text style={[styles.modalInfoText, { color: theme.colors.textSecondary }]}>{t("machine.autoDreamHint")}</Text>
+            </View>
+            <TextInput
+                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                placeholder={t("machine.agentLoopNameOptional")}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={autoDreamName}
+                onChangeText={setAutoDreamName}
+            />
+            <TextInput
+                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                placeholder={t("machine.agentLoopPath")}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={autoDreamRootDirectory}
+                onChangeText={setAutoDreamRootDirectory}
+                autoCapitalize="none"
+                autoCorrect={false}
+            />
+            <View style={styles.row}>
+                <TextInput
+                    style={[styles.input, styles.rowInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                    placeholder={t("machine.agentLoopInterval")}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={autoDreamInterval}
+                    onChangeText={setAutoDreamInterval}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                />
+                <TextInput
+                    style={[styles.input, styles.rowInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                    placeholder={t("machine.agentLoopBootstrapMaxDepth")}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={autoDreamMaxDepth}
+                    onChangeText={setAutoDreamMaxDepth}
+                    keyboardType="number-pad"
+                />
+                <TextInput
+                    style={[styles.input, styles.rowInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                    placeholder={t("machine.agentLoopBootstrapLimit")}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={autoDreamLimit}
+                    onChangeText={setAutoDreamLimit}
+                    keyboardType="number-pad"
+                />
+            </View>
+            <View style={styles.actionsRow}>
+                <Pressable
+                    style={[styles.primaryButton, { backgroundColor: theme.colors.button.primary.background, opacity: autoDreamSaving ? 0.7 : 1 }]}
+                    onPress={() => void saveAutoDreamProfile()}
+                    disabled={autoDreamSaving}
+                >
+                    {autoDreamSaving ? <ActivityIndicator size="small" color={theme.colors.button.primary.tint} /> : <Text style={[styles.createButtonText, { color: theme.colors.button.primary.tint }]}>{editingAutoDreamProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>}
+                </Pressable>
+                <Pressable
+                    style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                    onPress={resetAutoDreamProfileForm}
+                >
+                    <Text style={{ color: theme.colors.textSecondary }}>{t("common.reset")}</Text>
+                </Pressable>
+            </View>
+        </View>
+    );
 
     return (
         <>
@@ -1396,370 +1988,130 @@ export default React.memo(function MachineLoopsPage() {
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load("refresh")} />}
             >
-                <ItemGroup title={editingLoopId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}>
-                    <View style={styles.formSection}>
-                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>
-                            {`${t("machine.agentLoopEnabled")}: ${enabledCount} / ${loops.length}`}
-                        </Text>
-                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopName")}</Text>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopNamePlaceholder")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={name}
-                            onChangeText={setName}
-                        />
-                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopPath")}</Text>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopPathPlaceholder")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={directory}
-                            onChangeText={setDirectory}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        <Pressable
-                            style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: suggesting ? 0.6 : 1 }]}
-                            onPress={() => void loadSuggestions()}
-                            disabled={suggesting}
-                        >
-                            {suggesting ? (
-                                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                            ) : (
-                                <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopSuggest")}</Text>
-                            )}
-                        </Pressable>
-                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopInterval")}</Text>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopIntervalPlaceholder")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={interval}
-                            onChangeText={setInterval}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopPrompt")}</Text>
-                        <TextInput
-                            style={[styles.input, styles.promptInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopPromptPlaceholder")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={prompt}
-                            onChangeText={setPrompt}
-                            multiline
-                            textAlignVertical="top"
-                        />
-
-                        <Pressable onPress={() => setShowAdvanced((current) => !current)}>
-                            <Text style={[styles.advancedToggle, { color: theme.colors.textSecondary }]}>
-                                {showAdvanced ? t("machine.agentLoopAdvancedHide") : t("machine.agentLoopAdvancedShow")}
-                            </Text>
-                        </Pressable>
-
-                        {showAdvanced ? (
-                            <View style={styles.advancedSection}>
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopAgent")}</Text>
-                                <View style={styles.agentRow}>
-                                    {(["claude", "codex", "gemini"] as const).map((option) => {
-                                        const active = agent === option;
-                                        return (
-                                            <Pressable
-                                                key={option}
-                                                style={[
-                                                    styles.agentButton,
-                                                    {
-                                                        borderColor: active ? theme.colors.button.primary.background : theme.colors.divider,
-                                                        backgroundColor: active ? theme.colors.button.primary.background : theme.colors.surface,
-                                                    },
-                                                ]}
-                                                onPress={() => setAgent(option)}
-                                            >
-                                                <Text style={{ color: active ? theme.colors.button.primary.tint : theme.colors.text }}>{option}</Text>
-                                            </Pressable>
-                                        );
-                                    })}
-                                </View>
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.automationAuditProject")}</Text>
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopProjectPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={projectId}
-                                    onChangeText={setProjectId}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopProfile")}</Text>
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopProfilePlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={profileId}
-                                    onChangeText={setProfileId}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopFileWatch")}</Text>
-                                <Pressable
-                                    style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    onPress={() => setFileWatchEnabled((current) => !current)}
-                                >
-                                    <Text style={{ color: theme.colors.text }}>
-                                        {fileWatchEnabled ? t("machine.agentLoopFileWatchEnabled") : t("machine.agentLoopFileWatchDisabled")}
-                                    </Text>
-                                </Pressable>
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopGithubBridge")}</Text>
-                                <Pressable
-                                    style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    onPress={() => setGithubBridgeEnabled((current) => !current)}
-                                >
-                                    <Text style={{ color: theme.colors.text }}>
-                                        {githubBridgeEnabled ? t("machine.agentLoopGithubBridgeEnabled") : t("machine.agentLoopGithubBridgeDisabled")}
-                                    </Text>
-                                </Pressable>
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCiBridge")}</Text>
-                                <Pressable
-                                    style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    onPress={() => setCiBridgeEnabled((current) => !current)}
-                                >
-                                    <Text style={{ color: theme.colors.text }}>
-                                        {ciBridgeEnabled ? t("machine.agentLoopCiBridgeEnabled") : t("machine.agentLoopCiBridgeDisabled")}
-                                    </Text>
-                                </Pressable>
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxFailures")}</Text>
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopMaxFailuresPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={maxFailures}
-                                    onChangeText={setMaxFailures}
-                                    keyboardType="number-pad"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopRetryBackoff")}</Text>
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopRetryBackoffPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={retryBackoff}
-                                    onChangeText={setRetryBackoff}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCooldown")}</Text>
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopCooldownPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={cooldown}
-                                    onChangeText={setCooldown}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopQuietHours")}</Text>
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopQuietHoursStart")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={quietStart}
-                                    onChangeText={setQuietStart}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopQuietHoursEnd")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={quietEnd}
-                                    onChangeText={setQuietEnd}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxAutoRuns")}</Text>
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopMaxAutoRunsPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={maxAutoRuns}
-                                    onChangeText={setMaxAutoRuns}
-                                    keyboardType="number-pad"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxIterations")}</Text>
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopMaxIterationsPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={maxIterations}
-                                    onChangeText={setMaxIterations}
-                                    keyboardType="number-pad"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopStopOnSuccess")}</Text>
-                                <Pressable
-                                    style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    onPress={() => setStopOnSuccess((current) => !current)}
-                                >
-                                    <Text style={{ color: theme.colors.text }}>
-                                        {stopOnSuccess ? t("machine.agentLoopStopOnSuccessEnabled") : t("machine.agentLoopStopOnSuccessDisabled")}
-                                    </Text>
-                                </Pressable>
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopEventSources")}</Text>
-                                <TextInput
-                                    style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopEventSourcesPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={eventSourceText}
-                                    onChangeText={setEventSourceText}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    multiline
-                                    textAlignVertical="top"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopEventKeywords")}</Text>
-                                <TextInput
-                                    style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopEventKeywordsPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={eventKeywordText}
-                                    onChangeText={setEventKeywordText}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    multiline
-                                    textAlignVertical="top"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopGoal")}</Text>
-                                <TextInput
-                                    style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopGoalPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={goal}
-                                    onChangeText={setGoal}
-                                    multiline
-                                    textAlignVertical="top"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCurrentFocus")}</Text>
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopCurrentFocusPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={currentFocus}
-                                    onChangeText={setCurrentFocus}
-                                    multiline
-                                    textAlignVertical="top"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopWorkingMemory")}</Text>
-                                <TextInput
-                                    style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopWorkingMemoryPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={workingMemory}
-                                    onChangeText={setWorkingMemory}
-                                    multiline
-                                    textAlignVertical="top"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopReflectionSummary")}</Text>
-                                <TextInput
-                                    style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopReflectionSummaryPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={reflectionSummary}
-                                    onChangeText={setReflectionSummary}
-                                    multiline
-                                    textAlignVertical="top"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopDownstreamLoops")}</Text>
-                                <TextInput
-                                    style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopDownstreamLoopsPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={downstreamLoopText}
-                                    onChangeText={setDownstreamLoopText}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    multiline
-                                    textAlignVertical="top"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopDownstreamTriggers")}</Text>
-                                <TextInput
-                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopDownstreamTriggersPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={downstreamTriggerText}
-                                    onChangeText={setDownstreamTriggerText}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    multiline
-                                    textAlignVertical="top"
-                                />
-                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopEnvironment")}</Text>
-                                <TextInput
-                                    style={[styles.input, styles.envInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    placeholder={t("machine.agentLoopEnvironmentPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={environmentText}
-                                    onChangeText={setEnvironmentText}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    multiline
-                                    textAlignVertical="top"
-                                />
+                <ItemGroup title={t("machine.agentLoopsViewAll")} footer={t("machine.agentLoopsViewAllHint")}>
+                    <View style={[styles.heroPanel, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                        <View style={styles.heroPanelHeader}>
+                            <View style={styles.heroPanelTextWrap}>
+                                <Text style={[styles.heroPanelTitle, { color: theme.colors.text }]}>{t("machine.agentLoopsViewAll")}</Text>
+                                <Text style={[styles.heroPanelSubtitle, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopsViewAllHint")}</Text>
                             </View>
-                        ) : null}
-
-                        <View style={styles.buttonRow}>
-                            <Pressable
-                                style={[styles.createButton, { backgroundColor: theme.colors.button.primary.background, opacity: saving ? 0.6 : 1 }]}
-                                onPress={() => void saveLoop()}
-                                disabled={saving}
-                            >
-                                {saving ? (
-                                    <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
-                                ) : (
-                                    <Text style={[styles.createButtonText, { color: theme.colors.button.primary.tint }]}>
-{editingLoopId ? t("common.save") : t("machine.agentLoopCreate")}
-                                    </Text>
-                                )}
-                            </Pressable>
-                            {editingLoopId ? (
-                                <Pressable
-                                    style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    onPress={resetForm}
-                                    disabled={saving}
-                                >
-                                    <Text style={{ color: theme.colors.text }}>{t("common.cancel")}</Text>
-                                </Pressable>
-                            ) : null}
+                            <View style={[styles.sectionBadge, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                <Text style={[styles.sectionBadgeText, { color: theme.colors.text }]}>{`${enabledCount}/${loops.length}`}</Text>
+                            </View>
                         </View>
+                    </View>
+                    <View style={styles.quickActionsGrid}>
+                        {[
+                            {
+                                key: "create",
+                                title: editingLoopId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate"),
+                                subtitle: editingLoopId ? (name.trim() || directory.trim() || t("machine.agentLoopPathPlaceholder")) : t("machine.agentLoopsViewAllHint"),
+                                detail: `${enabledCount}/${loops.length}`,
+                                loading: saving,
+                                icon: "add-circle-outline" as const,
+                                color: theme.colors.textLink,
+                                onPress: openCreateLoopEditor,
+                            },
+                            {
+                                key: "suggest",
+                                title: t("machine.agentLoopSuggest"),
+                                subtitle: directory.trim() || t("machine.agentLoopPathPlaceholder"),
+                                detail: suggesting ? t("common.loading") : String(suggestionCreatableCount),
+                                loading: suggesting,
+                                icon: "sparkles-outline" as const,
+                                color: theme.colors.header.tint,
+                                onPress: handleSuggestAction,
+                            },
+                            {
+                                key: "bootstrap-profile",
+                                title: t("machine.agentLoopBootstrapProfiles"),
+                                subtitle: t("machine.agentLoopBootstrapHint"),
+                                detail: String(bootstrapProfiles.length),
+                                loading: bootstrapSaving,
+                                icon: "git-branch-outline" as const,
+                                color: theme.colors.primary,
+                                onPress: openCreateBootstrapProfileEditor,
+                            },
+                            {
+                                key: "auto-dream",
+                                title: t("machine.autoDreamProfiles"),
+                                subtitle: t("machine.autoDreamHint"),
+                                detail: String(autoDreamProfiles.length),
+                                loading: autoDreamSaving,
+                                icon: "moon-outline" as const,
+                                color: theme.colors.textLink,
+                                onPress: openCreateAutoDreamProfileEditor,
+                            },
+                            {
+                                key: "scan",
+                                title: t("gitHosts.scanRepos"),
+                                subtitle: t("machine.agentLoopBootstrapHint"),
+                                detail: bootstrapScanning ? t("common.scanning") : String(bootstrapCreatableCount),
+                                loading: bootstrapScanning,
+                                icon: "search-outline" as const,
+                                color: theme.colors.accentOrange,
+                                onPress: () => void scanBootstrapRepos(),
+                            },
+                        ].map((action) => (
+                            <Pressable
+                                key={action.key}
+                                style={[styles.quickActionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}
+                                onPress={action.onPress}
+                            >
+                                <View style={styles.quickActionCardHeader}>
+                                    <View style={styles.quickActionTitleWrap}>
+                                        <Ionicons name={action.icon} size={18} color={action.color} />
+                                        <Text style={[styles.quickActionCardTitle, { color: theme.colors.text }]}>{action.title}</Text>
+                                    </View>
+                                    {action.loading ? (
+                                        <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    ) : (
+                                        <Text style={[styles.quickActionCardMeta, { color: theme.colors.textSecondary }]}>{action.detail}</Text>
+                                    )}
+                                </View>
+                                <Text style={[styles.quickActionCardSubtitle, { color: theme.colors.textSecondary }]}>{action.subtitle}</Text>
+                            </Pressable>
+                        ))}
                     </View>
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.agentLoopSuggestions")}>
-                    {suggestions.length > 0 ? (
-                        <View style={[styles.buttonRow, { marginBottom: 12 }]}>
-                            <Pressable
-                                style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: adoptingAllSuggestions ? 0.7 : 1 }]}
-                                onPress={() => void adoptAllSuggestions()}
-                                disabled={adoptingAllSuggestions}
-                            >
-                                {adoptingAllSuggestions ? (
-                                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                                ) : (
-                                    <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopSuggestionAdoptAll")}</Text>
-                                )}
-                            </Pressable>
-                        </View>
-                    ) : null}
+                    {renderSectionBanner(t("machine.agentLoopSuggestions"), suggestions.length > 0 ? t("machine.agentLoopSuggestions") : t("machine.agentLoopSuggestionsEmpty"), String(suggestions.length), "sparkles-outline")} 
+                    <Item
+                        title={t("machine.agentLoopPath")}
+                        subtitle={directory.trim() || t("machine.agentLoopPathPlaceholder")}
+                        detail={String(suggestions.length)}
+                        icon={<Ionicons name="folder-outline" size={22} color={theme.colors.textSecondary} />}
+                        onPress={openCreateLoopEditor}
+                    />
+                    <Item
+                        title={suggestions.length > 0 ? t("machine.agentLoopSuggestionAdoptAll") : t("machine.agentLoopSuggest")}
+                        subtitle={suggestions.length > 0 ? t("machine.agentLoopSuggestions") : t("machine.agentLoopSuggestionsEmpty")}
+                        detail={suggestions.length > 0 ? String(suggestionCreatableCount) : undefined}
+                        icon={<Ionicons name="sparkles-outline" size={22} color={theme.colors.header.tint} />}
+                        onPress={suggestions.length > 0 ? (() => void adoptAllSuggestions()) : handleSuggestAction}
+                        rightElement={(adoptingAllSuggestions || suggesting) ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                    />
                     {suggestions.length === 0 ? (
-                        <Item title={t("machine.agentLoopSuggestionsEmpty")} showChevron={false} />
+                        renderEmptyStateCard("sparkles-outline", t("machine.agentLoopSuggestionsEmpty"), t("machine.agentLoopPathPlaceholder"))
                     ) : suggestions.map((suggestion) => (
-                        <View key={suggestion.key} style={styles.suggestionCard}>
-                            <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>{suggestion.name}</Text>
-                            <Text style={{ color: theme.colors.textSecondary }}>
-                                {`${suggestion.description} • ${suggestion.confidence} • ${formatIntervalMs(suggestion.intervalMs)}`}
-                            </Text>
-                            <Text style={{ color: theme.colors.textSecondary }}>{suggestion.rationale}</Text>
-                            {suggestion.currentFocus ? (
-                                <Text style={{ color: theme.colors.textSecondary }}>{`${t("machine.agentLoopCurrentFocus")}: ${suggestion.currentFocus}`}</Text>
-                            ) : null}
+                        <View key={suggestion.key} style={[styles.suggestionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                            <View style={styles.cardHeaderRow}>
+                                <View style={styles.cardHeaderTextWrap}>
+                                    <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>{suggestion.name}</Text>
+                                    <Text style={[styles.cardPathText, { color: theme.colors.textSecondary }]}>{suggestion.directory}</Text>
+                                </View>
+                                <Ionicons name="sparkles-outline" size={18} color={theme.colors.header.tint} />
+                            </View>
+                            <View style={styles.metaPillRow}>
+                                <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                    <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{formatIntervalMs(suggestion.intervalMs)}</Text>
+                                </View>
+                                <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                    <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{suggestion.agent}</Text>
+                                </View>
+                            </View>
+                            <Text style={[styles.cardDescription, { color: theme.colors.textSecondary }]}>{suggestion.prompt}</Text>
                             <View style={styles.suggestionActions}>
                                 <Pressable
                                     style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: suggestion.alreadyConfigured ? 0.6 : 1 }]}
@@ -1774,105 +2126,22 @@ export default React.memo(function MachineLoopsPage() {
                                         </Text>
                                     )}
                                 </Pressable>
-                                {suggestion.existingLoopId ? (
-                                    <Pressable
-                                        style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                        onPress={() => router.push(`/machine/${machineId}/loops?loopId=${encodeURIComponent(suggestion.existingLoopId!)}` as any)}
-                                    >
-                                        <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopViewAutomation")}</Text>
-                                    </Pressable>
-                                ) : null}
                             </View>
                         </View>
                     ))}
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.agentLoopBootstrapProfiles")}>
-                    <View style={styles.formSection}>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopNameOptional")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={bootstrapProfileName}
-                            onChangeText={setBootstrapProfileName}
-                        />
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopPathPlaceholder")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={bootstrapRootDirectory}
-                            onChangeText={setBootstrapRootDirectory}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopIntervalPlaceholder")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={bootstrapInterval}
-                            onChangeText={setBootstrapInterval}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopBootstrapMaxDepth")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={bootstrapMaxDepth}
-                            onChangeText={setBootstrapMaxDepth}
-                            keyboardType="number-pad"
-                        />
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopBootstrapLimit")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={bootstrapLimit}
-                            onChangeText={setBootstrapLimit}
-                            keyboardType="number-pad"
-                        />
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.automationAuditProject")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={bootstrapProjectId}
-                            onChangeText={setBootstrapProjectId}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopProfile")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={bootstrapProfileIdValue}
-                            onChangeText={setBootstrapProfileIdValue}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapAutoRunCreated")}</Text>
-                        <Pressable
-                            style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            onPress={() => setBootstrapAutoRunCreated((current) => !current)}
-                        >
-                            <Text style={{ color: theme.colors.text }}>{bootstrapAutoRunCreated ? t("common.yes") : t("common.no")}</Text>
-                        </Pressable>
-                        <View style={styles.buttonRow}>
-                            <Pressable
-                                style={[styles.createButton, { backgroundColor: theme.colors.primary, opacity: bootstrapSaving ? 0.7 : 1 }]}
-                                onPress={() => void saveBootstrapProfile()}
-                                disabled={bootstrapSaving}
-                            >
-                                {bootstrapSaving ? <ActivityIndicator size="small" color={theme.colors.button.primary.tint} /> : <Text style={[styles.createButtonText, { color: theme.colors.button.primary.tint }]}>{editingBootstrapProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>}
-                            </Pressable>
-                            <Pressable
-                                style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                onPress={resetBootstrapProfileForm}
-                            >
-                                <Text style={{ color: theme.colors.textSecondary }}>{t("common.reset")}</Text>
-                            </Pressable>
-                        </View>
-                    </View>
+                    {renderSectionBanner(t("machine.agentLoopBootstrapProfiles"), t("machine.agentLoopBootstrapHint"), String(bootstrapProfiles.length), "git-branch-outline")} 
+                    <Item
+                        title={t("machine.agentLoopCreate")}
+                        subtitle={t("machine.agentLoopBootstrapHint")}
+                        icon={<Ionicons name="add-circle-outline" size={22} color={theme.colors.primary} />}
+                        onPress={openCreateBootstrapProfileEditor}
+                        rightElement={bootstrapSaving ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                    />
                     {bootstrapProfiles.length === 0 ? (
-                        <Item title={t("machine.agentLoopBootstrapProfilesEmpty")} showChevron={false} />
+                        renderEmptyStateCard("git-branch-outline", t("machine.agentLoopBootstrapProfilesEmpty"), t("machine.agentLoopBootstrapHint"))
                     ) : bootstrapProfiles.map((profile) => (
                         <Item
                             key={profile.id}
@@ -1880,6 +2149,7 @@ export default React.memo(function MachineLoopsPage() {
                             subtitle={getBootstrapProfileSubtitle(profile)}
                             detail={profile.status}
                             detailStyle={{ color: getBootstrapProfileStatusColor(profile, theme) }}
+                            icon={<Ionicons name="git-branch-outline" size={22} color={getBootstrapProfileStatusColor(profile, theme)} />}
                             onPress={() => openBootstrapProfileActions(profile)}
                             showChevron
                             rightElement={mutatingBootstrapProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
@@ -1888,69 +2158,16 @@ export default React.memo(function MachineLoopsPage() {
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.autoDreamProfiles")}>
-                    <View style={styles.formSection}>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopNameOptional")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={autoDreamName}
-                            onChangeText={setAutoDreamName}
-                        />
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopPath")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={autoDreamRootDirectory}
-                            onChangeText={setAutoDreamRootDirectory}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        <View style={styles.row}>
-                            <TextInput
-                                style={[styles.input, styles.rowInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                placeholder={t("machine.agentLoopInterval")}
-                                placeholderTextColor={theme.colors.textSecondary}
-                                value={autoDreamInterval}
-                                onChangeText={setAutoDreamInterval}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                            />
-                            <TextInput
-                                style={[styles.input, styles.rowInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                placeholder={t("machine.agentLoopBootstrapMaxDepth")}
-                                placeholderTextColor={theme.colors.textSecondary}
-                                value={autoDreamMaxDepth}
-                                onChangeText={setAutoDreamMaxDepth}
-                                keyboardType="number-pad"
-                            />
-                            <TextInput
-                                style={[styles.input, styles.rowInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                placeholder={t("machine.agentLoopBootstrapLimit")}
-                                placeholderTextColor={theme.colors.textSecondary}
-                                value={autoDreamLimit}
-                                onChangeText={setAutoDreamLimit}
-                                keyboardType="number-pad"
-                            />
-                        </View>
-                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.autoDreamHint")}</Text>
-                        <View style={styles.actionsRow}>
-                            <Pressable
-                                style={[styles.primaryButton, { backgroundColor: theme.colors.button.primary.background, opacity: autoDreamSaving ? 0.7 : 1 }]}
-                                onPress={() => void saveAutoDreamProfile()}
-                                disabled={autoDreamSaving}
-                            >
-                                {autoDreamSaving ? <ActivityIndicator size="small" color={theme.colors.button.primary.tint} /> : <Text style={[styles.createButtonText, { color: theme.colors.button.primary.tint }]}>{editingAutoDreamProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>}
-                            </Pressable>
-                            <Pressable
-                                style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                onPress={resetAutoDreamProfileForm}
-                            >
-                                <Text style={{ color: theme.colors.textSecondary }}>{t("common.reset")}</Text>
-                            </Pressable>
-                        </View>
-                    </View>
+                    {renderSectionBanner(t("machine.autoDreamProfiles"), t("machine.autoDreamHint"), String(autoDreamProfiles.length), "moon-outline")} 
+                    <Item
+                        title={t("machine.agentLoopCreate")}
+                        subtitle={t("machine.autoDreamHint")}
+                        icon={<Ionicons name="add-circle-outline" size={22} color={theme.colors.textLink} />}
+                        onPress={openCreateAutoDreamProfileEditor}
+                        rightElement={autoDreamSaving ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                    />
                     {autoDreamProfiles.length === 0 ? (
-                        <Item title={t("machine.autoDreamProfilesEmpty")} showChevron={false} />
+                        renderEmptyStateCard("moon-outline", t("machine.autoDreamProfilesEmpty"), t("machine.autoDreamHint"))
                     ) : autoDreamProfiles.map((profile) => (
                         <Item
                             key={profile.id}
@@ -1958,6 +2175,7 @@ export default React.memo(function MachineLoopsPage() {
                             subtitle={getAutoDreamProfileSubtitle(profile)}
                             detail={profile.status}
                             detailStyle={{ color: getAutoDreamProfileStatusColor(profile, theme) }}
+                            icon={<Ionicons name="moon-outline" size={22} color={getAutoDreamProfileStatusColor(profile, theme)} />}
                             onPress={() => openAutoDreamProfileActions(profile)}
                             showChevron
                             rightElement={mutatingAutoDreamProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
@@ -1966,31 +2184,35 @@ export default React.memo(function MachineLoopsPage() {
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.agentLoopBootstrap")}>
-                    <View style={styles.formSection}>
-                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapHint")}</Text>
-                        <Pressable
-                            style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: bootstrapScanning ? 0.7 : 1 }]}
-                            onPress={() => void scanBootstrapRepos()}
-                            disabled={bootstrapScanning}
-                        >
-                            {bootstrapScanning ? (
-                                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                            ) : (
-                                <Text style={{ color: theme.colors.text }}>{t("gitHosts.scanRepos")}</Text>
-                            )}
-                        </Pressable>
-                    </View>
+                    {renderSectionBanner(t("machine.agentLoopBootstrap"), t("machine.agentLoopBootstrapHint"), String(bootstrapEntries.length), "search-outline")} 
+                    <Item
+                        title={t("gitHosts.scanRepos")}
+                        subtitle={t("machine.agentLoopBootstrapHint")}
+                        detail={bootstrapScanning ? t("common.scanning") : String(bootstrapEntries.length)}
+                        onPress={() => void scanBootstrapRepos()}
+                        rightElement={bootstrapScanning ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                    />
                     {bootstrapEntries.length === 0 ? (
-                        <Item title={t("machine.agentLoopBootstrapEmpty")} showChevron={false} />
+                        renderEmptyStateCard("search-outline", t("machine.agentLoopBootstrapEmpty"), t("machine.agentLoopBootstrapHint"))
                     ) : bootstrapEntries.map((entry) => {
                         const missingCount = entry.suggestions.filter((suggestion) => !suggestion.alreadyConfigured).length;
                         return (
-                            <View key={entry.repo.repoPath} style={[styles.suggestionCard, { borderBottomWidth: 1, borderBottomColor: theme.colors.divider }]}> 
-                                <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>{entry.repo.name}</Text>
-                                <Text style={{ color: theme.colors.textSecondary }}>{entry.repo.repoPath}</Text>
-                                <Text style={{ color: theme.colors.textSecondary }}>
-                                    {entry.suggestions.length} suggestions • {missingCount} creatable
-                                </Text>
+                            <View key={entry.repo.repoPath} style={[styles.suggestionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                                <View style={styles.cardHeaderRow}>
+                                    <View style={styles.cardHeaderTextWrap}>
+                                        <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>{entry.repo.name}</Text>
+                                        <Text style={[styles.cardPathText, { color: theme.colors.textSecondary }]}>{entry.repo.repoPath}</Text>
+                                    </View>
+                                    <Ionicons name="search-outline" size={18} color={theme.colors.accentOrange} />
+                                </View>
+                                <View style={styles.metaPillRow}>
+                                    <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                        <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{entry.suggestions.length} suggestions</Text>
+                                    </View>
+                                    <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                        <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{missingCount} creatable</Text>
+                                    </View>
+                                </View>
                                 <View style={styles.suggestionActions}>
                                     <Pressable
                                         style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: missingCount === 0 ? 0.6 : 1 }]}
@@ -2017,21 +2239,25 @@ export default React.memo(function MachineLoopsPage() {
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.agentLoops")}>
+                    {renderSectionBanner(t("machine.agentLoops"), t("machine.agentLoopsViewAllHint"), String(filteredLoops.length), "repeat-outline")} 
                     <View style={styles.formSection}>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopSearchPlaceholder")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                        />
+                        <View style={[styles.searchBar, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}> 
+                            <Ionicons name="search-outline" size={18} color={theme.colors.textSecondary} />
+                            <TextInput
+                                style={[styles.searchInput, { color: theme.colors.text }]}
+                                placeholder={t("machine.agentLoopSearchPlaceholder")}
+                                placeholderTextColor={theme.colors.textSecondary}
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                            />
+                        </View>
                     </View>
                     {loading ? (
                         <View style={styles.loadingWrap}>
                             <ActivityIndicator size="small" color={theme.colors.textSecondary} />
                         </View>
                     ) : filteredLoops.length === 0 ? (
-                        <Item title={loops.length === 0 ? t("machine.agentLoopsEmpty") : t("machine.agentLoopNoMatches")} showChevron={false} />
+                        renderEmptyStateCard("repeat-outline", loops.length === 0 ? t("machine.agentLoopsEmpty") : t("machine.agentLoopNoMatches"), t("machine.agentLoopsViewAllHint"))
                     ) : filteredLoops.map((loop) => (
                         <Item
                             key={loop.id}
@@ -2039,6 +2265,7 @@ export default React.memo(function MachineLoopsPage() {
                             subtitle={getLoopSubtitle(loop)}
                             detail={getLoopStatusLabel(loop)}
                             detailStyle={{ color: getLoopStatusColor(loop, theme) }}
+                            icon={<Ionicons name="repeat-outline" size={22} color={getLoopStatusColor(loop, theme)} />}
                             onPress={() => openLoopActions(loop)}
                             showChevron
                             rightElement={mutatingLoopId === loop.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
@@ -2046,6 +2273,57 @@ export default React.memo(function MachineLoopsPage() {
                     ))}
                 </ItemGroup>
             </ScrollView>
+
+            <BaseModal visible={loopEditorVisible} onClose={closeLoopEditor}>
+                <View style={[styles.modalCard, { backgroundColor: theme.colors.surface }]}>
+                    <View style={[styles.modalHeader, { borderBottomColor: theme.colors.divider }]}>
+                        <View style={styles.modalHeaderTextWrap}>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingLoopId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>
+                            <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>{editingLoopId ? (name.trim() || directory.trim() || t("machine.agentLoopsViewAllHint")) : t("machine.agentLoopsViewAllHint")}</Text>
+                        </View>
+                        <Pressable style={[styles.modalDismissButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]} onPress={closeLoopEditor}>
+                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+                        </Pressable>
+                    </View>
+                    <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+                        {renderLoopEditorForm()}
+                    </ScrollView>
+                </View>
+            </BaseModal>
+
+            <BaseModal visible={bootstrapProfileEditorVisible} onClose={closeBootstrapProfileEditor}>
+                <View style={[styles.modalCard, { backgroundColor: theme.colors.surface }]}>
+                    <View style={[styles.modalHeader, { borderBottomColor: theme.colors.divider }]}>
+                        <View style={styles.modalHeaderTextWrap}>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingBootstrapProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>
+                            <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapHint")}</Text>
+                        </View>
+                        <Pressable style={[styles.modalDismissButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]} onPress={closeBootstrapProfileEditor}>
+                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+                        </Pressable>
+                    </View>
+                    <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+                        {renderBootstrapProfileEditorForm()}
+                    </ScrollView>
+                </View>
+            </BaseModal>
+
+            <BaseModal visible={autoDreamProfileEditorVisible} onClose={closeAutoDreamProfileEditor}>
+                <View style={[styles.modalCard, { backgroundColor: theme.colors.surface }]}>
+                    <View style={[styles.modalHeader, { borderBottomColor: theme.colors.divider }]}>
+                        <View style={styles.modalHeaderTextWrap}>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingAutoDreamProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>
+                            <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>{t("machine.autoDreamHint")}</Text>
+                        </View>
+                        <Pressable style={[styles.modalDismissButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]} onPress={closeAutoDreamProfileEditor}>
+                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+                        </Pressable>
+                    </View>
+                    <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+                        {renderAutoDreamProfileEditorForm()}
+                    </ScrollView>
+                </View>
+            </BaseModal>
         </>
     );
 });
@@ -2053,7 +2331,7 @@ export default React.memo(function MachineLoopsPage() {
 const styles = StyleSheet.create((theme) => ({
     container: {
         flex: 1,
-        backgroundColor: theme.colors.surface,
+        backgroundColor: theme.colors.groupped.background,
     },
     content: {
         maxWidth: layout.maxWidth,
@@ -2089,13 +2367,27 @@ const styles = StyleSheet.create((theme) => ({
         minHeight: 76,
     },
     advancedToggle: {
-        marginTop: 6,
         fontSize: 13,
         fontWeight: "600",
+    },
+    advancedToggleButton: {
+        marginTop: 6,
+        minHeight: 40,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
     },
     advancedSection: {
         gap: 8,
         paddingTop: 4,
+        marginTop: 4,
+        borderWidth: 1,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingBottom: 12,
     },
     agentRow: {
         flexDirection: "row",
@@ -2167,17 +2459,263 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center",
         justifyContent: "center",
     },
+    searchBar: {
+        minHeight: 46,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 15,
+        paddingVertical: 0,
+    },
+    emptyStateCard: {
+        marginHorizontal: 12,
+        marginVertical: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderRadius: 14,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
+    emptyStateTextWrap: {
+        flex: 1,
+        gap: 2,
+    },
+    emptyStateTitle: {
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    emptyStateSubtitle: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
     suggestionCard: {
         padding: 16,
         gap: 8,
+        marginHorizontal: 12,
+        marginVertical: 8,
+        borderWidth: 1,
+        borderRadius: 14,
     },
     suggestionTitle: {
         fontSize: 15,
         fontWeight: "600",
     },
+    cardHeaderRow: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 12,
+    },
+    cardHeaderTextWrap: {
+        flex: 1,
+        gap: 4,
+    },
+    cardPathText: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    metaPillRow: {
+        flexDirection: "row",
+        gap: 8,
+        flexWrap: "wrap",
+    },
+    metaPill: {
+        minHeight: 28,
+        paddingHorizontal: 10,
+        borderRadius: 999,
+        borderWidth: 1,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    metaPillText: {
+        fontSize: 12,
+        fontWeight: "600",
+    },
+    cardDescription: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
     suggestionActions: {
         flexDirection: "row",
         gap: 8,
         flexWrap: "wrap",
+        paddingTop: 2,
+    },
+    heroPanel: {
+        margin: 16,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderRadius: 16,
+        padding: 16,
+    },
+    heroPanelHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+    },
+    heroPanelTextWrap: {
+        flex: 1,
+        gap: 4,
+    },
+    heroPanelTitle: {
+        fontSize: 18,
+        fontWeight: "700",
+    },
+    heroPanelSubtitle: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    quickActionsGrid: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        gap: 12,
+        flexDirection: Platform.OS === "web" ? "row" : "column",
+        flexWrap: "wrap",
+    },
+    quickActionCard: {
+        borderWidth: 1,
+        borderRadius: 16,
+        padding: 14,
+        gap: 8,
+        width: Platform.OS === "web" ? "48.5%" : "100%",
+        minHeight: 108,
+    },
+    quickActionCardHeader: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 12,
+    },
+    quickActionTitleWrap: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+    },
+    quickActionCardTitle: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: "700",
+    },
+    quickActionCardSubtitle: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    quickActionCardMeta: {
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    sectionBanner: {
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+    },
+    sectionBannerLeading: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+    },
+    sectionBannerTextWrap: {
+        flex: 1,
+        gap: 4,
+    },
+    sectionBannerTitle: {
+        fontSize: 15,
+        fontWeight: "700",
+    },
+    sectionBannerSubtitle: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    sectionBadge: {
+        minWidth: 44,
+        minHeight: 32,
+        paddingHorizontal: 12,
+        borderRadius: 999,
+        borderWidth: 1,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    sectionBadgeText: {
+        fontSize: 13,
+        fontWeight: "700",
+    },
+    modalCard: {
+        width: Platform.OS === "web" ? 860 : "92%",
+        minWidth: Platform.OS === "web" ? 720 : undefined,
+        maxWidth: layout.maxWidth + 140,
+        maxHeight: Platform.OS === "web" ? "92%" : "88%",
+        borderRadius: 24,
+        overflow: "hidden",
+        borderWidth: 1,
+        shadowColor: theme.colors.shadow.color,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.18,
+        shadowRadius: 24,
+        elevation: 10,
+    },
+    modalHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        gap: 16,
+    },
+    modalHeaderTextWrap: {
+        flex: 1,
+        gap: 4,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: "700",
+    },
+    modalSubtitle: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    modalDismissButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        borderWidth: 1,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    modalScroll: {
+        width: "100%",
+        flexGrow: 0,
+    },
+    modalScrollContent: {
+        paddingBottom: 24,
+    },
+    modalInfoBanner: {
+        borderWidth: 1,
+        borderRadius: 14,
+        padding: 14,
+        gap: 4,
+        marginBottom: 4,
+    },
+    modalInfoTitle: {
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    modalInfoText: {
+        fontSize: 13,
+        lineHeight: 18,
     },
 }));

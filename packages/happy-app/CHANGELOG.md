@@ -39,6 +39,7 @@ Dev environment management with live log streaming, project-level Knowledge Base
 - Fixed backgroundTaskId processing skipped by state guard
 
 ### Web & UI
+- Improved Machine Loops page with a quick-action overview and modal-based loop, bootstrap, and Auto-Dream editors to reduce scroll-heavy setup flows
 - Added automatic vertical button layout for alerts with more than 2 buttons (iOS ActionSheet style)
 - Removed microphone STT voice-to-text input feature
 - Fixed Codex YOLO sessions auto-approve flow so GPT/Codex permission requests no longer stall on manual review

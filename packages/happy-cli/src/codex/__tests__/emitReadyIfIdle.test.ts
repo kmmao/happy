@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { emitReadyIfIdle } from '../runCodex';
+import { emitReadyIfIdle, extractCodexResponseText } from '../runCodex';
 
 describe('emitReadyIfIdle', () => {
     it('emits ready and notification when queue is idle', () => {
@@ -59,5 +59,30 @@ describe('emitReadyIfIdle', () => {
 
         expect(emitted).toBe(false);
         expect(sendReady).not.toHaveBeenCalled();
+    });
+});
+
+
+describe('extractCodexResponseText', () => {
+    it('joins text fragments and ignores non-text entries', () => {
+        const text = extractCodexResponseText({
+            content: [
+                { type: 'text', text: ' first ' },
+                { type: 'image', data: 'ignored' },
+                { type: 'text', text: 'second' },
+            ],
+        });
+
+        expect(text).toBe('first\nsecond');
+    });
+
+    it('returns empty string when no text payload exists', () => {
+        const text = extractCodexResponseText({
+            content: [
+                { type: 'resource', data: { ok: false } },
+            ],
+        });
+
+        expect(text).toBe('');
     });
 });

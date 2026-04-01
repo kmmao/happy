@@ -29,7 +29,7 @@ import { startHappyServer } from "@/claude/utils/startHappyServer";
 import { MessageBuffer } from "@/ui/ink/messageBuffer";
 import { CodexDisplay } from "@/ui/ink/CodexDisplay";
 import { trimIdent } from "@/utils/trimIdent";
-import type { CodexSessionConfig } from "./types";
+import type { CodexSessionConfig, CodexToolResponse } from "./types";
 import { CHANGE_TITLE_INSTRUCTION } from "@/gemini/constants";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
 import { registerKillSessionHandler } from "@/claude/registerKillSessionHandler";
@@ -76,6 +76,31 @@ export function emitReadyIfIdle({
   sendReady();
   notify?.();
   return true;
+}
+
+
+export function extractCodexResponseText(response: CodexToolResponse): string {
+  return response.content
+    .filter(
+      (item): item is CodexToolResponse["content"][number] & { text: string } =>
+        item.type === "text" && typeof item.text === "string",
+    )
+    .map((item) => item.text.trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function requireSuccessfulCodexResponse(
+  response: CodexToolResponse,
+  action: "start" | "continue",
+): CodexToolResponse {
+  if (!response.isError) {
+    return response;
+  }
+
+  const message = extractCodexResponseText(response);
+  throw new Error(message || `Codex ${action} session failed`);
 }
 
 /**
@@ -791,15 +816,22 @@ export async function runCodex(opts: {
             (startConfig.config as any).experimental_resume = resumeFile;
           }
 
-          await client.startSession(startConfig, {
-            signal: abortController.signal,
-          });
+          const startResponse = requireSuccessfulCodexResponse(
+            await client.startSession(startConfig, {
+              signal: abortController.signal,
+            }),
+            "start",
+          );
+          logger.debug("[Codex] startSession response:", startResponse);
           wasCreated = true;
           first = false;
         } else {
-          const response = await client.continueSession(message.message, {
-            signal: abortController.signal,
-          });
+          const response = requireSuccessfulCodexResponse(
+            await client.continueSession(message.message, {
+              signal: abortController.signal,
+            }),
+            "continue",
+          );
           logger.debug("[Codex] continueSession response:", response);
         }
       } catch (error) {
@@ -817,19 +849,22 @@ export async function runCodex(opts: {
           // Do not clear session state here; the next user message should continue on the
           // existing session if possible.
         } else {
-          messageBuffer.addMessage("Process exited unexpectedly", "status");
+          const errorMessage =
+            error instanceof Error && error.message
+              ? trimIdent(error.message)
+              : "Process exited unexpectedly";
+          messageBuffer.addMessage(errorMessage, "result");
           session.sendSessionEvent({
             type: "message",
-            message: "Process exited unexpectedly",
+            message: errorMessage,
           });
-          // For unexpected exits, try to store session for potential recovery
+          // Reset the active session after a startup/transport error so the next
+          // user message creates a fresh Codex session instead of replying into a
+          // broken one.
           if (client.hasActiveSession()) {
-            storedSessionIdForResume = client.storeSessionForResume();
-            logger.debug(
-              "[Codex] Stored session after unexpected error:",
-              storedSessionIdForResume,
-            );
+            client.clearSession();
           }
+          wasCreated = false;
         }
       } finally {
         // Reset permission handler, reasoning processor, and diff processor

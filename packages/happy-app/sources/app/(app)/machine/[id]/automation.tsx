@@ -1,5 +1,6 @@
 import * as React from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
@@ -7,6 +8,7 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
 import { layout } from "@/components/layout";
 import { Modal } from "@/modal";
+import { BaseModal } from "@/modal/components/BaseModal";
 import {
     machineAutomationStatus,
     machineCancelAutomationJob,
@@ -37,6 +39,11 @@ type TimelineEntry = {
 type JobFilter = "all" | "running" | "failed" | "terminal" | "recovered";
 type GuardianFilter = "all" | "attached" | "persisted" | "recovered";
 type AuditFilter = "all" | "anomalies" | "guardian" | "jobs" | "recovered";
+type DetailSheetState =
+    | { kind: "job"; job: MachineAutomationJob; relatedEvents: MachineAutomationAuditEvent[] }
+    | { kind: "guardian"; guardian: MachineAutomationGuardian; usage?: MachineAutomationGuardianUsage; relatedEvents: MachineAutomationAuditEvent[] }
+    | { kind: "audit"; event: MachineAutomationAuditEvent; relatedJob?: MachineAutomationJob }
+    | null;
 
 const JOB_FILTER_VALUES: readonly JobFilter[] = ["all", "running", "failed", "terminal", "recovered"];
 const GUARDIAN_FILTER_VALUES: readonly GuardianFilter[] = ["all", "attached", "persisted", "recovered"];
@@ -44,6 +51,10 @@ const AUDIT_FILTER_VALUES: readonly AuditFilter[] = ["all", "anomalies", "guardi
 
 function parseFilterValue<T extends string>(value: string | undefined, allowed: readonly T[], fallback: T): T {
     return value && allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+function isRpcMethodUnavailableError(error: unknown): boolean {
+    return error instanceof Error && error.message === "RPC method not available";
 }
 
 function matchesSearch(values: Array<string | undefined>, query: string): boolean {
@@ -372,6 +383,78 @@ function buildTimelineEntries(jobs: MachineAutomationJob[]): TimelineEntry[] {
     return entries.sort((a, b) => b.timestamp - a.timestamp);
 }
 
+function getJobKindLabel(kind: MachineAutomationJob["kind"]): string {
+    switch (kind) {
+        case "agent_loop":
+            return "Agent Loop";
+        case "webhook":
+            return "Webhook";
+        default:
+            return "Supervisor";
+    }
+}
+
+function getPriorityLabel(priority: MachineAutomationJob["priority"]): string {
+    switch (priority) {
+        case "urgent":
+            return "Urgent";
+        case "background":
+            return "Background";
+        default:
+            return "User";
+    }
+}
+
+function getAuditKindAccent(event: MachineAutomationAuditEvent): string | undefined {
+    if (event.status === "failed" || event.kind === "watchdog_stopped" || event.kind === "session_stop_requested") {
+        return "#FF3B30";
+    }
+    if (event.kind.startsWith("guardian_") || event.kind === "session_reattached") {
+        return "#0A84FF";
+    }
+    if (event.kind === "loop_policy_gated") {
+        return "#FF9500";
+    }
+    return undefined;
+}
+
+function renderSummaryCard(options: {
+    title: string;
+    value: string;
+    hint: string;
+    accent?: string;
+}) {
+    const { title, value, hint, accent } = options;
+    return (
+        <View style={[styles.summaryCard, accent ? { borderColor: accent } : null]}>
+            <Text style={styles.summaryCardTitle}>{title}</Text>
+            <Text style={[styles.summaryCardValue, accent ? { color: accent } : null]}>{value}</Text>
+            <Text style={styles.summaryCardHint}>{hint}</Text>
+        </View>
+    );
+}
+
+function renderSectionBanner(options: {
+    title: string;
+    subtitle: string;
+    detail?: string;
+}) {
+    const { title, subtitle, detail } = options;
+    return (
+        <View style={styles.sectionBanner}>
+            <View style={styles.sectionBannerTextWrap}>
+                <Text style={styles.sectionBannerTitle}>{title}</Text>
+                <Text style={styles.sectionBannerSubtitle}>{subtitle}</Text>
+            </View>
+            {detail ? (
+                <View style={styles.sectionBannerBadge}>
+                    <Text style={styles.sectionBannerBadgeText}>{detail}</Text>
+                </View>
+            ) : null}
+        </View>
+    );
+}
+
 export default React.memo(function MachineAutomationPage() {
     const {
         id: machineId,
@@ -387,6 +470,7 @@ export default React.memo(function MachineAutomationPage() {
         guardianFilter?: GuardianFilter;
     }>();
     const machine = useMachine(machineId!);
+    const rpcReady = machine?.rpcReady ?? false;
     const router = useRouter();
     const { theme } = useUnistyles();
     const [status, setStatus] = React.useState<MachineAutomationStatus | null>(null);
@@ -405,6 +489,23 @@ export default React.memo(function MachineAutomationPage() {
     const [jobFilter, setJobFilter] = React.useState<JobFilter>(initialJobFilter);
     const [auditFilter, setAuditFilter] = React.useState<AuditFilter>(initialAuditFilter);
     const [guardianFilter, setGuardianFilter] = React.useState<GuardianFilter>(initialGuardianFilter);
+    const [detailSheet, setDetailSheet] = React.useState<DetailSheetState>(null);
+    const closeDetailSheet = React.useCallback(() => setDetailSheet(null), []);
+
+    const applyCachedAutomationState = React.useCallback(() => {
+        const fallback = machine?.daemonState?.automation;
+        if (fallback) {
+            setStatus({
+                counts: fallback.counts ?? {},
+                jobs: fallback.recentJobs ?? [],
+                guardians: fallback.guardians ?? [],
+                guardianUsage: fallback.guardianUsage ?? [],
+                auditStats: fallback.auditStats,
+                recentAuditEvents: fallback.recentAuditEvents ?? [],
+            });
+        }
+        setLoopStatus([]);
+    }, [machine?.daemonState?.automation]);
 
     const load = React.useCallback(async (kind: "initial" | "refresh") => {
         if (!machineId) {
@@ -416,25 +517,22 @@ export default React.memo(function MachineAutomationPage() {
             setRefreshing(true);
         }
         try {
+            if (!rpcReady) {
+                applyCachedAutomationState();
+                return;
+            }
             const [fresh, loopsResult] = await Promise.all([
                 machineAutomationStatus(machineId),
                 machineListAgentLoops(machineId),
             ]);
             setStatus(fresh);
             setLoopStatus(loopsResult.loops ?? []);
-        } catch {
-            const fallback = machine?.daemonState?.automation;
-            if (fallback) {
-                setStatus({
-                    counts: fallback.counts ?? {},
-                    jobs: fallback.recentJobs ?? [],
-                    guardians: fallback.guardians ?? [],
-                    guardianUsage: fallback.guardianUsage ?? [],
-                    auditStats: fallback.auditStats,
-                    recentAuditEvents: fallback.recentAuditEvents ?? [],
-                });
+        } catch (error) {
+            if (isRpcMethodUnavailableError(error)) {
+                applyCachedAutomationState();
+            } else {
+                applyCachedAutomationState();
             }
-            setLoopStatus([]);
         } finally {
             if (kind === "initial") {
                 setLoading(false);
@@ -442,7 +540,7 @@ export default React.memo(function MachineAutomationPage() {
                 setRefreshing(false);
             }
         }
-    }, [machineId, machine?.daemonState?.automation]);
+    }, [applyCachedAutomationState, machineId, rpcReady]);
 
     React.useEffect(() => {
         void load("initial");
@@ -564,7 +662,9 @@ export default React.memo(function MachineAutomationPage() {
             }
             await load("refresh");
         } catch (error) {
-            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            if (!isRpcMethodUnavailableError(error)) {
+                Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            }
         } finally {
             setActiveJobId(null);
         }
@@ -579,7 +679,9 @@ export default React.memo(function MachineAutomationPage() {
             }
             await load("refresh");
         } catch (error) {
-            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            if (!isRpcMethodUnavailableError(error)) {
+                Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            }
         } finally {
             setClearingGuardians(false);
         }
@@ -594,7 +696,9 @@ export default React.memo(function MachineAutomationPage() {
             }
             await load("refresh");
         } catch (error) {
-            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            if (!isRpcMethodUnavailableError(error)) {
+                Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            }
         } finally {
             setClearingAudit(false);
         }
@@ -609,7 +713,9 @@ export default React.memo(function MachineAutomationPage() {
             }
             await load("refresh");
         } catch (error) {
-            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            if (!isRpcMethodUnavailableError(error)) {
+                Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            }
         } finally {
             setClearing(false);
         }
@@ -792,7 +898,17 @@ export default React.memo(function MachineAutomationPage() {
             contentContainerStyle={styles.content}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load("refresh")} />}
         >
+            {!rpcReady ? (
+                <View style={styles.rpcNotice}>
+                    <Text style={styles.rpcNoticeTitle}>{t("status.connecting")}</Text>
+                    <Text style={styles.rpcNoticeText}>{t("machine.automationViewAllHint")}</Text>
+                </View>
+            ) : null}
             <View style={styles.filterPanel}>
+                <View style={styles.panelHeader}>
+                    <Text style={styles.panelTitle}>{t("machine.automationOverviewTitle")}</Text>
+                    <Text style={styles.panelSubtitle}>{t("machine.automationOverviewHint")}</Text>
+                </View>
                 <TextInput
                     style={styles.searchInput}
                     value={searchQuery}
@@ -800,7 +916,9 @@ export default React.memo(function MachineAutomationPage() {
                     placeholder={t("machine.automationSearchPlaceholder")}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
+                <Text style={styles.panelHint}>{t("machine.automationSearchHint")}</Text>
                 <Text style={styles.filterLabel}>{t("machine.automationJobFilters")}</Text>
+                <Text style={styles.filterHint}>{t("machine.automationJobFiltersHint")}</Text>
                 <View style={styles.filterChipRow}>
                     {([
                         ["all", t("machine.automationFilterAll")],
@@ -819,6 +937,7 @@ export default React.memo(function MachineAutomationPage() {
                     ))}
                 </View>
                 <Text style={styles.filterLabel}>{t("machine.automationAuditFilters")}</Text>
+                <Text style={styles.filterHint}>{t("machine.automationAuditFiltersHint")}</Text>
                 <View style={styles.filterChipRow}>
                     {([
                         ["all", t("machine.automationFilterAll")],
@@ -837,6 +956,7 @@ export default React.memo(function MachineAutomationPage() {
                     ))}
                 </View>
                 <Text style={styles.filterLabel}>{t("machine.automationGuardians")}</Text>
+                <Text style={styles.filterHint}>{t("machine.automationGuardianFiltersHint")}</Text>
                 <View style={styles.filterChipRow}>
                     {([
                         ["all", t("machine.automationFilterAll")],
@@ -859,6 +979,7 @@ export default React.memo(function MachineAutomationPage() {
             <ItemList>
                 {persistedGuardianCount > 0 || anomalyCount > 0 ? (
                     <ItemGroup title={t("machine.automationAlerts")}>
+                    {renderSectionBanner({ title: t("machine.automationAlerts"), subtitle: t("machine.automationAlertsHint"), detail: String((persistedGuardianCount > 0 ? 1 : 0) + (anomalyCount > 0 ? 1 : 0)) })}
                         {persistedGuardianCount > 0 ? (
                             <Item
                                 title={t("machine.automationGuardianRecoveryNeeded")}
@@ -880,14 +1001,17 @@ export default React.memo(function MachineAutomationPage() {
                     </ItemGroup>
                 ) : null}
                 <ItemGroup title={t("machine.automation")}>
-                    <Item title={t("machine.automationQueued")} detail={String(counts.queued ?? 0)} showChevron={false} />
-                    <Item title={t("machine.automationRunning")} detail={String((counts.running ?? 0) + (counts.dispatching ?? 0))} detailStyle={{ color: "#0A84FF" }} showChevron={false} />
-                    <Item title={t("machine.automationGuardians")} detail={String(filteredGuardians.length)} showChevron={false} />
-                    <Item title={t("machine.automationFailed")} detail={String(counts.failed ?? 0)} detailStyle={{ color: "#FF3B30" }} showChevron={false} />
-                    <Item title={t("machine.automationCompleted")} detail={String(counts.completed ?? 0)} detailStyle={{ color: "#34C759" }} showChevron={false} />
-                    <Item title={t("machine.automationCancelled")} detail={String(counts.cancelled ?? 0)} detailStyle={{ color: theme.colors.textSecondary }} showChevron={false} />
+                    <View style={styles.summaryGrid}>
+                        {renderSummaryCard({ title: t("machine.automationQueued"), value: String(counts.queued ?? 0), hint: t("machine.automationQueuedHint"), accent: "#FF9500" })}
+                        {renderSummaryCard({ title: t("machine.automationRunning"), value: String((counts.running ?? 0) + (counts.dispatching ?? 0)), hint: t("machine.automationRunningHint"), accent: "#0A84FF" })}
+                        {renderSummaryCard({ title: t("machine.automationGuardians"), value: String(filteredGuardians.length), hint: t("machine.automationGuardiansHint") })}
+                        {renderSummaryCard({ title: t("machine.automationFailed"), value: String(counts.failed ?? 0), hint: t("machine.automationFailedHint"), accent: "#FF3B30" })}
+                        {renderSummaryCard({ title: t("machine.automationCompleted"), value: String(counts.completed ?? 0), hint: t("machine.automationCompletedHint"), accent: "#34C759" })}
+                        {renderSummaryCard({ title: t("machine.automationCancelled"), value: String(counts.cancelled ?? 0), hint: t("machine.automationCancelledHint"), accent: theme.colors.textSecondary })}
+                    </View>
                     <Item
                         title={t("machine.automationClearTerminal")}
+                        subtitle={t("machine.automationClearTerminalHint")}
                         titleStyle={{ color: theme.colors.textLink }}
                         onPress={() => {
                             Modal.alert(
@@ -908,89 +1032,95 @@ export default React.memo(function MachineAutomationPage() {
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.automationLoopRollup")}>
-                    <Item title={t("machine.automationLoopsTotal")} detail={String(loopRollup.total)} showChevron={false} />
-                    <Item title={t("machine.automationLoopsActive")} detail={String(loopRollup.active)} detailStyle={{ color: "#0A84FF" }} showChevron={false} />
-                    <Item title={t("machine.automationLoopsBlocked")} detail={String(loopRollup.blocked)} detailStyle={{ color: "#FF3B30" }} showChevron={false} />
-                    <Item title={t("machine.automationLoopsPaused")} detail={String(loopRollup.paused)} detailStyle={{ color: theme.colors.textSecondary }} showChevron={false} />
-                    <Item title={t("machine.automationLoopsPendingEvents")} detail={String(loopRollup.pendingEvents)} showChevron={false} />
-                    <Item title={t("machine.automationLoopsPolicyStopped")} detail={String(loopRollup.policyStopped)} showChevron={false} />
-                    <Item title={t("machine.automationOpenLoops")} titleStyle={{ color: theme.colors.textLink }} onPress={() => router.push(`/machine/${machineId}/loops` as any)} />
+                    {renderSectionBanner({ title: t("machine.automationLoopRollup"), subtitle: t("machine.automationLoopRollupHint"), detail: `${loopRollup.active}/${loopRollup.total}` })}
+                    <View style={styles.summaryGrid}>
+                        {renderSummaryCard({ title: t("machine.automationLoopsTotal"), value: String(loopRollup.total), hint: t("machine.automationLoopsTotalHint") })}
+                        {renderSummaryCard({ title: t("machine.automationLoopsActive"), value: String(loopRollup.active), hint: t("machine.automationLoopsActiveHint"), accent: "#0A84FF" })}
+                        {renderSummaryCard({ title: t("machine.automationLoopsBlocked"), value: String(loopRollup.blocked), hint: t("machine.automationLoopsBlockedHint"), accent: "#FF3B30" })}
+                        {renderSummaryCard({ title: t("machine.automationLoopsPaused"), value: String(loopRollup.paused), hint: t("machine.automationLoopsPausedHint"), accent: theme.colors.textSecondary })}
+                        {renderSummaryCard({ title: t("machine.automationLoopsPendingEvents"), value: String(loopRollup.pendingEvents), hint: t("machine.automationLoopsPendingEventsHint") })}
+                        {renderSummaryCard({ title: t("machine.automationLoopsPolicyStopped"), value: String(loopRollup.policyStopped), hint: t("machine.automationLoopsPolicyStoppedHint"), accent: "#FF9500" })}
+                    </View>
+                    <Item title={t("machine.automationOpenLoops")} subtitle={t("machine.automationOpenLoopsHint")} titleStyle={{ color: theme.colors.textLink }} onPress={() => router.push(`/machine/${machineId}/loops` as any)} />
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.automationGuardians")}>
-                    <Item
-                        title={t("machine.automationResetGuardians")}
-                        titleStyle={{ color: theme.colors.textLink }}
-                        onPress={() => {
-                            Modal.alert(
-                                t("machine.automationResetGuardians"),
-                                t("machine.automationResetGuardiansMessage"),
-                                [
-                                    { text: t("common.cancel"), style: "cancel" },
-                                    {
-                                        text: t("machine.automationResetGuardians"),
-                                        style: "destructive",
-                                        onPress: () => void clearGuardians({ clearAll: true }),
-                                    },
-                                ],
-                            );
-                        }}
-                        rightElement={clearingGuardians ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                    />
+                    {renderSectionBanner({ title: t("machine.automationGuardians"), subtitle: t("machine.automationGuardiansHint"), detail: String(filteredGuardians.length) })}
                     {filteredGuardians.length === 0 ? (
-                        <Item title={searchQuery.trim() ? t("machine.automationNoMatches") : t("machine.automationGuardiansEmpty")} showChevron={false} />
+                        <View style={styles.emptyCard}>
+                            <Text style={styles.emptyCardTitle}>{(searchQuery.trim() ? t("machine.automationNoMatches") : t("machine.automationGuardiansEmpty"))}</Text>
+                            <Text style={styles.emptyCardSubtitle}>{t("machine.automationGuardiansHint")}</Text>
+                        </View>
                     ) : filteredGuardians.map((guardian: MachineAutomationGuardian) => (
-                        <Item
-                            key={guardian.key}
-                            title={guardian.key}
-                            subtitle={`${t("machine.automationGuardianSession")}: ${guardian.sessionId} • ${getGuardianStateLabel(guardian.attached, guardian.recovered)}`}
-                            detail={formatTimestamp(guardian.updatedAt)}
-                            onPress={() => handleGuardianPress(guardian)}
-                            showChevron
-                        />
+                        <Pressable key={guardian.key} style={styles.dataCard} onPress={() => handleGuardianPress(guardian)}>
+                            <View style={styles.dataCardHeader}>
+                                <View style={styles.dataCardTitleWrap}>
+                                    <Text style={styles.dataCardTitle}>{guardian.key}</Text>
+                                    <Text style={styles.dataCardSubtitle}>{getGuardianStateLabel(guardian.attached, guardian.recovered)}</Text>
+                                </View>
+                                <Text style={styles.dataCardTimestamp}>{formatTimestamp(guardian.updatedAt)}</Text>
+                            </View>
+                            <View style={styles.pillRow}>
+                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationGuardianSession")}: ${guardian.sessionId}`}</Text></View>
+                                {guardian.projectId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditProject")}: ${guardian.projectId}`}</Text></View> : null}
+                                {guardian.loopId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditLoop")}: ${guardian.loopId}`}</Text></View> : null}
+                            </View>
+                        </Pressable>
                     ))}
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.automationAuditStats")}>
-                    <Item title={t("machine.automationTotalAuditEvents")} detail={String(auditStats?.totalEvents ?? 0)} showChevron={false} />
-                    <Item title={t("machine.automationGuardianReuseCount")} detail={String(auditStats?.guardianReuseCount ?? 0)} showChevron={false} />
-                    <Item title={t("machine.automationGuardianReuseRate")} detail={formatRate(auditStats?.guardianReuseRate)} showChevron={false} />
-                    <Item title={t("machine.automationGuardianResetCount")} detail={String(auditStats?.guardianResetCount ?? 0)} showChevron={false} />
-                    <Item title={t("machine.automationSessionReattachedCount")} detail={String(auditStats?.sessionReattachedCount ?? 0)} showChevron={false} />
-                    <Item title={t("machine.automationWatchdogStops")} detail={String(auditStats?.watchdogStopCount ?? 0)} showChevron={false} />
-                    <Item title={t("machine.automationStopRequests")} detail={String(auditStats?.stopRequestCount ?? 0)} showChevron={false} />
-                    <Item title={t("machine.automationPolicyGatedCount")} detail={String(auditStats?.policyGatedCount ?? 0)} showChevron={false} />
-                    <Item title={t("machine.automationDownstreamEmitCount")} detail={String(auditStats?.downstreamEmitCount ?? 0)} showChevron={false} />
-                    {auditStats?.lastEventAt ? (
-                        <Item title={t("machine.automationLastAuditEvent")} detail={formatTimestamp(auditStats.lastEventAt)} showChevron={false} />
-                    ) : null}
+                    {renderSectionBanner({ title: t("machine.automationAuditStats"), subtitle: t("machine.automationAuditStatsHint"), detail: formatRate(auditStats?.guardianReuseRate) })}
+                    <View style={styles.summaryGrid}>
+                        {renderSummaryCard({ title: t("machine.automationTotalAuditEvents"), value: String(auditStats?.totalEvents ?? 0), hint: t("machine.automationTotalAuditEventsHint") })}
+                        {renderSummaryCard({ title: t("machine.automationGuardianReuseCount"), value: String(auditStats?.guardianReuseCount ?? 0), hint: t("machine.automationGuardianReuseCountHint"), accent: "#0A84FF" })}
+                        {renderSummaryCard({ title: t("machine.automationGuardianReuseRate"), value: formatRate(auditStats?.guardianReuseRate), hint: t("machine.automationGuardianReuseRateHint") })}
+                        {renderSummaryCard({ title: t("machine.automationGuardianResetCount"), value: String(auditStats?.guardianResetCount ?? 0), hint: t("machine.automationGuardianResetCountHint"), accent: "#FF9500" })}
+                        {renderSummaryCard({ title: t("machine.automationSessionReattachedCount"), value: String(auditStats?.sessionReattachedCount ?? 0), hint: t("machine.automationSessionReattachedCountHint"), accent: "#34C759" })}
+                        {renderSummaryCard({ title: t("machine.automationWatchdogStops"), value: String(auditStats?.watchdogStopCount ?? 0), hint: t("machine.automationWatchdogStopsHint"), accent: "#FF3B30" })}
+                    </View>
+                    <Item title={t("machine.automationLastAuditEvent")} subtitle={t("machine.automationLastAuditEventHint")} detail={auditStats?.lastEventAt ? formatTimestamp(auditStats.lastEventAt) : "-"} showChevron={false} />
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.automationGuardianUsage")}>
+                    {renderSectionBanner({ title: t("machine.automationGuardianUsage"), subtitle: t("machine.automationGuardianUsageHint"), detail: String(filteredGuardianUsage.length) })}
                     {filteredGuardianUsage.length === 0 ? (
-                        <Item title={searchQuery.trim() ? t("machine.automationNoMatches") : t("machine.automationGuardianUsageEmpty")} showChevron={false} />
+                        <View style={styles.emptyCard}>
+                            <Text style={styles.emptyCardTitle}>{(searchQuery.trim() ? t("machine.automationNoMatches") : t("machine.automationGuardianUsageEmpty"))}</Text>
+                            <Text style={styles.emptyCardSubtitle}>{t("machine.automationGuardianUsageHint")}</Text>
+                        </View>
                     ) : filteredGuardianUsage.map((entry: MachineAutomationGuardianUsage) => {
                         const matchingGuardian = guardians.find((guardian) => guardian.key === entry.key);
+                        const onPress = matchingGuardian
+                            ? () => handleGuardianPress(matchingGuardian)
+                            : entry.currentSessionId
+                                ? () => router.push(`/session/${entry.currentSessionId}` as any)
+                                : undefined;
                         return (
-                            <Item
-                                key={entry.key}
-                                title={entry.key}
-                                subtitle={getGuardianUsageSubtitle(entry)}
-                                detail={formatTimestamp(entry.lastUsedAt)}
-                                onPress={matchingGuardian
-                                    ? () => handleGuardianPress(matchingGuardian)
-                                    : entry.currentSessionId
-                                        ? () => router.push(`/session/${entry.currentSessionId}` as any)
-                                        : undefined}
-                                showChevron={Boolean(matchingGuardian || entry.currentSessionId)}
-                            />
+                            <Pressable key={entry.key} style={styles.dataCard} onPress={onPress}>
+                                <View style={styles.dataCardHeader}>
+                                    <View style={styles.dataCardTitleWrap}>
+                                        <Text style={styles.dataCardTitle}>{entry.key}</Text>
+                                        <Text style={styles.dataCardSubtitle}>{t("machine.automationGuardianUsage")}</Text>
+                                    </View>
+                                    <Text style={styles.dataCardTimestamp}>{formatTimestamp(entry.lastUsedAt)}</Text>
+                                </View>
+                                <View style={styles.pillRow}>
+                                    <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationGuardianReuseCount")}: ${entry.reuseCount}`}</Text></View>
+                                    <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationGuardianRememberCount")}: ${entry.rememberCount}`}</Text></View>
+                                    <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationGuardianResetCount")}: ${entry.resetCount}`}</Text></View>
+                                    {entry.projectId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditProject")}: ${entry.projectId}`}</Text></View> : null}
+                                </View>
+                            </Pressable>
                         );
                     })}
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.automationAudit")}>
+                    {renderSectionBanner({ title: t("machine.automationAudit"), subtitle: t("machine.automationAuditHint"), detail: String(filteredAuditEvents.length) })}
                     <Item
                         title={t("machine.automationClearAudit")}
+                        subtitle={t("machine.automationClearAuditHint")}
                         titleStyle={{ color: theme.colors.textLink }}
                         onPress={() => {
                             Modal.alert(
@@ -1009,56 +1139,89 @@ export default React.memo(function MachineAutomationPage() {
                         rightElement={clearingAudit ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
                     />
                     {filteredAuditEvents.length === 0 ? (
-                        <Item title={(searchQuery.trim() || auditFilter !== "all") ? t("machine.automationNoMatches") : t("machine.automationAuditEmpty")} showChevron={false} />
+                        <View style={styles.emptyCard}>
+                            <Text style={styles.emptyCardTitle}>{((searchQuery.trim() || auditFilter !== "all") ? t("machine.automationNoMatches") : t("machine.automationAuditEmpty"))}</Text>
+                            <Text style={styles.emptyCardSubtitle}>{t("machine.automationAuditHint")}</Text>
+                        </View>
                     ) : filteredAuditEvents.map((event: MachineAutomationAuditEvent) => (
-                        <Item
-                            key={event.id}
-                            title={getAuditEventTitle(event)}
-                            subtitle={getAuditEventSubtitle(event)}
-                            detail={formatTimestamp(event.occurredAt)}
-                            onPress={() => handleAuditEventPress(event)}
-                            showChevron
-                        />
+                        <Pressable key={event.id} style={styles.dataCard} onPress={() => handleAuditEventPress(event)}>
+                            <View style={styles.dataCardHeader}>
+                                <View style={styles.dataCardTitleWrap}>
+                                    <Text style={styles.dataCardTitle}>{getAuditEventTitle(event)}</Text>
+                                    <Text style={styles.dataCardSubtitle}>{event.message || getAuditEventSubtitle(event) || t("machine.automationAudit")}</Text>
+                                </View>
+                                <Text style={[styles.dataCardTimestamp, getAuditKindAccent(event) ? { color: getAuditKindAccent(event) } : null]}>{formatTimestamp(event.occurredAt)}</Text>
+                            </View>
+                            <View style={styles.pillRow}>
+                                {event.status ? <View style={[styles.pill, { borderColor: getAuditKindAccent(event) ?? theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationStatusLabel")}: ${event.status}`}</Text></View> : null}
+                                {event.guardianKey ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditGuardian")}: ${event.guardianKey}`}</Text></View> : null}
+                                {event.loopId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditLoop")}: ${event.loopId}`}</Text></View> : null}
+                            </View>
+                        </Pressable>
                     ))}
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.automationTimeline")}>
+                    {renderSectionBanner({ title: t("machine.automationTimeline"), subtitle: t("machine.automationTimelineHint"), detail: String(timeline.length) })}
                     {timeline.length === 0 ? (
-                        <Item title={t("machine.automationTimelineEmpty")} showChevron={false} />
+                        <View style={styles.emptyCard}>
+                            <Text style={styles.emptyCardTitle}>{t("machine.automationTimelineEmpty")}</Text>
+                            <Text style={styles.emptyCardSubtitle}>{t("machine.automationTimelineHint")}</Text>
+                        </View>
                     ) : timeline.map((entry) => {
                         const job = jobs.find((candidate) => candidate.id === entry.jobId);
+                        const accent = entry.kind === "terminal" ? theme.colors.textSecondary : entry.kind === "running" ? "#0A84FF" : "#FF9500";
                         return (
-                            <Item
-                                key={entry.key}
-                                title={entry.title}
-                                subtitle={entry.subtitle}
-                                detail={formatTimestamp(entry.timestamp)}
-                                detailStyle={{ color: entry.kind === "terminal" ? theme.colors.textSecondary : undefined }}
-                                onPress={job ? () => handleJobPress(job) : undefined}
-                                showChevron={Boolean(job)}
-                            />
+                            <Pressable key={entry.key} style={styles.timelineCard} onPress={job ? () => handleJobPress(job) : undefined}>
+                                <View style={styles.timelineRail}>
+                                    <View style={[styles.timelineDot, { backgroundColor: accent }]} />
+                                    <View style={[styles.timelineLine, { backgroundColor: theme.colors.divider }]} />
+                                </View>
+                                <View style={styles.timelineContent}>
+                                    <View style={styles.dataCardHeader}>
+                                        <View style={styles.dataCardTitleWrap}>
+                                            <Text style={styles.dataCardTitle}>{entry.title}</Text>
+                                            <Text style={styles.dataCardSubtitle}>{entry.subtitle}</Text>
+                                        </View>
+                                        <Text style={[styles.dataCardTimestamp, { color: accent }]}>{formatTimestamp(entry.timestamp)}</Text>
+                                    </View>
+                                </View>
+                            </Pressable>
                         );
                     })}
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.automationJobs")}>
+                    {renderSectionBanner({ title: t("machine.automationJobs"), subtitle: t("machine.automationJobsHint"), detail: String(filteredJobs.length) })}
                     {filteredJobs.length === 0 ? (
-                        <Item title={(searchQuery.trim() || jobFilter !== "all") ? t("machine.automationNoMatches") : t("machine.automationDetailsEmpty")} showChevron={false} />
+                        <View style={styles.emptyCard}>
+                            <Text style={styles.emptyCardTitle}>{((searchQuery.trim() || jobFilter !== "all") ? t("machine.automationNoMatches") : t("machine.automationDetailsEmpty"))}</Text>
+                            <Text style={styles.emptyCardSubtitle}>{t("machine.automationJobsHint")}</Text>
+                        </View>
                     ) : filteredJobs.map((job) => (
-                        <Item
-                            key={job.id}
-                            title={getJobTitle(job)}
-                            subtitle={formatJobSubtitle(job)}
-                            detail={getStatusLabel(job.status)}
-                            detailStyle={{ color: getStatusColor(job.status) }}
-                            onPress={() => handleJobPress(job)}
-                            showChevron
-                            rightElement={
-                                activeJobId === job.id ? (
-                                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                                ) : undefined
-                            }
-                        />
+                        <Pressable key={job.id} style={styles.dataCard} onPress={() => handleJobPress(job)}>
+                            <View style={styles.dataCardHeader}>
+                                <View style={styles.dataCardTitleWrap}>
+                                    <Text style={styles.dataCardTitle}>{getJobTitle(job)}</Text>
+                                    <Text style={styles.dataCardSubtitle}>{formatJobSubtitle(job)}</Text>
+                                </View>
+                                <View style={styles.statusWrap}>
+                                    <View style={[styles.statusBadge, { borderColor: getStatusColor(job.status) ?? theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                        <Text style={[styles.statusBadgeText, { color: getStatusColor(job.status) ?? theme.colors.text }]}>{getStatusLabel(job.status)}</Text>
+                                    </View>
+                                    {activeJobId === job.id ? (
+                                        <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    ) : null}
+                                </View>
+                            </View>
+                            <View style={styles.pillRow}>
+                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{getJobKindLabel(job.kind)}</Text></View>
+                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationPriority")}: ${getPriorityLabel(job.priority)}`}</Text></View>
+                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationCreatedAt")}: ${formatTimestamp(job.createdAt)}`}</Text></View>
+                                {job.projectId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditProject")}: ${job.projectId}`}</Text></View> : null}
+                                {job.loopId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditLoop")}: ${job.loopId}`}</Text></View> : null}
+                            </View>
+                        </Pressable>
                     ))}
                 </ItemGroup>
             </ItemList>
@@ -1076,6 +1239,45 @@ const styles = StyleSheet.create((theme) => ({
         width: "100%",
         alignSelf: "center",
         paddingBottom: 40,
+    },
+    rpcNotice: {
+        marginHorizontal: 16,
+        marginTop: 16,
+        marginBottom: -4,
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.groupped.background,
+        gap: 4,
+    },
+    rpcNoticeTitle: {
+        color: theme.colors.text,
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    rpcNoticeText: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+    },
+    panelHeader: {
+        gap: 4,
+    },
+    panelTitle: {
+        color: theme.colors.text,
+        fontSize: 16,
+        fontWeight: "700",
+    },
+    panelSubtitle: {
+        color: theme.colors.textSecondary,
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    panelHint: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        lineHeight: 17,
+        marginTop: -2,
     },
     filterPanel: {
         marginHorizontal: 16,
@@ -1102,6 +1304,12 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         fontSize: 13,
         fontWeight: "600",
+    },
+    filterHint: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        lineHeight: 17,
+        marginTop: -6,
     },
     filterChipRow: {
         flexDirection: "row",
@@ -1131,6 +1339,205 @@ const styles = StyleSheet.create((theme) => ({
     filterSummary: {
         color: theme.colors.textSecondary,
         fontSize: 12,
+    },
+    summaryGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+    },
+    summaryCard: {
+        width: Platform.OS === "web" ? "31.5%" : "47.5%",
+        minHeight: 112,
+        padding: 12,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.surface,
+        gap: 6,
+    },
+    summaryCardTitle: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        fontWeight: "600",
+    },
+    summaryCardValue: {
+        color: theme.colors.text,
+        fontSize: 26,
+        fontWeight: "800",
+    },
+    summaryCardHint: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        lineHeight: 17,
+    },
+    sectionBanner: {
+        marginHorizontal: 12,
+        marginTop: 12,
+        marginBottom: 4,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.groupped.background,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+    },
+    sectionBannerTextWrap: {
+        flex: 1,
+        gap: 4,
+    },
+    sectionBannerTitle: {
+        color: theme.colors.text,
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    sectionBannerSubtitle: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        lineHeight: 17,
+    },
+    sectionBannerBadge: {
+        minHeight: 30,
+        minWidth: 44,
+        paddingHorizontal: 10,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.surface,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    sectionBannerBadgeText: {
+        color: theme.colors.text,
+        fontSize: 12,
+        fontWeight: "700",
+    },
+    emptyCard: {
+        marginHorizontal: 12,
+        marginVertical: 8,
+        padding: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.surface,
+        gap: 4,
+    },
+    emptyCardTitle: {
+        color: theme.colors.text,
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    emptyCardSubtitle: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        lineHeight: 17,
+    },
+    dataCard: {
+        marginHorizontal: 12,
+        marginVertical: 6,
+        padding: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.surface,
+        gap: 10,
+    },
+    dataCardHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        gap: 12,
+        alignItems: "flex-start",
+    },
+    dataCardTitleWrap: {
+        flex: 1,
+        gap: 4,
+    },
+    dataCardTitle: {
+        color: theme.colors.text,
+        fontSize: 15,
+        fontWeight: "700",
+    },
+    dataCardSubtitle: {
+        color: theme.colors.textSecondary,
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    dataCardTimestamp: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        fontWeight: "600",
+        textAlign: "right",
+        maxWidth: 132,
+    },
+    pillRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+    },
+    pill: {
+        minHeight: 28,
+        paddingHorizontal: 10,
+        borderRadius: 999,
+        borderWidth: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: theme.colors.surfaceHigh ?? theme.colors.surface,
+    },
+    pillText: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        fontWeight: "600",
+    },
+    statusWrap: {
+        alignItems: "flex-end",
+        gap: 8,
+    },
+    statusBadge: {
+        minHeight: 28,
+        paddingHorizontal: 10,
+        borderRadius: 999,
+        borderWidth: 1,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    statusBadgeText: {
+        fontSize: 12,
+        fontWeight: "700",
+    },
+    timelineCard: {
+        marginHorizontal: 12,
+        marginVertical: 4,
+        flexDirection: "row",
+        gap: 10,
+    },
+    timelineRail: {
+        width: 16,
+        alignItems: "center",
+    },
+    timelineDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginTop: 10,
+    },
+    timelineLine: {
+        width: 2,
+        flex: 1,
+        marginTop: 4,
+        marginBottom: -4,
+    },
+    timelineContent: {
+        flex: 1,
+        padding: 12,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.surface,
     },
     centered: {
         flex: 1,

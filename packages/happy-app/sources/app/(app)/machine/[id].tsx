@@ -37,7 +37,8 @@ import {
   type MultiTextInputHandle,
 } from "@/components/MultiTextInput";
 import { NetworkServicesSummaryItem } from "@/components/machine/NetworkServicesSection";
-import { AutomationSummarySection } from "@/components/machine/AutomationSummarySection";
+import { MachineNavigationSummaryItem } from "@/components/machine/MachineNavigationSummaryItem";
+import { AgentLoopsSummaryItem, AutomationSummaryItem } from "@/components/machine/AutomationSummarySection";
 
 const styles = StyleSheet.create((theme) => ({
   pathInputContainer: {
@@ -677,49 +678,38 @@ function MachineDetailScreen() {
           />
         </ItemGroup>
 
-        <AutomationSummarySection machine={machine} machineId={machineId} />
+        <ItemGroup title={t("machine.automation")}>
+          <AutomationSummaryItem machine={machine} machineId={machineId} />
+          <AgentLoopsSummaryItem machine={machine} machineId={machineId} />
+        </ItemGroup>
 
         {/* Network Services */}
         <NetworkServicesSummaryItem machineId={machineId} machine={machine} />
 
         {/* Background processes */}
-        <ItemGroup title={t("processManager.title")}>
-          <Item
-            title={t("processManager.viewAll")}
-            subtitle={t("processManager.viewAllHint")}
-            icon={
-              <Ionicons
-                name="terminal-outline"
-                size={20}
-                color={theme.colors.textLink}
-              />
-            }
-            onPress={() => router.push(`/machine/${machineId}/processes`)}
-            showChevron
-          />
-        </ItemGroup>
+        <MachineNavigationSummaryItem
+          groupTitle={t("processManager.title")}
+          title={t("processManager.viewAll")}
+          subtitle={t("processManager.viewAllHint")}
+          iconName="terminal-outline"
+          iconColor={theme.colors.textLink}
+          onPress={() => router.push(`/machine/${machineId}/processes`)}
+        />
 
         {/* Docker Containers (Provision Tokens) — only if Docker is available */}
         {hasDocker && (
-          <ItemGroup title={t("provision.title")}>
-            <Item
-              title={t("provision.title")}
-              subtitle={t("settings.provisionSubtitle")}
-              icon={
-                <Ionicons
-                  name="key-outline"
-                  size={20}
-                  color={theme.colors.accentOrange}
-                />
-              }
-              onPress={() =>
-                router.push(
-                  `/settings/provision?machineId=${machineId}` as any,
-                )
-              }
-              showChevron
-            />
-          </ItemGroup>
+          <MachineNavigationSummaryItem
+            groupTitle={t("provision.title")}
+            title={t("provision.title")}
+            subtitle={t("settings.provisionSubtitle")}
+            iconName="key-outline"
+            iconColor={theme.colors.accentOrange}
+            onPress={() =>
+              router.push(
+                `/settings/provision?machineId=${machineId}` as any,
+              )
+            }
+          />
         )}
 
         {/* Extensions (per-machine) */}

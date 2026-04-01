@@ -1,8 +1,10 @@
 import React, { useMemo, useRef, useState } from "react";
 import { ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
+import { MachineNavigationSummaryItem } from "@/components/machine/MachineNavigationSummaryItem";
 import type { Machine } from "@/sync/storageTypes";
 import {
     machineCancelAutomationJob,
@@ -132,12 +134,92 @@ function formatRate(value?: number): string {
     return `${Math.round(value * 100)}%`;
 }
 
+export const AutomationSummaryItem = React.memo(function AutomationSummaryItem({
+    machine,
+    machineId,
+}: Props) {
+    const { theme } = useUnistyles();
+    const router = useRouter();
+    const automation = machine.daemonState?.automation as any;
+
+    const subtitle = useMemo(() => {
+        if (!automation) {
+            return t("machine.automationViewAllHint");
+        }
+        const counts = automation.counts ?? {};
+        const runningCount = (counts.running ?? 0) + (counts.dispatching ?? 0);
+        const guardianCount = Array.isArray(automation.guardians) ? automation.guardians.length : 0;
+        const loopRollup = automation.loopRollup ?? {};
+        const parts = [
+            `${t("machine.automationQueued")} (${counts.queued ?? 0})`,
+            `${t("machine.automationRunning")} (${runningCount})`,
+        ];
+        if ((loopRollup.total ?? 0) > 0) {
+            parts.push(`${t("machine.automationLoopsTotal")} (${loopRollup.total ?? 0})`);
+        }
+        if (guardianCount > 0) {
+            parts.push(`${t("machine.automationGuardians")} (${guardianCount})`);
+        }
+        return parts.join("  ·  ");
+    }, [automation]);
+
+    return (
+        <Item
+            title={t("machine.automation")}
+            subtitle={subtitle}
+            icon={<Ionicons name="sparkles-outline" size={20} color={theme.colors.textLink} />}
+            onPress={() => router.push(`/machine/${machineId}/automation` as any)}
+            showChevron
+        />
+    );
+});
+
 function getGuardianStateLabel(attached?: boolean, recovered?: boolean): string {
     if (attached && recovered) {
         return t("machine.automationGuardianRecovered");
     }
     return attached ? t("machine.automationGuardianAttached") : t("machine.automationGuardianPersisted");
 }
+
+export const AgentLoopsSummaryItem = React.memo(function AgentLoopsSummaryItem({
+    machine,
+    machineId,
+}: Props) {
+    const { theme } = useUnistyles();
+    const router = useRouter();
+    const automation = machine.daemonState?.automation as any;
+
+    const subtitle = useMemo(() => {
+        const loopRollup = automation?.loopRollup;
+        if (!loopRollup) {
+            return t("machine.agentLoopsViewAllHint");
+        }
+        const parts = [
+            `${t("machine.automationLoopsTotal")} (${loopRollup.total ?? 0})`,
+            `${t("machine.automationLoopsActive")} (${loopRollup.active ?? 0})`,
+        ];
+        if ((loopRollup.blocked ?? 0) > 0) {
+            parts.push(`${t("machine.automationLoopsBlocked")} (${loopRollup.blocked ?? 0})`);
+        }
+        if ((loopRollup.paused ?? 0) > 0) {
+            parts.push(`${t("machine.automationLoopsPaused")} (${loopRollup.paused ?? 0})`);
+        }
+        if ((loopRollup.pendingEvents ?? 0) > 0) {
+            parts.push(`${t("machine.automationLoopsPendingEvents")} (${loopRollup.pendingEvents ?? 0})`);
+        }
+        return parts.join("  ·  ");
+    }, [automation]);
+
+    return (
+        <Item
+            title={t("machine.agentLoopsViewAll")}
+            subtitle={subtitle}
+            icon={<Ionicons name="repeat-outline" size={20} color={theme.colors.textLink} />}
+            onPress={() => router.push(`/machine/${machineId}/loops` as any)}
+            showChevron
+        />
+    );
+});
 
 export const AutomationSummarySection = React.memo(function AutomationSummarySection({
     machine,
