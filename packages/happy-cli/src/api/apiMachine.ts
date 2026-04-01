@@ -21,6 +21,11 @@ import {
 import type { AutomationJob, AutomationMutationResult } from "@/automation/types";
 import type { AgentLoopDefinition } from "@/automation/AgentLoopStore";
 import type { AgentLoopCreateInput, AgentLoopMutationResult, AgentLoopUpdateInput } from "@/automation/AgentLoopCoordinator";
+import type { AgentLoopBootstrapCreateInput, AgentLoopBootstrapMutationResult, AgentLoopBootstrapUpdateInput } from "@/automation/AgentLoopBootstrapCoordinator";
+import type { AgentLoopBootstrapProfile } from "@/automation/AgentLoopBootstrapStore";
+import type { AutoDreamCreateInput, AutoDreamMutationResult, AutoDreamUpdateInput } from "@/automation/AutoDreamCoordinator";
+import type { AutoDreamProfile } from "@/automation/AutoDreamStore";
+import type { AgentLoopSuggestInput, AgentLoopSuggestion } from "@/automation/AgentLoopSuggestion";
 import { encodeBase64, decodeBase64, encrypt, decrypt } from "./encryption";
 import { backoff } from "@/utils/time";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
@@ -119,7 +124,7 @@ type MachineRpcHandlers = {
     counts: Record<string, number>;
     guardians?: Array<{ key: string; projectId: string; loopId?: string; sessionId: string; updatedAt: number; lastRunId?: string; attached?: boolean; recovered?: boolean }>;
     guardianUsage?: Array<{ key: string; projectId?: string; loopId?: string; reuseCount: number; rememberCount: number; resetCount: number; lastUsedAt: number; currentSessionId?: string }>;
-    auditStats?: { totalEvents: number; lastEventAt?: number; queuedCount: number; sessionStartedCount: number; terminalCompletedCount: number; terminalFailedCount: number; terminalCancelledCount: number; guardianReuseCount: number; guardianRememberCount: number; guardianResetCount: number; sessionReattachedCount: number; watchdogStopCount: number; stopRequestCount: number; guardianEligibleRunCount: number; guardianReuseRate: number; activeGuardianCount: number };
+    auditStats?: { totalEvents: number; lastEventAt?: number; queuedCount: number; sessionStartedCount: number; terminalCompletedCount: number; terminalFailedCount: number; terminalCancelledCount: number; guardianReuseCount: number; guardianRememberCount: number; guardianResetCount: number; sessionReattachedCount: number; watchdogStopCount: number; stopRequestCount: number; policyGatedCount: number; downstreamEmitCount: number; guardianEligibleRunCount: number; guardianReuseRate: number; activeGuardianCount: number };
     recentAuditEvents?: Array<{ id: string; occurredAt: number; kind: string; jobId?: string; dedupeKey?: string; sessionId?: string; projectId?: string; runId?: string; loopId?: string; trigger?: string; status?: string; guardianKey?: string; guardianSessionId?: string; message?: string }>;
   };
   cancelAutomationJob: (jobId: string) => Promise<AutomationMutationResult>;
@@ -135,6 +140,24 @@ type MachineRpcHandlers = {
   resumeAgentLoop: (loopId: string) => Promise<AgentLoopMutationResult>;
   runAgentLoopNow: (loopId: string) => Promise<AgentLoopMutationResult>;
   removeAgentLoop: (loopId: string) => Promise<AgentLoopMutationResult>;
+  emitAgentLoopEvent: (loopId: string, input: { source?: string; title: string; details?: string; autoRun?: boolean }) => Promise<AgentLoopMutationResult>;
+  suggestAgentLoops: (input: AgentLoopSuggestInput) => Promise<AgentLoopSuggestion[]>;
+  listAgentLoopBootstrapProfiles: () => Promise<AgentLoopBootstrapProfile[]>;
+  getAgentLoopBootstrapProfile: (profileIdValue: string) => Promise<AgentLoopBootstrapProfile | undefined>;
+  createAgentLoopBootstrapProfile: (input: AgentLoopBootstrapCreateInput) => Promise<AgentLoopBootstrapMutationResult>;
+  updateAgentLoopBootstrapProfile: (profileIdValue: string, input: AgentLoopBootstrapUpdateInput) => Promise<AgentLoopBootstrapMutationResult>;
+  pauseAgentLoopBootstrapProfile: (profileIdValue: string) => Promise<AgentLoopBootstrapMutationResult>;
+  resumeAgentLoopBootstrapProfile: (profileIdValue: string) => Promise<AgentLoopBootstrapMutationResult>;
+  runAgentLoopBootstrapProfileNow: (profileIdValue: string) => Promise<AgentLoopBootstrapMutationResult>;
+  removeAgentLoopBootstrapProfile: (profileIdValue: string) => Promise<AgentLoopBootstrapMutationResult>;
+  listAutoDreamProfiles: () => Promise<AutoDreamProfile[]>;
+  getAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamProfile | undefined>;
+  createAutoDreamProfile: (input: AutoDreamCreateInput) => Promise<AutoDreamMutationResult>;
+  updateAutoDreamProfile: (profileIdValue: string, input: AutoDreamUpdateInput) => Promise<AutoDreamMutationResult>;
+  pauseAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
+  resumeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
+  runAutoDreamProfileNow: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
+  removeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
 };
 
 export type WebhookTriggerData = {
@@ -150,6 +173,24 @@ export type WebhookTriggerData = {
   repoPath: string;
   provider: string;
   apiToken?: string;
+};
+
+export type CiTriggerData = {
+  type: "ci-trigger";
+  eventId?: string;
+  provider: string;
+  repoPath: string;
+  repoUrl: string;
+  kind: "workflow_run" | "check_run" | "check_suite" | "generic";
+  status: string;
+  conclusion?: string;
+  workflowName?: string;
+  checkName?: string;
+  branch?: string;
+  sha?: string;
+  title?: string;
+  details?: string;
+  targetLoopId?: string;
 };
 
 export type SupervisorTriggerData = {
@@ -234,6 +275,7 @@ export class ApiMachineClient {
   private tunnelManager: TunnelManager | null = null;
   private rpcHandlerManager: RpcHandlerManager;
   private webhookHandler: ((data: WebhookTriggerData) => void) | null = null;
+  private ciHandler: ((data: CiTriggerData) => void) | null = null;
   private supervisorHandler:
     | ((data: SupervisorTriggerData) => void)
     | null = null;
@@ -288,6 +330,24 @@ export class ApiMachineClient {
     resumeAgentLoop,
     runAgentLoopNow,
     removeAgentLoop,
+    emitAgentLoopEvent,
+    suggestAgentLoops,
+    listAgentLoopBootstrapProfiles,
+    getAgentLoopBootstrapProfile,
+    createAgentLoopBootstrapProfile,
+    updateAgentLoopBootstrapProfile,
+    pauseAgentLoopBootstrapProfile,
+    resumeAgentLoopBootstrapProfile,
+    runAgentLoopBootstrapProfileNow,
+    removeAgentLoopBootstrapProfile,
+    listAutoDreamProfiles,
+    getAutoDreamProfile,
+    createAutoDreamProfile,
+    updateAutoDreamProfile,
+    pauseAutoDreamProfile,
+    resumeAutoDreamProfile,
+    runAutoDreamProfileNow,
+    removeAutoDreamProfile,
   }: MachineRpcHandlers) {
     // Register spawn session handler
     this.rpcHandlerManager.registerHandler(
@@ -438,6 +498,63 @@ export class ApiMachineClient {
       return removeAgentLoop(loopId);
     });
 
+    this.rpcHandlerManager.registerHandler("loop-event", async (params: any) => {
+      const { loopId, ...input } = params || {};
+      if (!loopId) throw new Error("Loop ID is required");
+      if (!input?.title) throw new Error("Event title is required");
+      return emitAgentLoopEvent(loopId, input);
+    });
+
+    this.rpcHandlerManager.registerHandler("loop-suggest", async (params: any) => {
+      const input = params || {};
+      if (!input.directory) throw new Error("Directory is required");
+      return { suggestions: await suggestAgentLoops(input) };
+    });
+
+    this.rpcHandlerManager.registerHandler("dream-profile-list", async () => {
+      return { profiles: await listAutoDreamProfiles() };
+    });
+
+    this.rpcHandlerManager.registerHandler("dream-profile-get", async (params: any) => {
+      const { profileIdValue } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return { success: true, profile: await getAutoDreamProfile(profileIdValue) };
+    });
+
+    this.rpcHandlerManager.registerHandler("dream-profile-create", async (params: any) => {
+      return createAutoDreamProfile(params);
+    });
+
+    this.rpcHandlerManager.registerHandler("dream-profile-update", async (params: any) => {
+      const { profileIdValue, ...input } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return updateAutoDreamProfile(profileIdValue, input);
+    });
+
+    this.rpcHandlerManager.registerHandler("dream-profile-pause", async (params: any) => {
+      const { profileIdValue } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return pauseAutoDreamProfile(profileIdValue);
+    });
+
+    this.rpcHandlerManager.registerHandler("dream-profile-resume", async (params: any) => {
+      const { profileIdValue } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return resumeAutoDreamProfile(profileIdValue);
+    });
+
+    this.rpcHandlerManager.registerHandler("dream-profile-run-now", async (params: any) => {
+      const { profileIdValue } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return runAutoDreamProfileNow(profileIdValue);
+    });
+
+    this.rpcHandlerManager.registerHandler("dream-profile-remove", async (params: any) => {
+      const { profileIdValue } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return removeAutoDreamProfile(profileIdValue);
+    });
+
     this.rpcHandlerManager.registerHandler("stop-daemon", () => {
       logger.debug("[API MACHINE] Received stop-daemon RPC request");
 
@@ -500,6 +617,14 @@ export class ApiMachineClient {
    */
   setWebhookHandler(handler: (data: WebhookTriggerData) => void) {
     this.webhookHandler = handler;
+  }
+
+  /**
+   * Set handler for incoming CI trigger events.
+   * Called when Server dispatches a ci-trigger ephemeral event to this machine.
+   */
+  setCiHandler(handler: (data: CiTriggerData) => void) {
+    this.ciHandler = handler;
   }
 
   /**
@@ -794,6 +919,12 @@ export class ApiMachineClient {
           `[API MACHINE] Received webhook-trigger for issue #${data.issueNumber}`,
         );
         this.webhookHandler(data as WebhookTriggerData);
+      }
+      if (data.type === "ci-trigger" && this.ciHandler) {
+        logger.debug(
+          `[API MACHINE] Received ci-trigger for repo ${data.repoPath}, kind ${data.kind}`,
+        );
+        this.ciHandler(data as CiTriggerData);
       }
       if (data.type === "supervisor-trigger" && this.supervisorHandler) {
         logger.debug(

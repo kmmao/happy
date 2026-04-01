@@ -147,6 +147,10 @@ function describeAutomationAuditEvent(event: {
       return event.message ?? "watchdog stopped session";
     case "session_stop_requested":
       return event.message ?? "stop requested";
+    case "loop_policy_gated":
+      return event.message ?? `policy gated: ${event.status ?? 'unknown'}`;
+    case "loop_downstream_emitted":
+      return event.message ?? "downstream event emitted";
     default:
       return event.message ?? event.kind;
   }
@@ -742,7 +746,7 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
         if (automationStatus.auditStats) {
           const stats = automationStatus.auditStats;
           logger.print(
-            `Stats: events=${stats.totalEvents} reuse=${stats.guardianReuseCount} reuseRate=${formatAutomationRate(stats.guardianReuseRate)} resets=${stats.guardianResetCount} reattached=${stats.sessionReattachedCount} watchdogStops=${stats.watchdogStopCount} stopRequests=${stats.stopRequestCount}`,
+            `Stats: events=${stats.totalEvents} reuse=${stats.guardianReuseCount} reuseRate=${formatAutomationRate(stats.guardianReuseRate)} resets=${stats.guardianResetCount} reattached=${stats.sessionReattachedCount} watchdogStops=${stats.watchdogStopCount} stopRequests=${stats.stopRequestCount} policyGated=${stats.policyGatedCount} downstream=${stats.downstreamEmitCount}`,
           );
         }
 
@@ -925,6 +929,8 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
         logger.print(`- sessions reattached: ${stats.sessionReattachedCount}`);
         logger.print(`- watchdog stops: ${stats.watchdogStopCount}`);
         logger.print(`- stop requests: ${stats.stopRequestCount}`);
+        logger.print(`- policy gated: ${stats.policyGatedCount}`);
+        logger.print(`- downstream emitted: ${stats.downstreamEmitCount}`);
         logger.print(`- queued jobs: ${stats.queuedCount}`);
         logger.print(`- sessions started: ${stats.sessionStartedCount}`);
         logger.print(`- terminal: completed=${stats.terminalCompletedCount} failed=${stats.terminalFailedCount} cancelled=${stats.terminalCancelledCount}`);

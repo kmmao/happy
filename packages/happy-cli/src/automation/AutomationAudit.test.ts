@@ -69,6 +69,20 @@ describe("AutomationAudit", () => {
         kind: "guardian_cleared",
         guardianKey: "loop:loop-1",
       },
+      {
+        id: "9",
+        occurredAt: 850,
+        kind: "loop_policy_gated",
+        loopId: "loop-1",
+        status: "quiet-hours",
+      },
+      {
+        id: "10",
+        occurredAt: 875,
+        kind: "loop_downstream_emitted",
+        loopId: "loop-2",
+        status: "completed",
+      },
     ];
     const guardians: GuardianSessionEntry[] = [
       {
@@ -96,7 +110,7 @@ describe("AutomationAudit", () => {
     });
 
     expect(stats).toMatchObject({
-      totalEvents: 8,
+      totalEvents: 10,
       queuedCount: 1,
       sessionStartedCount: 1,
       terminalFailedCount: 1,
@@ -105,6 +119,8 @@ describe("AutomationAudit", () => {
       guardianResetCount: 1,
       watchdogStopCount: 1,
       stopRequestCount: 1,
+      policyGatedCount: 1,
+      downstreamEmitCount: 1,
       guardianEligibleRunCount: 1,
       activeGuardianCount: 1,
     });

@@ -1,4 +1,4 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { logger } from "@/ui/logger";
@@ -7,6 +7,7 @@ import type {
   SpawnSessionResult,
 } from "@/modules/common/registerCommonHandlers";
 import type { AgentLoopTriggerData } from "./types";
+import { prepareAgentLoopPromptArtifacts } from "./AgentLoopMemory";
 
 export interface AgentLoopHandlerDeps {
   readonly spawnSession: (
@@ -18,9 +19,7 @@ export interface AgentLoopHandlerDeps {
 }
 
 async function writePromptFile(directory: string, loopId: string, prompt: string): Promise<string> {
-  const tempDir = join(directory, ".happy");
-  await mkdir(tempDir, { recursive: true });
-  const path = join(tempDir, `agent-loop-${loopId}-${randomUUID()}.md`);
+  const path = join(directory, `agent-loop-${loopId}-${randomUUID()}.md`);
   await writeFile(path, prompt, "utf-8");
   return path;
 }
@@ -38,7 +37,8 @@ export async function runAgentLoopJob(
   deps: AgentLoopHandlerDeps,
 ): Promise<{ success: boolean; errorMessage?: string; sessionId?: string }> {
   const guardianSessionId = deps.resolveGuardianSessionId?.(data);
-  const promptFilePath = await writePromptFile(data.directory, data.loopId, data.prompt);
+  const artifacts = await prepareAgentLoopPromptArtifacts(data);
+  const promptFilePath = await writePromptFile(artifacts.supportDir, data.loopId, artifacts.prompt);
 
   logger.debug(
     `[AGENT LOOP] Running loop ${data.loopId} iteration ${data.iteration} at ${data.directory}${guardianSessionId ? ` reusing=${guardianSessionId}` : ""}`,
@@ -63,6 +63,24 @@ export async function runAgentLoopJob(
       HAPPY_AGENT_LOOP_NAME: data.loopName ?? "",
       HAPPY_AGENT_LOOP_TRIGGER: data.trigger,
       HAPPY_AGENT_LOOP_ITERATION: String(data.iteration),
+      HAPPY_AGENT_LOOP_GOAL: data.goal ?? "",
+      HAPPY_AGENT_LOOP_CURRENT_FOCUS: data.currentFocus ?? "",
+      HAPPY_AGENT_LOOP_WORKING_MEMORY: data.workingMemory ?? "",
+      HAPPY_AGENT_LOOP_REFLECTION_SUMMARY: data.lastReflectionSummary ?? "",
+      HAPPY_AGENT_LOOP_MEMORY_UPDATED_AT: data.memoryUpdatedAt ? String(data.memoryUpdatedAt) : "",
+      HAPPY_AGENT_LOOP_CONSECUTIVE_FAILURES: data.consecutiveFailures !== undefined ? String(data.consecutiveFailures) : "0",
+      HAPPY_AGENT_LOOP_MAX_CONSECUTIVE_FAILURES: data.maxConsecutiveFailures !== undefined ? String(data.maxConsecutiveFailures) : "1",
+      HAPPY_AGENT_LOOP_RETRY_BACKOFF_MS: data.retryBackoffMs !== undefined ? String(data.retryBackoffMs) : "",
+      HAPPY_AGENT_LOOP_COOLDOWN_MS: data.cooldownMs !== undefined ? String(data.cooldownMs) : "",
+      HAPPY_AGENT_LOOP_QUIET_HOURS_START: data.quietHoursStart ?? "",
+      HAPPY_AGENT_LOOP_QUIET_HOURS_END: data.quietHoursEnd ?? "",
+      HAPPY_AGENT_LOOP_MAX_AUTO_RUNS_PER_DAY: data.maxAutoRunsPerDay !== undefined ? String(data.maxAutoRunsPerDay) : "",
+      HAPPY_AGENT_LOOP_MEMORY_FILE: artifacts.memoryFilePath,
+      HAPPY_AGENT_LOOP_CONTEXT_FILE: artifacts.contextFilePath,
+      HAPPY_AGENT_LOOP_EVENT_ID: data.eventId ?? "",
+      HAPPY_AGENT_LOOP_EVENT_SOURCE: data.eventSource ?? "",
+      HAPPY_AGENT_LOOP_EVENT_TITLE: data.eventTitle ?? "",
+      HAPPY_AGENT_LOOP_EVENT_DETAILS: data.eventDetails ?? "",
       ...(data.environmentVariables ?? {}),
     },
   });

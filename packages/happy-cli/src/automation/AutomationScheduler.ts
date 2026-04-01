@@ -60,8 +60,11 @@ function buildAutomationJobMetadata(
   if (input.kind === "agent_loop") {
     const { payload } = input;
     const promptPreview = payload.prompt.trim().replace(/\s+/g, " ").slice(0, 48);
+    const baseLabel = payload.loopName ? `Agent Loop: ${payload.loopName}` : `Agent Loop: ${promptPreview}`;
     return {
-      label: payload.loopName ? `Agent Loop: ${payload.loopName}` : `Agent Loop: ${promptPreview}`,
+      label: payload.trigger === "event" && payload.eventTitle
+        ? `${baseLabel} · Event: ${payload.eventTitle}`
+        : baseLabel,
       projectId: payload.projectId,
       loopId: payload.loopId,
       loopIteration: payload.iteration,

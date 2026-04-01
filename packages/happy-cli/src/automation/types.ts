@@ -36,7 +36,7 @@ export interface ExecutionGuardTransition {
 
 export type AutomationPriority = "urgent" | "user" | "background";
 
-export type AgentLoopTriggerSource = "manual" | "schedule";
+export type AgentLoopTriggerSource = "manual" | "schedule" | "event";
 
 export interface AgentLoopTriggerData {
   type: "agent-loop-trigger";
@@ -51,6 +51,23 @@ export interface AgentLoopTriggerData {
   profileId?: string;
   projectId?: string;
   environmentVariables?: Record<string, string>;
+  fileWatchEnabled?: boolean;
+  goal?: string;
+  currentFocus?: string;
+  workingMemory?: string;
+  lastReflectionSummary?: string;
+  memoryUpdatedAt?: number;
+  consecutiveFailures?: number;
+  maxConsecutiveFailures?: number;
+  retryBackoffMs?: number;
+  cooldownMs?: number;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+  maxAutoRunsPerDay?: number;
+  eventId?: string;
+  eventSource?: string;
+  eventTitle?: string;
+  eventDetails?: string;
 }
 
 export type AutomationJobKind = "supervisor" | "webhook" | "agent_loop";
@@ -138,7 +155,9 @@ export type AutomationAuditKind =
   | "guardian_cleared"
   | "session_reattached"
   | "watchdog_stopped"
-  | "session_stop_requested";
+  | "session_stop_requested"
+  | "loop_policy_gated"
+  | "loop_downstream_emitted";
 
 export interface AutomationAuditEvent {
   id: string;
@@ -187,6 +206,8 @@ export interface AutomationAuditStats {
   sessionReattachedCount: number;
   watchdogStopCount: number;
   stopRequestCount: number;
+  policyGatedCount: number;
+  downstreamEmitCount: number;
   guardianEligibleRunCount: number;
   guardianReuseRate: number;
   activeGuardianCount: number;

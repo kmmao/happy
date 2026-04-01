@@ -54,6 +54,15 @@ import { deriveAutomationAuditStats, deriveAutomationGuardianUsage } from "@/aut
 import { AutomationScheduler } from "@/automation/AutomationScheduler";
 import { AgentLoopStore } from "@/automation/AgentLoopStore";
 import { AgentLoopCoordinator } from "@/automation/AgentLoopCoordinator";
+import { AgentLoopBootstrapStore } from "@/automation/AgentLoopBootstrapStore";
+import { AgentLoopBootstrapCoordinator } from "@/automation/AgentLoopBootstrapCoordinator";
+import { AutoDreamCoordinator } from "@/automation/AutoDreamCoordinator";
+import { AutoDreamStore } from "@/automation/AutoDreamStore";
+import { AgentLoopFileWatcher } from "@/automation/AgentLoopFileWatcher";
+import { buildLoopEventFromCiTrigger, selectLoopsForCiBridge, selectLoopsForCiBridgeResolved } from "@/automation/AgentLoopCiBridge";
+import { buildCiTriggerFromGitHubActionsWebhook } from "@/automation/GitHubActionsCiAdapter";
+import { buildLoopEventsFromWebhook, selectLoopsForWebhookBridge } from "@/automation/AgentLoopWebhookBridge";
+import { suggestAgentLoops as generateAgentLoopSuggestions } from "@/automation/AgentLoopSuggestion";
 import { TrackedSessionRegistry } from "./TrackedSessionRegistry";
 import type { AutomationAuditEvent, AutomationJob } from "@/automation/types";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
@@ -1369,6 +1378,9 @@ export async function startDaemon(): Promise<void> {
 
     let automationScheduler: AutomationScheduler | null = null;
     let agentLoopCoordinator: AgentLoopCoordinator | null = null;
+    let agentLoopBootstrapCoordinator: AgentLoopBootstrapCoordinator | null = null;
+    let agentLoopFileWatcher: AgentLoopFileWatcher | null = null;
+    let autoDreamCoordinator: AutoDreamCoordinator | null = null;
     const getAutomationStatusSnapshot = () => {
       const jobs = automationScheduler?.getJobsSnapshot() ?? [];
       const trackedSessionsBySessionId = new Map(
@@ -1542,6 +1554,164 @@ export async function startDaemon(): Promise<void> {
           scheduleAutomationStatePublish();
           return result;
         },
+        emitAgentLoopEvent: async (loopId, input) => {
+          if (!agentLoopCoordinator) {
+            return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+          }
+          const result = await agentLoopCoordinator.emitEvent(loopId, input);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        emitGitHubActionsWebhook: async (input) => {
+          if (!agentLoopCoordinator) {
+            return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+          }
+          try {
+            let repoPath = input.repoPath;
+            if (!repoPath && input.targetLoopId) {
+              const loop = await agentLoopCoordinator.getLoop(input.targetLoopId);
+              repoPath = loop?.directory;
+            }
+            const payload = buildCiTriggerFromGitHubActionsWebhook({
+              eventName: input.eventName,
+              payload: input.payload,
+              repoPath,
+              targetLoopId: input.targetLoopId,
+            });
+            if (!payload) {
+              return { success: false, errorMessage: "Unsupported or invalid GitHub Actions webhook payload" };
+            }
+            const loops = await agentLoopCoordinator.listLoops();
+            const matchingLoops = await selectLoopsForCiBridgeResolved(loops, payload);
+            for (const loop of matchingLoops) {
+              const event = buildLoopEventFromCiTrigger(payload);
+              const result = await agentLoopCoordinator.emitEvent(loop.id, event);
+              if (!result.success) {
+                logger.debug(`[DAEMON RUN] Failed to bridge github-actions webhook into loop ${loop.id}: ${result.errorMessage ?? "unknown error"}`);
+              }
+            }
+            scheduleAutomationStatePublish();
+            return { success: true };
+          } catch (error) {
+            return { success: false, errorMessage: error instanceof Error ? error.message : String(error) };
+          }
+        },
+        emitCiTrigger: async (input) => {
+          if (!agentLoopCoordinator) {
+            return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+          }
+          try {
+            const payload = { type: "ci-trigger" as const, ...input };
+            const loops = await agentLoopCoordinator.listLoops();
+            const matchingLoops = await selectLoopsForCiBridgeResolved(loops, payload);
+            for (const loop of matchingLoops) {
+              const event = buildLoopEventFromCiTrigger(payload);
+              const result = await agentLoopCoordinator.emitEvent(loop.id, event);
+              if (!result.success) {
+                logger.debug(`[DAEMON RUN] Failed to bridge ci-trigger into loop ${loop.id}: ${result.errorMessage ?? "unknown error"}`);
+              }
+            }
+            scheduleAutomationStatePublish();
+            return { success: true };
+          } catch (error) {
+            return { success: false, errorMessage: error instanceof Error ? error.message : String(error) };
+          }
+        },
+        suggestAgentLoops: async (input) => {
+          return generateAgentLoopSuggestions(input, await agentLoopCoordinator?.listLoops() ?? []);
+        },
+        listAgentLoopBootstrapProfiles: async () => {
+          return agentLoopBootstrapCoordinator?.listProfiles() ?? [];
+        },
+        getAgentLoopBootstrapProfile: async (profileIdValue) => {
+          return agentLoopBootstrapCoordinator?.getProfile(profileIdValue);
+        },
+        createAgentLoopBootstrapProfile: async (input) => {
+          if (!agentLoopBootstrapCoordinator) {
+            return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+          }
+          const result = await agentLoopBootstrapCoordinator.createProfile(input);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        updateAgentLoopBootstrapProfile: async (profileIdValue, input) => {
+          if (!agentLoopBootstrapCoordinator) {
+            return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+          }
+          const result = await agentLoopBootstrapCoordinator.updateProfile(profileIdValue, input);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        pauseAgentLoopBootstrapProfile: async (profileIdValue) => {
+          if (!agentLoopBootstrapCoordinator) {
+            return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+          }
+          const result = await agentLoopBootstrapCoordinator.pauseProfile(profileIdValue);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        resumeAgentLoopBootstrapProfile: async (profileIdValue) => {
+          if (!agentLoopBootstrapCoordinator) {
+            return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+          }
+          const result = await agentLoopBootstrapCoordinator.resumeProfile(profileIdValue);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        runAgentLoopBootstrapProfileNow: async (profileIdValue) => {
+          if (!agentLoopBootstrapCoordinator) {
+            return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+          }
+          const result = await agentLoopBootstrapCoordinator.runNow(profileIdValue);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        removeAgentLoopBootstrapProfile: async (profileIdValue) => {
+          if (!agentLoopBootstrapCoordinator) {
+            return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+          }
+          const result = await agentLoopBootstrapCoordinator.removeProfile(profileIdValue);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        listAutoDreamProfiles: async () => autoDreamCoordinator?.listProfiles() ?? [],
+        getAutoDreamProfile: async (profileIdValue) => autoDreamCoordinator?.getProfile(profileIdValue),
+        createAutoDreamProfile: async (input) => {
+          if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+          const result = await autoDreamCoordinator.createProfile(input);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        updateAutoDreamProfile: async (profileIdValue, input) => {
+          if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+          const result = await autoDreamCoordinator.updateProfile(profileIdValue, input);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        pauseAutoDreamProfile: async (profileIdValue) => {
+          if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+          const result = await autoDreamCoordinator.pauseProfile(profileIdValue);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        resumeAutoDreamProfile: async (profileIdValue) => {
+          if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+          const result = await autoDreamCoordinator.resumeProfile(profileIdValue);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        runAutoDreamProfileNow: async (profileIdValue) => {
+          if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+          const result = await autoDreamCoordinator.runNow(profileIdValue);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        removeAutoDreamProfile: async (profileIdValue) => {
+          if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+          const result = await autoDreamCoordinator.removeProfile(profileIdValue);
+          scheduleAutomationStatePublish();
+          return result;
+        },
       });
 
     // Write initial daemon state (no lock needed for state file)
@@ -1702,6 +1872,109 @@ export async function startDaemon(): Promise<void> {
         }
         await guardianSessionRegistry.forgetKey(`agent-loop:${loopId}`).catch(() => {});
         const result = await agentLoopCoordinator.removeLoop(loopId);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      emitAgentLoopEvent: async (loopId, input) => {
+        if (!agentLoopCoordinator) {
+          return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+        }
+        const result = await agentLoopCoordinator.emitEvent(loopId, input);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      suggestAgentLoops: async (input) => {
+        return generateAgentLoopSuggestions(input, await agentLoopCoordinator?.listLoops() ?? []);
+      },
+      listAgentLoopBootstrapProfiles: async () => {
+        return agentLoopBootstrapCoordinator?.listProfiles() ?? [];
+      },
+      getAgentLoopBootstrapProfile: async (profileIdValue) => {
+        return agentLoopBootstrapCoordinator?.getProfile(profileIdValue);
+      },
+      createAgentLoopBootstrapProfile: async (input) => {
+        if (!agentLoopBootstrapCoordinator) {
+          return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+        }
+        const result = await agentLoopBootstrapCoordinator.createProfile(input);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      updateAgentLoopBootstrapProfile: async (profileIdValue, input) => {
+        if (!agentLoopBootstrapCoordinator) {
+          return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+        }
+        const result = await agentLoopBootstrapCoordinator.updateProfile(profileIdValue, input);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      pauseAgentLoopBootstrapProfile: async (profileIdValue) => {
+        if (!agentLoopBootstrapCoordinator) {
+          return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+        }
+        const result = await agentLoopBootstrapCoordinator.pauseProfile(profileIdValue);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      resumeAgentLoopBootstrapProfile: async (profileIdValue) => {
+        if (!agentLoopBootstrapCoordinator) {
+          return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+        }
+        const result = await agentLoopBootstrapCoordinator.resumeProfile(profileIdValue);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      runAgentLoopBootstrapProfileNow: async (profileIdValue) => {
+        if (!agentLoopBootstrapCoordinator) {
+          return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+        }
+        const result = await agentLoopBootstrapCoordinator.runNow(profileIdValue);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      removeAgentLoopBootstrapProfile: async (profileIdValue) => {
+        if (!agentLoopBootstrapCoordinator) {
+          return { success: false, errorMessage: "Bootstrap coordinator is not ready" };
+        }
+        const result = await agentLoopBootstrapCoordinator.removeProfile(profileIdValue);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      listAutoDreamProfiles: async () => autoDreamCoordinator?.listProfiles() ?? [],
+      getAutoDreamProfile: async (profileIdValue) => autoDreamCoordinator?.getProfile(profileIdValue),
+      createAutoDreamProfile: async (input) => {
+        if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+        const result = await autoDreamCoordinator.createProfile(input);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      updateAutoDreamProfile: async (profileIdValue, input) => {
+        if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+        const result = await autoDreamCoordinator.updateProfile(profileIdValue, input);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      pauseAutoDreamProfile: async (profileIdValue) => {
+        if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+        const result = await autoDreamCoordinator.pauseProfile(profileIdValue);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      resumeAutoDreamProfile: async (profileIdValue) => {
+        if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+        const result = await autoDreamCoordinator.resumeProfile(profileIdValue);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      runAutoDreamProfileNow: async (profileIdValue) => {
+        if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+        const result = await autoDreamCoordinator.runNow(profileIdValue);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      removeAutoDreamProfile: async (profileIdValue) => {
+        if (!autoDreamCoordinator) return { success: false, errorMessage: "Auto-Dream coordinator is not ready" };
+        const result = await autoDreamCoordinator.removeProfile(profileIdValue);
         scheduleAutomationStatePublish();
         return result;
       },
@@ -1920,13 +2193,55 @@ export async function startDaemon(): Promise<void> {
     const agentLoopStore = new AgentLoopStore(
       join(configuration.happyHomeDir, "agent-loops.json"),
     );
+    agentLoopFileWatcher = new AgentLoopFileWatcher({
+      emitEvent: async (loopId, input) => {
+        if (!agentLoopCoordinator) {
+          return;
+        }
+        const result = await agentLoopCoordinator.emitEvent(loopId, input);
+        if (!result.success) {
+          logger.debug(`[AGENT LOOP WATCH] event skipped for ${loopId}: ${result.errorMessage ?? "unknown error"}`);
+        }
+      },
+      logger: (message) => logger.debug(message),
+    });
     agentLoopCoordinator = new AgentLoopCoordinator({
       store: agentLoopStore,
       scheduler: automationScheduler,
-      onChange: () => scheduleAutomationStatePublish(),
+      onChange: (loops) => {
+        agentLoopFileWatcher?.sync(loops);
+        scheduleAutomationStatePublish();
+      },
       recordAuditEvent: (event) => recordAutomationAuditEvent(event),
+      sendPushNotification: async ({ title, body, data }) => {
+        try {
+          api.push().sendToAllDevices(title, body, {
+            source: "agent-loop",
+            ...(data ?? {}),
+          });
+        } catch (error) {
+          logger.debug(`[DAEMON RUN] Failed to send loop push notification: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      },
     });
     await agentLoopCoordinator.start();
+    const agentLoopBootstrapStore = new AgentLoopBootstrapStore(
+      join(configuration.happyHomeDir, "agent-loop-bootstrap-profiles.json"),
+    );
+    agentLoopBootstrapCoordinator = new AgentLoopBootstrapCoordinator({
+      store: agentLoopBootstrapStore,
+      agentLoopCoordinator,
+      onChange: () => scheduleAutomationStatePublish(),
+    });
+    await agentLoopBootstrapCoordinator.start();
+    const autoDreamStore = new AutoDreamStore(
+      join(configuration.happyHomeDir, "auto-dream-profiles.json"),
+    );
+    autoDreamCoordinator = new AutoDreamCoordinator({
+      store: autoDreamStore,
+      onChange: () => scheduleAutomationStatePublish(),
+    });
+    await autoDreamCoordinator.start();
     scheduleAutomationStatePublish();
     setTimeout(() => {
       void publishAutomationState();
@@ -1937,22 +2252,57 @@ export async function startDaemon(): Promise<void> {
 
     // Set up webhook trigger handler
     apiMachine.setWebhookHandler((data) => {
-      void automationScheduler!
-        .enqueueWebhook(data)
-        .then((result) => {
-          if (!result.deduped) {
-            void recordAutomationAuditEvent({
-              kind: "job_enqueued",
-              jobId: result.job.id,
-              dedupeKey: result.job.dedupeKey,
-              status: result.job.status,
-              message: result.job.label,
-            });
+      void (async () => {
+        if (agentLoopCoordinator) {
+          const loops = await agentLoopCoordinator.listLoops();
+          const matchingLoops = selectLoopsForWebhookBridge(loops, data);
+          if (matchingLoops.length > 0) {
+            const events = buildLoopEventsFromWebhook(data);
+            await Promise.all(matchingLoops.flatMap((loop) => events.map(async (event) => {
+              const result = await agentLoopCoordinator!.emitEvent(loop.id, event);
+              if (!result.success) {
+                logger.debug(`[DAEMON RUN] Failed to bridge webhook into loop ${loop.id}: ${result.errorMessage ?? "unknown error"}`);
+              }
+            })));
           }
-        })
-        .catch((error) => {
-          logger.debug(`[DAEMON RUN] Failed to enqueue webhook job: ${error}`);
-        });
+        }
+
+        await automationScheduler!
+          .enqueueWebhook(data)
+          .then((result) => {
+            if (!result.deduped) {
+              void recordAutomationAuditEvent({
+                kind: "job_enqueued",
+                jobId: result.job.id,
+                dedupeKey: result.job.dedupeKey,
+                status: result.job.status,
+                message: result.job.label,
+              });
+            }
+          });
+      })().catch((error) => {
+        logger.debug(`[DAEMON RUN] Failed to enqueue webhook job: ${error}`);
+      });
+    });
+
+    apiMachine.setCiHandler((data: import("@/api/apiMachine").CiTriggerData) => {
+      void (async () => {
+        if (agentLoopCoordinator) {
+          const loops = await agentLoopCoordinator.listLoops();
+          const matchingLoops = selectLoopsForCiBridge(loops, data);
+          if (matchingLoops.length > 0) {
+            const event = buildLoopEventFromCiTrigger(data);
+            await Promise.all(matchingLoops.map(async (loop) => {
+              const result = await agentLoopCoordinator!.emitEvent(loop.id, event);
+              if (!result.success) {
+                logger.debug(`[DAEMON RUN] Failed to bridge ci-trigger into loop ${loop.id}: ${result.errorMessage ?? "unknown error"}`);
+              }
+            }));
+          }
+        }
+      })().catch((error) => {
+        logger.debug(`[DAEMON RUN] Failed to handle ci-trigger: ${error}`);
+      });
     });
 
     // Set up supervisor trigger handler
@@ -2174,6 +2524,8 @@ export async function startDaemon(): Promise<void> {
         clearTimeout(automationPublishTimer);
         automationPublishTimer = null;
       }
+      await agentLoopFileWatcher?.stop();
+      await agentLoopBootstrapCoordinator?.stop();
       await agentLoopCoordinator?.stop();
       await automationScheduler?.stop();
 

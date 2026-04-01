@@ -41,6 +41,9 @@ export const DiffView: React.FC<DiffViewProps> = ({
   showLineNumbers = true,
   showPlusMinusSymbols = true,
   wrapLines = false,
+  showDiffStats = false,
+  oldTitle,
+  newTitle,
   style,
   fontScaleX = 1,
   collapsible = false,
@@ -69,7 +72,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
 
   // Calculate diff with inline highlighting
   const effectiveContextLines = expandedContext ? 999999 : contextLines;
-  const { hunks } = useMemo(() => {
+  const { hunks, stats } = useMemo(() => {
     return calculateUnifiedDiff(oldText, newText, effectiveContextLines);
   }, [oldText, newText, effectiveContextLines]);
 
@@ -530,6 +533,44 @@ export const DiffView: React.FC<DiffViewProps> = ({
 
   return (
     <View style={[containerStyle, { overflow: "hidden" }]}>
+      {(oldTitle || newTitle || showDiffStats) ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            backgroundColor: theme.colors.surfaceHigh,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.outline,
+          }}
+        >
+          <Text
+            numberOfLines={1}
+            style={{
+              ...Typography.mono(),
+              flex: 1,
+              fontSize: 12,
+              color: theme.colors.textSecondary,
+              transform: [{ scaleX: fontScaleX }],
+            }}
+          >
+            {oldTitle && newTitle ? `${oldTitle} → ${newTitle}` : oldTitle ?? newTitle ?? ""}
+          </Text>
+          {showDiffStats ? (
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <Text style={{ ...Typography.mono(), fontSize: 12, color: colors.addedText }}>
+                +{stats.additions}
+              </Text>
+              <Text style={{ ...Typography.mono(), fontSize: 12, color: colors.removedText }}>
+                -{stats.deletions}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
       {viewMode === "split" ? renderSplitContent() : renderDiffContent()}
     </View>
   );

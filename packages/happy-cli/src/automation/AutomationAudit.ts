@@ -80,6 +80,8 @@ export function deriveAutomationAuditStats(
     sessionReattachedCount: 0,
     watchdogStopCount: 0,
     stopRequestCount: 0,
+    policyGatedCount: 0,
+    downstreamEmitCount: 0,
     guardianEligibleRunCount: 0,
     guardianReuseRate: 0,
     activeGuardianCount: guardians.length,
@@ -118,6 +120,12 @@ export function deriveAutomationAuditStats(
         break;
       case "session_stop_requested":
         stats.stopRequestCount += 1;
+        break;
+      case "loop_policy_gated":
+        stats.policyGatedCount += 1;
+        break;
+      case "loop_downstream_emitted":
+        stats.downstreamEmitCount += 1;
         break;
     }
   }

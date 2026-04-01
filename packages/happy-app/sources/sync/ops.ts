@@ -313,6 +313,8 @@ export interface MachineAutomationAuditStats {
   sessionReattachedCount: number;
   watchdogStopCount: number;
   stopRequestCount: number;
+  policyGatedCount: number;
+  downstreamEmitCount: number;
   guardianEligibleRunCount: number;
   guardianReuseRate: number;
   activeGuardianCount: number;
@@ -415,6 +417,25 @@ export async function machineClearAutomationAudit(
 }
 
 
+export type MachineAgentLoopRuntimeState = "idle" | "active" | "blocked" | "paused";
+export type MachineAgentLoopPhase = "sleeping" | "planning" | "acting" | "reflecting" | "blocked" | "paused";
+export type MachineAgentLoopTriggerSource = "manual" | "schedule" | "event";
+export type MachineAgentLoopEventStatus = "pending" | "dispatched" | "completed" | "failed" | "cancelled" | "ignored";
+
+export interface MachineAgentLoopEvent {
+  id: string;
+  source: string;
+  title: string;
+  details?: string;
+  status: MachineAgentLoopEventStatus;
+  createdAt: number;
+  dispatchedAt?: number;
+  completedAt?: number;
+  jobId?: string;
+  sessionId?: string;
+  errorMessage?: string;
+}
+
 export interface MachineAgentLoop {
   id: string;
   name?: string;
@@ -431,11 +452,90 @@ export interface MachineAgentLoop {
   profileId?: string;
   projectId?: string;
   environmentVariables?: Record<string, string>;
+  fileWatchEnabled?: boolean;
+  githubBridgeEnabled?: boolean;
+  ciBridgeEnabled?: boolean;
+  eventSourceAllowlist?: string[];
+  eventKeywordFilters?: string[];
+  goal?: string;
+  currentFocus?: string;
+  workingMemory?: string;
+  lastReflectionSummary?: string;
+  memoryUpdatedAt?: number;
+  consecutiveFailures?: number;
+  maxConsecutiveFailures?: number;
+  retryBackoffMs?: number;
+  cooldownMs?: number;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+  maxAutoRunsPerDay?: number;
+  maxIterations?: number;
+  stopOnSuccess?: boolean;
+  downstreamLoopIds?: string[];
+  downstreamTriggerOn?: Array<"completed" | "failed">;
+  notifyEvents?: Array<"completed" | "failed" | "blocked" | "brief">;
+  notificationChannels?: Array<"push" | "webhook">;
+  notificationWebhookUrl?: string;
+  lastBriefAt?: number;
+  lastBriefSummary?: string;
+  lastSuccessfulAt?: number;
+  autoRunsToday?: number;
+  autoRunWindowStartedAt?: number;
+  lastPolicyGateAt?: number;
+  lastPolicyGateReason?: string;
+  runtimeState: MachineAgentLoopRuntimeState;
+  phase: MachineAgentLoopPhase;
+  phaseUpdatedAt: number;
+  activeJobId?: string;
+  activeSessionId?: string;
+  lastTriggerSource?: MachineAgentLoopTriggerSource;
+  lastTriggerAt?: number;
+  blockedReason?: string;
+  stopReason?: string;
+  lastReflectionAt?: number;
+  recentEvents?: MachineAgentLoopEvent[];
   lastEnqueuedAt?: number;
   lastStartedAt?: number;
   lastCompletedAt?: number;
   lastSessionId?: string;
   lastError?: string;
+}
+
+export interface MachineAgentLoopSuggestion {
+  key: string;
+  name: string;
+  description: string;
+  rationale: string;
+  directory: string;
+  intervalMs: number;
+  agent: "claude" | "codex" | "gemini";
+  fileWatchEnabled?: boolean;
+  githubBridgeEnabled?: boolean;
+  ciBridgeEnabled?: boolean;
+  eventSourceAllowlist?: string[];
+  eventKeywordFilters?: string[];
+  goal?: string;
+  currentFocus?: string;
+  workingMemory?: string;
+  lastReflectionSummary?: string;
+  maxConsecutiveFailures?: number;
+  retryBackoffMs?: number;
+  cooldownMs?: number;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+  maxAutoRunsPerDay?: number;
+  prompt: string;
+  tags: string[];
+  confidence: "high" | "medium";
+  alreadyConfigured: boolean;
+  existingLoopId?: string;
+}
+
+export interface MachineAgentLoopSuggestInput {
+  directory: string;
+  agent?: "claude" | "codex" | "gemini";
+  projectId?: string;
+  profileId?: string;
 }
 
 export interface MachineAgentLoopCreateInput {
@@ -447,6 +547,28 @@ export interface MachineAgentLoopCreateInput {
   profileId?: string;
   projectId?: string;
   environmentVariables?: Record<string, string>;
+  fileWatchEnabled?: boolean;
+  githubBridgeEnabled?: boolean;
+  ciBridgeEnabled?: boolean;
+  eventSourceAllowlist?: string[];
+  eventKeywordFilters?: string[];
+  goal?: string;
+  currentFocus?: string;
+  workingMemory?: string;
+  lastReflectionSummary?: string;
+  maxConsecutiveFailures?: number;
+  retryBackoffMs?: number;
+  cooldownMs?: number;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+  maxAutoRunsPerDay?: number;
+  maxIterations?: number;
+  stopOnSuccess?: boolean;
+  downstreamLoopIds?: string[];
+  downstreamTriggerOn?: Array<"completed" | "failed">;
+  notifyEvents?: Array<"completed" | "failed" | "blocked" | "brief">;
+  notificationChannels?: Array<"push" | "webhook">;
+  notificationWebhookUrl?: string;
   runNow?: boolean;
 }
 
@@ -459,6 +581,115 @@ export interface MachineAgentLoopUpdateInput {
   profileId?: string | null;
   projectId?: string | null;
   environmentVariables?: Record<string, string> | null;
+  fileWatchEnabled?: boolean;
+  githubBridgeEnabled?: boolean;
+  ciBridgeEnabled?: boolean;
+  eventSourceAllowlist?: string[] | null;
+  eventKeywordFilters?: string[] | null;
+  goal?: string | null;
+  currentFocus?: string | null;
+  workingMemory?: string | null;
+  lastReflectionSummary?: string | null;
+  maxConsecutiveFailures?: number | null;
+  retryBackoffMs?: number | null;
+  cooldownMs?: number | null;
+  quietHoursStart?: string | null;
+  quietHoursEnd?: string | null;
+  maxAutoRunsPerDay?: number | null;
+  maxIterations?: number | null;
+  stopOnSuccess?: boolean;
+  downstreamLoopIds?: string[] | null;
+  downstreamTriggerOn?: Array<"completed" | "failed"> | null;
+  notifyEvents?: Array<"completed" | "failed" | "blocked" | "brief"> | null;
+  notificationChannels?: Array<"push" | "webhook"> | null;
+  notificationWebhookUrl?: string | null;
+}
+
+export interface MachineAgentLoopBootstrapProfile {
+  id: string;
+  name?: string;
+  rootDirectory: string;
+  intervalMs: number;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+  nextRunAt: number;
+  maxDepth?: number;
+  limit?: number;
+  agent?: "claude" | "codex" | "gemini";
+  profileId?: string;
+  projectId?: string;
+  autoRunCreatedLoops?: boolean;
+  status: "idle" | "running" | "paused" | "failed";
+  statusUpdatedAt: number;
+  lastRunAt?: number;
+  lastRepoCount?: number;
+  lastSuggestionCount?: number;
+  lastCreatedCount?: number;
+  lastError?: string;
+}
+
+export interface MachineAgentLoopBootstrapCreateInput {
+  name?: string;
+  rootDirectory: string;
+  intervalMs: number;
+  maxDepth?: number;
+  limit?: number;
+  agent?: "claude" | "codex" | "gemini";
+  profileId?: string;
+  projectId?: string;
+  autoRunCreatedLoops?: boolean;
+  runNow?: boolean;
+}
+
+export interface MachineAgentLoopBootstrapUpdateInput {
+  name?: string | null;
+  rootDirectory?: string;
+  intervalMs?: number;
+  maxDepth?: number | null;
+  limit?: number | null;
+  agent?: "claude" | "codex" | "gemini" | null;
+  profileId?: string | null;
+  projectId?: string | null;
+  autoRunCreatedLoops?: boolean;
+}
+
+export interface MachineAutoDreamProfile {
+  id: string;
+  name?: string;
+  rootDirectory: string;
+  intervalMs: number;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+  nextRunAt: number;
+  status: "idle" | "running" | "paused" | "failed";
+  stage: "starting" | "updating";
+  statusUpdatedAt: number;
+  maxDepth?: number;
+  limit?: number;
+  lastRunAt?: number;
+  lastError?: string;
+  lastMemoryFiles?: number;
+  lastUpdatedFiles?: number;
+  latestDreamFilePath?: string;
+}
+
+export interface MachineAutoDreamCreateInput {
+  name?: string;
+  rootDirectory: string;
+  intervalMs: number;
+  maxDepth?: number;
+  limit?: number;
+  runNow?: boolean;
+}
+
+export interface MachineAutoDreamUpdateInput {
+  name?: string | null;
+  rootDirectory?: string;
+  intervalMs?: number;
+  maxDepth?: number | null;
+  limit?: number | null;
 }
 
 export async function machineListAgentLoops(
@@ -538,6 +769,18 @@ export async function machineRunAgentLoopNow(
   );
 }
 
+export async function machineEmitAgentLoopEvent(
+  machineId: string,
+  loopId: string,
+  input: { source?: string; title: string; details?: string; autoRun?: boolean },
+): Promise<{ success: boolean; errorMessage?: string; loop?: MachineAgentLoop }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-event",
+    { loopId, ...input },
+  );
+}
+
 export async function machineRemoveAgentLoop(
   machineId: string,
   loopId: string,
@@ -546,6 +789,172 @@ export async function machineRemoveAgentLoop(
     machineId,
     "loop-remove",
     { loopId },
+  );
+}
+
+export async function machineSuggestAgentLoops(
+  machineId: string,
+  input: MachineAgentLoopSuggestInput,
+): Promise<{ suggestions: MachineAgentLoopSuggestion[] }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-suggest",
+    input,
+  );
+}
+
+
+export async function machineListAgentLoopBootstrapProfiles(
+  machineId: string,
+): Promise<{ profiles: MachineAgentLoopBootstrapProfile[] }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "bootstrap-profile-list",
+    {},
+  );
+}
+
+export async function machineCreateAgentLoopBootstrapProfile(
+  machineId: string,
+  input: MachineAgentLoopBootstrapCreateInput,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAgentLoopBootstrapProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "bootstrap-profile-create",
+    input,
+  );
+}
+
+export async function machineUpdateAgentLoopBootstrapProfile(
+  machineId: string,
+  profileIdValue: string,
+  input: MachineAgentLoopBootstrapUpdateInput,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAgentLoopBootstrapProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "bootstrap-profile-update",
+    { profileIdValue, ...input },
+  );
+}
+
+export async function machinePauseAgentLoopBootstrapProfile(
+  machineId: string,
+  profileIdValue: string,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAgentLoopBootstrapProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "bootstrap-profile-pause",
+    { profileIdValue },
+  );
+}
+
+export async function machineResumeAgentLoopBootstrapProfile(
+  machineId: string,
+  profileIdValue: string,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAgentLoopBootstrapProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "bootstrap-profile-resume",
+    { profileIdValue },
+  );
+}
+
+export async function machineRunNowAgentLoopBootstrapProfile(
+  machineId: string,
+  profileIdValue: string,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAgentLoopBootstrapProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "bootstrap-profile-run-now",
+    { profileIdValue },
+  );
+}
+
+export async function machineRemoveAgentLoopBootstrapProfile(
+  machineId: string,
+  profileIdValue: string,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAgentLoopBootstrapProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "bootstrap-profile-remove",
+    { profileIdValue },
+  );
+}
+
+export async function machineListAutoDreamProfiles(
+  machineId: string,
+): Promise<{ profiles: MachineAutoDreamProfile[] }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "dream-profile-list",
+    {},
+  );
+}
+
+export async function machineCreateAutoDreamProfile(
+  machineId: string,
+  input: MachineAutoDreamCreateInput,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAutoDreamProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "dream-profile-create",
+    input,
+  );
+}
+
+export async function machineUpdateAutoDreamProfile(
+  machineId: string,
+  profileIdValue: string,
+  input: MachineAutoDreamUpdateInput,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAutoDreamProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "dream-profile-update",
+    { profileIdValue, ...input },
+  );
+}
+
+export async function machinePauseAutoDreamProfile(
+  machineId: string,
+  profileIdValue: string,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAutoDreamProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "dream-profile-pause",
+    { profileIdValue },
+  );
+}
+
+export async function machineResumeAutoDreamProfile(
+  machineId: string,
+  profileIdValue: string,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAutoDreamProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "dream-profile-resume",
+    { profileIdValue },
+  );
+}
+
+export async function machineRunNowAutoDreamProfile(
+  machineId: string,
+  profileIdValue: string,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAutoDreamProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "dream-profile-run-now",
+    { profileIdValue },
+  );
+}
+
+export async function machineRemoveAutoDreamProfile(
+  machineId: string,
+  profileIdValue: string,
+): Promise<{ success: boolean; errorMessage?: string; profile?: MachineAutoDreamProfile }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "dream-profile-remove",
+    { profileIdValue },
   );
 }
 

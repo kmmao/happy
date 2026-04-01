@@ -49,6 +49,7 @@ Implemented platform capabilities:
 - guardian continuity registry with reuse and reset behavior
 - daemon-local audit log persistence and derived audit/guardian usage stats
 - durable loop-definition storage for generic autonomous loops
+- loop runtime state machine for generic loops (`idle` / `active` / `blocked` / `paused` with phase visibility)
 - conservative restart recovery for indexed live sessions
 - tmux-backed reverse PID refresh when the persisted PID is stale but the tmux pane is still alive
 
@@ -126,6 +127,14 @@ Primary files:
 The design direction here was informed by targeted review of the production-validated automation model in `/Users/sangreal/Documents/GitHub/claude-code`, especially:
 - `README.md`
 - `src/skills/bundled/loop.ts`
+
+Additional autonomy work completed in this phase:
+- durable per-loop memory/context hydration
+- smart loop suggestion/materialization from repo signals
+- file-watch wakeups for local repository changes
+- GitHub webhook bridge for issue/webhook-driven loop events
+- first-class CI bridge for workflow/check/suite wakeups
+- event inbox filtering by source and keyword
 
 The main lessons adopted into Happy were:
 - recurring autonomy should be a durable scheduled primitive
@@ -241,3 +250,20 @@ If someone picks this work up next, the most important things to know are:
 - generic autonomous loops are implemented on top of that runtime
 - the correct next improvements are hardening and policy, not rebuilding the architecture
 - restart recovery is intentionally conservative and should stay that way unless stronger evidence is introduced
+
+## Agent Loop Autonomy Substrate
+
+The shared automation platform now carries a more autonomous `agent_loop` layer on top of the durable scheduler:
+- event-driven wakeups via loop-local event inboxes
+- stateful runtime/phase transitions (`idle`, `active`, `blocked`, `paused`)
+- durable per-loop memory files under `.happy/agent-loops/<loopId>/`
+- prompt/context hydration from stored loop memory before every autonomous wakeup
+- loop-state resync from `memory.md` after the session finishes
+
+This means Happy loop is now closer to an always-on agent substrate:
+- the scheduler decides **when** to wake
+- the event inbox decides **why** to wake
+- the memory file preserves **what it learned** across wakes
+
+
+- loop policy now supports `maxIterations` and `stopOnSuccess` so autonomous runs can terminate cleanly without manual cleanup

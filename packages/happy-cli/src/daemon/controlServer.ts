@@ -15,6 +15,10 @@ import {
 import type { AutomationJob, AutomationMutationResult } from "@/automation/types";
 import type { AgentLoopDefinition } from "@/automation/AgentLoopStore";
 import type { AgentLoopCreateInput, AgentLoopMutationResult, AgentLoopUpdateInput } from "@/automation/AgentLoopCoordinator";
+import type { AgentLoopBootstrapCreateInput, AgentLoopBootstrapMutationResult, AgentLoopBootstrapUpdateInput } from "@/automation/AgentLoopBootstrapCoordinator";
+import type { AgentLoopBootstrapProfile } from "@/automation/AgentLoopBootstrapStore";
+import type { AutoDreamCreateInput, AutoDreamMutationResult, AutoDreamUpdateInput } from "@/automation/AutoDreamCoordinator";
+import type { AutoDreamProfile } from "@/automation/AutoDreamStore";
 
 const automationJobSchema = z.object({
   id: z.string(),
@@ -95,6 +99,8 @@ const automationAuditStatsSchema = z.object({
   sessionReattachedCount: z.number(),
   watchdogStopCount: z.number(),
   stopRequestCount: z.number(),
+  policyGatedCount: z.number(),
+  downstreamEmitCount: z.number(),
   guardianEligibleRunCount: z.number(),
   guardianReuseRate: z.number(),
   activeGuardianCount: z.number(),
@@ -108,6 +114,20 @@ const automationMutationSchema = z.object({
 
 const automationGuardianMutationSchema = z.object({
   success: z.boolean(),
+  errorMessage: z.string().optional(),
+});
+
+const agentLoopEventSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  title: z.string(),
+  details: z.string().optional(),
+  status: z.enum(["pending", "dispatched", "completed", "failed", "cancelled", "ignored"]),
+  createdAt: z.number(),
+  dispatchedAt: z.number().optional(),
+  completedAt: z.number().optional(),
+  jobId: z.string().optional(),
+  sessionId: z.string().optional(),
   errorMessage: z.string().optional(),
 });
 
@@ -127,6 +147,45 @@ const agentLoopSchema = z.object({
   profileId: z.string().optional(),
   projectId: z.string().optional(),
   environmentVariables: z.record(z.string(), z.string()).optional(),
+  fileWatchEnabled: z.boolean().optional(),
+  githubBridgeEnabled: z.boolean().optional(),
+  ciBridgeEnabled: z.boolean().optional(),
+  eventSourceAllowlist: z.array(z.string()).optional(),
+  eventKeywordFilters: z.array(z.string()).optional(),
+  goal: z.string().optional(),
+  currentFocus: z.string().optional(),
+  workingMemory: z.string().optional(),
+  lastReflectionSummary: z.string().optional(),
+  memoryUpdatedAt: z.number().optional(),
+  consecutiveFailures: z.number().int().nonnegative().optional(),
+  maxConsecutiveFailures: z.number().int().positive().optional(),
+  retryBackoffMs: z.number().int().positive().optional(),
+  cooldownMs: z.number().int().positive().optional(),
+  quietHoursStart: z.string().optional(),
+  quietHoursEnd: z.string().optional(),
+  maxAutoRunsPerDay: z.number().int().positive().optional(),
+  downstreamLoopIds: z.array(z.string()).optional(),
+  downstreamTriggerOn: z.array(z.enum(["completed", "failed"])).optional(),
+  notifyEvents: z.array(z.enum(["completed", "failed", "blocked", "brief"])).optional(),
+  notificationChannels: z.array(z.enum(["push", "webhook"])).optional(),
+  notificationWebhookUrl: z.string().optional(),
+  lastBriefAt: z.number().optional(),
+  lastBriefSummary: z.string().optional(),
+  lastSuccessfulAt: z.number().optional(),
+  autoRunsToday: z.number().int().nonnegative().optional(),
+  autoRunWindowStartedAt: z.number().optional(),
+  lastPolicyGateAt: z.number().optional(),
+  lastPolicyGateReason: z.string().optional(),
+  runtimeState: z.enum(["idle", "active", "blocked", "paused"]),
+  phase: z.enum(["sleeping", "planning", "acting", "reflecting", "blocked", "paused"]),
+  phaseUpdatedAt: z.number(),
+  activeJobId: z.string().optional(),
+  activeSessionId: z.string().optional(),
+  lastTriggerSource: z.enum(["manual", "schedule", "event"]).optional(),
+  lastTriggerAt: z.number().optional(),
+  blockedReason: z.string().optional(),
+  lastReflectionAt: z.number().optional(),
+  recentEvents: z.array(agentLoopEventSchema).optional(),
   lastEnqueuedAt: z.number().optional(),
   lastStartedAt: z.number().optional(),
   lastCompletedAt: z.number().optional(),
@@ -140,6 +199,71 @@ const agentLoopMutationSchema = z.object({
   loop: agentLoopSchema.optional(),
 });
 
+const agentLoopEventEmitSchema = z.object({
+  loopId: z.string(),
+  source: z.string().optional(),
+  title: z.string(),
+  details: z.string().optional(),
+  autoRun: z.boolean().optional(),
+});
+
+const agentLoopSuggestionSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  description: z.string(),
+  rationale: z.string(),
+  directory: z.string(),
+  intervalMs: z.number(),
+  agent: z.enum(["claude", "codex", "gemini"]),
+  fileWatchEnabled: z.boolean().optional(),
+  githubBridgeEnabled: z.boolean().optional(),
+  ciBridgeEnabled: z.boolean().optional(),
+  eventSourceAllowlist: z.array(z.string()).optional(),
+  eventKeywordFilters: z.array(z.string()).optional(),
+  goal: z.string().optional(),
+  currentFocus: z.string().optional(),
+  workingMemory: z.string().optional(),
+  lastReflectionSummary: z.string().optional(),
+  maxConsecutiveFailures: z.number().int().positive().optional(),
+  retryBackoffMs: z.number().int().positive().optional(),
+  prompt: z.string(),
+  tags: z.array(z.string()),
+  confidence: z.enum(["high", "medium"]),
+  alreadyConfigured: z.boolean(),
+  existingLoopId: z.string().optional(),
+});
+
+const agentLoopSuggestInputSchema = z.object({
+  directory: z.string(),
+  agent: z.enum(["claude", "codex", "gemini"]).optional(),
+  projectId: z.string().optional(),
+  profileId: z.string().optional(),
+});
+
+const githubActionsWebhookSchema = z.object({
+  eventName: z.enum(["workflow_run", "check_run", "check_suite"]),
+  payload: z.any(),
+  repoPath: z.string().optional(),
+  targetLoopId: z.string().optional(),
+});
+
+const ciTriggerSchema = z.object({
+  eventId: z.string().optional(),
+  provider: z.string(),
+  repoPath: z.string(),
+  repoUrl: z.string(),
+  kind: z.enum(["workflow_run", "check_run", "check_suite", "generic"]),
+  status: z.string(),
+  conclusion: z.string().optional(),
+  workflowName: z.string().optional(),
+  checkName: z.string().optional(),
+  branch: z.string().optional(),
+  sha: z.string().optional(),
+  title: z.string().optional(),
+  details: z.string().optional(),
+  targetLoopId: z.string().optional(),
+});
+
 const agentLoopCreateSchema = z.object({
   name: z.string().optional(),
   prompt: z.string(),
@@ -149,6 +273,26 @@ const agentLoopCreateSchema = z.object({
   profileId: z.string().optional(),
   projectId: z.string().optional(),
   environmentVariables: z.record(z.string(), z.string()).optional(),
+  fileWatchEnabled: z.boolean().optional(),
+  githubBridgeEnabled: z.boolean().optional(),
+  ciBridgeEnabled: z.boolean().optional(),
+  eventSourceAllowlist: z.array(z.string()).optional(),
+  eventKeywordFilters: z.array(z.string()).optional(),
+  goal: z.string().optional(),
+  currentFocus: z.string().optional(),
+  workingMemory: z.string().optional(),
+  lastReflectionSummary: z.string().optional(),
+  maxConsecutiveFailures: z.number().int().positive().optional(),
+  retryBackoffMs: z.number().int().positive().optional(),
+  cooldownMs: z.number().int().positive().optional(),
+  quietHoursStart: z.string().optional(),
+  quietHoursEnd: z.string().optional(),
+  maxAutoRunsPerDay: z.number().int().positive().optional(),
+  downstreamLoopIds: z.array(z.string()).optional(),
+  downstreamTriggerOn: z.array(z.enum(["completed", "failed"])).optional(),
+  notifyEvents: z.array(z.enum(["completed", "failed", "blocked", "brief"])).optional(),
+  notificationChannels: z.array(z.enum(["push", "webhook"])).optional(),
+  notificationWebhookUrl: z.string().optional(),
   runNow: z.boolean().optional(),
 });
 
@@ -162,6 +306,127 @@ const agentLoopUpdateSchema = z.object({
   profileId: z.string().nullable().optional(),
   projectId: z.string().nullable().optional(),
   environmentVariables: z.record(z.string(), z.string()).nullable().optional(),
+  fileWatchEnabled: z.boolean().optional(),
+  githubBridgeEnabled: z.boolean().optional(),
+  ciBridgeEnabled: z.boolean().optional(),
+  eventSourceAllowlist: z.array(z.string()).nullable().optional(),
+  eventKeywordFilters: z.array(z.string()).nullable().optional(),
+  goal: z.string().nullable().optional(),
+  currentFocus: z.string().nullable().optional(),
+  workingMemory: z.string().nullable().optional(),
+  lastReflectionSummary: z.string().nullable().optional(),
+  maxConsecutiveFailures: z.number().int().positive().nullable().optional(),
+  retryBackoffMs: z.number().int().positive().nullable().optional(),
+  cooldownMs: z.number().int().positive().nullable().optional(),
+  quietHoursStart: z.string().nullable().optional(),
+  quietHoursEnd: z.string().nullable().optional(),
+  maxAutoRunsPerDay: z.number().int().positive().nullable().optional(),
+  downstreamLoopIds: z.array(z.string()).nullable().optional(),
+  downstreamTriggerOn: z.array(z.enum(["completed", "failed"])).nullable().optional(),
+  notifyEvents: z.array(z.enum(["completed", "failed", "blocked", "brief"])).nullable().optional(),
+  notificationChannels: z.array(z.enum(["push", "webhook"])).nullable().optional(),
+  notificationWebhookUrl: z.string().nullable().optional(),
+});
+
+const agentLoopBootstrapProfileSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  rootDirectory: z.string(),
+  intervalMs: z.number(),
+  enabled: z.boolean(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  nextRunAt: z.number(),
+  maxDepth: z.number().int().nonnegative().optional(),
+  limit: z.number().int().positive().optional(),
+  agent: z.enum(["claude", "codex", "gemini"]).optional(),
+  profileId: z.string().optional(),
+  projectId: z.string().optional(),
+  autoRunCreatedLoops: z.boolean().optional(),
+  status: z.enum(["idle", "running", "paused", "failed"]),
+  statusUpdatedAt: z.number(),
+  lastRunAt: z.number().optional(),
+  lastRepoCount: z.number().optional(),
+  lastSuggestionCount: z.number().optional(),
+  lastCreatedCount: z.number().optional(),
+  lastError: z.string().optional(),
+});
+
+const agentLoopBootstrapMutationSchema = z.object({
+  success: z.boolean(),
+  errorMessage: z.string().optional(),
+  profile: agentLoopBootstrapProfileSchema.optional(),
+});
+
+const agentLoopBootstrapCreateSchema = z.object({
+  name: z.string().optional(),
+  rootDirectory: z.string(),
+  intervalMs: z.number().positive(),
+  maxDepth: z.number().int().nonnegative().optional(),
+  limit: z.number().int().positive().optional(),
+  agent: z.enum(["claude", "codex", "gemini"]).optional(),
+  profileId: z.string().optional(),
+  projectId: z.string().optional(),
+  autoRunCreatedLoops: z.boolean().optional(),
+  runNow: z.boolean().optional(),
+});
+
+const agentLoopBootstrapUpdateSchema = z.object({
+  profileIdValue: z.string(),
+  name: z.string().nullable().optional(),
+  rootDirectory: z.string().optional(),
+  intervalMs: z.number().positive().optional(),
+  maxDepth: z.number().int().nonnegative().nullable().optional(),
+  limit: z.number().int().positive().nullable().optional(),
+  agent: z.enum(["claude", "codex", "gemini"]).nullable().optional(),
+  profileId: z.string().nullable().optional(),
+  projectId: z.string().nullable().optional(),
+  autoRunCreatedLoops: z.boolean().optional(),
+});
+
+const autoDreamProfileSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  rootDirectory: z.string(),
+  intervalMs: z.number(),
+  enabled: z.boolean(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  nextRunAt: z.number(),
+  status: z.enum(["idle", "running", "paused", "failed"]),
+  stage: z.enum(["starting", "updating"]),
+  statusUpdatedAt: z.number(),
+  maxDepth: z.number().int().nonnegative().optional(),
+  limit: z.number().int().positive().optional(),
+  lastRunAt: z.number().optional(),
+  lastError: z.string().optional(),
+  lastMemoryFiles: z.number().optional(),
+  lastUpdatedFiles: z.number().optional(),
+  latestDreamFilePath: z.string().optional(),
+});
+
+const autoDreamMutationSchema = z.object({
+  success: z.boolean(),
+  errorMessage: z.string().optional(),
+  profile: autoDreamProfileSchema.optional(),
+});
+
+const autoDreamCreateSchema = z.object({
+  name: z.string().optional(),
+  rootDirectory: z.string(),
+  intervalMs: z.number().positive(),
+  maxDepth: z.number().int().nonnegative().optional(),
+  limit: z.number().int().positive().optional(),
+  runNow: z.boolean().optional(),
+});
+
+const autoDreamUpdateSchema = z.object({
+  profileIdValue: z.string(),
+  name: z.string().nullable().optional(),
+  rootDirectory: z.string().optional(),
+  intervalMs: z.number().positive().optional(),
+  maxDepth: z.number().int().nonnegative().nullable().optional(),
+  limit: z.number().int().positive().nullable().optional(),
 });
 
 export function startDaemonControlServer({
@@ -177,6 +442,23 @@ export function startDaemonControlServer({
   clearAutomationGuardians,
   clearAutomationAudit,
   listAgentLoops,
+  suggestAgentLoops,
+  listAgentLoopBootstrapProfiles,
+  getAgentLoopBootstrapProfile,
+  createAgentLoopBootstrapProfile,
+  updateAgentLoopBootstrapProfile,
+  pauseAgentLoopBootstrapProfile,
+  resumeAgentLoopBootstrapProfile,
+  runAgentLoopBootstrapProfileNow,
+  removeAgentLoopBootstrapProfile,
+  listAutoDreamProfiles,
+  getAutoDreamProfile,
+  createAutoDreamProfile,
+  updateAutoDreamProfile,
+  pauseAutoDreamProfile,
+  resumeAutoDreamProfile,
+  runAutoDreamProfileNow,
+  removeAutoDreamProfile,
   getAgentLoop,
   createAgentLoop,
   updateAgentLoop,
@@ -184,6 +466,9 @@ export function startDaemonControlServer({
   resumeAgentLoop,
   runAgentLoopNow,
   removeAgentLoop,
+  emitAgentLoopEvent,
+  emitCiTrigger,
+  emitGitHubActionsWebhook,
 }: {
   getChildren: () => TrackedSession[];
   stopSession: (sessionId: string) => boolean;
@@ -227,6 +512,8 @@ export function startDaemonControlServer({
       sessionReattachedCount: number;
       watchdogStopCount: number;
       stopRequestCount: number;
+      policyGatedCount: number;
+      downstreamEmitCount: number;
       guardianEligibleRunCount: number;
       guardianReuseRate: number;
       activeGuardianCount: number;
@@ -261,6 +548,26 @@ export function startDaemonControlServer({
   resumeAgentLoop: (loopId: string) => Promise<AgentLoopMutationResult>;
   runAgentLoopNow: (loopId: string) => Promise<AgentLoopMutationResult>;
   removeAgentLoop: (loopId: string) => Promise<AgentLoopMutationResult>;
+  emitAgentLoopEvent: (loopId: string, input: { source?: string; title: string; details?: string; autoRun?: boolean }) => Promise<AgentLoopMutationResult>;
+  emitCiTrigger: (input: { eventId?: string; provider: string; repoPath: string; repoUrl: string; kind: "workflow_run" | "check_run" | "check_suite" | "generic"; status: string; conclusion?: string; workflowName?: string; checkName?: string; branch?: string; sha?: string; title?: string; details?: string; targetLoopId?: string }) => Promise<{ success: boolean; errorMessage?: string }>;
+  emitGitHubActionsWebhook: (input: { eventName: "workflow_run" | "check_run" | "check_suite"; payload: unknown; repoPath?: string; targetLoopId?: string }) => Promise<{ success: boolean; errorMessage?: string }>;
+  suggestAgentLoops: (input: { directory: string; agent?: "claude" | "codex" | "gemini"; projectId?: string; profileId?: string }) => Promise<Array<{ key: string; name: string; description: string; rationale: string; directory: string; intervalMs: number; agent: "claude" | "codex" | "gemini"; fileWatchEnabled?: boolean; githubBridgeEnabled?: boolean; ciBridgeEnabled?: boolean; eventSourceAllowlist?: string[]; eventKeywordFilters?: string[]; goal?: string; currentFocus?: string; workingMemory?: string; lastReflectionSummary?: string; maxConsecutiveFailures?: number; retryBackoffMs?: number; prompt: string; tags: string[]; confidence: "high" | "medium"; alreadyConfigured: boolean; existingLoopId?: string }>>;
+  listAgentLoopBootstrapProfiles: () => Promise<AgentLoopBootstrapProfile[]>;
+  getAgentLoopBootstrapProfile: (profileIdValue: string) => Promise<AgentLoopBootstrapProfile | undefined>;
+  createAgentLoopBootstrapProfile: (input: AgentLoopBootstrapCreateInput) => Promise<AgentLoopBootstrapMutationResult>;
+  updateAgentLoopBootstrapProfile: (profileIdValue: string, input: AgentLoopBootstrapUpdateInput) => Promise<AgentLoopBootstrapMutationResult>;
+  pauseAgentLoopBootstrapProfile: (profileIdValue: string) => Promise<AgentLoopBootstrapMutationResult>;
+  resumeAgentLoopBootstrapProfile: (profileIdValue: string) => Promise<AgentLoopBootstrapMutationResult>;
+  runAgentLoopBootstrapProfileNow: (profileIdValue: string) => Promise<AgentLoopBootstrapMutationResult>;
+  removeAgentLoopBootstrapProfile: (profileIdValue: string) => Promise<AgentLoopBootstrapMutationResult>;
+  listAutoDreamProfiles: () => Promise<AutoDreamProfile[]>;
+  getAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamProfile | undefined>;
+  createAutoDreamProfile: (input: AutoDreamCreateInput) => Promise<AutoDreamMutationResult>;
+  updateAutoDreamProfile: (profileIdValue: string, input: AutoDreamUpdateInput) => Promise<AutoDreamMutationResult>;
+  pauseAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
+  resumeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
+  runAutoDreamProfileNow: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
+  removeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
   return new Promise((resolve) => {
     const app = fastify({ logger: false });
@@ -610,6 +917,242 @@ export function startDaemonControlServer({
         },
       },
       async (request) => removeAgentLoop(request.body.loopId),
+    );
+
+    typed.post(
+      "/loop-event",
+      {
+        schema: {
+          body: agentLoopEventEmitSchema,
+          response: {
+            200: agentLoopMutationSchema,
+          },
+        },
+      },
+      async (request) => emitAgentLoopEvent(request.body.loopId, request.body),
+    );
+
+    typed.post(
+      "/github-actions-webhook",
+      {
+        schema: {
+          body: githubActionsWebhookSchema,
+          response: {
+            200: z.object({ success: z.boolean(), errorMessage: z.string().optional() }),
+          },
+        },
+      },
+      async (request) => emitGitHubActionsWebhook(request.body),
+    );
+
+    typed.post(
+      "/ci-trigger",
+      {
+        schema: {
+          body: ciTriggerSchema,
+          response: {
+            200: z.object({ success: z.boolean(), errorMessage: z.string().optional() }),
+          },
+        },
+      },
+      async (request) => emitCiTrigger(request.body),
+    );
+
+    typed.post(
+      "/bootstrap-profiles",
+      {
+        schema: {
+          response: {
+            200: z.object({
+              profiles: z.array(agentLoopBootstrapProfileSchema),
+            }),
+          },
+        },
+      },
+      async () => ({ profiles: await listAgentLoopBootstrapProfiles() }),
+    );
+
+    typed.post(
+      "/bootstrap-profile-get",
+      {
+        schema: {
+          body: z.object({ profileIdValue: z.string() }),
+          response: { 200: agentLoopBootstrapMutationSchema },
+        },
+      },
+      async (request) => ({ success: true, profile: await getAgentLoopBootstrapProfile(request.body.profileIdValue) }),
+    );
+
+    typed.post(
+      "/bootstrap-profile-create",
+      {
+        schema: {
+          body: agentLoopBootstrapCreateSchema,
+          response: { 200: agentLoopBootstrapMutationSchema },
+        },
+      },
+      async (request) => createAgentLoopBootstrapProfile(request.body),
+    );
+
+    typed.post(
+      "/bootstrap-profile-update",
+      {
+        schema: {
+          body: agentLoopBootstrapUpdateSchema,
+          response: { 200: agentLoopBootstrapMutationSchema },
+        },
+      },
+      async (request) => {
+        const { profileIdValue, ...input } = request.body;
+        return updateAgentLoopBootstrapProfile(profileIdValue, input);
+      },
+    );
+
+    typed.post(
+      "/bootstrap-profile-pause",
+      {
+        schema: {
+          body: z.object({ profileIdValue: z.string() }),
+          response: { 200: agentLoopBootstrapMutationSchema },
+        },
+      },
+      async (request) => pauseAgentLoopBootstrapProfile(request.body.profileIdValue),
+    );
+
+    typed.post(
+      "/bootstrap-profile-resume",
+      {
+        schema: {
+          body: z.object({ profileIdValue: z.string() }),
+          response: { 200: agentLoopBootstrapMutationSchema },
+        },
+      },
+      async (request) => resumeAgentLoopBootstrapProfile(request.body.profileIdValue),
+    );
+
+    typed.post(
+      "/bootstrap-profile-run-now",
+      {
+        schema: {
+          body: z.object({ profileIdValue: z.string() }),
+          response: { 200: agentLoopBootstrapMutationSchema },
+        },
+      },
+      async (request) => runAgentLoopBootstrapProfileNow(request.body.profileIdValue),
+    );
+
+    typed.post(
+      "/bootstrap-profile-remove",
+      {
+        schema: {
+          body: z.object({ profileIdValue: z.string() }),
+          response: { 200: agentLoopBootstrapMutationSchema },
+        },
+      },
+      async (request) => removeAgentLoopBootstrapProfile(request.body.profileIdValue),
+    );
+
+    typed.post(
+      "/dream-profiles",
+      {
+        schema: {
+          response: { 200: z.object({ profiles: z.array(autoDreamProfileSchema) }) },
+        },
+      },
+      async () => ({ profiles: await listAutoDreamProfiles() }),
+    );
+
+    typed.post(
+      "/dream-profile-get",
+      {
+        schema: {
+          body: z.object({ profileIdValue: z.string() }),
+          response: { 200: autoDreamMutationSchema },
+        },
+      },
+      async (request) => ({ success: true, profile: await getAutoDreamProfile(request.body.profileIdValue) }),
+    );
+
+    typed.post(
+      "/dream-profile-create",
+      {
+        schema: {
+          body: autoDreamCreateSchema,
+          response: { 200: autoDreamMutationSchema },
+        },
+      },
+      async (request) => createAutoDreamProfile(request.body),
+    );
+
+    typed.post(
+      "/dream-profile-update",
+      {
+        schema: {
+          body: autoDreamUpdateSchema,
+          response: { 200: autoDreamMutationSchema },
+        },
+      },
+      async (request) => {
+        const { profileIdValue, ...input } = request.body;
+        return updateAutoDreamProfile(profileIdValue, input);
+      },
+    );
+
+    typed.post(
+      "/dream-profile-pause",
+      {
+        schema: {
+          body: z.object({ profileIdValue: z.string() }),
+          response: { 200: autoDreamMutationSchema },
+        },
+      },
+      async (request) => pauseAutoDreamProfile(request.body.profileIdValue),
+    );
+
+    typed.post(
+      "/dream-profile-resume",
+      {
+        schema: {
+          body: z.object({ profileIdValue: z.string() }),
+          response: { 200: autoDreamMutationSchema },
+        },
+      },
+      async (request) => resumeAutoDreamProfile(request.body.profileIdValue),
+    );
+
+    typed.post(
+      "/dream-profile-run-now",
+      {
+        schema: {
+          body: z.object({ profileIdValue: z.string() }),
+          response: { 200: autoDreamMutationSchema },
+        },
+      },
+      async (request) => runAutoDreamProfileNow(request.body.profileIdValue),
+    );
+
+    typed.post(
+      "/dream-profile-remove",
+      {
+        schema: {
+          body: z.object({ profileIdValue: z.string() }),
+          response: { 200: autoDreamMutationSchema },
+        },
+      },
+      async (request) => removeAutoDreamProfile(request.body.profileIdValue),
+    );
+
+    typed.post(
+      "/loop-suggest",
+      {
+        schema: {
+          body: agentLoopSuggestInputSchema,
+          response: {
+            200: z.object({ suggestions: z.array(agentLoopSuggestionSchema) }),
+          },
+        },
+      },
+      async (request) => ({ suggestions: await suggestAgentLoops(request.body) }),
     );
 
     typed.post(

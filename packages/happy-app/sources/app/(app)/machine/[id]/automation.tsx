@@ -10,6 +10,7 @@ import { Modal } from "@/modal";
 import {
     machineAutomationStatus,
     machineCancelAutomationJob,
+    machineListAgentLoops,
     machineClearAutomationAudit,
     machineClearAutomationGuardians,
     machineClearAutomationJobs,
@@ -20,6 +21,7 @@ import {
     type MachineAutomationGuardianUsage,
     type MachineAutomationJob,
     type MachineAutomationStatus,
+    type MachineAgentLoop,
 } from "@/sync/ops";
 import { useMachine } from "@/sync/storage";
 import { t } from "@/text";
@@ -195,6 +197,10 @@ function getAuditEventTitle(event: MachineAutomationAuditEvent): string {
             return t("machine.automationAuditEventWatchdogStopped");
         case "session_stop_requested":
             return t("machine.automationAuditEventStopRequested");
+        case "loop_policy_gated":
+            return t("machine.automationAuditEventLoopPolicyGated");
+        case "loop_downstream_emitted":
+            return t("machine.automationAuditEventLoopDownstreamEmitted");
         default:
             return event.kind;
     }
@@ -384,6 +390,7 @@ export default React.memo(function MachineAutomationPage() {
     const router = useRouter();
     const { theme } = useUnistyles();
     const [status, setStatus] = React.useState<MachineAutomationStatus | null>(null);
+    const [loopStatus, setLoopStatus] = React.useState<MachineAgentLoop[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [refreshing, setRefreshing] = React.useState(false);
     const [activeJobId, setActiveJobId] = React.useState<string | null>(null);
@@ -409,8 +416,12 @@ export default React.memo(function MachineAutomationPage() {
             setRefreshing(true);
         }
         try {
-            const fresh = await machineAutomationStatus(machineId);
+            const [fresh, loopsResult] = await Promise.all([
+                machineAutomationStatus(machineId),
+                machineListAgentLoops(machineId),
+            ]);
             setStatus(fresh);
+            setLoopStatus(loopsResult.loops ?? []);
         } catch {
             const fallback = machine?.daemonState?.automation;
             if (fallback) {
@@ -423,6 +434,7 @@ export default React.memo(function MachineAutomationPage() {
                     recentAuditEvents: fallback.recentAuditEvents ?? [],
                 });
             }
+            setLoopStatus([]);
         } finally {
             if (kind === "initial") {
                 setLoading(false);
@@ -469,6 +481,16 @@ export default React.memo(function MachineAutomationPage() {
     }, [machine?.daemonState?.automation?.guardianUsage, status?.guardianUsage]);
 
     const auditStats = status?.auditStats ?? machine?.daemonState?.automation?.auditStats;
+
+    const loopRollup = React.useMemo(() => {
+        const total = loopStatus.length;
+        const active = loopStatus.filter((loop) => loop.runtimeState === "active").length;
+        const blocked = loopStatus.filter((loop) => loop.runtimeState === "blocked").length;
+        const paused = loopStatus.filter((loop) => loop.runtimeState === "paused" || (loop.enabled === false && loop.runtimeState !== "blocked")).length;
+        const pendingEvents = loopStatus.filter((loop) => (loop.recentEvents?.some((event) => event.status === "pending") ?? false)).length;
+        const policyStopped = loopStatus.filter((loop) => Boolean(loop.stopReason || loop.lastPolicyGateReason)).length;
+        return { total, active, blocked, paused, pendingEvents, policyStopped };
+    }, [loopStatus]);
 
     const recentAuditEvents = React.useMemo<MachineAutomationAuditEvent[]>(() => {
         const source = (status?.recentAuditEvents ?? machine?.daemonState?.automation?.recentAuditEvents ?? []) as MachineAutomationAuditEvent[];
@@ -885,6 +907,16 @@ export default React.memo(function MachineAutomationPage() {
                     />
                 </ItemGroup>
 
+                <ItemGroup title={t("machine.automationLoopRollup")}>
+                    <Item title={t("machine.automationLoopsTotal")} detail={String(loopRollup.total)} showChevron={false} />
+                    <Item title={t("machine.automationLoopsActive")} detail={String(loopRollup.active)} detailStyle={{ color: "#0A84FF" }} showChevron={false} />
+                    <Item title={t("machine.automationLoopsBlocked")} detail={String(loopRollup.blocked)} detailStyle={{ color: "#FF3B30" }} showChevron={false} />
+                    <Item title={t("machine.automationLoopsPaused")} detail={String(loopRollup.paused)} detailStyle={{ color: theme.colors.textSecondary }} showChevron={false} />
+                    <Item title={t("machine.automationLoopsPendingEvents")} detail={String(loopRollup.pendingEvents)} showChevron={false} />
+                    <Item title={t("machine.automationLoopsPolicyStopped")} detail={String(loopRollup.policyStopped)} showChevron={false} />
+                    <Item title={t("machine.automationOpenLoops")} titleStyle={{ color: theme.colors.textLink }} onPress={() => router.push(`/machine/${machineId}/loops` as any)} />
+                </ItemGroup>
+
                 <ItemGroup title={t("machine.automationGuardians")}>
                     <Item
                         title={t("machine.automationResetGuardians")}
@@ -927,6 +959,8 @@ export default React.memo(function MachineAutomationPage() {
                     <Item title={t("machine.automationSessionReattachedCount")} detail={String(auditStats?.sessionReattachedCount ?? 0)} showChevron={false} />
                     <Item title={t("machine.automationWatchdogStops")} detail={String(auditStats?.watchdogStopCount ?? 0)} showChevron={false} />
                     <Item title={t("machine.automationStopRequests")} detail={String(auditStats?.stopRequestCount ?? 0)} showChevron={false} />
+                    <Item title={t("machine.automationPolicyGatedCount")} detail={String(auditStats?.policyGatedCount ?? 0)} showChevron={false} />
+                    <Item title={t("machine.automationDownstreamEmitCount")} detail={String(auditStats?.downstreamEmitCount ?? 0)} showChevron={false} />
                     {auditStats?.lastEventAt ? (
                         <Item title={t("machine.automationLastAuditEvent")} detail={formatTimestamp(auditStats.lastEventAt)} showChevron={false} />
                     ) : null}

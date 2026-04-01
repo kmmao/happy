@@ -17,6 +17,11 @@ import type {
 } from "@/automation/types";
 import type { AgentLoopDefinition } from "@/automation/AgentLoopStore";
 import type { AgentLoopCreateInput, AgentLoopMutationResult, AgentLoopUpdateInput } from "@/automation/AgentLoopCoordinator";
+import type { AgentLoopBootstrapCreateInput, AgentLoopBootstrapMutationResult, AgentLoopBootstrapUpdateInput } from "@/automation/AgentLoopBootstrapCoordinator";
+import type { AgentLoopBootstrapProfile } from "@/automation/AgentLoopBootstrapStore";
+import type { AutoDreamCreateInput, AutoDreamMutationResult, AutoDreamUpdateInput } from "@/automation/AutoDreamCoordinator";
+import type { AutoDreamProfile } from "@/automation/AutoDreamStore";
+import type { AgentLoopSuggestInput, AgentLoopSuggestion } from "@/automation/AgentLoopSuggestion";
 
 export type DaemonCheckResult =
   | { status: "running"; state: DaemonLocallyPersistedState }
@@ -231,6 +236,191 @@ export async function runNowDaemonAgentLoop(loopId: string): Promise<AgentLoopMu
     return { success: false, errorMessage: result.error };
   }
   return result as AgentLoopMutationResult;
+}
+
+export async function emitDaemonAgentLoopEvent(loopId: string, input: {
+  source?: string;
+  title: string;
+  details?: string;
+  autoRun?: boolean;
+}): Promise<AgentLoopMutationResult> {
+  const result = await daemonPost("/loop-event", { loopId, ...input });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopMutationResult;
+}
+
+export async function emitDaemonCiTrigger(input: {
+  eventId?: string;
+  provider: string;
+  repoPath: string;
+  repoUrl: string;
+  kind: "workflow_run" | "check_run" | "check_suite" | "generic";
+  status: string;
+  conclusion?: string;
+  workflowName?: string;
+  checkName?: string;
+  branch?: string;
+  sha?: string;
+  title?: string;
+  details?: string;
+  targetLoopId?: string;
+}): Promise<{ success: boolean; errorMessage?: string }> {
+  const result = await daemonPost("/ci-trigger", input);
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as { success: boolean; errorMessage?: string };
+}
+
+export async function emitDaemonGitHubActionsWebhook(input: {
+  eventName: "workflow_run" | "check_run" | "check_suite";
+  payload: unknown;
+  repoPath?: string;
+  targetLoopId?: string;
+}): Promise<{ success: boolean; errorMessage?: string }> {
+  const result = await daemonPost("/github-actions-webhook", input);
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as { success: boolean; errorMessage?: string };
+}
+
+export async function suggestDaemonAgentLoops(input: AgentLoopSuggestInput): Promise<AgentLoopSuggestion[]> {
+  const result = await daemonPost("/loop-suggest", input);
+  if (result.error) {
+    return [];
+  }
+  return result.suggestions ?? [];
+}
+
+export async function listDaemonAgentLoopBootstrapProfiles(): Promise<AgentLoopBootstrapProfile[]> {
+  const result = await daemonPost("/bootstrap-profiles");
+  if (result.error) {
+    return [];
+  }
+  return result.profiles ?? [];
+}
+
+export async function getDaemonAgentLoopBootstrapProfile(profileIdValue: string): Promise<AgentLoopBootstrapMutationResult> {
+  const result = await daemonPost("/bootstrap-profile-get", { profileIdValue });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopBootstrapMutationResult;
+}
+
+export async function createDaemonAgentLoopBootstrapProfile(input: AgentLoopBootstrapCreateInput): Promise<AgentLoopBootstrapMutationResult> {
+  const result = await daemonPost("/bootstrap-profile-create", input);
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopBootstrapMutationResult;
+}
+
+export async function updateDaemonAgentLoopBootstrapProfile(profileIdValue: string, input: AgentLoopBootstrapUpdateInput): Promise<AgentLoopBootstrapMutationResult> {
+  const result = await daemonPost("/bootstrap-profile-update", { profileIdValue, ...input });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopBootstrapMutationResult;
+}
+
+export async function pauseDaemonAgentLoopBootstrapProfile(profileIdValue: string): Promise<AgentLoopBootstrapMutationResult> {
+  const result = await daemonPost("/bootstrap-profile-pause", { profileIdValue });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopBootstrapMutationResult;
+}
+
+export async function resumeDaemonAgentLoopBootstrapProfile(profileIdValue: string): Promise<AgentLoopBootstrapMutationResult> {
+  const result = await daemonPost("/bootstrap-profile-resume", { profileIdValue });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopBootstrapMutationResult;
+}
+
+export async function runNowDaemonAgentLoopBootstrapProfile(profileIdValue: string): Promise<AgentLoopBootstrapMutationResult> {
+  const result = await daemonPost("/bootstrap-profile-run-now", { profileIdValue });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopBootstrapMutationResult;
+}
+
+export async function removeDaemonAgentLoopBootstrapProfile(profileIdValue: string): Promise<AgentLoopBootstrapMutationResult> {
+  const result = await daemonPost("/bootstrap-profile-remove", { profileIdValue });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopBootstrapMutationResult;
+}
+
+export async function listDaemonAutoDreamProfiles(): Promise<AutoDreamProfile[]> {
+  const result = await daemonPost("/dream-profiles");
+  if (result.error) {
+    return [];
+  }
+  return result.profiles ?? [];
+}
+
+export async function getDaemonAutoDreamProfile(profileIdValue: string): Promise<AutoDreamMutationResult> {
+  const result = await daemonPost("/dream-profile-get", { profileIdValue });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AutoDreamMutationResult;
+}
+
+export async function createDaemonAutoDreamProfile(input: AutoDreamCreateInput): Promise<AutoDreamMutationResult> {
+  const result = await daemonPost("/dream-profile-create", input);
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AutoDreamMutationResult;
+}
+
+export async function updateDaemonAutoDreamProfile(profileIdValue: string, input: AutoDreamUpdateInput): Promise<AutoDreamMutationResult> {
+  const result = await daemonPost("/dream-profile-update", { profileIdValue, ...input });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AutoDreamMutationResult;
+}
+
+export async function pauseDaemonAutoDreamProfile(profileIdValue: string): Promise<AutoDreamMutationResult> {
+  const result = await daemonPost("/dream-profile-pause", { profileIdValue });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AutoDreamMutationResult;
+}
+
+export async function resumeDaemonAutoDreamProfile(profileIdValue: string): Promise<AutoDreamMutationResult> {
+  const result = await daemonPost("/dream-profile-resume", { profileIdValue });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AutoDreamMutationResult;
+}
+
+export async function runNowDaemonAutoDreamProfile(profileIdValue: string): Promise<AutoDreamMutationResult> {
+  const result = await daemonPost("/dream-profile-run-now", { profileIdValue });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AutoDreamMutationResult;
+}
+
+export async function removeDaemonAutoDreamProfile(profileIdValue: string): Promise<AutoDreamMutationResult> {
+  const result = await daemonPost("/dream-profile-remove", { profileIdValue });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AutoDreamMutationResult;
 }
 
 export async function removeDaemonAgentLoop(loopId: string): Promise<AgentLoopMutationResult> {
