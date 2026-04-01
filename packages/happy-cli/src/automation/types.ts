@@ -36,7 +36,24 @@ export interface ExecutionGuardTransition {
 
 export type AutomationPriority = "urgent" | "user" | "background";
 
-export type AutomationJobKind = "supervisor" | "webhook";
+export type AgentLoopTriggerSource = "manual" | "schedule";
+
+export interface AgentLoopTriggerData {
+  type: "agent-loop-trigger";
+  loopId: string;
+  loopName?: string;
+  prompt: string;
+  directory: string;
+  intervalMs: number;
+  trigger: AgentLoopTriggerSource;
+  iteration: number;
+  agent?: "claude" | "codex" | "gemini";
+  profileId?: string;
+  projectId?: string;
+  environmentVariables?: Record<string, string>;
+}
+
+export type AutomationJobKind = "supervisor" | "webhook" | "agent_loop";
 
 export type AutomationJobStatus =
   | "queued"
@@ -67,6 +84,7 @@ export interface AutomationJobBase<TKind extends AutomationJobKind, TPayload> {
   runId?: string;
   loopId?: string;
   loopIteration?: number;
+  recovered?: boolean;
   continuityKey?: string;
   completionMode?: AutomationCompletionMode;
   errorMessage?: string;
@@ -80,7 +98,9 @@ export type SupervisorAutomationJob = AutomationJobBase<
 
 export type WebhookAutomationJob = AutomationJobBase<"webhook", WebhookTriggerData>;
 
-export type AutomationJob = SupervisorAutomationJob | WebhookAutomationJob;
+export type AgentLoopAutomationJob = AutomationJobBase<"agent_loop", AgentLoopTriggerData>;
+
+export type AutomationJob = SupervisorAutomationJob | WebhookAutomationJob | AgentLoopAutomationJob;
 
 export interface AutomationStoreFile {
   version: 1;
@@ -95,6 +115,7 @@ export interface AutomationEnqueueResult {
 export interface AutomationRecoveryResult {
   requeued: number;
   retainedTerminal: number;
+  reattachedRunning: number;
 }
 
 export interface AutomationMutationResult {
@@ -108,7 +129,6 @@ export interface AutomationRunResult {
   sessionId?: string;
 }
 
-
 export type AutomationAuditKind =
   | "job_enqueued"
   | "job_session_started"
@@ -116,6 +136,7 @@ export type AutomationAuditKind =
   | "guardian_reused"
   | "guardian_remembered"
   | "guardian_cleared"
+  | "session_reattached"
   | "watchdog_stopped"
   | "session_stop_requested";
 
@@ -163,6 +184,7 @@ export interface AutomationAuditStats {
   guardianReuseCount: number;
   guardianRememberCount: number;
   guardianResetCount: number;
+  sessionReattachedCount: number;
   watchdogStopCount: number;
   stopRequestCount: number;
   guardianEligibleRunCount: number;

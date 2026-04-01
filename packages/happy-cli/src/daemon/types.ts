@@ -16,7 +16,7 @@ export interface TrackedSession {
   terminationRequestedAt?: number;
   terminationReason?: string;
   automationContext?: {
-    kind: "supervisor" | "webhook";
+    kind: "supervisor" | "webhook" | "agent_loop";
     trigger?: string;
     projectId?: string;
     runId?: string;
@@ -32,4 +32,8 @@ export interface TrackedSession {
   message?: string;
   /** tmux session identifier (format: session:window) */
   tmuxSessionId?: string;
+  /** True when restored from daemon-local persisted session index after restart. */
+  recoveredFromIndex?: boolean;
+  /** Recovery timestamp for sessions reattached after daemon restart. */
+  recoveredAt?: number;
 }

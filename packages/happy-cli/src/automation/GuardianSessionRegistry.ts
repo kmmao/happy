@@ -79,6 +79,10 @@ export class GuardianSessionRegistry {
     return undefined;
   }
 
+  resolveByKey(key: string): string | undefined {
+    return this.entries.get(key)?.sessionId;
+  }
+
   async rememberForSupervisor(
     data: SupervisorTriggerData,
     sessionId: string,
@@ -94,6 +98,24 @@ export class GuardianSessionRegistry {
         updatedAt,
       });
     }
+    await this.flush();
+  }
+
+  async rememberByKey(params: {
+    key: string;
+    projectId?: string;
+    loopId?: string;
+    lastRunId?: string;
+    sessionId: string;
+  }): Promise<void> {
+    this.entries.set(params.key, {
+      key: params.key,
+      projectId: params.projectId ?? "",
+      loopId: params.loopId,
+      lastRunId: params.lastRunId,
+      sessionId: params.sessionId,
+      updatedAt: Date.now(),
+    });
     await this.flush();
   }
 

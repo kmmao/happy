@@ -23,10 +23,11 @@ This folder documents how Happy works internally, with a focus on protocol, back
 - UPSTREAM_TRACKING.md: Upstream PR tracking for the slopus/happy fork.
 - architecture-project-supervisor.md: Architecture design for Project as first-class citizen with Supervisor Agent.
 - supervisor-operations-guide.md: Project Supervisor operations guide for autonomous code health analysis and fixes.
+- automation-operations-guide.md: Automation / Agent Loop operations guide covering daemon automation, loop management, guardian continuity, and recovered-session troubleshooting.
 
 ## Conventions
 - Paths and field names reflect the current implementation in `packages/happy-server`.
 - Examples are illustrative; the canonical source is the code.
 
 ## Last reviewed
-- 2026-03-20
+- 2026-04-01

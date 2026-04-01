@@ -39,6 +39,7 @@ import { handleAuthCommand } from "./commands/auth";
 import { handleConnectCommand } from "./commands/connect";
 import { handleSandboxCommand } from "./commands/sandbox";
 import { handleSupervisorCommand } from "./commands/supervisor";
+import { handleLoopCommand } from "./commands/loop";
 import { spawnHappyCLI } from "./utils/spawnHappyCLI";
 import { claudeCliPath } from "./claude/claudeLocal";
 import { execFileSync } from "node:child_process";
@@ -140,6 +141,8 @@ function describeAutomationAuditEvent(event: {
         : "guardian remembered";
     case "guardian_cleared":
       return event.guardianKey ? `cleared ${event.guardianKey}` : (event.message ?? "guardian cleared");
+    case "session_reattached":
+      return event.message ?? (event.sessionId ? `reattached ${event.sessionId}` : "session reattached");
     case "watchdog_stopped":
       return event.message ?? "watchdog stopped session";
     case "session_stop_requested":
@@ -153,10 +156,11 @@ function describeAutomationAuditEvent(event: {
 type AutomationFilters = {
   projectId?: string;
   loopId?: string;
-  kind?: "supervisor" | "webhook";
+  kind?: "supervisor" | "webhook" | "agent_loop";
   jobMode?: "running" | "failed" | "terminal";
   guardianState?: "attached" | "persisted";
   auditMode?: "anomalies" | "guardian" | "jobs";
+  recoveredOnly?: boolean;
 };
 
 function readFlagValue(args: string[], flag: string): string | undefined {
@@ -170,18 +174,20 @@ function parseAutomationFilters(args: string[]): AutomationFilters {
   return {
     projectId: readFlagValue(args, "--project"),
     loopId: readFlagValue(args, "--loop"),
-    kind: readFlagValue(args, "--kind") as "supervisor" | "webhook" | undefined,
+    kind: readFlagValue(args, "--kind") as "supervisor" | "webhook" | "agent_loop" | undefined,
     jobMode: args.includes("--running") ? "running" : args.includes("--failed") ? "failed" : args.includes("--terminal") ? "terminal" : undefined,
     guardianState: args.includes("--attached") ? "attached" : args.includes("--persisted") ? "persisted" : undefined,
     auditMode: args.includes("--anomalies") ? "anomalies" : args.includes("--guardian") ? "guardian" : args.includes("--jobs") ? "jobs" : undefined,
+    recoveredOnly: args.includes("--recovered"),
   };
 }
 
-function filterAutomationJobs<T extends { status: string; projectId?: string; loopId?: string; kind: string }>(entries: T[], filters: AutomationFilters): T[] {
+function filterAutomationJobs<T extends { status: string; projectId?: string; loopId?: string; kind: string; recovered?: boolean }>(entries: T[], filters: AutomationFilters): T[] {
   return entries.filter((entry) => {
     if (filters.projectId && entry.projectId !== filters.projectId) return false;
     if (filters.loopId && entry.loopId !== filters.loopId) return false;
     if (filters.kind && entry.kind !== filters.kind) return false;
+    if (filters.recoveredOnly && entry.recovered !== true) return false;
     if (filters.jobMode === "running") return entry.status === "running" || entry.status === "dispatching";
     if (filters.jobMode === "failed") return entry.status === "failed";
     if (filters.jobMode === "terminal") return entry.status === "completed" || entry.status === "failed" || entry.status === "cancelled";
@@ -189,12 +195,13 @@ function filterAutomationJobs<T extends { status: string; projectId?: string; lo
   });
 }
 
-function filterAutomationGuardians<T extends { projectId?: string; loopId?: string; attached?: boolean }>(entries: T[], filters: AutomationFilters): T[] {
+function filterAutomationGuardians<T extends { projectId?: string; loopId?: string; attached?: boolean; recovered?: boolean }>(entries: T[], filters: AutomationFilters): T[] {
   return entries.filter((entry) => {
     if (filters.projectId && entry.projectId !== filters.projectId) return false;
     if (filters.loopId && entry.loopId !== filters.loopId) return false;
     if (filters.guardianState === "attached" && entry.attached !== true) return false;
     if (filters.guardianState === "persisted" && entry.attached !== false) return false;
+    if (filters.recoveredOnly && entry.recovered !== true) return false;
     return true;
   });
 }
@@ -203,9 +210,10 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
   return entries.filter((entry) => {
     if (filters.projectId && entry.projectId !== filters.projectId) return false;
     if (filters.loopId && entry.loopId !== filters.loopId) return false;
+    if (filters.recoveredOnly && entry.kind !== "session_reattached") return false;
     if (filters.auditMode === "anomalies") return entry.kind === "watchdog_stopped" || entry.kind === "session_stop_requested" || entry.kind === "guardian_cleared" || entry.status === "failed" || entry.status === "cancelled";
     if (filters.auditMode === "guardian") return entry.kind.startsWith("guardian_");
-    if (filters.auditMode === "jobs") return entry.kind.startsWith("job_") || entry.kind === "watchdog_stopped" || entry.kind === "session_stop_requested";
+    if (filters.auditMode === "jobs") return entry.kind.startsWith("job_") || entry.kind === "session_reattached" || entry.kind === "watchdog_stopped" || entry.kind === "session_stop_requested";
     return true;
   });
 }
@@ -284,6 +292,18 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
         error instanceof Error ? error.message : "Unknown error",
       );
       logger.debug("Supervisor command error:", error);
+      process.exit(1);
+    }
+    return;
+  } else if (subcommand === "loop") {
+    try {
+      await handleLoopCommand(args.slice(1));
+    } catch (error) {
+      logger.printError(
+        chalk.red("Error:"),
+        error instanceof Error ? error.message : "Unknown error",
+      );
+      logger.debug("Loop command error:", error);
       process.exit(1);
     }
     return;
@@ -712,6 +732,7 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
             logger.print(
               `- ${guardian.key} session=${guardian.sessionId}` +
                 (guardian.attached === false ? ` state=persisted` : guardian.attached === true ? ` state=attached` : "") +
+                (guardian.recovered ? ` recovered=true` : "") +
                 (guardian.projectId ? ` project=${guardian.projectId}` : "") +
                 (guardian.loopId ? ` loop=${guardian.loopId}` : "") +
                 (guardian.lastRunId ? ` run=${guardian.lastRunId}` : ""),
@@ -721,7 +742,7 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
         if (automationStatus.auditStats) {
           const stats = automationStatus.auditStats;
           logger.print(
-            `Stats: events=${stats.totalEvents} reuse=${stats.guardianReuseCount} reuseRate=${formatAutomationRate(stats.guardianReuseRate)} resets=${stats.guardianResetCount} watchdogStops=${stats.watchdogStopCount} stopRequests=${stats.stopRequestCount}`,
+            `Stats: events=${stats.totalEvents} reuse=${stats.guardianReuseCount} reuseRate=${formatAutomationRate(stats.guardianReuseRate)} resets=${stats.guardianResetCount} reattached=${stats.sessionReattachedCount} watchdogStops=${stats.watchdogStopCount} stopRequests=${stats.stopRequestCount}`,
           );
         }
 
@@ -737,6 +758,7 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
               (job.loopId ? ` loop=${job.loopId}` : "") +
               (job.sessionId ? ` session=${job.sessionId}` : "") +
               (job.continuityKey ? ` continuity=${job.continuityKey}` : "") +
+              (job.recovered ? ` recovered=true` : "") +
               (job.errorMessage ? ` error=${job.errorMessage}` : ""),
           );
         });
@@ -767,6 +789,7 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
             logger.print(
               `- ${guardian.key} session=${guardian.sessionId}` +
                 (guardian.attached === false ? ` state=persisted` : guardian.attached === true ? ` state=attached` : "") +
+                (guardian.recovered ? ` recovered=true` : "") +
                 (guardian.projectId ? ` project=${guardian.projectId}` : "") +
                 (guardian.loopId ? ` loop=${guardian.loopId}` : "") +
                 (guardian.lastRunId ? ` run=${guardian.lastRunId}` : ""),
@@ -899,6 +922,7 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
         logger.print(`- guardian reuse rate: ${formatAutomationRate(stats.guardianReuseRate)}`);
         logger.print(`- guardian remembered: ${stats.guardianRememberCount}`);
         logger.print(`- guardian resets: ${stats.guardianResetCount}`);
+        logger.print(`- sessions reattached: ${stats.sessionReattachedCount}`);
         logger.print(`- watchdog stops: ${stats.watchdogStopCount}`);
         logger.print(`- stop requests: ${stats.stopRequestCount}`);
         logger.print(`- queued jobs: ${stats.queuedCount}`);
@@ -983,6 +1007,7 @@ ${chalk.bold("happy daemon automation")} - Automation job management
 
 ${chalk.bold("Usage:")}
   happy daemon automation list [--json] [--running|--failed|--terminal] [--project <id>] [--loop <id>] [--kind <kind>]
+  happy loop create --path <dir> --interval <10m> --prompt <text>
                                                List automation jobs
   happy daemon automation stats [--json] [--project <id>] [--loop <id>]
                                                Show audit + guardian metrics

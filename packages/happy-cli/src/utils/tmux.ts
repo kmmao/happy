@@ -885,6 +885,57 @@ export class TmuxUtilities {
     }
 
     /**
+     * Resolve the current pane PID for a tmux session/window[/pane] identifier.
+     * When no pane is specified, prefers the active pane and falls back to the first pane.
+     */
+    async getPanePidFromSessionIdentifier(sessionIdentifier: string): Promise<number | null> {
+        try {
+            const parsed = parseTmuxSessionIdentifier(sessionIdentifier);
+            if (parsed.pane) {
+                const result = await this.executeTmuxCommand(['display-message', '-p', '#{pane_pid}'], parsed.session, parsed.window, parsed.pane);
+                if (!result || result.returncode !== 0) {
+                    return null;
+                }
+                const panePid = Number.parseInt(result.stdout.trim(), 10);
+                return Number.isFinite(panePid) && panePid > 0 ? panePid : null;
+            }
+
+            const result = await this.executeTmuxCommand(['list-panes', '-F', '#{pane_index}:#{pane_active}:#{pane_pid}'], parsed.session, parsed.window);
+            if (!result || result.returncode !== 0) {
+                return null;
+            }
+
+            const panes = result.stdout
+                .trim()
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean)
+                .map((line) => {
+                    const [paneIndex, activeFlag, panePid] = line.split(':');
+                    return {
+                        paneIndex,
+                        active: activeFlag === '1',
+                        panePid: Number.parseInt(panePid ?? '', 10),
+                    };
+                })
+                .filter((entry) => Number.isFinite(entry.panePid) && entry.panePid > 0);
+
+            if (panes.length === 0) {
+                return null;
+            }
+
+            return panes.find((entry) => entry.active)?.panePid ?? panes[0]?.panePid ?? null;
+        } catch (error) {
+            if (error instanceof TmuxSessionIdentifierError) {
+                logger.debug(`[TMUX] Invalid pane pid lookup identifier: ${error.message}`);
+            } else {
+                logger.debug('[TMUX] Error resolving pane pid:', error);
+            }
+            return null;
+        }
+    }
+
+    /**
      * Kill a tmux window safely with proper error handling
      */
     async killWindow(sessionIdentifier: string): Promise<boolean> {

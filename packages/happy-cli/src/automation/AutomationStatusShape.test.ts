@@ -24,6 +24,9 @@ describe("Automation status snapshot shape", () => {
             spawnSession: async () => ({ type: "success", sessionId: "sid" }),
             emitWebhookStatus: () => {},
           },
+          agentLoop: {
+            spawnSession: async () => ({ type: "success", sessionId: "sid" }),
+          },
         },
         maxConcurrentDispatches: 0,
         runJob: async () => ({ completion: "immediate" }),

@@ -13,10 +13,12 @@ import {
   SpawnSessionResult,
 } from "@/modules/common/registerCommonHandlers";
 import type { AutomationJob, AutomationMutationResult } from "@/automation/types";
+import type { AgentLoopDefinition } from "@/automation/AgentLoopStore";
+import type { AgentLoopCreateInput, AgentLoopMutationResult, AgentLoopUpdateInput } from "@/automation/AgentLoopCoordinator";
 
 const automationJobSchema = z.object({
   id: z.string(),
-  kind: z.enum(["supervisor", "webhook"]),
+  kind: z.enum(["supervisor", "webhook", "agent_loop"]),
   status: z.enum(["queued", "dispatching", "running", "completed", "failed", "cancelled"]),
   priority: z.enum(["urgent", "user", "background"]),
   dedupeKey: z.string(),
@@ -36,6 +38,7 @@ const automationJobSchema = z.object({
   loopIteration: z.number().optional(),
   continuityKey: z.string().optional(),
   errorMessage: z.string().optional(),
+  recovered: z.boolean().optional(),
   payload: z.any(),
 });
 
@@ -47,6 +50,7 @@ const automationGuardianSchema = z.object({
   updatedAt: z.number(),
   lastRunId: z.string().optional(),
   attached: z.boolean().optional(),
+  recovered: z.boolean().optional(),
 });
 
 const automationGuardianUsageSchema = z.object({
@@ -88,6 +92,7 @@ const automationAuditStatsSchema = z.object({
   guardianReuseCount: z.number(),
   guardianRememberCount: z.number(),
   guardianResetCount: z.number(),
+  sessionReattachedCount: z.number(),
   watchdogStopCount: z.number(),
   stopRequestCount: z.number(),
   guardianEligibleRunCount: z.number(),
@@ -106,6 +111,59 @@ const automationGuardianMutationSchema = z.object({
   errorMessage: z.string().optional(),
 });
 
+const agentLoopSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  prompt: z.string(),
+  directory: z.string(),
+  intervalMs: z.number(),
+  enabled: z.boolean(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  nextRunAt: z.number(),
+  iteration: z.number(),
+  continuityKey: z.string(),
+  agent: z.enum(["claude", "codex", "gemini"]),
+  profileId: z.string().optional(),
+  projectId: z.string().optional(),
+  environmentVariables: z.record(z.string(), z.string()).optional(),
+  lastEnqueuedAt: z.number().optional(),
+  lastStartedAt: z.number().optional(),
+  lastCompletedAt: z.number().optional(),
+  lastSessionId: z.string().optional(),
+  lastError: z.string().optional(),
+});
+
+const agentLoopMutationSchema = z.object({
+  success: z.boolean(),
+  errorMessage: z.string().optional(),
+  loop: agentLoopSchema.optional(),
+});
+
+const agentLoopCreateSchema = z.object({
+  name: z.string().optional(),
+  prompt: z.string(),
+  directory: z.string(),
+  intervalMs: z.number().positive(),
+  agent: z.enum(["claude", "codex", "gemini"]).optional(),
+  profileId: z.string().optional(),
+  projectId: z.string().optional(),
+  environmentVariables: z.record(z.string(), z.string()).optional(),
+  runNow: z.boolean().optional(),
+});
+
+const agentLoopUpdateSchema = z.object({
+  loopId: z.string(),
+  name: z.string().nullable().optional(),
+  prompt: z.string().optional(),
+  directory: z.string().optional(),
+  intervalMs: z.number().positive().optional(),
+  agent: z.enum(["claude", "codex", "gemini"]).optional(),
+  profileId: z.string().nullable().optional(),
+  projectId: z.string().nullable().optional(),
+  environmentVariables: z.record(z.string(), z.string()).nullable().optional(),
+});
+
 export function startDaemonControlServer({
   getChildren,
   stopSession,
@@ -118,6 +176,14 @@ export function startDaemonControlServer({
   clearAutomationJobs,
   clearAutomationGuardians,
   clearAutomationAudit,
+  listAgentLoops,
+  getAgentLoop,
+  createAgentLoop,
+  updateAgentLoop,
+  pauseAgentLoop,
+  resumeAgentLoop,
+  runAgentLoopNow,
+  removeAgentLoop,
 }: {
   getChildren: () => TrackedSession[];
   stopSession: (sessionId: string) => boolean;
@@ -135,6 +201,7 @@ export function startDaemonControlServer({
       updatedAt: number;
       lastRunId?: string;
       attached?: boolean;
+      recovered?: boolean;
     }>;
     guardianUsage?: Array<{
       key: string;
@@ -157,6 +224,7 @@ export function startDaemonControlServer({
       guardianReuseCount: number;
       guardianRememberCount: number;
       guardianResetCount: number;
+      sessionReattachedCount: number;
       watchdogStopCount: number;
       stopRequestCount: number;
       guardianEligibleRunCount: number;
@@ -185,6 +253,14 @@ export function startDaemonControlServer({
   clearAutomationJobs: () => Promise<AutomationMutationResult>;
   clearAutomationGuardians: (params?: { key?: string; sessionId?: string; clearAll?: boolean }) => Promise<{ success: boolean; errorMessage?: string }>;
   clearAutomationAudit: () => Promise<{ success: boolean; errorMessage?: string }>;
+  listAgentLoops: () => Promise<AgentLoopDefinition[]>;
+  getAgentLoop: (loopId: string) => Promise<AgentLoopDefinition | undefined>;
+  createAgentLoop: (input: AgentLoopCreateInput) => Promise<AgentLoopMutationResult>;
+  updateAgentLoop: (loopId: string, input: AgentLoopUpdateInput) => Promise<AgentLoopMutationResult>;
+  pauseAgentLoop: (loopId: string) => Promise<AgentLoopMutationResult>;
+  resumeAgentLoop: (loopId: string) => Promise<AgentLoopMutationResult>;
+  runAgentLoopNow: (loopId: string) => Promise<AgentLoopMutationResult>;
+  removeAgentLoop: (loopId: string) => Promise<AgentLoopMutationResult>;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
   return new Promise((resolve) => {
     const app = fastify({ logger: false });
@@ -423,6 +499,117 @@ export function startDaemonControlServer({
         },
       },
       async () => clearAutomationAudit(),
+    );
+
+
+    typed.post(
+      "/loops",
+      {
+        schema: {
+          response: {
+            200: z.object({
+              loops: z.array(agentLoopSchema),
+            }),
+          },
+        },
+      },
+      async () => ({ loops: await listAgentLoops() }),
+    );
+
+    typed.post(
+      "/loop-get",
+      {
+        schema: {
+          body: z.object({
+            loopId: z.string(),
+          }),
+          response: {
+            200: agentLoopMutationSchema,
+          },
+        },
+      },
+      async (request) => ({ success: true, loop: await getAgentLoop(request.body.loopId) }),
+    );
+
+    typed.post(
+      "/loop-create",
+      {
+        schema: {
+          body: agentLoopCreateSchema,
+          response: {
+            200: agentLoopMutationSchema,
+          },
+        },
+      },
+      async (request) => createAgentLoop(request.body),
+    );
+
+    typed.post(
+      "/loop-update",
+      {
+        schema: {
+          body: agentLoopUpdateSchema,
+          response: {
+            200: agentLoopMutationSchema,
+          },
+        },
+      },
+      async (request) => {
+        const { loopId, ...input } = request.body;
+        return updateAgentLoop(loopId, input);
+      },
+    );
+
+    typed.post(
+      "/loop-pause",
+      {
+        schema: {
+          body: z.object({ loopId: z.string() }),
+          response: {
+            200: agentLoopMutationSchema,
+          },
+        },
+      },
+      async (request) => pauseAgentLoop(request.body.loopId),
+    );
+
+    typed.post(
+      "/loop-resume",
+      {
+        schema: {
+          body: z.object({ loopId: z.string() }),
+          response: {
+            200: agentLoopMutationSchema,
+          },
+        },
+      },
+      async (request) => resumeAgentLoop(request.body.loopId),
+    );
+
+    typed.post(
+      "/loop-run-now",
+      {
+        schema: {
+          body: z.object({ loopId: z.string() }),
+          response: {
+            200: agentLoopMutationSchema,
+          },
+        },
+      },
+      async (request) => runAgentLoopNow(request.body.loopId),
+    );
+
+    typed.post(
+      "/loop-remove",
+      {
+        schema: {
+          body: z.object({ loopId: z.string() }),
+          response: {
+            200: agentLoopMutationSchema,
+          },
+        },
+      },
+      async (request) => removeAgentLoop(request.body.loopId),
     );
 
     typed.post(

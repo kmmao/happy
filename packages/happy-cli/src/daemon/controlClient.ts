@@ -15,6 +15,8 @@ import type {
   AutomationJob,
   AutomationMutationResult,
 } from "@/automation/types";
+import type { AgentLoopDefinition } from "@/automation/AgentLoopStore";
+import type { AgentLoopCreateInput, AgentLoopMutationResult, AgentLoopUpdateInput } from "@/automation/AgentLoopCoordinator";
 
 export type DaemonCheckResult =
   | { status: "running"; state: DaemonLocallyPersistedState }
@@ -98,6 +100,7 @@ export async function getDaemonAutomationStatus(): Promise<{
     updatedAt: number;
     lastRunId?: string;
     attached?: boolean;
+    recovered?: boolean;
   }>;
   guardianUsage?: AutomationGuardianUsageSummary[];
   auditStats?: AutomationAuditStats;
@@ -118,6 +121,7 @@ export async function getDaemonAutomationStatus(): Promise<{
       updatedAt: number;
       lastRunId?: string;
       attached?: boolean;
+      recovered?: boolean;
     }>;
     guardianUsage?: AutomationGuardianUsageSummary[];
     auditStats?: AutomationAuditStats;
@@ -171,6 +175,70 @@ export async function clearDaemonAutomationAudit(): Promise<{ success: boolean; 
     return { success: false, errorMessage: result.error };
   }
   return result as { success: boolean; errorMessage?: string };
+}
+
+export async function listDaemonAgentLoops(): Promise<AgentLoopDefinition[]> {
+  const result = await daemonPost("/loops");
+  if (result.error) {
+    return [];
+  }
+  return result.loops ?? [];
+}
+
+export async function getDaemonAgentLoop(loopId: string): Promise<AgentLoopMutationResult> {
+  const result = await daemonPost("/loop-get", { loopId });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopMutationResult;
+}
+
+export async function createDaemonAgentLoop(input: AgentLoopCreateInput): Promise<AgentLoopMutationResult> {
+  const result = await daemonPost("/loop-create", input);
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopMutationResult;
+}
+
+export async function updateDaemonAgentLoop(loopId: string, input: AgentLoopUpdateInput): Promise<AgentLoopMutationResult> {
+  const result = await daemonPost("/loop-update", { loopId, ...input });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopMutationResult;
+}
+
+export async function pauseDaemonAgentLoop(loopId: string): Promise<AgentLoopMutationResult> {
+  const result = await daemonPost("/loop-pause", { loopId });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopMutationResult;
+}
+
+export async function resumeDaemonAgentLoop(loopId: string): Promise<AgentLoopMutationResult> {
+  const result = await daemonPost("/loop-resume", { loopId });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopMutationResult;
+}
+
+export async function runNowDaemonAgentLoop(loopId: string): Promise<AgentLoopMutationResult> {
+  const result = await daemonPost("/loop-run-now", { loopId });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopMutationResult;
+}
+
+export async function removeDaemonAgentLoop(loopId: string): Promise<AgentLoopMutationResult> {
+  const result = await daemonPost("/loop-remove", { loopId });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AgentLoopMutationResult;
 }
 
 export async function checkDaemonStatus(): Promise<DaemonCheckResult> {

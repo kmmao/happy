@@ -268,6 +268,7 @@ export interface MachineAutomationGuardian {
   updatedAt: number;
   lastRunId?: string;
   attached?: boolean;
+  recovered?: boolean;
 }
 
 export interface MachineAutomationGuardianUsage {
@@ -309,6 +310,7 @@ export interface MachineAutomationAuditStats {
   guardianReuseCount: number;
   guardianRememberCount: number;
   guardianResetCount: number;
+  sessionReattachedCount: number;
   watchdogStopCount: number;
   stopRequestCount: number;
   guardianEligibleRunCount: number;
@@ -318,7 +320,7 @@ export interface MachineAutomationAuditStats {
 
 export interface MachineAutomationJob {
   id: string;
-  kind: "supervisor" | "webhook";
+  kind: "supervisor" | "webhook" | "agent_loop";
   status: "queued" | "dispatching" | "running" | "completed" | "failed" | "cancelled";
   priority: "urgent" | "user" | "background";
   dedupeKey: string;
@@ -337,6 +339,7 @@ export interface MachineAutomationJob {
   loopIteration?: number;
   continuityKey?: string;
   errorMessage?: string;
+  recovered?: boolean;
 }
 
 export interface MachineAutomationStatus {
@@ -408,6 +411,141 @@ export async function machineClearAutomationAudit(
     machineId,
     "automation-audit-clear",
     {},
+  );
+}
+
+
+export interface MachineAgentLoop {
+  id: string;
+  name?: string;
+  prompt: string;
+  directory: string;
+  intervalMs: number;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+  nextRunAt: number;
+  iteration: number;
+  continuityKey: string;
+  agent: "claude" | "codex" | "gemini";
+  profileId?: string;
+  projectId?: string;
+  environmentVariables?: Record<string, string>;
+  lastEnqueuedAt?: number;
+  lastStartedAt?: number;
+  lastCompletedAt?: number;
+  lastSessionId?: string;
+  lastError?: string;
+}
+
+export interface MachineAgentLoopCreateInput {
+  name?: string;
+  prompt: string;
+  directory: string;
+  intervalMs: number;
+  agent?: "claude" | "codex" | "gemini";
+  profileId?: string;
+  projectId?: string;
+  environmentVariables?: Record<string, string>;
+  runNow?: boolean;
+}
+
+export interface MachineAgentLoopUpdateInput {
+  name?: string | null;
+  prompt?: string;
+  directory?: string;
+  intervalMs?: number;
+  agent?: "claude" | "codex" | "gemini";
+  profileId?: string | null;
+  projectId?: string | null;
+  environmentVariables?: Record<string, string> | null;
+}
+
+export async function machineListAgentLoops(
+  machineId: string,
+): Promise<{ loops: MachineAgentLoop[] }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-list",
+    {},
+  );
+}
+
+export async function machineGetAgentLoop(
+  machineId: string,
+  loopId: string,
+): Promise<{ success: boolean; errorMessage?: string; loop?: MachineAgentLoop }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-get",
+    { loopId },
+  );
+}
+
+export async function machineCreateAgentLoop(
+  machineId: string,
+  input: MachineAgentLoopCreateInput,
+): Promise<{ success: boolean; errorMessage?: string; loop?: MachineAgentLoop }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-create",
+    input,
+  );
+}
+
+export async function machineUpdateAgentLoop(
+  machineId: string,
+  loopId: string,
+  input: MachineAgentLoopUpdateInput,
+): Promise<{ success: boolean; errorMessage?: string; loop?: MachineAgentLoop }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-update",
+    { loopId, ...input },
+  );
+}
+
+export async function machinePauseAgentLoop(
+  machineId: string,
+  loopId: string,
+): Promise<{ success: boolean; errorMessage?: string; loop?: MachineAgentLoop }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-pause",
+    { loopId },
+  );
+}
+
+export async function machineResumeAgentLoop(
+  machineId: string,
+  loopId: string,
+): Promise<{ success: boolean; errorMessage?: string; loop?: MachineAgentLoop }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-resume",
+    { loopId },
+  );
+}
+
+export async function machineRunAgentLoopNow(
+  machineId: string,
+  loopId: string,
+): Promise<{ success: boolean; errorMessage?: string; loop?: MachineAgentLoop }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-run-now",
+    { loopId },
+  );
+}
+
+export async function machineRemoveAgentLoop(
+  machineId: string,
+  loopId: string,
+): Promise<{ success: boolean; errorMessage?: string; loop?: MachineAgentLoop }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-remove",
+    { loopId },
   );
 }
 

@@ -73,6 +73,7 @@ describe("DaemonStateSchema", () => {
           guardianReuseCount: 1,
           guardianRememberCount: 2,
           guardianResetCount: 1,
+          sessionReattachedCount: 1,
           watchdogStopCount: 1,
           stopRequestCount: 1,
           guardianEligibleRunCount: 2,

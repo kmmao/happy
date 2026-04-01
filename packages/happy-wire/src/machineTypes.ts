@@ -75,7 +75,7 @@ export type TunnelState = z.infer<typeof TunnelStateSchema>;
 export const AutomationPrioritySchema = z.enum(["urgent", "user", "background"]);
 export type AutomationPriority = z.infer<typeof AutomationPrioritySchema>;
 
-export const AutomationJobKindSchema = z.enum(["supervisor", "webhook"]);
+export const AutomationJobKindSchema = z.enum(["supervisor", "webhook", "agent_loop"]);
 export type AutomationJobKind = z.infer<typeof AutomationJobKindSchema>;
 
 export const AutomationJobStatusSchema = z.enum([
@@ -109,6 +109,7 @@ export const AutomationJobSummarySchema = z.object({
   loopIteration: z.number().optional(),
   continuityKey: z.string().optional(),
   errorMessage: z.string().optional(),
+  recovered: z.boolean().optional(),
 });
 
 export type AutomationJobSummary = z.infer<typeof AutomationJobSummarySchema>;
@@ -121,6 +122,7 @@ export const AutomationGuardianSummarySchema = z.object({
   updatedAt: z.number(),
   lastRunId: z.string().optional(),
   attached: z.boolean().optional(),
+  recovered: z.boolean().optional(),
 });
 
 export type AutomationGuardianSummary = z.infer<typeof AutomationGuardianSummarySchema>;
@@ -168,6 +170,7 @@ export const AutomationAuditStatsSchema = z.object({
   guardianReuseCount: z.number(),
   guardianRememberCount: z.number(),
   guardianResetCount: z.number(),
+  sessionReattachedCount: z.number(),
   watchdogStopCount: z.number(),
   stopRequestCount: z.number(),
   guardianEligibleRunCount: z.number(),

@@ -5,7 +5,7 @@
  * They do NOT require tmux to be installed on the system.
  * All tests mock environment variables and test string parsing only.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
     parseTmuxSessionIdentifier,
     formatTmuxSessionIdentifier,
@@ -280,6 +280,45 @@ describe('buildTmuxSessionIdentifier', () => {
         expect(() => buildTmuxSessionIdentifier({ session: '' })).not.toThrow();
         expect(() => buildTmuxSessionIdentifier({ session: 'invalid session' })).not.toThrow();
         expect(() => buildTmuxSessionIdentifier({ session: null as any })).not.toThrow();
+    });
+});
+
+describe('TmuxUtilities.getPanePidFromSessionIdentifier', () => {
+    it('should resolve the pane pid from a specific pane identifier', async () => {
+        const utils = new TmuxUtilities();
+        const spy = vi.spyOn(utils, 'executeTmuxCommand').mockResolvedValue({
+            returncode: 0,
+            stdout: '4321\n',
+            stderr: '',
+            command: ['tmux', 'display-message']
+        });
+
+        await expect(utils.getPanePidFromSessionIdentifier('happy:main.2')).resolves.toBe(4321);
+        expect(spy).toHaveBeenCalledWith(['display-message', '-p', '#{pane_pid}'], 'happy', 'main', '2');
+    });
+
+    it('should prefer the active pane when window has multiple panes', async () => {
+        const utils = new TmuxUtilities();
+        vi.spyOn(utils, 'executeTmuxCommand').mockResolvedValue({
+            returncode: 0,
+            stdout: '0:0:1111\n1:1:2222\n',
+            stderr: '',
+            command: ['tmux', 'list-panes']
+        });
+
+        await expect(utils.getPanePidFromSessionIdentifier('happy:main')).resolves.toBe(2222);
+    });
+
+    it('should return null when no valid pane pid is available', async () => {
+        const utils = new TmuxUtilities();
+        vi.spyOn(utils, 'executeTmuxCommand').mockResolvedValue({
+            returncode: 0,
+            stdout: '0:0:not-a-pid\n',
+            stderr: '',
+            command: ['tmux', 'list-panes']
+        });
+
+        await expect(utils.getPanePidFromSessionIdentifier('happy:main')).resolves.toBeNull();
     });
 });
 

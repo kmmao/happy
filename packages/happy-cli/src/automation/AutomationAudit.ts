@@ -77,6 +77,7 @@ export function deriveAutomationAuditStats(
     guardianReuseCount: 0,
     guardianRememberCount: 0,
     guardianResetCount: 0,
+    sessionReattachedCount: 0,
     watchdogStopCount: 0,
     stopRequestCount: 0,
     guardianEligibleRunCount: 0,
@@ -108,6 +109,9 @@ export function deriveAutomationAuditStats(
         break;
       case "guardian_cleared":
         stats.guardianResetCount += 1;
+        break;
+      case "session_reattached":
+        stats.sessionReattachedCount += 1;
         break;
       case "watchdog_stopped":
         stats.watchdogStopCount += 1;

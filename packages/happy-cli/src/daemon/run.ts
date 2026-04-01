@@ -1,6 +1,8 @@
 import fs from "fs/promises";
 import os from "os";
 import * as tmp from "tmp";
+import { execFile as execFileCb } from "node:child_process";
+import { promisify } from "node:util";
 
 import { ApiClient } from "@/api/api";
 import { TrackedSession } from "./types";
@@ -50,11 +52,16 @@ import { GuardianSessionRegistry } from "@/automation/GuardianSessionRegistry";
 import { AutomationAuditStore } from "@/automation/AutomationAuditStore";
 import { deriveAutomationAuditStats, deriveAutomationGuardianUsage } from "@/automation/AutomationAudit";
 import { AutomationScheduler } from "@/automation/AutomationScheduler";
+import { AgentLoopStore } from "@/automation/AgentLoopStore";
+import { AgentLoopCoordinator } from "@/automation/AgentLoopCoordinator";
+import { TrackedSessionRegistry } from "./TrackedSessionRegistry";
 import type { AutomationAuditEvent, AutomationJob } from "@/automation/types";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
 import { detectTailscale, detectTailscaleServe } from "@/utils/tailscale";
 import { TunnelManager, TailscaleProvider, UpnpProvider, CaddyProvider } from "@/tunnel";
 
+
+const execFileAsync = promisify(execFileCb);
 
 // Prepare initial metadata
 export const initialMachineMetadata: MachineMetadata = {
@@ -237,6 +244,10 @@ export async function startDaemon(): Promise<void> {
       join(configuration.happyHomeDir, "automation-audit-log.json"),
     );
     await automationAuditStore.load();
+    const trackedSessionRegistry = new TrackedSessionRegistry(
+      join(configuration.happyHomeDir, "tracked-sessions.json"),
+    );
+    await trackedSessionRegistry.load();
 
     const formatDurationMs = (value: number) => {
       if (value < 60_000) {
@@ -374,16 +385,18 @@ export async function startDaemon(): Promise<void> {
           continue;
         }
 
-        const runtimeSince = trackedSession.startedAt ?? job.dispatchedAt ?? job.createdAt;
+        const runtimeSince = trackedSession.recoveredAt ?? trackedSession.startedAt ?? job.dispatchedAt ?? job.createdAt;
         const activitySince =
           trackedSession.lastActivityAt ??
           trackedSession.lastOutputAt ??
+          trackedSession.recoveredAt ??
           trackedSession.startedAt ??
           job.dispatchedAt ??
           job.createdAt;
         const runtimeMs = now - runtimeSince;
         const inactivityMs = now - activitySince;
-        if (runtimeMs <= maxRuntimeMs && inactivityMs <= maxInactivityMs) {
+        const inactivityExceeded = !trackedSession.recoveredFromIndex && inactivityMs > maxInactivityMs;
+        if (runtimeMs <= maxRuntimeMs && !inactivityExceeded) {
           continue;
         }
 
@@ -410,6 +423,139 @@ export async function startDaemon(): Promise<void> {
 
     // Helper functions
     const getCurrentChildren = () => Array.from(pidToTrackedSession.values());
+
+    const rememberTrackedSession = (session: TrackedSession) => {
+      if (!session.happySessionId) {
+        return;
+      }
+      void trackedSessionRegistry.rememberTrackedSession(session).catch((error) => {
+        logger.debug(`[DAEMON RUN] Failed to persist tracked session ${session.happySessionId}: ${error}`);
+      });
+    };
+
+    const forgetTrackedSession = (sessionId?: string) => {
+      if (!sessionId) {
+        return;
+      }
+      void trackedSessionRegistry.forgetSession(sessionId).catch((error) => {
+        logger.debug(`[DAEMON RUN] Failed to forget persisted tracked session ${sessionId}: ${error}`);
+      });
+    };
+
+    const resolveLikelyRecoverableHappyPid = async (persisted: { pid: number; startedAt?: number; tmuxSessionId?: string }): Promise<number | null> => {
+      if (process.platform === "win32") {
+        return null;
+      }
+
+      const candidatePids: number[] = [];
+      const pushCandidate = (pid?: number | null) => {
+        if (!pid || !Number.isFinite(pid) || pid <= 0 || candidatePids.includes(pid)) {
+          return;
+        }
+        candidatePids.push(pid);
+      };
+
+      pushCandidate(persisted.pid);
+
+      if (persisted.tmuxSessionId) {
+        const tmuxInfo = await getTmuxUtilities().getSessionInfoFromString(persisted.tmuxSessionId).catch(() => null);
+        if (!tmuxInfo) {
+          return null;
+        }
+
+        const panePid = await getTmuxUtilities().getPanePidFromSessionIdentifier(persisted.tmuxSessionId).catch(() => null);
+        pushCandidate(panePid);
+      }
+
+      for (const candidatePid of candidatePids) {
+        try {
+          process.kill(candidatePid, 0);
+        } catch {
+          continue;
+        }
+
+        try {
+          const { stdout } = await execFileAsync("ps", ["-p", String(candidatePid), "-o", "etimes=,command="]);
+          const line = stdout.trim();
+          const match = line.match(/^(\d+)\s+(.*)$/);
+          const elapsedSeconds = match ? Number(match[1]) : 0;
+          const command = match ? match[2].trim() : line;
+          if (!/(\bhappy\b|index\.mjs|dist_next\/index\.mjs|dist\/index\.mjs)/i.test(command)) {
+            continue;
+          }
+          if (persisted.startedAt) {
+            const minimumExpectedAgeSeconds = Math.max(0, Math.floor((Date.now() - persisted.startedAt) / 1000) - 300);
+            if (elapsedSeconds < minimumExpectedAgeSeconds) {
+              logger.debug(`[DAEMON RUN] PID ${candidatePid} looks newer than persisted session record; refusing reattach`);
+              continue;
+            }
+          }
+          return candidatePid;
+        } catch (error) {
+          logger.debug(`[DAEMON RUN] Failed to inspect PID ${candidatePid} for recovery: ${error}`);
+        }
+      }
+
+      return null;
+    };
+
+    const recoverTrackedSessionsFromIndex = async (): Promise<Set<string>> => {
+      const recoveredSessionIds = new Set<string>();
+      for (const persisted of trackedSessionRegistry.getAll()) {
+        if (pidToTrackedSession.has(persisted.pid)) {
+          recoveredSessionIds.add(persisted.happySessionId);
+          continue;
+        }
+
+        const recoveredPid = await resolveLikelyRecoverableHappyPid(persisted);
+        if (!recoveredPid) {
+          await trackedSessionRegistry.forgetSession(persisted.happySessionId).catch(() => {});
+          continue;
+        }
+
+        const existingRecoveredSession = pidToTrackedSession.get(recoveredPid);
+        if (existingRecoveredSession?.happySessionId === persisted.happySessionId) {
+          recoveredSessionIds.add(persisted.happySessionId);
+          continue;
+        }
+
+        const recoveredAt = Date.now();
+        const trackedSession: TrackedSession = {
+          startedBy: persisted.startedBy,
+          pid: recoveredPid,
+          happySessionId: persisted.happySessionId,
+          startedAt: persisted.startedAt,
+          lastActivityAt: persisted.lastActivityAt,
+          lastOutputAt: persisted.lastOutputAt,
+          automationContext: persisted.automationContext,
+          tmuxSessionId: persisted.tmuxSessionId,
+          directoryCreated: persisted.directoryCreated,
+          message: persisted.message,
+          recoveredFromIndex: true,
+          recoveredAt,
+        };
+        pidToTrackedSession.set(recoveredPid, trackedSession);
+        await trackedSessionRegistry.rememberTrackedSession(trackedSession).catch((error) => {
+          logger.debug(`[DAEMON RUN] Failed to refresh persisted tracked session ${persisted.happySessionId}: ${error}`);
+        });
+        recoveredSessionIds.add(persisted.happySessionId);
+        void recordAutomationAuditEvent({
+          kind: "session_reattached",
+          sessionId: persisted.happySessionId,
+          projectId: persisted.automationContext?.projectId,
+          runId: persisted.automationContext?.runId,
+          loopId: persisted.automationContext?.loopId,
+          trigger: persisted.automationContext?.trigger,
+          dedupeKey: persisted.automationContext?.dedupeKey,
+          status: "running",
+          message: `Reattached live session on PID ${recoveredPid}${persisted.pid !== recoveredPid ? ` (previous PID ${persisted.pid})` : ""}${persisted.tmuxSessionId ? ` (${persisted.tmuxSessionId})` : ""}`,
+        });
+        logger.debug(
+          `[DAEMON RUN] Reattached persisted session ${persisted.happySessionId} on PID ${recoveredPid}${persisted.pid !== recoveredPid ? ` (previous PID ${persisted.pid})` : ""}`,
+        );
+      }
+      return recoveredSessionIds;
+    };
 
     // Handle webhook from happy session reporting itself
     const onHappySessionWebhook = (
@@ -441,6 +587,8 @@ export async function startDaemon(): Promise<void> {
         existingSession.happySessionId = sessionId;
         existingSession.happySessionMetadataFromLocalWebhook = sessionMetadata;
         existingSession.lastActivityAt = Date.now();
+        existingSession.recoveredFromIndex = false;
+        existingSession.recoveredAt = undefined;
         logger.debug(
           `[DAEMON RUN] Updated daemon-spawned session ${sessionId} with metadata`,
         );
@@ -452,6 +600,7 @@ export async function startDaemon(): Promise<void> {
           awaiter(existingSession);
           logger.debug(`[DAEMON RUN] Resolved session awaiter for PID ${pid}`);
         }
+        rememberTrackedSession(existingSession);
       } else if (!existingSession) {
         // New session started externally
         const trackedSession: TrackedSession = {
@@ -466,6 +615,7 @@ export async function startDaemon(): Promise<void> {
         logger.debug(
           `[DAEMON RUN] Registered externally-started session ${sessionId}`,
         );
+        rememberTrackedSession(trackedSession);
       }
     };
 
@@ -1159,6 +1309,12 @@ export async function startDaemon(): Promise<void> {
         terminalStatus,
         terminalError,
       );
+      void agentLoopCoordinator?.onJobTerminal({
+        loopId: session.automationContext?.kind === "agent_loop" ? session.automationContext?.loopId : undefined,
+        status: terminalStatus,
+        sessionId: session.happySessionId,
+        errorMessage: terminalError,
+      });
       void recordAutomationAuditEvent({
         kind: "job_terminal",
         sessionId: session.happySessionId,
@@ -1173,6 +1329,7 @@ export async function startDaemon(): Promise<void> {
       void guardianSessionRegistry.forgetSession(session.happySessionId).catch((error) => {
         logger.debug(`[DAEMON RUN] Failed to forget guardian session ${session.happySessionId}: ${error}`);
       });
+      forgetTrackedSession(session.happySessionId);
 
       const fixInfo = getFixWorktreeInfo(session.happySessionId);
       if (fixInfo) {
@@ -1211,16 +1368,25 @@ export async function startDaemon(): Promise<void> {
     });
 
     let automationScheduler: AutomationScheduler | null = null;
+    let agentLoopCoordinator: AgentLoopCoordinator | null = null;
     const getAutomationStatusSnapshot = () => {
       const jobs = automationScheduler?.getJobsSnapshot() ?? [];
-      const attachedSessionIds = new Set(
+      const trackedSessionsBySessionId = new Map(
         Array.from(pidToTrackedSession.values())
-          .map((session) => session.happySessionId)
-          .filter((sessionId): sessionId is string => Boolean(sessionId)),
+          .filter((session): session is TrackedSession & { happySessionId: string } => Boolean(session.happySessionId))
+          .map((session) => [session.happySessionId, session]),
       );
-      const guardians = guardianSessionRegistry.getSnapshot().map((guardian) => ({
-        ...guardian,
-        attached: attachedSessionIds.has(guardian.sessionId),
+      const guardians = guardianSessionRegistry.getSnapshot().map((guardian) => {
+        const tracked = trackedSessionsBySessionId.get(guardian.sessionId);
+        return {
+          ...guardian,
+          attached: Boolean(tracked),
+          recovered: tracked?.recoveredFromIndex,
+        };
+      });
+      const jobsWithRecovery = jobs.map((job) => ({
+        ...job,
+        recovered: job.sessionId ? trackedSessionsBySessionId.get(job.sessionId)?.recoveredFromIndex : undefined,
       }));
       const allAuditEvents = automationAuditStore.getAll();
       const recentAuditEvents = allAuditEvents.slice(0, 50);
@@ -1230,7 +1396,7 @@ export async function startDaemon(): Promise<void> {
         acc[job.status] = (acc[job.status] ?? 0) + 1;
         return acc;
       }, emptyAutomationCounts());
-      return { counts, jobs, guardians, guardianUsage, auditStats, recentAuditEvents };
+      return { counts, jobs: jobsWithRecovery, guardians, guardianUsage, auditStats, recentAuditEvents };
     };
     const getAutomationStateSummary = () => {
       const { counts, jobs, guardians, guardianUsage, auditStats, recentAuditEvents } = getAutomationStatusSnapshot();
@@ -1320,6 +1486,61 @@ export async function startDaemon(): Promise<void> {
           } catch (error) {
             return { success: false, errorMessage: error instanceof Error ? error.message : String(error) };
           }
+        },
+        listAgentLoops: async () => {
+          return agentLoopCoordinator?.listLoops() ?? [];
+        },
+        getAgentLoop: async (loopId) => {
+          return agentLoopCoordinator?.getLoop(loopId);
+        },
+        createAgentLoop: async (input) => {
+          if (!agentLoopCoordinator) {
+            return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+          }
+          const result = await agentLoopCoordinator.createLoop(input);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        updateAgentLoop: async (loopId, input) => {
+          if (!agentLoopCoordinator) {
+            return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+          }
+          const result = await agentLoopCoordinator.updateLoop(loopId, input);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        pauseAgentLoop: async (loopId) => {
+          if (!agentLoopCoordinator) {
+            return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+          }
+          const result = await agentLoopCoordinator.pauseLoop(loopId);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        resumeAgentLoop: async (loopId) => {
+          if (!agentLoopCoordinator) {
+            return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+          }
+          const result = await agentLoopCoordinator.resumeLoop(loopId);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        runAgentLoopNow: async (loopId) => {
+          if (!agentLoopCoordinator) {
+            return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+          }
+          const result = await agentLoopCoordinator.runNow(loopId);
+          scheduleAutomationStatePublish();
+          return result;
+        },
+        removeAgentLoop: async (loopId) => {
+          if (!agentLoopCoordinator) {
+            return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+          }
+          await guardianSessionRegistry.forgetKey(`agent-loop:${loopId}`).catch(() => {});
+          const result = await agentLoopCoordinator.removeLoop(loopId);
+          scheduleAutomationStatePublish();
+          return result;
         },
       });
 
@@ -1429,6 +1650,61 @@ export async function startDaemon(): Promise<void> {
           return { success: false, errorMessage: error instanceof Error ? error.message : String(error) };
         }
       },
+      listAgentLoops: async () => {
+        return agentLoopCoordinator?.listLoops() ?? [];
+      },
+      getAgentLoop: async (loopId) => {
+        return agentLoopCoordinator?.getLoop(loopId);
+      },
+      createAgentLoop: async (input) => {
+        if (!agentLoopCoordinator) {
+          return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+        }
+        const result = await agentLoopCoordinator.createLoop(input);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      updateAgentLoop: async (loopId, input) => {
+        if (!agentLoopCoordinator) {
+          return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+        }
+        const result = await agentLoopCoordinator.updateLoop(loopId, input);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      pauseAgentLoop: async (loopId) => {
+        if (!agentLoopCoordinator) {
+          return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+        }
+        const result = await agentLoopCoordinator.pauseLoop(loopId);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      resumeAgentLoop: async (loopId) => {
+        if (!agentLoopCoordinator) {
+          return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+        }
+        const result = await agentLoopCoordinator.resumeLoop(loopId);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      runAgentLoopNow: async (loopId) => {
+        if (!agentLoopCoordinator) {
+          return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+        }
+        const result = await agentLoopCoordinator.runNow(loopId);
+        scheduleAutomationStatePublish();
+        return result;
+      },
+      removeAgentLoop: async (loopId) => {
+        if (!agentLoopCoordinator) {
+          return { success: false, errorMessage: "Agent loop coordinator is not ready" };
+        }
+        await guardianSessionRegistry.forgetKey(`agent-loop:${loopId}`).catch(() => {});
+        const result = await agentLoopCoordinator.removeLoop(loopId);
+        scheduleAutomationStatePublish();
+        return result;
+      },
     });
 
     // Connect to server
@@ -1536,6 +1812,8 @@ export async function startDaemon(): Promise<void> {
     const automationStore = new AutomationStore(
       join(configuration.happyHomeDir, "automation-jobs.json"),
     );
+    const recoveredRunningSessionIds = await recoverTrackedSessionsFromIndex();
+
     automationScheduler = new AutomationScheduler({
       store: automationStore,
       runnerDeps: {
@@ -1583,16 +1861,78 @@ export async function startDaemon(): Promise<void> {
             return guardianSessionRegistry.rememberForSupervisor(data, sessionId);
           },
         },
+        agentLoop: {
+          spawnSession,
+          resolveGuardianSessionId: (data) => {
+            const guardianKey = `agent-loop:${data.loopId}`;
+            const resolved = guardianSessionRegistry.resolveByKey(guardianKey);
+            if (resolved) {
+              void recordAutomationAuditEvent({
+                kind: "guardian_reused",
+                projectId: data.projectId,
+                loopId: data.loopId,
+                trigger: `agent_loop:${data.trigger}`,
+                sessionId: resolved,
+                guardianKey,
+                guardianSessionId: resolved,
+                message: `Reused agent loop guardian session ${resolved}`,
+              });
+            }
+            return resolved;
+          },
+          rememberGuardianSession: (data, sessionId) => {
+            const guardianKey = `agent-loop:${data.loopId}`;
+            void recordAutomationAuditEvent({
+              kind: "guardian_remembered",
+              projectId: data.projectId,
+              loopId: data.loopId,
+              trigger: `agent_loop:${data.trigger}`,
+              sessionId,
+              guardianKey,
+              guardianSessionId: sessionId,
+              message: `Remembered agent loop guardian session ${sessionId}`,
+            });
+            return guardianSessionRegistry.rememberByKey({
+              key: guardianKey,
+              projectId: data.projectId,
+              loopId: data.loopId,
+              sessionId,
+            });
+          },
+          onSessionStarted: (data, sessionId) => {
+            void recordAutomationAuditEvent({
+              kind: "job_session_started",
+              dedupeKey: `agent-loop:${data.loopId}:${data.iteration}`,
+              sessionId,
+              projectId: data.projectId,
+              loopId: data.loopId,
+              trigger: `agent_loop:${data.trigger}`,
+              status: "running",
+              message: data.loopName ?? undefined,
+            });
+            return agentLoopCoordinator?.onJobSessionStarted(data.loopId, sessionId);
+          },
+        },
       },
       onChange: () => scheduleAutomationStatePublish(),
     });
-    const automationRecovery = await automationScheduler.start();
+    const automationRecovery = await automationScheduler.start(recoveredRunningSessionIds);
+    const agentLoopStore = new AgentLoopStore(
+      join(configuration.happyHomeDir, "agent-loops.json"),
+    );
+    agentLoopCoordinator = new AgentLoopCoordinator({
+      store: agentLoopStore,
+      scheduler: automationScheduler,
+      onChange: () => scheduleAutomationStatePublish(),
+      recordAuditEvent: (event) => recordAutomationAuditEvent(event),
+    });
+    await agentLoopCoordinator.start();
     scheduleAutomationStatePublish();
     setTimeout(() => {
       void publishAutomationState();
     }, 1_000);
     logger.debug(
-      `[DAEMON RUN] Automation scheduler started (requeued=${automationRecovery.requeued}, retainedTerminal=${automationRecovery.retainedTerminal})`,
+      `[DAEMON RUN] Automation scheduler started (requeued=${automationRecovery.requeued}, retainedTerminal=${automationRecovery.retainedTerminal}, reattachedRunning=${automationRecovery.reattachedRunning})`,
     );
 
     // Set up webhook trigger handler
@@ -1834,6 +2174,7 @@ export async function startDaemon(): Promise<void> {
         clearTimeout(automationPublishTimer);
         automationPublishTimer = null;
       }
+      await agentLoopCoordinator?.stop();
       await automationScheduler?.stop();
 
       apiMachine.shutdown();

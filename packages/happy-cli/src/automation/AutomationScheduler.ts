@@ -10,6 +10,7 @@ import {
   type AutomationRunnerDeps,
 } from "./AutomationRunner";
 import type {
+  AgentLoopTriggerData,
   AutomationEnqueueResult,
   AutomationJob,
   AutomationMutationResult,
@@ -28,7 +29,8 @@ const PRIORITY_ORDER: Record<AutomationPriority, number> = {
 function buildAutomationJobMetadata(
   input:
     | { kind: "supervisor"; payload: SupervisorTriggerData }
-    | { kind: "webhook"; payload: WebhookTriggerData },
+    | { kind: "webhook"; payload: WebhookTriggerData }
+    | { kind: "agent_loop"; payload: AgentLoopTriggerData },
 ): Pick<AutomationJob, "label" | "projectId" | "runId" | "loopId" | "loopIteration" | "continuityKey"> {
   if (input.kind === "supervisor") {
     const { payload } = input;
@@ -46,7 +48,24 @@ function buildAutomationJobMetadata(
       runId: payload.runId,
       loopId: payload.loopId,
       loopIteration: payload.loopIteration,
-      continuityKey: payload.trigger === "fix" ? `project:${payload.projectId}` : (payload.loopId ? `loop:${payload.loopId}` : `project:${payload.projectId}`),
+      continuityKey:
+        payload.trigger === "fix"
+          ? `project:${payload.projectId}`
+          : payload.loopId
+            ? `loop:${payload.loopId}`
+            : `project:${payload.projectId}`,
+    };
+  }
+
+  if (input.kind === "agent_loop") {
+    const { payload } = input;
+    const promptPreview = payload.prompt.trim().replace(/\s+/g, " ").slice(0, 48);
+    return {
+      label: payload.loopName ? `Agent Loop: ${payload.loopName}` : `Agent Loop: ${promptPreview}`,
+      projectId: payload.projectId,
+      loopId: payload.loopId,
+      loopIteration: payload.iteration,
+      continuityKey: `agent-loop:${payload.loopId}`,
     };
   }
 
@@ -91,10 +110,10 @@ export class AutomationScheduler {
     this.onChange = options.onChange;
   }
 
-  async start(): Promise<AutomationRecoveryResult> {
+  async start(recoveredRunningSessionIds?: ReadonlySet<string>): Promise<AutomationRecoveryResult> {
     await this.ensureLoaded();
     this.stopped = false;
-    const recovery = await this.recover();
+    const recovery = await this.recover(recoveredRunningSessionIds);
     this.interval = setInterval(() => {
       void this.pump();
     }, this.pollIntervalMs);
@@ -146,6 +165,19 @@ export class AutomationScheduler {
       payload: data,
       priority: "background",
       dedupeKey: `webhook:${data.webhookEventId}`,
+      maxAttempts: 3,
+    });
+  }
+
+  async enqueueAgentLoop(
+    data: AgentLoopTriggerData,
+  ): Promise<AutomationEnqueueResult> {
+    await this.ensureLoaded();
+    return this.enqueueJob({
+      kind: "agent_loop",
+      payload: data,
+      priority: "background",
+      dedupeKey: `agent-loop:${data.loopId}:${data.iteration}`,
       maxAttempts: 3,
     });
   }
@@ -269,11 +301,15 @@ export class AutomationScheduler {
     errorMessage?: string,
   ): Promise<AutomationJob | undefined> {
     await this.ensureLoaded();
-    const job = this.store
-      .getAll()
-      .filter((entry) => entry.sessionId === sessionId && !TERMINAL_STATUSES.has(entry.status))
-      .sort((a, b) => b.updatedAt - a.updatedAt)[0]
-      ?? this.store.getAll().filter((entry) => entry.sessionId === sessionId).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    const job =
+      this.store
+        .getAll()
+        .filter((entry) => entry.sessionId === sessionId && !TERMINAL_STATUSES.has(entry.status))
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0] ??
+      this.store
+        .getAll()
+        .filter((entry) => entry.sessionId === sessionId)
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0];
     if (!job) {
       return undefined;
     }
@@ -334,6 +370,13 @@ export class AutomationScheduler {
           priority: AutomationPriority;
           dedupeKey: string;
           maxAttempts: number;
+        }
+      | {
+          kind: "agent_loop";
+          payload: AgentLoopTriggerData;
+          priority: AutomationPriority;
+          dedupeKey: string;
+          maxAttempts: number;
         },
   ): Promise<AutomationEnqueueResult> {
     const active = this.store.findActiveByDedupeKey(input.dedupeKey);
@@ -368,13 +411,26 @@ export class AutomationScheduler {
     return { job, deduped: false };
   }
 
-  private async recover(): Promise<AutomationRecoveryResult> {
+  private async recover(recoveredRunningSessionIds?: ReadonlySet<string>): Promise<AutomationRecoveryResult> {
     let requeued = 0;
     let retainedTerminal = 0;
+    let reattachedRunning = 0;
 
     for (const job of this.store.getAll()) {
       if (TERMINAL_STATUSES.has(job.status)) {
         retainedTerminal++;
+        continue;
+      }
+
+      if (job.sessionId && recoveredRunningSessionIds?.has(job.sessionId)) {
+        const recoveredRunning: AutomationJob = {
+          ...job,
+          status: "running",
+          completionMode: job.completionMode ?? "session",
+          updatedAt: Date.now(),
+        };
+        await this.store.upsert(recoveredRunning);
+        reattachedRunning++;
         continue;
       }
 
@@ -397,8 +453,13 @@ export class AutomationScheduler {
         `[AUTOMATION] Recovered ${requeued} queued job(s) from previous daemon run`,
       );
     }
+    if (reattachedRunning > 0) {
+      logger.info(
+        `[AUTOMATION] Reattached ${reattachedRunning} running job(s) to live sessions after daemon restart`,
+      );
+    }
 
-    return { requeued, retainedTerminal };
+    return { requeued, retainedTerminal, reattachedRunning };
   }
 
   private isReady(job: AutomationJob, now: number): boolean {
@@ -413,8 +474,7 @@ export class AutomationScheduler {
       .getAll()
       .filter((job) => this.isReady(job, now) && !this.inFlight.has(job.id))
       .sort((a, b) => {
-        const byPriority =
-          PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+        const byPriority = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
         if (byPriority !== 0) return byPriority;
         if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
         return a.id.localeCompare(b.id);

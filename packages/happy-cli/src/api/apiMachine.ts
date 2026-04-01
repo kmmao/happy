@@ -19,6 +19,8 @@ import {
   SpawnSessionResult,
 } from "../modules/common/registerCommonHandlers";
 import type { AutomationJob, AutomationMutationResult } from "@/automation/types";
+import type { AgentLoopDefinition } from "@/automation/AgentLoopStore";
+import type { AgentLoopCreateInput, AgentLoopMutationResult, AgentLoopUpdateInput } from "@/automation/AgentLoopCoordinator";
 import { encodeBase64, decodeBase64, encrypt, decrypt } from "./encryption";
 import { backoff } from "@/utils/time";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
@@ -115,9 +117,9 @@ type MachineRpcHandlers = {
   getAutomationStatus: () => {
     jobs: AutomationJob[];
     counts: Record<string, number>;
-    guardians?: Array<{ key: string; projectId: string; loopId?: string; sessionId: string; updatedAt: number; lastRunId?: string; attached?: boolean }>;
+    guardians?: Array<{ key: string; projectId: string; loopId?: string; sessionId: string; updatedAt: number; lastRunId?: string; attached?: boolean; recovered?: boolean }>;
     guardianUsage?: Array<{ key: string; projectId?: string; loopId?: string; reuseCount: number; rememberCount: number; resetCount: number; lastUsedAt: number; currentSessionId?: string }>;
-    auditStats?: { totalEvents: number; lastEventAt?: number; queuedCount: number; sessionStartedCount: number; terminalCompletedCount: number; terminalFailedCount: number; terminalCancelledCount: number; guardianReuseCount: number; guardianRememberCount: number; guardianResetCount: number; watchdogStopCount: number; stopRequestCount: number; guardianEligibleRunCount: number; guardianReuseRate: number; activeGuardianCount: number };
+    auditStats?: { totalEvents: number; lastEventAt?: number; queuedCount: number; sessionStartedCount: number; terminalCompletedCount: number; terminalFailedCount: number; terminalCancelledCount: number; guardianReuseCount: number; guardianRememberCount: number; guardianResetCount: number; sessionReattachedCount: number; watchdogStopCount: number; stopRequestCount: number; guardianEligibleRunCount: number; guardianReuseRate: number; activeGuardianCount: number };
     recentAuditEvents?: Array<{ id: string; occurredAt: number; kind: string; jobId?: string; dedupeKey?: string; sessionId?: string; projectId?: string; runId?: string; loopId?: string; trigger?: string; status?: string; guardianKey?: string; guardianSessionId?: string; message?: string }>;
   };
   cancelAutomationJob: (jobId: string) => Promise<AutomationMutationResult>;
@@ -125,6 +127,14 @@ type MachineRpcHandlers = {
   clearAutomationJobs: () => Promise<AutomationMutationResult>;
   clearAutomationGuardians: (params?: { key?: string; sessionId?: string; clearAll?: boolean }) => Promise<{ success: boolean; errorMessage?: string }>;
   clearAutomationAudit: () => Promise<{ success: boolean; errorMessage?: string }>;
+  listAgentLoops: () => Promise<AgentLoopDefinition[]>;
+  getAgentLoop: (loopId: string) => Promise<AgentLoopDefinition | undefined>;
+  createAgentLoop: (input: AgentLoopCreateInput) => Promise<AgentLoopMutationResult>;
+  updateAgentLoop: (loopId: string, input: AgentLoopUpdateInput) => Promise<AgentLoopMutationResult>;
+  pauseAgentLoop: (loopId: string) => Promise<AgentLoopMutationResult>;
+  resumeAgentLoop: (loopId: string) => Promise<AgentLoopMutationResult>;
+  runAgentLoopNow: (loopId: string) => Promise<AgentLoopMutationResult>;
+  removeAgentLoop: (loopId: string) => Promise<AgentLoopMutationResult>;
 };
 
 export type WebhookTriggerData = {
@@ -270,6 +280,14 @@ export class ApiMachineClient {
     clearAutomationJobs,
     clearAutomationGuardians,
     clearAutomationAudit,
+    listAgentLoops,
+    getAgentLoop,
+    createAgentLoop,
+    updateAgentLoop,
+    pauseAgentLoop,
+    resumeAgentLoop,
+    runAgentLoopNow,
+    removeAgentLoop,
   }: MachineRpcHandlers) {
     // Register spawn session handler
     this.rpcHandlerManager.registerHandler(
@@ -374,6 +392,50 @@ export class ApiMachineClient {
 
     this.rpcHandlerManager.registerHandler("automation-audit-clear", async () => {
       return clearAutomationAudit();
+    });
+
+    this.rpcHandlerManager.registerHandler("loop-list", async () => {
+      return { loops: await listAgentLoops() };
+    });
+
+    this.rpcHandlerManager.registerHandler("loop-get", async (params: any) => {
+      const { loopId } = params || {};
+      if (!loopId) throw new Error("Loop ID is required");
+      return { success: true, loop: await getAgentLoop(loopId) };
+    });
+
+    this.rpcHandlerManager.registerHandler("loop-create", async (params: any) => {
+      return createAgentLoop(params);
+    });
+
+    this.rpcHandlerManager.registerHandler("loop-update", async (params: any) => {
+      const { loopId, ...input } = params || {};
+      if (!loopId) throw new Error("Loop ID is required");
+      return updateAgentLoop(loopId, input);
+    });
+
+    this.rpcHandlerManager.registerHandler("loop-pause", async (params: any) => {
+      const { loopId } = params || {};
+      if (!loopId) throw new Error("Loop ID is required");
+      return pauseAgentLoop(loopId);
+    });
+
+    this.rpcHandlerManager.registerHandler("loop-resume", async (params: any) => {
+      const { loopId } = params || {};
+      if (!loopId) throw new Error("Loop ID is required");
+      return resumeAgentLoop(loopId);
+    });
+
+    this.rpcHandlerManager.registerHandler("loop-run-now", async (params: any) => {
+      const { loopId } = params || {};
+      if (!loopId) throw new Error("Loop ID is required");
+      return runAgentLoopNow(loopId);
+    });
+
+    this.rpcHandlerManager.registerHandler("loop-remove", async (params: any) => {
+      const { loopId } = params || {};
+      if (!loopId) throw new Error("Loop ID is required");
+      return removeAgentLoop(loopId);
     });
 
     this.rpcHandlerManager.registerHandler("stop-daemon", () => {

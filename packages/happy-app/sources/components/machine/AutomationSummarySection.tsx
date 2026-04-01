@@ -40,6 +40,7 @@ type AutomationJobLike = {
     loopId?: string;
     loopIteration?: number;
     continuityKey?: string;
+    recovered?: boolean;
 };
 
 type AutomationGuardianLike = {
@@ -50,6 +51,7 @@ type AutomationGuardianLike = {
     updatedAt: number;
     lastRunId?: string;
     attached?: boolean;
+    recovered?: boolean;
 };
 
 function getStatusLabel(status: string): string {
@@ -114,6 +116,9 @@ function getJobSubtitle(job: AutomationJobLike): string {
     if (job.nextRunAt) {
         parts.push(`${t("machine.automationNextRunAt")}: ${new Date(job.nextRunAt).toLocaleString()}`);
     }
+    if (job.recovered) {
+        parts.push(t("machine.automationRecoveredShort"));
+    }
     if (parts.length === 0) {
         parts.push(new Date(job.updatedAt).toLocaleString());
     }
@@ -127,7 +132,10 @@ function formatRate(value?: number): string {
     return `${Math.round(value * 100)}%`;
 }
 
-function getGuardianStateLabel(attached?: boolean): string {
+function getGuardianStateLabel(attached?: boolean, recovered?: boolean): string {
+    if (attached && recovered) {
+        return t("machine.automationGuardianRecovered");
+    }
     return attached ? t("machine.automationGuardianAttached") : t("machine.automationGuardianPersisted");
 }
 
@@ -199,6 +207,12 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
     }, [automation]);
 
     const guardianCount = Array.isArray(automation?.guardians) ? automation.guardians.length : 0;
+    const recoveredGuardianCount = Array.isArray(automation?.guardians)
+        ? automation.guardians.filter((guardian: AutomationGuardianLike) => guardian.recovered).length
+        : 0;
+    const recoveredJobCount = Array.isArray(automation?.recentJobs)
+        ? automation.recentJobs.filter((job: AutomationJobLike) => job.recovered).length
+        : 0;
     const auditStats = automation?.auditStats;
     const guardianUsagePreview = Array.isArray(automation?.guardianUsage)
         ? automation.guardianUsage.slice().sort((a: any, b: any) => b.lastUsedAt - a.lastUsedAt).slice(0, 1)
@@ -298,7 +312,7 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
 
         Modal.alert(
             guardian.key,
-            `${t("machine.automationGuardianSession")}: ${guardian.sessionId} • ${getGuardianStateLabel(guardian.attached)} • ${new Date(guardian.updatedAt).toLocaleString()}`,
+            `${t("machine.automationGuardianSession")}: ${guardian.sessionId} • ${getGuardianStateLabel(guardian.attached, guardian.recovered)} • ${new Date(guardian.updatedAt).toLocaleString()}`,
             buttons,
         );
     };
@@ -309,6 +323,12 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
                 title={t("machine.automationViewAll")}
                 subtitle={t("machine.automationViewAllHint")}
                 onPress={() => router.push(`/machine/${machineId}/automation` as any)}
+                showChevron
+            />
+            <Item
+                title={t("machine.agentLoopsViewAll")}
+                subtitle={t("machine.agentLoopsViewAllHint")}
+                onPress={() => router.push(`/machine/${machineId}/loops` as any)}
                 showChevron
             />
             <Item title={t("machine.automationQueued")} detail={String(counts.queued ?? 0)} showChevron={false} />
@@ -350,6 +370,16 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
                     showChevron={false}
                 />
             ) : null}
+            {auditStats && auditStats.sessionReattachedCount > 0 ? (
+                <Item
+                    title={t("machine.automationRecoveredSessions")}
+                    subtitle={`${t("machine.automationRecoveredGuardians")}: ${recoveredGuardianCount} • ${t("machine.automationRecoveredJobs")}: ${recoveredJobCount}`}
+                    detail={String(auditStats.sessionReattachedCount)}
+                    detailStyle={{ color: "#34C759" }}
+                    onPress={() => router.push(`/machine/${machineId}/automation?jobFilter=recovered&auditFilter=recovered&guardianFilter=recovered` as any)}
+                    showChevron
+                />
+            ) : null}
             {anomalyCount > 0 ? (
                 <Item
                     title={t("machine.automationAlerts")}
@@ -386,7 +416,7 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
                 <Item
                     key={entry.key}
                     title={t("machine.automationGuardianUsage")}
-                    subtitle={`${entry.key} • ${t("machine.automationGuardianReuseCount")}: ${entry.reuseCount} • ${t("machine.automationGuardianRememberCount")}: ${entry.rememberCount}`}
+                    subtitle={`${entry.key} • ${t("machine.automationGuardianReuseCount")}: ${entry.reuseCount} • ${t("machine.automationGuardianRememberCount")}: ${entry.rememberCount}${entry.currentSessionId ? ` • ${t("machine.automationGuardianSession")}: ${entry.currentSessionId}` : ""}`}
                     detail={new Date(entry.lastUsedAt).toLocaleString()}
                     showChevron={false}
                 />
@@ -395,7 +425,7 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
                 <Item
                     key={guardian.key}
                     title={guardian.key}
-                    subtitle={`${t("machine.automationGuardianSession")}: ${guardian.sessionId} • ${getGuardianStateLabel(guardian.attached)}`}
+                    subtitle={`${t("machine.automationGuardianSession")}: ${guardian.sessionId} • ${getGuardianStateLabel(guardian.attached, guardian.recovered)}`}
                     detail={new Date(guardian.updatedAt).toLocaleString()}
                     onPress={() => handleGuardianPress(guardian)}
                     showChevron

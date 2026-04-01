@@ -36,6 +36,9 @@ function createScheduler(
         spawnSession: async () => ({ type: "success", sessionId: "sid" }),
         emitWebhookStatus: () => {},
       },
+      agentLoop: {
+        spawnSession: async () => ({ type: "success", sessionId: "sid" }),
+      },
     },
     pollIntervalMs: 50,
     maxConcurrentDispatches: options?.maxConcurrentDispatches ?? 1,
@@ -81,8 +84,53 @@ describe("AutomationScheduler", () => {
     try {
       const recovery = await scheduler.start();
       expect(recovery.requeued).toBe(1);
+      expect(recovery.reattachedRunning).toBe(0);
       expect(scheduler.getJobsSnapshot()[0]?.status).toBe("queued");
       expect(scheduler.getJobsSnapshot()[0]?.sessionId).toBeUndefined();
+    } finally {
+      await scheduler.stop();
+    }
+  });
+
+  it("reattaches running jobs when their live sessions are recovered", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "happy-automation-scheduler-"));
+    tempDirs.push(dir);
+    const store = new AutomationStore(join(dir, "jobs.json"));
+    await store.load();
+    await store.upsert({
+      id: "job-live-1",
+      kind: "agent_loop",
+      status: "running",
+      priority: "background",
+      dedupeKey: "agent-loop:loop-1:1",
+      attempt: 1,
+      maxAttempts: 3,
+      createdAt: 1,
+      updatedAt: 1,
+      sessionId: "sid-live-1",
+      completionMode: "session",
+      loopId: "loop-1",
+      loopIteration: 1,
+      continuityKey: "agent-loop:loop-1",
+      payload: {
+        type: "agent-loop-trigger",
+        loopId: "loop-1",
+        prompt: "check deploy",
+        directory: "/tmp/repo",
+        intervalMs: 600000,
+        trigger: "schedule",
+        iteration: 1,
+      },
+    });
+
+    const scheduler = createScheduler(dir, { maxConcurrentDispatches: 0 });
+
+    try {
+      const recovery = await scheduler.start(new Set(["sid-live-1"]));
+      expect(recovery.requeued).toBe(0);
+      expect(recovery.reattachedRunning).toBe(1);
+      expect(scheduler.getJobsSnapshot()[0]?.status).toBe("running");
+      expect(scheduler.getJobsSnapshot()[0]?.sessionId).toBe("sid-live-1");
     } finally {
       await scheduler.stop();
     }
@@ -171,8 +219,11 @@ describe("AutomationScheduler", () => {
         repoPath: "/tmp/repo",
         provider: "github",
       });
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      const running = scheduler.getJobsSnapshot()[0];
+      let running = scheduler.getJobsSnapshot()[0];
+      for (let attempt = 0; attempt < 20 && running?.status !== "running"; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        running = scheduler.getJobsSnapshot()[0];
+      }
       expect(running?.status).toBe("running");
       expect(running?.sessionId).toBe("sid-2");
 

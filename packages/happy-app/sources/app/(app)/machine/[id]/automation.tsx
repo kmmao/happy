@@ -32,8 +32,17 @@ type TimelineEntry = {
     subtitle: string;
     kind: "queued" | "dispatched" | "running" | "terminal";
 };
-type JobFilter = "all" | "running" | "failed" | "terminal";
-type AuditFilter = "all" | "anomalies" | "guardian" | "jobs";
+type JobFilter = "all" | "running" | "failed" | "terminal" | "recovered";
+type GuardianFilter = "all" | "attached" | "persisted" | "recovered";
+type AuditFilter = "all" | "anomalies" | "guardian" | "jobs" | "recovered";
+
+const JOB_FILTER_VALUES: readonly JobFilter[] = ["all", "running", "failed", "terminal", "recovered"];
+const GUARDIAN_FILTER_VALUES: readonly GuardianFilter[] = ["all", "attached", "persisted", "recovered"];
+const AUDIT_FILTER_VALUES: readonly AuditFilter[] = ["all", "anomalies", "guardian", "jobs", "recovered"];
+
+function parseFilterValue<T extends string>(value: string | undefined, allowed: readonly T[], fallback: T): T {
+    return value && allowed.includes(value as T) ? (value as T) : fallback;
+}
 
 function matchesSearch(values: Array<string | undefined>, query: string): boolean {
     const normalized = query.trim().toLowerCase();
@@ -51,6 +60,21 @@ function matchesJobFilter(job: MachineAutomationJob, filter: JobFilter): boolean
             return job.status === "failed";
         case "terminal":
             return job.status === "completed" || job.status === "failed" || job.status === "cancelled";
+        case "recovered":
+            return job.recovered === true;
+        default:
+            return true;
+    }
+}
+
+function matchesGuardianFilter(guardian: MachineAutomationGuardian, filter: GuardianFilter): boolean {
+    switch (filter) {
+        case "attached":
+            return guardian.attached === true;
+        case "persisted":
+            return guardian.attached === false;
+        case "recovered":
+            return guardian.recovered === true;
         default:
             return true;
     }
@@ -67,7 +91,9 @@ function matchesAuditFilter(event: MachineAutomationAuditEvent, filter: AuditFil
         case "guardian":
             return event.kind.startsWith("guardian_");
         case "jobs":
-            return event.kind.startsWith("job_") || event.kind === "watchdog_stopped" || event.kind === "session_stop_requested";
+            return event.kind.startsWith("job_") || event.kind === "session_reattached" || event.kind === "watchdog_stopped" || event.kind === "session_stop_requested";
+        case "recovered":
+            return event.kind === "session_reattached";
         default:
             return true;
     }
@@ -124,7 +150,10 @@ function formatRate(value?: number): string {
     return `${Math.round(value * 100)}%`;
 }
 
-function getGuardianStateLabel(attached?: boolean): string {
+function getGuardianStateLabel(attached?: boolean, recovered?: boolean): string {
+    if (attached && recovered) {
+        return t("machine.automationGuardianRecovered");
+    }
     return attached ? t("machine.automationGuardianAttached") : t("machine.automationGuardianPersisted");
 }
 
@@ -160,6 +189,8 @@ function getAuditEventTitle(event: MachineAutomationAuditEvent): string {
             return t("machine.automationAuditEventGuardianRemembered");
         case "guardian_cleared":
             return t("machine.automationAuditEventGuardianCleared");
+        case "session_reattached":
+            return t("machine.automationAuditEventSessionReattached");
         case "watchdog_stopped":
             return t("machine.automationAuditEventWatchdogStopped");
         case "session_stop_requested":
@@ -206,6 +237,7 @@ function getJobDetailMessage(job: MachineAutomationJob, relatedEvents: MachineAu
         ,job.projectId ? `${t("machine.automationAuditProject")}: ${job.projectId}` : undefined
         ,job.loopId ? `${t("machine.automationAuditLoop")}: ${job.loopId}` : undefined
         ,job.errorMessage ? `${t("machine.automationFailed")}: ${job.errorMessage}` : undefined
+        ,job.recovered ? t("machine.automationRecoveredAfterRestart") : undefined
         ,lifecycle.length > 0 ? t("machine.automationLifecycle") : undefined
         ,...lifecycle
         ,relatedEvents.length > 0 ? t("machine.automationRelatedEvents") : undefined
@@ -223,6 +255,7 @@ function getGuardianDetailMessage(
         `${t("machine.automationGuardianDetails")}: ${guardian.key}`
         ,`${t("machine.automationGuardianSession")}: ${guardian.sessionId}`
         ,`${t("machine.automationUpdatedAt")}: ${formatTimestamp(guardian.updatedAt)}`
+        ,guardian.recovered ? t("machine.automationRecoveredAfterRestart") : undefined
         ,guardian.projectId ? `${t("machine.automationAuditProject")}: ${guardian.projectId}` : undefined
         ,guardian.loopId ? `${t("machine.automationAuditLoop")}: ${guardian.loopId}` : undefined
         ,usage ? `${t("machine.automationGuardianReuseCount")}: ${usage.reuseCount}` : undefined
@@ -267,6 +300,9 @@ function formatJobSubtitle(job: MachineAutomationJob): string {
     }
     if (job.sessionId) {
         parts.push(`${t("machine.automationSession")}: ${job.sessionId}`);
+    }
+    if (job.recovered) {
+        parts.push(t("machine.automationRecoveredShort"));
     }
     if (job.nextRunAt) {
         parts.push(`${t("machine.automationNextRunAt")}: ${formatTimestamp(job.nextRunAt)}`);
@@ -331,7 +367,19 @@ function buildTimelineEntries(jobs: MachineAutomationJob[]): TimelineEntry[] {
 }
 
 export default React.memo(function MachineAutomationPage() {
-    const { id: machineId } = useLocalSearchParams<{ id: string }>();
+    const {
+        id: machineId,
+        q: initialQueryParam,
+        jobFilter: initialJobFilterParam,
+        auditFilter: initialAuditFilterParam,
+        guardianFilter: initialGuardianFilterParam,
+    } = useLocalSearchParams<{
+        id: string;
+        q?: string;
+        jobFilter?: JobFilter;
+        auditFilter?: AuditFilter;
+        guardianFilter?: GuardianFilter;
+    }>();
     const machine = useMachine(machineId!);
     const router = useRouter();
     const { theme } = useUnistyles();
@@ -342,9 +390,14 @@ export default React.memo(function MachineAutomationPage() {
     const [clearing, setClearing] = React.useState(false);
     const [clearingGuardians, setClearingGuardians] = React.useState(false);
     const [clearingAudit, setClearingAudit] = React.useState(false);
-    const [searchQuery, setSearchQuery] = React.useState("");
-    const [jobFilter, setJobFilter] = React.useState<JobFilter>("all");
-    const [auditFilter, setAuditFilter] = React.useState<AuditFilter>("all");
+    const initialSearchQuery = typeof initialQueryParam === "string" ? initialQueryParam : "";
+    const initialJobFilter = parseFilterValue(typeof initialJobFilterParam === "string" ? initialJobFilterParam : undefined, JOB_FILTER_VALUES, "all");
+    const initialAuditFilter = parseFilterValue(typeof initialAuditFilterParam === "string" ? initialAuditFilterParam : undefined, AUDIT_FILTER_VALUES, "all");
+    const initialGuardianFilter = parseFilterValue(typeof initialGuardianFilterParam === "string" ? initialGuardianFilterParam : undefined, GUARDIAN_FILTER_VALUES, "all");
+    const [searchQuery, setSearchQuery] = React.useState(initialSearchQuery);
+    const [jobFilter, setJobFilter] = React.useState<JobFilter>(initialJobFilter);
+    const [auditFilter, setAuditFilter] = React.useState<AuditFilter>(initialAuditFilter);
+    const [guardianFilter, setGuardianFilter] = React.useState<GuardianFilter>(initialGuardianFilter);
 
     const load = React.useCallback(async (kind: "initial" | "refresh") => {
         if (!machineId) {
@@ -383,6 +436,24 @@ export default React.memo(function MachineAutomationPage() {
         void load("initial");
     }, [load]);
 
+    React.useEffect(() => {
+        if (typeof initialQueryParam === "string") {
+            setSearchQuery(initialQueryParam);
+        }
+    }, [initialQueryParam]);
+
+    React.useEffect(() => {
+        setJobFilter(parseFilterValue(typeof initialJobFilterParam === "string" ? initialJobFilterParam : undefined, JOB_FILTER_VALUES, "all"));
+    }, [initialJobFilterParam]);
+
+    React.useEffect(() => {
+        setAuditFilter(parseFilterValue(typeof initialAuditFilterParam === "string" ? initialAuditFilterParam : undefined, AUDIT_FILTER_VALUES, "all"));
+    }, [initialAuditFilterParam]);
+
+    React.useEffect(() => {
+        setGuardianFilter(parseFilterValue(typeof initialGuardianFilterParam === "string" ? initialGuardianFilterParam : undefined, GUARDIAN_FILTER_VALUES, "all"));
+    }, [initialGuardianFilterParam]);
+
     const jobs = React.useMemo(() => {
         return (status?.jobs ?? []).slice().sort((a, b) => b.updatedAt - a.updatedAt);
     }, [status]);
@@ -415,20 +486,28 @@ export default React.memo(function MachineAutomationPage() {
         job.continuityKey,
     ], searchQuery)), [jobFilter, jobs, searchQuery]);
 
-    const filteredGuardians = React.useMemo(() => guardians.filter((guardian) => matchesSearch([
+    const filteredGuardians = React.useMemo(() => guardians.filter((guardian) => matchesGuardianFilter(guardian, guardianFilter) && matchesSearch([
         guardian.key,
         guardian.projectId,
         guardian.loopId,
         guardian.sessionId,
         guardian.lastRunId,
-    ], searchQuery)), [guardians, searchQuery]);
+    ], searchQuery)), [guardianFilter, guardians, searchQuery]);
 
-    const filteredGuardianUsage = React.useMemo(() => guardianUsage.filter((entry) => matchesSearch([
-        entry.key,
-        entry.projectId,
-        entry.loopId,
-        entry.currentSessionId,
-    ], searchQuery)), [guardianUsage, searchQuery]);
+    const filteredGuardianUsage = React.useMemo(() => guardianUsage.filter((entry) => {
+        const relatedGuardian = guardians.find((guardian) => guardian.key === entry.key);
+        const guardianMatches = guardianFilter === "all"
+            ? true
+            : relatedGuardian
+                ? matchesGuardianFilter(relatedGuardian, guardianFilter)
+                : false;
+        return guardianMatches && matchesSearch([
+            entry.key,
+            entry.projectId,
+            entry.loopId,
+            entry.currentSessionId,
+        ], searchQuery);
+    }), [guardianFilter, guardianUsage, guardians, searchQuery]);
 
     const filteredAuditEvents = React.useMemo(() => recentAuditEvents.filter((event) => matchesAuditFilter(event, auditFilter) && matchesSearch([
         event.kind,
@@ -524,10 +603,18 @@ export default React.memo(function MachineAutomationPage() {
             { text: t("common.cancel"), style: "cancel" },
         ];
 
-        if (job.projectId && job.loopId) {
+        if (job.loopId) {
             buttons.push({
                 text: t("machine.automationOpenLoop"),
-                onPress: () => router.push(`/project/${job.projectId}/supervisor-loop/${job.loopId}` as any),
+                onPress: () => {
+                    if (job.kind === "agent_loop") {
+                        router.push(`/machine/${machineId}/loops?loopId=${job.loopId}` as any);
+                        return;
+                    }
+                    if (job.projectId) {
+                        router.push(`/project/${job.projectId}/supervisor-loop/${job.loopId}` as any);
+                    }
+                },
             });
         }
         if (job.projectId) {
@@ -580,14 +667,24 @@ export default React.memo(function MachineAutomationPage() {
         const buttons: Array<{ text: string; style?: "cancel" | "default" | "destructive"; onPress?: () => void }> = [
             { text: t("common.cancel"), style: "cancel" },
         ];
-        buttons.push({
-            text: t("machine.automationOpenProject"),
-            onPress: () => router.push(`/project/${guardian.projectId}` as any),
-        });
+        if (guardian.projectId) {
+            buttons.push({
+                text: t("machine.automationOpenProject"),
+                onPress: () => router.push(`/project/${guardian.projectId}` as any),
+            });
+        }
         if (guardian.loopId) {
             buttons.push({
                 text: t("machine.automationOpenLoop"),
-                onPress: () => router.push(`/project/${guardian.projectId}/supervisor-loop/${guardian.loopId}` as any),
+                onPress: () => {
+                    if (guardian.key.startsWith("agent-loop:")) {
+                        router.push(`/machine/${machineId}/loops?loopId=${guardian.loopId}` as any);
+                        return;
+                    }
+                    if (guardian.projectId) {
+                        router.push(`/project/${guardian.projectId}/supervisor-loop/${guardian.loopId}` as any);
+                    }
+                },
             });
         }
         buttons.push({
@@ -614,7 +711,7 @@ export default React.memo(function MachineAutomationPage() {
         });
         Modal.alert(
             guardian.key,
-            `${getGuardianDetailMessage(guardian, usage, relatedEvents)}\n${t("machine.automationStatusLabel")}: ${getGuardianStateLabel(guardian.attached)}`,
+            `${getGuardianDetailMessage(guardian, usage, relatedEvents)}\n${t("machine.automationStatusLabel")}: ${getGuardianStateLabel(guardian.attached, guardian.recovered)}`,
             buttons,
         );
     }, [clearGuardians, guardianUsage, recentAuditEvents, router]);
@@ -630,10 +727,18 @@ export default React.memo(function MachineAutomationPage() {
                 onPress: () => router.push(`/session/${event.sessionId}` as any),
             });
         }
-        if (event.projectId && event.loopId) {
+        if (event.loopId) {
             buttons.push({
                 text: t("machine.automationOpenLoop"),
-                onPress: () => router.push(`/project/${event.projectId}/supervisor-loop/${event.loopId}` as any),
+                onPress: () => {
+                    if (event.trigger?.startsWith("agent_loop")) {
+                        router.push(`/machine/${machineId}/loops?loopId=${event.loopId}` as any);
+                        return;
+                    }
+                    if (event.projectId) {
+                        router.push(`/project/${event.projectId}/supervisor-loop/${event.loopId}` as any);
+                    }
+                },
             });
         }
         if (event.projectId) {
@@ -680,6 +785,7 @@ export default React.memo(function MachineAutomationPage() {
                         ["running", t("machine.automationFilterRunning")],
                         ["failed", t("machine.automationFilterFailed")],
                         ["terminal", t("machine.automationFilterTerminal")],
+                        ["recovered", t("machine.automationFilterRecovered")],
                     ] as Array<[JobFilter, string]>).map(([value, label]) => (
                         <Pressable
                             key={value}
@@ -697,6 +803,7 @@ export default React.memo(function MachineAutomationPage() {
                         ["anomalies", t("machine.automationFilterAnomalies")],
                         ["guardian", t("machine.automationFilterGuardian")],
                         ["jobs", t("machine.automationFilterJobs")],
+                        ["recovered", t("machine.automationFilterRecovered")],
                     ] as Array<[AuditFilter, string]>).map(([value, label]) => (
                         <Pressable
                             key={value}
@@ -707,7 +814,24 @@ export default React.memo(function MachineAutomationPage() {
                         </Pressable>
                     ))}
                 </View>
-                <Text style={styles.filterSummary}>{`${filteredJobs.length}/${jobs.length} jobs • ${filteredAuditEvents.length}/${recentAuditEvents.length} audit`}</Text>
+                <Text style={styles.filterLabel}>{t("machine.automationGuardians")}</Text>
+                <View style={styles.filterChipRow}>
+                    {([
+                        ["all", t("machine.automationFilterAll")],
+                        ["attached", t("machine.automationGuardianAttached")],
+                        ["persisted", t("machine.automationGuardianPersisted")],
+                        ["recovered", t("machine.automationFilterRecovered")],
+                    ] as Array<[GuardianFilter, string]>).map(([value, label]) => (
+                        <Pressable
+                            key={value}
+                            style={[styles.filterChip, guardianFilter === value && styles.filterChipSelected]}
+                            onPress={() => setGuardianFilter(value)}
+                        >
+                            <Text style={[styles.filterChipText, guardianFilter === value && styles.filterChipTextSelected]}>{label}</Text>
+                        </Pressable>
+                    ))}
+                </View>
+                <Text style={styles.filterSummary}>{`${filteredJobs.length}/${jobs.length} jobs • ${filteredGuardians.length}/${guardians.length} guardians • ${filteredAuditEvents.length}/${recentAuditEvents.length} audit`}</Text>
             </View>
 
             <ItemList>
@@ -787,7 +911,7 @@ export default React.memo(function MachineAutomationPage() {
                         <Item
                             key={guardian.key}
                             title={guardian.key}
-                            subtitle={`${t("machine.automationGuardianSession")}: ${guardian.sessionId} • ${getGuardianStateLabel(guardian.attached)}`}
+                            subtitle={`${t("machine.automationGuardianSession")}: ${guardian.sessionId} • ${getGuardianStateLabel(guardian.attached, guardian.recovered)}`}
                             detail={formatTimestamp(guardian.updatedAt)}
                             onPress={() => handleGuardianPress(guardian)}
                             showChevron
@@ -800,6 +924,7 @@ export default React.memo(function MachineAutomationPage() {
                     <Item title={t("machine.automationGuardianReuseCount")} detail={String(auditStats?.guardianReuseCount ?? 0)} showChevron={false} />
                     <Item title={t("machine.automationGuardianReuseRate")} detail={formatRate(auditStats?.guardianReuseRate)} showChevron={false} />
                     <Item title={t("machine.automationGuardianResetCount")} detail={String(auditStats?.guardianResetCount ?? 0)} showChevron={false} />
+                    <Item title={t("machine.automationSessionReattachedCount")} detail={String(auditStats?.sessionReattachedCount ?? 0)} showChevron={false} />
                     <Item title={t("machine.automationWatchdogStops")} detail={String(auditStats?.watchdogStopCount ?? 0)} showChevron={false} />
                     <Item title={t("machine.automationStopRequests")} detail={String(auditStats?.stopRequestCount ?? 0)} showChevron={false} />
                     {auditStats?.lastEventAt ? (
