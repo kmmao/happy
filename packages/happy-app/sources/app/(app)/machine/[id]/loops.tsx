@@ -211,10 +211,8 @@ export default React.memo(function MachineLoopsPage() {
     }, [resetForm]);
 
 
-    const [debugInfo, setDebugInfo] = React.useState("init");
     const load = React.useCallback(async (kind: "initial" | "refresh") => {
         if (!machineId) {
-            setDebugInfo("no machineId");
             return;
         }
         if (kind === "initial") {
@@ -224,34 +222,26 @@ export default React.memo(function MachineLoopsPage() {
         }
         try {
             if (!rpcReady) {
-                setDebugInfo(`rpcReady=false, kind=${kind}, mid=${machineId.slice(0, 8)}`);
                 return;
             }
-            setDebugInfo(`fetching... kind=${kind}`);
             const results = await Promise.allSettled([
                 machineListAgentLoops(machineId),
                 machineListAgentLoopBootstrapProfiles(machineId),
                 machineListAutoDreamProfiles(machineId),
             ]);
-            const loopResult = results[0];
-            const bootstrapResult = results[1];
-            const dreamResult = results[2];
-            const loopCount = loopResult.status === "fulfilled" ? (loopResult.value.loops?.length ?? 0) : -1;
-            const loopError = loopResult.status === "rejected" ? (loopResult.reason instanceof Error ? loopResult.reason.message : String(loopResult.reason)) : null;
-            const bsCount = bootstrapResult.status === "fulfilled" ? (bootstrapResult.value.profiles?.length ?? 0) : -1;
-            const dreamCount = dreamResult.status === "fulfilled" ? (dreamResult.value.profiles?.length ?? 0) : -1;
-            setDebugInfo(`loops=${loopCount}${loopError ? ` err=${loopError}` : ""} bs=${bsCount} dream=${dreamCount} | rpc=${String(rpcReady)}`);
-            if (loopResult.status === "fulfilled") {
-                setLoops(loopResult.value.loops ?? []);
+            if (results[0].status === "fulfilled") {
+                setLoops(results[0].value.loops ?? []);
             }
-            if (bootstrapResult.status === "fulfilled") {
-                setBootstrapProfiles(bootstrapResult.value.profiles ?? []);
+            if (results[1].status === "fulfilled") {
+                setBootstrapProfiles(results[1].value.profiles ?? []);
             }
-            if (dreamResult.status === "fulfilled") {
-                setAutoDreamProfiles(dreamResult.value.profiles ?? []);
+            if (results[2].status === "fulfilled") {
+                setAutoDreamProfiles(results[2].value.profiles ?? []);
             }
         } catch (error) {
-            setDebugInfo(`catch: ${error instanceof Error ? error.message : String(error)}`);
+            if (!isRpcMethodUnavailableError(error)) {
+                Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            }
         } finally {
             if (kind === "initial") {
                 setLoading(false);
@@ -1341,7 +1331,7 @@ export default React.memo(function MachineLoopsPage() {
 
                 {/* 3. Active Loops — main content */}
                 <ItemGroup title={t("machine.agentLoops")}>
-                    {renderSectionBanner(t("machine.agentLoops"), `${debugInfo} | rpc=${String(rpcReady)}`, String(filteredLoops.length), "repeat-outline")}
+                    {renderSectionBanner(t("machine.agentLoops"), t("machine.agentLoopsViewAllHint"), String(filteredLoops.length), "repeat-outline")}
                     <View style={styles.formSection}>
                         <View style={styles.searchRow}>
                             <View style={[styles.searchBar, styles.searchBarFlex, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
