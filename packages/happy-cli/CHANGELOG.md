@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.1 - 2026-04-03
+
+- Fixed machine WebSocket RPC: register `bootstrap-profile-*` handlers so the mobile app can list/create/update Bootstrap profiles (was returning `RPC method not available`).
+
 ## 0.44.4 - 2026-03-21
 
 - Fixed session restore causing messages to become unresponsive and cleared after 10 minutes

@@ -511,6 +511,50 @@ export class ApiMachineClient {
       return { suggestions: await suggestAgentLoops(input) };
     });
 
+    this.rpcHandlerManager.registerHandler("bootstrap-profile-list", async () => {
+      return { profiles: await listAgentLoopBootstrapProfiles() };
+    });
+
+    this.rpcHandlerManager.registerHandler("bootstrap-profile-get", async (params: any) => {
+      const { profileIdValue } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return { success: true, profile: await getAgentLoopBootstrapProfile(profileIdValue) };
+    });
+
+    this.rpcHandlerManager.registerHandler("bootstrap-profile-create", async (params: any) => {
+      return createAgentLoopBootstrapProfile(params);
+    });
+
+    this.rpcHandlerManager.registerHandler("bootstrap-profile-update", async (params: any) => {
+      const { profileIdValue, ...input } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return updateAgentLoopBootstrapProfile(profileIdValue, input);
+    });
+
+    this.rpcHandlerManager.registerHandler("bootstrap-profile-pause", async (params: any) => {
+      const { profileIdValue } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return pauseAgentLoopBootstrapProfile(profileIdValue);
+    });
+
+    this.rpcHandlerManager.registerHandler("bootstrap-profile-resume", async (params: any) => {
+      const { profileIdValue } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return resumeAgentLoopBootstrapProfile(profileIdValue);
+    });
+
+    this.rpcHandlerManager.registerHandler("bootstrap-profile-run-now", async (params: any) => {
+      const { profileIdValue } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return runAgentLoopBootstrapProfileNow(profileIdValue);
+    });
+
+    this.rpcHandlerManager.registerHandler("bootstrap-profile-remove", async (params: any) => {
+      const { profileIdValue } = params || {};
+      if (!profileIdValue) throw new Error("Profile ID is required");
+      return removeAgentLoopBootstrapProfile(profileIdValue);
+    });
+
     this.rpcHandlerManager.registerHandler("dream-profile-list", async () => {
       return { profiles: await listAutoDreamProfiles() };
     });
