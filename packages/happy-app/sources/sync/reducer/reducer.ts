@@ -126,7 +126,6 @@ import {
     processSidechainToolResult,
     extractSdkResultData,
 } from "./reducerHelpers";
-import { log } from '@/log';
 
 /** SDK event-driven background task entry, maintained by task-start/progress/end events */
 export type BackgroundTaskEntry = {
@@ -226,7 +225,6 @@ export function createReducer(): ReducerState {
   };
 }
 
-const ENABLE_LOGGING = false;
 
 export type ReducerResult = {
   messages: Message[];
@@ -269,22 +267,6 @@ export function reducer(
   messages: NormalizedMessage[],
   agentState?: AgentState | null,
 ): ReducerResult {
-  if (ENABLE_LOGGING) {
-    log.log(
-      `[REDUCER] Called with ${messages.length} messages, agentState: ${agentState ? "YES" : "NO"}`,
-    );
-    if (agentState?.requests) {
-      log.log(
-        `[REDUCER] AgentState has ${Object.keys(agentState.requests).length} pending requests`,
-      );
-    }
-    if (agentState?.completedRequests) {
-      log.log(
-        `[REDUCER] AgentState has ${Object.keys(agentState.completedRequests).length} completed requests`,
-      );
-    }
-  }
-
   let newMessages: Message[] = [];
   let changed: Set<string> = new Set();
   let hasReadyEvent = false;
@@ -300,10 +282,6 @@ export function reducer(
   // Phase 0.5: Message-to-Event Conversion
   // Convert certain messages to events before normal processing
   //
-
-  if (ENABLE_LOGGING) {
-    log.log(`[REDUCER] Phase 0.5: Message-to-Event Conversion`);
-  }
 
   const messagesToProcess: NormalizedMessage[] = [];
   const convertedEvents: { message: NormalizedMessage; event: AgentEvent }[] =
@@ -507,9 +485,6 @@ export function reducer(
     // Try to parse message as event
     const event = parseMessageAsEvent(msg);
     if (event) {
-      if (ENABLE_LOGGING) {
-        log.log(`[REDUCER] Converting message ${msg.id} to event:`, event);
-      }
       convertedEvents.push({ message: msg, event });
       // Mark as processed to prevent duplication
       state.messageIds.set(msg.id, msg.id);
@@ -556,9 +531,6 @@ export function reducer(
   // Phase 0: Process AgentState permissions
   //
 
-  if (ENABLE_LOGGING) {
-    log.log(`[REDUCER] Phase 0: Processing AgentState`);
-  }
   if (agentState) {
     // Process pending permission requests
     if (agentState.requests) {
@@ -577,11 +549,6 @@ export function reducer(
           // Update existing tool message with permission info
           const message = state.messages.get(existingMessageId);
           if (message?.tool && !message.tool.permission) {
-            if (ENABLE_LOGGING) {
-              log.log(
-                `[REDUCER] Updating existing tool ${permId} with permission`,
-              );
-            }
             message.tool.permission = {
               id: permId,
               status: "pending",
@@ -589,12 +556,6 @@ export function reducer(
             changed.add(existingMessageId);
           }
         } else {
-          if (ENABLE_LOGGING) {
-            log.log(
-              `[REDUCER] Creating new message for permission ${permId}`,
-            );
-          }
-
           // Create a new tool message for the permission request
           let mid = allocateId();
           let toolCall: ToolCall = {
@@ -657,11 +618,6 @@ export function reducer(
         } else {
           // No existing message - check if tool ID is in incoming messages
           if (incomingToolIds.has(permId)) {
-            if (ENABLE_LOGGING) {
-              log.log(
-                `[REDUCER] Storing permission ${permId} for incoming tool`,
-              );
-            }
             // Store permission for when tool arrives in Phase 2
             state.permissions.set(permId, createStoredPermission(completed));
             continue;
@@ -799,9 +755,6 @@ export function reducer(
   // Phase 2: Process non-sidechain tool calls
   //
 
-  if (ENABLE_LOGGING) {
-    log.log(`[REDUCER] Phase 2: Processing tool calls`);
-  }
   for (let msg of nonSidechainMessages) {
     if (msg.role === "agent") {
       for (let c of msg.content) {
@@ -810,9 +763,6 @@ export function reducer(
           const existingMessageId = state.toolIdToMessageId.get(c.id);
 
           if (existingMessageId) {
-            if (ENABLE_LOGGING) {
-              log.log(`[REDUCER] Found existing message for tool ${c.id}`);
-            }
             // Update existing message with tool execution details
             const message = state.messages.get(existingMessageId);
             if (message?.tool) {
@@ -849,9 +799,6 @@ export function reducer(
               }
             }
           } else {
-            if (ENABLE_LOGGING) {
-              log.log(`[REDUCER] Creating new message for tool ${c.id}`);
-            }
             // Check if there's a stored permission for this tool
             const permission = state.permissions.get(c.id);
 
@@ -868,11 +815,6 @@ export function reducer(
 
             // Add permission info if found
             if (permission) {
-              if (ENABLE_LOGGING) {
-                log.log(
-                  `[REDUCER] Found stored permission for tool ${c.id}`,
-                );
-              }
               toolCall.permission = {
                 id: c.id,
                 status: permission.status,
@@ -1357,15 +1299,6 @@ export function reducer(
     if (message) {
       newMessages.push(message);
     }
-  }
-
-  //
-  // Debug changes
-  //
-
-  if (ENABLE_LOGGING) {
-    log.log(JSON.stringify(messages, null, 2));
-    log.log(`[REDUCER] Changed messages: ${changed.size}`);
   }
 
   return {
