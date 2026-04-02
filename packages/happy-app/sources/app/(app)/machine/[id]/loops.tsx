@@ -224,24 +224,34 @@ export default React.memo(function MachineLoopsPage() {
         }
         try {
             if (!rpcReady) {
-                setDebugInfo(`rpcReady=false, kind=${kind}`);
+                setDebugInfo(`rpcReady=false, kind=${kind}, mid=${machineId.slice(0, 8)}`);
                 return;
             }
             setDebugInfo(`fetching... kind=${kind}`);
-            const [result, bootstrapResult, autoDreamResult] = await Promise.all([
+            const results = await Promise.allSettled([
                 machineListAgentLoops(machineId),
                 machineListAgentLoopBootstrapProfiles(machineId),
                 machineListAutoDreamProfiles(machineId),
             ]);
-            setLoops(result.loops ?? []);
-            setBootstrapProfiles(bootstrapResult.profiles ?? []);
-            setAutoDreamProfiles(autoDreamResult.profiles ?? []);
-            setDebugInfo(`ok: ${result.loops?.length ?? 0} loops, rpc=true`);
-        } catch (error) {
-            setDebugInfo(`error: ${error instanceof Error ? error.message : String(error)}`);
-            if (!isRpcMethodUnavailableError(error)) {
-                Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            const loopResult = results[0];
+            const bootstrapResult = results[1];
+            const dreamResult = results[2];
+            const loopCount = loopResult.status === "fulfilled" ? (loopResult.value.loops?.length ?? 0) : -1;
+            const loopError = loopResult.status === "rejected" ? (loopResult.reason instanceof Error ? loopResult.reason.message : String(loopResult.reason)) : null;
+            const bsCount = bootstrapResult.status === "fulfilled" ? (bootstrapResult.value.profiles?.length ?? 0) : -1;
+            const dreamCount = dreamResult.status === "fulfilled" ? (dreamResult.value.profiles?.length ?? 0) : -1;
+            setDebugInfo(`loops=${loopCount}${loopError ? ` err=${loopError}` : ""} bs=${bsCount} dream=${dreamCount} | rpc=${String(rpcReady)}`);
+            if (loopResult.status === "fulfilled") {
+                setLoops(loopResult.value.loops ?? []);
             }
+            if (bootstrapResult.status === "fulfilled") {
+                setBootstrapProfiles(bootstrapResult.value.profiles ?? []);
+            }
+            if (dreamResult.status === "fulfilled") {
+                setAutoDreamProfiles(dreamResult.value.profiles ?? []);
+            }
+        } catch (error) {
+            setDebugInfo(`catch: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
             if (kind === "initial") {
                 setLoading(false);
