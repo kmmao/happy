@@ -221,7 +221,9 @@ export default React.memo(function MachineLoopsPage() {
             setRefreshing(true);
         }
         try {
-            if (!rpcReady) return;
+            if (!rpcReady) {
+                return;
+            }
             const [result, bootstrapResult, autoDreamResult] = await Promise.all([
                 machineListAgentLoops(machineId),
                 machineListAgentLoopBootstrapProfiles(machineId),
@@ -242,6 +244,15 @@ export default React.memo(function MachineLoopsPage() {
             }
         }
     }, [machineId, rpcReady]);
+
+    // Retry loading when rpcReady becomes true after initial load
+    const rpcReadyPrev = React.useRef(rpcReady);
+    React.useEffect(() => {
+        if (rpcReady && !rpcReadyPrev.current && loops.length === 0) {
+            void load("refresh");
+        }
+        rpcReadyPrev.current = rpcReady;
+    }, [rpcReady, load, loops.length]);
 
     loadRef.current = () => void load("refresh");
 
@@ -1316,15 +1327,27 @@ export default React.memo(function MachineLoopsPage() {
                 <ItemGroup title={t("machine.agentLoops")}>
                     {renderSectionBanner(t("machine.agentLoops"), t("machine.agentLoopsViewAllHint"), String(filteredLoops.length), "repeat-outline")}
                     <View style={styles.formSection}>
-                        <View style={[styles.searchBar, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
-                            <Ionicons name="search-outline" size={18} color={theme.colors.textSecondary} />
-                            <TextInput
-                                style={[styles.searchInput, { color: theme.colors.text }]}
-                                placeholder={t("machine.agentLoopSearchPlaceholder")}
-                                placeholderTextColor={theme.colors.textSecondary}
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                            />
+                        <View style={styles.searchRow}>
+                            <View style={[styles.searchBar, styles.searchBarFlex, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                                <Ionicons name="search-outline" size={18} color={theme.colors.textSecondary} />
+                                <TextInput
+                                    style={[styles.searchInput, { color: theme.colors.text }]}
+                                    placeholder={t("machine.agentLoopSearchPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                />
+                            </View>
+                            <Pressable
+                                style={[styles.refreshIconButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}
+                                onPress={() => void load("refresh")}
+                            >
+                                {refreshing ? (
+                                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                ) : (
+                                    <Ionicons name="refresh-outline" size={18} color={theme.colors.primary} />
+                                )}
+                            </Pressable>
                         </View>
                     </View>
                     {loading ? (
@@ -1762,6 +1785,11 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center",
         justifyContent: "center",
     },
+    searchRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
     searchBar: {
         minHeight: 46,
         borderWidth: 1,
@@ -1770,6 +1798,17 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         alignItems: "center",
         gap: 10,
+    },
+    searchBarFlex: {
+        flex: 1,
+    },
+    refreshIconButton: {
+        width: 46,
+        height: 46,
+        borderWidth: 1,
+        borderRadius: 12,
+        alignItems: "center",
+        justifyContent: "center",
     },
     searchInput: {
         flex: 1,
