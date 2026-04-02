@@ -1665,6 +1665,8 @@ export const ru: TranslationStructure = {
     oneClickDone: "Настройка завершена",
     oneClickDoneCreated: ({ count }: { count: number }) => `Успешно создано ${count} циклов`,
     oneClickDoneNone: "Нет новых циклов — все рекомендации уже настроены",
+    oneClickSelectAll: "Выбрать все",
+    oneClickDeselectAll: "Снять выбор",
     oneClickError: "Ошибка настройки",
 
     agentLoopProjectPlaceholder: "Optional project ID",

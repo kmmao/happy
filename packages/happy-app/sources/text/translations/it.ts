@@ -1756,6 +1756,8 @@ export const it: TranslationStructure = {
     oneClickDone: "Configurazione completata",
     oneClickDoneCreated: ({ count }: { count: number }) => `${count} loop creati con successo`,
     oneClickDoneNone: "Nessun nuovo loop — tutte le raccomandazioni sono già configurate",
+    oneClickSelectAll: "Seleziona tutto",
+    oneClickDeselectAll: "Deseleziona tutto",
     oneClickError: "Configurazione fallita",
 
     agentLoopProjectPlaceholder: "Optional project ID",

@@ -1738,6 +1738,8 @@ export const ja: TranslationStructure = {
     oneClickDone: "設定完了",
     oneClickDoneCreated: ({ count }: { count: number }) => `${count}個のループを作成しました`,
     oneClickDoneNone: "新しいループはありません — すべての推奨は設定済みです",
+    oneClickSelectAll: "すべて選択",
+    oneClickDeselectAll: "すべて解除",
     oneClickError: "設定に失敗しました",
 
     agentLoopProjectPlaceholder: "Optional project ID",

@@ -1662,6 +1662,8 @@ export const en = {
     oneClickDone: "Setup Complete",
     oneClickDoneCreated: ({ count }: { count: number }) => `Successfully created ${count} loops`,
     oneClickDoneNone: "No new loops to create — all recommendations already configured",
+    oneClickSelectAll: "Select All",
+    oneClickDeselectAll: "Deselect All",
     oneClickError: "Setup Failed",
 
     agentLoopProjectPlaceholder: "Optional project ID",

@@ -1617,6 +1617,8 @@ export const zhHant: TranslationStructure = {
     oneClickDone: "配置完成",
     oneClickDoneCreated: ({ count }: { count: number }) => `成功建立 ${count} 個循環`,
     oneClickDoneNone: "沒有新循環可建立 — 所有推薦已配置",
+    oneClickSelectAll: "全選",
+    oneClickDeselectAll: "取消全選",
     oneClickError: "配置失敗",
 
     agentLoopProjectPlaceholder: "選填專案 ID",

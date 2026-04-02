@@ -19,7 +19,7 @@ function getStepIndex(phase: string): number {
 
 export const OneClickSetupCard = React.memo(function OneClickSetupCard({ setup }: OneClickSetupCardProps) {
     const { theme } = useUnistyles();
-    const { state, start, confirm, toggleRepo, reset } = setup;
+    const { state, start, confirm, toggleRepo, selectAll, reset } = setup;
     const { phase, repos, totalSuggestions, creatableCount, createdCount, errorMessage } = state;
     const [expandedRepo, setExpandedRepo] = React.useState<string | null>(null);
 
@@ -77,6 +77,20 @@ export const OneClickSetupCard = React.memo(function OneClickSetupCard({ setup }
                         </Text>
                     </View>
                 </View>
+
+                <Pressable
+                    style={styles.selectAllRow}
+                    onPress={() => selectAll(selectedCount < repos.length)}
+                >
+                    <Ionicons
+                        name={selectedCount === repos.length ? "checkbox" : selectedCount > 0 ? "remove-outline" : "square-outline"}
+                        size={18}
+                        color={selectedCount > 0 ? theme.colors.primary : theme.colors.textSecondary}
+                    />
+                    <Text style={[styles.selectAllText, { color: theme.colors.textSecondary }]}>
+                        {selectedCount === repos.length ? t("machine.oneClickDeselectAll") : t("machine.oneClickSelectAll")}
+                    </Text>
+                </Pressable>
 
                 <View style={styles.repoList}>
                     {repos.map((entry) => {
@@ -243,6 +257,16 @@ const styles = StyleSheet.create((theme) => ({
     progressFill: {
         height: "100%",
         borderRadius: 2,
+    },
+    selectAllRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingVertical: 4,
+    },
+    selectAllText: {
+        fontSize: 13,
+        fontWeight: "600",
     },
     repoList: {
         gap: 6,

@@ -29,6 +29,7 @@ export interface UseOneClickSetupReturn {
     start: () => void;
     confirm: () => void;
     toggleRepo: (repoPath: string) => void;
+    selectAll: (selected: boolean) => void;
     reset: () => void;
 }
 
@@ -61,6 +62,13 @@ export function useOneClickSetup(machineId: string | undefined): UseOneClickSetu
         }));
     }, []);
 
+    const selectAll = React.useCallback((selected: boolean) => {
+        setState((prev) => ({
+            ...prev,
+            repos: prev.repos.map((entry) => ({ ...entry, selected })),
+        }));
+    }, []);
+
     const start = React.useCallback(async () => {
         if (!machineId) return;
         abortRef.current = false;
@@ -88,7 +96,7 @@ export function useOneClickSetup(machineId: string | undefined): UseOneClickSetu
                     entries.push({
                         repo,
                         suggestions: creatableSuggestions,
-                        selected: true,
+                        selected: false,
                     });
                 }
             }
@@ -192,6 +200,7 @@ export function useOneClickSetup(machineId: string | undefined): UseOneClickSetu
         start: () => void start(),
         confirm: () => void confirm(),
         toggleRepo,
+        selectAll,
         reset,
     };
 }

@@ -1679,6 +1679,8 @@ export const pl: TranslationStructure = {
     oneClickDone: "Konfiguracja zakończona",
     oneClickDoneCreated: ({ count }: { count: number }) => `Pomyślnie utworzono ${count} pętli`,
     oneClickDoneNone: "Brak nowych pętli — wszystkie rekomendacje już skonfigurowane",
+    oneClickSelectAll: "Zaznacz wszystko",
+    oneClickDeselectAll: "Odznacz wszystko",
     oneClickError: "Błąd konfiguracji",
 
     agentLoopProjectPlaceholder: "Optional project ID",
