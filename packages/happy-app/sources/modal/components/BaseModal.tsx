@@ -6,7 +6,8 @@ import {
     Animated,
     StyleSheet,
     KeyboardAvoidingView,
-    Platform
+    Platform,
+    useWindowDimensions,
 } from 'react-native';
 
 // On web, stop events from propagating to expo-router's modal overlay
@@ -34,6 +35,7 @@ export function BaseModal({
     closeOnBackdrop = true
 }: BaseModalProps) {
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const { height } = useWindowDimensions();
 
     useEffect(() => {
         if (visible) {
@@ -86,6 +88,7 @@ export function BaseModal({
                 <Animated.View
                     style={[
                         styles.content,
+                        Platform.OS !== 'web' ? { maxHeight: Math.max(height - 24, 320), width: '100%' } : null,
                         {
                             opacity: fadeAnim,
                             transform: [{
@@ -109,6 +112,8 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 12,
         // On web, ensure modal can receive pointer events when body has pointer-events: none
         ...Platform.select({ web: { pointerEvents: 'auto' as const } })
     },

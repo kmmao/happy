@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -43,6 +43,11 @@ import {
 import { t } from "@/text";
 import { useMachine } from "@/sync/storage";
 import { utf8ToBase64 } from "@/utils/stringUtils";
+import {
+    getLoopFormLayoutMode,
+    getLoopModalMetrics,
+    getQuickActionColumnCount,
+} from "./loopsLayout";
 
 function parseIntervalMs(raw: string): number | null {
     const match = raw.trim().match(/^(\d+)([smhd])$/i);
@@ -485,6 +490,20 @@ export default React.memo(function MachineLoopsPage() {
     const machineId = typeof machineIdParam === "string" ? machineIdParam : undefined;
     const router = useRouter();
     const { theme } = useUnistyles();
+    const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+    const quickActionColumns = getQuickActionColumnCount({
+        viewportWidth,
+        isWeb: Platform.OS === "web",
+    });
+    const modalMetrics = getLoopModalMetrics({
+        viewportWidth,
+        viewportHeight,
+        isWeb: Platform.OS === "web",
+    });
+    const formLayout = getLoopFormLayoutMode({
+        viewportWidth,
+        isWeb: Platform.OS === "web",
+    });
     const machine = useMachine(machineId ?? "");
     const rpcReady = machine?.rpcReady ?? false;
     const [loops, setLoops] = React.useState<MachineAgentLoop[]>([]);
@@ -1455,7 +1474,11 @@ export default React.memo(function MachineLoopsPage() {
     }, [directory, loadSuggestions, openCreateLoopEditor]);
 
     const renderSectionBanner = (title: string, subtitle: string, badge?: string, icon?: React.ComponentProps<typeof Ionicons>["name"]) => (
-        <View style={[styles.sectionBanner, { borderBottomColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}> 
+        <View style={[
+            styles.sectionBanner,
+            formLayout.modalHeaderStacked ? styles.sectionBannerStacked : null,
+            { borderBottomColor: theme.colors.divider, backgroundColor: theme.colors.surface },
+        ]}>
             <View style={styles.sectionBannerLeading}>
                 {icon ? <Ionicons name={icon} size={18} color={theme.colors.textSecondary} /> : null}
                 <View style={styles.sectionBannerTextWrap}>
@@ -1989,8 +2012,8 @@ export default React.memo(function MachineLoopsPage() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load("refresh")} />}
             >
                 <ItemGroup title={t("machine.agentLoopsViewAll")} footer={t("machine.agentLoopsViewAllHint")}>
-                    <View style={[styles.heroPanel, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
-                        <View style={styles.heroPanelHeader}>
+                    <View style={[styles.heroPanel, formLayout.compactSpacing ? styles.heroPanelCompact : null, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                        <View style={[styles.heroPanelHeader, formLayout.modalHeaderStacked ? styles.heroPanelHeaderStacked : null]}>
                             <View style={styles.heroPanelTextWrap}>
                                 <Text style={[styles.heroPanelTitle, { color: theme.colors.text }]}>{t("machine.agentLoopsViewAll")}</Text>
                                 <Text style={[styles.heroPanelSubtitle, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopsViewAllHint")}</Text>
@@ -2000,7 +2023,10 @@ export default React.memo(function MachineLoopsPage() {
                             </View>
                         </View>
                     </View>
-                    <View style={styles.quickActionsGrid}>
+                    <View style={[
+                        styles.quickActionsGrid,
+                        quickActionColumns === 1 ? styles.quickActionsGridSingleColumn : styles.quickActionsGridTwoColumn,
+                    ]}>
                         {[
                             {
                                 key: "create",
@@ -2055,7 +2081,11 @@ export default React.memo(function MachineLoopsPage() {
                         ].map((action) => (
                             <Pressable
                                 key={action.key}
-                                style={[styles.quickActionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}
+                                style={[
+                                    styles.quickActionCard,
+                                    quickActionColumns === 1 ? styles.quickActionCardSingleColumn : styles.quickActionCardTwoColumn,
+                                    { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh },
+                                ]}
                                 onPress={action.onPress}
                             >
                                 <View style={styles.quickActionCardHeader}>
@@ -2069,7 +2099,7 @@ export default React.memo(function MachineLoopsPage() {
                                         <Text style={[styles.quickActionCardMeta, { color: theme.colors.textSecondary }]}>{action.detail}</Text>
                                     )}
                                 </View>
-                                <Text style={[styles.quickActionCardSubtitle, { color: theme.colors.textSecondary }]}>{action.subtitle}</Text>
+                                <Text style={[styles.quickActionCardSubtitle, formLayout.compactSpacing ? styles.quickActionCardSubtitleCompact : null, { color: theme.colors.textSecondary }]}>{action.subtitle}</Text>
                             </Pressable>
                         ))}
                     </View>
@@ -2275,8 +2305,21 @@ export default React.memo(function MachineLoopsPage() {
             </ScrollView>
 
             <BaseModal visible={loopEditorVisible} onClose={closeLoopEditor}>
-                <View style={[styles.modalCard, { backgroundColor: theme.colors.surface }]}>
-                    <View style={[styles.modalHeader, { borderBottomColor: theme.colors.divider }]}>
+                <View style={[
+                    styles.modalCard,
+                    {
+                        backgroundColor: theme.colors.surface,
+                        width: modalMetrics.width,
+                        maxHeight: modalMetrics.maxHeight,
+                        minWidth: modalMetrics.minWidth,
+                        borderRadius: modalMetrics.borderRadius,
+                    },
+                ]}>
+                    <View style={[
+                        styles.modalHeader,
+                        formLayout.modalHeaderStacked ? styles.modalHeaderStacked : null,
+                        { borderBottomColor: theme.colors.divider, paddingHorizontal: modalMetrics.horizontalPadding },
+                    ]}>
                         <View style={styles.modalHeaderTextWrap}>
                             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingLoopId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>
                             <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>{editingLoopId ? (name.trim() || directory.trim() || t("machine.agentLoopsViewAllHint")) : t("machine.agentLoopsViewAllHint")}</Text>
@@ -2285,15 +2328,28 @@ export default React.memo(function MachineLoopsPage() {
                             <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
                         </Pressable>
                     </View>
-                    <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+                    <ScrollView style={styles.modalScroll} contentContainerStyle={[styles.modalScrollContent, { paddingHorizontal: modalMetrics.horizontalPadding }]}>
                         {renderLoopEditorForm()}
                     </ScrollView>
                 </View>
             </BaseModal>
 
             <BaseModal visible={bootstrapProfileEditorVisible} onClose={closeBootstrapProfileEditor}>
-                <View style={[styles.modalCard, { backgroundColor: theme.colors.surface }]}>
-                    <View style={[styles.modalHeader, { borderBottomColor: theme.colors.divider }]}>
+                <View style={[
+                    styles.modalCard,
+                    {
+                        backgroundColor: theme.colors.surface,
+                        width: modalMetrics.width,
+                        maxHeight: modalMetrics.maxHeight,
+                        minWidth: modalMetrics.minWidth,
+                        borderRadius: modalMetrics.borderRadius,
+                    },
+                ]}>
+                    <View style={[
+                        styles.modalHeader,
+                        formLayout.modalHeaderStacked ? styles.modalHeaderStacked : null,
+                        { borderBottomColor: theme.colors.divider, paddingHorizontal: modalMetrics.horizontalPadding },
+                    ]}>
                         <View style={styles.modalHeaderTextWrap}>
                             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingBootstrapProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>
                             <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapHint")}</Text>
@@ -2302,15 +2358,28 @@ export default React.memo(function MachineLoopsPage() {
                             <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
                         </Pressable>
                     </View>
-                    <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+                    <ScrollView style={styles.modalScroll} contentContainerStyle={[styles.modalScrollContent, { paddingHorizontal: modalMetrics.horizontalPadding }]}>
                         {renderBootstrapProfileEditorForm()}
                     </ScrollView>
                 </View>
             </BaseModal>
 
             <BaseModal visible={autoDreamProfileEditorVisible} onClose={closeAutoDreamProfileEditor}>
-                <View style={[styles.modalCard, { backgroundColor: theme.colors.surface }]}>
-                    <View style={[styles.modalHeader, { borderBottomColor: theme.colors.divider }]}>
+                <View style={[
+                    styles.modalCard,
+                    {
+                        backgroundColor: theme.colors.surface,
+                        width: modalMetrics.width,
+                        maxHeight: modalMetrics.maxHeight,
+                        minWidth: modalMetrics.minWidth,
+                        borderRadius: modalMetrics.borderRadius,
+                    },
+                ]}>
+                    <View style={[
+                        styles.modalHeader,
+                        formLayout.modalHeaderStacked ? styles.modalHeaderStacked : null,
+                        { borderBottomColor: theme.colors.divider, paddingHorizontal: modalMetrics.horizontalPadding },
+                    ]}>
                         <View style={styles.modalHeaderTextWrap}>
                             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingAutoDreamProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>
                             <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>{t("machine.autoDreamHint")}</Text>
@@ -2319,7 +2388,7 @@ export default React.memo(function MachineLoopsPage() {
                             <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
                         </Pressable>
                     </View>
-                    <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+                    <ScrollView style={styles.modalScroll} contentContainerStyle={[styles.modalScrollContent, { paddingHorizontal: modalMetrics.horizontalPadding }]}>
                         {renderAutoDreamProfileEditorForm()}
                     </ScrollView>
                 </View>
@@ -2342,6 +2411,10 @@ const styles = StyleSheet.create((theme) => ({
     formSection: {
         padding: 16,
         gap: 8,
+    },
+    formSectionCompact: {
+        padding: 12,
+        gap: 6,
     },
     helperText: {
         fontSize: 13,
@@ -2405,7 +2478,7 @@ const styles = StyleSheet.create((theme) => ({
     },
     buttonRow: {
         marginTop: 8,
-        flexDirection: "row",
+        flexDirection: Platform.OS === "web" ? "row" : "column",
         gap: 10,
     },
     inlineSecondaryButton: {
@@ -2418,14 +2491,14 @@ const styles = StyleSheet.create((theme) => ({
         marginTop: 4,
     },
     row: {
-        flexDirection: "row",
+        flexDirection: Platform.OS === "web" ? "row" : "column",
         gap: 8,
     },
     rowInput: {
         flex: 1,
     },
     actionsRow: {
-        flexDirection: "row",
+        flexDirection: Platform.OS === "web" ? "row" : "column",
         gap: 10,
     },
     primaryButton: {
@@ -2555,11 +2628,20 @@ const styles = StyleSheet.create((theme) => ({
         borderRadius: 16,
         padding: 16,
     },
+    heroPanelCompact: {
+        margin: 12,
+        marginBottom: 6,
+        padding: 12,
+    },
     heroPanelHeader: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
+    },
+    heroPanelHeaderStacked: {
+        alignItems: "flex-start",
+        flexDirection: "column",
     },
     heroPanelTextWrap: {
         flex: 1,
@@ -2577,7 +2659,12 @@ const styles = StyleSheet.create((theme) => ({
         paddingHorizontal: 16,
         paddingBottom: 16,
         gap: 12,
-        flexDirection: Platform.OS === "web" ? "row" : "column",
+    },
+    quickActionsGridSingleColumn: {
+        flexDirection: "column",
+    },
+    quickActionsGridTwoColumn: {
+        flexDirection: "row",
         flexWrap: "wrap",
     },
     quickActionCard: {
@@ -2585,8 +2672,13 @@ const styles = StyleSheet.create((theme) => ({
         borderRadius: 16,
         padding: 14,
         gap: 8,
-        width: Platform.OS === "web" ? "48.5%" : "100%",
         minHeight: 108,
+    },
+    quickActionCardSingleColumn: {
+        width: "100%",
+    },
+    quickActionCardTwoColumn: {
+        width: "48.5%",
     },
     quickActionCardHeader: {
         flexDirection: "row",
@@ -2609,6 +2701,9 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 13,
         lineHeight: 18,
     },
+    quickActionCardSubtitleCompact: {
+        lineHeight: 17,
+    },
     quickActionCardMeta: {
         fontSize: 13,
         fontWeight: "600",
@@ -2621,6 +2716,10 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
+    },
+    sectionBannerStacked: {
+        alignItems: "flex-start",
+        flexDirection: "column",
     },
     sectionBannerLeading: {
         flex: 1,
@@ -2654,11 +2753,6 @@ const styles = StyleSheet.create((theme) => ({
         fontWeight: "700",
     },
     modalCard: {
-        width: Platform.OS === "web" ? 860 : "92%",
-        minWidth: Platform.OS === "web" ? 720 : undefined,
-        maxWidth: layout.maxWidth + 140,
-        maxHeight: Platform.OS === "web" ? "92%" : "88%",
-        borderRadius: 24,
         overflow: "hidden",
         borderWidth: 1,
         shadowColor: theme.colors.shadow.color,
@@ -2671,10 +2765,13 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        paddingHorizontal: 20,
         paddingVertical: 16,
         borderBottomWidth: 1,
         gap: 16,
+    },
+    modalHeaderStacked: {
+        alignItems: "flex-start",
+        flexDirection: "column",
     },
     modalHeaderTextWrap: {
         flex: 1,
@@ -2695,6 +2792,7 @@ const styles = StyleSheet.create((theme) => ({
         borderWidth: 1,
         alignItems: "center",
         justifyContent: "center",
+        alignSelf: Platform.OS === "web" ? "auto" : "flex-end",
     },
     modalScroll: {
         width: "100%",
