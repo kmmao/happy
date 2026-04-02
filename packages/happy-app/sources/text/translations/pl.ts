@@ -1681,6 +1681,7 @@ export const pl: TranslationStructure = {
     oneClickDoneNone: "Brak nowych pętli — wszystkie rekomendacje już skonfigurowane",
     oneClickSelectAll: "Zaznacz wszystko",
     oneClickDeselectAll: "Odznacz wszystko",
+    oneClickRefreshList: "Odśwież listę pętli",
     oneClickError: "Błąd konfiguracji",
 
     agentLoopProjectPlaceholder: "Optional project ID",

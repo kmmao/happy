@@ -1672,6 +1672,7 @@ export const ca: TranslationStructure = {
     oneClickDoneNone: "No hi ha loops nous — totes les recomanacions ja estan configurades",
     oneClickSelectAll: "Selecciona-ho tot",
     oneClickDeselectAll: "Desselecciona-ho tot",
+    oneClickRefreshList: "Actualitza la llista de loops",
     oneClickError: "Error de configuració",
 
     agentLoopProjectPlaceholder: "Optional project ID",

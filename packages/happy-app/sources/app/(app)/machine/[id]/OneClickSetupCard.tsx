@@ -8,16 +8,10 @@ import type { UseOneClickSetupReturn } from "./useOneClickSetup";
 
 interface OneClickSetupCardProps {
     setup: UseOneClickSetupReturn;
+    onRefresh?: () => void;
 }
 
-const PHASE_STEPS = ["scanning", "suggesting", "confirming", "creating", "done"] as const;
-
-function getStepIndex(phase: string): number {
-    const idx = PHASE_STEPS.indexOf(phase as any);
-    return idx >= 0 ? idx : 0;
-}
-
-export const OneClickSetupCard = React.memo(function OneClickSetupCard({ setup }: OneClickSetupCardProps) {
+export const OneClickSetupCard = React.memo(function OneClickSetupCard({ setup, onRefresh }: OneClickSetupCardProps) {
     const { theme } = useUnistyles();
     const { state, start, confirm, toggleRepo, selectAll, reset } = setup;
     const { phase, repos, totalSuggestions, creatableCount, createdCount, errorMessage } = state;
@@ -190,6 +184,15 @@ export const OneClickSetupCard = React.memo(function OneClickSetupCard({ setup }
                         <Ionicons name="close-circle-outline" size={22} color={theme.colors.textSecondary} />
                     </Pressable>
                 </View>
+                {createdCount > 0 && onRefresh ? (
+                    <Pressable
+                        style={[styles.refreshButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                        onPress={onRefresh}
+                    >
+                        <Ionicons name="refresh-outline" size={16} color={theme.colors.primary} />
+                        <Text style={[styles.refreshButtonText, { color: theme.colors.primary }]}>{t("machine.oneClickRefreshList")}</Text>
+                    </Pressable>
+                ) : null}
             </View>
         );
     }
@@ -338,6 +341,19 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 12,
         lineHeight: 16,
         paddingLeft: 20,
+    },
+    refreshButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        minHeight: 36,
+        borderRadius: 10,
+        borderWidth: 1,
+    },
+    refreshButtonText: {
+        fontSize: 13,
+        fontWeight: "600",
     },
     actionsRow: {
         flexDirection: Platform.OS === "web" ? "row" : "column",

@@ -1740,6 +1740,7 @@ export const ja: TranslationStructure = {
     oneClickDoneNone: "新しいループはありません — すべての推奨は設定済みです",
     oneClickSelectAll: "すべて選択",
     oneClickDeselectAll: "すべて解除",
+    oneClickRefreshList: "ループリストを更新",
     oneClickError: "設定に失敗しました",
 
     agentLoopProjectPlaceholder: "Optional project ID",

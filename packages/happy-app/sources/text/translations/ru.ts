@@ -1667,6 +1667,7 @@ export const ru: TranslationStructure = {
     oneClickDoneNone: "Нет новых циклов — все рекомендации уже настроены",
     oneClickSelectAll: "Выбрать все",
     oneClickDeselectAll: "Снять выбор",
+    oneClickRefreshList: "Обновить список циклов",
     oneClickError: "Ошибка настройки",
 
     agentLoopProjectPlaceholder: "Optional project ID",

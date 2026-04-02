@@ -1664,6 +1664,7 @@ export const en: TranslationStructure = {
     oneClickDoneNone: "No new loops to create — all recommendations already configured",
     oneClickSelectAll: "Select All",
     oneClickDeselectAll: "Deselect All",
+    oneClickRefreshList: "Refresh Loop List",
     oneClickError: "Setup Failed",
 
     agentLoopProjectPlaceholder: "Optional project ID",

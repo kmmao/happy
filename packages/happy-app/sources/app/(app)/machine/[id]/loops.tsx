@@ -1286,7 +1286,7 @@ export default React.memo(function MachineLoopsPage() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load("refresh")} />}
             >
                 {/* 1. OneClickSetupCard — standalone at very top */}
-                <OneClickSetupCard setup={oneClickSetup} />
+                <OneClickSetupCard setup={oneClickSetup} onRefresh={() => void load("refresh")} />
 
                 {/* 2. Flow guide — visual explanation of how loops work */}
                 <View style={[styles.flowGuide, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>

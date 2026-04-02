@@ -1618,6 +1618,7 @@ export const zhHans: TranslationStructure = {
     oneClickDoneNone: "没有新循环可创建 — 所有推荐已配置",
     oneClickSelectAll: "全选",
     oneClickDeselectAll: "取消全选",
+    oneClickRefreshList: "刷新循环列表",
     oneClickError: "配置失败",
 
     agentLoopProjectPlaceholder: "可选项目 ID",
