@@ -211,8 +211,10 @@ export default React.memo(function MachineLoopsPage() {
     }, [resetForm]);
 
 
+    const [debugInfo, setDebugInfo] = React.useState("init");
     const load = React.useCallback(async (kind: "initial" | "refresh") => {
         if (!machineId) {
+            setDebugInfo("no machineId");
             return;
         }
         if (kind === "initial") {
@@ -222,8 +224,10 @@ export default React.memo(function MachineLoopsPage() {
         }
         try {
             if (!rpcReady) {
+                setDebugInfo(`rpcReady=false, kind=${kind}`);
                 return;
             }
+            setDebugInfo(`fetching... kind=${kind}`);
             const [result, bootstrapResult, autoDreamResult] = await Promise.all([
                 machineListAgentLoops(machineId),
                 machineListAgentLoopBootstrapProfiles(machineId),
@@ -232,7 +236,9 @@ export default React.memo(function MachineLoopsPage() {
             setLoops(result.loops ?? []);
             setBootstrapProfiles(bootstrapResult.profiles ?? []);
             setAutoDreamProfiles(autoDreamResult.profiles ?? []);
+            setDebugInfo(`ok: ${result.loops?.length ?? 0} loops, rpc=true`);
         } catch (error) {
+            setDebugInfo(`error: ${error instanceof Error ? error.message : String(error)}`);
             if (!isRpcMethodUnavailableError(error)) {
                 Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
             }
@@ -1325,7 +1331,7 @@ export default React.memo(function MachineLoopsPage() {
 
                 {/* 3. Active Loops — main content */}
                 <ItemGroup title={t("machine.agentLoops")}>
-                    {renderSectionBanner(t("machine.agentLoops"), t("machine.agentLoopsViewAllHint"), String(filteredLoops.length), "repeat-outline")}
+                    {renderSectionBanner(t("machine.agentLoops"), `${debugInfo} | rpc=${String(rpcReady)}`, String(filteredLoops.length), "repeat-outline")}
                     <View style={styles.formSection}>
                         <View style={styles.searchRow}>
                             <View style={[styles.searchBar, styles.searchBarFlex, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
