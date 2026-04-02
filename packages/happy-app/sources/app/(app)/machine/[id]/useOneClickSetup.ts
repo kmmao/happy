@@ -1,32 +1,11 @@
 import * as React from "react";
 import {
     machineCreateAgentLoop,
-    machineCreateAgentLoopBootstrapProfile,
-    machineCreateAutoDreamProfile,
     machineListGitRepos,
     machineSuggestAgentLoops,
     type GitRepoEntry,
     type MachineAgentLoopSuggestion,
 } from "@/sync/ops";
-
-function findCommonParentDir(paths: string[]): string {
-    if (paths.length === 0) return "/";
-    if (paths.length === 1) {
-        const parts = paths[0].split("/");
-        return parts.slice(0, -1).join("/") || "/";
-    }
-    const segments = paths.map((p) => p.split("/"));
-    const common: string[] = [];
-    for (let i = 0; i < segments[0].length; i++) {
-        const seg = segments[0][i];
-        if (segments.every((s) => s[i] === seg)) {
-            common.push(seg);
-        } else {
-            break;
-        }
-    }
-    return common.join("/") || "/";
-}
 
 export type OneClickSetupPhase = "idle" | "scanning" | "suggesting" | "confirming" | "creating" | "done" | "error";
 
@@ -202,27 +181,6 @@ export function useOneClickSetup(machineId: string | undefined, onComplete?: () 
                     created++;
                     setState((prev) => ({ ...prev, createdCount: created }));
                 }
-            }
-
-            // Create Bootstrap profile + Auto-Dream profile for the root scan directory
-            if (created > 0 && selectedRepos.length > 0) {
-                const rootDir = findCommonParentDir(selectedRepos.map((r) => r.repo.repoPath));
-                await Promise.allSettled([
-                    machineCreateAgentLoopBootstrapProfile(machineId, {
-                        name: "Auto Bootstrap",
-                        rootDirectory: rootDir,
-                        intervalMs: 6 * 3_600_000,
-                        agent: "claude",
-                        autoRunCreatedLoops: false,
-                        runNow: false,
-                    }),
-                    machineCreateAutoDreamProfile(machineId, {
-                        name: "Auto Dream",
-                        rootDirectory: rootDir,
-                        intervalMs: 12 * 3_600_000,
-                        runNow: false,
-                    }),
-                ]);
             }
 
             setState((prev) => ({ ...prev, phase: "done" }));
