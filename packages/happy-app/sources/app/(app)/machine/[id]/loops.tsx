@@ -102,7 +102,8 @@ export default React.memo(function MachineLoopsPage() {
     });
     const machine = useMachine(machineId ?? "");
     const rpcReady = machine?.rpcReady ?? false;
-    const oneClickSetup = useOneClickSetup(machineId);
+    const loadRef = React.useRef<() => void>(() => {});
+    const oneClickSetup = useOneClickSetup(machineId, React.useCallback(() => loadRef.current(), []));
     const [loops, setLoops] = React.useState<MachineAgentLoop[]>([]);
     const upstreamLoopIdsByLoopId = React.useMemo(() => {
         const mapping: Record<string, string[]> = {};
@@ -241,6 +242,8 @@ export default React.memo(function MachineLoopsPage() {
             }
         }
     }, [machineId, rpcReady]);
+
+    loadRef.current = () => void load("refresh");
 
     const mutateLoop = React.useCallback(async (loop: MachineAgentLoop, action: "pause" | "resume" | "run-now" | "remove" | "event") => {
         if (!machineId) {
@@ -415,12 +418,6 @@ export default React.memo(function MachineLoopsPage() {
     React.useEffect(() => {
         void load("initial");
     }, [load]);
-
-    React.useEffect(() => {
-        if (oneClickSetup.state.phase === "done" && oneClickSetup.state.createdCount > 0) {
-            void load("refresh");
-        }
-    }, [oneClickSetup.state.phase, oneClickSetup.state.createdCount, load]);
 
     React.useEffect(() => {
         if (!focusLoopId || focusedLoopRef.current === focusLoopId) {

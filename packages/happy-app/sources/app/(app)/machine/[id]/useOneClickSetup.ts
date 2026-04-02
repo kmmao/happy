@@ -42,7 +42,7 @@ const INITIAL_STATE: OneClickSetupState = {
     errorMessage: undefined,
 };
 
-export function useOneClickSetup(machineId: string | undefined): UseOneClickSetupReturn {
+export function useOneClickSetup(machineId: string | undefined, onComplete?: () => void): UseOneClickSetupReturn {
     const [state, setState] = React.useState<OneClickSetupState>(INITIAL_STATE);
     const abortRef = React.useRef(false);
 
@@ -184,6 +184,9 @@ export function useOneClickSetup(machineId: string | undefined): UseOneClickSetu
             }
 
             setState((prev) => ({ ...prev, phase: "done" }));
+            if (created > 0) {
+                setTimeout(() => onComplete?.(), 300);
+            }
         } catch (error) {
             if (abortRef.current) return;
             setState((prev) => ({
@@ -192,8 +195,11 @@ export function useOneClickSetup(machineId: string | undefined): UseOneClickSetu
                 createdCount: created,
                 errorMessage: error instanceof Error ? error.message : String(error),
             }));
+            if (created > 0) {
+                setTimeout(() => onComplete?.(), 300);
+            }
         }
-    }, [machineId, state.repos]);
+    }, [machineId, onComplete, state.repos]);
 
     return {
         state,
