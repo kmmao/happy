@@ -20,15 +20,11 @@ import {
     machineUpdateAgentLoop,
     machineListGitRepos,
     machineListAgentLoopBootstrapProfiles,
-    machineCreateAgentLoopBootstrapProfile,
-    machineUpdateAgentLoopBootstrapProfile,
     machinePauseAgentLoopBootstrapProfile,
     machineResumeAgentLoopBootstrapProfile,
     machineRunNowAgentLoopBootstrapProfile,
     machineRemoveAgentLoopBootstrapProfile,
     machineListAutoDreamProfiles,
-    machineCreateAutoDreamProfile,
-    machineUpdateAutoDreamProfile,
     machinePauseAutoDreamProfile,
     machineResumeAutoDreamProfile,
     machineRunNowAutoDreamProfile,
@@ -36,7 +32,6 @@ import {
     type GitRepoEntry,
     type MachineAgentLoop,
     type MachineAgentLoopBootstrapProfile,
-    type MachineAgentLoopEvent,
     type MachineAgentLoopSuggestion,
     type MachineAutoDreamProfile,
 } from "@/sync/ops";
@@ -48,441 +43,42 @@ import {
     getLoopModalMetrics,
     getQuickActionColumnCount,
 } from "./loopsLayout";
-
-function parseIntervalMs(raw: string): number | null {
-    const match = raw.trim().match(/^(\d+)([smhd])$/i);
-    if (!match) {
-        return null;
-    }
-    const value = Number(match[1]);
-    const unit = match[2].toLowerCase();
-    const multiplier = unit === "s" ? 1_000 : unit === "m" ? 60_000 : unit === "h" ? 3_600_000 : 86_400_000;
-    return value * multiplier;
-}
-
-function formatIntervalMs(ms: number): string {
-    if (ms % 86_400_000 === 0) return `${ms / 86_400_000}d`;
-    if (ms % 3_600_000 === 0) return `${ms / 3_600_000}h`;
-    if (ms % 60_000 === 0) return `${ms / 60_000}m`;
-    return `${Math.round(ms / 1_000)}s`;
-}
-
-function formatTimestamp(value?: number | null): string {
-    if (!value) {
-        return "-";
-    }
-    return new Date(value).toLocaleString();
-}
-
-function getLoopBriefPath(loop: MachineAgentLoop): string {
-    return `${loop.directory}/.happy/agent-loops/${loop.id}/brief-latest.md`;
-}
-
-function getLoopMemoryPath(loop: MachineAgentLoop): string {
-    return `${loop.directory}/.happy/agent-loops/${loop.id}/memory.md`;
-}
-
-function getLoopContextPath(loop: MachineAgentLoop): string {
-    return `${loop.directory}/.happy/agent-loops/${loop.id}/context.md`;
-}
-
-function isRpcMethodUnavailableError(error: unknown): boolean {
-    return error instanceof Error && error.message === "RPC method not available";
-}
-
-function parseEnvironmentVariables(raw: string): Record<string, string> | undefined {
-    const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    if (lines.length === 0) {
-        return undefined;
-    }
-    const entries: Record<string, string> = {};
-    for (const line of lines) {
-        const idx = line.indexOf("=");
-        if (idx <= 0) {
-            throw new Error(t("machine.agentLoopEnvironmentInvalid"));
-        }
-        entries[line.slice(0, idx).trim()] = line.slice(idx + 1);
-    }
-    return Object.keys(entries).length > 0 ? entries : undefined;
-}
-
-function formatEnvironmentVariables(value?: Record<string, string>): string {
-    if (!value) {
-        return "";
-    }
-    return Object.entries(value).map(([key, entry]) => `${key}=${entry}`).join("\n");
-}
-
-function parseLineList(raw: string): string[] | undefined {
-    const values = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    return values.length > 0 ? values : undefined;
-}
-
-function formatLineList(value?: string[]): string {
-    return value?.join("\n") ?? "";
-}
-
-
-function parsePositiveInteger(raw: string): number | null | undefined {
-    const normalized = raw.trim();
-    if (!normalized) {
-        return undefined;
-    }
-    if (!/^\d+$/.test(normalized)) {
-        return null;
-    }
-    const value = Number(normalized);
-    return value > 0 ? value : null;
-}
-
-function isValidTimeOfDay(raw: string): boolean {
-    return /^([01]\d|2[0-3]):([0-5]\d)$/.test(raw.trim());
-}
-
-function parseDownstreamTriggers(raw: string): Array<"completed" | "failed"> | null | undefined {
-    const values = parseLineList(raw);
-    if (!values) {
-        return undefined;
-    }
-    const normalized = [...new Set(values.map((value) => value.toLowerCase()))];
-    if (normalized.every((value) => value === "completed" || value === "failed")) {
-        return normalized as Array<"completed" | "failed">;
-    }
-    return null;
-}
-
-function formatDownstreamTriggers(value?: Array<"completed" | "failed">): string {
-    return value?.join("\n") ?? "";
-}
-
-function getDownstreamTriggerLabel(value: "completed" | "failed"): string {
-    return value === "completed" ? t("machine.agentLoopDownstreamTriggerCompleted") : t("machine.agentLoopDownstreamTriggerFailed");
-}
-
-function getLoopRuntimeLabel(loop: MachineAgentLoop): string {
-    if (loop.runtimeState === "blocked") {
-        return t("machine.agentLoopRuntimeBlocked");
-    }
-    if (loop.runtimeState === "active") {
-        if (loop.phase === "planning") return t("machine.agentLoopPhasePlanning");
-        if (loop.phase === "acting") return t("machine.agentLoopPhaseActing");
-        if (loop.phase === "reflecting") return t("machine.agentLoopPhaseReflecting");
-        return t("machine.agentLoopRuntimeActive");
-    }
-    if (loop.runtimeState === "paused") {
-        return t("machine.agentLoopPaused");
-    }
-    return t("machine.agentLoopPhaseSleeping");
-}
-
-function getLoopPhaseLabel(loop: MachineAgentLoop): string {
-    switch (loop.phase) {
-        case "planning":
-            return t("machine.agentLoopPhasePlanning");
-        case "acting":
-            return t("machine.agentLoopPhaseActing");
-        case "reflecting":
-            return t("machine.agentLoopPhaseReflecting");
-        case "blocked":
-            return t("machine.agentLoopRuntimeBlocked");
-        case "paused":
-            return t("machine.agentLoopPaused");
-        case "sleeping":
-        default:
-            return t("machine.agentLoopPhaseSleeping");
-    }
-}
-
-function isWithinQuietHoursLocal(loop: MachineAgentLoop, now = Date.now()): boolean {
-    if (!loop.quietHoursStart || !loop.quietHoursEnd || loop.quietHoursStart === loop.quietHoursEnd) {
-        return false;
-    }
-    const [startHour, startMinute] = loop.quietHoursStart.split(":").map(Number);
-    const [endHour, endMinute] = loop.quietHoursEnd.split(":").map(Number);
-    const current = new Date(now);
-    const currentMinutes = current.getHours() * 60 + current.getMinutes();
-    const startMinutes = startHour * 60 + startMinute;
-    const endMinutes = endHour * 60 + endMinute;
-    if (startMinutes < endMinutes) {
-        return currentMinutes >= startMinutes && currentMinutes < endMinutes;
-    }
-    return currentMinutes >= startMinutes || currentMinutes < endMinutes;
-}
-
-function getLoopPolicyReasonLabel(reason?: string): string {
-    switch (reason) {
-        case "quiet-hours":
-            return t("machine.agentLoopPolicyStateQuietHours");
-        case "cooldown":
-            return t("machine.agentLoopPolicyStateCooldown");
-        case "max-auto-runs":
-            return t("machine.agentLoopPolicyStateMaxAutoRuns");
-        case "max-iterations":
-            return t("machine.agentLoopPolicyStateMaxIterations");
-        case "stop-on-success":
-            return t("machine.agentLoopStopReasonSuccess");
-        default:
-            return t("machine.agentLoopPolicyStateReady");
-    }
-}
-
-function getLoopPolicyStateLabel(loop: MachineAgentLoop, now = Date.now()): string {
-    if (loop.stopReason) {
-        return getLoopPolicyReasonLabel(loop.stopReason);
-    }
-    if (loop.maxIterations && loop.iteration >= loop.maxIterations) {
-        return t("machine.agentLoopPolicyStateMaxIterations");
-    }
-    if (isWithinQuietHoursLocal(loop, now)) {
-        return t("machine.agentLoopPolicyStateQuietHours");
-    }
-    if (loop.cooldownMs && loop.lastCompletedAt && now < loop.lastCompletedAt + loop.cooldownMs) {
-        return t("machine.agentLoopPolicyStateCooldown");
-    }
-    if (loop.maxAutoRunsPerDay && (loop.autoRunsToday ?? 0) >= loop.maxAutoRunsPerDay) {
-        return t("machine.agentLoopPolicyStateMaxAutoRuns");
-    }
-    return t("machine.agentLoopPolicyStateReady");
-}
-
-function getLoopTriggerLabel(loop: MachineAgentLoop): string {
-    if (!loop.lastTriggerSource) {
-        return "-";
-    }
-    switch (loop.lastTriggerSource) {
-        case "manual":
-            return t("machine.agentLoopTriggerManual");
-        case "schedule":
-            return t("machine.agentLoopTriggerSchedule");
-        case "event":
-            return t("machine.agentLoopTriggerEvent");
-        default:
-            return loop.lastTriggerSource;
-    }
-}
-
-function getLoopStatusLabel(loop: MachineAgentLoop): string {
-    if (loop.runtimeState === "blocked") {
-        return t("machine.agentLoopRuntimeBlocked");
-    }
-    return loop.enabled ? t("machine.agentLoopEnabled") : t("machine.agentLoopPaused");
-}
-
-function getLoopSubtitle(loop: MachineAgentLoop): string {
-    const parts = [
-        `${t("machine.agentLoopIteration")}: ${loop.iteration}`,
-        `${t("machine.agentLoopRuntime")}: ${getLoopRuntimeLabel(loop)}`,
-        `${t("machine.agentLoopInterval")}: ${formatIntervalMs(loop.intervalMs)}`,
-        `${t("machine.agentLoopNextRun")}: ${formatTimestamp(loop.nextRunAt)}`,
-        `${t("machine.agentLoopAgent")}: ${loop.agent}`,
-        `${t("machine.agentLoopFileWatch")}: ${loop.fileWatchEnabled ? t("common.yes") : t("common.no")}`,
-        `${t("machine.agentLoopGithubBridge")}: ${loop.githubBridgeEnabled ? t("common.yes") : t("common.no")}`,
-        `${t("machine.agentLoopCiBridge")}: ${loop.ciBridgeEnabled ? t("common.yes") : t("common.no")}`,
-        `${t("machine.agentLoopFailurePolicy")}: ${loop.consecutiveFailures ?? 0}/${loop.maxConsecutiveFailures ?? 1}${loop.retryBackoffMs ? ` • ${formatIntervalMs(loop.retryBackoffMs)}` : ""}`,
-        `${t("machine.agentLoopPolicyState")}: ${getLoopPolicyStateLabel(loop)}`,
-        loop.cooldownMs ? `${t("machine.agentLoopCooldown")}: ${formatIntervalMs(loop.cooldownMs)}` : undefined,
-        loop.quietHoursStart && loop.quietHoursEnd ? `${t("machine.agentLoopQuietHours")}: ${loop.quietHoursStart} → ${loop.quietHoursEnd}` : undefined,
-        loop.maxAutoRunsPerDay ? `${t("machine.agentLoopMaxAutoRuns")}: ${loop.autoRunsToday ?? 0}/${loop.maxAutoRunsPerDay}` : undefined,
-        loop.maxIterations ? `${t("machine.agentLoopMaxIterations")}: ${loop.iteration}/${loop.maxIterations}` : undefined,
-        loop.stopOnSuccess ? `${t("machine.agentLoopStopOnSuccess")}: ${t("common.yes")}` : undefined,
-        loop.stopReason ? `${t("machine.agentLoopStopReason")}: ${getLoopPolicyReasonLabel(loop.stopReason)}` : undefined,
-        loop.downstreamLoopIds?.length ? `${t("machine.agentLoopDownstreamLoops")}: ${loop.downstreamLoopIds.join(", ")}` : undefined,
-        loop.downstreamTriggerOn?.length ? `${t("machine.agentLoopDownstreamTriggers")}: ${loop.downstreamTriggerOn.map(getDownstreamTriggerLabel).join(", ")}` : undefined,
-        loop.notifyEvents?.length ? `${t("machine.agentLoopNotifyEvents")}: ${loop.notifyEvents.join(", ")}` : undefined,
-        loop.notificationChannels?.length ? `${t("machine.agentLoopNotifyChannels")}: ${loop.notificationChannels.join(", ")}` : undefined,
-        loop.notificationWebhookUrl ? `${t("machine.agentLoopNotifyWebhook")}: ${loop.notificationWebhookUrl}` : undefined,
-        loop.lastBriefAt ? `${t("machine.agentLoopLastBrief")}: ${formatTimestamp(loop.lastBriefAt)}${loop.lastBriefSummary ? ` • ${loop.lastBriefSummary}` : ""}` : undefined,
-        loop.eventSourceAllowlist?.length ? `${t("machine.agentLoopEventSources")}: ${loop.eventSourceAllowlist.join(", ")}` : undefined,
-        loop.eventKeywordFilters?.length ? `${t("machine.agentLoopEventKeywords")}: ${loop.eventKeywordFilters.join(", ")}` : undefined,
-        `${t("machine.agentLoopLastTrigger")}: ${getLoopTriggerLabel(loop)} • ${formatTimestamp(loop.lastTriggerAt)}`,
-        loop.lastBriefSummary ? `${t("machine.agentLoopLastBrief")}: ${loop.lastBriefSummary}` : undefined,
-    ];
-    if (loop.currentFocus) {
-        parts.push(`${t("machine.agentLoopCurrentFocus")}: ${loop.currentFocus}`);
-    }
-    const pendingEvents = loop.recentEvents?.filter((event) => event.status === "pending").length ?? 0;
-    if (pendingEvents > 0) {
-        parts.push(`${t("machine.agentLoopPendingEvents")}: ${pendingEvents}`);
-    }
-    if (loop.lastError) {
-        parts.push(loop.lastError);
-    }
-    return parts.join(" • ");
-}
-
-
-function getLoopEventStatusLabel(event: MachineAgentLoopEvent): string {
-    switch (event.status) {
-        case "pending":
-            return t("machine.agentLoopEventPending");
-        case "dispatched":
-            return t("machine.agentLoopEventDispatched");
-        case "completed":
-            return t("machine.automationCompleted");
-        case "failed":
-            return t("machine.automationFailed");
-        case "cancelled":
-            return t("machine.automationCancelled");
-        case "ignored":
-            return t("machine.agentLoopEventIgnored");
-        default:
-            return event.status;
-    }
-}
-
-function formatLoopEvents(loop: MachineAgentLoop): string | undefined {
-    if (!loop.recentEvents || loop.recentEvents.length === 0) {
-        return undefined;
-    }
-    return loop.recentEvents.slice(0, 5).map((event) => `• ${formatTimestamp(event.createdAt)} — ${event.title} (${getLoopEventStatusLabel(event)})${event.source ? ` [${event.source}]` : ""}`).join("\n");
-}
+import { AutoDreamProfileEditorModal } from "./AutoDreamProfileEditorModal";
+import { BootstrapProfileEditorModal } from "./BootstrapProfileEditorModal";
+import { OneClickSetupCard } from "./OneClickSetupCard";
+import { useOneClickSetup } from "./useOneClickSetup";
+import {
+    formatDownstreamTriggers,
+    formatEnvironmentVariables,
+    formatIntervalMs,
+    formatLineList,
+    isRpcMethodUnavailableError,
+    isValidTimeOfDay,
+    parseDownstreamTriggers,
+    parseEnvironmentVariables,
+    parseIntervalMs,
+    parseLineList,
+    parsePositiveInteger,
+} from "./loopsUtils";
+import {
+    getAutoDreamProfileDetailMessage,
+    getAutoDreamProfileStatusColor,
+    getAutoDreamProfileSubtitle,
+    getBootstrapProfileDetailMessage,
+    getBootstrapProfileStatusColor,
+    getBootstrapProfileSubtitle,
+    getLoopBriefPath,
+    getLoopContextPath,
+    getLoopDetailMessage,
+    getLoopMemoryPath,
+    getLoopStatusColor,
+    getLoopStatusLabel,
+    getLoopSubtitle,
+} from "./loopsLabels";
 
 interface RepoBootstrapEntry {
     readonly repo: GitRepoEntry;
     readonly suggestions: readonly MachineAgentLoopSuggestion[];
-}
-
-function getLoopStatusColor(loop: MachineAgentLoop, theme: any): string {
-    if (loop.runtimeState === "blocked") {
-        return "#FF3B30";
-    }
-    if (loop.runtimeState === "active") {
-        return "#0A84FF";
-    }
-    if (loop.enabled) {
-        return "#34C759";
-    }
-    return theme.colors.textSecondary;
-}
-
-function getLoopDetailMessage(loop: MachineAgentLoop): string {
-    return [
-        `${t("machine.agentLoopStatus")}: ${getLoopStatusLabel(loop)}`,
-        `${t("machine.agentLoopPath")}: ${loop.directory}`,
-        `${t("machine.agentLoopRuntime")}: ${getLoopRuntimeLabel(loop)}`,
-        `${t("machine.agentLoopPhase")}: ${getLoopPhaseLabel(loop)}`,
-        `${t("machine.agentLoopInterval")}: ${formatIntervalMs(loop.intervalMs)}`,
-        `${t("machine.agentLoopIteration")}: ${loop.iteration}`,
-        `${t("machine.agentLoopNextRun")}: ${formatTimestamp(loop.nextRunAt)}`,
-        `${t("machine.agentLoopLastRun")}: ${formatTimestamp(loop.lastCompletedAt ?? loop.lastStartedAt ?? loop.lastEnqueuedAt)}`,
-        `${t("machine.agentLoopLastTrigger")}: ${getLoopTriggerLabel(loop)} • ${formatTimestamp(loop.lastTriggerAt)}`,
-        loop.lastBriefSummary ? `${t("machine.agentLoopLastBrief")}: ${loop.lastBriefSummary}` : undefined,
-        `${t("machine.agentLoopPhaseUpdatedAt")}: ${formatTimestamp(loop.phaseUpdatedAt)}`,
-        `${t("machine.agentLoopLastSession")}: ${loop.lastSessionId ?? "-"}`,
-        `${t("machine.agentLoopAgent")}: ${loop.agent}`,
-        `${t("machine.agentLoopFileWatch")}: ${loop.fileWatchEnabled ? t("common.yes") : t("common.no")}`,
-        `${t("machine.agentLoopGithubBridge")}: ${loop.githubBridgeEnabled ? t("common.yes") : t("common.no")}`,
-        `${t("machine.agentLoopCiBridge")}: ${loop.ciBridgeEnabled ? t("common.yes") : t("common.no")}`,
-        loop.eventSourceAllowlist?.length ? `${t("machine.agentLoopEventSources")}: ${loop.eventSourceAllowlist.join(", ")}` : undefined,
-        loop.eventKeywordFilters?.length ? `${t("machine.agentLoopEventKeywords")}: ${loop.eventKeywordFilters.join(", ")}` : undefined,
-        loop.cooldownMs ? `${t("machine.agentLoopCooldown")}: ${formatIntervalMs(loop.cooldownMs)}` : undefined,
-        loop.quietHoursStart && loop.quietHoursEnd ? `${t("machine.agentLoopQuietHours")}: ${loop.quietHoursStart} → ${loop.quietHoursEnd}` : undefined,
-        `${t("machine.agentLoopPolicyState")}: ${getLoopPolicyStateLabel(loop)}`,
-        loop.maxAutoRunsPerDay ? `${t("machine.agentLoopMaxAutoRuns")}: ${loop.maxAutoRunsPerDay}` : undefined,
-        loop.maxIterations ? `${t("machine.agentLoopMaxIterations")}: ${loop.maxIterations}` : undefined,
-        `${t("machine.agentLoopStopOnSuccess")}: ${loop.stopOnSuccess ? t("common.yes") : t("common.no")}`,
-        loop.stopReason ? `${t("machine.agentLoopStopReason")}: ${getLoopPolicyReasonLabel(loop.stopReason)}` : undefined,
-        `${t("machine.agentLoopAutoRunsToday")}: ${loop.autoRunsToday ?? 0}`,
-        `${t("machine.agentLoopAutoRunWindow")}: ${formatTimestamp(loop.autoRunWindowStartedAt)}`,
-        loop.lastPolicyGateReason ? `${t("machine.agentLoopLastPolicyGate")}: ${getLoopPolicyReasonLabel(loop.lastPolicyGateReason)} • ${formatTimestamp(loop.lastPolicyGateAt)}` : undefined,
-        loop.downstreamLoopIds?.length ? `${t("machine.agentLoopDownstreamLoops")}: ${loop.downstreamLoopIds.join(", ")}` : undefined,
-        loop.downstreamTriggerOn?.length ? `${t("machine.agentLoopDownstreamTriggers")}: ${loop.downstreamTriggerOn.map(getDownstreamTriggerLabel).join(", ")}` : undefined,
-        loop.notifyEvents?.length ? `${t("machine.agentLoopNotifyEvents")}: ${loop.notifyEvents.join(", ")}` : undefined,
-        loop.notificationChannels?.length ? `${t("machine.agentLoopNotifyChannels")}: ${loop.notificationChannels.join(", ")}` : undefined,
-        loop.notificationWebhookUrl ? `${t("machine.agentLoopNotifyWebhook")}: ${loop.notificationWebhookUrl}` : undefined,
-        loop.lastBriefAt ? `${t("machine.agentLoopLastBrief")}: ${formatTimestamp(loop.lastBriefAt)}${loop.lastBriefSummary ? ` • ${loop.lastBriefSummary}` : ""}` : undefined,
-        loop.goal ? `${t("machine.agentLoopGoal")}: ${loop.goal}` : undefined,
-        loop.currentFocus ? `${t("machine.agentLoopCurrentFocus")}: ${loop.currentFocus}` : undefined,
-        loop.workingMemory ? `${t("machine.agentLoopWorkingMemory")}:
-${loop.workingMemory}` : undefined,
-        loop.lastReflectionSummary ? `${t("machine.agentLoopReflectionSummary")}:
-${loop.lastReflectionSummary}` : undefined,
-        loop.memoryUpdatedAt ? `${t("machine.agentLoopMemoryUpdated")}: ${formatTimestamp(loop.memoryUpdatedAt)}` : undefined,
-        loop.projectId ? `${t("machine.automationAuditProject")}: ${loop.projectId}` : undefined,
-        loop.profileId ? `${t("machine.agentLoopProfile")}: ${loop.profileId}` : undefined,
-        loop.lastError ? `${t("machine.automationFailed")}: ${loop.lastError}` : undefined,
-        loop.blockedReason ? `${t("machine.agentLoopBlockedReason")}: ${loop.blockedReason}` : undefined,
-        loop.environmentVariables ? `${t("machine.agentLoopEnvironment")}:\n${formatEnvironmentVariables(loop.environmentVariables)}` : undefined,
-        formatLoopEvents(loop) ? `${t("machine.agentLoopRecentEvents")}:
-${formatLoopEvents(loop)}` : undefined,
-        undefined,
-        `${t("machine.agentLoopPrompt")}:`,
-        loop.prompt,
-    ].filter(Boolean).join("\n");
-}
-
-function getBootstrapProfileStatusColor(profile: MachineAgentLoopBootstrapProfile, theme: any): string {
-    if (profile.status === "failed") return "#FF3B30";
-    if (profile.status === "running") return "#0A84FF";
-    if (profile.status === "paused") return theme.colors.textSecondary;
-    return "#34C759";
-}
-
-function getBootstrapProfileSubtitle(profile: MachineAgentLoopBootstrapProfile): string {
-    return [
-        `${t("machine.agentLoopPath")}: ${profile.rootDirectory}`,
-        `${t("machine.agentLoopInterval")}: ${formatIntervalMs(profile.intervalMs)}`,
-        `${t("machine.agentLoopBootstrapStatus")}: ${profile.status}`,
-        `${t("machine.agentLoopNextRun")}: ${formatTimestamp(profile.nextRunAt)}`,
-        `${t("machine.agentLoopBootstrapCreatedCount")}: ${profile.lastCreatedCount ?? 0}`,
-        profile.lastError ? profile.lastError : undefined,
-    ].filter(Boolean).join(" • ");
-}
-
-function getBootstrapProfileDetailMessage(profile: MachineAgentLoopBootstrapProfile): string {
-    return [
-        `${t("machine.agentLoopStatus")}: ${profile.status}`,
-        `${t("machine.agentLoopPath")}: ${profile.rootDirectory}`,
-        `${t("machine.agentLoopInterval")}: ${formatIntervalMs(profile.intervalMs)}`,
-        `${t("machine.agentLoopNextRun")}: ${formatTimestamp(profile.nextRunAt)}`,
-        `${t("machine.agentLoopBootstrapMaxDepth")}: ${profile.maxDepth ?? "-"}`,
-        `${t("machine.agentLoopBootstrapLimit")}: ${profile.limit ?? "-"}`,
-        `${t("machine.agentLoopAgent")}: ${profile.agent ?? "-"}`,
-        `${t("machine.agentLoopProfile")}: ${profile.profileId ?? "-"}`,
-        `${t("machine.automationAuditProject")}: ${profile.projectId ?? "-"}`,
-        `${t("machine.agentLoopBootstrapAutoRunCreated")}: ${profile.autoRunCreatedLoops ? t("common.yes") : t("common.no")}`,
-        `${t("machine.agentLoopLastRun")}: ${formatTimestamp(profile.lastRunAt)}`,
-        `${t("machine.agentLoopBootstrapRepoCount")}: ${profile.lastRepoCount ?? 0}`,
-        `${t("machine.agentLoopBootstrapSuggestionCount")}: ${profile.lastSuggestionCount ?? 0}`,
-        `${t("machine.agentLoopBootstrapCreatedCount")}: ${profile.lastCreatedCount ?? 0}`,
-        profile.lastError ? `${t("machine.automationFailed")}: ${profile.lastError}` : undefined,
-    ].filter(Boolean).join("\n");
-}
-
-
-function getAutoDreamProfileStatusColor(profile: MachineAutoDreamProfile, theme: any): string {
-    if (profile.status === "failed") return "#FF3B30";
-    if (profile.status === "running") return "#0A84FF";
-    if (profile.status === "paused") return theme.colors.textSecondary;
-    return "#34C759";
-}
-
-function getAutoDreamProfileSubtitle(profile: MachineAutoDreamProfile): string {
-    return [
-        `${t("machine.agentLoopPath")}: ${profile.rootDirectory}`,
-        `${t("machine.agentLoopInterval")}: ${formatIntervalMs(profile.intervalMs)}`,
-        `${t("machine.autoDreamStage")}: ${profile.stage}`,
-        `${t("machine.agentLoopNextRun")}: ${formatTimestamp(profile.nextRunAt)}`,
-        `${t("machine.autoDreamMemoryFiles")}: ${profile.lastMemoryFiles ?? 0}`,
-        profile.lastError ? profile.lastError : undefined,
-    ].filter(Boolean).join(" • ");
-}
-
-function getAutoDreamProfileDetailMessage(profile: MachineAutoDreamProfile): string {
-    return [
-        `${t("machine.agentLoopStatus")}: ${profile.status}`,
-        `${t("machine.autoDreamStage")}: ${profile.stage}`,
-        `${t("machine.agentLoopPath")}: ${profile.rootDirectory}`,
-        `${t("machine.agentLoopInterval")}: ${formatIntervalMs(profile.intervalMs)}`,
-        `${t("machine.agentLoopNextRun")}: ${formatTimestamp(profile.nextRunAt)}`,
-        `${t("machine.agentLoopBootstrapMaxDepth")}: ${profile.maxDepth ?? "-"}`,
-        `${t("machine.agentLoopBootstrapLimit")}: ${profile.limit ?? "-"}`,
-        `${t("machine.agentLoopLastRun")}: ${formatTimestamp(profile.lastRunAt)}`,
-        `${t("machine.autoDreamMemoryFiles")}: ${profile.lastMemoryFiles ?? 0}`,
-        `${t("machine.autoDreamUpdatedFiles")}: ${profile.lastUpdatedFiles ?? 0}`,
-        `${t("machine.autoDreamLatestReport")}: ${profile.latestDreamFilePath ?? "-"}`,
-        profile.lastError ? `${t("machine.automationFailed")}: ${profile.lastError}` : undefined,
-    ].filter(Boolean).join("\n");
 }
 
 export default React.memo(function MachineLoopsPage() {
@@ -506,6 +102,7 @@ export default React.memo(function MachineLoopsPage() {
     });
     const machine = useMachine(machineId ?? "");
     const rpcReady = machine?.rpcReady ?? false;
+    const oneClickSetup = useOneClickSetup(machineId);
     const [loops, setLoops] = React.useState<MachineAgentLoop[]>([]);
     const upstreamLoopIdsByLoopId = React.useMemo(() => {
         const mapping: Record<string, string[]> = {};
@@ -526,27 +123,11 @@ export default React.memo(function MachineLoopsPage() {
     const [bootstrapScanning, setBootstrapScanning] = React.useState(false);
     const [bootstrappingRepoPath, setBootstrappingRepoPath] = React.useState<string | null>(null);
     const [bootstrapProfiles, setBootstrapProfiles] = React.useState<MachineAgentLoopBootstrapProfile[]>([]);
-    const [bootstrapSaving, setBootstrapSaving] = React.useState(false);
     const [mutatingBootstrapProfileId, setMutatingBootstrapProfileId] = React.useState<string | null>(null);
-    const [editingBootstrapProfileId, setEditingBootstrapProfileId] = React.useState<string | null>(null);
-    const [bootstrapProfileName, setBootstrapProfileName] = React.useState("");
-    const [bootstrapRootDirectory, setBootstrapRootDirectory] = React.useState("");
-    const [bootstrapInterval, setBootstrapInterval] = React.useState("6h");
-    const [bootstrapMaxDepth, setBootstrapMaxDepth] = React.useState("");
-    const [bootstrapLimit, setBootstrapLimit] = React.useState("");
-    const [bootstrapAgent, setBootstrapAgent] = React.useState<MachineAgentLoop["agent"]>("claude");
-    const [bootstrapProjectId, setBootstrapProjectId] = React.useState("");
-    const [bootstrapProfileIdValue, setBootstrapProfileIdValue] = React.useState("");
-    const [bootstrapAutoRunCreated, setBootstrapAutoRunCreated] = React.useState(false);
+    const [editingBootstrapProfile, setEditingBootstrapProfile] = React.useState<MachineAgentLoopBootstrapProfile | null>(null);
     const [autoDreamProfiles, setAutoDreamProfiles] = React.useState<MachineAutoDreamProfile[]>([]);
-    const [autoDreamSaving, setAutoDreamSaving] = React.useState(false);
     const [mutatingAutoDreamProfileId, setMutatingAutoDreamProfileId] = React.useState<string | null>(null);
-    const [editingAutoDreamProfileId, setEditingAutoDreamProfileId] = React.useState<string | null>(null);
-    const [autoDreamName, setAutoDreamName] = React.useState("");
-    const [autoDreamRootDirectory, setAutoDreamRootDirectory] = React.useState("");
-    const [autoDreamInterval, setAutoDreamInterval] = React.useState("12h");
-    const [autoDreamMaxDepth, setAutoDreamMaxDepth] = React.useState("");
-    const [autoDreamLimit, setAutoDreamLimit] = React.useState("");
+    const [editingAutoDreamProfile, setEditingAutoDreamProfile] = React.useState<MachineAutoDreamProfile | null>(null);
     const [suggesting, setSuggesting] = React.useState(false);
     const [creatingSuggestionKey, setCreatingSuggestionKey] = React.useState<string | null>(null);
     const [adoptingAllSuggestions, setAdoptingAllSuggestions] = React.useState(false);
@@ -616,27 +197,6 @@ export default React.memo(function MachineLoopsPage() {
         setShowAdvanced(false);
     }, []);
 
-    const resetBootstrapProfileForm = React.useCallback(() => {
-        setEditingBootstrapProfileId(null);
-        setBootstrapProfileName("");
-        setBootstrapRootDirectory("");
-        setBootstrapInterval("6h");
-        setBootstrapMaxDepth("");
-        setBootstrapLimit("");
-        setBootstrapAgent("claude");
-        setBootstrapProjectId("");
-        setBootstrapProfileIdValue("");
-        setBootstrapAutoRunCreated(false);
-    }, []);
-
-    const resetAutoDreamProfileForm = React.useCallback(() => {
-        setEditingAutoDreamProfileId(null);
-        setAutoDreamName("");
-        setAutoDreamRootDirectory("");
-        setAutoDreamInterval("12h");
-        setAutoDreamMaxDepth("");
-        setAutoDreamLimit("");
-    }, []);
 
     const closeLoopEditor = React.useCallback(() => {
         setLoopEditorVisible(false);
@@ -648,25 +208,6 @@ export default React.memo(function MachineLoopsPage() {
         setLoopEditorVisible(true);
     }, [resetForm]);
 
-    const closeBootstrapProfileEditor = React.useCallback(() => {
-        setBootstrapProfileEditorVisible(false);
-        resetBootstrapProfileForm();
-    }, [resetBootstrapProfileForm]);
-
-    const openCreateBootstrapProfileEditor = React.useCallback(() => {
-        resetBootstrapProfileForm();
-        setBootstrapProfileEditorVisible(true);
-    }, [resetBootstrapProfileForm]);
-
-    const closeAutoDreamProfileEditor = React.useCallback(() => {
-        setAutoDreamProfileEditorVisible(false);
-        resetAutoDreamProfileForm();
-    }, [resetAutoDreamProfileForm]);
-
-    const openCreateAutoDreamProfileEditor = React.useCallback(() => {
-        resetAutoDreamProfileForm();
-        setAutoDreamProfileEditorVisible(true);
-    }, [resetAutoDreamProfileForm]);
 
     const load = React.useCallback(async (kind: "initial" | "refresh") => {
         if (!machineId) {
@@ -678,9 +219,7 @@ export default React.memo(function MachineLoopsPage() {
             setRefreshing(true);
         }
         try {
-            if (!rpcReady) {
-                return;
-            }
+            if (!rpcReady) return;
             const [result, bootstrapResult, autoDreamResult] = await Promise.all([
                 machineListAgentLoops(machineId),
                 machineListAgentLoopBootstrapProfiles(machineId),
@@ -877,6 +416,12 @@ export default React.memo(function MachineLoopsPage() {
     }, [load]);
 
     React.useEffect(() => {
+        if (oneClickSetup.state.phase === "done" && oneClickSetup.state.createdCount > 0) {
+            void load("refresh");
+        }
+    }, [oneClickSetup.state.phase, oneClickSetup.state.createdCount, load]);
+
+    React.useEffect(() => {
         if (!focusLoopId || focusedLoopRef.current === focusLoopId) {
             return;
         }
@@ -912,81 +457,6 @@ export default React.memo(function MachineLoopsPage() {
         }
     }, [agent, directory, machineId, profileId, projectId]);
 
-    const saveBootstrapProfile = React.useCallback(async () => {
-        if (!machineId) {
-            return;
-        }
-        const parsedInterval = parseIntervalMs(bootstrapInterval);
-        const parsedMaxDepth = parsePositiveInteger(bootstrapMaxDepth);
-        const parsedLimit = parsePositiveInteger(bootstrapLimit);
-        if (!bootstrapRootDirectory.trim()) {
-            Modal.alert(t("common.error"), t("machine.agentLoopPathRequired"));
-            return;
-        }
-        if (parsedInterval == null) {
-            Modal.alert(t("common.error"), t("machine.agentLoopIntervalInvalid"));
-            return;
-        }
-        if (bootstrapMaxDepth.trim() && parsedMaxDepth == null) {
-            Modal.alert(t("common.error"), t("machine.agentLoopBootstrapDepthInvalid"));
-            return;
-        }
-        if (bootstrapLimit.trim() && parsedLimit == null) {
-            Modal.alert(t("common.error"), t("machine.agentLoopBootstrapLimitInvalid"));
-            return;
-        }
-        setBootstrapSaving(true);
-        try {
-            const result = editingBootstrapProfileId
-                ? await machineUpdateAgentLoopBootstrapProfile(machineId, editingBootstrapProfileId, {
-                    name: bootstrapProfileName.trim() || null,
-                    rootDirectory: bootstrapRootDirectory.trim(),
-                    intervalMs: parsedInterval,
-                    maxDepth: parsedMaxDepth ?? null,
-                    limit: parsedLimit ?? null,
-                    agent: bootstrapAgent,
-                    profileId: bootstrapProfileIdValue.trim() || null,
-                    projectId: bootstrapProjectId.trim() || null,
-                    autoRunCreatedLoops: bootstrapAutoRunCreated,
-                })
-                : await machineCreateAgentLoopBootstrapProfile(machineId, {
-                    name: bootstrapProfileName.trim() || undefined,
-                    rootDirectory: bootstrapRootDirectory.trim(),
-                    intervalMs: parsedInterval,
-                    maxDepth: parsedMaxDepth ?? undefined,
-                    limit: parsedLimit ?? undefined,
-                    agent: bootstrapAgent,
-                    profileId: bootstrapProfileIdValue.trim() || undefined,
-                    projectId: bootstrapProjectId.trim() || undefined,
-                    autoRunCreatedLoops: bootstrapAutoRunCreated,
-                    runNow: false,
-                });
-            if (!result.success) {
-                throw new Error(result.errorMessage || t("common.error"));
-            }
-            setBootstrapProfileEditorVisible(false);
-            resetBootstrapProfileForm();
-            await load("refresh");
-        } catch (error) {
-            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
-        } finally {
-            setBootstrapSaving(false);
-        }
-    }, [bootstrapAgent, bootstrapAutoRunCreated, bootstrapInterval, bootstrapLimit, bootstrapMaxDepth, bootstrapProfileIdValue, bootstrapProfileName, bootstrapProjectId, bootstrapRootDirectory, editingBootstrapProfileId, load, machineId, resetBootstrapProfileForm]);
-
-    const applyBootstrapProfileToForm = React.useCallback((profile: MachineAgentLoopBootstrapProfile) => {
-        setEditingBootstrapProfileId(profile.id);
-        setBootstrapProfileName(profile.name ?? "");
-        setBootstrapRootDirectory(profile.rootDirectory);
-        setBootstrapInterval(formatIntervalMs(profile.intervalMs));
-        setBootstrapMaxDepth(profile.maxDepth != null ? String(profile.maxDepth) : "");
-        setBootstrapLimit(profile.limit != null ? String(profile.limit) : "");
-        setBootstrapAgent(profile.agent ?? "claude");
-        setBootstrapProfileIdValue(profile.profileId ?? "");
-        setBootstrapProjectId(profile.projectId ?? "");
-        setBootstrapAutoRunCreated(Boolean(profile.autoRunCreatedLoops));
-        setBootstrapProfileEditorVisible(true);
-    }, []);
 
     const mutateBootstrapProfile = React.useCallback(async (profile: MachineAgentLoopBootstrapProfile, action: "pause" | "resume" | "run-now" | "remove") => {
         if (!machineId) {
@@ -1004,9 +474,8 @@ export default React.memo(function MachineLoopsPage() {
             if (!result.success) {
                 throw new Error(result.errorMessage || t("common.error"));
             }
-            if (editingBootstrapProfileId === profile.id && action === "remove") {
+            if (editingBootstrapProfile?.id === profile.id && action === "remove") {
                 setBootstrapProfileEditorVisible(false);
-                resetBootstrapProfileForm();
             }
             await load("refresh");
         } catch (error) {
@@ -1014,12 +483,12 @@ export default React.memo(function MachineLoopsPage() {
         } finally {
             setMutatingBootstrapProfileId(null);
         }
-    }, [editingBootstrapProfileId, load, machineId, resetBootstrapProfileForm]);
+    }, [editingBootstrapProfile?.id, load, machineId]);
 
     const openBootstrapProfileActions = React.useCallback((profile: MachineAgentLoopBootstrapProfile) => {
         const buttons: Array<{ text: string; style?: "cancel" | "default" | "destructive"; onPress?: () => void }> = [
             { text: t("common.cancel"), style: "cancel" },
-            { text: t("machine.agentLoopEdit"), onPress: () => applyBootstrapProfileToForm(profile) },
+            { text: t("machine.agentLoopEdit"), onPress: () => { setEditingBootstrapProfile(profile); setBootstrapProfileEditorVisible(true); } },
             { text: t("machine.agentLoopRunNow"), onPress: () => void mutateBootstrapProfile(profile, "run-now") },
             profile.enabled
                 ? { text: t("machine.agentLoopPause"), onPress: () => void mutateBootstrapProfile(profile, "pause") }
@@ -1038,71 +507,8 @@ export default React.memo(function MachineLoopsPage() {
             },
         ];
         Modal.alert(profile.name || profile.id, getBootstrapProfileDetailMessage(profile), buttons);
-    }, [applyBootstrapProfileToForm, mutateBootstrapProfile]);
+    }, [mutateBootstrapProfile]);
 
-    const saveAutoDreamProfile = React.useCallback(async () => {
-        if (!machineId) {
-            return;
-        }
-        const parsedInterval = parseIntervalMs(autoDreamInterval);
-        const parsedMaxDepth = parsePositiveInteger(autoDreamMaxDepth);
-        const parsedLimit = parsePositiveInteger(autoDreamLimit);
-        if (!autoDreamRootDirectory.trim()) {
-            Modal.alert(t("common.error"), t("machine.agentLoopPathRequired"));
-            return;
-        }
-        if (parsedInterval == null) {
-            Modal.alert(t("common.error"), t("machine.agentLoopIntervalInvalid"));
-            return;
-        }
-        if (autoDreamMaxDepth.trim() && parsedMaxDepth == null) {
-            Modal.alert(t("common.error"), t("machine.agentLoopBootstrapDepthInvalid"));
-            return;
-        }
-        if (autoDreamLimit.trim() && parsedLimit == null) {
-            Modal.alert(t("common.error"), t("machine.agentLoopBootstrapLimitInvalid"));
-            return;
-        }
-        setAutoDreamSaving(true);
-        try {
-            const result = editingAutoDreamProfileId
-                ? await machineUpdateAutoDreamProfile(machineId, editingAutoDreamProfileId, {
-                    name: autoDreamName.trim() || null,
-                    rootDirectory: autoDreamRootDirectory.trim(),
-                    intervalMs: parsedInterval,
-                    maxDepth: parsedMaxDepth ?? null,
-                    limit: parsedLimit ?? null,
-                })
-                : await machineCreateAutoDreamProfile(machineId, {
-                    name: autoDreamName.trim() || undefined,
-                    rootDirectory: autoDreamRootDirectory.trim(),
-                    intervalMs: parsedInterval,
-                    maxDepth: parsedMaxDepth ?? undefined,
-                    limit: parsedLimit ?? undefined,
-                    runNow: false,
-                });
-            if (!result.success) {
-                throw new Error(result.errorMessage || t("common.error"));
-            }
-            setAutoDreamProfileEditorVisible(false);
-            resetAutoDreamProfileForm();
-            await load("refresh");
-        } catch (error) {
-            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
-        } finally {
-            setAutoDreamSaving(false);
-        }
-    }, [autoDreamInterval, autoDreamLimit, autoDreamMaxDepth, autoDreamName, autoDreamRootDirectory, editingAutoDreamProfileId, load, machineId, resetAutoDreamProfileForm]);
-
-    const applyAutoDreamProfileToForm = React.useCallback((profile: MachineAutoDreamProfile) => {
-        setEditingAutoDreamProfileId(profile.id);
-        setAutoDreamName(profile.name ?? "");
-        setAutoDreamRootDirectory(profile.rootDirectory);
-        setAutoDreamInterval(formatIntervalMs(profile.intervalMs));
-        setAutoDreamMaxDepth(profile.maxDepth != null ? String(profile.maxDepth) : "");
-        setAutoDreamLimit(profile.limit != null ? String(profile.limit) : "");
-        setAutoDreamProfileEditorVisible(true);
-    }, []);
 
     const mutateAutoDreamProfile = React.useCallback(async (profile: MachineAutoDreamProfile, action: "pause" | "resume" | "run-now" | "remove") => {
         if (!machineId) {
@@ -1120,9 +526,8 @@ export default React.memo(function MachineLoopsPage() {
             if (!result.success) {
                 throw new Error(result.errorMessage || t("common.error"));
             }
-            if (editingAutoDreamProfileId === profile.id && action === "remove") {
+            if (editingAutoDreamProfile?.id === profile.id && action === "remove") {
                 setAutoDreamProfileEditorVisible(false);
-                resetAutoDreamProfileForm();
             }
             await load("refresh");
         } catch (error) {
@@ -1130,12 +535,12 @@ export default React.memo(function MachineLoopsPage() {
         } finally {
             setMutatingAutoDreamProfileId(null);
         }
-    }, [editingAutoDreamProfileId, load, machineId, resetAutoDreamProfileForm]);
+    }, [editingAutoDreamProfile?.id, load, machineId]);
 
     const openAutoDreamProfileActions = React.useCallback((profile: MachineAutoDreamProfile) => {
         const buttons = [
             { text: t("common.ok") },
-            { text: t("machine.agentLoopEdit"), onPress: () => applyAutoDreamProfileToForm(profile) },
+            { text: t("machine.agentLoopEdit"), onPress: () => { setEditingAutoDreamProfile(profile); setAutoDreamProfileEditorVisible(true); } },
             profile.latestDreamFilePath ? { text: t("machine.autoDreamViewReport"), onPress: () => openMachineFileViewer(profile.name || profile.id, profile.latestDreamFilePath!) } : undefined,
             { text: t("machine.agentLoopRunNow"), onPress: () => void mutateAutoDreamProfile(profile, "run-now") },
             profile.enabled
@@ -1157,7 +562,7 @@ export default React.memo(function MachineLoopsPage() {
             },
         ].filter(Boolean) as Array<{ text: string; style?: "cancel" | "default" | "destructive"; onPress?: () => void }> ;
         Modal.alert(profile.name || profile.id, getAutoDreamProfileDetailMessage(profile), buttons);
-    }, [applyAutoDreamProfileToForm, mutateAutoDreamProfile, openMachineFileViewer]);
+    }, [mutateAutoDreamProfile, openMachineFileViewer]);
 
     const scanBootstrapRepos = React.useCallback(async () => {
         if (!machineId) {
@@ -1463,7 +868,7 @@ export default React.memo(function MachineLoopsPage() {
 
     const enabledCount = React.useMemo(() => loops.filter((loop) => loop.enabled).length, [loops]);
     const suggestionCreatableCount = React.useMemo(() => suggestions.filter((suggestion) => !suggestion.alreadyConfigured).length, [suggestions]);
-    const bootstrapCreatableCount = React.useMemo(() => bootstrapEntries.reduce((total, entry) => total + entry.suggestions.filter((suggestion) => !suggestion.alreadyConfigured).length, 0), [bootstrapEntries]);
+
 
     const handleSuggestAction = React.useCallback(() => {
         if (!directory.trim()) {
@@ -1519,6 +924,7 @@ export default React.memo(function MachineLoopsPage() {
                                     value={name}
                                     onChangeText={setName}
                                 />
+                                <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopName")}</Text>
                                 <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopPath")}</Text>
                                 <TextInput
                                     style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1529,6 +935,7 @@ export default React.memo(function MachineLoopsPage() {
                                     autoCapitalize="none"
                                     autoCorrect={false}
                                 />
+                                <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopPath")}</Text>
                                 <Pressable
                                     style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: suggesting ? 0.6 : 1 }]}
                                     onPress={() => void loadSuggestions()}
@@ -1550,6 +957,7 @@ export default React.memo(function MachineLoopsPage() {
                                     autoCapitalize="none"
                                     autoCorrect={false}
                                 />
+                                <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopInterval")}</Text>
                                 <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopPrompt")}</Text>
                                 <TextInput
                                     style={[styles.input, styles.promptInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1560,6 +968,7 @@ export default React.memo(function MachineLoopsPage() {
                                     multiline
                                     textAlignVertical="top"
                                 />
+                                <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopPrompt")}</Text>
 
                                 <Pressable
                                     style={[styles.advancedToggleButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}
@@ -1594,6 +1003,7 @@ export default React.memo(function MachineLoopsPage() {
                                                 );
                                             })}
                                         </View>
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopAgent")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.automationAuditProject")}</Text>
                                         <TextInput
                                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1604,6 +1014,7 @@ export default React.memo(function MachineLoopsPage() {
                                             autoCapitalize="none"
                                             autoCorrect={false}
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopProjectId")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopProfile")}</Text>
                                         <TextInput
                                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1614,6 +1025,7 @@ export default React.memo(function MachineLoopsPage() {
                                             autoCapitalize="none"
                                             autoCorrect={false}
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopProfileId")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopFileWatch")}</Text>
                                         <Pressable
                                             style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1623,6 +1035,7 @@ export default React.memo(function MachineLoopsPage() {
                                                 {fileWatchEnabled ? t("machine.agentLoopFileWatchEnabled") : t("machine.agentLoopFileWatchDisabled")}
                                             </Text>
                                         </Pressable>
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopFileWatch")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopGithubBridge")}</Text>
                                         <Pressable
                                             style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1632,6 +1045,7 @@ export default React.memo(function MachineLoopsPage() {
                                                 {githubBridgeEnabled ? t("machine.agentLoopGithubBridgeEnabled") : t("machine.agentLoopGithubBridgeDisabled")}
                                             </Text>
                                         </Pressable>
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopGithubBridge")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCiBridge")}</Text>
                                         <Pressable
                                             style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1641,6 +1055,7 @@ export default React.memo(function MachineLoopsPage() {
                                                 {ciBridgeEnabled ? t("machine.agentLoopCiBridgeEnabled") : t("machine.agentLoopCiBridgeDisabled")}
                                             </Text>
                                         </Pressable>
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopCiBridge")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxFailures")}</Text>
                                         <TextInput
                                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1650,6 +1065,7 @@ export default React.memo(function MachineLoopsPage() {
                                             onChangeText={setMaxFailures}
                                             keyboardType="number-pad"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopMaxFailures")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopRetryBackoff")}</Text>
                                         <TextInput
                                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1660,6 +1076,7 @@ export default React.memo(function MachineLoopsPage() {
                                             autoCapitalize="none"
                                             autoCorrect={false}
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopRetryBackoff")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCooldown")}</Text>
                                         <TextInput
                                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1670,6 +1087,7 @@ export default React.memo(function MachineLoopsPage() {
                                             autoCapitalize="none"
                                             autoCorrect={false}
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopCooldown")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopQuietHours")}</Text>
                                         <TextInput
                                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1689,6 +1107,7 @@ export default React.memo(function MachineLoopsPage() {
                                             autoCapitalize="none"
                                             autoCorrect={false}
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopQuietHours")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxAutoRuns")}</Text>
                                         <TextInput
                                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1698,6 +1117,7 @@ export default React.memo(function MachineLoopsPage() {
                                             onChangeText={setMaxAutoRuns}
                                             keyboardType="number-pad"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopMaxAutoRuns")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxIterations")}</Text>
                                         <TextInput
                                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1707,6 +1127,7 @@ export default React.memo(function MachineLoopsPage() {
                                             onChangeText={setMaxIterations}
                                             keyboardType="number-pad"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopMaxIterations")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopStopOnSuccess")}</Text>
                                         <Pressable
                                             style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1716,6 +1137,7 @@ export default React.memo(function MachineLoopsPage() {
                                                 {stopOnSuccess ? t("machine.agentLoopStopOnSuccessEnabled") : t("machine.agentLoopStopOnSuccessDisabled")}
                                             </Text>
                                         </Pressable>
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopStopOnSuccess")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopEventSources")}</Text>
                                         <TextInput
                                             style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1728,6 +1150,7 @@ export default React.memo(function MachineLoopsPage() {
                                             multiline
                                             textAlignVertical="top"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopEventSources")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopEventKeywords")}</Text>
                                         <TextInput
                                             style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1740,6 +1163,7 @@ export default React.memo(function MachineLoopsPage() {
                                             multiline
                                             textAlignVertical="top"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopEventKeywords")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopGoal")}</Text>
                                         <TextInput
                                             style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1750,6 +1174,7 @@ export default React.memo(function MachineLoopsPage() {
                                             multiline
                                             textAlignVertical="top"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopGoal")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCurrentFocus")}</Text>
                                         <TextInput
                                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1760,6 +1185,7 @@ export default React.memo(function MachineLoopsPage() {
                                             multiline
                                             textAlignVertical="top"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopCurrentFocus")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopWorkingMemory")}</Text>
                                         <TextInput
                                             style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1770,6 +1196,7 @@ export default React.memo(function MachineLoopsPage() {
                                             multiline
                                             textAlignVertical="top"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopWorkingMemory")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopReflectionSummary")}</Text>
                                         <TextInput
                                             style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1780,6 +1207,7 @@ export default React.memo(function MachineLoopsPage() {
                                             multiline
                                             textAlignVertical="top"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopReflectionSummary")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopDownstreamLoops")}</Text>
                                         <TextInput
                                             style={[styles.input, styles.memoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1792,6 +1220,7 @@ export default React.memo(function MachineLoopsPage() {
                                             multiline
                                             textAlignVertical="top"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopDownstreamLoops")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopDownstreamTriggers")}</Text>
                                         <TextInput
                                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1804,6 +1233,7 @@ export default React.memo(function MachineLoopsPage() {
                                             multiline
                                             textAlignVertical="top"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopDownstreamTriggers")}</Text>
                                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopEnvironment")}</Text>
                                         <TextInput
                                             style={[styles.input, styles.envInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1816,6 +1246,7 @@ export default React.memo(function MachineLoopsPage() {
                                             multiline
                                             textAlignVertical="top"
                                         />
+                                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopEnvironment")}</Text>
                                     </View>
                                 ) : null}
 
@@ -1846,162 +1277,7 @@ export default React.memo(function MachineLoopsPage() {
                             </View>
     );
 
-    const renderBootstrapProfileEditorForm = () => (
-        <View style={styles.formSection}>
-            <View style={[styles.modalInfoBanner, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}> 
-                <Text style={[styles.modalInfoTitle, { color: theme.colors.text }]}>{t("machine.agentLoopBootstrap")}</Text>
-                <Text style={[styles.modalInfoText, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapHint")}</Text>
-            </View>
-            <TextInput
-                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                placeholder={t("machine.agentLoopNameOptional")}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={bootstrapProfileName}
-                onChangeText={setBootstrapProfileName}
-            />
-            <TextInput
-                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                placeholder={t("machine.agentLoopPathPlaceholder")}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={bootstrapRootDirectory}
-                onChangeText={setBootstrapRootDirectory}
-                autoCapitalize="none"
-                autoCorrect={false}
-            />
-            <TextInput
-                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                placeholder={t("machine.agentLoopIntervalPlaceholder")}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={bootstrapInterval}
-                onChangeText={setBootstrapInterval}
-                autoCapitalize="none"
-                autoCorrect={false}
-            />
-            <TextInput
-                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                placeholder={t("machine.agentLoopBootstrapMaxDepth")}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={bootstrapMaxDepth}
-                onChangeText={setBootstrapMaxDepth}
-                keyboardType="number-pad"
-            />
-            <TextInput
-                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                placeholder={t("machine.agentLoopBootstrapLimit")}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={bootstrapLimit}
-                onChangeText={setBootstrapLimit}
-                keyboardType="number-pad"
-            />
-            <TextInput
-                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                placeholder={t("machine.automationAuditProject")}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={bootstrapProjectId}
-                onChangeText={setBootstrapProjectId}
-                autoCapitalize="none"
-                autoCorrect={false}
-            />
-            <TextInput
-                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                placeholder={t("machine.agentLoopProfile")}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={bootstrapProfileIdValue}
-                onChangeText={setBootstrapProfileIdValue}
-                autoCapitalize="none"
-                autoCorrect={false}
-            />
-            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapAutoRunCreated")}</Text>
-            <Pressable
-                style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                onPress={() => setBootstrapAutoRunCreated((current) => !current)}
-            >
-                <Text style={{ color: theme.colors.text }}>{bootstrapAutoRunCreated ? t("common.yes") : t("common.no")}</Text>
-            </Pressable>
-            <View style={styles.buttonRow}>
-                <Pressable
-                    style={[styles.createButton, { backgroundColor: theme.colors.primary, opacity: bootstrapSaving ? 0.7 : 1 }]}
-                    onPress={() => void saveBootstrapProfile()}
-                    disabled={bootstrapSaving}
-                >
-                    {bootstrapSaving ? <ActivityIndicator size="small" color={theme.colors.button.primary.tint} /> : <Text style={[styles.createButtonText, { color: theme.colors.button.primary.tint }]}>{editingBootstrapProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>}
-                </Pressable>
-                <Pressable
-                    style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                    onPress={resetBootstrapProfileForm}
-                >
-                    <Text style={{ color: theme.colors.textSecondary }}>{t("common.reset")}</Text>
-                </Pressable>
-            </View>
-        </View>
-    );
 
-    const renderAutoDreamProfileEditorForm = () => (
-        <View style={styles.formSection}>
-            <View style={[styles.modalInfoBanner, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}> 
-                <Text style={[styles.modalInfoTitle, { color: theme.colors.text }]}>{t("machine.autoDreamProfiles")}</Text>
-                <Text style={[styles.modalInfoText, { color: theme.colors.textSecondary }]}>{t("machine.autoDreamHint")}</Text>
-            </View>
-            <TextInput
-                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                placeholder={t("machine.agentLoopNameOptional")}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={autoDreamName}
-                onChangeText={setAutoDreamName}
-            />
-            <TextInput
-                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                placeholder={t("machine.agentLoopPath")}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={autoDreamRootDirectory}
-                onChangeText={setAutoDreamRootDirectory}
-                autoCapitalize="none"
-                autoCorrect={false}
-            />
-            <View style={styles.row}>
-                <TextInput
-                    style={[styles.input, styles.rowInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                    placeholder={t("machine.agentLoopInterval")}
-                    placeholderTextColor={theme.colors.textSecondary}
-                    value={autoDreamInterval}
-                    onChangeText={setAutoDreamInterval}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                />
-                <TextInput
-                    style={[styles.input, styles.rowInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                    placeholder={t("machine.agentLoopBootstrapMaxDepth")}
-                    placeholderTextColor={theme.colors.textSecondary}
-                    value={autoDreamMaxDepth}
-                    onChangeText={setAutoDreamMaxDepth}
-                    keyboardType="number-pad"
-                />
-                <TextInput
-                    style={[styles.input, styles.rowInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                    placeholder={t("machine.agentLoopBootstrapLimit")}
-                    placeholderTextColor={theme.colors.textSecondary}
-                    value={autoDreamLimit}
-                    onChangeText={setAutoDreamLimit}
-                    keyboardType="number-pad"
-                />
-            </View>
-            <View style={styles.actionsRow}>
-                <Pressable
-                    style={[styles.primaryButton, { backgroundColor: theme.colors.button.primary.background, opacity: autoDreamSaving ? 0.7 : 1 }]}
-                    onPress={() => void saveAutoDreamProfile()}
-                    disabled={autoDreamSaving}
-                >
-                    {autoDreamSaving ? <ActivityIndicator size="small" color={theme.colors.button.primary.tint} /> : <Text style={[styles.createButtonText, { color: theme.colors.button.primary.tint }]}>{editingAutoDreamProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>}
-                </Pressable>
-                <Pressable
-                    style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                    onPress={resetAutoDreamProfileForm}
-                >
-                    <Text style={{ color: theme.colors.textSecondary }}>{t("common.reset")}</Text>
-                </Pressable>
-            </View>
-        </View>
-    );
 
     return (
         <>
@@ -2011,7 +1287,45 @@ export default React.memo(function MachineLoopsPage() {
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load("refresh")} />}
             >
+                {/* 1. Active Loops (most important, at top) */}
+                <ItemGroup title={t("machine.agentLoops")}>
+                    {renderSectionBanner(t("machine.agentLoops"), t("machine.agentLoopsViewAllHint"), String(filteredLoops.length), "repeat-outline")}
+                    <View style={styles.formSection}>
+                        <View style={[styles.searchBar, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                            <Ionicons name="search-outline" size={18} color={theme.colors.textSecondary} />
+                            <TextInput
+                                style={[styles.searchInput, { color: theme.colors.text }]}
+                                placeholder={t("machine.agentLoopSearchPlaceholder")}
+                                placeholderTextColor={theme.colors.textSecondary}
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                            />
+                        </View>
+                    </View>
+                    {loading ? (
+                        <View style={styles.loadingWrap}>
+                            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                        </View>
+                    ) : filteredLoops.length === 0 ? (
+                        renderEmptyStateCard("repeat-outline", loops.length === 0 ? t("machine.agentLoopsEmpty") : t("machine.agentLoopNoMatches"), t("machine.agentLoopsViewAllHint"))
+                    ) : filteredLoops.map((loop) => (
+                        <Item
+                            key={loop.id}
+                            title={loop.name || loop.id}
+                            subtitle={getLoopSubtitle(loop)}
+                            detail={getLoopStatusLabel(loop)}
+                            detailStyle={{ color: getLoopStatusColor(loop, theme) }}
+                            icon={<Ionicons name="repeat-outline" size={22} color={getLoopStatusColor(loop, theme)} />}
+                            onPress={() => openLoopActions(loop)}
+                            showChevron
+                            rightElement={mutatingLoopId === loop.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                        />
+                    ))}
+                </ItemGroup>
+
+                {/* 2. Quick Start: one-click setup + hero panel + 2 primary action cards */}
                 <ItemGroup title={t("machine.agentLoopsViewAll")} footer={t("machine.agentLoopsViewAllHint")}>
+                    <OneClickSetupCard setup={oneClickSetup} />
                     <View style={[styles.heroPanel, formLayout.compactSpacing ? styles.heroPanelCompact : null, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
                         <View style={[styles.heroPanelHeader, formLayout.modalHeaderStacked ? styles.heroPanelHeaderStacked : null]}>
                             <View style={styles.heroPanelTextWrap}>
@@ -2048,36 +1362,6 @@ export default React.memo(function MachineLoopsPage() {
                                 color: theme.colors.header.tint,
                                 onPress: handleSuggestAction,
                             },
-                            {
-                                key: "bootstrap-profile",
-                                title: t("machine.agentLoopBootstrapProfiles"),
-                                subtitle: t("machine.agentLoopBootstrapHint"),
-                                detail: String(bootstrapProfiles.length),
-                                loading: bootstrapSaving,
-                                icon: "git-branch-outline" as const,
-                                color: theme.colors.primary,
-                                onPress: openCreateBootstrapProfileEditor,
-                            },
-                            {
-                                key: "auto-dream",
-                                title: t("machine.autoDreamProfiles"),
-                                subtitle: t("machine.autoDreamHint"),
-                                detail: String(autoDreamProfiles.length),
-                                loading: autoDreamSaving,
-                                icon: "moon-outline" as const,
-                                color: theme.colors.textLink,
-                                onPress: openCreateAutoDreamProfileEditor,
-                            },
-                            {
-                                key: "scan",
-                                title: t("gitHosts.scanRepos"),
-                                subtitle: t("machine.agentLoopBootstrapHint"),
-                                detail: bootstrapScanning ? t("common.scanning") : String(bootstrapCreatableCount),
-                                loading: bootstrapScanning,
-                                icon: "search-outline" as const,
-                                color: theme.colors.accentOrange,
-                                onPress: () => void scanBootstrapRepos(),
-                            },
                         ].map((action) => (
                             <Pressable
                                 key={action.key}
@@ -2105,8 +1389,9 @@ export default React.memo(function MachineLoopsPage() {
                     </View>
                 </ItemGroup>
 
+                {/* 3. Suggestions (when available) */}
                 <ItemGroup title={t("machine.agentLoopSuggestions")}>
-                    {renderSectionBanner(t("machine.agentLoopSuggestions"), suggestions.length > 0 ? t("machine.agentLoopSuggestions") : t("machine.agentLoopSuggestionsEmpty"), String(suggestions.length), "sparkles-outline")} 
+                    {renderSectionBanner(t("machine.agentLoopSuggestions"), suggestions.length > 0 ? t("machine.agentLoopSuggestions") : t("machine.agentLoopSuggestionsEmpty"), String(suggestions.length), "sparkles-outline")}
                     <Item
                         title={t("machine.agentLoopPath")}
                         subtitle={directory.trim() || t("machine.agentLoopPathPlaceholder")}
@@ -2161,14 +1446,15 @@ export default React.memo(function MachineLoopsPage() {
                     ))}
                 </ItemGroup>
 
-                <ItemGroup title={t("machine.agentLoopBootstrapProfiles")}>
-                    {renderSectionBanner(t("machine.agentLoopBootstrapProfiles"), t("machine.agentLoopBootstrapHint"), String(bootstrapProfiles.length), "git-branch-outline")} 
+                {/* 4. Automation (merged bootstrap profiles + auto-dream profiles + scan results) */}
+                <ItemGroup title={t("machine.loopsAutomation")}>
+                    {/* Bootstrap Profiles sub-section */}
+                    {renderSectionBanner(t("machine.agentLoopBootstrapProfiles"), t("machine.agentLoopBootstrapHint"), String(bootstrapProfiles.length), "git-branch-outline")}
                     <Item
                         title={t("machine.agentLoopCreate")}
                         subtitle={t("machine.agentLoopBootstrapHint")}
                         icon={<Ionicons name="add-circle-outline" size={22} color={theme.colors.primary} />}
-                        onPress={openCreateBootstrapProfileEditor}
-                        rightElement={bootstrapSaving ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                        onPress={() => { setEditingBootstrapProfile(null); setBootstrapProfileEditorVisible(true); }}
                     />
                     {bootstrapProfiles.length === 0 ? (
                         renderEmptyStateCard("git-branch-outline", t("machine.agentLoopBootstrapProfilesEmpty"), t("machine.agentLoopBootstrapHint"))
@@ -2185,16 +1471,14 @@ export default React.memo(function MachineLoopsPage() {
                             rightElement={mutatingBootstrapProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
                         />
                     ))}
-                </ItemGroup>
 
-                <ItemGroup title={t("machine.autoDreamProfiles")}>
-                    {renderSectionBanner(t("machine.autoDreamProfiles"), t("machine.autoDreamHint"), String(autoDreamProfiles.length), "moon-outline")} 
+                    {/* Auto-Dream Profiles sub-section */}
+                    {renderSectionBanner(t("machine.autoDreamProfiles"), t("machine.autoDreamHint"), String(autoDreamProfiles.length), "moon-outline")}
                     <Item
                         title={t("machine.agentLoopCreate")}
                         subtitle={t("machine.autoDreamHint")}
                         icon={<Ionicons name="add-circle-outline" size={22} color={theme.colors.textLink} />}
-                        onPress={openCreateAutoDreamProfileEditor}
-                        rightElement={autoDreamSaving ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                        onPress={() => { setEditingAutoDreamProfile(null); setAutoDreamProfileEditorVisible(true); }}
                     />
                     {autoDreamProfiles.length === 0 ? (
                         renderEmptyStateCard("moon-outline", t("machine.autoDreamProfilesEmpty"), t("machine.autoDreamHint"))
@@ -2211,10 +1495,9 @@ export default React.memo(function MachineLoopsPage() {
                             rightElement={mutatingAutoDreamProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
                         />
                     ))}
-                </ItemGroup>
 
-                <ItemGroup title={t("machine.agentLoopBootstrap")}>
-                    {renderSectionBanner(t("machine.agentLoopBootstrap"), t("machine.agentLoopBootstrapHint"), String(bootstrapEntries.length), "search-outline")} 
+                    {/* Scan Results sub-section */}
+                    {renderSectionBanner(t("machine.agentLoopBootstrap"), t("machine.agentLoopBootstrapHint"), String(bootstrapEntries.length), "search-outline")}
                     <Item
                         title={t("gitHosts.scanRepos")}
                         subtitle={t("machine.agentLoopBootstrapHint")}
@@ -2267,41 +1550,6 @@ export default React.memo(function MachineLoopsPage() {
                         );
                     })}
                 </ItemGroup>
-
-                <ItemGroup title={t("machine.agentLoops")}>
-                    {renderSectionBanner(t("machine.agentLoops"), t("machine.agentLoopsViewAllHint"), String(filteredLoops.length), "repeat-outline")} 
-                    <View style={styles.formSection}>
-                        <View style={[styles.searchBar, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}> 
-                            <Ionicons name="search-outline" size={18} color={theme.colors.textSecondary} />
-                            <TextInput
-                                style={[styles.searchInput, { color: theme.colors.text }]}
-                                placeholder={t("machine.agentLoopSearchPlaceholder")}
-                                placeholderTextColor={theme.colors.textSecondary}
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                            />
-                        </View>
-                    </View>
-                    {loading ? (
-                        <View style={styles.loadingWrap}>
-                            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                        </View>
-                    ) : filteredLoops.length === 0 ? (
-                        renderEmptyStateCard("repeat-outline", loops.length === 0 ? t("machine.agentLoopsEmpty") : t("machine.agentLoopNoMatches"), t("machine.agentLoopsViewAllHint"))
-                    ) : filteredLoops.map((loop) => (
-                        <Item
-                            key={loop.id}
-                            title={loop.name || loop.id}
-                            subtitle={getLoopSubtitle(loop)}
-                            detail={getLoopStatusLabel(loop)}
-                            detailStyle={{ color: getLoopStatusColor(loop, theme) }}
-                            icon={<Ionicons name="repeat-outline" size={22} color={getLoopStatusColor(loop, theme)} />}
-                            onPress={() => openLoopActions(loop)}
-                            showChevron
-                            rightElement={mutatingLoopId === loop.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                        />
-                    ))}
-                </ItemGroup>
             </ScrollView>
 
             <BaseModal visible={loopEditorVisible} onClose={closeLoopEditor}>
@@ -2334,65 +1582,21 @@ export default React.memo(function MachineLoopsPage() {
                 </View>
             </BaseModal>
 
-            <BaseModal visible={bootstrapProfileEditorVisible} onClose={closeBootstrapProfileEditor}>
-                <View style={[
-                    styles.modalCard,
-                    {
-                        backgroundColor: theme.colors.surface,
-                        width: modalMetrics.width,
-                        maxHeight: modalMetrics.maxHeight,
-                        minWidth: modalMetrics.minWidth,
-                        borderRadius: modalMetrics.borderRadius,
-                    },
-                ]}>
-                    <View style={[
-                        styles.modalHeader,
-                        formLayout.modalHeaderStacked ? styles.modalHeaderStacked : null,
-                        { borderBottomColor: theme.colors.divider, paddingHorizontal: modalMetrics.horizontalPadding },
-                    ]}>
-                        <View style={styles.modalHeaderTextWrap}>
-                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingBootstrapProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>
-                            <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapHint")}</Text>
-                        </View>
-                        <Pressable style={[styles.modalDismissButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]} onPress={closeBootstrapProfileEditor}>
-                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
-                        </Pressable>
-                    </View>
-                    <ScrollView style={styles.modalScroll} contentContainerStyle={[styles.modalScrollContent, { paddingHorizontal: modalMetrics.horizontalPadding }]}>
-                        {renderBootstrapProfileEditorForm()}
-                    </ScrollView>
-                </View>
-            </BaseModal>
+            <BootstrapProfileEditorModal
+                visible={bootstrapProfileEditorVisible}
+                onClose={() => setBootstrapProfileEditorVisible(false)}
+                onSaved={() => void load("refresh")}
+                machineId={machineId}
+                editingProfile={editingBootstrapProfile}
+            />
 
-            <BaseModal visible={autoDreamProfileEditorVisible} onClose={closeAutoDreamProfileEditor}>
-                <View style={[
-                    styles.modalCard,
-                    {
-                        backgroundColor: theme.colors.surface,
-                        width: modalMetrics.width,
-                        maxHeight: modalMetrics.maxHeight,
-                        minWidth: modalMetrics.minWidth,
-                        borderRadius: modalMetrics.borderRadius,
-                    },
-                ]}>
-                    <View style={[
-                        styles.modalHeader,
-                        formLayout.modalHeaderStacked ? styles.modalHeaderStacked : null,
-                        { borderBottomColor: theme.colors.divider, paddingHorizontal: modalMetrics.horizontalPadding },
-                    ]}>
-                        <View style={styles.modalHeaderTextWrap}>
-                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingAutoDreamProfileId ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>
-                            <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>{t("machine.autoDreamHint")}</Text>
-                        </View>
-                        <Pressable style={[styles.modalDismissButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]} onPress={closeAutoDreamProfileEditor}>
-                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
-                        </Pressable>
-                    </View>
-                    <ScrollView style={styles.modalScroll} contentContainerStyle={[styles.modalScrollContent, { paddingHorizontal: modalMetrics.horizontalPadding }]}>
-                        {renderAutoDreamProfileEditorForm()}
-                    </ScrollView>
-                </View>
-            </BaseModal>
+            <AutoDreamProfileEditorModal
+                visible={autoDreamProfileEditorVisible}
+                onClose={() => setAutoDreamProfileEditorVisible(false)}
+                onSaved={() => void load("refresh")}
+                machineId={machineId}
+                editingProfile={editingAutoDreamProfile}
+            />
         </>
     );
 });
