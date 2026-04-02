@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
+import { formatIntervalMs } from "./loopsUtils";
 import type { UseOneClickSetupReturn } from "./useOneClickSetup";
 
 interface OneClickSetupCardProps {
@@ -20,6 +21,7 @@ export const OneClickSetupCard = React.memo(function OneClickSetupCard({ setup }
     const { theme } = useUnistyles();
     const { state, start, confirm, toggleRepo, reset } = setup;
     const { phase, repos, totalSuggestions, creatableCount, createdCount, errorMessage } = state;
+    const [expandedRepo, setExpandedRepo] = React.useState<string | null>(null);
 
     if (phase === "idle") {
         return (
@@ -77,26 +79,44 @@ export const OneClickSetupCard = React.memo(function OneClickSetupCard({ setup }
                 </View>
 
                 <View style={styles.repoList}>
-                    {repos.map((entry) => (
-                        <Pressable
-                            key={entry.repo.repoPath}
-                            style={[styles.repoItem, { borderColor: theme.colors.divider, backgroundColor: entry.selected ? theme.colors.surface : "transparent" }]}
-                            onPress={() => toggleRepo(entry.repo.repoPath)}
-                        >
-                            <Ionicons
-                                name={entry.selected ? "checkbox" : "square-outline"}
-                                size={20}
-                                color={entry.selected ? theme.colors.primary : theme.colors.textSecondary}
-                            />
-                            <View style={styles.repoItemTextWrap}>
-                                <Text style={[styles.repoItemTitle, { color: theme.colors.text }]}>{entry.repo.name}</Text>
-                                <Text style={[styles.repoItemPath, { color: theme.colors.textSecondary }]}>{entry.repo.repoPath}</Text>
+                    {repos.map((entry) => {
+                        const isExpanded = expandedRepo === entry.repo.repoPath;
+                        return (
+                            <View key={entry.repo.repoPath} style={[styles.repoCard, { borderColor: entry.selected ? theme.colors.primary : theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                <View style={styles.repoItemRow}>
+                                    <Pressable style={styles.repoCheckbox} onPress={() => toggleRepo(entry.repo.repoPath)}>
+                                        <Ionicons
+                                            name={entry.selected ? "checkbox" : "square-outline"}
+                                            size={20}
+                                            color={entry.selected ? theme.colors.primary : theme.colors.textSecondary}
+                                        />
+                                    </Pressable>
+                                    <Pressable style={styles.repoItemTextWrap} onPress={() => setExpandedRepo(isExpanded ? null : entry.repo.repoPath)}>
+                                        <Text style={[styles.repoItemTitle, { color: theme.colors.text }]}>{entry.repo.name}</Text>
+                                        <Text style={[styles.repoItemPath, { color: theme.colors.textSecondary }]}>{entry.repo.repoPath}</Text>
+                                    </Pressable>
+                                    <Pressable style={[styles.badge, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]} onPress={() => setExpandedRepo(isExpanded ? null : entry.repo.repoPath)}>
+                                        <Text style={[styles.badgeText, { color: theme.colors.textSecondary }]}>{entry.suggestions.length}</Text>
+                                        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={12} color={theme.colors.textSecondary} />
+                                    </Pressable>
+                                </View>
+                                {isExpanded ? (
+                                    <View style={[styles.suggestionDetailList, { borderTopColor: theme.colors.divider }]}>
+                                        {entry.suggestions.map((suggestion) => (
+                                            <View key={suggestion.key} style={styles.suggestionDetailItem}>
+                                                <View style={styles.suggestionDetailHeader}>
+                                                    <Ionicons name="sparkles-outline" size={14} color={theme.colors.header.tint} />
+                                                    <Text style={[styles.suggestionDetailName, { color: theme.colors.text }]}>{suggestion.name}</Text>
+                                                    <Text style={[styles.suggestionDetailMeta, { color: theme.colors.textSecondary }]}>{formatIntervalMs(suggestion.intervalMs)} • {suggestion.agent}</Text>
+                                                </View>
+                                                <Text style={[styles.suggestionDetailDesc, { color: theme.colors.textSecondary }]} numberOfLines={2}>{suggestion.description || suggestion.prompt}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                ) : null}
                             </View>
-                            <View style={[styles.badge, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
-                                <Text style={[styles.badgeText, { color: theme.colors.textSecondary }]}>{entry.suggestions.length}</Text>
-                            </View>
-                        </Pressable>
-                    ))}
+                        );
+                    })}
                 </View>
 
                 <View style={styles.actionsRow}>
@@ -227,13 +247,19 @@ const styles = StyleSheet.create((theme) => ({
     repoList: {
         gap: 6,
     },
-    repoItem: {
+    repoCard: {
+        borderWidth: 1,
+        borderRadius: 10,
+        overflow: "hidden",
+    },
+    repoItemRow: {
         flexDirection: "row",
         alignItems: "center",
         gap: 10,
         padding: 10,
-        borderWidth: 1,
-        borderRadius: 10,
+    },
+    repoCheckbox: {
+        padding: 4,
     },
     repoItemTextWrap: {
         flex: 1,
@@ -248,6 +274,7 @@ const styles = StyleSheet.create((theme) => ({
         lineHeight: 16,
     },
     badge: {
+        flexDirection: "row",
         minWidth: 28,
         minHeight: 24,
         paddingHorizontal: 8,
@@ -255,10 +282,38 @@ const styles = StyleSheet.create((theme) => ({
         borderWidth: 1,
         alignItems: "center",
         justifyContent: "center",
+        gap: 4,
     },
     badgeText: {
         fontSize: 12,
         fontWeight: "700",
+    },
+    suggestionDetailList: {
+        borderTopWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        gap: 8,
+    },
+    suggestionDetailItem: {
+        gap: 2,
+    },
+    suggestionDetailHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+    },
+    suggestionDetailName: {
+        fontSize: 13,
+        fontWeight: "600",
+        flex: 1,
+    },
+    suggestionDetailMeta: {
+        fontSize: 11,
+    },
+    suggestionDetailDesc: {
+        fontSize: 12,
+        lineHeight: 16,
+        paddingLeft: 20,
     },
     actionsRow: {
         flexDirection: Platform.OS === "web" ? "row" : "column",
