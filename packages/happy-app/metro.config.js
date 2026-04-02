@@ -20,4 +20,10 @@ config.transformer.getTransformOptions = async () => ({
   },
 });
 
+// Exclude test files from bundling (they import vitest which is not available at runtime)
+config.resolver.blockList = [
+  /\.test\.[jt]sx?$/,
+  /\.spec\.[jt]sx?$/,
+];
+
 module.exports = config;

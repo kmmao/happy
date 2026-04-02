@@ -27,6 +27,11 @@ import {
 } from "@/sync/ops";
 import { useMachine } from "@/sync/storage";
 import { t } from "@/text";
+import {
+    buildAutomationAlerts,
+    buildAutomationOverviewCards,
+    getRecentJobPreview,
+} from "./automationLayout";
 
 type TimelineEntry = {
     key: string;
@@ -490,6 +495,7 @@ export default React.memo(function MachineAutomationPage() {
     const [auditFilter, setAuditFilter] = React.useState<AuditFilter>(initialAuditFilter);
     const [guardianFilter, setGuardianFilter] = React.useState<GuardianFilter>(initialGuardianFilter);
     const [detailSheet, setDetailSheet] = React.useState<DetailSheetState>(null);
+    const [showAllJobs, setShowAllJobs] = React.useState(false);
     const closeDetailSheet = React.useCallback(() => setDetailSheet(null), []);
 
     const applyCachedAutomationState = React.useCallback(() => {
@@ -641,10 +647,27 @@ export default React.memo(function MachineAutomationPage() {
         event.guardianKey,
     ], searchQuery)), [auditFilter, recentAuditEvents, searchQuery]);
 
-    const timeline = React.useMemo(() => buildTimelineEntries(filteredJobs).slice(0, 30), [filteredJobs]);
+    const timeline = React.useMemo(() => buildTimelineEntries(filteredJobs).slice(0, 8), [filteredJobs]);
     const counts = status?.counts ?? machine?.daemonState?.automation?.counts ?? {};
     const persistedGuardianCount = React.useMemo(() => guardians.filter((guardian) => guardian.attached === false).length, [guardians]);
     const anomalyCount = (auditStats?.watchdogStopCount ?? 0) + (auditStats?.stopRequestCount ?? 0) + (counts.failed ?? 0);
+    const recoveredSessionCount = auditStats?.sessionReattachedCount ?? 0;
+    const alertCards = React.useMemo(() => buildAutomationAlerts({
+        persistedGuardianCount,
+        anomalyCount,
+        recoveredSessionCount,
+    }), [anomalyCount, persistedGuardianCount, recoveredSessionCount]);
+    const overviewCards = React.useMemo(() => buildAutomationOverviewCards({
+        counts,
+        guardianCount: guardians.length,
+        alertCount: alertCards.reduce((total, alert) => total + alert.count, 0),
+    }), [alertCards, counts, guardians.length]);
+    const recentJobPreview = React.useMemo(() => getRecentJobPreview(filteredJobs, 4, recentAuditEvents), [filteredJobs, recentAuditEvents]);
+    const visibleJobs = showAllJobs ? filteredJobs : recentJobPreview;
+
+    React.useEffect(() => {
+        setShowAllJobs(false);
+    }, [searchQuery, jobFilter]);
 
     const mutateAndReload = React.useCallback(async (jobId: string, action: "retry" | "cancel") => {
         setActiveJobId(jobId);
@@ -919,7 +942,7 @@ export default React.memo(function MachineAutomationPage() {
                 <Text style={styles.panelHint}>{t("machine.automationSearchHint")}</Text>
                 <Text style={styles.filterLabel}>{t("machine.automationJobFilters")}</Text>
                 <Text style={styles.filterHint}>{t("machine.automationJobFiltersHint")}</Text>
-                <View style={styles.filterChipRow}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipRow} style={styles.filterScroll}>
                     {([
                         ["all", t("machine.automationFilterAll")],
                         ["running", t("machine.automationFilterRunning")],
@@ -935,10 +958,10 @@ export default React.memo(function MachineAutomationPage() {
                             <Text style={[styles.filterChipText, jobFilter === value && styles.filterChipTextSelected]}>{label}</Text>
                         </Pressable>
                     ))}
-                </View>
+                </ScrollView>
                 <Text style={styles.filterLabel}>{t("machine.automationAuditFilters")}</Text>
                 <Text style={styles.filterHint}>{t("machine.automationAuditFiltersHint")}</Text>
-                <View style={styles.filterChipRow}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipRow} style={styles.filterScroll}>
                     {([
                         ["all", t("machine.automationFilterAll")],
                         ["anomalies", t("machine.automationFilterAnomalies")],
@@ -954,10 +977,10 @@ export default React.memo(function MachineAutomationPage() {
                             <Text style={[styles.filterChipText, auditFilter === value && styles.filterChipTextSelected]}>{label}</Text>
                         </Pressable>
                     ))}
-                </View>
+                </ScrollView>
                 <Text style={styles.filterLabel}>{t("machine.automationGuardians")}</Text>
                 <Text style={styles.filterHint}>{t("machine.automationGuardianFiltersHint")}</Text>
-                <View style={styles.filterChipRow}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipRow} style={styles.filterScroll}>
                     {([
                         ["all", t("machine.automationFilterAll")],
                         ["attached", t("machine.automationGuardianAttached")],
@@ -972,42 +995,76 @@ export default React.memo(function MachineAutomationPage() {
                             <Text style={[styles.filterChipText, guardianFilter === value && styles.filterChipTextSelected]}>{label}</Text>
                         </Pressable>
                     ))}
-                </View>
+                </ScrollView>
                 <Text style={styles.filterSummary}>{`${filteredJobs.length}/${jobs.length} jobs • ${filteredGuardians.length}/${guardians.length} guardians • ${filteredAuditEvents.length}/${recentAuditEvents.length} audit`}</Text>
             </View>
 
             <ItemList>
-                {persistedGuardianCount > 0 || anomalyCount > 0 ? (
+                {alertCards.length > 0 ? (
                     <ItemGroup title={t("machine.automationAlerts")}>
-                    {renderSectionBanner({ title: t("machine.automationAlerts"), subtitle: t("machine.automationAlertsHint"), detail: String((persistedGuardianCount > 0 ? 1 : 0) + (anomalyCount > 0 ? 1 : 0)) })}
-                        {persistedGuardianCount > 0 ? (
-                            <Item
-                                title={t("machine.automationGuardianRecoveryNeeded")}
-                                subtitle={t("machine.automationGuardianRecoveryNeededMessage")}
-                                detail={String(persistedGuardianCount)}
-                                detailStyle={{ color: "#FF9500" }}
-                                showChevron={false}
-                            />
-                        ) : null}
-                        {anomalyCount > 0 ? (
-                            <Item
-                                title={t("machine.automationAnomaliesDetected")}
-                                subtitle={`${t("machine.automationFailed")}: ${counts.failed ?? 0} • ${t("machine.automationWatchdogStops")}: ${auditStats?.watchdogStopCount ?? 0} • ${t("machine.automationStopRequests")}: ${auditStats?.stopRequestCount ?? 0}`}
-                                detail={String(anomalyCount)}
-                                detailStyle={{ color: "#FF3B30" }}
-                                showChevron={false}
-                            />
-                        ) : null}
+                    {renderSectionBanner({ title: t("machine.automationAlerts"), subtitle: t("machine.automationAlertsHint"), detail: String(alertCards.length) })}
+                        {alertCards.map((alert) => {
+                            if (alert.kind === "anomalies") {
+                                return (
+                                    <Item
+                                        key={alert.kind}
+                                        title={t("machine.automationAnomaliesDetected")}
+                                        subtitle={`${t("machine.automationFailed")}: ${counts.failed ?? 0} • ${t("machine.automationWatchdogStops")}: ${auditStats?.watchdogStopCount ?? 0} • ${t("machine.automationStopRequests")}: ${auditStats?.stopRequestCount ?? 0}`}
+                                        detail={String(alert.count)}
+                                        detailStyle={{ color: "#FF3B30" }}
+                                        showChevron={false}
+                                    />
+                                );
+                            }
+                            if (alert.kind === "recovered") {
+                                return (
+                                    <Item
+                                        key={alert.kind}
+                                        title={t("machine.automationRecoveredSessions")}
+                                        subtitle={`${t("machine.automationRecoveredGuardians")}: ${guardians.filter((guardian) => guardian.recovered).length} • ${t("machine.automationRecoveredJobs")}: ${jobs.filter((job) => job.recovered).length}`}
+                                        detail={String(alert.count)}
+                                        detailStyle={{ color: "#34C759" }}
+                                        showChevron={false}
+                                    />
+                                );
+                            }
+                            return (
+                                <Item
+                                    key={alert.kind}
+                                    title={t("machine.automationGuardianRecoveryNeeded")}
+                                    subtitle={t("machine.automationGuardianRecoveryNeededMessage")}
+                                    detail={String(alert.count)}
+                                    detailStyle={{ color: "#FF9500" }}
+                                    showChevron={false}
+                                />
+                            );
+                        })}
                     </ItemGroup>
                 ) : null}
                 <ItemGroup title={t("machine.automation")}>
                     <View style={styles.summaryGrid}>
-                        {renderSummaryCard({ title: t("machine.automationQueued"), value: String(counts.queued ?? 0), hint: t("machine.automationQueuedHint"), accent: "#FF9500" })}
-                        {renderSummaryCard({ title: t("machine.automationRunning"), value: String((counts.running ?? 0) + (counts.dispatching ?? 0)), hint: t("machine.automationRunningHint"), accent: "#0A84FF" })}
-                        {renderSummaryCard({ title: t("machine.automationGuardians"), value: String(filteredGuardians.length), hint: t("machine.automationGuardiansHint") })}
-                        {renderSummaryCard({ title: t("machine.automationFailed"), value: String(counts.failed ?? 0), hint: t("machine.automationFailedHint"), accent: "#FF3B30" })}
-                        {renderSummaryCard({ title: t("machine.automationCompleted"), value: String(counts.completed ?? 0), hint: t("machine.automationCompletedHint"), accent: "#34C759" })}
-                        {renderSummaryCard({ title: t("machine.automationCancelled"), value: String(counts.cancelled ?? 0), hint: t("machine.automationCancelledHint"), accent: theme.colors.textSecondary })}
+                        {overviewCards.map((card) => {
+                            const title = card.kind === "running"
+                                ? t("machine.automationRunning")
+                                : card.kind === "queued"
+                                    ? t("machine.automationQueued")
+                                    : card.kind === "alerts"
+                                        ? t("machine.automationAlerts")
+                                        : t("machine.automationGuardians");
+                            const hint = card.kind === "running"
+                                ? t("machine.automationRunningHint")
+                                : card.kind === "queued"
+                                    ? t("machine.automationQueuedHint")
+                                    : card.kind === "alerts"
+                                        ? t("machine.automationAnomaliesDetected")
+                                        : t("machine.automationGuardiansHint");
+                            return renderSummaryCard({
+                                title,
+                                value: card.value,
+                                hint,
+                                accent: card.accent,
+                            });
+                        })}
                     </View>
                     <Item
                         title={t("machine.automationClearTerminal")}
@@ -1192,13 +1249,13 @@ export default React.memo(function MachineAutomationPage() {
                 </ItemGroup>
 
                 <ItemGroup title={t("machine.automationJobs")}>
-                    {renderSectionBanner({ title: t("machine.automationJobs"), subtitle: t("machine.automationJobsHint"), detail: String(filteredJobs.length) })}
+                    {renderSectionBanner({ title: t("machine.automationJobs"), subtitle: recentJobPreview.length < filteredJobs.length ? `${t("machine.automationJobsHint")} · ${t("machine.automationViewAllHint")}` : t("machine.automationJobsHint"), detail: `${visibleJobs.length}/${filteredJobs.length}` })}
                     {filteredJobs.length === 0 ? (
                         <View style={styles.emptyCard}>
                             <Text style={styles.emptyCardTitle}>{((searchQuery.trim() || jobFilter !== "all") ? t("machine.automationNoMatches") : t("machine.automationDetailsEmpty"))}</Text>
                             <Text style={styles.emptyCardSubtitle}>{t("machine.automationJobsHint")}</Text>
                         </View>
-                    ) : filteredJobs.map((job) => (
+                    ) : showAllJobs ? filteredJobs.map((job) => (
                         <Pressable key={job.id} style={styles.dataCard} onPress={() => handleJobPress(job)}>
                             <View style={styles.dataCardHeader}>
                                 <View style={styles.dataCardTitleWrap}>
@@ -1206,7 +1263,7 @@ export default React.memo(function MachineAutomationPage() {
                                     <Text style={styles.dataCardSubtitle}>{formatJobSubtitle(job)}</Text>
                                 </View>
                                 <View style={styles.statusWrap}>
-                                    <View style={[styles.statusBadge, { borderColor: getStatusColor(job.status) ?? theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                    <View style={[styles.statusBadge, { borderColor: getStatusColor(job.status) ?? theme.colors.divider, backgroundColor: theme.colors.surface }] }>
                                         <Text style={[styles.statusBadgeText, { color: getStatusColor(job.status) ?? theme.colors.text }]}>{getStatusLabel(job.status)}</Text>
                                     </View>
                                     {activeJobId === job.id ? (
@@ -1222,7 +1279,42 @@ export default React.memo(function MachineAutomationPage() {
                                 {job.loopId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditLoop")}: ${job.loopId}`}</Text></View> : null}
                             </View>
                         </Pressable>
+                    )) : recentJobPreview.map((job) => (
+                        <Pressable key={job.id} style={styles.dataCard} onPress={() => handleJobPress(job)}>
+                            <View style={styles.dataCardHeader}>
+                                <View style={styles.dataCardTitleWrap}>
+                                    <Text style={styles.dataCardTitle}>{getJobTitle(job)}</Text>
+                                    <Text style={styles.dataCardSubtitle}>{formatJobSubtitle(job)}</Text>
+                                </View>
+                                <View style={styles.statusWrap}>
+                                    <View style={[styles.statusBadge, { borderColor: getStatusColor(job.status) ?? theme.colors.divider, backgroundColor: theme.colors.surface }] }>
+                                        <Text style={[styles.statusBadgeText, { color: getStatusColor(job.status) ?? theme.colors.text }]}>{getStatusLabel(job.status)}</Text>
+                                    </View>
+                                    {activeJobId === job.id ? (
+                                        <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    ) : null}
+                                </View>
+                            </View>
+                            <View style={styles.pillRow}>
+                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{getJobKindLabel(job.kind)}</Text></View>
+                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationRelatedEvents")}: ${job.relatedEventCount}`}</Text></View>
+                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationPriority")}: ${getPriorityLabel(job.priority)}`}</Text></View>
+                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationCreatedAt")}: ${formatTimestamp(job.createdAt)}`}</Text></View>
+                                {job.projectId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditProject")}: ${job.projectId}`}</Text></View> : null}
+                                {job.loopId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditLoop")}: ${job.loopId}`}</Text></View> : null}
+                            </View>
+                        </Pressable>
                     ))}
+                    {filteredJobs.length > recentJobPreview.length ? (
+                        <Item
+                            title={showAllJobs ? t("machine.automationViewAll") : t("machine.automationViewAll")}
+                            subtitle={showAllJobs
+                                ? `${t("machine.automationJobs")}: ${filteredJobs.length}`
+                                : `${t("machine.automationViewAllHint")} · ${recentJobPreview.length}/${filteredJobs.length}`}
+                            onPress={() => setShowAllJobs((current) => !current)}
+                            showChevron={false}
+                        />
+                    ) : null}
                 </ItemGroup>
             </ItemList>
         </ScrollView>
@@ -1313,8 +1405,12 @@ const styles = StyleSheet.create((theme) => ({
     },
     filterChipRow: {
         flexDirection: "row",
-        flexWrap: "wrap",
+        flexWrap: "nowrap",
         gap: 8,
+        paddingRight: 12,
+    },
+    filterScroll: {
+        flexGrow: 0,
     },
     filterChip: {
         paddingHorizontal: 10,
