@@ -131,6 +131,7 @@ export default React.memo(function MachineLoopsPage() {
     const [suggesting, setSuggesting] = React.useState(false);
     const [creatingSuggestionKey, setCreatingSuggestionKey] = React.useState<string | null>(null);
     const [adoptingAllSuggestions, setAdoptingAllSuggestions] = React.useState(false);
+    const [showAutomation, setShowAutomation] = React.useState(false);
     const [searchQuery, setSearchQuery] = React.useState("");
     const [showAdvanced, setShowAdvanced] = React.useState(false);
     const [name, setName] = React.useState("");
@@ -1287,7 +1288,34 @@ export default React.memo(function MachineLoopsPage() {
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load("refresh")} />}
             >
-                {/* 1. Active Loops (most important, at top) */}
+                {/* 1. OneClickSetupCard — standalone at very top */}
+                <OneClickSetupCard setup={oneClickSetup} />
+
+                {/* 2. Flow guide — visual explanation of how loops work */}
+                <View style={[styles.flowGuide, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                    <Text style={[styles.flowGuideTitle, { color: theme.colors.text }]}>{t("machine.loopsFlowTitle")}</Text>
+                    <View style={styles.flowStepsRow}>
+                        {[
+                            { icon: "search-outline" as const, label: t("machine.loopsFlowStep1") },
+                            { icon: "sparkles-outline" as const, label: t("machine.loopsFlowStep2") },
+                            { icon: "add-circle-outline" as const, label: t("machine.loopsFlowStep3") },
+                            { icon: "repeat-outline" as const, label: t("machine.loopsFlowStep4") },
+                        ].map((step, index, arr) => (
+                            <React.Fragment key={step.label}>
+                                <View style={styles.flowStep}>
+                                    <Ionicons name={step.icon} size={18} color={theme.colors.primary} />
+                                    <Text style={[styles.flowStepLabel, { color: theme.colors.textSecondary }]}>{step.label}</Text>
+                                </View>
+                                {index < arr.length - 1 ? (
+                                    <Ionicons name="arrow-forward" size={14} color={theme.colors.textSecondary} />
+                                ) : null}
+                            </React.Fragment>
+                        ))}
+                    </View>
+                    <Text style={[styles.flowGuideSubtitle, { color: theme.colors.textSecondary }]}>{t("machine.loopsFlowSubtitle")}</Text>
+                </View>
+
+                {/* 3. Active Loops — main content */}
                 <ItemGroup title={t("machine.agentLoops")}>
                     {renderSectionBanner(t("machine.agentLoops"), t("machine.agentLoopsViewAllHint"), String(filteredLoops.length), "repeat-outline")}
                     <View style={styles.formSection}>
@@ -1323,9 +1351,8 @@ export default React.memo(function MachineLoopsPage() {
                     ))}
                 </ItemGroup>
 
-                {/* 2. Quick Start: one-click setup + hero panel + 2 primary action cards */}
-                <ItemGroup title={t("machine.agentLoopsViewAll")} footer={t("machine.agentLoopsViewAllHint")}>
-                    <OneClickSetupCard setup={oneClickSetup} />
+                {/* 4. Create & Suggest — merged section with hero + 2 cards + suggestions */}
+                <ItemGroup title={t("machine.agentLoopCreate")}>
                     <View style={[styles.heroPanel, formLayout.compactSpacing ? styles.heroPanelCompact : null, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
                         <View style={[styles.heroPanelHeader, formLayout.modalHeaderStacked ? styles.heroPanelHeaderStacked : null]}>
                             <View style={styles.heroPanelTextWrap}>
@@ -1387,168 +1414,170 @@ export default React.memo(function MachineLoopsPage() {
                             </Pressable>
                         ))}
                     </View>
+                    {suggestions.length > 0 ? (
+                        <>
+                            {renderSectionBanner(t("machine.agentLoopSuggestions"), t("machine.agentLoopSuggestions"), String(suggestions.length), "sparkles-outline")}
+                            <Item
+                                title={t("machine.agentLoopSuggestionAdoptAll")}
+                                subtitle={t("machine.agentLoopSuggestions")}
+                                detail={String(suggestionCreatableCount)}
+                                icon={<Ionicons name="sparkles-outline" size={22} color={theme.colors.header.tint} />}
+                                onPress={() => void adoptAllSuggestions()}
+                                rightElement={adoptingAllSuggestions ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                            />
+                            {suggestions.map((suggestion) => (
+                                <View key={suggestion.key} style={[styles.suggestionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                                    <View style={styles.cardHeaderRow}>
+                                        <View style={styles.cardHeaderTextWrap}>
+                                            <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>{suggestion.name}</Text>
+                                            <Text style={[styles.cardPathText, { color: theme.colors.textSecondary }]}>{suggestion.directory}</Text>
+                                        </View>
+                                        <Ionicons name="sparkles-outline" size={18} color={theme.colors.header.tint} />
+                                    </View>
+                                    <View style={styles.metaPillRow}>
+                                        <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                            <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{formatIntervalMs(suggestion.intervalMs)}</Text>
+                                        </View>
+                                        <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                            <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{suggestion.agent}</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.cardDescription, { color: theme.colors.textSecondary }]}>{suggestion.prompt}</Text>
+                                    <View style={styles.suggestionActions}>
+                                        <Pressable
+                                            style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: suggestion.alreadyConfigured ? 0.6 : 1 }]}
+                                            onPress={() => void adoptSuggestion(suggestion)}
+                                            disabled={suggestion.alreadyConfigured || creatingSuggestionKey === suggestion.key}
+                                        >
+                                            {creatingSuggestionKey === suggestion.key ? (
+                                                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                            ) : (
+                                                <Text style={{ color: theme.colors.text }}>
+                                                    {suggestion.alreadyConfigured ? t("machine.agentLoopSuggestionConfigured") : t("machine.agentLoopSuggestionAdopt")}
+                                                </Text>
+                                            )}
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            ))}
+                        </>
+                    ) : null}
                 </ItemGroup>
 
-                {/* 3. Suggestions (when available) */}
-                <ItemGroup title={t("machine.agentLoopSuggestions")}>
-                    {renderSectionBanner(t("machine.agentLoopSuggestions"), suggestions.length > 0 ? t("machine.agentLoopSuggestions") : t("machine.agentLoopSuggestionsEmpty"), String(suggestions.length), "sparkles-outline")}
-                    <Item
-                        title={t("machine.agentLoopPath")}
-                        subtitle={directory.trim() || t("machine.agentLoopPathPlaceholder")}
-                        detail={String(suggestions.length)}
-                        icon={<Ionicons name="folder-outline" size={22} color={theme.colors.textSecondary} />}
-                        onPress={openCreateLoopEditor}
-                    />
-                    <Item
-                        title={suggestions.length > 0 ? t("machine.agentLoopSuggestionAdoptAll") : t("machine.agentLoopSuggest")}
-                        subtitle={suggestions.length > 0 ? t("machine.agentLoopSuggestions") : t("machine.agentLoopSuggestionsEmpty")}
-                        detail={suggestions.length > 0 ? String(suggestionCreatableCount) : undefined}
-                        icon={<Ionicons name="sparkles-outline" size={22} color={theme.colors.header.tint} />}
-                        onPress={suggestions.length > 0 ? (() => void adoptAllSuggestions()) : handleSuggestAction}
-                        rightElement={(adoptingAllSuggestions || suggesting) ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                    />
-                    {suggestions.length === 0 ? (
-                        renderEmptyStateCard("sparkles-outline", t("machine.agentLoopSuggestionsEmpty"), t("machine.agentLoopPathPlaceholder"))
-                    ) : suggestions.map((suggestion) => (
-                        <View key={suggestion.key} style={[styles.suggestionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
-                            <View style={styles.cardHeaderRow}>
-                                <View style={styles.cardHeaderTextWrap}>
-                                    <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>{suggestion.name}</Text>
-                                    <Text style={[styles.cardPathText, { color: theme.colors.textSecondary }]}>{suggestion.directory}</Text>
-                                </View>
-                                <Ionicons name="sparkles-outline" size={18} color={theme.colors.header.tint} />
-                            </View>
-                            <View style={styles.metaPillRow}>
-                                <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
-                                    <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{formatIntervalMs(suggestion.intervalMs)}</Text>
-                                </View>
-                                <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
-                                    <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{suggestion.agent}</Text>
-                                </View>
-                            </View>
-                            <Text style={[styles.cardDescription, { color: theme.colors.textSecondary }]}>{suggestion.prompt}</Text>
-                            <View style={styles.suggestionActions}>
-                                <Pressable
-                                    style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: suggestion.alreadyConfigured ? 0.6 : 1 }]}
-                                    onPress={() => void adoptSuggestion(suggestion)}
-                                    disabled={suggestion.alreadyConfigured || creatingSuggestionKey === suggestion.key}
-                                >
-                                    {creatingSuggestionKey === suggestion.key ? (
-                                        <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                                    ) : (
-                                        <Text style={{ color: theme.colors.text }}>
-                                            {suggestion.alreadyConfigured ? t("machine.agentLoopSuggestionConfigured") : t("machine.agentLoopSuggestionAdopt")}
-                                        </Text>
-                                    )}
-                                </Pressable>
-                            </View>
-                        </View>
-                    ))}
-                </ItemGroup>
-
-                {/* 4. Automation (merged bootstrap profiles + auto-dream profiles + scan results) */}
+                {/* 5. Automation — collapsible, default collapsed */}
                 <ItemGroup title={t("machine.loopsAutomation")}>
-                    {/* Bootstrap Profiles sub-section */}
-                    {renderSectionBanner(t("machine.agentLoopBootstrapProfiles"), t("machine.agentLoopBootstrapHint"), String(bootstrapProfiles.length), "git-branch-outline")}
-                    <Item
-                        title={t("machine.agentLoopCreate")}
-                        subtitle={t("machine.agentLoopBootstrapHint")}
-                        icon={<Ionicons name="add-circle-outline" size={22} color={theme.colors.primary} />}
-                        onPress={() => { setEditingBootstrapProfile(null); setBootstrapProfileEditorVisible(true); }}
-                    />
-                    {bootstrapProfiles.length === 0 ? (
-                        renderEmptyStateCard("git-branch-outline", t("machine.agentLoopBootstrapProfilesEmpty"), t("machine.agentLoopBootstrapHint"))
-                    ) : bootstrapProfiles.map((profile) => (
-                        <Item
-                            key={profile.id}
-                            title={profile.name || profile.id}
-                            subtitle={getBootstrapProfileSubtitle(profile)}
-                            detail={profile.status}
-                            detailStyle={{ color: getBootstrapProfileStatusColor(profile, theme) }}
-                            icon={<Ionicons name="git-branch-outline" size={22} color={getBootstrapProfileStatusColor(profile, theme)} />}
-                            onPress={() => openBootstrapProfileActions(profile)}
-                            showChevron
-                            rightElement={mutatingBootstrapProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                        />
-                    ))}
+                    <Pressable
+                        style={[styles.automationToggle, { borderBottomColor: showAutomation ? theme.colors.divider : "transparent", borderBottomWidth: showAutomation ? 1 : 0 }]}
+                        onPress={() => setShowAutomation((current) => !current)}
+                    >
+                        <Text style={[styles.automationToggleText, { color: theme.colors.text }]}>{t("machine.loopsAutomation")}</Text>
+                        <Ionicons name={showAutomation ? "chevron-up-outline" : "chevron-down-outline"} size={18} color={theme.colors.textSecondary} />
+                    </Pressable>
+                    {showAutomation ? (
+                        <>
+                            {/* Bootstrap Profiles sub-section */}
+                            {renderSectionBanner(t("machine.agentLoopBootstrapProfiles"), t("machine.agentLoopBootstrapHint"), String(bootstrapProfiles.length), "git-branch-outline")}
+                            <Item
+                                title={t("machine.agentLoopCreate")}
+                                subtitle={t("machine.agentLoopBootstrapHint")}
+                                icon={<Ionicons name="add-circle-outline" size={22} color={theme.colors.primary} />}
+                                onPress={() => { setEditingBootstrapProfile(null); setBootstrapProfileEditorVisible(true); }}
+                            />
+                            {bootstrapProfiles.length === 0 ? (
+                                renderEmptyStateCard("git-branch-outline", t("machine.agentLoopBootstrapProfilesEmpty"), t("machine.agentLoopBootstrapHint"))
+                            ) : bootstrapProfiles.map((profile) => (
+                                <Item
+                                    key={profile.id}
+                                    title={profile.name || profile.id}
+                                    subtitle={getBootstrapProfileSubtitle(profile)}
+                                    detail={profile.status}
+                                    detailStyle={{ color: getBootstrapProfileStatusColor(profile, theme) }}
+                                    icon={<Ionicons name="git-branch-outline" size={22} color={getBootstrapProfileStatusColor(profile, theme)} />}
+                                    onPress={() => openBootstrapProfileActions(profile)}
+                                    showChevron
+                                    rightElement={mutatingBootstrapProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                                />
+                            ))}
 
-                    {/* Auto-Dream Profiles sub-section */}
-                    {renderSectionBanner(t("machine.autoDreamProfiles"), t("machine.autoDreamHint"), String(autoDreamProfiles.length), "moon-outline")}
-                    <Item
-                        title={t("machine.agentLoopCreate")}
-                        subtitle={t("machine.autoDreamHint")}
-                        icon={<Ionicons name="add-circle-outline" size={22} color={theme.colors.textLink} />}
-                        onPress={() => { setEditingAutoDreamProfile(null); setAutoDreamProfileEditorVisible(true); }}
-                    />
-                    {autoDreamProfiles.length === 0 ? (
-                        renderEmptyStateCard("moon-outline", t("machine.autoDreamProfilesEmpty"), t("machine.autoDreamHint"))
-                    ) : autoDreamProfiles.map((profile) => (
-                        <Item
-                            key={profile.id}
-                            title={profile.name || profile.id}
-                            subtitle={getAutoDreamProfileSubtitle(profile)}
-                            detail={profile.status}
-                            detailStyle={{ color: getAutoDreamProfileStatusColor(profile, theme) }}
-                            icon={<Ionicons name="moon-outline" size={22} color={getAutoDreamProfileStatusColor(profile, theme)} />}
-                            onPress={() => openAutoDreamProfileActions(profile)}
-                            showChevron
-                            rightElement={mutatingAutoDreamProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                        />
-                    ))}
+                            {/* Auto-Dream Profiles sub-section */}
+                            {renderSectionBanner(t("machine.autoDreamProfiles"), t("machine.autoDreamHint"), String(autoDreamProfiles.length), "moon-outline")}
+                            <Item
+                                title={t("machine.agentLoopCreate")}
+                                subtitle={t("machine.autoDreamHint")}
+                                icon={<Ionicons name="add-circle-outline" size={22} color={theme.colors.textLink} />}
+                                onPress={() => { setEditingAutoDreamProfile(null); setAutoDreamProfileEditorVisible(true); }}
+                            />
+                            {autoDreamProfiles.length === 0 ? (
+                                renderEmptyStateCard("moon-outline", t("machine.autoDreamProfilesEmpty"), t("machine.autoDreamHint"))
+                            ) : autoDreamProfiles.map((profile) => (
+                                <Item
+                                    key={profile.id}
+                                    title={profile.name || profile.id}
+                                    subtitle={getAutoDreamProfileSubtitle(profile)}
+                                    detail={profile.status}
+                                    detailStyle={{ color: getAutoDreamProfileStatusColor(profile, theme) }}
+                                    icon={<Ionicons name="moon-outline" size={22} color={getAutoDreamProfileStatusColor(profile, theme)} />}
+                                    onPress={() => openAutoDreamProfileActions(profile)}
+                                    showChevron
+                                    rightElement={mutatingAutoDreamProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                                />
+                            ))}
 
-                    {/* Scan Results sub-section */}
-                    {renderSectionBanner(t("machine.agentLoopBootstrap"), t("machine.agentLoopBootstrapHint"), String(bootstrapEntries.length), "search-outline")}
-                    <Item
-                        title={t("gitHosts.scanRepos")}
-                        subtitle={t("machine.agentLoopBootstrapHint")}
-                        detail={bootstrapScanning ? t("common.scanning") : String(bootstrapEntries.length)}
-                        onPress={() => void scanBootstrapRepos()}
-                        rightElement={bootstrapScanning ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                    />
-                    {bootstrapEntries.length === 0 ? (
-                        renderEmptyStateCard("search-outline", t("machine.agentLoopBootstrapEmpty"), t("machine.agentLoopBootstrapHint"))
-                    ) : bootstrapEntries.map((entry) => {
-                        const missingCount = entry.suggestions.filter((suggestion) => !suggestion.alreadyConfigured).length;
-                        return (
-                            <View key={entry.repo.repoPath} style={[styles.suggestionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
-                                <View style={styles.cardHeaderRow}>
-                                    <View style={styles.cardHeaderTextWrap}>
-                                        <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>{entry.repo.name}</Text>
-                                        <Text style={[styles.cardPathText, { color: theme.colors.textSecondary }]}>{entry.repo.repoPath}</Text>
+                            {/* Scan Results sub-section */}
+                            {renderSectionBanner(t("machine.agentLoopBootstrap"), t("machine.agentLoopBootstrapHint"), String(bootstrapEntries.length), "search-outline")}
+                            <Item
+                                title={t("gitHosts.scanRepos")}
+                                subtitle={t("machine.agentLoopBootstrapHint")}
+                                detail={bootstrapScanning ? t("common.scanning") : String(bootstrapEntries.length)}
+                                onPress={() => void scanBootstrapRepos()}
+                                rightElement={bootstrapScanning ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                            />
+                            {bootstrapEntries.length === 0 ? (
+                                renderEmptyStateCard("search-outline", t("machine.agentLoopBootstrapEmpty"), t("machine.agentLoopBootstrapHint"))
+                            ) : bootstrapEntries.map((entry) => {
+                                const missingCount = entry.suggestions.filter((suggestion) => !suggestion.alreadyConfigured).length;
+                                return (
+                                    <View key={entry.repo.repoPath} style={[styles.suggestionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                                        <View style={styles.cardHeaderRow}>
+                                            <View style={styles.cardHeaderTextWrap}>
+                                                <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>{entry.repo.name}</Text>
+                                                <Text style={[styles.cardPathText, { color: theme.colors.textSecondary }]}>{entry.repo.repoPath}</Text>
+                                            </View>
+                                            <Ionicons name="search-outline" size={18} color={theme.colors.accentOrange} />
+                                        </View>
+                                        <View style={styles.metaPillRow}>
+                                            <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                                <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{entry.suggestions.length} suggestions</Text>
+                                            </View>
+                                            <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                                <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{missingCount} creatable</Text>
+                                            </View>
+                                        </View>
+                                        <View style={styles.suggestionActions}>
+                                            <Pressable
+                                                style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: missingCount === 0 ? 0.6 : 1 }]}
+                                                onPress={() => void adoptRepoSuggestions(entry, false)}
+                                                disabled={missingCount === 0 || bootstrappingRepoPath === entry.repo.repoPath}
+                                            >
+                                                {bootstrappingRepoPath === entry.repo.repoPath ? (
+                                                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                                ) : (
+                                                    <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopBootstrapCreateAll")}</Text>
+                                                )}
+                                            </Pressable>
+                                            <Pressable
+                                                style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: missingCount === 0 ? 0.6 : 1 }]}
+                                                onPress={() => void adoptRepoSuggestions(entry, true)}
+                                                disabled={missingCount === 0 || bootstrappingRepoPath === entry.repo.repoPath}
+                                            >
+                                                <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopBootstrapCreateAndRun")}</Text>
+                                            </Pressable>
+                                        </View>
                                     </View>
-                                    <Ionicons name="search-outline" size={18} color={theme.colors.accentOrange} />
-                                </View>
-                                <View style={styles.metaPillRow}>
-                                    <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
-                                        <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{entry.suggestions.length} suggestions</Text>
-                                    </View>
-                                    <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
-                                        <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{missingCount} creatable</Text>
-                                    </View>
-                                </View>
-                                <View style={styles.suggestionActions}>
-                                    <Pressable
-                                        style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: missingCount === 0 ? 0.6 : 1 }]}
-                                        onPress={() => void adoptRepoSuggestions(entry, false)}
-                                        disabled={missingCount === 0 || bootstrappingRepoPath === entry.repo.repoPath}
-                                    >
-                                        {bootstrappingRepoPath === entry.repo.repoPath ? (
-                                            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                                        ) : (
-                                            <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopBootstrapCreateAll")}</Text>
-                                        )}
-                                    </Pressable>
-                                    <Pressable
-                                        style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: missingCount === 0 ? 0.6 : 1 }]}
-                                        onPress={() => void adoptRepoSuggestions(entry, true)}
-                                        disabled={missingCount === 0 || bootstrappingRepoPath === entry.repo.repoPath}
-                                    >
-                                        <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopBootstrapCreateAndRun")}</Text>
-                                    </Pressable>
-                                </View>
-                            </View>
-                        );
-                    })}
+                                );
+                            })}
+                        </>
+                    ) : null}
                 </ItemGroup>
             </ScrollView>
 
@@ -2019,5 +2048,52 @@ const styles = StyleSheet.create((theme) => ({
     modalInfoText: {
         fontSize: 13,
         lineHeight: 18,
+    },
+    flowGuide: {
+        marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderRadius: 16,
+        padding: 16,
+        gap: 10,
+    },
+    flowGuideTitle: {
+        fontSize: 15,
+        fontWeight: "700",
+    },
+    flowGuideSubtitle: {
+        fontSize: 12,
+        lineHeight: 16,
+    },
+    flowStepsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        flexWrap: "wrap",
+        paddingVertical: 4,
+    },
+    flowStep: {
+        alignItems: "center",
+        gap: 4,
+        minWidth: 56,
+    },
+    flowStepLabel: {
+        fontSize: 11,
+        fontWeight: "600",
+        textAlign: "center",
+    },
+    automationToggle: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        gap: 12,
+    },
+    automationToggleText: {
+        fontSize: 15,
+        fontWeight: "600",
     },
 }));
