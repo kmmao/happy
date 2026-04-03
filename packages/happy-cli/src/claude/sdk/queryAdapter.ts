@@ -129,6 +129,9 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // ── Partial/streaming messages ──
   if (opts.includePartialMessages) result.includePartialMessages = opts.includePartialMessages;
 
+  // ── Hook lifecycle events in output stream ──
+  if (opts.includeHookEvents) result.includeHookEvents = opts.includeHookEvents;
+
   // ── System prompt mapping ──
   if (opts.customSystemPrompt) {
     result.systemPrompt = opts.customSystemPrompt;

@@ -44,7 +44,7 @@ import { ExecutionGuard } from "@/automation/ExecutionGuard";
 interface PermissionsField {
   date: number;
   result: "approved" | "denied";
-  mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk";
+  mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk" | "auto";
   allowedTools?: string[];
 }
 

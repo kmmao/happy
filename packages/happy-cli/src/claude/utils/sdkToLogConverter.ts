@@ -75,7 +75,8 @@ export class SDKToLogConverter {
         | "acceptEdits"
         | "bypassPermissions"
         | "plan"
-        | "dontAsk";
+        | "dontAsk"
+        | "auto";
       reason?: string;
     }
   >;
@@ -92,7 +93,8 @@ export class SDKToLogConverter {
           | "acceptEdits"
           | "bypassPermissions"
           | "plan"
-          | "dontAsk";
+          | "dontAsk"
+        | "auto";
         reason?: string;
       }
     >,
@@ -366,7 +368,8 @@ export function convertSDKToLog(
         | "acceptEdits"
         | "bypassPermissions"
         | "plan"
-        | "dontAsk";
+        | "dontAsk"
+        | "auto";
       reason?: string;
     }
   >,

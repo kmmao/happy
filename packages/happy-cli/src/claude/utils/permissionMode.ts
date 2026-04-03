@@ -33,6 +33,7 @@ const VALID_PERMISSION_MODES: readonly PermissionMode[] = [
   "bypassPermissions",
   "plan",
   "dontAsk",
+  "auto",
   "read-only",
   "safe-yolo",
   "yolo",

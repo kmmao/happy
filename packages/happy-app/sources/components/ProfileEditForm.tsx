@@ -318,6 +318,12 @@ export function ProfileEditForm({
               icon: "list-outline" as const,
             },
             {
+              value: "auto" as const,
+              label: t("profiles.permissionAuto"),
+              description: t("profiles.permissionAutoDesc"),
+              icon: "sparkles-outline" as const,
+            },
+            {
               value: "bypassPermissions" as const,
               label: t("profiles.permissionYolo"),
               description: t("profiles.permissionYoloDesc"),

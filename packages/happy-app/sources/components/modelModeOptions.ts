@@ -113,6 +113,11 @@ export function getClaudePermissionModes(
       description: "Auto-deny unapproved actions",
     },
     {
+      key: "auto",
+      name: translate("agentInput.permissionMode.auto"),
+      description: "AI classifier auto-approves/denies",
+    },
+    {
       key: "bypassPermissions",
       name: translate("agentInput.permissionMode.bypassPermissions"),
       description: "Auto-approve everything",
@@ -419,7 +424,8 @@ export function getDefaultModelKey(flavor: AgentFlavor): string {
   return "default";
 }
 
-export function getDefaultPermissionModeKey(_flavor: AgentFlavor): string {
+export function getDefaultPermissionModeKey(flavor: AgentFlavor): string {
+  if (flavor === "claude") return "auto";
   return "default";
 }
 

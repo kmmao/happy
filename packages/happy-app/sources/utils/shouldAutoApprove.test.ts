@@ -81,6 +81,26 @@ describe("shouldAutoApprove", () => {
         });
     });
 
+    // auto mode: SDK handles permissions server-side — no App-side auto-approve
+    describe("auto mode", () => {
+        it.each(["Bash", "Edit", "Read", "Write", "MultiEdit", "Grep"])(
+            "does not auto-approve %s (SDK handles it)",
+            (tool) => {
+                expect(shouldAutoApprove("auto", tool)).toBe(false);
+            },
+        );
+    });
+
+    // dontAsk mode: auto-deny unapproved — SDK handles it
+    describe("dontAsk mode", () => {
+        it.each(["Bash", "Edit", "Read", "Write", "MultiEdit", "Grep"])(
+            "does not auto-approve %s (SDK denies)",
+            (tool) => {
+                expect(shouldAutoApprove("dontAsk", tool)).toBe(false);
+            },
+        );
+    });
+
     // default mode: never auto-approve
     describe("default mode", () => {
         it.each(["Bash", "Edit", "Read", "Write", "MultiEdit", "Grep"])(

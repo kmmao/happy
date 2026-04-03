@@ -20,7 +20,7 @@ interface PermissionResponse {
   id: string;
   approved: boolean;
   reason?: string;
-  mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk";
+  mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk" | "auto";
   allowTools?: string[];
   receivedAt?: number;
   /** User answers for AskUserQuestion — keyed by question text */
@@ -97,7 +97,7 @@ export class PermissionHandler {
         // Inject the approval message at the beginning of the queue
         if (
           response.mode &&
-          ["default", "acceptEdits", "bypassPermissions"].includes(
+          ["default", "acceptEdits", "bypassPermissions", "auto", "dontAsk"].includes(
             response.mode,
           )
         ) {

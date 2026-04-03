@@ -15,6 +15,7 @@ describe("resolveMessageModeMeta", () => {
       thinking: { type: "adaptive" },
       effort: null,
       maxBudgetUsd: null,
+      taskBudget: null,
     });
   });
 
@@ -33,6 +34,7 @@ describe("resolveMessageModeMeta", () => {
       thinking: { type: "adaptive" },
       effort: null,
       maxBudgetUsd: null,
+      taskBudget: null,
     });
   });
 
@@ -51,6 +53,7 @@ describe("resolveMessageModeMeta", () => {
       thinking: { type: "adaptive" },
       effort: null,
       maxBudgetUsd: null,
+      taskBudget: null,
     });
   });
 

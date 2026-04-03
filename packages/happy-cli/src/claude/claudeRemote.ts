@@ -91,6 +91,7 @@ export async function claudeRemote(opts: {
   onResult?: (result: {
     totalCostUsd: number;
     numTurns: number;
+    terminalReason?: string;
     modelUsage: Record<
       string,
       {
@@ -457,10 +458,11 @@ export async function claudeRemote(opts: {
           opts.onMaxTurnsReached?.();
         }
 
-        // Extract SDK result data (cost, usage breakdown) before signaling ready
+        // Extract SDK result data (cost, usage breakdown, terminal reason) before signaling ready
         const resultMsg = message as {
           total_cost_usd?: number;
           num_turns?: number;
+          terminal_reason?: string;
           modelUsage?: Record<
             string,
             {
@@ -478,6 +480,7 @@ export async function claudeRemote(opts: {
           opts.onResult?.({
             totalCostUsd: resultMsg.total_cost_usd ?? 0,
             numTurns: resultMsg.num_turns ?? 0,
+            terminalReason: resultMsg.terminal_reason,
             modelUsage: resultMsg.modelUsage ?? {},
           });
         }

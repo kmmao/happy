@@ -14,8 +14,12 @@ export type {
   SDKResultError,
   SDKAPIRetryMessage,
   SDKSessionStateChangedMessage,
+  SDKDeferredToolUse,
   PermissionResult,
   PermissionDecisionClassification,
+  HookPermissionDecision,
+  PermissionMode as SdkPermissionMode,
+  TerminalReason,
   ThinkingConfig,
   EffortLevel,
   Settings,
@@ -28,9 +32,16 @@ export type {
   OutputFormat,
   SdkBeta,
   SdkPluginConfig,
+  GetSubagentMessagesOptions,
+  ListSubagentsOptions,
 } from "@anthropic-ai/claude-agent-sdk";
 
-export { AbortError, forkSession } from "@anthropic-ai/claude-agent-sdk";
+export {
+  AbortError,
+  forkSession,
+  getSubagentMessages,
+  listSubagents,
+} from "@anthropic-ai/claude-agent-sdk";
 
 // ── Adapter-specific types (our API, not the official SDK's) ──
 
@@ -61,7 +72,8 @@ export interface QueryOptions {
     | "acceptEdits"
     | "bypassPermissions"
     | "plan"
-    | "dontAsk";
+    | "dontAsk"
+    | "auto";
   continue?: boolean;
   resume?: string;
   model?: string;
@@ -149,6 +161,12 @@ export interface QueryOptions {
    * Include partial/streaming message events in the output.
    */
   includePartialMessages?: boolean;
+  /**
+   * Include hook lifecycle events (hook_started, hook_progress, hook_response)
+   * in the output stream. SessionStart and Setup hooks are always emitted.
+   * @default false
+   */
+  includeHookEvents?: boolean;
 }
 
 /** Query prompt — string or async stream of user messages */

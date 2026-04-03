@@ -56,6 +56,14 @@ export function shouldAutoApprove(
             // Only auto-approve edit tools
             return EDIT_TOOLS.has(toolName);
 
+        case "auto":
+            // AI classifier handles permissions server-side — no App-side auto-approve
+            return false;
+
+        case "dontAsk":
+            // Auto-deny unapproved actions — SDK handles it, App shows nothing
+            return false;
+
         case "default":
         case null:
         case undefined:

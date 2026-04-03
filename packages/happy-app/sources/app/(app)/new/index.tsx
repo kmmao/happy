@@ -2524,6 +2524,8 @@ function NewSessionWizard() {
                       default: "shield-outline",
                       acceptEdits: "checkmark-outline",
                       plan: "list-outline",
+                      dontAsk: "close-circle-outline",
+                      auto: "sparkles-outline",
                       bypassPermissions: "flash-outline",
                       "read-only": "eye-outline",
                       "safe-yolo": "shield-checkmark-outline",

@@ -38,6 +38,7 @@ export type PermissionMode =
   | "bypassPermissions"
   | "plan"
   | "dontAsk"
+  | "auto"
   | "read-only"
   | "safe-yolo"
   | "yolo";
@@ -298,6 +299,7 @@ export const MessageMetaSchema = z.object({
       "bypassPermissions",
       "plan",
       "dontAsk",
+      "auto",
       "read-only",
       "safe-yolo",
       "yolo",

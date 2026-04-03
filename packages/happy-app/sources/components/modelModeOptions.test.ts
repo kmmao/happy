@@ -31,6 +31,7 @@ describe("modelModeOptions", () => {
       "acceptEdits",
       "plan",
       "dontAsk",
+      "auto",
       "bypassPermissions",
     ]);
     expect(modes[0].name).toBe("tr:agentInput.permissionMode.default");
