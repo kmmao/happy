@@ -1,20 +1,18 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   View,
   Text,
-  ScrollView,
   ActivityIndicator,
   RefreshControl,
   Platform,
   Pressable,
-  TextInput,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
 import { Typography } from "@/constants/Typography";
-import { useSessions, useAllMachines, useMachine } from "@/sync/storage";
+import { useSessions, useMachine } from "@/sync/storage";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import type { Session } from "@/sync/storageTypes";
 import { machineStopDaemon, machineUpdateMetadata, machineBash, machineUpgradeCli } from "@/sync/ops";
@@ -46,7 +44,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 10,
   },
   pathInput: {
     flex: 1,
@@ -55,18 +53,18 @@ const styles = StyleSheet.create((theme) => ({
       theme.colors.input?.background ?? theme.colors.groupped.background,
     borderWidth: 1,
     borderColor: theme.colors.divider,
-    minHeight: 44,
+    minHeight: 36,
     position: "relative",
-    paddingHorizontal: 12,
-    paddingVertical: Platform.select({ web: 10, ios: 8, default: 10 }) as any,
+    paddingHorizontal: 10,
+    paddingVertical: Platform.select({ web: 6, ios: 4, default: 6 }) as any,
   },
   inlineSendButton: {
     position: "absolute",
-    right: 8,
-    bottom: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    right: 6,
+    bottom: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -74,18 +72,39 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.button.primary.background,
   },
   inlineSendInactive: {
-    // Use a darker neutral in light theme to avoid blending into input
-    backgroundColor: Platform.select({
-      ios:
-        theme.colors.permissionButton?.inactive?.background ??
-        theme.colors.surfaceHigh,
-      android:
-        theme.colors.permissionButton?.inactive?.background ??
-        theme.colors.surfaceHigh,
-      default:
-        theme.colors.permissionButton?.inactive?.background ??
-        theme.colors.surfaceHigh,
-    }) as any,
+    backgroundColor:
+      theme.colors.permissionButton?.inactive?.background ??
+      theme.colors.surfaceHigh,
+  },
+  // Daemon compact status bar
+  daemonBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  daemonDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  daemonLabel: {
+    ...Typography.default("regular"),
+    fontSize: 14,
+    color: theme.colors.text,
+    flex: 1,
+  },
+  daemonMeta: {
+    ...Typography.default("regular"),
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    fontFamily: "Menlo",
+  },
+  daemonActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
 }));
 
@@ -107,7 +126,7 @@ function MachineDetailScreen() {
   const [isUpgradingCli, setIsUpgradingCli] = useState(false);
 
   const currentCliVersion = machine?.daemonState?.startedWithCliVersion as string | undefined;
-  const { latestVersion, hasUpdate, isChecking: isCheckingVersion } = useCliVersionCheck(currentCliVersion);
+  const { latestVersion, hasUpdate } = useCliVersionCheck(currentCliVersion);
 
   // Check if Docker is available on this machine
   React.useEffect(() => {
@@ -338,14 +357,6 @@ function MachineDetailScreen() {
     }
   };
 
-  const pastUsedRelativePath = useCallback((session: Session) => {
-    if (!session.metadata) return "unknown path";
-    return formatPathRelativeToHome(
-      session.metadata.path,
-      session.metadata.homeDir,
-    );
-  }, []);
-
   if (!machine) {
     return (
       <>
@@ -452,230 +463,58 @@ function MachineDetailScreen() {
         }
         keyboardShouldPersistTaps="handled"
       >
-        {/* Launch section */}
-        {machine && (
-          <>
-            {!isMachineOnline(machine) && (
-              <ItemGroup>
-                <Item
-                  title={t("machine.offlineUnableToSpawn")}
-                  subtitle={t("machine.offlineHelp")}
-                  subtitleLines={0}
-                  showChevron={false}
-                />
-              </ItemGroup>
+        {/* Daemon — compact status bar at top */}
+        <ItemGroup>
+          <View style={styles.daemonBar}>
+            <View
+              style={[
+                styles.daemonDot,
+                {
+                  backgroundColor:
+                    daemonStatus === "likely alive" ? "#34C759" : "#FF9500",
+                },
+              ]}
+            />
+            <Text style={styles.daemonLabel}>
+              {t("machine.daemon")}
+            </Text>
+            {machine.daemonState?.startedWithCliVersion && (
+              <Text style={styles.daemonMeta}>
+                {hasUpdate && latestVersion
+                  ? `v${machine.daemonState.startedWithCliVersion} → ${latestVersion}`
+                  : `v${machine.daemonState.startedWithCliVersion}`}
+              </Text>
             )}
-            <ItemGroup title={t("machine.launchNewSessionInDirectory")}>
-              <View style={{ opacity: isMachineOnline(machine) ? 1 : 0.5 }}>
-                <View style={styles.pathInputContainer}>
-                  <View style={[styles.pathInput, { paddingVertical: 8 }]}>
-                    <MultiTextInput
-                      ref={inputRef}
-                      value={customPath}
-                      onChangeText={setCustomPath}
-                      placeholder={"Enter custom path"}
-                      maxHeight={76}
-                      paddingTop={8}
-                      paddingBottom={8}
-                      paddingRight={48}
-                    />
-                    <Pressable
-                      onPress={() => handleStartSession()}
-                      disabled={spawnButtonDisabled}
-                      style={[
-                        styles.inlineSendButton,
-                        spawnButtonDisabled
-                          ? styles.inlineSendInactive
-                          : styles.inlineSendActive,
-                      ]}
-                    >
-                      <Ionicons
-                        name="play"
-                        size={16}
-                        color={
-                          spawnButtonDisabled
-                            ? theme.colors.textSecondary
-                            : theme.colors.button.primary.tint
-                        }
-                        style={{ marginLeft: 1 }}
-                      />
-                    </Pressable>
-                  </View>
-                </View>
-                <View style={{ paddingTop: 4 }} />
-                {pathsToShow.map((path, index) => {
-                  const display = formatPathRelativeToHome(
-                    path,
-                    machine.metadata?.homeDir,
-                  );
-                  const isSelected = customPath.trim() === display;
-                  const isLast = index === pathsToShow.length - 1;
-                  const hideDivider = isLast && pathsToShow.length <= 5;
-                  return (
-                    <Item
-                      key={path}
-                      title={display}
-                      leftElement={
-                        <Ionicons
-                          name="folder-outline"
-                          size={18}
-                          color={theme.colors.textSecondary}
-                        />
-                      }
-                      onPress={
-                        isMachineOnline(machine)
-                          ? () => {
-                              setCustomPath(display);
-                              setTimeout(() => inputRef.current?.focus(), 50);
-                            }
-                          : undefined
-                      }
-                      disabled={!isMachineOnline(machine)}
-                      selected={isSelected}
-                      showChevron={false}
-                      pressableStyle={
-                        isSelected
-                          ? { backgroundColor: theme.colors.surfaceSelected }
-                          : undefined
-                      }
-                      showDivider={!hideDivider}
-                    />
-                  );
-                })}
-                {recentPaths.length > 5 && (
-                  <Item
-                    title={
-                      showAllPaths
-                        ? t("machineLauncher.showLess")
-                        : t("machineLauncher.showAll", {
-                            count: recentPaths.length,
-                          })
-                    }
-                    onPress={() => setShowAllPaths(!showAllPaths)}
-                    showChevron={false}
-                    showDivider={false}
-                    titleStyle={{
-                      textAlign: "center",
-                      color: (theme as any).dark
-                        ? theme.colors.button.primary.tint
-                        : theme.colors.button.primary.background,
-                    }}
-                  />
-                )}
-              </View>
-            </ItemGroup>
-          </>
-        )}
-
-        {/* Daemon */}
-        <ItemGroup title={t("machine.daemon")}>
-          <Item
-            title={t("machine.status")}
-            detail={daemonStatus}
-            detailStyle={{
-              color: daemonStatus === "likely alive" ? "#34C759" : "#FF9500",
-            }}
-            showChevron={false}
-          />
-          <Item
-            title={t("machine.stopDaemon")}
-            titleStyle={{
-              color: daemonStatus === "stopped" ? "#999" : "#FF9500",
-            }}
-            onPress={daemonStatus === "stopped" ? undefined : handleStopDaemon}
-            disabled={isStoppingDaemon || daemonStatus === "stopped"}
-            rightElement={
-              isStoppingDaemon ? (
-                <ActivityIndicator
-                  size="small"
-                  color={theme.colors.textSecondary}
-                />
-              ) : (
-                <Ionicons
-                  name="stop-circle"
-                  size={20}
-                  color={daemonStatus === "stopped" ? "#999" : "#FF9500"}
-                />
-              )
-            }
-          />
-          {machine.daemonState && (
-            <>
-              {machine.daemonState.pid && (
-                <Item
-                  title={t("machine.lastKnownPid")}
-                  subtitle={String(machine.daemonState.pid)}
-                  subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
-                />
-              )}
-              {machine.daemonState.httpPort && (
-                <Item
-                  title={t("machine.lastKnownHttpPort")}
-                  subtitle={String(machine.daemonState.httpPort)}
-                  subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
-                />
-              )}
-              {machine.daemonState.startTime && (
-                <Item
-                  title={t("machine.startedAt")}
-                  subtitle={new Date(
-                    machine.daemonState.startTime,
-                  ).toLocaleString()}
-                />
-              )}
-              {machine.daemonState.startedWithCliVersion && (
-                <Item
-                  title={t("machine.cliVersion")}
-                  subtitle={
-                    hasUpdate && latestVersion
-                      ? `${machine.daemonState.startedWithCliVersion}  →  ${latestVersion}`
-                      : machine.daemonState.startedWithCliVersion
-                  }
-                  subtitleStyle={{
-                    fontFamily: "Menlo",
-                    fontSize: 13,
-                    color: hasUpdate ? "#FF9500" : undefined,
-                  }}
-                  rightElement={
-                    isCheckingVersion ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={theme.colors.textSecondary}
-                      />
-                    ) : undefined
-                  }
-                />
-              )}
+            {machine.daemonState?.pid && (
+              <Text style={styles.daemonMeta}>
+                PID {machine.daemonState.pid}
+              </Text>
+            )}
+            <View style={styles.daemonActions}>
               {hasUpdate && latestVersion && isMachineOnline(machine) && (
-                <Item
-                  title={t("machine.upgradeCliButton")}
-                  titleStyle={{
-                    color: theme.colors.textLink,
-                  }}
-                  onPress={handleUpgradeCli}
-                  disabled={isUpgradingCli}
-                  rightElement={
-                    isUpgradingCli ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={theme.colors.textSecondary}
-                      />
-                    ) : (
-                      <Ionicons
-                        name="cloud-download-outline"
-                        size={20}
-                        color={theme.colors.textLink}
-                      />
-                    )
-                  }
-                />
+                <Pressable onPress={handleUpgradeCli} disabled={isUpgradingCli} hitSlop={8}>
+                  {isUpgradingCli ? (
+                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                  ) : (
+                    <Ionicons name="cloud-download-outline" size={18} color={theme.colors.textLink} />
+                  )}
+                </Pressable>
               )}
-            </>
-          )}
-          <Item
-            title={t("machine.daemonStateVersion")}
-            subtitle={String(machine.daemonStateVersion)}
-          />
+              {daemonStatus !== "stopped" && (
+                <Pressable
+                  onPress={handleStopDaemon}
+                  disabled={isStoppingDaemon}
+                  hitSlop={8}
+                >
+                  {isStoppingDaemon ? (
+                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                  ) : (
+                    <Ionicons name="stop-circle" size={18} color="#FF9500" />
+                  )}
+                </Pressable>
+              )}
+            </View>
+          </View>
         </ItemGroup>
 
         <ItemGroup title={t("machine.automation")}>
@@ -750,6 +589,120 @@ function MachineDetailScreen() {
           />
         </ItemGroup>
 
+        {/* Launch section */}
+        {machine && (
+          <>
+            {!isMachineOnline(machine) && (
+              <ItemGroup>
+                <Item
+                  title={t("machine.offlineUnableToSpawn")}
+                  subtitle={t("machine.offlineHelp")}
+                  subtitleLines={0}
+                  showChevron={false}
+                />
+              </ItemGroup>
+            )}
+            <ItemGroup title={t("machine.launchNewSessionInDirectory")}>
+              <View style={{ opacity: isMachineOnline(machine) ? 1 : 0.5 }}>
+                <View style={styles.pathInputContainer}>
+                  <View style={styles.pathInput}>
+                    <MultiTextInput
+                      ref={inputRef}
+                      value={customPath}
+                      onChangeText={setCustomPath}
+                      placeholder={"Enter custom path"}
+                      maxHeight={60}
+                      paddingTop={4}
+                      paddingBottom={4}
+                      paddingRight={36}
+                    />
+                    <Pressable
+                      onPress={() => handleStartSession()}
+                      disabled={spawnButtonDisabled}
+                      style={[
+                        styles.inlineSendButton,
+                        spawnButtonDisabled
+                          ? styles.inlineSendInactive
+                          : styles.inlineSendActive,
+                      ]}
+                    >
+                      <Ionicons
+                        name="play"
+                        size={14}
+                        color={
+                          spawnButtonDisabled
+                            ? theme.colors.textSecondary
+                            : theme.colors.button.primary.tint
+                        }
+                        style={{ marginLeft: 1 }}
+                      />
+                    </Pressable>
+                  </View>
+                </View>
+                {pathsToShow.map((path, index) => {
+                  const display = formatPathRelativeToHome(
+                    path,
+                    machine.metadata?.homeDir,
+                  );
+                  const isSelected = customPath.trim() === display;
+                  const isLast = index === pathsToShow.length - 1;
+                  const hideDivider = isLast && pathsToShow.length <= 5;
+                  return (
+                    <Item
+                      key={path}
+                      title={display}
+                      leftElement={
+                        <Ionicons
+                          name="folder-outline"
+                          size={18}
+                          color={theme.colors.textSecondary}
+                        />
+                      }
+                      onPress={
+                        isMachineOnline(machine)
+                          ? () => {
+                              setCustomPath(display);
+                              setTimeout(() => inputRef.current?.focus(), 50);
+                            }
+                          : undefined
+                      }
+                      disabled={!isMachineOnline(machine)}
+                      selected={isSelected}
+                      showChevron={false}
+                      pressableStyle={
+                        isSelected
+                          ? { backgroundColor: theme.colors.surfaceSelected }
+                          : undefined
+                      }
+                      showDivider={!hideDivider}
+                    />
+                  );
+                })}
+                {recentPaths.length > 5 && (
+                  <Item
+                    title={
+                      showAllPaths
+                        ? t("machineLauncher.showLess")
+                        : t("machineLauncher.showAll", {
+                            count: recentPaths.length,
+                          })
+                    }
+                    onPress={() => setShowAllPaths(!showAllPaths)}
+                    showChevron={false}
+                    showDivider={false}
+                    titleStyle={{
+                      textAlign: "center",
+                      color: (theme as any).dark
+                        ? theme.colors.button.primary.tint
+                        : theme.colors.button.primary.background,
+                    }}
+                  />
+                )}
+              </View>
+            </ItemGroup>
+          </>
+        )}
+
         {/* Previous Sessions (debug view) */}
         {previousSessions.length > 0 && (
           <ItemGroup title={t("machine.previousSessions")}>
@@ -767,44 +720,61 @@ function MachineDetailScreen() {
           </ItemGroup>
         )}
 
-        {/* Machine */}
+        {/* Machine — compact detail layout */}
         <ItemGroup title={t("machine.machineGroup")}>
           <Item
             title={t("machine.host")}
-            subtitle={metadata?.host || machineId}
+            detail={metadata?.host || machineId}
+            showChevron={false}
+            copy
           />
           <Item
             title={t("machine.machineId")}
-            subtitle={machineId}
-            subtitleStyle={{ fontFamily: "Menlo", fontSize: 12 }}
+            detail={machineId}
+            detailStyle={{ fontFamily: "Menlo", fontSize: 12 }}
+            showChevron={false}
+            copy
           />
           {metadata?.username && (
-            <Item title={t("machine.username")} subtitle={metadata.username} />
+            <Item
+              title={t("machine.username")}
+              detail={metadata.username}
+              showChevron={false}
+            />
           )}
           {metadata?.homeDir && (
             <Item
               title={t("machine.homeDirectory")}
-              subtitle={metadata.homeDir}
-              subtitleStyle={{ fontFamily: "Menlo", fontSize: 13 }}
+              detail={metadata.homeDir}
+              detailStyle={{ fontFamily: "Menlo", fontSize: 12 }}
+              showChevron={false}
+              copy
             />
           )}
-          {metadata?.platform && (
-            <Item title={t("machine.platform")} subtitle={metadata.platform} />
-          )}
-          {metadata?.arch && (
-            <Item title={t("machine.architecture")} subtitle={metadata.arch} />
+          {metadata?.platform && metadata?.arch ? (
+            <Item
+              title={t("machine.platform")}
+              detail={`${metadata.platform} / ${metadata.arch}`}
+              showChevron={false}
+            />
+          ) : (
+            <>
+              {metadata?.platform && (
+                <Item title={t("machine.platform")} detail={metadata.platform} showChevron={false} />
+              )}
+              {metadata?.arch && (
+                <Item title={t("machine.architecture")} detail={metadata.arch} showChevron={false} />
+              )}
+            </>
           )}
           <Item
             title={t("machine.lastSeen")}
-            subtitle={
+            detail={
               machine.activeAt
                 ? new Date(machine.activeAt).toLocaleString()
                 : t("machine.never")
             }
-          />
-          <Item
-            title={t("machine.metadataVersion")}
-            subtitle={String(machine.metadataVersion)}
+            showChevron={false}
           />
         </ItemGroup>
       </ItemList>
