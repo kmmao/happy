@@ -6,6 +6,8 @@ import {
     Pressable,
     ActivityIndicator,
     FlatList,
+    ScrollView,
+    useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -66,13 +68,16 @@ const stylesheet = StyleSheet.create((theme) => ({
         width: 420,
         maxWidth: "94%",
         borderRadius: 16,
-        padding: 16,
         backgroundColor: theme.colors.surface,
         shadowColor: theme.colors.shadow.color,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.2,
         shadowRadius: 16,
         elevation: 10,
+        overflow: "hidden",
+    },
+    cardScroll: {
+        padding: 16,
     },
     title: {
         fontSize: 18,
@@ -157,7 +162,6 @@ const stylesheet = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
     },
     repoList: {
-        maxHeight: 220,
         borderWidth: 1,
         borderRadius: 10,
         marginBottom: 12,
@@ -250,7 +254,9 @@ export const CloneRepoModal = React.memo(function CloneRepoModal({
     onClone,
 }: CloneRepoModalProps) {
     const { theme } = useUnistyles();
+    const { height: windowHeight } = useWindowDimensions();
     const styles = stylesheet;
+    const repoListHeight = Math.min(220, Math.max(120, windowHeight * 0.22));
     const availableHosts = useMemo(
         () => gitHosts.filter((host) => !!host.apiToken),
         [gitHosts],
@@ -563,100 +569,266 @@ export const CloneRepoModal = React.memo(function CloneRepoModal({
                 },
             ]}
         >
-            <Text style={[styles.title, { color: theme.colors.text }]}>
-                {t("newSession.gitRepos.cloneRepo")}
-            </Text>
-            <Text style={[styles.description, { color: theme.colors.textSecondary }]}>
-                {t("newSession.gitRepos.cloneDescription")}
-            </Text>
+            <ScrollView
+                bounces={false}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.cardScroll}
+            >
+                <Text style={[styles.title, { color: theme.colors.text }]}>
+                    {t("newSession.gitRepos.cloneRepo")}
+                </Text>
+                <Text style={[styles.description, { color: theme.colors.textSecondary }]}>
+                    {t("newSession.gitRepos.cloneDescription")}
+                </Text>
 
-            <Text style={[styles.label, { color: theme.colors.text, marginBottom: 8 }]}>
-                {t("newSession.gitRepos.repoHostLabel")}
-            </Text>
-            {availableHosts.length === 0 ? (
-                <View
-                    style={[
-                        styles.helperBox,
-                        { backgroundColor: theme.colors.input.background },
-                    ]}
-                >
-                    <Ionicons
-                        name="information-circle-outline"
-                        size={16}
-                        color={theme.colors.textSecondary}
-                        style={{ marginTop: 1 }}
-                    />
-                    <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>
-                        {t("newSession.gitRepos.noConfiguredHosts")}
-                    </Text>
-                </View>
-            ) : (
-                <View style={styles.hostRow}>
-                    {availableHosts.map((host) => {
-                        const selected = host.host === selectedHostKey;
-                        return (
-                            <Pressable
-                                key={host.host}
-                                onPress={() => setSelectedHostKey(host.host)}
-                                style={({ pressed }) => [
-                                    styles.hostChip,
-                                    {
-                                        borderColor: selected
-                                            ? theme.colors.textLink
-                                            : theme.colors.divider,
-                                        backgroundColor: selected
-                                            ? `${theme.colors.textLink}12`
-                                            : theme.colors.input.background,
-                                        opacity: pressed ? 0.8 : 1,
-                                    },
-                                ]}
-                            >
-                                <Ionicons
-                                    name={
-                                        host.provider === "github"
-                                            ? "logo-github"
-                                            : "git-branch-outline"
-                                    }
-                                    size={14}
-                                    color={selected ? theme.colors.textLink : theme.colors.textSecondary}
-                                />
-                                <Text
-                                    style={[
-                                        styles.hostChipText,
-                                        { color: selected ? theme.colors.textLink : theme.colors.text },
+                <Text style={[styles.label, { color: theme.colors.text, marginBottom: 8 }]}>
+                    {t("newSession.gitRepos.repoHostLabel")}
+                </Text>
+                {availableHosts.length === 0 ? (
+                    <View
+                        style={[
+                            styles.helperBox,
+                            { backgroundColor: theme.colors.input.background },
+                        ]}
+                    >
+                        <Ionicons
+                            name="information-circle-outline"
+                            size={16}
+                            color={theme.colors.textSecondary}
+                            style={{ marginTop: 1 }}
+                        />
+                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>
+                            {t("newSession.gitRepos.noConfiguredHosts")}
+                        </Text>
+                    </View>
+                ) : (
+                    <View style={styles.hostRow}>
+                        {availableHosts.map((host) => {
+                            const selected = host.host === selectedHostKey;
+                            return (
+                                <Pressable
+                                    key={host.host}
+                                    onPress={() => setSelectedHostKey(host.host)}
+                                    style={({ pressed }) => [
+                                        styles.hostChip,
+                                        {
+                                            borderColor: selected
+                                                ? theme.colors.textLink
+                                                : theme.colors.divider,
+                                            backgroundColor: selected
+                                                ? `${theme.colors.textLink}12`
+                                                : theme.colors.input.background,
+                                            opacity: pressed ? 0.8 : 1,
+                                        },
                                     ]}
                                 >
-                                    {host.host}
-                                </Text>
-                            </Pressable>
-                        );
-                    })}
-                </View>
-            )}
+                                    <Ionicons
+                                        name={
+                                            host.provider === "github"
+                                                ? "logo-github"
+                                                : "git-branch-outline"
+                                        }
+                                        size={14}
+                                        color={selected ? theme.colors.textLink : theme.colors.textSecondary}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.hostChipText,
+                                            { color: selected ? theme.colors.textLink : theme.colors.text },
+                                        ]}
+                                    >
+                                        {host.host}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                )}
 
-            {selectedHost && (
+                {selectedHost && (
+                    <View
+                        style={[
+                            styles.helperBox,
+                            { backgroundColor: theme.colors.input.background },
+                        ]}
+                    >
+                        <Ionicons
+                            name="key-outline"
+                            size={16}
+                            color={theme.colors.textLink}
+                            style={{ marginTop: 1 }}
+                        />
+                        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>
+                            {t("newSession.gitRepos.configuredHostDetected", {
+                                provider: selectedHost.provider === "github" ? "GitHub" : "Gitea",
+                                host: selectedHost.host,
+                            })}
+                        </Text>
+                    </View>
+                )}
+
+                {selectedHost && (
+                    <TextInput
+                        style={[
+                            styles.input,
+                            {
+                                borderColor: theme.colors.divider,
+                                color: theme.colors.text,
+                                backgroundColor: theme.colors.input.background,
+                                marginBottom: 10,
+                            },
+                        ]}
+                        value={repoSearch}
+                        onChangeText={handleSearchChange}
+                        placeholder={t("newSession.gitRepos.remoteSearchPlaceholder")}
+                        placeholderTextColor={theme.colors.textSecondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                    />
+                )}
+
+                <View style={styles.labelRow}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>
+                        {t("newSession.gitRepos.title")}
+                    </Text>
+                    {selectedHost && (
+                        <Pressable
+                            onPress={() => {
+                                setRepoSearch("");
+                                activeQueryRef.current = "";
+                                handleLoadRepos({ forceRefresh: true });
+                            }}
+                            disabled={loadingRepos}
+                            style={({ pressed }) => [
+                                styles.smallButton,
+                                {
+                                    backgroundColor: theme.colors.input.background,
+                                    opacity: pressed || loadingRepos ? 0.75 : 1,
+                                },
+                            ]}
+                        >
+                            {loadingRepos ? (
+                                <ActivityIndicator size="small" color={theme.colors.textLink} />
+                            ) : (
+                                <Ionicons
+                                    name="refresh-outline"
+                                    size={14}
+                                    color={theme.colors.textLink}
+                                />
+                            )}
+                            <Text style={[styles.smallButtonText, { color: theme.colors.textLink }]}>
+                                {loadingRepos
+                                    ? t("newSession.gitRepos.loadingRepos")
+                                    : t("newSession.gitRepos.loadRepos")}
+                            </Text>
+                        </Pressable>
+                    )}
+                </View>
+
+                {repos.length > 0 && (
+                    <View style={styles.filterRow}>
+                        {([
+                            ["all", t("newSession.gitRepos.filterAll", { count: visibilityCounts.all })],
+                            [
+                                "private",
+                                t("newSession.gitRepos.filterPrivate", { count: visibilityCounts.private }),
+                            ],
+                            [
+                                "public",
+                                t("newSession.gitRepos.filterPublic", { count: visibilityCounts.public }),
+                            ],
+                        ] as const).map(([key, label]) => {
+                            const selected = visibilityFilter === key;
+                            return (
+                                <Pressable
+                                    key={key}
+                                    onPress={() => setVisibilityFilter(key)}
+                                    style={({ pressed }) => [
+                                        styles.filterChip,
+                                        {
+                                            borderColor: selected
+                                                ? theme.colors.textLink
+                                                : theme.colors.divider,
+                                            backgroundColor: selected
+                                                ? `${theme.colors.textLink}12`
+                                                : theme.colors.input.background,
+                                            opacity: pressed ? 0.8 : 1,
+                                        },
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.filterChipText,
+                                            { color: selected ? theme.colors.textLink : theme.colors.textSecondary },
+                                        ]}
+                                    >
+                                        {label}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                )}
+
                 <View
                     style={[
-                        styles.helperBox,
-                        { backgroundColor: theme.colors.input.background },
+                        styles.repoList,
+                        {
+                            maxHeight: repoListHeight,
+                            borderColor: theme.colors.divider,
+                            backgroundColor: theme.colors.input.background,
+                        },
                     ]}
                 >
-                    <Ionicons
-                        name="key-outline"
-                        size={16}
-                        color={theme.colors.textLink}
-                        style={{ marginTop: 1 }}
-                    />
-                    <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>
-                        {t("newSession.gitRepos.configuredHostDetected", {
-                            provider: selectedHost.provider === "github" ? "GitHub" : "Gitea",
-                            host: selectedHost.host,
-                        })}
-                    </Text>
+                    {loadingRepos ? (
+                        <View style={{ paddingVertical: 24 }}>
+                            <ActivityIndicator size="small" color={theme.colors.textLink} />
+                        </View>
+                    ) : loadError ? (
+                        <Text style={[styles.emptyText, { color: theme.colors.accentOrange }]}>
+                            {loadError}
+                        </Text>
+                    ) : filteredRepos.length === 0 ? (
+                        <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+                            {repos.length === 0
+                                ? t("newSession.gitRepos.noRemoteRepos")
+                                : t("newSession.gitRepos.noSearchResults")}
+                        </Text>
+                    ) : (
+                        <FlatList
+                            data={filteredRepos}
+                            renderItem={renderRepoItem}
+                            keyExtractor={keyExtractor}
+                            nestedScrollEnabled
+                            onEndReached={handleLoadMore}
+                            onEndReachedThreshold={0.3}
+                            ListFooterComponent={listFooter}
+                        />
+                    )}
                 </View>
-            )}
 
-            {selectedHost && (
+                <Text style={[styles.label, { color: theme.colors.text }]}>
+                    {t("newSession.gitRepos.repoUrlLabel")}
+                </Text>
+                <TextInput
+                    style={[
+                        styles.input,
+                        {
+                            borderColor: theme.colors.divider,
+                            color: theme.colors.textSecondary,
+                            backgroundColor: theme.colors.input.background,
+                        },
+                    ]}
+                    value={selectedRepo?.cloneUrl ?? ""}
+                    placeholder={t("newSession.gitRepos.selectRepoPlaceholder")}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    editable={false}
+                />
+
+                <Text style={[styles.label, { color: theme.colors.text }]}>
+                    {t("newSession.gitRepos.targetDirLabel")}
+                </Text>
                 <TextInput
                     style={[
                         styles.input,
@@ -664,221 +836,63 @@ export const CloneRepoModal = React.memo(function CloneRepoModal({
                             borderColor: theme.colors.divider,
                             color: theme.colors.text,
                             backgroundColor: theme.colors.input.background,
-                            marginBottom: 10,
                         },
                     ]}
-                    value={repoSearch}
-                    onChangeText={handleSearchChange}
-                    placeholder={t("newSession.gitRepos.remoteSearchPlaceholder")}
+                    value={targetDir}
+                    onChangeText={setTargetDir}
+                    placeholder={t("newSession.gitRepos.targetDirPlaceholder")}
                     placeholderTextColor={theme.colors.textSecondary}
                     autoCapitalize="none"
                     autoCorrect={false}
                 />
-            )}
 
-            <View style={styles.labelRow}>
-                <Text style={[styles.label, { color: theme.colors.text }]}>
-                    {t("newSession.gitRepos.title")}
-                </Text>
-                {selectedHost && (
+                {error && (
+                    <Text style={[styles.errorText, { color: theme.colors.accentOrange }]}>
+                        {error}
+                    </Text>
+                )}
+
+                <View style={styles.buttonRow}>
                     <Pressable
-                        onPress={() => {
-                            setRepoSearch("");
-                            activeQueryRef.current = "";
-                            handleLoadRepos({ forceRefresh: true });
-                        }}
-                        disabled={loadingRepos}
+                        onPress={onClose}
+                        disabled={submitting}
                         style={({ pressed }) => [
-                            styles.smallButton,
+                            styles.button,
                             {
                                 backgroundColor: theme.colors.input.background,
-                                opacity: pressed || loadingRepos ? 0.75 : 1,
+                                opacity: pressed || submitting ? 0.7 : 1,
                             },
                         ]}
                     >
-                        {loadingRepos ? (
-                            <ActivityIndicator size="small" color={theme.colors.textLink} />
-                        ) : (
-                            <Ionicons
-                                name="refresh-outline"
-                                size={14}
-                                color={theme.colors.textLink}
-                            />
-                        )}
-                        <Text style={[styles.smallButtonText, { color: theme.colors.textLink }]}>
-                            {loadingRepos
-                                ? t("newSession.gitRepos.loadingRepos")
-                                : t("newSession.gitRepos.loadRepos")}
+                        <Text style={[styles.buttonText, { color: theme.colors.text }]}>
+                            {t("common.cancel")}
                         </Text>
                     </Pressable>
-                )}
-            </View>
-
-            {repos.length > 0 && (
-                <View style={styles.filterRow}>
-                    {([
-                        ["all", t("newSession.gitRepos.filterAll", { count: visibilityCounts.all })],
-                        [
-                            "private",
-                            t("newSession.gitRepos.filterPrivate", { count: visibilityCounts.private }),
-                        ],
-                        [
-                            "public",
-                            t("newSession.gitRepos.filterPublic", { count: visibilityCounts.public }),
-                        ],
-                    ] as const).map(([key, label]) => {
-                        const selected = visibilityFilter === key;
-                        return (
-                            <Pressable
-                                key={key}
-                                onPress={() => setVisibilityFilter(key)}
-                                style={({ pressed }) => [
-                                    styles.filterChip,
-                                    {
-                                        borderColor: selected
-                                            ? theme.colors.textLink
-                                            : theme.colors.divider,
-                                        backgroundColor: selected
-                                            ? `${theme.colors.textLink}12`
-                                            : theme.colors.input.background,
-                                        opacity: pressed ? 0.8 : 1,
-                                    },
-                                ]}
-                            >
-                                <Text
-                                    style={[
-                                        styles.filterChipText,
-                                        { color: selected ? theme.colors.textLink : theme.colors.textSecondary },
-                                    ]}
-                                >
-                                    {label}
-                                </Text>
-                            </Pressable>
-                        );
-                    })}
+                    <Pressable
+                        onPress={handleSubmit}
+                        disabled={submitting || !selectedRepo || !selectedHost}
+                        style={({ pressed }) => [
+                            styles.button,
+                            {
+                                backgroundColor: theme.colors.textLink,
+                                opacity:
+                                    pressed || submitting || !selectedRepo || !selectedHost
+                                        ? 0.8
+                                        : 1,
+                            },
+                        ]}
+                    >
+                        {submitting ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : null}
+                        <Text style={[styles.buttonText, { color: "#fff" }]}>
+                            {submitting
+                                ? t("newSession.gitRepos.cloning")
+                                : t("newSession.gitRepos.cloneRepo")}
+                        </Text>
+                    </Pressable>
                 </View>
-            )}
-
-            <View
-                style={[
-                    styles.repoList,
-                    {
-                        borderColor: theme.colors.divider,
-                        backgroundColor: theme.colors.input.background,
-                    },
-                ]}
-            >
-                {loadingRepos ? (
-                    <View style={{ paddingVertical: 24 }}>
-                        <ActivityIndicator size="small" color={theme.colors.textLink} />
-                    </View>
-                ) : loadError ? (
-                    <Text style={[styles.emptyText, { color: theme.colors.accentOrange }]}>
-                        {loadError}
-                    </Text>
-                ) : filteredRepos.length === 0 ? (
-                    <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                        {repos.length === 0
-                            ? t("newSession.gitRepos.noRemoteRepos")
-                            : t("newSession.gitRepos.noSearchResults")}
-                    </Text>
-                ) : (
-                    <FlatList
-                        data={filteredRepos}
-                        renderItem={renderRepoItem}
-                        keyExtractor={keyExtractor}
-                        nestedScrollEnabled
-                        onEndReached={handleLoadMore}
-                        onEndReachedThreshold={0.3}
-                        ListFooterComponent={listFooter}
-                    />
-                )}
-            </View>
-
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-                {t("newSession.gitRepos.repoUrlLabel")}
-            </Text>
-            <TextInput
-                style={[
-                    styles.input,
-                    {
-                        borderColor: theme.colors.divider,
-                        color: theme.colors.textSecondary,
-                        backgroundColor: theme.colors.input.background,
-                    },
-                ]}
-                value={selectedRepo?.cloneUrl ?? ""}
-                placeholder={t("newSession.gitRepos.selectRepoPlaceholder")}
-                placeholderTextColor={theme.colors.textSecondary}
-                editable={false}
-            />
-
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-                {t("newSession.gitRepos.targetDirLabel")}
-            </Text>
-            <TextInput
-                style={[
-                    styles.input,
-                    {
-                        borderColor: theme.colors.divider,
-                        color: theme.colors.text,
-                        backgroundColor: theme.colors.input.background,
-                    },
-                ]}
-                value={targetDir}
-                onChangeText={setTargetDir}
-                placeholder={t("newSession.gitRepos.targetDirPlaceholder")}
-                placeholderTextColor={theme.colors.textSecondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-            />
-
-            {error && (
-                <Text style={[styles.errorText, { color: theme.colors.accentOrange }]}>
-                    {error}
-                </Text>
-            )}
-
-            <View style={styles.buttonRow}>
-                <Pressable
-                    onPress={onClose}
-                    disabled={submitting}
-                    style={({ pressed }) => [
-                        styles.button,
-                        {
-                            backgroundColor: theme.colors.input.background,
-                            opacity: pressed || submitting ? 0.7 : 1,
-                        },
-                    ]}
-                >
-                    <Text style={[styles.buttonText, { color: theme.colors.text }]}>
-                        {t("common.cancel")}
-                    </Text>
-                </Pressable>
-                <Pressable
-                    onPress={handleSubmit}
-                    disabled={submitting || !selectedRepo || !selectedHost}
-                    style={({ pressed }) => [
-                        styles.button,
-                        {
-                            backgroundColor: theme.colors.textLink,
-                            opacity:
-                                pressed || submitting || !selectedRepo || !selectedHost
-                                    ? 0.8
-                                    : 1,
-                        },
-                    ]}
-                >
-                    {submitting ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                    ) : null}
-                    <Text style={[styles.buttonText, { color: "#fff" }]}>
-                        {submitting
-                            ? t("newSession.gitRepos.cloning")
-                            : t("newSession.gitRepos.cloneRepo")}
-                    </Text>
-                </Pressable>
-            </View>
+            </ScrollView>
         </View>
     );
 });
