@@ -1412,6 +1412,7 @@ export async function startDaemon(): Promise<void> {
     };
     const getAutomationStateSummary = () => {
       const { counts, jobs, guardians, guardianUsage, auditStats, recentAuditEvents } = getAutomationStatusSnapshot();
+      const allLoops = agentLoopCoordinator?.listLoopsSync() ?? [];
       return {
         updatedAt: Date.now(),
         counts: {
@@ -1431,6 +1432,22 @@ export async function startDaemon(): Promise<void> {
         guardianUsage,
         auditStats,
         recentAuditEvents: recentAuditEvents.slice(0, 20),
+        loops: allLoops.map((loop) => ({
+          id: loop.id,
+          name: loop.name,
+          directory: loop.directory,
+          enabled: loop.enabled,
+          intervalMs: loop.intervalMs,
+          cronExpression: loop.cronExpression,
+          iteration: loop.iteration,
+          nextRunAt: loop.nextRunAt,
+          runtimeState: loop.runtimeState,
+          phase: loop.phase,
+          lastTriggerSource: loop.lastTriggerSource,
+          lastBriefSummary: loop.lastBriefSummary,
+          lastError: loop.lastError,
+          agent: loop.agent,
+        })),
       };
     };
 

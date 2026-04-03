@@ -7,8 +7,8 @@ vi.mock('@/text', () => ({
     t: (key: string) => {
         const translations: Record<string, string> = {
             'status.unknown': 'Unknown',
-            'sessionInfo.startedByDaemon': 'Daemon',
-            'sessionInfo.startedByTerminal': 'Terminal',
+            'session.startedByDaemon': 'daemon',
+            'session.startedByTerminal': 'Terminal',
         };
         return translations[key] || key;
     }

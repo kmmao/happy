@@ -56,6 +56,14 @@ type AutomationGuardianLike = {
     recovered?: boolean;
 };
 
+function truncateGuardianKey(key: string): string {
+    const prefix = "agent-loop:";
+    if (key.startsWith(prefix)) {
+        return `${prefix}${key.slice(prefix.length, prefix.length + 8)}`;
+    }
+    return key;
+}
+
 function getStatusLabel(status: string): string {
     switch (status) {
         case "queued":
@@ -110,10 +118,13 @@ function getJobSubtitle(job: AutomationJobLike): string {
         );
     }
     if (job.continuityKey) {
-        parts.push(`${t("machine.automationContinuity")}: ${job.continuityKey}`);
+        const shortKey = job.continuityKey.startsWith("agent-loop:")
+            ? job.continuityKey.slice(0, "agent-loop:".length + 8)
+            : job.continuityKey;
+        parts.push(`${t("machine.automationContinuity")}: ${shortKey}`);
     }
     if (job.sessionId) {
-        parts.push(`${t("machine.automationSession")}: ${job.sessionId}`);
+        parts.push(`${t("machine.automationSession")}: ${job.sessionId.slice(0, 12)}…`);
     }
     if (job.nextRunAt) {
         parts.push(`${t("machine.automationNextRunAt")}: ${new Date(job.nextRunAt).toLocaleString()}`);
@@ -306,7 +317,7 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
 
     const counts = automation.counts ?? {};
     const persistedGuardianCount = guardians.filter((guardian) => guardian.attached === false).length;
-    const anomalyCount = (auditStats?.watchdogStopCount ?? 0) + (counts.failed ?? 0) + (auditStats?.stopRequestCount ?? 0);
+    const anomalyCount = (auditStats?.watchdogStopCount ?? 0) + (counts.failed ?? 0);
     const activeRunningCount = (counts.running ?? 0) + (counts.dispatching ?? 0);
 
     const triggerJobAction = (action: PendingJobAction) => {
@@ -498,7 +509,7 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
                 <Item
                     key={entry.key}
                     title={t("machine.automationGuardianUsage")}
-                    subtitle={`${entry.key} • ${t("machine.automationGuardianReuseCount")}: ${entry.reuseCount} • ${t("machine.automationGuardianRememberCount")}: ${entry.rememberCount}${entry.currentSessionId ? ` • ${t("machine.automationGuardianSession")}: ${entry.currentSessionId}` : ""}`}
+                    subtitle={`${t("machine.automationGuardianReuseCount")}: ${entry.reuseCount} • ${t("machine.automationGuardianRememberCount")}: ${entry.rememberCount}`}
                     detail={new Date(entry.lastUsedAt).toLocaleString()}
                     showChevron={false}
                 />
@@ -506,9 +517,8 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
             {guardians.map((guardian) => (
                 <Item
                     key={guardian.key}
-                    title={guardian.key}
-                    subtitle={`${t("machine.automationGuardianSession")}: ${guardian.sessionId} • ${getGuardianStateLabel(guardian.attached, guardian.recovered)}`}
-                    detail={new Date(guardian.updatedAt).toLocaleString()}
+                    title={truncateGuardianKey(guardian.key)}
+                    subtitle={`${getGuardianStateLabel(guardian.attached, guardian.recovered)} • ${new Date(guardian.updatedAt).toLocaleString()}`}
                     onPress={() => handleGuardianPress(guardian)}
                     showChevron
                 />

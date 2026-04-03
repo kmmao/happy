@@ -55,7 +55,8 @@ export default React.memo(function MachineLoopsPage() {
     const machine = useMachine(machineId ?? "");
     const rpcReady = machine?.rpcReady ?? false;
 
-    const loopsData = useLoopsData({ machineId, rpcReady });
+    const pushedLoops = machine?.daemonState?.automation?.loops;
+    const loopsData = useLoopsData({ machineId, rpcReady, pushedLoops });
     const {
         loops,
         loading,

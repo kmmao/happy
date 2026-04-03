@@ -374,6 +374,11 @@ export class AgentLoopCoordinator {
     return this.store.getAll();
   }
 
+  /** Sync version — only safe to call after start() has resolved. */
+  listLoopsSync(): AgentLoopDefinition[] {
+    return this.store.getAll();
+  }
+
   async getLoop(id: string): Promise<AgentLoopDefinition | undefined> {
     await this.ensureLoaded();
     return this.store.get(id);

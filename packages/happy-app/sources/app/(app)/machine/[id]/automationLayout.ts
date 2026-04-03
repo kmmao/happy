@@ -4,10 +4,11 @@ type AutomationCountsLike = {
     queued?: number;
     running?: number;
     dispatching?: number;
+    completed?: number;
 };
 
 export type AutomationOverviewCard = {
-    kind: "running" | "queued" | "alerts" | "guardians";
+    kind: "running" | "queued" | "completed" | "alerts" | "guardians";
     value: string;
     accent?: string;
 };
@@ -32,6 +33,7 @@ export function buildAutomationOverviewCards(options: {
     return [
         { kind: "running", value: String(runningCount), accent: "#0A84FF" },
         { kind: "queued", value: String(counts.queued ?? 0), accent: "#FF9500" },
+        { kind: "completed", value: String(counts.completed ?? 0), accent: "#34C759" },
         { kind: "alerts", value: String(alertCount), accent: "#FF3B30" },
         { kind: "guardians", value: String(guardianCount) },
     ];

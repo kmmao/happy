@@ -191,6 +191,25 @@ export const AutomationCountsSchema = z.object({
 
 export type AutomationCounts = z.infer<typeof AutomationCountsSchema>;
 
+export const AgentLoopSummarySchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  directory: z.string(),
+  enabled: z.boolean(),
+  intervalMs: z.number(),
+  cronExpression: z.string().optional(),
+  iteration: z.number(),
+  nextRunAt: z.number(),
+  runtimeState: z.string(),
+  phase: z.string(),
+  lastTriggerSource: z.string().optional(),
+  lastBriefSummary: z.string().optional(),
+  lastError: z.string().optional(),
+  agent: z.string(),
+});
+
+export type AgentLoopSummary = z.infer<typeof AgentLoopSummarySchema>;
+
 export const AutomationStateSchema = z.object({
   updatedAt: z.number(),
   counts: AutomationCountsSchema,
@@ -199,6 +218,7 @@ export const AutomationStateSchema = z.object({
   guardianUsage: z.array(AutomationGuardianUsageSummarySchema).optional(),
   auditStats: AutomationAuditStatsSchema.optional(),
   recentAuditEvents: z.array(AutomationAuditEventSummarySchema).optional(),
+  loops: z.array(AgentLoopSummarySchema).optional(),
 });
 
 export type AutomationState = z.infer<typeof AutomationStateSchema>;

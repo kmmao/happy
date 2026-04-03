@@ -175,6 +175,31 @@ export function useAutomationData(params: {
 
     const auditStats = status?.auditStats ?? machine?.daemonState?.automation?.auditStats;
 
+    const loopNameMap = React.useMemo(() => {
+        const map = new Map<string, string>();
+        for (const loop of loopStatus) {
+            if (loop.name) {
+                map.set(loop.id, loop.name);
+            }
+        }
+        return map;
+    }, [loopStatus]);
+
+    const resolveLoopName = React.useCallback((loopId: string | undefined | null): string | undefined => {
+        if (!loopId) return undefined;
+        return loopNameMap.get(loopId);
+    }, [loopNameMap]);
+
+    const resolveGuardianKeyLabel = React.useCallback((key: string): string => {
+        const loopPrefix = "agent-loop:";
+        if (key.startsWith(loopPrefix)) {
+            const loopId = key.slice(loopPrefix.length);
+            const name = loopNameMap.get(loopId);
+            return name ?? key;
+        }
+        return key;
+    }, [loopNameMap]);
+
     const loopRollup = React.useMemo(() => {
         const total = loopStatus.length;
         const active = loopStatus.filter((loop) => loop.runtimeState === "active").length;
@@ -252,7 +277,7 @@ export function useAutomationData(params: {
 
     const counts = status?.counts ?? machine?.daemonState?.automation?.counts ?? {};
     const persistedGuardianCount = React.useMemo(() => guardians.filter((guardian) => guardian.attached === false).length, [guardians]);
-    const anomalyCount = (auditStats?.watchdogStopCount ?? 0) + (auditStats?.stopRequestCount ?? 0) + (counts.failed ?? 0);
+    const anomalyCount = (auditStats?.watchdogStopCount ?? 0) + (counts.failed ?? 0);
     const recoveredSessionCount = auditStats?.sessionReattachedCount ?? 0;
     const alertCards = React.useMemo(() => buildAutomationAlerts({
         persistedGuardianCount,
@@ -436,6 +461,8 @@ export function useAutomationData(params: {
         visibleGuardians,
         visibleGuardianUsage,
         visibleAuditEvents,
+        resolveLoopName,
+        resolveGuardianKeyLabel,
         mutateAndReload,
         clearGuardians,
         clearAudit,

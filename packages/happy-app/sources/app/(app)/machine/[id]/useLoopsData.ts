@@ -27,6 +27,8 @@ import {
 interface UseLoopsDataParams {
     machineId: string | undefined;
     rpcReady: boolean;
+    /** Lightweight loop summaries from DaemonState push — used for instant initial render */
+    pushedLoops?: readonly { id: string; name?: string; directory: string; enabled: boolean; intervalMs: number; cronExpression?: string; iteration: number; nextRunAt: number; runtimeState: string; phase: string; lastTriggerSource?: string; lastBriefSummary?: string; lastError?: string; agent: string }[];
 }
 
 interface UseLoopsDataResult {
@@ -64,10 +66,26 @@ interface UseLoopsDataResult {
     readonly mutateAutoDreamProfile: (profile: MachineAutoDreamProfile, action: "pause" | "resume" | "run-now" | "remove") => Promise<void>;
 }
 
-export function useLoopsData({ machineId, rpcReady }: UseLoopsDataParams): UseLoopsDataResult {
+export function useLoopsData({ machineId, rpcReady, pushedLoops }: UseLoopsDataParams): UseLoopsDataResult {
     const loadRef = React.useRef<() => void>(() => {});
     const [loops, setLoops] = React.useState<MachineAgentLoop[]>([]);
     const [loading, setLoading] = React.useState(true);
+    // Seed from pushed data: show loops instantly while RPC loads full details
+    const hasPushedSeed = React.useRef(false);
+    React.useEffect(() => {
+        if (pushedLoops && pushedLoops.length > 0 && loops.length === 0 && !hasPushedSeed.current) {
+            hasPushedSeed.current = true;
+            setLoops(pushedLoops.map((l) => ({
+                ...l,
+                createdAt: 0,
+                updatedAt: 0,
+                continuityKey: "",
+                prompt: "",
+                phaseUpdatedAt: 0,
+            } as MachineAgentLoop)));
+            setLoading(false);
+        }
+    }, [pushedLoops, loops.length]);
     const [refreshing, setRefreshing] = React.useState(false);
     const [bootstrapProfiles, setBootstrapProfiles] = React.useState<MachineAgentLoopBootstrapProfile[]>([]);
     const [autoDreamProfiles, setAutoDreamProfiles] = React.useState<MachineAutoDreamProfile[]>([]);

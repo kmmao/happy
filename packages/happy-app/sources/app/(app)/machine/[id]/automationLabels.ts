@@ -283,7 +283,10 @@ export function getAuditEventDetailMessage(event: MachineAutomationAuditEvent): 
     return lines.join("\n");
 }
 
-export function formatJobSubtitle(job: MachineAutomationJob): string {
+export function formatJobSubtitle(
+    job: MachineAutomationJob,
+    resolveGuardianKeyLabel?: (key: string) => string,
+): string {
     if (job.errorMessage) {
         return job.errorMessage;
     }
@@ -297,10 +300,13 @@ export function formatJobSubtitle(job: MachineAutomationJob): string {
         );
     }
     if (job.continuityKey) {
-        parts.push(`${t("machine.automationContinuity")}: ${job.continuityKey}`);
+        const label = resolveGuardianKeyLabel
+            ? resolveGuardianKeyLabel(job.continuityKey)
+            : job.continuityKey;
+        parts.push(`${t("machine.automationContinuity")}: ${label}`);
     }
     if (job.sessionId) {
-        parts.push(`${t("machine.automationSession")}: ${job.sessionId}`);
+        parts.push(`${t("machine.automationSession")}: ${job.sessionId.slice(0, 12)}…`);
     }
     if (job.recovered) {
         parts.push(t("machine.automationRecoveredShort"));
