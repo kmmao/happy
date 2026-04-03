@@ -39,6 +39,67 @@ export function getLoopRuntimeLabel(loop: MachineAgentLoop): string {
     return t("machine.agentLoopPhaseSleeping");
 }
 
+/** One–two line summary for loop list rows; full fields stay in {@link getLoopSubtitle}. */
+export function getLoopListSubtitle(loop: MachineAgentLoop): string {
+    return [
+        `${t("machine.agentLoopIteration")}: ${loop.iteration}`,
+        `${t("machine.agentLoopRuntime")}: ${getLoopRuntimeLabel(loop)}`,
+        `${t("machine.agentLoopInterval")}: ${formatIntervalMs(loop.intervalMs)}`,
+        `${t("machine.agentLoopNextRun")}: ${formatTimestamp(loop.nextRunAt)}`,
+        `${t("machine.agentLoopAgent")}: ${loop.agent}`,
+    ].join(" · ");
+}
+
+/** Compact single-line meta for list rows, context-aware based on loop state. */
+export function getLoopListSubtitleCompact(loop: MachineAgentLoop): string {
+    // Error state: show error prominently
+    if (loop.lastError) {
+        return [
+            "\u26A0",
+            loop.lastError.slice(0, 60) + (loop.lastError.length > 60 ? "\u2026" : ""),
+        ].join(" ");
+    }
+
+    // Active/running: show phase and current focus
+    if (loop.runtimeState === "active") {
+        const parts: string[] = [];
+        if (loop.phase) parts.push(getLoopPhaseLabel(loop));
+        parts.push(`#${loop.iteration}`);
+        if (loop.currentFocus) {
+            parts.push(loop.currentFocus.slice(0, 40) + (loop.currentFocus.length > 40 ? "\u2026" : ""));
+        } else {
+            parts.push(formatIntervalMs(loop.intervalMs));
+            parts.push(loop.agent);
+        }
+        return parts.join(" \u00B7 ");
+    }
+
+    // Blocked: show blocked reason
+    if (loop.runtimeState === "blocked") {
+        return [
+            loop.blockedReason?.slice(0, 60) || t("machine.agentLoopRuntimeBlocked"),
+            `#${loop.iteration}`,
+        ].join(" \u00B7 ");
+    }
+
+    // Paused: show when it was last active
+    if (!loop.enabled) {
+        const parts = [`#${loop.iteration}`, formatIntervalMs(loop.intervalMs), loop.agent];
+        if (loop.lastCompletedAt) {
+            parts.push(formatTimestamp(loop.lastCompletedAt));
+        }
+        return parts.join(" \u00B7 ");
+    }
+
+    // Normal enabled/sleeping: show next run and iteration count
+    return [
+        `#${loop.iteration}`,
+        formatIntervalMs(loop.intervalMs),
+        formatTimestamp(loop.nextRunAt),
+        loop.agent,
+    ].join(" \u00B7 ");
+}
+
 export function getLoopPhaseLabel(loop: MachineAgentLoop): string {
     switch (loop.phase) {
         case "planning":

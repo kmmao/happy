@@ -1,12 +1,42 @@
 import { describe, expect, it } from "vitest";
 import {
+    commonDirectoryPrefix,
     formatIntervalMs,
     isValidTimeOfDay,
+    normalizeMachineRootPath,
     parseDownstreamTriggers,
     parseIntervalMs,
     parseLineList,
     parsePositiveInteger,
 } from "./loopsUtils";
+
+describe("normalizeMachineRootPath", () => {
+    it("trims and strips trailing slashes", () => {
+        expect(normalizeMachineRootPath("  /foo/bar/  ")).toBe("/foo/bar");
+    });
+
+    it("normalizes backslashes", () => {
+        expect(normalizeMachineRootPath("C:\\foo\\bar")).toBe("C:/foo/bar");
+    });
+});
+
+describe("commonDirectoryPrefix", () => {
+    it("returns full path for a single absolute path", () => {
+        expect(commonDirectoryPrefix(["/Users/x/work/happy"])).toBe("/Users/x/work/happy");
+    });
+
+    it("returns shared parent for sibling repos", () => {
+        expect(commonDirectoryPrefix(["/a/b/c", "/a/b/d"])).toBe("/a/b");
+    });
+
+    it("returns empty when paths diverge at root", () => {
+        expect(commonDirectoryPrefix(["/a/x", "/b/y"])).toBe("");
+    });
+
+    it("returns empty for empty input", () => {
+        expect(commonDirectoryPrefix([])).toBe("");
+    });
+});
 
 describe("parseIntervalMs", () => {
     it("parses seconds", () => {

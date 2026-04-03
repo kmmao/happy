@@ -500,6 +500,31 @@ export function saveHiddenProcesses(machineId: string, names: readonly string[])
   }
 }
 
+/** One-click setup: Git repo paths hidden from scan list (per machine, local only). */
+const ONE_CLICK_IGNORED_REPOS_PREFIX = "one-click-ignored-repos-";
+const OneClickIgnoredReposSchema = z.array(z.string());
+
+export function loadOneClickIgnoredRepos(machineId: string): readonly string[] {
+  const raw = mmkv.getString(`${ONE_CLICK_IGNORED_REPOS_PREFIX}${machineId}`);
+  if (raw) {
+    try {
+      const parsed = OneClickIgnoredReposSchema.safeParse(JSON.parse(raw));
+      if (parsed.success) return parsed.data;
+    } catch (e) {
+      log.error("Failed to parse one-click ignored repos", e);
+    }
+  }
+  return [];
+}
+
+export function saveOneClickIgnoredRepos(machineId: string, paths: readonly string[]) {
+  if (paths.length === 0) {
+    mmkv.delete(`${ONE_CLICK_IGNORED_REPOS_PREFIX}${machineId}`);
+  } else {
+    mmkv.set(`${ONE_CLICK_IGNORED_REPOS_PREFIX}${machineId}`, JSON.stringify(paths));
+  }
+}
+
 export function loadDismissedTasks(sessionId: string): ReadonlySet<string> {
   const raw = mmkv.getString(`${DISMISSED_TASKS_PREFIX}${sessionId}`);
   if (raw) {

@@ -90,3 +90,41 @@ export function parseDownstreamTriggers(raw: string): Array<"completed" | "faile
 export function formatDownstreamTriggers(value?: Array<"completed" | "failed">): string {
     return value?.join("\n") ?? "";
 }
+
+export function normalizeMachineRootPath(path: string): string {
+    const replaced = path.trim().replace(/\\/g, "/");
+    const trimmed = replaced.replace(/\/+$/, "");
+    return trimmed || "/";
+}
+
+/** Longest shared directory prefix for absolute-style paths (Unix /… or Windows drive paths). */
+export function commonDirectoryPrefix(paths: string[]): string {
+    if (paths.length === 0) {
+        return "";
+    }
+    const normalized = paths
+        .map((p) => normalizeMachineRootPath(p))
+        .filter((p) => p.length > 0);
+    if (normalized.length === 0) {
+        return "";
+    }
+    const firstParts = normalized[0]!.split("/").filter(Boolean);
+    if (firstParts.length === 0) {
+        return "/";
+    }
+    let depth = firstParts.length;
+    for (let i = 1; i < normalized.length; i++) {
+        const parts = normalized[i]!.split("/").filter(Boolean);
+        let j = 0;
+        while (j < depth && j < parts.length && parts[j] === firstParts[j]) {
+            j++;
+        }
+        depth = j;
+        if (depth === 0) {
+            return "";
+        }
+    }
+    const allAbsolute = normalized.every((s) => s.startsWith("/"));
+    const prefix = (allAbsolute ? "/" : "") + firstParts.slice(0, depth).join("/");
+    return normalizeMachineRootPath(prefix);
+}

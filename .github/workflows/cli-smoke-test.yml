@@ -32,13 +32,13 @@ jobs:
         cache-dependency-path: yarn.lock
 
     - name: Install dependencies
-      run: yarn install --immutable
+      run: yarn install --frozen-lockfile
 
     - name: Build package
-      run: yarn workspace happy-coder build
+      run: yarn workspace @kmmao/happy-coder build
 
     - name: Pack package
-      run: yarn workspace happy-coder pack
+      run: yarn workspace @kmmao/happy-coder pack
 
     - name: Install packed package globally
       run: |
@@ -92,13 +92,13 @@ jobs:
         cache-dependency-path: yarn.lock
 
     - name: Install dependencies
-      run: yarn install --immutable
+      run: yarn install --frozen-lockfile
 
     - name: Build package
-      run: yarn workspace happy-coder build
+      run: yarn workspace @kmmao/happy-coder build
 
     - name: Pack package
-      run: yarn workspace happy-coder pack
+      run: yarn workspace @kmmao/happy-coder pack
 
     - name: Install packed package globally
       shell: cmd

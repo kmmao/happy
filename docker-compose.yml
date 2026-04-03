@@ -79,6 +79,12 @@ services:
       # Anthropic API: key 从 .env 读取，URL 通过宿主机 socat 转发到 Tailscale 代理
       # 宿主机 launchd: com.happy.anthropic-proxy → socat 0.0.0.0:8899 → 100.85.22.83:8899
       ANTHROPIC_BASE_URL: http://host.docker.internal:8899
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3005/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy

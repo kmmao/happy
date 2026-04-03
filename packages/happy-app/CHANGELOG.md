@@ -4,6 +4,13 @@
 
 Dev environment management with live log streaming, project-level Knowledge Base configuration with lifecycle UI, task display overhaul with colored badges and collapsible results, and extensive background task stability fixes.
 
+### Agent Loops
+- Fixed false **Working directory is required** error after adopting a suggestion when the loop form path was empty (refresh now uses each suggestion’s directory)
+- Added per-recommendation **Adopt** on the one-click confirm step so each suggested loop can be created individually without selecting the whole repository
+- Added optional one-click toggle to create Bootstrap + Auto-Dream profiles from inferred repo root when deploying recommended loops
+- Added automation section quick action to create missing Bootstrap / Auto-Dream profiles from existing loop working directories
+- Fixed Web/Tauri alert menus with many actions clipping the bottom options (e.g. loop delete); loop action sheet now lists delete before view-file entries for quicker access
+
 ### Dev Environment Management
 - Added `/dev` skill for scanning and generating project dev configurations
 - Added Dev configuration page with service cards, Start All and per-service start/stop buttons

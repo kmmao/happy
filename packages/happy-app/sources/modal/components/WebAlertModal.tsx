@@ -27,7 +27,9 @@ export function WebAlertModal({
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const isConfirm = config.type === "confirm";
   const modalWidth = Math.min(Math.max(270, windowWidth * 0.85), 480);
-  const maxMessageHeight = windowHeight * 0.5;
+  const maxMessageHeight = windowHeight * 0.4;
+  /** Many action rows (e.g. Agent Loops menu) must scroll — otherwise bottom buttons are clipped by container maxHeight. */
+  const maxButtonStackHeight = windowHeight * 0.42;
 
   const handleButtonPress = (buttonIndex: number) => {
     if (isConfirm && onConfirm) {
@@ -138,35 +140,43 @@ export function WebAlertModal({
           )}
         </View>
 
-        {buttons.length > 0 && (
-          <View style={styles.buttonContainer}>
-            {buttons.map((button, index) => (
-              <React.Fragment key={index}>
-                {index > 0 && <View style={styles.buttonSeparator} />}
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.button,
-                    pressed && styles.buttonPressed,
-                  ]}
-                  onPress={() => handleButtonPress(index)}
-                >
-                  <Text
-                    style={[
-                      styles.buttonText,
-                      button.style === "cancel" && styles.cancelText,
-                      button.style === "destructive" && styles.destructiveText,
-                      Typography.default(
-                        button.style === "cancel" ? undefined : "semiBold",
-                      ),
+        {buttons.length > 0 ? (
+          <ScrollView
+            style={{ maxHeight: maxButtonStackHeight }}
+            bounces={false}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={buttons.length > 5}
+          >
+            <View style={styles.buttonContainer}>
+              {buttons.map((button, index) => (
+                <React.Fragment key={index}>
+                  {index > 0 && <View style={styles.buttonSeparator} />}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.button,
+                      pressed && styles.buttonPressed,
                     ]}
+                    onPress={() => handleButtonPress(index)}
                   >
-                    {button.text}
-                  </Text>
-                </Pressable>
-              </React.Fragment>
-            ))}
-          </View>
-        )}
+                    <Text
+                      style={[
+                        styles.buttonText,
+                        button.style === "cancel" && styles.cancelText,
+                        button.style === "destructive" && styles.destructiveText,
+                        Typography.default(
+                          button.style === "cancel" ? undefined : "semiBold",
+                        ),
+                      ]}
+                    >
+                      {button.text}
+                    </Text>
+                  </Pressable>
+                </React.Fragment>
+              ))}
+            </View>
+          </ScrollView>
+        ) : null}
       </View>
     </BaseModal>
   );
