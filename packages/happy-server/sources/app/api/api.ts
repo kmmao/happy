@@ -39,6 +39,7 @@ import { knowledgeSearchRoutes } from "./routes/knowledgeSearchRoutes";
 import { knowledgeConfigRoutes } from "./routes/knowledgeConfigRoutes";
 import { knowledgeLifecycleRoutes } from "./routes/knowledgeLifecycleRoutes";
 import { voiceRoutes } from "./routes/voiceRoutes";
+import { sub2apiRoutes } from "./routes/sub2apiRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
 import * as path from "path";
@@ -123,6 +124,7 @@ export async function startApi() {
   knowledgeConfigRoutes(typed);
   knowledgeLifecycleRoutes(typed);
   voiceRoutes(typed);
+  sub2apiRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

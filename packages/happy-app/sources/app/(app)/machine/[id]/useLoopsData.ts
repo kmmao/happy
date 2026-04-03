@@ -24,11 +24,31 @@ import {
     isRpcMethodUnavailableError,
 } from "./loopsUtils";
 
+interface PushedLoopSummary {
+    id: string; name?: string; directory: string; enabled: boolean; intervalMs: number;
+    cronExpression?: string; iteration: number; nextRunAt: number; runtimeState: string;
+    phase: string; lastTriggerSource?: string; lastBriefSummary?: string; lastError?: string; agent: string;
+}
+
+interface PushedBootstrapSummary {
+    id: string; name?: string; rootDirectory: string; intervalMs: number; enabled: boolean;
+    status: string; statusUpdatedAt: number; lastRunAt?: number;
+    lastRepoCount?: number; lastSuggestionCount?: number; lastError?: string;
+}
+
+interface PushedAutoDreamSummary {
+    id: string; name?: string; rootDirectory: string; intervalMs: number; enabled: boolean;
+    nextRunAt: number; status: string; stage: string; statusUpdatedAt: number;
+    lastRunAt?: number; lastMemoryFiles?: number; lastError?: string;
+}
+
 interface UseLoopsDataParams {
     machineId: string | undefined;
     rpcReady: boolean;
-    /** Lightweight loop summaries from DaemonState push — used for instant initial render */
-    pushedLoops?: readonly { id: string; name?: string; directory: string; enabled: boolean; intervalMs: number; cronExpression?: string; iteration: number; nextRunAt: number; runtimeState: string; phase: string; lastTriggerSource?: string; lastBriefSummary?: string; lastError?: string; agent: string }[];
+    /** Lightweight summaries from DaemonState push — used for instant initial render */
+    pushedLoops?: readonly PushedLoopSummary[];
+    pushedBootstrapProfiles?: readonly PushedBootstrapSummary[];
+    pushedAutoDreamProfiles?: readonly PushedAutoDreamSummary[];
 }
 
 interface UseLoopsDataResult {
@@ -66,15 +86,22 @@ interface UseLoopsDataResult {
     readonly mutateAutoDreamProfile: (profile: MachineAutoDreamProfile, action: "pause" | "resume" | "run-now" | "remove") => Promise<void>;
 }
 
-export function useLoopsData({ machineId, rpcReady, pushedLoops }: UseLoopsDataParams): UseLoopsDataResult {
+export function useLoopsData({ machineId, rpcReady, pushedLoops, pushedBootstrapProfiles, pushedAutoDreamProfiles }: UseLoopsDataParams): UseLoopsDataResult {
     const loadRef = React.useRef<() => void>(() => {});
     const [loops, setLoops] = React.useState<MachineAgentLoop[]>([]);
     const [loading, setLoading] = React.useState(true);
-    // Seed from pushed data: show loops instantly while RPC loads full details
+    const [refreshing, setRefreshing] = React.useState(false);
+
+    // Seed from pushed DaemonState: show data instantly while RPC loads full details
     const hasPushedSeed = React.useRef(false);
     React.useEffect(() => {
-        if (pushedLoops && pushedLoops.length > 0 && loops.length === 0 && !hasPushedSeed.current) {
-            hasPushedSeed.current = true;
+        if (hasPushedSeed.current) return;
+        const hasAnyPushed = (pushedLoops && pushedLoops.length > 0)
+            || (pushedBootstrapProfiles && pushedBootstrapProfiles.length > 0)
+            || (pushedAutoDreamProfiles && pushedAutoDreamProfiles.length > 0);
+        if (!hasAnyPushed) return;
+        hasPushedSeed.current = true;
+        if (pushedLoops && pushedLoops.length > 0 && loops.length === 0) {
             setLoops(pushedLoops.map((l) => ({
                 ...l,
                 createdAt: 0,
@@ -83,10 +110,24 @@ export function useLoopsData({ machineId, rpcReady, pushedLoops }: UseLoopsDataP
                 prompt: "",
                 phaseUpdatedAt: 0,
             } as MachineAgentLoop)));
-            setLoading(false);
         }
-    }, [pushedLoops, loops.length]);
-    const [refreshing, setRefreshing] = React.useState(false);
+        if (pushedBootstrapProfiles && pushedBootstrapProfiles.length > 0) {
+            setBootstrapProfiles(pushedBootstrapProfiles.map((p) => ({
+                ...p,
+                createdAt: 0,
+                updatedAt: 0,
+                nextRunAt: 0,
+            } as MachineAgentLoopBootstrapProfile)));
+        }
+        if (pushedAutoDreamProfiles && pushedAutoDreamProfiles.length > 0) {
+            setAutoDreamProfiles(pushedAutoDreamProfiles.map((p) => ({
+                ...p,
+                createdAt: 0,
+                updatedAt: 0,
+            } as MachineAutoDreamProfile)));
+        }
+        setLoading(false);
+    }, [pushedLoops, pushedBootstrapProfiles, pushedAutoDreamProfiles, loops.length]);
     const [bootstrapProfiles, setBootstrapProfiles] = React.useState<MachineAgentLoopBootstrapProfile[]>([]);
     const [autoDreamProfiles, setAutoDreamProfiles] = React.useState<MachineAutoDreamProfile[]>([]);
     const automationProfilesRef = React.useRef<OneClickAutomationProfilesRef>({ bootstrap: [], autoDream: [] });

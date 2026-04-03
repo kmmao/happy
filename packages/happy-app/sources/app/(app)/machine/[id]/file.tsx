@@ -12,6 +12,7 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
+import { SimpleSyntaxHighlighter } from "@/components/SimpleSyntaxHighlighter";
 import { DiffView } from "@/components/diff/DiffView";
 import { layout } from "@/components/layout";
 import { Typography } from "@/constants/Typography";
@@ -172,6 +173,7 @@ export default function MachineFileViewerScreen() {
   const [lastRefreshedAt, setLastRefreshedAt] = React.useState<number | null>(null);
   const [searchMode, setSearchMode] = React.useState<"focused" | "full">("focused");
   const [displayMode, setDisplayMode] = React.useState<"content" | "diff">("content");
+  const [markdownMode, setMarkdownMode] = React.useState<"preview" | "source">("preview");
   const [previousContent, setPreviousContent] = React.useState<string | null>(null);
   const [lastRefreshChanged, setLastRefreshChanged] = React.useState<boolean | null>(null);
 
@@ -377,6 +379,26 @@ export default function MachineFileViewerScreen() {
                 </Text>
               </Pressable>
             ) : null}
+            {isMarkdown && displayMode === "content" && (
+              <>
+                <Pressable
+                  style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: markdownMode === "preview" ? theme.colors.primary : theme.colors.surfaceHigh }]}
+                  onPress={() => setMarkdownMode("preview")}
+                >
+                  <Text style={{ color: markdownMode === "preview" ? theme.colors.button.primary.tint : theme.colors.text }}>
+                    {t("machine.fileViewerPreview")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: markdownMode === "source" ? theme.colors.primary : theme.colors.surfaceHigh }]}
+                  onPress={() => setMarkdownMode("source")}
+                >
+                  <Text style={{ color: markdownMode === "source" ? theme.colors.button.primary.tint : theme.colors.text }}>
+                    {t("machine.fileViewerSource")}
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </View>
 
           <Text style={[styles.pathText, { color: theme.colors.textSecondary }]}>{filePath}</Text>
@@ -460,10 +482,14 @@ export default function MachineFileViewerScreen() {
             />
           ) : query.trim() ? (
             <HighlightedTextBlock content={displayContent} query={query} activeLine={searchState.activeLine} />
-          ) : isMarkdown ? (
+          ) : isMarkdown && markdownMode === "preview" ? (
             <MarkdownView markdown={displayContent} />
           ) : (
-            <Text style={[styles.plainText, { color: theme.colors.text }]}>{displayContent}</Text>
+            language ? (
+              <SimpleSyntaxHighlighter code={displayContent} language={language} selectable={true} />
+            ) : (
+              <Text style={[styles.plainText, { color: theme.colors.text }]}>{displayContent}</Text>
+            )
           )}
         </ScrollView>
       )}

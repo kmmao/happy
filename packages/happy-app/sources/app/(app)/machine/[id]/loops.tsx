@@ -55,8 +55,14 @@ export default React.memo(function MachineLoopsPage() {
     const machine = useMachine(machineId ?? "");
     const rpcReady = machine?.rpcReady ?? false;
 
-    const pushedLoops = machine?.daemonState?.automation?.loops;
-    const loopsData = useLoopsData({ machineId, rpcReady, pushedLoops });
+    const automation = machine?.daemonState?.automation;
+    const loopsData = useLoopsData({
+        machineId,
+        rpcReady,
+        pushedLoops: automation?.loops,
+        pushedBootstrapProfiles: automation?.bootstrapProfiles,
+        pushedAutoDreamProfiles: automation?.autoDreamProfiles,
+    });
     const {
         loops,
         loading,

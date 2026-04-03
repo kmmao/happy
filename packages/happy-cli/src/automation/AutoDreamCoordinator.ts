@@ -145,6 +145,11 @@ export class AutoDreamCoordinator {
     return this.store.getAll();
   }
 
+  /** Sync version — only safe to call after start() has resolved. */
+  listProfilesSync(): AutoDreamProfile[] {
+    return this.store.getAll();
+  }
+
   async getProfile(id: string): Promise<AutoDreamProfile | undefined> {
     await this.ensureLoaded();
     return this.store.get(id);

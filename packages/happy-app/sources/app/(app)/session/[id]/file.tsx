@@ -9,6 +9,7 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { Text } from "@/components/StyledText";
 import { SimpleSyntaxHighlighter } from "@/components/SimpleSyntaxHighlighter";
+import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { Typography } from "@/constants/Typography";
 import { sessionReadFile, sessionBash } from "@/sync/ops";
 import { storage } from "@/sync/storage";
@@ -117,6 +118,7 @@ function FileScreen() {
   );
   const [diffContent, setDiffContent] = React.useState<string | null>(null);
   const [displayMode, setDisplayMode] = React.useState<"file" | "diff">("diff");
+  const [markdownMode, setMarkdownMode] = React.useState<"preview" | "source">("preview");
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -432,6 +434,7 @@ function FileScreen() {
 
   const fileName = filePath.split("/").pop() || filePath;
   const language = getFileLanguage(filePath);
+  const isMarkdown = language === "markdown";
 
   if (isLoading) {
     return (
@@ -568,8 +571,8 @@ function FileScreen() {
         </Text>
       </View>
 
-      {/* Toggle buttons for File/Diff view */}
-      {diffContent && (
+      {/* Toggle buttons for File/Diff view and Markdown preview/source */}
+      {(diffContent || isMarkdown) && (
         <View
           style={{
             flexDirection: "row",
@@ -580,31 +583,33 @@ function FileScreen() {
             backgroundColor: theme.colors.surface,
           }}
         >
-          <Pressable
-            onPress={() => setDisplayMode("diff")}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-              borderRadius: 8,
-              backgroundColor:
-                displayMode === "diff"
-                  ? theme.colors.textLink
-                  : theme.colors.input.background,
-              marginRight: 8,
-            }}
-          >
-            <Text
+          {diffContent && (
+            <Pressable
+              onPress={() => setDisplayMode("diff")}
               style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color:
-                  displayMode === "diff" ? "white" : theme.colors.textSecondary,
-                ...Typography.default(),
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: 8,
+                backgroundColor:
+                  displayMode === "diff"
+                    ? theme.colors.textLink
+                    : theme.colors.input.background,
+                marginRight: 8,
               }}
             >
-              {t("files.diff")}
-            </Text>
-          </Pressable>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "600",
+                  color:
+                    displayMode === "diff" ? "white" : theme.colors.textSecondary,
+                  ...Typography.default(),
+                }}
+              >
+                {t("files.diff")}
+              </Text>
+            </Pressable>
+          )}
 
           <Pressable
             onPress={() => setDisplayMode("file")}
@@ -616,6 +621,7 @@ function FileScreen() {
                 displayMode === "file"
                   ? theme.colors.textLink
                   : theme.colors.input.background,
+              marginRight: isMarkdown ? 8 : 0,
             }}
           >
             <Text
@@ -630,6 +636,61 @@ function FileScreen() {
               {t("files.file")}
             </Text>
           </Pressable>
+
+          {isMarkdown && displayMode === "file" && (
+            <>
+              <View style={{ width: 1, backgroundColor: theme.colors.divider, marginHorizontal: 8 }} />
+              <Pressable
+                onPress={() => setMarkdownMode("preview")}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  backgroundColor:
+                    markdownMode === "preview"
+                      ? theme.colors.textLink
+                      : theme.colors.input.background,
+                  marginRight: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "600",
+                    color:
+                      markdownMode === "preview" ? "white" : theme.colors.textSecondary,
+                    ...Typography.default(),
+                  }}
+                >
+                  {t("files.preview")}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setMarkdownMode("source")}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  backgroundColor:
+                    markdownMode === "source"
+                      ? theme.colors.textLink
+                      : theme.colors.input.background,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "600",
+                    color:
+                      markdownMode === "source" ? "white" : theme.colors.textSecondary,
+                    ...Typography.default(),
+                  }}
+                >
+                  {t("files.source")}
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
       )}
 
@@ -642,11 +703,15 @@ function FileScreen() {
         {displayMode === "diff" && diffContent ? (
           <DiffDisplay diffContent={diffContent} />
         ) : displayMode === "file" && fileContent?.content ? (
-          <SimpleSyntaxHighlighter
-            code={fileContent.content}
-            language={language}
-            selectable={true}
-          />
+          isMarkdown && markdownMode === "preview" ? (
+            <MarkdownView markdown={fileContent.content} />
+          ) : (
+            <SimpleSyntaxHighlighter
+              code={fileContent.content}
+              language={language}
+              selectable={true}
+            />
+          )
         ) : displayMode === "file" && fileContent && !fileContent.content ? (
           <Text
             style={{

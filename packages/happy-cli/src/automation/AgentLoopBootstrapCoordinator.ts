@@ -105,6 +105,11 @@ export class AgentLoopBootstrapCoordinator {
     return this.store.getAll();
   }
 
+  /** Sync version — only safe to call after start() has resolved. */
+  listProfilesSync(): AgentLoopBootstrapProfile[] {
+    return this.store.getAll();
+  }
+
   async getProfile(id: string): Promise<AgentLoopBootstrapProfile | undefined> {
     await this.ensureLoaded();
     return this.store.get(id);

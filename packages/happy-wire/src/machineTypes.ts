@@ -210,6 +210,39 @@ export const AgentLoopSummarySchema = z.object({
 
 export type AgentLoopSummary = z.infer<typeof AgentLoopSummarySchema>;
 
+export const BootstrapProfileSummarySchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  rootDirectory: z.string(),
+  intervalMs: z.number(),
+  enabled: z.boolean(),
+  status: z.string(),
+  statusUpdatedAt: z.number(),
+  lastRunAt: z.number().optional(),
+  lastRepoCount: z.number().optional(),
+  lastSuggestionCount: z.number().optional(),
+  lastError: z.string().optional(),
+});
+
+export type BootstrapProfileSummary = z.infer<typeof BootstrapProfileSummarySchema>;
+
+export const AutoDreamProfileSummarySchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  rootDirectory: z.string(),
+  intervalMs: z.number(),
+  enabled: z.boolean(),
+  nextRunAt: z.number(),
+  status: z.string(),
+  stage: z.string(),
+  statusUpdatedAt: z.number(),
+  lastRunAt: z.number().optional(),
+  lastMemoryFiles: z.number().optional(),
+  lastError: z.string().optional(),
+});
+
+export type AutoDreamProfileSummary = z.infer<typeof AutoDreamProfileSummarySchema>;
+
 export const AutomationStateSchema = z.object({
   updatedAt: z.number(),
   counts: AutomationCountsSchema,
@@ -219,6 +252,8 @@ export const AutomationStateSchema = z.object({
   auditStats: AutomationAuditStatsSchema.optional(),
   recentAuditEvents: z.array(AutomationAuditEventSummarySchema).optional(),
   loops: z.array(AgentLoopSummarySchema).optional(),
+  bootstrapProfiles: z.array(BootstrapProfileSummarySchema).optional(),
+  autoDreamProfiles: z.array(AutoDreamProfileSummarySchema).optional(),
 });
 
 export type AutomationState = z.infer<typeof AutomationStateSchema>;

@@ -1448,6 +1448,33 @@ export async function startDaemon(): Promise<void> {
           lastError: loop.lastError,
           agent: loop.agent,
         })),
+        bootstrapProfiles: (agentLoopBootstrapCoordinator?.listProfilesSync() ?? []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          rootDirectory: p.rootDirectory,
+          intervalMs: p.intervalMs,
+          enabled: p.enabled,
+          status: p.status,
+          statusUpdatedAt: p.statusUpdatedAt,
+          lastRunAt: p.lastRunAt,
+          lastRepoCount: p.lastRepoCount,
+          lastSuggestionCount: p.lastSuggestionCount,
+          lastError: p.lastError,
+        })),
+        autoDreamProfiles: (autoDreamCoordinator?.listProfilesSync() ?? []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          rootDirectory: p.rootDirectory,
+          intervalMs: p.intervalMs,
+          enabled: p.enabled,
+          nextRunAt: p.nextRunAt,
+          status: p.status,
+          stage: p.stage,
+          statusUpdatedAt: p.statusUpdatedAt,
+          lastRunAt: p.lastRunAt,
+          lastMemoryFiles: p.lastMemoryFiles,
+          lastError: p.lastError,
+        })),
       };
     };
 
