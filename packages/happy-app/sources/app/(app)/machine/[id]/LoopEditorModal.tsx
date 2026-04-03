@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { BaseModal } from "@/modal/components/BaseModal";
@@ -72,10 +72,7 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
     onSuggest,
 }: LoopEditorModalProps) {
     const { theme } = useUnistyles();
-    const { width: viewportWidth, height: viewportHeight } = React.useMemo(() => ({
-        width: typeof window !== "undefined" ? window.innerWidth : 400,
-        height: typeof window !== "undefined" ? window.innerHeight : 800,
-    }), []);
+    const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
     const modalMetrics = getLoopModalMetrics({
         viewportWidth,
         viewportHeight,
@@ -679,7 +676,7 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                             </View>
                         ) : null}
 
-                        <View style={styles.buttonRow}>
+                        <View style={[styles.buttonRow, formLayout.fullWidthButtons ? { flexDirection: "column" } : null]}>
                             <Pressable
                                 style={[styles.createButton, { backgroundColor: theme.colors.button.primary.background, opacity: saving ? 0.6 : 1 }]}
                                 onPress={() => void handleSave()}

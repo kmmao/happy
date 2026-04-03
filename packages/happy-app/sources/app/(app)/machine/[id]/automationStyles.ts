@@ -127,13 +127,13 @@ export const styles = StyleSheet.create((theme) => ({
     },
     summaryCard: {
         width: Platform.OS === "web" ? "31.5%" : "47.5%",
-        minHeight: 112,
+        minHeight: 80,
         padding: 12,
         borderRadius: 14,
         borderWidth: 1,
         borderColor: theme.colors.divider,
         backgroundColor: theme.colors.surface,
-        gap: 6,
+        gap: 4,
     },
     summaryCardTitle: {
         color: theme.colors.textSecondary,

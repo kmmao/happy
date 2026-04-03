@@ -50,8 +50,11 @@ const UpdateKnowledgeEntryBodySchema = z.object({
     confidence: KnowledgeConfidenceEnum.optional(),
 });
 
+const KnowledgeCategoryEnum = z.enum(["user", "feedback", "project", "reference"]);
+
 const QueryKnowledgeParamsSchema = z.object({
     entryType: KnowledgeEntryTypeEnum.optional(),
+    category: KnowledgeCategoryEnum.optional(),
     status: KnowledgeStatusEnum.optional(),
     tags: z.preprocess(
         (val) => typeof val === "string" ? val.split(",") : val,
@@ -87,7 +90,7 @@ export function knowledgeRoutes(app: Fastify) {
         async (request, reply) => {
             const userId = request.userId;
             const { id } = request.params;
-            const { entryType, status, tags, search, limit, offset } = request.query;
+            const { entryType, category, status, tags, search, limit, offset } = request.query;
 
             const project = await db.project.findFirst({
                 where: { id, accountId: userId },
@@ -100,6 +103,7 @@ export function knowledgeRoutes(app: Fastify) {
                 projectId: id,
             };
             if (entryType) where.entryType = entryType;
+            if (category) where.category = category;
             if (status) {
                 where.status = status;
             } else {

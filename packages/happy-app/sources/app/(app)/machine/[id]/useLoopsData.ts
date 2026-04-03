@@ -97,7 +97,7 @@ export function useLoopsData({ machineId, rpcReady }: UseLoopsDataParams): UseLo
     }, [loops]);
 
     const load = React.useCallback(async (kind: "initial" | "refresh") => {
-        if (!machineId) {
+        if (!machineId || !rpcReady) {
             return;
         }
         if (kind === "initial") {
@@ -106,9 +106,6 @@ export function useLoopsData({ machineId, rpcReady }: UseLoopsDataParams): UseLo
             setRefreshing(true);
         }
         try {
-            if (!rpcReady) {
-                return;
-            }
             const results = await Promise.allSettled([
                 machineListAgentLoops(machineId),
                 machineListAgentLoopBootstrapProfiles(machineId),
@@ -128,25 +125,12 @@ export function useLoopsData({ machineId, rpcReady }: UseLoopsDataParams): UseLo
                 Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
             }
         } finally {
-            if (kind === "initial") {
-                if (rpcReady) {
-                    setLoading(false);
-                }
-            } else {
+            setLoading(false);
+            if (kind === "refresh") {
                 setRefreshing(false);
-                setLoading(false);
             }
         }
     }, [machineId, rpcReady]);
-
-    // Retry loading when rpcReady becomes true after initial load
-    const rpcReadyPrev = React.useRef(rpcReady);
-    React.useEffect(() => {
-        if (rpcReady && !rpcReadyPrev.current && loops.length === 0) {
-            void load("refresh");
-        }
-        rpcReadyPrev.current = rpcReady;
-    }, [rpcReady, load, loops.length]);
 
     loadRef.current = () => void load("refresh");
 

@@ -31,6 +31,7 @@ export function serializeKnowledgeEntry(entry: ProjectKnowledge) {
         id: entry.id,
         projectId: entry.projectId,
         entryType: entry.entryType,
+        category: entry.category,
         contributorType: entry.contributorType,
         action: entry.action,
         status: entry.status,

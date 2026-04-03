@@ -19,7 +19,8 @@ export function getLoopModalMetrics(options: {
     borderRadius: number;
     horizontalPadding: number;
 } {
-    if (!options.isWeb) {
+    // Mobile native or narrow web viewport (mobile browser)
+    if (!options.isWeb || options.viewportWidth < 768) {
         return {
             width: Math.max(options.viewportWidth - 24, 280),
             maxHeight: Math.max(options.viewportHeight - 32, 320),
@@ -30,13 +31,15 @@ export function getLoopModalMetrics(options: {
     }
 
     return {
-        width: 860,
+        width: Math.min(860, options.viewportWidth - 48),
         maxHeight: Math.round(options.viewportHeight * 0.92),
-        minWidth: 720,
+        minWidth: Math.min(720, options.viewportWidth - 48),
         borderRadius: 24,
         horizontalPadding: 20,
     };
 }
+
+
 
 export function getLoopFormLayoutMode(options: {
     viewportWidth: number;

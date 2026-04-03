@@ -22,6 +22,9 @@ interface ProjectKnowledgeTabProps {
 const FILTER_KEYS = ["all", "discovery", "decision", "fix", "convention", "warning", "archived"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
+const CATEGORY_KEYS = ["all", "user", "feedback", "project", "reference"] as const;
+type CategoryKey = (typeof CATEGORY_KEYS)[number];
+
 function filterLabel(key: FilterKey): string {
     switch (key) {
         case "all":
@@ -41,12 +44,28 @@ function filterLabel(key: FilterKey): string {
     }
 }
 
+function categoryLabel(key: CategoryKey): string {
+    switch (key) {
+        case "all":
+            return t("projects.knowledgeFilterAll");
+        case "user":
+            return t("projects.knowledgeCategoryUser");
+        case "feedback":
+            return t("projects.knowledgeCategoryFeedback");
+        case "project":
+            return t("projects.knowledgeCategoryProject");
+        case "reference":
+            return t("projects.knowledgeCategoryReference");
+    }
+}
+
 const STALE_THRESHOLD_MS = 30_000;
 
 export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
     ({ projectServerId, isActive }) => {
         const { theme } = useUnistyles();
         const [activeFilter, setActiveFilter] = React.useState<FilterKey>("all");
+        const [activeCategory, setActiveCategory] = React.useState<CategoryKey>("all");
 
         const {
             entries,
@@ -157,11 +176,15 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             if (isArchivedFilter) {
                 return archivedEntries;
             }
-            if (activeFilter === "all") {
-                return entries;
+            let result = entries;
+            if (activeFilter !== "all") {
+                result = result.filter((e) => e.entryType === activeFilter);
             }
-            return entries.filter((e) => e.entryType === activeFilter);
-        }, [entries, archivedEntries, activeFilter, isArchivedFilter]);
+            if (activeCategory !== "all") {
+                result = result.filter((e) => e.category === activeCategory);
+            }
+            return result;
+        }, [entries, archivedEntries, activeFilter, activeCategory, isArchivedFilter]);
 
         const renderItem = React.useCallback(
             ({ item }: { item: (typeof entries)[number] }) => (
@@ -314,6 +337,39 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                                         ]}
                                     >
                                         {filterLabel(key)}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                    {/* Category filter bar */}
+                    <View style={styles.filterRow}>
+                        {CATEGORY_KEYS.map((key) => {
+                            const isCatActive = activeCategory === key;
+                            return (
+                                <Pressable
+                                    key={key}
+                                    style={[
+                                        styles.filterChip,
+                                        {
+                                            backgroundColor: isCatActive
+                                                ? (theme.dark ? theme.colors.accentOrange : theme.colors.accentBlue)
+                                                : theme.colors.surfaceHighest,
+                                        },
+                                    ]}
+                                    onPress={() => setActiveCategory(key)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.filterChipText,
+                                            {
+                                                color: isCatActive
+                                                    ? "#FFFFFF"
+                                                    : theme.colors.textSecondary,
+                                            },
+                                        ]}
+                                    >
+                                        {categoryLabel(key)}
                                     </Text>
                                 </Pressable>
                             );

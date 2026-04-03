@@ -52,7 +52,7 @@ function renderSummaryCard(options: {
         <View style={[styles.summaryCard, accent ? { borderColor: accent } : null]}>
             <Text style={styles.summaryCardTitle}>{title}</Text>
             <Text style={[styles.summaryCardValue, accent ? { color: accent } : null]}>{value}</Text>
-            <Text style={styles.summaryCardHint}>{hint}</Text>
+            <Text style={styles.summaryCardHint} numberOfLines={1}>{hint}</Text>
         </View>
     );
 }

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { BaseModal } from "@/modal/components/BaseModal";
@@ -30,10 +30,7 @@ export const BootstrapProfileEditorModal = React.memo(function BootstrapProfileE
     editingProfile,
 }: BootstrapProfileEditorModalProps) {
     const { theme } = useUnistyles();
-    const { width: viewportWidth, height: viewportHeight } = React.useMemo(() => ({
-        width: typeof window !== "undefined" ? window.innerWidth : 400,
-        height: typeof window !== "undefined" ? window.innerHeight : 800,
-    }), []);
+    const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
     const modalMetrics = getLoopModalMetrics({
         viewportWidth,
         viewportHeight,

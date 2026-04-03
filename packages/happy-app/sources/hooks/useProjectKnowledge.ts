@@ -17,6 +17,7 @@ import { backoff } from "@/utils/time";
 interface KnowledgeEntry {
     id: string;
     entryType: string;
+    category: string | null;
     contributorType: string;
     status: string;
     title: string;
