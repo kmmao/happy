@@ -9,6 +9,7 @@ const LONG_RUNNING_METHODS = new Set([
   "difftastic",
   "getDirectoryTree",
   "writeFile",
+  "listRemoteGitRepos",
 ]);
 const SHORT_TIMEOUT = 30_000;
 const LONG_TIMEOUT = 300_000; // 5 minutes

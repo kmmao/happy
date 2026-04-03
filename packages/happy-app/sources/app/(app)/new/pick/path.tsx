@@ -30,7 +30,6 @@ import {
   machineListRemoteGitRepos,
 } from "@/sync/ops";
 
-const remoteRepoCache = new Map<string, readonly import("@/sync/ops").RemoteGitRepoEntry[]>();
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -199,19 +198,15 @@ function PathPickerScreen() {
         recentRemoteRepos,
         onLoadRepos: async (
           host: (typeof gitHosts)[number],
-          options?: { forceRefresh?: boolean },
+          options?: {
+            forceRefresh?: boolean;
+            page?: number;
+            perPage?: number;
+            query?: string;
+          },
         ) => {
           if (!host.apiToken) {
             throw new Error(t("newSession.gitRepos.noConfiguredHosts"));
-          }
-
-          const cacheKey = `${machineId}:${host.provider}:${host.host}`;
-          if (!options?.forceRefresh) {
-            const cachedRepos = remoteRepoCache.get(cacheKey);
-            if (cachedRepos) {
-              sync.applySettings({ lastUsedGitHost: host.host });
-              return cachedRepos;
-            }
           }
 
           const result = await machineListRemoteGitRepos({
@@ -219,6 +214,9 @@ function PathPickerScreen() {
             provider: host.provider,
             apiToken: host.apiToken,
             host: host.host,
+            page: options?.page,
+            perPage: options?.perPage,
+            query: options?.query,
           });
           if (!result.success) {
             throw new Error(
@@ -228,10 +226,11 @@ function PathPickerScreen() {
                 }),
             );
           }
-          const repos = result.repos || [];
-          remoteRepoCache.set(cacheKey, repos);
           sync.applySettings({ lastUsedGitHost: host.host });
-          return repos;
+          return {
+            repos: result.repos || [],
+            hasMore: result.hasMore ?? false,
+          };
         },
         onClone: async ({
           repoUrl,

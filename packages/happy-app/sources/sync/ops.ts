@@ -1045,11 +1045,16 @@ export interface ListRemoteGitReposOptions {
   readonly provider: "github" | "gitea";
   readonly apiToken: string;
   readonly host: string;
+  readonly page?: number;
+  readonly perPage?: number;
+  readonly query?: string;
 }
 
 export interface ListRemoteGitReposResult {
   readonly success: boolean;
   readonly repos?: readonly RemoteGitRepoEntry[];
+  readonly hasMore?: boolean;
+  readonly totalCount?: number;
   readonly error?: string;
 }
 
@@ -1103,6 +1108,9 @@ export async function machineListRemoteGitRepos(
       provider: options.provider,
       apiToken: options.apiToken,
       host: options.host,
+      page: options.page,
+      perPage: options.perPage,
+      query: options.query,
     });
 
     return result;

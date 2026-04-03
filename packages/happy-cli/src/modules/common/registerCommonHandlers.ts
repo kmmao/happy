@@ -153,11 +153,16 @@ interface ListRemoteGitReposRequest {
   provider: "github" | "gitea";
   apiToken: string;
   host: string;
+  page?: number;
+  perPage?: number;
+  query?: string;
 }
 
 interface ListRemoteGitReposResponse {
   success: boolean;
   repos?: RemoteGitRepoEntry[];
+  hasMore?: boolean;
+  totalCount?: number;
   error?: string;
 }
 
@@ -862,68 +867,6 @@ export function registerCommonHandlers(
     };
   }
 
-  function parseLinkHeader(linkHeader: string | null): Record<string, string> {
-    if (!linkHeader) return {};
-    const links: Record<string, string> = {};
-    for (const part of linkHeader.split(",")) {
-      const section = part.trim();
-      const match = section.match(/^<([^>]+)>;\s*rel="([^"]+)"$/);
-      if (match) {
-        links[match[2]] = match[1];
-      }
-    }
-    return links;
-  }
-
-  async function fetchPaginatedJson<T>(
-    firstUrl: string,
-    headers: Record<string, string>,
-  ): Promise<T[]> {
-    const maxPages = 100;
-    const items: T[] = [];
-    const seenUrls = new Set<string>();
-    let nextUrl: string | null = firstUrl;
-    let page = 0;
-
-    while (nextUrl && page < maxPages) {
-      if (seenUrls.has(nextUrl)) break;
-      seenUrls.add(nextUrl);
-      page += 1;
-
-      const response = await fetch(nextUrl, { headers });
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "");
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const pageItems = (await response.json()) as T[];
-      items.push(...pageItems);
-
-      if (pageItems.length === 0) {
-        break;
-      }
-
-      const links = parseLinkHeader(response.headers.get("link"));
-      nextUrl = links.next ?? null;
-
-      if (!nextUrl) {
-        const current = new URL(response.url);
-        const currentPage = Number(current.searchParams.get("page") || "1");
-        const currentPerPage = Number(
-          current.searchParams.get("per_page") ||
-            current.searchParams.get("limit") ||
-            "100",
-        );
-        if (pageItems.length >= currentPerPage) {
-          current.searchParams.set("page", String(currentPage + 1));
-          nextUrl = current.toString();
-        }
-      }
-    }
-
-    return items;
-  }
-
   function normalizeRemoteRepoEntries(
     pageRepos: Array<{
       name?: string;
@@ -958,10 +901,17 @@ export function registerCommonHandlers(
     ListRemoteGitReposRequest,
     ListRemoteGitReposResponse
   >("listRemoteGitRepos", async (data) => {
+    const page = data.page ?? 1;
+    const perPage = data.perPage ?? 30;
+    const query = data.query?.trim() || "";
+
     logger.debug("listRemoteGitRepos request:", {
       provider: data.provider,
       host: data.host,
       hasToken: !!data.apiToken,
+      page,
+      perPage,
+      query,
     });
 
     if (!data.apiToken) {
@@ -974,78 +924,60 @@ export function registerCommonHandlers(
     try {
       const baseUrl = buildGitApiBase(data.provider, data.host);
       const headers = buildGitApiHeaders(data.apiToken);
-      const repos: RemoteGitRepoEntry[] = [];
-      const seenRepoKeys = new Set<string>();
-      const requestedPageSize = 100;
 
-      const userReposUrl =
-        data.provider === "github"
-          ? `${baseUrl}/user/repos?per_page=${requestedPageSize}&page=1&sort=updated&affiliation=owner,collaborator,organization_member`
-          : `${baseUrl}/user/repos?limit=${requestedPageSize}&page=1&sort=updated`;
+      type RawRepo = {
+        name?: string;
+        full_name?: string;
+        clone_url?: string;
+        html_url?: string;
+        private?: boolean;
+        updated_at?: string;
+        owner?: { login?: string; username?: string };
+      };
 
-      const userRepos = normalizeRemoteRepoEntries(
-        await fetchPaginatedJson<{
-          name?: string;
-          full_name?: string;
-          clone_url?: string;
-          html_url?: string;
-          private?: boolean;
-          updated_at?: string;
-          owner?: { login?: string; username?: string };
-        }>(userReposUrl, headers),
-      );
-      repos.push(...userRepos);
-      userRepos.forEach((repo) => seenRepoKeys.add(repo.cloneUrl || repo.fullName));
+      let repos: RemoteGitRepoEntry[];
+      let hasMore: boolean;
+      let totalCount: number | undefined;
 
-      if (data.provider === "gitea") {
-        const orgsUrl = `${baseUrl}/user/orgs?limit=${requestedPageSize}&page=1`;
-        const orgs = await fetchPaginatedJson<{
-          login?: string;
-          username?: string;
-          name?: string;
-        }>(orgsUrl, headers);
-
-        const orgNames = orgs
-          .map((org) => org.login || org.username || org.name)
-          .filter((orgName): orgName is string => !!orgName);
-
-        const concurrency = 4;
-        for (let index = 0; index < orgNames.length; index += concurrency) {
-          const batch = orgNames.slice(index, index + concurrency);
-          const batchResults = await Promise.all(
-            batch.map(async (orgName) => {
-              const orgReposUrl = `${baseUrl}/orgs/${encodeURIComponent(orgName)}/repos?limit=${requestedPageSize}&page=1`;
-              return normalizeRemoteRepoEntries(
-                await fetchPaginatedJson<{
-                  name?: string;
-                  full_name?: string;
-                  clone_url?: string;
-                  html_url?: string;
-                  private?: boolean;
-                  updated_at?: string;
-                  owner?: { login?: string; username?: string };
-                }>(orgReposUrl, headers),
-              );
-            }),
-          );
-
-          for (const orgRepos of batchResults) {
-            for (const repo of orgRepos) {
-              const key = repo.cloneUrl || repo.fullName;
-              if (seenRepoKeys.has(key)) continue;
-              seenRepoKeys.add(key);
-              repos.push(repo);
-            }
-          }
+      if (data.provider === "github") {
+        // GitHub: always use /user/repos with pagination.
+        // GitHub has no API to search "repos I can access", so query is
+        // ignored here — search filtering happens client-side in the App.
+        const listUrl = `${baseUrl}/user/repos?per_page=${perPage}&page=${page}&sort=updated&affiliation=owner,collaborator,organization_member`;
+        const response = await fetch(listUrl, { headers });
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "");
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
+        const items = (await response.json()) as RawRepo[];
+        repos = normalizeRemoteRepoEntries(items);
+        hasMore = items.length >= perPage;
+      } else {
+        // Gitea: use /repos/search for both list and search mode.
+        // This endpoint returns all repos the user can access (own + org)
+        // in one unified paginated stream, avoiding separate org fetches.
+        const searchParams = new URLSearchParams({
+          sort: "updated",
+          order: "desc",
+          limit: String(perPage),
+          page: String(page),
+        });
+        if (query) {
+          searchParams.set("q", query);
+        }
+        const searchUrl = `${baseUrl}/repos/search?${searchParams.toString()}`;
+        const response = await fetch(searchUrl, { headers });
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "");
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        const body = (await response.json()) as { data?: RawRepo[]; ok?: boolean };
+        const items = Array.isArray(body) ? (body as RawRepo[]) : (body.data || []);
+        repos = normalizeRemoteRepoEntries(items);
+        hasMore = items.length >= perPage;
       }
 
-      repos.sort((a, b) => {
-        const updatedDiff = (b.updatedAt || 0) - (a.updatedAt || 0);
-        if (updatedDiff !== 0) return updatedDiff;
-        return a.fullName.localeCompare(b.fullName);
-      });
-      return { success: true, repos };
+      return { success: true, repos, hasMore, totalCount };
     } catch (error) {
       logger.debug("listRemoteGitRepos failed:", error);
       return {
