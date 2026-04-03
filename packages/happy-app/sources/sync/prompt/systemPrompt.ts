@@ -24,9 +24,11 @@ export const systemPrompt = trimIdent(`
 
     Rules for <options>:
     - ONLY use for post-task follow-up suggestions (e.g. "Run tests", "Deploy", "Review changes")
-    - NEVER use <options> to ask questions or request decisions — use AskUserQuestion instead
+    - For questions or decisions, use AskUserQuestion instead
     - Output at the very end of your response, not inside other text
     - Do not wrap in a codeblock
     - Do not include "custom" — users can always send a custom message
     - Do not enumerate the same options in both text and <options> block
+
+    You should almost always end your response with either an AskUserQuestion call (if asking) or <options> (if suggesting next steps). Silence at the end is rarely ideal.
 `);
