@@ -30,6 +30,7 @@ export interface AgentLoopDefinition {
   prompt: string;
   directory: string;
   intervalMs: number;
+  cronExpression?: string;
   enabled: boolean;
   createdAt: number;
   updatedAt: number;

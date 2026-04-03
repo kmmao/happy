@@ -278,4 +278,19 @@ export const styles = StyleSheet.create((theme) => ({
         justifyContent: "center",
         backgroundColor: theme.colors.surface,
     },
+    killswitchButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        marginHorizontal: 16,
+        marginTop: 12,
+        paddingVertical: 12,
+        borderRadius: 10,
+    },
+    killswitchText: {
+        color: "#fff",
+        fontSize: 15,
+        fontWeight: "600",
+    },
 }));

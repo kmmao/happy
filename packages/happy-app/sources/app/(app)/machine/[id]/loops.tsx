@@ -27,6 +27,7 @@ import { LoopAutomationSection } from "./LoopAutomationSection";
 import { LoopEditorModal } from "./LoopEditorModal";
 import { LoopSuggestionsSection } from "./LoopSuggestionsSection";
 import { OneClickSetupCard } from "./OneClickSetupCard";
+import { BriefSection } from "./BriefSection";
 import { useOneClickSetup } from "./useOneClickSetup";
 import { useLoopsData } from "./useLoopsData";
 import { useLoopSuggestions } from "./useLoopSuggestions";
@@ -495,6 +496,9 @@ export default React.memo(function MachineLoopsPage() {
                         formLayoutStacked={formLayout.modalHeaderStacked}
                     />
                 </ItemGroup>
+
+                {/* Recent Briefs from Agent Loops */}
+                <BriefSection briefs={machine?.daemonState?.recentBriefs ?? []} />
 
                 {/* Automation -- collapsible, default expanded */}
                 <LoopAutomationSection

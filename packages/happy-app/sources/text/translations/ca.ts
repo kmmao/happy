@@ -1604,8 +1604,11 @@ export const ca: TranslationStructure = {
     automationSessionReattachedCount: "Reattached Sessions",
     automationGuardianRecoveryNeeded: "Guardian Recovery Needed",
     automationGuardianRecoveryNeededMessage: "Some guardian sessions are persisted from previous daemon state and are not currently attached.",
+    automationEmergencyStop: "Aturada d'emergència",
+    automationResume: "Reprendre automatització",
     automationAnomaliesDetected: "Automation anomalies detected",
 
+    agentLoopBriefs: "Resums recents",
     agentLoops: "Agent Loops",
     agentLoopsViewAll: "Manage Agent Loops",
     agentLoopsViewAllHint: "Create, pause, resume, and run autonomous loops",
@@ -1622,6 +1625,7 @@ export const ca: TranslationStructure = {
     agentLoopAdvancedShow: "Show advanced options",
     agentLoopAdvancedHide: "Hide advanced options",
     agentLoopEnvironment: "Environment Variables",
+    agentLoopCronExpression: "Expressió Cron (opcional, substitueix l'interval)",
     agentLoopEnvironmentPlaceholder: "FOO=bar\nBAZ=qux",
     agentLoopEnvironmentInvalid: "Environment variables must use KEY=value per line",
 

@@ -1,4 +1,31 @@
 import { randomUUID } from "node:crypto";
+import { CronExpressionParser } from "cron-parser";
+import { logger } from "@/ui/logger";
+import { jitteredDelay } from "@/utils/jitter";
+
+/**
+ * Compute the next run timestamp from a cron expression.
+ * Returns null if the expression is invalid or has no future match.
+ */
+function nextRunFromCron(cronExpression: string, fromMs: number = Date.now()): number | null {
+  try {
+    const interval = CronExpressionParser.parse(cronExpression, { currentDate: new Date(fromMs) });
+    return interval.next().getTime();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compute the effective next run time for a loop, preferring cron expression over interval.
+ */
+function computeNextRunAt(loop: { cronExpression?: string; intervalMs: number; id: string }, now: number): number {
+  if (loop.cronExpression) {
+    const next = nextRunFromCron(loop.cronExpression, now);
+    if (next != null) return next;
+  }
+  return now + loop.intervalMs + jitteredDelay(loop.id, loop.intervalMs);
+}
 import type { AutomationAuditEvent } from "./types";
 import type { AutomationScheduler } from "./AutomationScheduler";
 import {
@@ -8,6 +35,7 @@ import {
 import {
   buildAgentLoopBrief,
   persistAgentLoopBrief,
+  type AgentLoopBriefSnapshot,
 } from "./AgentLoopBrief";
 import {
   AgentLoopStore,
@@ -26,6 +54,7 @@ export interface AgentLoopCreateInput {
   prompt: string;
   directory: string;
   intervalMs: number;
+  cronExpression?: string;
   agent?: "claude" | "codex" | "gemini";
   profileId?: string;
   projectId?: string;
@@ -60,6 +89,7 @@ export interface AgentLoopUpdateInput {
   prompt?: string;
   directory?: string;
   intervalMs?: number;
+  cronExpression?: string | null;
   agent?: "claude" | "codex" | "gemini";
   profileId?: string | null;
   projectId?: string | null;
@@ -112,6 +142,7 @@ export interface AgentLoopCoordinatorOptions {
   onChange?: (loops: AgentLoopDefinition[]) => void;
   recordAuditEvent?: (event: Omit<AutomationAuditEvent, "id" | "occurredAt"> & { occurredAt?: number }) => Promise<void> | void;
   sendPushNotification?: (payload: { title: string; body: string; data?: Record<string, unknown> }) => Promise<void> | void;
+  onBriefGenerated?: (brief: AgentLoopBriefSnapshot) => void;
 }
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
@@ -294,8 +325,10 @@ export class AgentLoopCoordinator {
   private readonly onChange?: (loops: AgentLoopDefinition[]) => void;
   private readonly recordAuditEvent?: AgentLoopCoordinatorOptions["recordAuditEvent"];
   private readonly sendPushNotification?: AgentLoopCoordinatorOptions["sendPushNotification"];
+  private readonly onBriefGenerated?: AgentLoopCoordinatorOptions["onBriefGenerated"];
   private interval: NodeJS.Timeout | null = null;
   private loaded = false;
+  private _killed = false;
 
   constructor(options: AgentLoopCoordinatorOptions) {
     this.store = options.store;
@@ -304,6 +337,16 @@ export class AgentLoopCoordinator {
     this.onChange = options.onChange;
     this.recordAuditEvent = options.recordAuditEvent;
     this.sendPushNotification = options.sendPushNotification;
+    this.onBriefGenerated = options.onBriefGenerated;
+  }
+
+  get killed(): boolean {
+    return this._killed;
+  }
+
+  setKilled(value: boolean): void {
+    this._killed = value;
+    this.notifyChange();
   }
 
   async start(): Promise<void> {
@@ -312,10 +355,11 @@ export class AgentLoopCoordinator {
       clearInterval(this.interval);
     }
     this.interval = setInterval(() => {
-      void this.tick();
+      void this.tick().catch((err) => logger.debug("[LOOP-COORDINATOR] tick error:", err));
     }, this.pollIntervalMs);
+    if (this.interval) (this.interval as NodeJS.Timeout).unref?.();
     this.notifyChange();
-    void this.tick();
+    void this.tick().catch((err) => logger.debug("[LOOP-COORDINATOR] tick error:", err));
   }
 
   async stop(): Promise<void> {
@@ -346,10 +390,11 @@ export class AgentLoopCoordinator {
       prompt: input.prompt.trim(),
       directory: input.directory.trim(),
       intervalMs: input.intervalMs,
+      cronExpression: normalizeOptionalString(input.cronExpression),
       enabled: true,
       createdAt: now,
       updatedAt: now,
-      nextRunAt: now + input.intervalMs,
+      nextRunAt: computeNextRunAt({ cronExpression: input.cronExpression, intervalMs: input.intervalMs, id: loopId }, now),
       iteration: 0,
       continuityKey: `agent-loop:${randomUUID()}`,
       agent: input.agent ?? "claude",
@@ -406,13 +451,20 @@ export class AgentLoopCoordinator {
     }
 
     const intervalMs = input.intervalMs ?? existing.intervalMs;
-    const nextRunAt = input.intervalMs != null ? Date.now() + intervalMs : existing.nextRunAt;
+    const cronExpression = input.cronExpression === undefined
+      ? existing.cronExpression
+      : normalizeOptionalString(input.cronExpression);
+    const scheduleChanged = input.intervalMs != null || input.cronExpression !== undefined;
+    const nextRunAt = scheduleChanged
+      ? computeNextRunAt({ cronExpression, intervalMs, id: existing.id }, Date.now())
+      : existing.nextRunAt;
     const updated: AgentLoopDefinition = {
       ...existing,
       name: input.name === undefined ? existing.name : normalizeOptionalString(input.name),
       prompt: input.prompt === undefined ? existing.prompt : input.prompt.trim(),
       directory: input.directory === undefined ? existing.directory : input.directory.trim(),
       intervalMs,
+      cronExpression,
       nextRunAt,
       agent: input.agent ?? existing.agent,
       profileId: input.profileId === undefined ? existing.profileId : normalizeOptionalString(input.profileId),
@@ -735,6 +787,7 @@ export class AgentLoopCoordinator {
       errorMessage: params.errorMessage,
     });
     const briefFilePath = await persistAgentLoopBrief(draftLoop.directory, draftLoop.id, brief);
+    try { this.onBriefGenerated?.(brief); } catch { /* best-effort */ }
     const updated: AgentLoopDefinition = {
       ...draftLoop,
       lastBriefAt: brief.generatedAt,
@@ -849,39 +902,44 @@ export class AgentLoopCoordinator {
   }
 
   private async tick(): Promise<void> {
+    if (this._killed) return;
     await this.ensureLoaded();
     const now = Date.now();
     for (const loop of this.store.getAll()) {
-      if (!loop.enabled || loop.runtimeState === "blocked") {
-        continue;
-      }
-      if (this.hasActiveJob(loop.id)) {
-        continue;
-      }
-      if ((loop.recentEvents ?? []).some((event) => event.status === "pending")) {
+      try {
+        if (!loop.enabled || loop.runtimeState === "blocked") {
+          continue;
+        }
+        if (this.hasActiveJob(loop.id)) {
+          continue;
+        }
+        if ((loop.recentEvents ?? []).some((event) => event.status === "pending")) {
+          const policy = evaluateAutoRunPolicy(loop, now);
+          if (policy.allowed) {
+            await this.enqueuePendingEvent(loop, now);
+          } else if (policy.reason === "max-iterations") {
+            await this.stopLoopByCondition(loop, policy.reason, now);
+          } else {
+            await this.markPolicyGated(loop, policy.reason ?? "policy", now, "event");
+          }
+          continue;
+        }
+        if (loop.nextRunAt > now) {
+          continue;
+        }
         const policy = evaluateAutoRunPolicy(loop, now);
-        if (policy.allowed) {
-          await this.enqueuePendingEvent(loop, now);
-        } else if (policy.reason === "max-iterations") {
-          await this.stopLoopByCondition(loop, policy.reason, now);
-        } else {
-          await this.markPolicyGated(loop, policy.reason ?? "policy", now, "event");
+        if (!policy.allowed) {
+          if (policy.reason === "max-iterations") {
+            await this.stopLoopByCondition(loop, policy.reason, now);
+          } else {
+            await this.markPolicyGated(loop, policy.reason ?? "policy", now, "schedule");
+          }
+          continue;
         }
-        continue;
+        await this.enqueueLoop(loop, "schedule", now);
+      } catch (err) {
+        logger.debug(`[LOOP-COORDINATOR] tick error for loop ${loop.id}:`, err);
       }
-      if (loop.nextRunAt > now) {
-        continue;
-      }
-      const policy = evaluateAutoRunPolicy(loop, now);
-      if (!policy.allowed) {
-        if (policy.reason === "max-iterations") {
-          await this.stopLoopByCondition(loop, policy.reason, now);
-        } else {
-          await this.markPolicyGated(loop, policy.reason ?? "policy", now, "schedule");
-        }
-        continue;
-      }
-      await this.enqueueLoop(loop, "schedule", now);
     }
   }
 
@@ -942,7 +1000,7 @@ export class AgentLoopCoordinator {
       iteration,
       updatedAt: now,
       lastEnqueuedAt: now,
-      nextRunAt: now + loop.intervalMs,
+      nextRunAt: computeNextRunAt(loop, now),
       activeJobId: result.job.id,
       activeSessionId: undefined,
       lastTriggerSource: triggerSource,

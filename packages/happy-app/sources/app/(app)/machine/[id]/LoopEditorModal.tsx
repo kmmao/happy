@@ -110,6 +110,7 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
     const [maxAutoRuns, setMaxAutoRuns] = React.useState("");
     const [maxIterations, setMaxIterations] = React.useState("");
     const [stopOnSuccess, setStopOnSuccess] = React.useState(false);
+    const [cronExpression, setCronExpression] = React.useState("");
     const [downstreamLoopText, setDownstreamLoopText] = React.useState("");
     const [downstreamTriggerText, setDownstreamTriggerText] = React.useState("");
     const [environmentText, setEnvironmentText] = React.useState("");
@@ -121,6 +122,7 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
             setName(editingLoop.name ?? "");
             setDirectory(editingLoop.directory);
             setInterval(formatIntervalMs(editingLoop.intervalMs));
+            setCronExpression(editingLoop.cronExpression ?? "");
             setPrompt(editingLoop.prompt);
             setAgent(editingLoop.agent);
             setProfileId(editingLoop.profileId ?? "");
@@ -150,6 +152,7 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
             setName("");
             setDirectory("");
             setInterval("10m");
+            setCronExpression("");
             setPrompt("");
             setAgent("claude");
             setProfileId("");
@@ -253,6 +256,7 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                     directory: directory.trim(),
                     prompt: prompt.trim(),
                     intervalMs: parsedInterval,
+                    cronExpression: cronExpression.trim() || null,
                     agent,
                     profileId,
                     projectId,
@@ -282,6 +286,7 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                     directory: directory.trim(),
                     prompt: prompt.trim(),
                     intervalMs: parsedInterval,
+                    cronExpression: cronExpression.trim() || undefined,
                     agent,
                     profileId: profileId.trim() || undefined,
                     projectId: projectId.trim() || undefined,
@@ -392,6 +397,16 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                             placeholderTextColor={theme.colors.textSecondary}
                             value={interval}
                             onChangeText={setInterval}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
+                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCronExpression")}</Text>
+                        <TextInput
+                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                            placeholder="*/30 * * * *"
+                            placeholderTextColor={theme.colors.textSecondary}
+                            value={cronExpression}
+                            onChangeText={setCronExpression}
                             autoCapitalize="none"
                             autoCorrect={false}
                         />

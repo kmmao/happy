@@ -46,6 +46,7 @@ const RefinedKnowledgeSchema = z.object({
     title: z.string().max(200),
     content: z.string().max(2000),
     entryType: z.enum(["discovery", "decision", "fix", "convention", "warning"]),
+    category: z.enum(["user", "feedback", "project", "reference"]).optional(),
     confidence: z.enum(["high", "medium", "low"]),
     tags: z.array(z.string().max(50)).max(10),
     structured: z.object({
@@ -97,6 +98,7 @@ Rules:
 - title: rewrite as a clear, searchable summary (NOT the raw user message)
 - content: distill the key knowledge — remove conversational filler, tool output, and code dumps
 - entryType: classify based on the nature of the knowledge
+- category: classify into one of: "user" (user role/preferences), "feedback" (process guidance), "project" (ongoing work context), "reference" (external resource pointers). Omit if unclear.
 - confidence: high = clear solution/finding, medium = partial, low = speculative
 - tags: extract 2-5 relevant technology/topic tags
 - structured fields: fill in whichever fields apply, omit the rest
@@ -314,6 +316,7 @@ export async function refineKnowledgeEntry(input: RefineInput): Promise<void> {
                 title: refined.title,
                 content: refined.content,
                 entryType: refined.entryType,
+                category: refined.category ?? undefined,
                 confidence: refined.confidence,
                 tags: JSON.stringify(refined.tags),
                 structured: JSON.stringify(refined.structured),

@@ -1,8 +1,10 @@
 import { randomUUID, createHash } from "node:crypto";
+import { logger } from "@/ui/logger";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, join, relative } from "node:path";
 import { parseAgentLoopMemory } from "./AgentLoopMemory";
 import { AutoDreamStore, type AutoDreamProfile } from "./AutoDreamStore";
+import { scanSessionTranscripts, type TranscriptTurn } from "./SessionTranscriptScanner";
 
 export interface AutoDreamCreateInput {
   name?: string;
@@ -112,6 +114,7 @@ export class AutoDreamCoordinator {
       store: AutoDreamStore;
       pollIntervalMs?: number;
       onChange?: (profiles: AutoDreamProfile[]) => void;
+      onTranscriptsFound?: (turns: TranscriptTurn[]) => void;
     },
   ) {}
 
@@ -126,9 +129,10 @@ export class AutoDreamCoordinator {
   async start(): Promise<void> {
     await this.ensureLoaded();
     if (this.interval) clearInterval(this.interval);
-    this.interval = setInterval(() => void this.tick(), this.pollIntervalMs);
+    this.interval = setInterval(() => void this.tick().catch((err) => logger.debug("[AUTO-DREAM] tick error:", err)), this.pollIntervalMs);
+    if (this.interval) (this.interval as NodeJS.Timeout).unref?.();
     this.notifyChange();
-    void this.tick();
+    void this.tick().catch((err) => logger.debug("[AUTO-DREAM] tick error:", err));
   }
 
   async stop(): Promise<void> {
@@ -241,33 +245,64 @@ export class AutoDreamCoordinator {
   private async executeProfile(profile: AutoDreamProfile): Promise<AutoDreamMutationResult> {
     this.active.add(profile.id);
     const startedAt = Date.now();
-    const running: AutoDreamProfile = { ...profile, updatedAt: startedAt, status: "running", statusUpdatedAt: startedAt };
-    await this.store.upsert(running);
+    let current: AutoDreamProfile = { ...profile, updatedAt: startedAt, status: "running", stage: "starting", statusUpdatedAt: startedAt };
+    await this.store.upsert(current);
     this.notifyChange();
+
+    const updateStage = async (stage: AutoDreamProfile["stage"]) => {
+      const now = Date.now();
+      current = { ...current, stage, updatedAt: now, statusUpdatedAt: now };
+      await this.store.upsert(current);
+      this.notifyChange();
+    };
+
     try {
-      const files = await walkForMemoryFiles(running.rootDirectory, running.maxDepth ?? 6, running.limit ?? 100);
+      // Phase 1: Scanning memory files
+      await updateStage("scanning");
+      const files = await walkForMemoryFiles(current.rootDirectory, current.maxDepth ?? 6, current.limit ?? 100);
       const entries = await Promise.all(files.map(async (path) => {
         const raw = await readFile(path, "utf-8");
         const info = await stat(path);
         return { path, content: parseAgentLoopMemory(raw), updatedAt: info.mtimeMs };
       }));
-      const lastRunAt = running.lastRunAt ?? 0;
+      const lastRunAt = current.lastRunAt ?? 0;
       const updatedFiles = entries.filter((entry) => entry.updatedAt > lastRunAt).length;
-      const stage = running.lastRunAt ? "updating" as const : "starting" as const;
-      const dreamDir = join(running.rootDirectory, ".happy", "auto-dream", running.id);
+      const finalStage = current.lastRunAt ? "updating" as const : "starting" as const;
+
+      // Phase 2: Analyzing and scanning transcripts
+      await updateStage("analyzing");
+      // Scan session transcripts and submit valuable turns to knowledge base
+      try {
+        const transcripts = await scanSessionTranscripts({
+          sinceMs: current.lastRunAt ?? startedAt - 24 * 60 * 60_000,
+          maxSessions: 20,
+          maxTurnsPerSession: 10,
+        });
+        if (transcripts.length > 0) {
+          try { this.options.onTranscriptsFound?.(transcripts); } catch { /* best-effort */ }
+          logger.debug(`[AUTO-DREAM] Found ${transcripts.length} valuable transcript turns`);
+        }
+      } catch (err) {
+        logger.debug("[AUTO-DREAM] Session transcript scan failed (non-fatal):", err);
+      }
+
+      // Phase 3: Writing dream report
+      await updateStage("writing");
+      const dreamDir = join(current.rootDirectory, ".happy", "auto-dream", current.id);
       await mkdir(dreamDir, { recursive: true });
-      const report = renderDreamReport({ rootDirectory: running.rootDirectory, stage, generatedAt: startedAt, files: entries });
+      const report = renderDreamReport({ rootDirectory: current.rootDirectory, stage: finalStage, generatedAt: startedAt, files: entries });
       const hash = createHash("sha1").update(report).digest("hex").slice(0, 12);
       const dreamFilePath = join(dreamDir, `dream-${hash}.md`);
       await writeFile(join(dreamDir, "dream-latest.md"), report, "utf-8");
       await writeFile(dreamFilePath, report, "utf-8");
+
       const completedAt = Date.now();
       const completed: AutoDreamProfile = {
-        ...running,
+        ...current,
         updatedAt: completedAt,
-        nextRunAt: completedAt + running.intervalMs,
+        nextRunAt: completedAt + current.intervalMs,
         status: "idle",
-        stage,
+        stage: finalStage,
         statusUpdatedAt: completedAt,
         lastRunAt: completedAt,
         lastError: undefined,
@@ -280,7 +315,7 @@ export class AutoDreamCoordinator {
       return { success: true, profile: completed };
     } catch (error) {
       const failedAt = Date.now();
-      const failed: AutoDreamProfile = { ...running, updatedAt: failedAt, status: "failed", statusUpdatedAt: failedAt, nextRunAt: failedAt + running.intervalMs, lastError: error instanceof Error ? error.message : String(error) };
+      const failed: AutoDreamProfile = { ...current, updatedAt: failedAt, status: "failed", statusUpdatedAt: failedAt, nextRunAt: failedAt + current.intervalMs, lastError: error instanceof Error ? error.message : String(error) };
       await this.store.upsert(failed);
       this.notifyChange();
       return { success: false, errorMessage: failed.lastError, profile: failed };

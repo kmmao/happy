@@ -12,6 +12,7 @@
 import { writeFile, mkdir, unlink } from "fs/promises";
 import { join } from "path";
 import { logger } from "@/ui/logger";
+import { withTimeout } from "@/utils/withTimeout";
 import { buildSupervisorPrompt } from "./buildSupervisorPrompt";
 import { buildFixPrompt } from "./buildFixPrompt";
 import { buildResearchPrompt } from "./buildResearchPrompt";
@@ -53,7 +54,9 @@ export interface SupervisorHandlerDeps {
 }
 
 // Track in-flight supervisor runs to prevent duplicate processing
-const processingRuns = new Set<string>();
+// Uses Map<runId, addedAt> so stale entries can be auto-cleaned after 30 minutes
+const processingRuns = new Map<string, number>();
+const PROCESSING_RUN_STALE_MS = 30 * 60_000; // 30 minutes
 
 // Track fix session worktrees for cleanup on session exit
 const fixWorktrees = new Map<
@@ -169,6 +172,15 @@ export async function handleSupervisorTrigger(
     setMaxConcurrency("fix", maxConcurrentFix);
   }
 
+  // Auto-clean stale entries (e.g. crash left runId stuck in map)
+  const staleThreshold = Date.now() - PROCESSING_RUN_STALE_MS;
+  for (const [id, addedAt] of processingRuns) {
+    if (addedAt < staleThreshold) {
+      processingRuns.delete(id);
+      logger.debug(`[SUPERVISOR] Cleared stale processingRun: ${id}`);
+    }
+  }
+
   // Guard against duplicate processing
   if (processingRuns.has(runId)) {
     logger.debug(
@@ -176,7 +188,7 @@ export async function handleSupervisorTrigger(
     );
     return { success: false, errorMessage: "Run already processing" };
   }
-  processingRuns.add(runId);
+  processingRuns.set(runId, Date.now());
 
   // Determine which pool to use
   const slotType: SlotType = trigger === "fix" ? "fix" : "analysis";
@@ -272,7 +284,7 @@ export async function handleSupervisorTrigger(
         totalDimensions: 5,
       });
 
-      const preflightResult = await runPreflightSync(repoPath, (step) => {
+      const preflightResult = await withTimeout(runPreflightSync(repoPath, (step) => {
         const mapped = preflightStepMap[step];
         if (mapped) {
           deps.emitSupervisorRunStatus({
@@ -284,7 +296,7 @@ export async function handleSupervisorTrigger(
             totalDimensions: mapped.total,
           });
         }
-      });
+      }), 180_000, "runPreflightSync");
 
       if (!preflightResult.success) {
         logger.debug(
@@ -579,7 +591,11 @@ async function handleFixTrigger(
       `[SUPERVISOR] Pre-worktree fetch failed (will use local HEAD)`,
     );
   }
-  const worktreeResult = await createWorktreeLocal(repoPath, { prefix: "fix", startPoint });
+  const worktreeResult = await withTimeout(
+    createWorktreeLocal(repoPath, { prefix: "fix", startPoint }),
+    120_000,
+    "createWorktreeLocal",
+  );
   if (!worktreeResult.success) {
     const errorMessage = worktreeResult.error ?? "Failed to create worktree";
     logger.debug(`[SUPERVISOR] Worktree creation failed: ${errorMessage}`);

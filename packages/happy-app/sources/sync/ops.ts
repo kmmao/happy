@@ -417,6 +417,27 @@ export async function machineClearAutomationAudit(
 }
 
 
+export async function machineSetKillswitch(
+  machineId: string,
+  enabled: boolean,
+): Promise<{ success: boolean; killed: boolean }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "killswitch-set",
+    { enabled },
+  );
+}
+
+export async function machineGetKillswitch(
+  machineId: string,
+): Promise<{ killed: boolean }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "killswitch-get",
+    {},
+  );
+}
+
 export type MachineAgentLoopRuntimeState = "idle" | "active" | "blocked" | "paused";
 export type MachineAgentLoopPhase = "sleeping" | "planning" | "acting" | "reflecting" | "blocked" | "paused";
 export type MachineAgentLoopTriggerSource = "manual" | "schedule" | "event";
@@ -442,6 +463,7 @@ export interface MachineAgentLoop {
   prompt: string;
   directory: string;
   intervalMs: number;
+  cronExpression?: string;
   enabled: boolean;
   createdAt: number;
   updatedAt: number;
@@ -543,6 +565,7 @@ export interface MachineAgentLoopCreateInput {
   prompt: string;
   directory: string;
   intervalMs: number;
+  cronExpression?: string;
   agent?: "claude" | "codex" | "gemini";
   profileId?: string;
   projectId?: string;
@@ -577,6 +600,7 @@ export interface MachineAgentLoopUpdateInput {
   prompt?: string;
   directory?: string;
   intervalMs?: number;
+  cronExpression?: string | null;
   agent?: "claude" | "codex" | "gemini";
   profileId?: string | null;
   projectId?: string | null;
@@ -664,7 +688,7 @@ export interface MachineAutoDreamProfile {
   updatedAt: number;
   nextRunAt: number;
   status: "idle" | "running" | "paused" | "failed";
-  stage: "starting" | "updating";
+  stage: "starting" | "scanning" | "analyzing" | "writing" | "updating";
   statusUpdatedAt: number;
   maxDepth?: number;
   limit?: number;

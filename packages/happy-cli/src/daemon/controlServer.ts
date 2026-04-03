@@ -394,7 +394,7 @@ const autoDreamProfileSchema = z.object({
   updatedAt: z.number(),
   nextRunAt: z.number(),
   status: z.enum(["idle", "running", "paused", "failed"]),
-  stage: z.enum(["starting", "updating"]),
+  stage: z.enum(["starting", "scanning", "analyzing", "writing", "updating"]),
   statusUpdatedAt: z.number(),
   maxDepth: z.number().int().nonnegative().optional(),
   limit: z.number().int().positive().optional(),
@@ -441,6 +441,8 @@ export function startDaemonControlServer({
   clearAutomationJobs,
   clearAutomationGuardians,
   clearAutomationAudit,
+  setKillswitch,
+  getKillswitch,
   listAgentLoops,
   suggestAgentLoops,
   listAgentLoopBootstrapProfiles,
@@ -540,6 +542,8 @@ export function startDaemonControlServer({
   clearAutomationJobs: () => Promise<AutomationMutationResult>;
   clearAutomationGuardians: (params?: { key?: string; sessionId?: string; clearAll?: boolean }) => Promise<{ success: boolean; errorMessage?: string }>;
   clearAutomationAudit: () => Promise<{ success: boolean; errorMessage?: string }>;
+  setKillswitch: (enabled: boolean) => Promise<{ success: boolean; killed: boolean }>;
+  getKillswitch: () => { killed: boolean };
   listAgentLoops: () => Promise<AgentLoopDefinition[]>;
   getAgentLoop: (loopId: string) => Promise<AgentLoopDefinition | undefined>;
   createAgentLoop: (input: AgentLoopCreateInput) => Promise<AgentLoopMutationResult>;
@@ -808,6 +812,37 @@ export function startDaemonControlServer({
       async () => clearAutomationAudit(),
     );
 
+    typed.post(
+      "/killswitch",
+      {
+        schema: {
+          body: z.object({
+            enabled: z.boolean(),
+          }),
+          response: {
+            200: z.object({
+              success: z.boolean(),
+              killed: z.boolean(),
+            }),
+          },
+        },
+      },
+      async (request) => setKillswitch(request.body.enabled),
+    );
+
+    typed.get(
+      "/killswitch",
+      {
+        schema: {
+          response: {
+            200: z.object({
+              killed: z.boolean(),
+            }),
+          },
+        },
+      },
+      async () => getKillswitch(),
+    );
 
     typed.post(
       "/loops",

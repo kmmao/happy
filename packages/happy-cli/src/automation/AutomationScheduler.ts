@@ -85,6 +85,7 @@ export interface AutomationSchedulerOptions {
   stopWaitMs?: number;
   runJob?: (job: AutomationJob) => Promise<AutomationRunResult>;
   onChange?: (jobs: AutomationJob[]) => void;
+  sendPushNotification?: (title: string, body: string) => void;
 }
 
 export class AutomationScheduler {
@@ -95,12 +96,14 @@ export class AutomationScheduler {
   private readonly stopWaitMs: number;
   private readonly runJob: (job: AutomationJob) => Promise<AutomationRunResult>;
   private readonly onChange?: (jobs: AutomationJob[]) => void;
+  private readonly sendPushNotification?: (title: string, body: string) => void;
   private readonly inFlight = new Set<string>();
   private readonly activeDispatches = new Set<Promise<void>>();
   private interval: NodeJS.Timeout | null = null;
   private loaded = false;
   private pumpInProgress = false;
   private stopped = false;
+  private _killed = false;
 
   constructor(options: AutomationSchedulerOptions) {
     this.store = options.store;
@@ -111,6 +114,7 @@ export class AutomationScheduler {
     this.runJob =
       options.runJob ?? ((job) => runAutomationJob(job, this.runnerDeps));
     this.onChange = options.onChange;
+    this.sendPushNotification = options.sendPushNotification;
   }
 
   async start(recoveredRunningSessionIds?: ReadonlySet<string>): Promise<AutomationRecoveryResult> {
@@ -120,6 +124,7 @@ export class AutomationScheduler {
     this.interval = setInterval(() => {
       void this.pump();
     }, this.pollIntervalMs);
+    if (this.interval) (this.interval as NodeJS.Timeout).unref?.();
     this.notifyChange();
     void this.pump();
     return recovery;
@@ -455,6 +460,14 @@ export class AutomationScheduler {
       logger.info(
         `[AUTOMATION] Recovered ${requeued} queued job(s) from previous daemon run`,
       );
+      try {
+        this.sendPushNotification?.(
+          "Automation Recovery",
+          `${requeued} task(s) re-queued after daemon restart`,
+        );
+      } catch {
+        // best-effort notification
+      }
     }
     if (reattachedRunning > 0) {
       logger.info(
@@ -484,8 +497,16 @@ export class AutomationScheduler {
       });
   }
 
+  get killed(): boolean {
+    return this._killed;
+  }
+
+  setKilled(value: boolean): void {
+    this._killed = value;
+  }
+
   private async pump(): Promise<void> {
-    if (this.stopped || this.pumpInProgress) {
+    if (this.stopped || this._killed || this.pumpInProgress) {
       return;
     }
     this.pumpInProgress = true;

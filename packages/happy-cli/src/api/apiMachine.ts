@@ -112,6 +112,20 @@ interface DaemonToServerEvents {
   }) => void;
   "supervisor-run-status": (data: SupervisorRunStatusData) => void;
   "supervisor-fix-status": (data: SupervisorFixStatusData) => void;
+  "transcript-knowledge": (data: {
+    turns: Array<{
+      sessionId: string;
+      entryType: string;
+      title: string;
+      content: string;
+      request?: string;
+      outcome?: string;
+      tags: string[];
+      confidence: string;
+      model?: string;
+      affectedFiles: string[];
+    }>;
+  }) => void;
 
 }
 
@@ -132,6 +146,8 @@ type MachineRpcHandlers = {
   clearAutomationJobs: () => Promise<AutomationMutationResult>;
   clearAutomationGuardians: (params?: { key?: string; sessionId?: string; clearAll?: boolean }) => Promise<{ success: boolean; errorMessage?: string }>;
   clearAutomationAudit: () => Promise<{ success: boolean; errorMessage?: string }>;
+  setKillswitch: (enabled: boolean) => Promise<{ success: boolean; killed: boolean }>;
+  getKillswitch: () => { killed: boolean };
   listAgentLoops: () => Promise<AgentLoopDefinition[]>;
   getAgentLoop: (loopId: string) => Promise<AgentLoopDefinition | undefined>;
   createAgentLoop: (input: AgentLoopCreateInput) => Promise<AgentLoopMutationResult>;
@@ -322,6 +338,8 @@ export class ApiMachineClient {
     clearAutomationJobs,
     clearAutomationGuardians,
     clearAutomationAudit,
+    setKillswitch,
+    getKillswitch,
     listAgentLoops,
     getAgentLoop,
     createAgentLoop,
@@ -452,6 +470,15 @@ export class ApiMachineClient {
 
     this.rpcHandlerManager.registerHandler("automation-audit-clear", async () => {
       return clearAutomationAudit();
+    });
+
+    this.rpcHandlerManager.registerHandler("killswitch-set", async (params: any) => {
+      const { enabled } = params || {};
+      return setKillswitch(Boolean(enabled));
+    });
+
+    this.rpcHandlerManager.registerHandler("killswitch-get", async () => {
+      return getKillswitch();
     });
 
     this.rpcHandlerManager.registerHandler("loop-list", async () => {
@@ -752,6 +779,45 @@ export class ApiMachineClient {
       return;
     }
     this.socket.emit("supervisor-fix-status", data);
+  }
+
+  /**
+   * Submit session transcript turns as knowledge entries.
+   * Reuses the existing "submit-knowledge" socket event.
+   * Fire-and-forget — server maps sessions to projects and stores entries.
+   */
+  emitTranscriptKnowledge(turns: Array<{
+    sessionId: string;
+    userMessage: string;
+    assistantText: string;
+    fileEdits: Array<{ path: string; type: string }>;
+    toolCallCount: number;
+    outputTokens: number;
+    model: string;
+  }>) {
+    if (!this.socket.connected) return;
+    const entries = turns.slice(0, 10).map((turn) => {
+      const text = `${turn.userMessage} ${turn.assistantText}`.toLowerCase();
+      const entryType = text.includes("fix") || text.includes("bug") ? "fix"
+        : text.includes("decision") || text.includes("选型") ? "decision"
+        : "discovery";
+      const firstLine = turn.userMessage.split("\n")[0].trim().slice(0, 200) || "Session activity";
+      return {
+        sessionId: turn.sessionId,
+        entryType,
+        title: firstLine,
+        content: turn.assistantText.slice(0, 2000),
+        request: turn.userMessage.slice(0, 500),
+        outcome: turn.fileEdits.length > 0
+          ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
+          : undefined,
+        tags: [...new Set(turn.fileEdits.map((f) => f.path.split(".").pop()).filter(Boolean))].slice(0, 10) as string[],
+        confidence: turn.outputTokens > 1000 ? "high" : "medium",
+        model: turn.model,
+        affectedFiles: turn.fileEdits.map((f) => f.path),
+      };
+    });
+    this.socket.emit("transcript-knowledge", { turns: entries });
   }
 
   private flushPendingFixStatuses() {

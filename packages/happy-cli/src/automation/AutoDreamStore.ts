@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { atomicFileWrite } from "@/utils/fileAtomic";
 
 export type AutoDreamProfileStatus = "idle" | "running" | "paused" | "failed";
-export type AutoDreamStage = "starting" | "updating";
+export type AutoDreamStage = "starting" | "scanning" | "analyzing" | "writing" | "updating";
 
 export interface AutoDreamProfile {
   id: string;

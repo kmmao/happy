@@ -8,6 +8,13 @@ import { allocateUserSeq } from "@/storage/seq";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { checkAndTriggerScheduledRuns } from "@/modules/supervisorScheduler";
 import { cleanupStaleFixActions } from "@/modules/supervisorFixWatchdog";
+import { pushSend } from "@/modules/pushSend";
+import { consolidate } from "@/modules/knowledgeConsolidate";
+import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
+import { inTx } from "@/storage/inTx";
+
+// Track last seen brief timestamp per machine to detect new briefs
+const lastBriefTimestamp = new Map<string, number>();
 
 // Throttle schedule checks to once per 5 minutes per machine
 const SCHEDULE_CHECK_INTERVAL = 5 * 60 * 1000;
@@ -251,6 +258,33 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 recipientFilter: { type: 'machine-scoped-only', machineId }
             });
 
+            // Check for new briefs and send push notifications
+            try {
+                const parsed = JSON.parse(daemonState);
+                const briefs = parsed?.recentBriefs;
+                if (Array.isArray(briefs) && briefs.length > 0) {
+                    const latestBrief = briefs[0];
+                    const lastSeen = lastBriefTimestamp.get(machineId) ?? 0;
+                    if (latestBrief.generatedAt > lastSeen) {
+                        lastBriefTimestamp.set(machineId, latestBrief.generatedAt);
+                        // Only push if this is genuinely new (not first load)
+                        if (lastSeen > 0) {
+                            void pushSend(userId, {
+                                title: `Loop Brief: ${latestBrief.loopName ?? latestBrief.loopId}`,
+                                body: latestBrief.summary,
+                                data: {
+                                    type: "loop_brief",
+                                    loopId: latestBrief.loopId,
+                                    status: latestBrief.status,
+                                },
+                            });
+                        }
+                    }
+                }
+            } catch {
+                // best-effort brief detection — don't fail the update
+            }
+
             // Send success response with new version
             callback({
                 result: 'success',
@@ -262,6 +296,70 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
             if (callback) {
                 callback({ result: 'error', message: 'Internal error' });
             }
+        }
+    });
+
+    // Handle transcript knowledge submissions from AutoDream
+    socket.on('transcript-knowledge', async (data: any) => {
+        try {
+            const turns = data?.turns;
+            if (!Array.isArray(turns) || turns.length === 0) return;
+
+            for (const turn of turns.slice(0, 10)) {
+                const sessionId = turn.sessionId;
+                if (!sessionId) continue;
+
+                // Map session to project
+                const session = await db.session.findFirst({
+                    where: { id: sessionId, accountId: userId },
+                    select: { projectId: true },
+                });
+                if (!session?.projectId) continue;
+
+                const projectId = session.projectId;
+                const action = await consolidate(projectId, {
+                    title: turn.title ?? "Session activity",
+                    entryType: turn.entryType ?? "discovery",
+                    tags: turn.tags ?? [],
+                    content: turn.content ?? "",
+                });
+
+                if (action.type === "noop") continue;
+
+                const created = await inTx(async (tx) => {
+                    if (action.type === "update" && action.existingId) {
+                        await tx.projectKnowledge.update({
+                            where: { id: action.existingId },
+                            data: { status: "superseded" },
+                        });
+                    }
+                    return tx.projectKnowledge.create({
+                        data: {
+                            projectId,
+                            entryType: turn.entryType ?? "discovery",
+                            contributorType: "auto-dream",
+                            action: action.type === "update" ? "supersede" : "create",
+                            title: turn.title ?? "Session activity",
+                            content: turn.content ?? "",
+                            structured: turn.request || turn.outcome
+                                ? JSON.stringify({ request: turn.request, outcome: turn.outcome })
+                                : null,
+                            tags: JSON.stringify(turn.tags ?? []),
+                            confidence: turn.confidence ?? "medium",
+                            model: turn.model ?? null,
+                            sessionId,
+                            affectedFiles: JSON.stringify(turn.affectedFiles ?? []),
+                            supersedesId: action.type === "update" ? action.existingId : null,
+                        },
+                    });
+                });
+
+                void storeKnowledgeEmbedding(created.id, turn.title ?? "", turn.content ?? "");
+            }
+
+            log({ module: 'knowledge' }, `Processed ${turns.length} transcript knowledge entries`);
+        } catch (error) {
+            log({ module: 'knowledge', level: 'error' }, `Error processing transcript knowledge: ${error}`);
         }
     });
 }

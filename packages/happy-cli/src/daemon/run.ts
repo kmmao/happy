@@ -1499,6 +1499,21 @@ export async function startDaemon(): Promise<void> {
             return { success: false, errorMessage: error instanceof Error ? error.message : String(error) };
           }
         },
+        setKillswitch: async (enabled: boolean) => {
+          agentLoopCoordinator?.setKilled(enabled);
+          automationScheduler?.setKilled(enabled);
+          // Persist killed state in daemon state
+          await apiMachine.updateDaemonState((state: DaemonState | null) => ({
+            ...state,
+            status: state?.status ?? "running",
+            killed: enabled,
+          }));
+          logger.debug(`[DAEMON RUN] Killswitch ${enabled ? "activated" : "deactivated"}`);
+          return { success: true, killed: enabled };
+        },
+        getKillswitch: () => ({
+          killed: agentLoopCoordinator?.killed ?? false,
+        }),
         listAgentLoops: async () => {
           return agentLoopCoordinator?.listLoops() ?? [];
         },
@@ -1820,6 +1835,20 @@ export async function startDaemon(): Promise<void> {
           return { success: false, errorMessage: error instanceof Error ? error.message : String(error) };
         }
       },
+      setKillswitch: async (enabled: boolean) => {
+        agentLoopCoordinator?.setKilled(enabled);
+        automationScheduler?.setKilled(enabled);
+        await apiMachine.updateDaemonState((state: DaemonState | null) => ({
+          ...state,
+          status: state?.status ?? "running",
+          killed: enabled,
+        }));
+        logger.debug(`[DAEMON RUN] Killswitch ${enabled ? "activated" : "deactivated"} (via socket)`);
+        return { success: true, killed: enabled };
+      },
+      getKillswitch: () => ({
+        killed: agentLoopCoordinator?.killed ?? false,
+      }),
       listAgentLoops: async () => {
         return agentLoopCoordinator?.listLoops() ?? [];
       },
@@ -1983,6 +2012,33 @@ export async function startDaemon(): Promise<void> {
     // Connect to server
     apiMachine.connect();
 
+    // Brief ring buffer — keeps last 20 briefs for DaemonState push
+    const MAX_RECENT_BRIEFS = 20;
+    const recentBriefs: Array<{
+      loopId: string;
+      loopName?: string;
+      status: "completed" | "failed" | "cancelled";
+      summary: string;
+      detail: string;
+      generatedAt: number;
+      sessionId?: string;
+    }> = [];
+    const addBrief = (brief: {
+      loopId: string;
+      loopName?: string;
+      status: "completed" | "failed" | "cancelled";
+      summary: string;
+      detail: string;
+      generatedAt: number;
+      sessionId?: string;
+    }) => {
+      recentBriefs.unshift(brief);
+      if (recentBriefs.length > MAX_RECENT_BRIEFS) {
+        recentBriefs.length = MAX_RECENT_BRIEFS;
+      }
+      scheduleAutomationStatePublish();
+    };
+
     let automationPublishTimer: NodeJS.Timeout | null = null;
     const publishAutomationState = async () => {
       try {
@@ -1990,6 +2046,7 @@ export async function startDaemon(): Promise<void> {
           ...state,
           status: state?.status ?? "running",
           automation: getAutomationStateSummary(),
+          recentBriefs: recentBriefs.length > 0 ? [...recentBriefs] : undefined,
         }));
       } catch (error) {
         logger.debug("[DAEMON RUN] Failed to publish automation state", error);
@@ -2223,6 +2280,7 @@ export async function startDaemon(): Promise<void> {
           logger.debug(`[DAEMON RUN] Failed to send loop push notification: ${error instanceof Error ? error.message : String(error)}`);
         }
       },
+      onBriefGenerated: (brief) => addBrief(brief),
     });
     await agentLoopCoordinator.start();
     const agentLoopBootstrapStore = new AgentLoopBootstrapStore(
@@ -2240,6 +2298,9 @@ export async function startDaemon(): Promise<void> {
     autoDreamCoordinator = new AutoDreamCoordinator({
       store: autoDreamStore,
       onChange: () => scheduleAutomationStatePublish(),
+      onTranscriptsFound: (turns) => {
+        try { apiMachine.emitTranscriptKnowledge(turns); } catch { /* best-effort */ }
+      },
     });
     await autoDreamCoordinator.start();
     scheduleAutomationStatePublish();
@@ -2493,6 +2554,9 @@ export async function startDaemon(): Promise<void> {
 
       heartbeatRunning = false;
     }, heartbeatIntervalMs); // Every 60 seconds in production
+    if (restartOnStaleVersionAndHeartbeat) {
+      (restartOnStaleVersionAndHeartbeat as NodeJS.Timeout).unref?.();
+    }
 
     // Setup signal handlers
     const cleanupAndShutdown = async (
@@ -2524,16 +2588,45 @@ export async function startDaemon(): Promise<void> {
         clearTimeout(automationPublishTimer);
         automationPublishTimer = null;
       }
-      await agentLoopFileWatcher?.stop();
-      await agentLoopBootstrapCoordinator?.stop();
-      await agentLoopCoordinator?.stop();
-      await automationScheduler?.stop();
 
-      apiMachine.shutdown();
-      await stopControlServer();
-      await cleanupDaemonState();
-      await stopCaffeinate();
-      await releaseDaemonLock(daemonLockHandle);
+      // Cleanup with Promise.allSettled to prevent one failure from blocking others
+      const logRejected = (label: string, results: PromiseSettledResult<unknown>[]) => {
+        for (const r of results) {
+          if (r.status === "rejected") {
+            logger.warn(`[DAEMON RUN] ${label} cleanup failed:`, r.reason);
+          }
+        }
+      };
+
+      await Promise.race([
+        (async () => {
+          // Group 1: Stop automation subsystems (independent, safe to parallelize)
+          const group1 = await Promise.allSettled([
+            agentLoopFileWatcher?.stop(),
+            agentLoopBootstrapCoordinator?.stop(),
+            agentLoopCoordinator?.stop(),
+            automationScheduler?.stop(),
+          ]);
+          logRejected("automation", group1);
+
+          // Synchronous shutdown - wrap in try-catch
+          try {
+            apiMachine.shutdown();
+          } catch (e) {
+            logger.warn("[DAEMON RUN] apiMachine shutdown failed:", e);
+          }
+
+          // Group 2: Infrastructure cleanup (independent, safe to parallelize)
+          const group2 = await Promise.allSettled([
+            stopControlServer(),
+            cleanupDaemonState(),
+            stopCaffeinate(),
+            releaseDaemonLock(daemonLockHandle),
+          ]);
+          logRejected("infrastructure", group2);
+        })(),
+        new Promise<void>((resolve) => setTimeout(resolve, 10_000)), // 10s total timeout
+      ]);
 
       logger.debug("[DAEMON RUN] Cleanup completed, exiting process");
       process.exit(0);

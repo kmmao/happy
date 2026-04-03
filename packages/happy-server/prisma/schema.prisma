@@ -657,7 +657,8 @@ model ProjectKnowledge {
 
     // Classification
     entryType       String   // discovery | decision | fix | convention | warning
-    contributorType String   // session | supervisor | user
+    category        String?  // user | feedback | project | reference (Claude Code 4-type taxonomy)
+    contributorType String   // session | supervisor | user | auto-dream
     action          String   // create | amend | supersede | verify
     status          String   @default("active") // active | superseded | archived
 
@@ -698,6 +699,7 @@ model ProjectKnowledge {
 
     @@index([projectId, status])
     @@index([projectId, entryType])
+    @@index([projectId, category])
     @@index([projectId, createdAt])
     @@index([projectId, status, lastAccessedAt])
 }

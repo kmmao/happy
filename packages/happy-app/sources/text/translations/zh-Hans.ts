@@ -1550,8 +1550,11 @@ export const zhHans: TranslationStructure = {
     automationSessionReattachedCount: "重附着会话数",
     automationGuardianRecoveryNeeded: "需要恢复 Guardian",
     automationGuardianRecoveryNeededMessage: "部分 Guardian 会话来自此前守护进程状态的持久化数据，当前尚未附着。",
+    automationEmergencyStop: "紧急停止",
+    automationResume: "恢复自动化",
     automationAnomaliesDetected: "检测到自动化异常",
 
+    agentLoopBriefs: "最近简报",
     agentLoops: "Agent Loops",
     agentLoopsViewAll: "管理 Agent Loops",
     agentLoopsViewAllHint: "创建、暂停、恢复并立即运行自治循环",
@@ -1568,6 +1571,7 @@ export const zhHans: TranslationStructure = {
     agentLoopAdvancedShow: "显示高级选项",
     agentLoopAdvancedHide: "隐藏高级选项",
     agentLoopEnvironment: "环境变量",
+    agentLoopCronExpression: "Cron 表达式（可选，覆盖间隔）",
     agentLoopEnvironmentPlaceholder: "FOO=bar\nBAZ=qux",
     agentLoopEnvironmentInvalid: "环境变量必须按每行 KEY=value 填写",
 

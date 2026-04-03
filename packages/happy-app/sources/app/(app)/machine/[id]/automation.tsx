@@ -7,12 +7,14 @@ import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
 import { Modal } from "@/modal";
-import type {
-    MachineAutomationAuditEvent,
-    MachineAutomationGuardian,
-    MachineAutomationGuardianUsage,
-    MachineAutomationJob,
+import {
+    machineSetKillswitch,
+    type MachineAutomationAuditEvent,
+    type MachineAutomationGuardian,
+    type MachineAutomationGuardianUsage,
+    type MachineAutomationJob,
 } from "@/sync/ops";
+import { useMachine } from "@/sync/storage";
 import { t } from "@/text";
 import {
     type AuditFilter,
@@ -71,6 +73,17 @@ export default React.memo(function MachineAutomationPage() {
     }>();
     const router = useRouter();
     const { theme } = useUnistyles();
+    const machine = useMachine(typeof machineId === "string" ? machineId : "");
+    const isKilled = Boolean(machine?.daemonState?.killed);
+
+    const toggleKillswitch = React.useCallback(async () => {
+        if (typeof machineId !== "string") return;
+        try {
+            await machineSetKillswitch(machineId, !isKilled);
+        } catch {
+            // best-effort
+        }
+    }, [machineId, isKilled]);
 
     const data = useAutomationData({
         machineId,
@@ -258,6 +271,24 @@ export default React.memo(function MachineAutomationPage() {
                     <Text style={styles.rpcNoticeTitle}>{t("status.connecting")}</Text>
                     <Text style={styles.rpcNoticeText}>{t("machine.automationViewAllHint")}</Text>
                 </View>
+            ) : null}
+            {data.rpcReady ? (
+                <Pressable
+                    style={[
+                        styles.killswitchButton,
+                        { backgroundColor: isKilled ? theme.colors.success : theme.colors.deleteAction },
+                    ]}
+                    onPress={toggleKillswitch}
+                >
+                    <Ionicons
+                        name={isKilled ? "play-circle" : "stop-circle"}
+                        size={20}
+                        color="#fff"
+                    />
+                    <Text style={styles.killswitchText}>
+                        {isKilled ? t("machine.automationResume") : t("machine.automationEmergencyStop")}
+                    </Text>
+                </Pressable>
             ) : null}
             <View style={styles.filterPanel}>
                 <Pressable

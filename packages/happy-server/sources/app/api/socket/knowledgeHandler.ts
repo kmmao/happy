@@ -253,6 +253,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 entries: entries.map((e) => ({
                     id: e.id,
                     entryType: e.entryType,
+                    category: e.category,
                     title: e.title,
                     content: e.content,
                     tags: safeParseJsonArray(e.tags),

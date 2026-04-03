@@ -258,7 +258,7 @@ export const LoopAutomationSection = React.memo(function LoopAutomationSection(p
                             key={profile.id}
                             title={profile.name || profile.id}
                             subtitle={getAutoDreamProfileSubtitle(profile)}
-                            detail={profile.status}
+                            detail={profile.status === "running" ? `${profile.status} (${profile.stage})` : profile.status}
                             detailStyle={{ color: getAutoDreamProfileStatusColor(profile, theme) }}
                             icon={<Ionicons name="moon-outline" size={20} color={getAutoDreamProfileStatusColor(profile, theme)} />}
                             onPress={() => openAutoDreamProfileActions(profile)}
