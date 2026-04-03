@@ -203,6 +203,18 @@ export const AutomationStateSchema = z.object({
 
 export type AutomationState = z.infer<typeof AutomationStateSchema>;
 
+export const BriefMessageSchema = z.object({
+  loopId: z.string(),
+  loopName: z.string().optional(),
+  status: z.enum(["completed", "failed", "cancelled"]),
+  summary: z.string(),
+  detail: z.string(),
+  generatedAt: z.number(),
+  sessionId: z.string().optional(),
+});
+
+export type BriefMessage = z.infer<typeof BriefMessageSchema>;
+
 export const DaemonStateSchema = z.object({
   status: z.union([
     z.enum(["running", "shutting-down"]),
@@ -223,6 +235,8 @@ export const DaemonStateSchema = z.object({
   tailscale: TailscaleInfoSchema.optional(),
   tunnels: TunnelStateSchema.optional(),
   automation: AutomationStateSchema.optional(),
+  recentBriefs: z.array(BriefMessageSchema).optional(),
+  killed: z.boolean().optional(),
 });
 
 export type DaemonState = z.infer<typeof DaemonStateSchema>;
