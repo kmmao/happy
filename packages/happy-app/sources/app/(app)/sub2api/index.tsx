@@ -21,9 +21,14 @@ import type { UsageProgress } from "@/sub2api";
 
 function formatRemainingTime(seconds: number): string {
     if (seconds <= 0) return t("sub2api.expired");
-    const h = Math.floor(seconds / 3600);
+    const totalHours = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
-    if (h > 0) return `${h}h ${m}m`;
+    if (totalHours >= 24) {
+        const d = Math.floor(totalHours / 24);
+        const h = totalHours % 24;
+        return h > 0 ? `${d}d ${h}h` : `${d}d`;
+    }
+    if (totalHours > 0) return m > 0 ? `${totalHours}h ${m}m` : `${totalHours}h`;
     return `${m}m`;
 }
 
