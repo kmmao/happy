@@ -51,6 +51,7 @@ export class KnowledgeClient {
       try {
         const body = {
           entryType: this.inferEntryType(turn),
+          category: this.inferCategory(turn),
           contributorType: "session",
           action: "create",
           title: this.generateTitle(turn),
@@ -156,6 +157,30 @@ export class KnowledgeClient {
     }
 
     return parts.join("\n");
+  }
+
+  /**
+   * Infer knowledge category from turn content.
+   * Categories: user (preferences/role), feedback (corrections/guidance),
+   * project (goals/decisions/architecture), reference (external pointers).
+   */
+  private inferCategory(turn: TurnData): string {
+    const text = `${turn.userMessage} ${turn.assistantText}`.toLowerCase();
+
+    // Feedback: corrections, style guidance, approach preferences
+    const feedbackSignals = ["don't", "stop", "不要", "别", "改成", "换成", "prefer", "instead", "should be", "wrong", "纠正", "错了"];
+    if (feedbackSignals.some((s) => text.includes(s)) && turn.fileEdits.length === 0) return "feedback";
+
+    // Reference: URLs, docs, external resources
+    const refSignals = ["http://", "https://", "docs.", "文档", "参考", "reference", "documentation", "readme", "wiki"];
+    if (refSignals.some((s) => text.includes(s)) && turn.fileEdits.length === 0) return "reference";
+
+    // User: role, preferences, environment info
+    const userSignals = ["i am", "i'm", "我是", "my setup", "my environment", "我的", "偏好", "preference", "workflow"];
+    if (userSignals.some((s) => text.includes(s)) && turn.fileEdits.length === 0) return "user";
+
+    // Default: project knowledge (code changes, discoveries, decisions)
+    return "project";
   }
 
   private inferEntryType(turn: TurnData): string {

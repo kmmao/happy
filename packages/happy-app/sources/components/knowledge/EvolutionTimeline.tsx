@@ -39,10 +39,11 @@ const RELATION_COLORS: Record<string, string> = {
     combines: "#22C55E",
 };
 
-function getRelationInfo(
+function getRelationInfoList(
     entryId: string,
     relations: ChainRelation[],
-): { label: string; color: string } | null {
+): Array<{ label: string; color: string }> {
+    const results: Array<{ label: string; color: string }> = [];
     for (const rel of relations) {
         if (rel.from === entryId) {
             const label = (() => {
@@ -59,10 +60,26 @@ function getRelationInfo(
                         return t("projects.knowledgeEvolutionRelated");
                 }
             })();
-            return { label, color: RELATION_COLORS[rel.type] ?? "#3B82F6" };
+            results.push({ label, color: RELATION_COLORS[rel.type] ?? "#3B82F6" });
+        } else if (rel.to === entryId) {
+            const label = (() => {
+                switch (rel.type) {
+                    case "supersedes":
+                        return t("projects.knowledgeEvolutionSupersededBy");
+                    case "contradicts":
+                        return t("projects.knowledgeEvolutionContradictedBy");
+                    case "refines":
+                        return t("projects.knowledgeEvolutionRefinedBy");
+                    case "combines":
+                        return t("projects.knowledgeEvolutionCombinedFrom");
+                    default:
+                        return t("projects.knowledgeEvolutionRelated");
+                }
+            })();
+            results.push({ label, color: RELATION_COLORS[rel.type] ?? "#3B82F6" });
         }
     }
-    return null;
+    return results;
 }
 
 export const EvolutionTimeline = React.memo<EvolutionTimelineProps>(
@@ -75,7 +92,7 @@ export const EvolutionTimeline = React.memo<EvolutionTimelineProps>(
                     const isCurrent = entry.id === currentEntryId;
                     const isLast = index === chain.length - 1;
                     const typeColor = TYPE_COLORS[entry.entryType] ?? theme.colors.textSecondary;
-                    const relationInfo = getRelationInfo(entry.id, relations);
+                    const relationInfoList = getRelationInfoList(entry.id, relations);
 
                     return (
                         <View key={entry.id} style={styles.nodeRow}>
@@ -120,7 +137,7 @@ export const EvolutionTimeline = React.memo<EvolutionTimelineProps>(
                                     },
                                 ]}
                             >
-                                {/* Header: type badge + current marker */}
+                                {/* Header: type badge + current marker + relation badges */}
                                 <View style={styles.nodeHeader}>
                                     <View style={[styles.typeBadge, { backgroundColor: typeColor + "20" }]}>
                                         <Text style={[styles.typeBadgeText, { color: typeColor }]}>
@@ -135,13 +152,13 @@ export const EvolutionTimeline = React.memo<EvolutionTimelineProps>(
                                             </Text>
                                         </View>
                                     )}
-                                    {relationInfo && (
-                                        <View style={[styles.relationBadge, { backgroundColor: relationInfo.color + "20" }]}>
-                                            <Text style={[styles.relationBadgeText, { color: relationInfo.color }]}>
-                                                {relationInfo.label}
+                                    {relationInfoList.map((ri, idx) => (
+                                        <View key={idx} style={[styles.relationBadge, { backgroundColor: ri.color + "20" }]}>
+                                            <Text style={[styles.relationBadgeText, { color: ri.color }]}>
+                                                {ri.label}
                                             </Text>
                                         </View>
-                                    )}
+                                    ))}
                                 </View>
 
                                 {/* Title */}

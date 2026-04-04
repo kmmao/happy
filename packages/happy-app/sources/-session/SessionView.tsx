@@ -20,6 +20,7 @@ import { ChatList, ChatListHandle } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
 import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
 import { OptionsPopover } from "@/components/OptionsPopover";
+import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
 import { EmptyMessages } from "@/components/EmptyMessages";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
@@ -53,6 +54,7 @@ import {
   useSessionUsage,
   useSessionContextUsage,
   useSessionKnowledgeCount,
+  useProjectForSession,
   useSetting,
 } from "@/sync/storage";
 import { Session } from "@/sync/storageTypes";
@@ -122,6 +124,8 @@ export const SessionView = React.memo((props: { id: string }) => {
   const realtimeStatus = useRealtimeStatus();
   const isTablet = useIsTablet();
   const knowledgeCount = useSessionKnowledgeCount(sessionId);
+  const sessionProject = useProjectForSession(sessionId);
+  const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
 
   const showAgentActivity = useSetting("showAgentActivity");
 
@@ -233,6 +237,7 @@ export const SessionView = React.memo((props: { id: string }) => {
           <ChatHeaderView
             {...headerProps}
             knowledgeCount={knowledgeCount}
+            onKnowledgePress={knowledgeCount > 0 ? () => setShowKnowledgeSheet(true) : undefined}
             onBackPress={() => router.back()}
             onRefreshPress={() => sync.refreshSession(sessionId)}
             onPreviewPress={
@@ -318,6 +323,12 @@ export const SessionView = React.memo((props: { id: string }) => {
           />
         )}
       </View>
+      <SessionKnowledgeSheet
+        visible={showKnowledgeSheet}
+        onClose={() => setShowKnowledgeSheet(false)}
+        projectServerId={sessionProject?.serverId ?? undefined}
+        sessionId={sessionId}
+      />
     </>
   );
 });

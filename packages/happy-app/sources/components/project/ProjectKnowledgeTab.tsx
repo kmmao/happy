@@ -19,7 +19,7 @@ interface ProjectKnowledgeTabProps {
     isActive: boolean;
 }
 
-const FILTER_KEYS = ["all", "discovery", "decision", "fix", "convention", "warning", "archived"] as const;
+const FILTER_KEYS = ["all", "discovery", "decision", "fix", "convention", "warning", "has-evolution", "superseded", "archived"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
 const CATEGORY_KEYS = ["all", "user", "feedback", "project", "reference"] as const;
@@ -39,6 +39,10 @@ function filterLabel(key: FilterKey): string {
             return t("projects.knowledgeFilterConvention");
         case "warning":
             return t("projects.knowledgeFilterWarning");
+        case "has-evolution":
+            return t("projects.knowledgeFilterHasEvolution");
+        case "superseded":
+            return t("projects.knowledgeFilterSuperseded");
         case "archived":
             return t("projects.knowledgeFilterArchived");
     }
@@ -70,11 +74,15 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
         const {
             entries,
             archivedEntries,
+            supersededEntries,
             profile,
             loading,
+            loadingMore,
+            hasMore,
             lastRefreshAt,
             refresh,
             refreshIfStale,
+            loadMore,
             updateEntry,
             deleteEntry,
             refineEntry,
@@ -171,20 +179,32 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
         );
 
         const isArchivedFilter = activeFilter === "archived";
+        const isSupersededFilter = activeFilter === "superseded";
+        const isEvolutionFilter = activeFilter === "has-evolution";
 
         const filteredEntries = React.useMemo(() => {
             if (isArchivedFilter) {
                 return archivedEntries;
             }
+            if (isSupersededFilter) {
+                return supersededEntries;
+            }
             let result = entries;
-            if (activeFilter !== "all") {
+            if (isEvolutionFilter) {
+                result = result.filter((e) => (e.evolutionSize ?? 0) > 1);
+            } else if (activeFilter !== "all") {
                 result = result.filter((e) => e.entryType === activeFilter);
             }
             if (activeCategory !== "all") {
                 result = result.filter((e) => e.category === activeCategory);
             }
             return result;
-        }, [entries, archivedEntries, activeFilter, activeCategory, isArchivedFilter]);
+        }, [entries, archivedEntries, supersededEntries, activeFilter, activeCategory, isArchivedFilter, isSupersededFilter, isEvolutionFilter]);
+
+        const hasCategories = React.useMemo(
+            () => entries.some((e) => e.category != null),
+            [entries],
+        );
 
         const renderItem = React.useCallback(
             ({ item }: { item: (typeof entries)[number] }) => (
@@ -242,38 +262,38 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                                 </Text>
                             </View>
                             <View style={styles.lifecycleStats}>
-                                <View style={styles.lifecycleStat}>
+                                <Pressable style={styles.lifecycleStat} onPress={() => setActiveFilter("all")}>
                                     <Text style={[styles.lifecycleStatValue, { color: theme.colors.success }]}>
                                         {lifecycleStats.active}
                                     </Text>
                                     <Text style={[styles.lifecycleStatLabel, { color: theme.colors.textSecondary }]}>
                                         {t("projects.knowledgeLifecycleActive")}
                                     </Text>
-                                </View>
-                                <View style={styles.lifecycleStat}>
+                                </Pressable>
+                                <Pressable style={styles.lifecycleStat} onPress={() => setActiveFilter("superseded")}>
                                     <Text style={[styles.lifecycleStatValue, { color: theme.colors.accentOrange }]}>
                                         {lifecycleStats.superseded}
                                     </Text>
                                     <Text style={[styles.lifecycleStatLabel, { color: theme.colors.textSecondary }]}>
                                         {t("projects.knowledgeLifecycleSuperseded")}
                                     </Text>
-                                </View>
-                                <View style={styles.lifecycleStat}>
+                                </Pressable>
+                                <Pressable style={styles.lifecycleStat} onPress={() => setActiveFilter("archived")}>
                                     <Text style={[styles.lifecycleStatValue, { color: theme.colors.textSecondary }]}>
                                         {lifecycleStats.archived}
                                     </Text>
                                     <Text style={[styles.lifecycleStatLabel, { color: theme.colors.textSecondary }]}>
                                         {t("projects.knowledgeLifecycleArchived")}
                                     </Text>
-                                </View>
-                                <View style={styles.lifecycleStat}>
+                                </Pressable>
+                                <Pressable style={styles.lifecycleStat} onPress={() => setActiveFilter("has-evolution")}>
                                     <Text style={[styles.lifecycleStatValue, { color: theme.colors.accentPurple }]}>
                                         {lifecycleStats.totalRelations}
                                     </Text>
                                     <Text style={[styles.lifecycleStatLabel, { color: theme.colors.textSecondary }]}>
                                         {t("projects.knowledgeLifecycleRelations")}
                                     </Text>
-                                </View>
+                                </Pressable>
                             </View>
                             <View style={styles.lifecycleActions}>
                                 {decayEnabled && (
@@ -342,8 +362,8 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                             );
                         })}
                     </View>
-                    {/* Category filter bar */}
-                    <View style={styles.filterRow}>
+                    {/* Category filter bar — hidden when no entries have categories */}
+                    {hasCategories && <View style={styles.filterRow}>
                         {CATEGORY_KEYS.map((key) => {
                             const isCatActive = activeCategory === key;
                             return (
@@ -374,7 +394,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                                 </Pressable>
                             );
                         })}
-                    </View>
+                    </View>}
                     {/* Refresh status bar */}
                     <View style={styles.refreshBar}>
                         <Text style={[styles.refreshText, { color: theme.colors.textSecondary }]}>
@@ -395,7 +415,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                     </View>
                 </View>
             ),
-            [profile, activeFilter, theme, refreshStatusText, refreshing, loading, showLifecycle, lifecycleStats, decayEnabled, mergeEnabled, decaying, merging, knowledgeConfig, configIsCustomized, configSaving, updateConfig, resetConfig],
+            [profile, activeFilter, activeCategory, hasCategories, theme, refreshStatusText, refreshing, loading, showLifecycle, lifecycleStats, decayEnabled, mergeEnabled, decaying, merging, doDecay, doMerge, doRefresh, doRegenerate, regenerating, knowledgeConfig, configIsCustomized, configSaving, updateConfig, resetConfig],
         );
 
         const EmptyComponent = React.useMemo(
@@ -417,6 +437,23 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             [theme],
         );
 
+        const isActiveList = activeFilter !== "archived" && activeFilter !== "superseded";
+
+        const handleEndReached = React.useCallback(() => {
+            if (isActiveList && hasMore && !loadingMore) {
+                void loadMore();
+            }
+        }, [isActiveList, hasMore, loadingMore, loadMore]);
+
+        const ListFooter = React.useMemo(() => {
+            if (!isActiveList || !loadingMore) return null;
+            return (
+                <View style={styles.footerLoader}>
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                </View>
+            );
+        }, [isActiveList, loadingMore, theme]);
+
         return (
             <FlatList
                 data={filteredEntries}
@@ -424,11 +461,14 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                 keyExtractor={keyExtractor}
                 ListHeaderComponent={ListHeader}
                 ListEmptyComponent={!loading ? EmptyComponent : null}
+                ListFooterComponent={ListFooter}
                 contentContainerStyle={styles.listContent}
                 style={styles.list}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={doRefresh} />
                 }
+                onEndReached={handleEndReached}
+                onEndReachedThreshold={0.3}
             />
         );
     },
@@ -443,6 +483,10 @@ const styles = StyleSheet.create((theme) => ({
         maxWidth: layout.maxWidth,
         alignSelf: "center",
         width: "100%",
+    },
+    footerLoader: {
+        paddingVertical: 16,
+        alignItems: "center",
     },
     filterRow: {
         flexDirection: "row",

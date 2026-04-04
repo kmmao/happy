@@ -34,6 +34,7 @@ interface KnowledgeEntry {
     sessionId: string | null;
     pinned: boolean;
     createdAt: number;
+    evolutionSize?: number;
 }
 
 interface ProjectProfile {
@@ -74,13 +75,39 @@ function authHeaders(token: string) {
     };
 }
 
+const PAGE_SIZE = 30;
+
 export function useProjectKnowledge(projectServerId: string | undefined) {
     const [entries, setEntries] = React.useState<KnowledgeEntry[]>([]);
     const [archivedEntries, setArchivedEntries] = React.useState<KnowledgeEntry[]>([]);
+    const [supersededEntries, setSupersededEntries] = React.useState<KnowledgeEntry[]>([]);
     const [profile, setProfile] = React.useState<ProjectProfile | null>(null);
     const [loading, setLoading] = React.useState(false);
+    const [loadingMore, setLoadingMore] = React.useState(false);
+    const [hasMore, setHasMore] = React.useState(false);
     const [lastRefreshAt, setLastRefreshAt] = React.useState<number | null>(null);
     const lastRefreshAtRef = React.useRef<number | null>(null);
+    const totalRef = React.useRef(0);
+
+    const fetchPage = React.useCallback(async (
+        headers: Record<string, string>,
+        apiEndpoint: string,
+        status?: string,
+        offset = 0,
+        limit = PAGE_SIZE,
+    ): Promise<KnowledgeListResponse | null> => {
+        if (!projectServerId) return null;
+        const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+        if (status) params.set("status", status);
+        return backoff(async () => {
+            const response = await fetch(
+                `${apiEndpoint}/v1/projects/${projectServerId}/knowledge?${params}`,
+                { headers },
+            );
+            if (!response.ok) throw new Error(`Failed to fetch knowledge: ${response.status}`);
+            return (await response.json()) as KnowledgeListResponse;
+        }).catch(() => null);
+    }, [projectServerId]);
 
     const refresh = React.useCallback(async () => {
         if (!projectServerId) return;
@@ -92,50 +119,30 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
 
         setLoading(true);
         try {
-            const [knowledgeResult, archivedResult, profileResult] = await Promise.all([
-                backoff(async () => {
-                    const response = await fetch(
-                        `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge`,
-                        { headers },
-                    );
-                    if (!response.ok) {
-                        throw new Error(
-                            `Failed to fetch knowledge: ${response.status}`,
-                        );
-                    }
-                    return (await response.json()) as KnowledgeListResponse;
-                }).catch(() => null),
-                backoff(async () => {
-                    const response = await fetch(
-                        `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge?status=archived`,
-                        { headers },
-                    );
-                    if (!response.ok) {
-                        throw new Error(
-                            `Failed to fetch archived knowledge: ${response.status}`,
-                        );
-                    }
-                    return (await response.json()) as KnowledgeListResponse;
-                }).catch(() => null),
+            const [knowledgeResult, archivedResult, supersededResult, profileResult] = await Promise.all([
+                fetchPage(headers, API_ENDPOINT, undefined, 0, PAGE_SIZE),
+                fetchPage(headers, API_ENDPOINT, "archived", 0, PAGE_SIZE),
+                fetchPage(headers, API_ENDPOINT, "superseded", 0, PAGE_SIZE),
                 backoff(async () => {
                     const response = await fetch(
                         `${API_ENDPOINT}/v1/projects/${projectServerId}/profile`,
                         { headers },
                     );
-                    if (!response.ok) {
-                        throw new Error(
-                            `Failed to fetch profile: ${response.status}`,
-                        );
-                    }
+                    if (!response.ok) throw new Error(`Failed to fetch profile: ${response.status}`);
                     return (await response.json()) as ProfileResponse;
                 }).catch(() => null),
             ]);
 
             if (knowledgeResult) {
                 setEntries(knowledgeResult.entries);
+                totalRef.current = knowledgeResult.total;
+                setHasMore(knowledgeResult.entries.length < knowledgeResult.total);
             }
             if (archivedResult) {
                 setArchivedEntries(archivedResult.entries);
+            }
+            if (supersededResult) {
+                setSupersededEntries(supersededResult.entries);
             }
             if (profileResult) {
                 setProfile(profileResult.profile);
@@ -148,7 +155,29 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         } finally {
             setLoading(false);
         }
-    }, [projectServerId]);
+    }, [projectServerId, fetchPage]);
+
+    const loadMore = React.useCallback(async () => {
+        if (!projectServerId || loadingMore || !hasMore) return;
+        const credentials = await TokenStorage.getCredentials();
+        if (!credentials) return;
+
+        const API_ENDPOINT = getServerUrl();
+        const headers = authHeaders(credentials.token);
+        const offset = entries.length;
+
+        setLoadingMore(true);
+        try {
+            const result = await fetchPage(headers, API_ENDPOINT, undefined, offset, PAGE_SIZE);
+            if (result) {
+                setEntries((prev) => [...prev, ...result.entries]);
+                totalRef.current = result.total;
+                setHasMore(offset + result.entries.length < result.total);
+            }
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [projectServerId, loadingMore, hasMore, entries.length, fetchPage]);
 
     const updateEntry = React.useCallback(
         async (
@@ -404,5 +433,5 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         return result;
     }, [projectServerId, refresh]);
 
-    return { entries, archivedEntries, profile, loading, lastRefreshAt, refresh, refreshIfStale, updateEntry, deleteEntry, refineEntry, search, regenerateProfile, fetchLifecycle, runDecay, runMerge };
+    return { entries, archivedEntries, supersededEntries, profile, loading, loadingMore, hasMore, lastRefreshAt, refresh, refreshIfStale, loadMore, updateEntry, deleteEntry, refineEntry, search, regenerateProfile, fetchLifecycle, runDecay, runMerge };
 }

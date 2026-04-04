@@ -26,6 +26,7 @@ interface KnowledgeEntryCardProps {
         sessionId: string | null;
         pinned: boolean;
         createdAt: number;
+        evolutionSize?: number;
     };
     onUpdate: (entryId: string, data: { status?: string; pinned?: boolean }) => void;
     onDelete?: (entryId: string) => void;
@@ -418,7 +419,7 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
                                         {t("projects.knowledgeArchive")}
                                     </Text>
                                 </Pressable>
-                                {onViewEvolution && (
+                                {onViewEvolution && (entry.evolutionSize == null || entry.evolutionSize > 1) && (
                                     <Pressable
                                         onPress={() => onViewEvolution(entry.id)}
                                         style={styles.actionButton}
@@ -427,11 +428,18 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
                                         <Ionicons
                                             name="git-branch-outline"
                                             size={18}
-                                            color={theme.colors.textSecondary}
+                                            color={entry.evolutionSize != null && entry.evolutionSize > 1 ? theme.colors.primary : theme.colors.textSecondary}
                                         />
-                                        <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
+                                        <Text style={[styles.actionText, { color: entry.evolutionSize != null && entry.evolutionSize > 1 ? theme.colors.primary : theme.colors.textSecondary }]}>
                                             {t("projects.knowledgeViewEvolution")}
                                         </Text>
+                                        {entry.evolutionSize != null && entry.evolutionSize > 1 && (
+                                            <View style={[styles.evolutionBadge, { backgroundColor: theme.colors.primary + "20" }]}>
+                                                <Text style={[styles.evolutionBadgeText, { color: theme.colors.primary }]}>
+                                                    {entry.evolutionSize}
+                                                </Text>
+                                            </View>
+                                        )}
                                     </Pressable>
                                 )}
                                 {onRefine && (
@@ -580,5 +588,16 @@ const styles = StyleSheet.create((theme) => ({
     actionText: {
         ...Typography.default("regular"),
         fontSize: 12,
+    },
+    evolutionBadge: {
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 8,
+        minWidth: 18,
+        alignItems: "center",
+    },
+    evolutionBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 10,
     },
 }));

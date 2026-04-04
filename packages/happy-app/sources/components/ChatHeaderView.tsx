@@ -28,6 +28,7 @@ interface ChatHeaderViewProps {
   flavor?: string | null;
   provider?: string | null;
   knowledgeCount?: number;
+  onKnowledgePress?: () => void;
   devButtonState?: DevButtonState;
   devRunningCount?: number;
   devTotalCount?: number;
@@ -48,6 +49,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   flavor,
   provider,
   knowledgeCount,
+  onKnowledgePress,
   devButtonState,
   devRunningCount,
   devTotalCount,
@@ -167,12 +169,16 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
           </View>
 
           {knowledgeCount != null && knowledgeCount > 0 && (
-            <View style={[styles.knowledgeBadge, { backgroundColor: theme.colors.primary + "20" }]}>
+            <Pressable
+              style={[styles.knowledgeBadge, { backgroundColor: theme.colors.primary + "20" }]}
+              onPress={onKnowledgePress}
+              hitSlop={6}
+            >
               <Ionicons name="bulb-outline" size={11} color={theme.colors.primary} />
               <Text style={[styles.knowledgeBadgeText, { color: theme.colors.primary }]}>
                 {knowledgeCount}
               </Text>
-            </View>
+            </Pressable>
           )}
 
           {devButtonState && devButtonState !== "hidden" && onDevPress && (
