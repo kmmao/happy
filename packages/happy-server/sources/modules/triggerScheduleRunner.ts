@@ -7,6 +7,8 @@ import {
 } from "@/app/events/eventRouter";
 import { CronExpressionParser } from "cron-parser";
 
+const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "cancelled"]);
+
 /**
  * Compute next run time from a cron expression, starting after `currentDate`.
  */
@@ -46,6 +48,21 @@ export async function checkAndTriggerSchedules(
     for (const schedule of dueSchedules) {
         try {
             if (!schedule.nextRunAt) continue;
+
+            // Skip if the last task from this schedule is still in progress
+            if (schedule.lastTaskId) {
+                const lastTask = await db.task.findUnique({
+                    where: { id: schedule.lastTaskId },
+                    select: { status: true },
+                });
+                if (lastTask && !TERMINAL_TASK_STATUSES.has(lastTask.status)) {
+                    log(
+                        { module: "trigger" },
+                        `Skipping schedule ${schedule.id}: last task ${schedule.lastTaskId} still ${lastTask.status}`,
+                    );
+                    continue;
+                }
+            }
 
             const nextRunAt = computeNextRunAt(schedule.cronExpression, now);
             if (!nextRunAt) {
