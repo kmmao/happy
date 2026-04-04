@@ -329,6 +329,41 @@ export const ApiEphemeralTaskStatusChangedSchema = z.object({
     completedAt: z.number().optional(),
 });
 
+export const ApiEphemeralInboxNewItemSchema = z.object({
+    type: z.literal("inbox-new-item"),
+    item: z.object({
+        id: z.string(),
+        category: z.string(),
+        eventType: z.string(),
+        severity: z.string(),
+        title: z.string(),
+        body: z.string().optional(),
+        read: z.boolean(),
+        referenceUrl: z.string().optional(),
+        refType: z.string().optional(),
+        refId: z.string().optional(),
+        groupKey: z.string().optional(),
+        createdAt: z.number(),
+    }),
+});
+
+export const ApiEphemeralInboxUnreadCountSchema = z.object({
+    type: z.literal("inbox-unread-count"),
+    count: z.number(),
+});
+
+export const ApiEphemeralSessionEventCreatedSchema = z.object({
+    type: z.literal("session-event-created"),
+    event: z.object({
+        id: z.string(),
+        sessionId: z.string(),
+        eventType: z.string(),
+        summary: z.string(),
+        detail: z.record(z.string(), z.unknown()).optional(),
+        createdAt: z.number(),
+    }),
+});
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
@@ -342,6 +377,9 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralKnowledgeCountSchema,
   ApiEphemeralTaskLogSchema,
   ApiEphemeralTaskStatusChangedSchema,
+  ApiEphemeralInboxNewItemSchema,
+  ApiEphemeralInboxUnreadCountSchema,
+  ApiEphemeralSessionEventCreatedSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

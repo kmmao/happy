@@ -113,6 +113,12 @@ export interface ClientToServerEvents {
     };
   }) => void;
   "session-end": (data: { sid: string; time: number }) => void;
+  "session-event": (data: {
+    sessionId: string;
+    eventType: string;
+    summary: string;
+    detail?: Record<string, unknown>;
+  }) => void;
   "update-metadata": (
     data: { sid: string; expectedVersion: number; metadata: string },
     cb: (

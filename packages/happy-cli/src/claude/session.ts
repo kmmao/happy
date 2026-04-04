@@ -23,6 +23,8 @@ export class Session {
   readonly jsRuntime: JsRuntime;
   /** Model to pass to Claude Code */
   readonly model?: string;
+  /** Optional callback to report session timeline events */
+  onSessionEvent?: (sessionId: string, eventType: string, summary: string, detail?: Record<string, unknown>) => void;
 
   sessionId: string | null;
   mode: "local" | "remote" = "local";

@@ -933,6 +933,19 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
+   * Report a session timeline event. Fire-and-forget, no queueing.
+   */
+  sessionEvent(
+    sessionId: string,
+    eventType: string,
+    summary: string,
+    detail?: Record<string, unknown>,
+  ) {
+    if (!this.socket.connected) return;
+    this.socket.emit("session-event", { sessionId, eventType, summary, detail });
+  }
+
+  /**
    * Send session death message
    */
   sendSessionDeath() {

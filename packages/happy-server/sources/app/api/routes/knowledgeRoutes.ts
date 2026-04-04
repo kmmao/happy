@@ -11,6 +11,7 @@ import { regenerateProfile } from "@/modules/knowledgeProfileGenerator";
 import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
+import { inboxCreate } from "@/modules/inboxCreate";
 
 // Inline Zod schemas (mirrors @kmmao/happy-wire/knowledge.ts)
 // Server uses CommonJS resolution which can't import ESM-only wire values directly.
@@ -295,6 +296,19 @@ export function knowledgeRoutes(app: Fastify) {
                 projectId: id,
             });
             trackKnowledgeCreation(id);
+
+            void inboxCreate({
+                accountId: userId,
+                category: "knowledge",
+                eventType: "knowledge.created",
+                severity: "info",
+                title: `New knowledge: ${body.title.substring(0, 50)}`,
+                body: `Type: ${body.entryType}`,
+                refType: "projectKnowledge",
+                refId: entry.id,
+                groupKey: `knowledge:${id}:created`,
+                skipPush: true,
+            });
 
             // Dual-write: persist relatedIds to KnowledgeRelation table
             if (body.relatedIds.length > 0) {

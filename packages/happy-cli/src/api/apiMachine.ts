@@ -132,6 +132,12 @@ interface DaemonToServerEvents {
       affectedFiles: string[];
     }>;
   }) => void;
+  "session-event": (data: {
+    sessionId: string;
+    eventType: string;
+    summary: string;
+    detail?: Record<string, unknown>;
+  }) => void;
 
 }
 
@@ -868,6 +874,19 @@ export class ApiMachineClient {
       };
     });
     this.socket.emit("transcript-knowledge", { turns: entries });
+  }
+
+  /**
+   * Report a session timeline event. Fire-and-forget, no queueing.
+   */
+  sessionEvent(
+    sessionId: string,
+    eventType: string,
+    summary: string,
+    detail?: Record<string, unknown>,
+  ) {
+    if (!this.socket.connected) return;
+    this.socket.emit("session-event", { sessionId, eventType, summary, detail });
   }
 
   private flushPendingFixStatuses() {

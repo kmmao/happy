@@ -8,6 +8,7 @@ import { z } from "zod";
 import { log } from "@/utils/log";
 import crypto from "crypto";
 import { inTx } from "@/storage/inTx";
+import { inboxCreate } from "@/modules/inboxCreate";
 
 const MAX_WEBHOOK_PAYLOAD_SIZE = 65536; // 64KB
 const MAX_PROMPT_LENGTH = 50000;
@@ -199,6 +200,19 @@ export function webhookTriggerRoutes(app: Fastify) {
                     type: "machine-scoped-only",
                     machineId: trigger.machineId,
                 },
+            });
+
+            void inboxCreate({
+                accountId: trigger.accountId,
+                category: "trigger",
+                eventType: "trigger.webhook_fired",
+                severity: "info",
+                title: `Webhook '${trigger.slug}' triggered`,
+                body: trigger.name ?? undefined,
+                refType: "webhookTrigger",
+                refId: trigger.id,
+                groupKey: `webhook:${trigger.id}:triggered`,
+                skipPush: true,
             });
 
             log(

@@ -210,6 +210,29 @@ class Sync {
     exitReason: string | null;
     consecutiveFailures: number;
   }) => void>();
+  private inboxNewItemListeners = new Set<(item: {
+    id: string;
+    category: string;
+    eventType: string;
+    severity: string;
+    title: string;
+    body?: string;
+    read: boolean;
+    referenceUrl?: string;
+    refType?: string;
+    refId?: string;
+    groupKey?: string;
+    createdAt: number;
+  }) => void>();
+  private inboxUnreadCountListeners = new Set<(count: number) => void>();
+  private sessionEventCreatedListeners = new Set<(event: {
+    id: string;
+    sessionId: string;
+    eventType: string;
+    summary: string;
+    detail?: Record<string, unknown>;
+    createdAt: number;
+  }) => void>();
   private preferencesMigrationDone = false;
   private projectMigrationFailures = new Map<string, number>();
   private pendingSettings: Partial<Settings> = loadPendingSettings();
@@ -2475,6 +2498,27 @@ class Sync {
       }
     }
 
+    // Handle inbox-new-item: notify listeners for real-time inbox updates
+    if (updateData.type === "inbox-new-item" && updateData.item) {
+      for (const listener of this.inboxNewItemListeners) {
+        listener(updateData.item);
+      }
+    }
+
+    // Handle inbox-unread-count: notify listeners for badge updates
+    if (updateData.type === "inbox-unread-count" && typeof updateData.count === "number") {
+      for (const listener of this.inboxUnreadCountListeners) {
+        listener(updateData.count);
+      }
+    }
+
+    // Handle session-event-created: notify listeners for real-time timeline updates
+    if (updateData.type === "session-event-created" && updateData.event) {
+      for (const listener of this.sessionEventCreatedListeners) {
+        listener(updateData.event);
+      }
+    }
+
     // Handle supervisor-loop-status: notify listeners for real-time Loop status updates.
     if (updateData.type === "supervisor-loop-status") {
       const loopEvent = {
@@ -2747,6 +2791,41 @@ class Sync {
   }) => void): () => void {
     this.taskStatusListeners.add(listener);
     return () => { this.taskStatusListeners.delete(listener); };
+  }
+
+  onInboxNewItem(listener: (item: {
+    id: string;
+    category: string;
+    eventType: string;
+    severity: string;
+    title: string;
+    body?: string;
+    read: boolean;
+    referenceUrl?: string;
+    refType?: string;
+    refId?: string;
+    groupKey?: string;
+    createdAt: number;
+  }) => void): () => void {
+    this.inboxNewItemListeners.add(listener);
+    return () => { this.inboxNewItemListeners.delete(listener); };
+  }
+
+  onInboxUnreadCount(listener: (count: number) => void): () => void {
+    this.inboxUnreadCountListeners.add(listener);
+    return () => { this.inboxUnreadCountListeners.delete(listener); };
+  }
+
+  onSessionEventCreated(listener: (event: {
+    id: string;
+    sessionId: string;
+    eventType: string;
+    summary: string;
+    detail?: Record<string, unknown>;
+    createdAt: number;
+  }) => void): () => void {
+    this.sessionEventCreatedListeners.add(listener);
+    return () => { this.sessionEventCreatedListeners.delete(listener); };
   }
 
   destroy() {

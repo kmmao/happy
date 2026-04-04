@@ -581,6 +581,13 @@ function SessionInfoContent({ session }: { session: Session }) {
             />
           )}
           <Item
+            title={t("timeline.title")}
+            subtitle={t("timeline.subtitle")}
+            icon={<Ionicons name="time-outline" size={29} color="#5856D6" />}
+            onPress={() => router.push(`/session/${session.id}/timeline` as any)}
+            showChevron
+          />
+          <Item
             title="Task Debug"
             subtitle="View raw background task data"
             icon={<Ionicons name="bug-outline" size={29} color="#FF9500" />}

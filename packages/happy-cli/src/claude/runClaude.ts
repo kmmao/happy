@@ -883,6 +883,9 @@ export async function runClaude(
     sandboxConfig,
     hookSettingsPath,
     jsRuntime: options.jsRuntime,
+    onSessionEvent: (sessionId, eventType, summary, detail) => {
+      session.sessionEvent(sessionId, eventType, summary, detail);
+    },
   });
 
   // Cleanup session resources (intervals, callbacks) - prevents memory leak

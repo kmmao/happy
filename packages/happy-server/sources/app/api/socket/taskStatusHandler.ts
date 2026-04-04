@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { eventRouter, buildTaskStatusChangedEphemeral } from "@/app/events/eventRouter";
+import { inboxCreate } from "@/modules/inboxCreate";
 
 const taskStatusSchema = z.object({
     taskId: z.string().min(1),
@@ -53,6 +54,25 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                     completedAt: isTerminal ? new Date() : task.completedAt,
                 },
             });
+
+            // Create inbox item for terminal statuses
+            if (isTerminal) {
+                void inboxCreate({
+                    accountId: userId,
+                    category: "task",
+                    eventType: `task.${data.status}`,
+                    severity: data.status === "failed" ? "error" : "info",
+                    title: data.status === "completed"
+                        ? "Task completed"
+                        : data.status === "failed"
+                            ? "Task failed"
+                            : "Task cancelled",
+                    body: data.status === "failed" ? data.errorMessage : undefined,
+                    refType: "task",
+                    refId: data.taskId,
+                    groupKey: `task:${data.taskId}:${data.status}`,
+                });
+            }
 
             // Notify App
             eventRouter.emitEphemeral({

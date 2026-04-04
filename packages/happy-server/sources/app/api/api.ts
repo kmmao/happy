@@ -44,6 +44,8 @@ import { taskRoutes } from "./routes/taskRoutes";
 import { skillRoutes } from "./routes/skillRoutes";
 import { triggerScheduleRoutes } from "./routes/triggerScheduleRoutes";
 import { webhookTriggerRoutes } from "./routes/webhookTriggerRoutes";
+import { inboxRoutes } from "./routes/inboxRoutes";
+import { sessionEventRoutes } from "./routes/sessionEventRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
 import * as path from "path";
@@ -133,6 +135,8 @@ export async function startApi() {
   skillRoutes(typed);
   triggerScheduleRoutes(typed);
   webhookTriggerRoutes(typed);
+  inboxRoutes(typed);
+  sessionEventRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

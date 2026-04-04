@@ -22,6 +22,7 @@ import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
 import { decryptString } from "@/modules/encrypt";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 import { contributeSupervisorKnowledge } from "@/modules/knowledgeContributor";
+import { inboxCreate } from "@/modules/inboxCreate";
 
 const supervisorActionSchema = z.object({
     severity: z.enum(["critical", "high", "medium", "low"]),
@@ -253,6 +254,29 @@ export function supervisorRunStatusHandler(
                 { module: "supervisor" },
                 `supervisor-run-status: run ${data.runId} → ${data.status}${data.actions ? ` (${data.actions.length} actions)` : ""}`,
             );
+
+            // Inbox notification for terminal supervisor runs
+            if (data.status === "completed" || data.status === "failed") {
+                const actionCount = data.actions?.length ?? 0;
+                void inboxCreate({
+                    accountId: userId,
+                    category: "supervisor",
+                    eventType: `supervisor.${data.status}`,
+                    severity: data.status === "failed"
+                        ? "error"
+                        : data.actions?.some((a) => a.severity === "critical")
+                            ? "warning"
+                            : "info",
+                    title: data.status === "completed"
+                        ? `Supervisor: ${actionCount} issue(s) found`
+                        : "Supervisor run failed",
+                    body: data.status === "failed" ? (data.errorMessage ?? undefined) : undefined,
+                    refType: "supervisorRun",
+                    refId: data.runId,
+                    groupKey: `supervisor:${data.runId}:${data.status}`,
+                    skipPush: true, // Supervisor already sends its own push
+                });
+            }
 
             // Aggregate session usage (cost/tokens) on completion
             if (data.status === "completed") {

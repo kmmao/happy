@@ -28,6 +28,7 @@ import { PLAN_FAKE_REJECT } from "./sdk/prompts";
 import { EnhancedMode } from "./loop";
 import { RawJSONLines } from "@/claude/types";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
+import { createSessionEventReporter } from "./sessionEventReporter";
 import { getToolName } from "./utils/getToolName";
 import { createEnvelope } from "@kmmao/happy-wire";
 import { hashObject } from "@/utils/deterministicJson";
@@ -421,6 +422,14 @@ export async function claudeRemoteLauncher(
   // Track files that have been Read by the SDK (for seedReadState after compact)
   const readFilePaths = new Set<string>();
 
+  // Session timeline event reporter (fire-and-forget to server)
+  const reportSessionEvent = session.onSessionEvent && session.sessionId
+    ? createSessionEventReporter(
+        { sessionEvent: session.onSessionEvent },
+        session.sessionId,
+      )
+    : null;
+
   // Handle messages
   let planModeToolCalls = new Set<string>();
   let latestPlanFilePath: string | null = null;
@@ -518,6 +527,11 @@ export async function claudeRemoteLauncher(
       }
     } catch (err) {
       logger.debug(`[knowledge] Error collecting turn data: ${err}`);
+    }
+
+    // Report session timeline events (fire-and-forget)
+    if (reportSessionEvent) {
+      reportSessionEvent(message);
     }
 
     // Detect plan mode tool calls

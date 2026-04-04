@@ -6,6 +6,7 @@ import {
     buildTaskTriggerEphemeral,
 } from "@/app/events/eventRouter";
 import { CronExpressionParser } from "cron-parser";
+import { inboxCreate } from "./inboxCreate";
 
 const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
@@ -179,6 +180,19 @@ export async function checkAndTriggerSchedules(
                     type: "machine-scoped-only",
                     machineId,
                 },
+            });
+
+            void inboxCreate({
+                accountId: userId,
+                category: "trigger",
+                eventType: "trigger.cron_fired",
+                severity: "info",
+                title: `Cron schedule fired`,
+                body: schedule.name ?? schedule.cronExpression,
+                refType: "triggerSchedule",
+                refId: schedule.id,
+                groupKey: `schedule:${schedule.id}:triggered`,
+                skipPush: true,
             });
 
             log(

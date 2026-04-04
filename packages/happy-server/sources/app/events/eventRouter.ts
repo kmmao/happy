@@ -367,6 +367,38 @@ export type EphemeralEvent =
       errorMessage?: string;
       completedAt?: number;
     }
+  | {
+      type: "inbox-new-item";
+      item: {
+        id: string;
+        category: string;
+        eventType: string;
+        severity: string;
+        title: string;
+        body?: string;
+        read: boolean;
+        referenceUrl?: string;
+        refType?: string;
+        refId?: string;
+        groupKey?: string;
+        createdAt: number;
+      };
+    }
+  | {
+      type: "inbox-unread-count";
+      count: number;
+    }
+  | {
+      type: "session-event-created";
+      event: {
+        id: string;
+        sessionId: string;
+        eventType: string;
+        summary: string;
+        detail?: Record<string, unknown>;
+        createdAt: number;
+      };
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -1106,6 +1138,47 @@ export function buildTaskStatusChangedEphemeral(opts: {
   return {
     type: "task-status-changed",
     ...opts,
+  };
+}
+
+export function buildInboxNewItemEphemeral(item: {
+  id: string;
+  category: string;
+  eventType: string;
+  severity: string;
+  title: string;
+  body?: string;
+  read: boolean;
+  referenceUrl?: string;
+  refType?: string;
+  refId?: string;
+  groupKey?: string;
+  createdAt: number;
+}): EphemeralPayload {
+  return {
+    type: "inbox-new-item",
+    item,
+  };
+}
+
+export function buildInboxUnreadCountEphemeral(count: number): EphemeralPayload {
+  return {
+    type: "inbox-unread-count",
+    count,
+  };
+}
+
+export function buildSessionEventCreatedEphemeral(event: {
+  id: string;
+  sessionId: string;
+  eventType: string;
+  summary: string;
+  detail?: Record<string, unknown>;
+  createdAt: number;
+}): EphemeralPayload {
+  return {
+    type: "session-event-created",
+    event,
   };
 }
 

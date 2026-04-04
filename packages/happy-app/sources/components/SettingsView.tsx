@@ -43,9 +43,14 @@ function Sub2ApiInlineUsage({ onPress }: { onPress: () => void }) {
     const getColor = (u: number) => u >= 90 ? "#FF3B30" : u >= 70 ? "#FF9500" : "#34C759";
     const formatTime = (s: number) => {
         if (s <= 0) return "";
-        const h = Math.floor(s / 3600);
+        const totalHours = Math.floor(s / 3600);
         const m = Math.floor((s % 3600) / 60);
-        return h > 0 ? `${h}h${m}m` : `${m}m`;
+        if (totalHours >= 24) {
+            const d = Math.floor(totalHours / 24);
+            const h = totalHours % 24;
+            return h > 0 ? `${d}d ${h}h` : `${d}d`;
+        }
+        return totalHours > 0 ? (m > 0 ? `${totalHours}h${m}m` : `${totalHours}h`) : `${m}m`;
     };
 
     const renderBar = (label: string, p: UsageProgress) => (

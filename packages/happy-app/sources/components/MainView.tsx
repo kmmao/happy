@@ -11,6 +11,7 @@ import {
   useSocketStatus,
   useRealtimeStatus,
 } from "@/sync/storage";
+import { useInboxUnreadCount } from "@/hooks/useInboxData";
 import { useVisibleSessionListViewData } from "@/hooks/useVisibleSessionListViewData";
 import { useIsTablet } from "@/utils/responsive";
 import { useRouter } from "expo-router";
@@ -294,6 +295,7 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
   const router = useRouter();
   const friendRequests = useFriendRequests();
   const realtimeStatus = useRealtimeStatus();
+  const inboxUnreadCount = useInboxUnreadCount();
 
   // Tab state management
   const [activeTab, setActiveTab] = React.useState<TabType>("sessions");
@@ -397,7 +399,7 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
       <TabBar
         activeTab={activeTab}
         onTabPress={handleTabPress}
-        inboxBadgeCount={friendRequests.length}
+        inboxBadgeCount={inboxUnreadCount + friendRequests.length}
         showOpenClaw={showOpenClaw}
       />
     </>

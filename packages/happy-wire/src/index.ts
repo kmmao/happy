@@ -6,3 +6,5 @@ export * from './knowledge';
 export * from './voice';
 export * from './tasks';
 export * from './skills';
+export * from './inbox';
+export * from './sessionEvents';

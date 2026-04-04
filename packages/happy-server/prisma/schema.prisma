@@ -59,6 +59,7 @@ model Account {
     Skill               Skill[]
     TriggerSchedule     TriggerSchedule[]
     WebhookTrigger      WebhookTrigger[]
+    InboxItem           InboxItem[]
 }
 
 model TerminalAuthRequest {
@@ -137,6 +138,7 @@ model Session {
     messages          SessionMessage[]
     usageReports      UsageReport[]
     accessKeys        AccessKey[]
+    sessionEvents     SessionEvent[]
 
     @@unique([accountId, tag])
     @@index([accountId, updatedAt(sort: Desc)])
@@ -908,4 +910,66 @@ model WebhookTrigger {
     updatedAt       DateTime  @updatedAt
 
     @@index([accountId, machineId])
+}
+
+//
+// Inbox
+//
+
+model InboxItem {
+    id          String   @id @default(cuid())
+
+    // Owner
+    accountId   String
+    account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    // Classification
+    category    String   // task | trigger | supervisor | session | knowledge | system
+    eventType   String   // e.g. "task.completed", "trigger.cron.fired"
+    severity    String   @default("info") // info | warning | error
+
+    // Content
+    title       String
+    body        String?
+
+    // State
+    read        Boolean  @default(false)
+
+    // Reference (polymorphic — no FK, string-based)
+    referenceUrl String? // Deep link path, e.g. "/machine/xxx/tasks"
+    refType     String?  // "task" | "trigger" | "session" | ...
+    refId       String?  // ID of referenced entity
+
+    // Dedup: same groupKey within 1 hour → skip creation
+    groupKey    String?
+
+    createdAt   DateTime @default(now())
+
+    @@index([accountId, read, createdAt(sort: Desc)])
+    @@index([accountId, category, createdAt(sort: Desc)])
+    @@index([groupKey, createdAt])
+}
+
+//
+// Session Timeline
+//
+
+model SessionEvent {
+    id          String   @id @default(cuid())
+
+    // Parent session
+    sessionId   String
+    session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    // Event classification
+    eventType   String   // file_edit | bash_command | tool_call | git_operation | error | session_start | session_end
+
+    // Content (plaintext — CLI reports metadata, not encrypted messages)
+    summary     String   // Human-readable one-liner, e.g. "Edited src/index.ts"
+    detail      Json?    // Structured metadata: { path, diff, command, exitCode, ... }
+
+    createdAt   DateTime @default(now())
+
+    @@index([sessionId, createdAt(sort: Desc)])
+    @@index([sessionId, eventType])
 }

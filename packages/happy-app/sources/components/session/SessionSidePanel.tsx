@@ -9,13 +9,14 @@ import { GitBrowseTab } from "@/components/git/GitBrowseTab";
 import { GitChangesTab } from "@/components/git/GitChangesTab";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
+import { SidePanelTimelineTab } from "./SidePanelTimelineTab";
 import { InputContext } from "@/hooks/useInputContext";
 
 export const SIDE_PANEL_WIDTH = 360;
 export const SIDE_PANEL_MIN_WINDOW_WIDTH = 1200;
 const COLLAPSED_WIDTH = 36;
 
-type TabKey = "files" | "changes" | "summary";
+type TabKey = "files" | "changes" | "summary" | "timeline";
 
 interface SessionSidePanelProps {
     sessionId: string;
@@ -73,6 +74,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             { key: "files", label: t("sidePanel.files") },
             { key: "changes", label: t("sidePanel.changes") },
             { key: "summary", label: t("sidePanel.summary") },
+            { key: "timeline", label: t("sidePanel.timeline") },
         ];
 
         return (
@@ -163,6 +165,9 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                             )}
                             {activeTab === "summary" && (
                                 <SidePanelSummaryTab sessionId={sessionId} />
+                            )}
+                            {activeTab === "timeline" && (
+                                <SidePanelTimelineTab sessionId={sessionId} />
                             )}
                         </View>
                     </>

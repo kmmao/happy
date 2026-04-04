@@ -68,6 +68,8 @@ interface LoopOptions {
   allowedTools?: string[];
   sandboxConfig?: SandboxConfig;
   onSessionReady?: (session: Session) => void;
+  /** Optional callback to report session timeline events to server */
+  onSessionEvent?: (sessionId: string, eventType: string, summary: string, detail?: Record<string, unknown>) => void;
   /** Path to temporary settings file with SessionStart hook (required for session tracking) */
   hookSettingsPath: string;
   /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
@@ -94,6 +96,11 @@ export async function loop(opts: LoopOptions): Promise<number> {
     jsRuntime: opts.jsRuntime,
     model: opts.model,
   });
+
+  // Wire optional session event reporter
+  if (opts.onSessionEvent) {
+    session.onSessionEvent = opts.onSessionEvent;
+  }
 
   opts.onSessionReady?.(session);
 
