@@ -33,6 +33,14 @@ export const LocalSettingsSchema = z.object({
   inputExpandedSessions: z
     .record(z.string(), z.boolean())
     .describe("Sessions with manually expanded input, keyed by session ID"),
+  // Side panel collapsed state (tablet+ widescreen)
+  sidePanelCollapsed: z
+    .boolean()
+    .describe("Whether the session side panel is collapsed"),
+  // Side panel width in pixels (tablet+ widescreen, user-resizable)
+  sidePanelWidth: z
+    .number()
+    .describe("Width of the session side panel in pixels"),
 });
 
 //
@@ -57,6 +65,8 @@ export const localSettingsDefaults: LocalSettings = {
   acknowledgedCliVersions: {},
   toolDetailMode: "simple",
   inputExpandedSessions: {},
+  sidePanelCollapsed: false,
+  sidePanelWidth: 400,
 };
 Object.freeze(localSettingsDefaults);
 

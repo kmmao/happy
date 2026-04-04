@@ -78,6 +78,9 @@ import {
   useSessionStatus,
 } from "@/utils/sessionUtils";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
+import { SessionSidePanel, SIDE_PANEL_MIN_WINDOW_WIDTH } from "@/components/session/SessionSidePanel";
+import { ResizableDivider, DIVIDER_WIDTH } from "@/components/session/ResizableDivider";
+import { layout } from "@/components/layout";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as React from "react";
@@ -89,6 +92,7 @@ import {
   Pressable,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUnistyles } from "react-native-unistyles";
@@ -123,6 +127,66 @@ export const SessionView = React.memo((props: { id: string }) => {
   const headerHeight = useHeaderHeight();
   const realtimeStatus = useRealtimeStatus();
   const isTablet = useIsTablet();
+  const { width: windowWidth } = useWindowDimensions();
+  const sidePanelCollapsed = useLocalSetting("sidePanelCollapsed");
+  const storedPanelWidth = useLocalSetting("sidePanelWidth");
+  const sessionIsOnline = session?.presence === "online";
+  const showSidePanelOuter = isTablet && windowWidth >= SIDE_PANEL_MIN_WINDOW_WIDTH && !!sessionIsOnline;
+  const toggleSidePanelOuter = React.useCallback(() => {
+    storage.getState().applyLocalSettings({ sidePanelCollapsed: !sidePanelCollapsed });
+  }, [sidePanelCollapsed]);
+
+  // Actual container width (excludes sidebar navigator etc.)
+  const [containerWidth, setContainerWidth] = React.useState(0);
+  const handleContainerLayout = React.useCallback((e: { nativeEvent: { layout: { width: number } } }) => {
+    setContainerWidth(e.nativeEvent.layout.width);
+  }, []);
+  // Use containerWidth when available, fall back to windowWidth
+  const effectiveWidth = containerWidth > 0 ? containerWidth : windowWidth;
+
+  // Resizable panel: compute column widths
+  const MIN_PANEL_WIDTH = 250;
+  const MIN_LEFT_WIDTH = 500;
+  const [dragPanelWidth, setDragPanelWidth] = React.useState<number | null>(null);
+
+  // Auto-expand panel on first layout so left column = content maxWidth (no whitespace)
+  const hasAutoExpanded = React.useRef(false);
+  React.useEffect(() => {
+    if (hasAutoExpanded.current || !showSidePanelOuter || sidePanelCollapsed || effectiveWidth <= 0) return;
+    const idealPanel = effectiveWidth - layout.maxWidth - DIVIDER_WIDTH;
+    if (idealPanel > storedPanelWidth) {
+      storage.getState().applyLocalSettings({ sidePanelWidth: idealPanel });
+    }
+    hasAutoExpanded.current = true;
+  }, [showSidePanelOuter, sidePanelCollapsed, effectiveWidth, storedPanelWidth]);
+
+  const activePanelWidth = dragPanelWidth ?? storedPanelWidth;
+
+  const panelWidths = React.useMemo(() => {
+    if (!showSidePanelOuter || sidePanelCollapsed) return { left: effectiveWidth, right: 0 };
+    const maxPanel = effectiveWidth - MIN_LEFT_WIDTH - DIVIDER_WIDTH;
+    const clampedPanel = Math.max(MIN_PANEL_WIDTH, Math.min(activePanelWidth, maxPanel));
+    const leftWidth = effectiveWidth - clampedPanel - DIVIDER_WIDTH;
+    return { left: leftWidth, right: clampedPanel };
+  }, [showSidePanelOuter, sidePanelCollapsed, effectiveWidth, activePanelWidth]);
+
+  const handlePanelResize = React.useCallback((deltaX: number) => {
+    // deltaX > 0 means dragging right → left bigger, panel smaller
+    setDragPanelWidth((prev) => {
+      const current = prev ?? storedPanelWidth;
+      const maxPanel = effectiveWidth - MIN_LEFT_WIDTH - DIVIDER_WIDTH;
+      return Math.max(MIN_PANEL_WIDTH, Math.min(current - deltaX, maxPanel));
+    });
+  }, [storedPanelWidth, windowWidth]);
+
+  const handlePanelResizeEnd = React.useCallback(() => {
+    setDragPanelWidth((prev) => {
+      if (prev !== null) {
+        storage.getState().applyLocalSettings({ sidePanelWidth: prev });
+      }
+      return null;
+    });
+  }, []);
   const knowledgeCount = useSessionKnowledgeCount(sessionId);
   const sessionProject = useProjectForSession(sessionId);
   const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
@@ -200,126 +264,150 @@ export const SessionView = React.memo((props: { id: string }) => {
 
   return (
     <>
-      {/* Status bar shadow for landscape mode */}
-      {isLandscape && deviceType === "phone" && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: safeArea.top,
-            backgroundColor: theme.colors.surface,
-            zIndex: 1000,
-            shadowColor: theme.colors.shadow.color,
-            shadowOffset: {
-              width: 0,
-              height: 2,
-            },
-            shadowOpacity: theme.colors.shadow.opacity,
-            shadowRadius: 3,
-            elevation: 5,
-          }}
-        />
-      )}
-
-      {/* Header - always shown on desktop/Mac, hidden in landscape mode only on actual phones */}
-      {!(isLandscape && deviceType === "phone" && Platform.OS !== "web") && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 1000,
-          }}
-        >
-          <ChatHeaderView
-            {...headerProps}
-            knowledgeCount={knowledgeCount}
-            onKnowledgePress={knowledgeCount > 0 ? () => setShowKnowledgeSheet(true) : undefined}
-            onBackPress={() => router.back()}
-            onRefreshPress={() => sync.refreshSession(sessionId)}
-            onPreviewPress={
-              headerProps.isConnected
-                ? () => router.push(`/session/${sessionId}/preview`)
-                : undefined
-            }
-            onChangesPress={hasChanges ? () => router.push(`/session/${sessionId}/changes`) : undefined}
-            devButtonState={headerProps.isConnected ? "idle" : "hidden"}
-            onDevPress={headerProps.isConnected ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
-            onDevLongPress={headerProps.isConnected ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
-          />
-          {/* Voice status bar below header - not on tablet (shown in sidebar) */}
-          {!isTablet && realtimeStatus !== "disconnected" && (
-            <VoiceAssistantStatusBar variant="full" />
+      {/* Two-column layout: left (header + content) + divider + right (side panel) */}
+      <View style={{ flex: 1, flexDirection: showSidePanelOuter ? "row" : "column" }} onLayout={handleContainerLayout}>
+        {/* Left column: header + chat content, capped to layout.maxWidth */}
+        <View style={showSidePanelOuter && !sidePanelCollapsed
+          ? { width: panelWidths.left, minWidth: 0 }
+          : { flex: 1, minWidth: 0 }
+        }>
+          {/* Status bar shadow for landscape mode */}
+          {isLandscape && deviceType === "phone" && (
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: safeArea.top,
+                backgroundColor: theme.colors.surface,
+                zIndex: 1000,
+                shadowColor: theme.colors.shadow.color,
+                shadowOffset: {
+                  width: 0,
+                  height: 2,
+                },
+                shadowOpacity: theme.colors.shadow.opacity,
+                shadowRadius: 3,
+                elevation: 5,
+              }}
+            />
           )}
-        </View>
-      )}
 
-      {/* Content based on state */}
-      <View
-        style={{
-          flex: 1,
-          paddingTop: !(
-            isLandscape &&
-            deviceType === "phone" &&
-            Platform.OS !== "web"
-          )
-            ? safeArea.top +
-              headerHeight +
-              (!isTablet && realtimeStatus !== "disconnected" ? 48 : 0)
-            : 0,
-        }}
-      >
-        {!isDataReady ? (
-          // Loading state
-          <View
-            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-          >
-            <ActivityIndicator
-              size="small"
-              color={theme.colors.textSecondary}
-            />
-          </View>
-        ) : !session ? (
-          // Deleted state
-          <View
-            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-          >
-            <Ionicons
-              name="trash-outline"
-              size={48}
-              color={theme.colors.textSecondary}
-            />
-            <Text
+          {/* Header - always shown on desktop/Mac, hidden in landscape mode only on actual phones */}
+          {!(isLandscape && deviceType === "phone" && Platform.OS !== "web") && (
+            <View
               style={{
-                color: theme.colors.text,
-                fontSize: 20,
-                marginTop: 16,
-                fontWeight: "600",
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 1000,
               }}
             >
-              {t("errors.sessionDeleted")}
-            </Text>
-            <Text
-              style={{
-                color: theme.colors.textSecondary,
-                fontSize: 15,
-                marginTop: 8,
-                textAlign: "center",
-                paddingHorizontal: 32,
-              }}
-            >
-              {t("errors.sessionDeletedDescription")}
-            </Text>
+              <ChatHeaderView
+                {...headerProps}
+                knowledgeCount={knowledgeCount}
+                onKnowledgePress={knowledgeCount > 0 ? () => setShowKnowledgeSheet(true) : undefined}
+                onBackPress={() => router.back()}
+                onRefreshPress={() => sync.refreshSession(sessionId)}
+                onPreviewPress={
+                  headerProps.isConnected
+                    ? () => router.push(`/session/${sessionId}/preview`)
+                    : undefined
+                }
+                onChangesPress={hasChanges ? () => router.push(`/session/${sessionId}/changes`) : undefined}
+                devButtonState={headerProps.isConnected ? "idle" : "hidden"}
+                onDevPress={headerProps.isConnected ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
+                onDevLongPress={headerProps.isConnected ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
+              />
+              {/* Voice status bar below header - not on tablet (shown in sidebar) */}
+              {!isTablet && realtimeStatus !== "disconnected" && (
+                <VoiceAssistantStatusBar variant="full" />
+              )}
+            </View>
+          )}
+
+          {/* Content based on state */}
+          <View
+            style={{
+              flex: 1,
+              paddingTop: !(
+                isLandscape &&
+                deviceType === "phone" &&
+                Platform.OS !== "web"
+              )
+                ? safeArea.top +
+                  headerHeight +
+                  (!isTablet && realtimeStatus !== "disconnected" ? 48 : 0)
+                : 0,
+            }}
+          >
+            {!isDataReady ? (
+              // Loading state
+              <View
+                style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+              >
+                <ActivityIndicator
+                  size="small"
+                  color={theme.colors.textSecondary}
+                />
+              </View>
+            ) : !session ? (
+              // Deleted state
+              <View
+                style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={48}
+                  color={theme.colors.textSecondary}
+                />
+                <Text
+                  style={{
+                    color: theme.colors.text,
+                    fontSize: 20,
+                    marginTop: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  {t("errors.sessionDeleted")}
+                </Text>
+                <Text
+                  style={{
+                    color: theme.colors.textSecondary,
+                    fontSize: 15,
+                    marginTop: 8,
+                    textAlign: "center",
+                    paddingHorizontal: 32,
+                  }}
+                >
+                  {t("errors.sessionDeletedDescription")}
+                </Text>
+              </View>
+            ) : (
+              // Normal session view
+              <SessionViewLoaded
+                key={sessionId}
+                sessionId={sessionId}
+                session={session}
+              />
+            )}
           </View>
-        ) : (
-          // Normal session view
-          <SessionViewLoaded
-            key={sessionId}
+        </View>
+
+        {/* Resizable divider + right column: side panel */}
+        {showSidePanelOuter && !sidePanelCollapsed && (
+          <ResizableDivider
+            onResize={handlePanelResize}
+            onResizeEnd={handlePanelResizeEnd}
+          />
+        )}
+        {showSidePanelOuter && (
+          <SessionSidePanel
             sessionId={sessionId}
-            session={session}
+            collapsed={sidePanelCollapsed}
+            onToggleCollapse={toggleSidePanelOuter}
           />
         )}
       </View>

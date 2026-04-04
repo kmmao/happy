@@ -54,8 +54,9 @@ export const GitBrowseTab = React.memo<{
     onScrollUp?: () => void;
     embedded?: boolean;
     onFileOpen?: () => void;
+    onFilePress?: (fullPath: string) => void;
     onReference?: (path: string) => void;
-}>(function GitBrowseTab({ sessionId, onPullDown, onScrollUp, embedded, onFileOpen, onReference }) {
+}>(function GitBrowseTab({ sessionId, onPullDown, onScrollUp, embedded, onFileOpen, onFilePress, onReference }) {
     const router = useRouter();
     const { theme } = useUnistyles();
 
@@ -126,13 +127,17 @@ export const GitBrowseTab = React.memo<{
                 setPathHistory((prev) => [...prev, currentPath!]);
                 setCurrentPath(newPath);
             } else {
-                onFileOpen?.();
                 const fullPath = `${currentPath}/${entry.name}`;
-                const encodedPath = utf8ToBase64(fullPath);
-                router.push(`/session/${sessionId}/file?path=${encodedPath}`);
+                if (onFilePress) {
+                    onFilePress(fullPath);
+                } else {
+                    onFileOpen?.();
+                    const encodedPath = utf8ToBase64(fullPath);
+                    router.push(`/session/${sessionId}/file?path=${encodedPath}`);
+                }
             }
         },
-        [currentPath, sessionId, router],
+        [currentPath, sessionId, router, onFilePress],
     );
 
     const handleBack = React.useCallback(() => {

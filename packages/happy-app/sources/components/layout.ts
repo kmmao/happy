@@ -17,11 +17,11 @@ function getMaxWidth(): number {
         return Math.max(width, height);
     }
 
-    if (isRunningOnMac() || isDesktopWeb()) {
+    if (isRunningOnMac() || isDesktopWeb() || Platform.OS === 'web') {
         return Number.POSITIVE_INFINITY;
     }
 
-    // For tablets and web, use 800px
+    // For tablets, use 800px
     return 800;
 }
 
@@ -35,11 +35,11 @@ function getMaxLayoutWidth(): number {
         return Math.max(width, height);
     }
 
-    if (isRunningOnMac() || isDesktopWeb()) {
+    if (isRunningOnMac() || isDesktopWeb() || Platform.OS === 'web') {
         return 1400;
     }
 
-    // For tablets and web, use 800px
+    // For tablets, use 800px
     return 800;
 }
 
