@@ -6,8 +6,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import { GitBrowseTab } from "@/components/git/GitBrowseTab";
-import { GitChangesTab } from "@/components/git/GitChangesTab";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
+import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
 import { SidePanelTimelineTab } from "./SidePanelTimelineTab";
 import { InputContext } from "@/hooks/useInputContext";
@@ -161,7 +161,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                 />
                             )}
                             {activeTab === "changes" && (
-                                <GitChangesTab sessionId={sessionId} />
+                                <SidePanelGitPanel sessionId={sessionId} />
                             )}
                             {activeTab === "summary" && (
                                 <SidePanelSummaryTab sessionId={sessionId} />
