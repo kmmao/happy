@@ -178,6 +178,21 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             [projectServerId, router],
         );
 
+        const handleExtractSkill = React.useCallback(
+            (entry: { id: string; title: string; content: string }) => {
+                router.push({
+                    pathname: "/skills/new" as any,
+                    params: {
+                        fromKnowledgeId: entry.id,
+                        fromTitle: entry.title,
+                        fromContent: entry.content,
+                        fromProjectId: projectServerId ?? "",
+                    },
+                });
+            },
+            [router, projectServerId],
+        );
+
         const isArchivedFilter = activeFilter === "archived";
         const isSupersededFilter = activeFilter === "superseded";
         const isEvolutionFilter = activeFilter === "has-evolution";
@@ -213,11 +228,12 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                     onUpdate={updateEntry}
                     onDelete={isArchivedFilter ? deleteEntry : undefined}
                     onRefine={isArchivedFilter ? undefined : refineEntry}
+                    onExtractSkill={isArchivedFilter ? undefined : handleExtractSkill}
                     isArchived={isArchivedFilter}
                     onViewEvolution={handleViewEvolution}
                 />
             ),
-            [updateEntry, deleteEntry, refineEntry, isArchivedFilter, handleViewEvolution],
+            [updateEntry, deleteEntry, refineEntry, handleExtractSkill, isArchivedFilter, handleViewEvolution],
         );
 
         const keyExtractor = React.useCallback(

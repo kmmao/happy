@@ -31,6 +31,7 @@ interface KnowledgeEntryCardProps {
     onUpdate: (entryId: string, data: { status?: string; pinned?: boolean }) => void;
     onDelete?: (entryId: string) => void;
     onRefine?: (entryId: string) => Promise<void>;
+    onExtractSkill?: (entry: KnowledgeEntryCardProps["entry"]) => void;
     isArchived?: boolean;
     onViewEvolution?: (entryId: string) => void;
 }
@@ -116,7 +117,7 @@ function soapLabel(field: string): string {
 }
 
 export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
-    ({ entry, onUpdate, onDelete, onRefine, isArchived, onViewEvolution }) => {
+    ({ entry, onUpdate, onDelete, onRefine, onExtractSkill, isArchived, onViewEvolution }) => {
         const { theme } = useUnistyles();
         const [expanded, setExpanded] = React.useState(false);
         const [refining, setRefining] = React.useState(false);
@@ -440,6 +441,22 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
                                                 </Text>
                                             </View>
                                         )}
+                                    </Pressable>
+                                )}
+                                {onExtractSkill && (
+                                    <Pressable
+                                        onPress={() => onExtractSkill(entry)}
+                                        style={styles.actionButton}
+                                        hitSlop={8}
+                                    >
+                                        <Ionicons
+                                            name="flash-outline"
+                                            size={18}
+                                            color={theme.colors.textSecondary}
+                                        />
+                                        <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
+                                            {t("skills.extractSkill")}
+                                        </Text>
                                     </Pressable>
                                 )}
                                 {onRefine && (

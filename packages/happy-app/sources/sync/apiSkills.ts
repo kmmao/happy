@@ -88,6 +88,7 @@ export async function createSkill(
         description?: string;
         content: string;
         projectId?: string;
+        sourceKnowledgeId?: string;
     },
 ): Promise<ServerSkill> {
     const API_ENDPOINT = getServerUrl();

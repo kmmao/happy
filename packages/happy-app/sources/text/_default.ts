@@ -2079,6 +2079,7 @@ export const en = {
     noSkills: "No skills yet",
     nameTaken: "A skill with that name already exists",
     contentPreview: ({ chars }: { chars: number }) => `${chars} chars`,
+    extractSkill: "To Skill",
   },
 
   triggers: {

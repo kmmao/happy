@@ -2095,6 +2095,7 @@ export const pl: TranslationStructure = {
     confirmArchive: "Archive this skill?",
     noSkills: "No skills yet",
     nameTaken: "A skill with that name already exists",
+    extractSkill: "To Skill",
     contentPreview: ({ chars }: { chars: number }) => `${chars} chars`,
   },
 

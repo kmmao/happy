@@ -2156,6 +2156,7 @@ export const ja: TranslationStructure = {
     confirmArchive: "このスキルをアーカイブしますか？",
     noSkills: "スキルはまだありません",
     nameTaken: "同名のスキルが既に存在します",
+    extractSkill: "スキルに変換",
     contentPreview: ({ chars }: { chars: number }) => `${chars}文字`,
   },
 

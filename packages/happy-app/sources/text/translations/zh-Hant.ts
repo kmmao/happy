@@ -2032,6 +2032,7 @@ export const zhHant: TranslationStructure = {
     confirmArchive: "封存此技能？",
     noSkills: "尚無技能",
     nameTaken: "同名技能已存在",
+    extractSkill: "提煉為技能",
     contentPreview: ({ chars }: { chars: number }) => `${chars} 字元`,
   },
 

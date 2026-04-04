@@ -2031,6 +2031,7 @@ export const zhHans: TranslationStructure = {
     confirmArchive: "归档此技能？",
     noSkills: "暂无技能",
     nameTaken: "同名技能已存在",
+    extractSkill: "提炼为技能",
     contentPreview: ({ chars }: { chars: number }) => `${chars} 字符`,
   },
 

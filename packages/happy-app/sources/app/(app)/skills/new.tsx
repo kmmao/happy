@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { useHappyAction } from "@/hooks/useHappyAction";
@@ -13,10 +13,16 @@ import { t } from "@/text";
 function NewSkillPage() {
     const router = useRouter();
     const { theme } = useUnistyles();
+    const params = useLocalSearchParams<{
+        fromKnowledgeId?: string;
+        fromTitle?: string;
+        fromContent?: string;
+        fromProjectId?: string;
+    }>();
 
-    const [name, setName] = React.useState("");
+    const [name, setName] = React.useState(params.fromTitle ?? "");
     const [description, setDescription] = React.useState("");
-    const [content, setContent] = React.useState("");
+    const [content, setContent] = React.useState(params.fromContent ?? "");
 
     const canSubmit = name.trim().length > 0 && content.trim().length > 0;
 
@@ -31,6 +37,8 @@ function NewSkillPage() {
                     name: name.trim(),
                     description: description.trim() || undefined,
                     content: content.trim(),
+                    projectId: params.fromProjectId || undefined,
+                    sourceKnowledgeId: params.fromKnowledgeId || undefined,
                 });
             } catch (error) {
                 if (String(error).includes("skill-name-conflict")) {
