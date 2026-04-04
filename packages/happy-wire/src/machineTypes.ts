@@ -75,7 +75,7 @@ export type TunnelState = z.infer<typeof TunnelStateSchema>;
 export const AutomationPrioritySchema = z.enum(["urgent", "user", "background"]);
 export type AutomationPriority = z.infer<typeof AutomationPrioritySchema>;
 
-export const AutomationJobKindSchema = z.enum(["supervisor", "webhook", "agent_loop"]);
+export const AutomationJobKindSchema = z.enum(["supervisor", "webhook", "agent_loop", "task"]);
 export type AutomationJobKind = z.infer<typeof AutomationJobKindSchema>;
 
 export const AutomationJobStatusSchema = z.enum([

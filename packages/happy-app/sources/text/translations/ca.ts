@@ -1088,6 +1088,8 @@ export const ca: TranslationStructure = {
     changesTab: "Canvis",
     directory: "Directori",
     emptyDirectory: "Aquest directori és buit",
+    filterFiles: "Filtra...",
+    noMatchingFiles: "Cap fitxer coincident",
     submodule: "Submòdul",
     submoduleNotInitialized: "No inicialitzat",
     childReposSummary: ({ count }) =>

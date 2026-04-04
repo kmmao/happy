@@ -320,6 +320,15 @@ export const ApiEphemeralTaskLogSchema = z.object({
     offset: z.number(),
 });
 
+export const ApiEphemeralTaskStatusChangedSchema = z.object({
+    type: z.literal("task-status-changed"),
+    taskId: z.string(),
+    status: z.string(),
+    sessionId: z.string().optional(),
+    errorMessage: z.string().optional(),
+    completedAt: z.number().optional(),
+});
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
@@ -332,6 +341,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralSupervisorLoopStatusSchema,
   ApiEphemeralKnowledgeCountSchema,
   ApiEphemeralTaskLogSchema,
+  ApiEphemeralTaskStatusChangedSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

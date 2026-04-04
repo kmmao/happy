@@ -13,7 +13,7 @@ Before `happy-wire`, wire-level message and session-protocol schemas were duplic
 - npm name: `@kmmao/happy-wire`
 - workspace path: `packages/happy-wire`
 - package type: publishable library (not private)
-- versioned dependency in consumers: `^0.1.0`
+- current version: `0.9.2`
 
 ## What is shared
 
@@ -53,6 +53,46 @@ User text rollout toggle:
 - enabled:
   - CLI emits modern user payloads (`role = 'session'`, `content.role = 'user'`)
   - app consumes modern user payloads and drops legacy user payloads
+
+### 3. Knowledge base schemas
+
+Shared from `knowledge.ts`:
+- `KnowledgeEntryTypeSchema` — entry categories: `discovery`, `decision`, `fix`, `convention`, `warning`
+- `KnowledgeContributorTypeSchema` — contributor types: `session`, `supervisor`, `user`
+- `KnowledgeActionSchema` — CRUD actions: `create`, `amend`, `supersede`, `verify`
+- `KnowledgeStatusSchema` — lifecycle states: `active`, `superseded`, `archived`
+- `KnowledgeConfidenceSchema` — confidence levels: `high`, `medium`, `low`
+- `CreateKnowledgeEntryBodySchema`, `UpdateKnowledgeEntryBodySchema`, `QueryKnowledgeParamsSchema`
+- `ProjectProfileSchema` — project tech stack, conventions, pitfalls
+- `KnowledgeInjectionRequestSchema` / `KnowledgeInjectionResponseSchema` — contextual injection
+- `KnowledgeChainEntrySchema`, `KnowledgeChainResponseSchema` — evolution chain (Phase 2)
+- `CrossProjectSearchResultSchema`, `CrossProjectSearchResponseSchema` — cross-project semantic search
+- `TurnKnowledgeExtractionSchema` — CLI → Server turn data for auto-extraction
+
+### 4. Voice schemas
+
+Shared from `voice.ts`:
+- `VoiceTokenResponseSchema` — discriminated union (`allowed: true` with token / `allowed: false` with denial reason)
+- Denial reasons: `voice_limit_reached`, `subscription_required`
+
+### 5. Task queue schemas
+
+Shared from `tasks.ts`:
+- `TaskPrioritySchema` — `urgent`, `user`, `background`
+- `TaskStatusSchema` — `queued`, `dispatching`, `running`, `completed`, `failed`, `cancelled`
+- `TaskTriggerTypeSchema` — `manual`, `cron`, `webhook`
+- `TaskSummarySchema` — task summary for App display
+- `CreateTaskBodySchema` — App → Server task creation
+- `TaskTriggerDataSchema` — Server → CLI dispatch payload
+- `TaskStatusReportSchema` — CLI → Server status updates
+- `TaskStatusChangedSchema` — Server → App ephemeral event
+
+### 6. Skill schemas
+
+Shared from `skills.ts`:
+- `SkillSummarySchema` — skill metadata for App display
+- `CreateSkillBodySchema`, `UpdateSkillBodySchema` — skill CRUD
+- `SkillContentSchema` — injected into `TaskTriggerData` for task execution
 
 ## Migration in this repository
 

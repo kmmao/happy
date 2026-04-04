@@ -350,6 +350,23 @@ export type EphemeralEvent =
       chunk: string;
       offset: number;
     }
+  | {
+      type: "task-trigger";
+      taskId: string;
+      prompt: string;
+      directory: string;
+      priority: string;
+      projectId?: string;
+      skillContents?: Array<{ name: string; content: string }>;
+    }
+  | {
+      type: "task-status-changed";
+      taskId: string;
+      status: string;
+      sessionId?: string;
+      errorMessage?: string;
+      completedAt?: number;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -1062,6 +1079,33 @@ export function buildKnowledgeCountEphemeral(
     type: "knowledge-count",
     id: sessionId,
     count,
+  };
+}
+
+export function buildTaskTriggerEphemeral(opts: {
+  taskId: string;
+  prompt: string;
+  directory: string;
+  priority: string;
+  projectId?: string;
+  skillContents?: Array<{ name: string; content: string }>;
+}): EphemeralPayload {
+  return {
+    type: "task-trigger",
+    ...opts,
+  };
+}
+
+export function buildTaskStatusChangedEphemeral(opts: {
+  taskId: string;
+  status: string;
+  sessionId?: string;
+  errorMessage?: string;
+  completedAt?: number;
+}): EphemeralPayload {
+  return {
+    type: "task-status-changed",
+    ...opts,
   };
 }
 

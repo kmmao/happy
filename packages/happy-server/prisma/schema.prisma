@@ -55,6 +55,10 @@ model Account {
     WebhookRoute        WebhookRoute[]
     Project             Project[]
     ProvisionToken      ProvisionToken[]
+    Task                Task[]
+    Skill               Skill[]
+    TriggerSchedule     TriggerSchedule[]
+    WebhookTrigger      WebhookTrigger[]
 }
 
 model TerminalAuthRequest {
@@ -441,6 +445,10 @@ model Project {
     supervisorLoops    SupervisorLoop[]
     knowledgeEntries   ProjectKnowledge[]
     profile            ProjectProfile?
+    tasks              Task[]
+    skills             Skill[]
+    triggerSchedules   TriggerSchedule[]
+    webhookTriggers    WebhookTrigger[]
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
@@ -738,4 +746,166 @@ model ProjectProfile {
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+}
+
+//
+// Tasks (Server-side persistent task queue)
+//
+
+model Task {
+    id              String    @id @default(cuid())
+    accountId       String
+    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    projectId       String?
+    project         Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+    machineId       String    // Target machine for execution
+
+    // Content (encrypted by App, decrypted by CLI)
+    prompt          String
+    promptVersion   Int       @default(0)
+
+    // Execution
+    priority        String    @default("user")     // urgent | user | background
+    status          String    @default("queued")    // queued | dispatching | running | completed | failed | cancelled
+    attempt         Int       @default(0)
+    maxAttempts     Int       @default(3)
+
+    // Trigger metadata
+    triggerType     String    @default("manual")    // manual | cron | webhook
+    triggerRef      String?                         // cron:<scheduleId> | webhook:<triggerId>
+
+    // Execution tracking
+    sessionId       String?                         // CLI session spawned for this task
+    errorMessage    String?
+    dispatchedAt    DateTime?
+    completedAt     DateTime?
+
+    // Skill bindings
+    skillBindings   TaskSkillBinding[]
+
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    @@index([accountId, status])
+    @@index([accountId, machineId, status])
+    @@index([machineId, status])
+    @@index([projectId])
+    @@index([accountId, createdAt(sort: Desc)])
+}
+
+//
+// Skills (Reusable instruction templates)
+//
+
+model Skill {
+    id                String    @id @default(cuid())
+    accountId         String
+    account           Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    projectId         String?                       // null = global skill, set = project-scoped
+    project           Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+    name              String
+    description       String?
+    content           String                        // The instruction template text
+    contentVersion    Int       @default(0)
+
+    // Optional attachment references (JSON array of file refs)
+    attachments       String    @default("[]")
+
+    // Lineage from Knowledge Base
+    sourceKnowledgeId String?                       // ProjectKnowledge.id this was derived from
+
+    archived          Boolean   @default(false)
+    createdAt         DateTime  @default(now())
+    updatedAt         DateTime  @updatedAt
+
+    // Relations
+    taskBindings      TaskSkillBinding[]
+
+    @@unique([accountId, projectId, name])
+    @@index([accountId, archived])
+    @@index([projectId])
+}
+
+//
+// Task ↔ Skill binding (many-to-many)
+//
+
+model TaskSkillBinding {
+    id        String @id @default(cuid())
+    taskId    String
+    task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    skillId   String
+    skill     Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+    order     Int    @default(0) // Injection order
+
+    @@unique([taskId, skillId])
+    @@index([taskId])
+    @@index([skillId])
+}
+
+//
+// Trigger Schedules (Cron-based task creation)
+//
+
+model TriggerSchedule {
+    id              String    @id @default(cuid())
+    accountId       String
+    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    projectId       String?
+    project         Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+    machineId       String    // Target machine
+
+    name            String?
+    prompt          String    // Encrypted: template prompt
+    cronExpression  String
+    priority        String    @default("background")
+    enabled         Boolean   @default(true)
+
+    // Skill bindings (JSON array of skill IDs)
+    skillIds        String    @default("[]")
+
+    // Tracking
+    nextRunAt       DateTime?
+    lastRunAt       DateTime?
+    lastTaskId      String?
+    runCount        Int       @default(0)
+
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    @@index([accountId, machineId, enabled])
+    @@index([nextRunAt])
+}
+
+//
+// Generic Webhook Triggers (external system → Task)
+//
+
+model WebhookTrigger {
+    id              String    @id @default(cuid())
+    accountId       String
+    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    projectId       String?
+    project         Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+    machineId       String    // Target machine
+
+    name            String?
+    slug            String    @unique              // URL slug: /v1/triggers/:slug
+    secretHash      String                         // SHA-256 hash of bearer token
+    prompt          String                         // Encrypted: template prompt (can use {{payload}} placeholder)
+    priority        String    @default("background")
+    enabled         Boolean   @default(true)
+
+    // Skill bindings (JSON array of skill IDs)
+    skillIds        String    @default("[]")
+
+    // Stats
+    lastTriggeredAt DateTime?
+    triggerCount    Int       @default(0)
+
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    @@index([accountId, machineId])
 }

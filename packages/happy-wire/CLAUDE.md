@@ -12,6 +12,10 @@ Shared message wire types and Zod schemas (`@kmmao/happy-wire`) used by all Happ
 | `sessionProtocol.ts` | Session protocol envelope types |
 | `legacyProtocol.ts` | Legacy agent/user message formats |
 | `messageMeta.ts` | Message metadata (model, permissions, thinking) |
+| `knowledge.ts` | Knowledge base entry types, CRUD schemas, injection, evolution chain |
+| `voice.ts` | Voice token request/response schemas (ElevenLabs integration) |
+| `tasks.ts` | Task queue schemas — priority, status, trigger, dispatch, reporting |
+| `skills.ts` | Skill CRUD schemas and injection content type |
 
 ## Wire-Specific Rules
 - 2 spaces indentation, source in `src/`, tests as `.test.ts`

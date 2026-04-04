@@ -343,6 +343,22 @@ graph TB
 
 The daemon updates these via `ApiMachineClient` and mirrors local state into `daemon.state.json` for control/diagnostics.
 
+## Agent loop scheduling and automation
+
+The daemon manages autonomous agent loops with scheduling, lifecycle tracking, and emergency controls.
+
+### Cron scheduling
+Agent loops support cron expressions (via `cron-parser`) for scheduling. When a loop has a `cronExpression`, `nextRunFromCron()` computes the next run timestamp, taking precedence over the `intervalMs` fallback. See `src/automation/AgentLoopCoordinator.ts`.
+
+### BriefTool
+When an agent loop completes (success, failure, or cancellation), `AgentLoopBrief` generates a markdown brief summarizing the loop's goal, current focus, reflection, working memory, and any errors. The latest brief is stored alongside timestamped archives. Briefs are sent via push notifications. See `src/automation/AgentLoopBrief.ts`.
+
+### Killswitch (emergency stop)
+The control server exposes `/killswitch` (POST/GET) and a Socket.IO RPC handler (`killswitch-set` / `killswitch-get`). When activated, sets `daemon.killed = true`, which halts all running agent loops and the automation scheduler. State persists to `daemon.state.json`. See `src/daemon/run.ts` and `src/daemon/controlServer.ts`.
+
+### Permission mode system
+Eight permission modes control tool execution: `default`, `acceptEdits`, `bypassPermissions`, `plan`, `dontAsk`, `auto` (AI-based auto-approval), `read-only`, `safe-yolo`, `yolo`. These map to Claude SDK's compatible modes. Set via `--permission-mode` CLI flag or session option. Sandbox mode forces `bypassPermissions`. See `src/claude/utils/permissionMode.ts` and `src/claude/utils/permissionHandler.ts`.
+
 ## RPC and tool bridge
 
 ```mermaid

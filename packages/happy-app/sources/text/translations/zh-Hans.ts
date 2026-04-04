@@ -1048,6 +1048,8 @@ export const zhHans: TranslationStructure = {
     changesTab: "更改",
     directory: "目录",
     emptyDirectory: "此目录为空",
+    filterFiles: "筛选...",
+    noMatchingFiles: "无匹配文件",
     submodule: "子模块",
     submoduleNotInitialized: "未初始化",
     childReposSummary: ({ count }: { count: number }) => `${count} 个 Git 仓库`,

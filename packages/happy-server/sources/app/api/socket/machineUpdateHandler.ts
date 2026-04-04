@@ -8,6 +8,7 @@ import { allocateUserSeq } from "@/storage/seq";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { checkAndTriggerScheduledRuns } from "@/modules/supervisorScheduler";
 import { cleanupStaleFixActions } from "@/modules/supervisorFixWatchdog";
+import { checkAndTriggerSchedules } from "@/modules/triggerScheduleRunner";
 import { pushSend } from "@/modules/pushSend";
 import { consolidate } from "@/modules/knowledgeConsolidate";
 import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
@@ -76,6 +77,11 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 // Also clean up stale fix actions whose sessions are no longer active
                 cleanupStaleFixActions(userId, data.machineId).catch(err =>
                     log({ module: 'supervisor', level: 'error' }, `Stale fix cleanup error: ${err}`)
+                );
+
+                // Check for due cron trigger schedules (shares 5-min heartbeat throttle)
+                checkAndTriggerSchedules(data.machineId, userId).catch(err =>
+                    log({ module: 'trigger', level: 'error' }, `Trigger schedule check error: ${err}`)
                 );
             }
         } catch (error) {

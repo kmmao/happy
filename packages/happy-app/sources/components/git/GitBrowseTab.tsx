@@ -7,6 +7,7 @@ import {
     RefreshControl,
     NativeScrollEvent,
     NativeSyntheticEvent,
+    TextInput,
 } from "react-native";
 import { t } from "@/text";
 import { useRouter } from "expo-router";
@@ -48,6 +49,16 @@ function formatFileSize(bytes?: number): string {
 
 const SCROLL_COLLAPSE_THRESHOLD = 20;
 
+const HIDDEN_PATTERNS = new Set([
+    ".git", ".svn", ".hg", ".history", ".vscode", ".idea",
+    ".DS_Store", ".gitignore", ".gitattributes", ".gitmodules",
+    "node_modules", "__pycache__", ".cache", ".tmp",
+]);
+
+function isHiddenEntry(name: string): boolean {
+    return name.startsWith(".") || HIDDEN_PATTERNS.has(name);
+}
+
 export const GitBrowseTab = React.memo<{
     sessionId: string;
     onPullDown?: () => void;
@@ -70,6 +81,8 @@ export const GitBrowseTab = React.memo<{
     const [isLoading, setIsLoading] = React.useState(false);
     const [pathHistory, setPathHistory] = React.useState<string[]>([]);
     const [refreshKey, setRefreshKey] = React.useState(0);
+    const [filterText, setFilterText] = React.useState("");
+    const [showHidden, setShowHidden] = React.useState(false);
 
     // Initialize to basePath once
     React.useEffect(() => {
@@ -162,15 +175,26 @@ export const GitBrowseTab = React.memo<{
             ? currentPath.slice(basePath.length) || "/"
             : currentPath ?? "/";
 
+    // Clear filter when navigating directories
+    React.useEffect(() => {
+        setFilterText("");
+    }, [currentPath]);
+
     // Sort: directories first, then files; both alphabetically
-    const sorted = React.useMemo(
-        () =>
-            [...entries].sort((a, b) => {
+    // Filter by search text and hidden files
+    const sorted = React.useMemo(() => {
+        const lowerFilter = filterText.toLowerCase();
+        return [...entries]
+            .filter((e) => {
+                if (!showHidden && isHiddenEntry(e.name)) return false;
+                if (lowerFilter && !e.name.toLowerCase().includes(lowerFilter)) return false;
+                return true;
+            })
+            .sort((a, b) => {
                 if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
                 return a.name.localeCompare(b.name);
-            }),
-        [entries],
-    );
+            });
+    }, [entries, filterText, showHidden]);
 
     const scrollCollapseCalledRef = React.useRef(false);
     const handleScroll = React.useCallback(
@@ -194,12 +218,12 @@ export const GitBrowseTab = React.memo<{
                 style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
+                    paddingHorizontal: embedded ? 8 : 16,
+                    paddingVertical: embedded ? 4 : 12,
                     borderBottomWidth: Platform.select({ ios: 0.33, default: 1 }),
                     borderBottomColor: theme.colors.divider,
                     backgroundColor: theme.colors.surfaceHigh,
-                    gap: 8,
+                    gap: embedded ? 6 : 8,
                 }}
             >
                 {canGoBack && (
@@ -219,7 +243,7 @@ export const GitBrowseTab = React.memo<{
                 <Text
                     style={{
                         flex: 1,
-                        fontSize: 13,
+                        fontSize: embedded ? 12 : 13,
                         color: theme.colors.textSecondary,
                         ...Typography.mono(),
                     }}
@@ -227,7 +251,57 @@ export const GitBrowseTab = React.memo<{
                 >
                     {displayPath}
                 </Text>
+                {embedded && (
+                    <Pressable
+                        onPress={() => setShowHidden((v) => !v)}
+                        hitSlop={6}
+                        style={{ padding: 2 }}
+                    >
+                        <Octicons
+                            name={showHidden ? "eye" : "eye-closed"}
+                            size={14}
+                            color={showHidden ? theme.colors.textLink : theme.colors.textSecondary}
+                        />
+                    </Pressable>
+                )}
             </View>
+
+            {/* Filter bar (embedded mode) */}
+            {embedded && (
+                <View
+                    style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.colors.divider,
+                        gap: 4,
+                    }}
+                >
+                    <Octicons name="search" size={12} color={theme.colors.textSecondary} />
+                    <TextInput
+                        value={filterText}
+                        onChangeText={setFilterText}
+                        placeholder={t("files.filterFiles")}
+                        placeholderTextColor={theme.colors.textSecondary}
+                        style={{
+                            flex: 1,
+                            fontSize: 12,
+                            color: theme.colors.text,
+                            paddingVertical: 2,
+                            ...Typography.default(),
+                        }}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                    />
+                    {filterText.length > 0 && (
+                        <Pressable onPress={() => setFilterText("")} hitSlop={4}>
+                            <Octicons name="x" size={12} color={theme.colors.textSecondary} />
+                        </Pressable>
+                    )}
+                </View>
+            )}
 
             {/* Directory listing */}
             <ItemList
@@ -264,27 +338,85 @@ export const GitBrowseTab = React.memo<{
                             flex: 1,
                             justifyContent: "center",
                             alignItems: "center",
-                            paddingTop: 40,
+                            paddingTop: embedded ? 20 : 40,
                             paddingHorizontal: 20,
                         }}
                     >
                         <Octicons
-                            name="file-directory"
-                            size={48}
+                            name={filterText ? "search" : "file-directory"}
+                            size={embedded ? 28 : 48}
                             color={theme.colors.textSecondary}
                         />
                         <Text
                             style={{
-                                fontSize: 16,
+                                fontSize: embedded ? 13 : 16,
                                 color: theme.colors.textSecondary,
                                 textAlign: "center",
-                                marginTop: 16,
+                                marginTop: embedded ? 8 : 16,
                                 ...Typography.default(),
                             }}
                         >
-                            {t("files.emptyDirectory")}
+                            {filterText ? t("files.noMatchingFiles") : t("files.emptyDirectory")}
                         </Text>
                     </View>
+                ) : embedded ? (
+                    sorted.map((entry) => {
+                        const isDir = entry.type === "directory";
+                        const entryFullPath = `${currentPath}/${entry.name}`;
+                        const entryRelPath = basePath
+                            ? entryFullPath.slice(basePath.length + 1)
+                            : entry.name;
+
+                        return (
+                            <Pressable
+                                key={`${entry.type}-${entry.name}`}
+                                onPress={() => handleEntryPress(entry)}
+                                style={({ pressed }) => ({
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 2,
+                                    gap: 4,
+                                    backgroundColor: pressed ? theme.colors.surfacePressedOverlay : "transparent",
+                                })}
+                            >
+                                {isDir ? (
+                                    <Octicons name="file-directory" size={14} color="#007AFF" />
+                                ) : (
+                                    <FileIcon fileName={entry.name} size={14} />
+                                )}
+                                <Text
+                                    style={{
+                                        flex: 1,
+                                        fontSize: 12,
+                                        color: theme.colors.text,
+                                        ...Typography.default(),
+                                    }}
+                                    numberOfLines={1}
+                                >
+                                    {entry.name}
+                                </Text>
+                                {onReference && (
+                                    <Pressable
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            onReference(entryRelPath);
+                                        }}
+                                        hitSlop={4}
+                                        style={({ pressed }) => ({
+                                            padding: 1,
+                                            opacity: pressed ? 0.5 : 1,
+                                        })}
+                                    >
+                                        <Octicons name="mention" size={12} color={theme.colors.textLink} />
+                                    </Pressable>
+                                )}
+                                {isDir && (
+                                    <Octicons name="chevron-right" size={12} color={theme.colors.textSecondary} />
+                                )}
+                            </Pressable>
+                        );
+                    })
                 ) : (
                     sorted.map((entry, index) => {
                         const isDir = entry.type === "directory";

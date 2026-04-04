@@ -1177,6 +1177,8 @@ export const it: TranslationStructure = {
     changesTab: "Modifiche",
     directory: "Cartella",
     emptyDirectory: "Questa cartella è vuota",
+    filterFiles: "Filtra...",
+    noMatchingFiles: "Nessun file corrispondente",
     submodule: "Sottomodulo",
     submoduleNotInitialized: "Non inizializzato",
     childReposSummary: ({ count }: { count: number }) =>

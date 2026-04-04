@@ -1048,6 +1048,8 @@ export const zhHant: TranslationStructure = {
     changesTab: "變更",
     directory: "目錄",
     emptyDirectory: "此目錄為空",
+    filterFiles: "篩選...",
+    noMatchingFiles: "無匹配檔案",
     submodule: "子模組",
     submoduleNotInitialized: "未初始化",
     childReposSummary: ({ count }) => `${count} 個 Git 倉庫`,

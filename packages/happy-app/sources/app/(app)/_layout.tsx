@@ -471,6 +471,70 @@ export default function RootLayout() {
           headerBackTitle: t("common.back"),
         }}
       />
+      <Stack.Screen
+        name="machine/[id]/tasks"
+        options={{
+          headerShown: true,
+          headerTitle: t("tasks.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="machine/[id]/task/new"
+        options={{
+          headerShown: true,
+          headerTitle: t("tasks.newTask"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="machine/[id]/triggers"
+        options={{
+          headerShown: true,
+          headerTitle: t("triggers.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="machine/[id]/trigger-schedule/new"
+        options={{
+          headerShown: true,
+          headerTitle: t("triggers.createSchedule"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="machine/[id]/webhook-trigger/new"
+        options={{
+          headerShown: true,
+          headerTitle: t("triggers.createWebhook"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="skills/index"
+        options={{
+          headerShown: true,
+          headerTitle: t("skills.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="skills/new"
+        options={{
+          headerShown: true,
+          headerTitle: t("skills.newSkill"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="skills/[id]/edit"
+        options={{
+          headerShown: true,
+          headerTitle: t("skills.editSkill"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
     </Stack>
   );
 }

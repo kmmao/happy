@@ -1099,6 +1099,8 @@ export const ru: TranslationStructure = {
     changesTab: "Изменения",
     directory: "Каталог",
     emptyDirectory: "Этот каталог пуст",
+    filterFiles: "Фильтр...",
+    noMatchingFiles: "Нет подходящих файлов",
     submodule: "Подмодуль",
     submoduleNotInitialized: "Не инициализирован",
     childReposSummary: ({ count }) =>

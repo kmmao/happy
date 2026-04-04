@@ -188,6 +188,13 @@ class Sync {
   }) => void>();
   private researchConfigListeners = new Set<(event: ResearchConfigChange) => void>();
   private taskLogListeners = new Set<(sessionId: string, taskId: string, chunk: string) => void>();
+  private taskStatusListeners = new Set<(event: {
+    taskId: string;
+    status: string;
+    sessionId?: string;
+    errorMessage?: string;
+    completedAt?: number;
+  }) => void>();
   private supervisorLoopStatusListeners = new Set<(event: {
     loopId: string;
     projectId: string;
@@ -2455,6 +2462,19 @@ class Sync {
       }
     }
 
+    // Handle task-status-changed: notify listeners for real-time task status updates
+    if (updateData.type === "task-status-changed") {
+      for (const listener of this.taskStatusListeners) {
+        listener({
+          taskId: updateData.taskId,
+          status: updateData.status,
+          sessionId: updateData.sessionId,
+          errorMessage: updateData.errorMessage,
+          completedAt: updateData.completedAt,
+        });
+      }
+    }
+
     // Handle supervisor-loop-status: notify listeners for real-time Loop status updates.
     if (updateData.type === "supervisor-loop-status") {
       const loopEvent = {
@@ -2716,6 +2736,17 @@ class Sync {
   onTaskLog(listener: (sessionId: string, taskId: string, chunk: string) => void): () => void {
     this.taskLogListeners.add(listener);
     return () => { this.taskLogListeners.delete(listener); };
+  }
+
+  onTaskStatusChanged(listener: (event: {
+    taskId: string;
+    status: string;
+    sessionId?: string;
+    errorMessage?: string;
+    completedAt?: number;
+  }) => void): () => void {
+    this.taskStatusListeners.add(listener);
+    return () => { this.taskStatusListeners.delete(listener); };
   }
 
   destroy() {

@@ -8,16 +8,16 @@
 
 | 包 | 发布目标 | 发布方式 | 当前版本 |
 |----|---------|---------|---------|
-| `@kmmao/happy-wire` | npm（上游维护） | 本地 workspace，不需要单独发布 | 0.2.8 |
+| `@kmmao/happy-wire` | npm | `npm publish` | 0.9.2 |
 | `happy-server` | Docker Compose | 重新构建镜像并重启 | 私有 |
-| `@kmmao/happy-coder` (CLI) | npm | `npm publish` | 0.14.0 |
-| `@kmmao/happy-agent` | npm | `npm publish`（暂不需要） | 0.2.3 |
-| `happy-app` | EAS | OTA 或原生构建 | 1.6.2 |
+| `@kmmao/happy-coder` (CLI) | npm | `npm publish` | 0.60.0 |
+| `@kmmao/happy-agent` | npm | `npm publish` | 0.3.11 |
+| `happy-app` | EAS | OTA 或原生构建 | 1.0.0 |
 
 ### 发布顺序
 
 ```
-happy-wire（本地构建即可）
+happy-wire（npm publish，必须先于 CLI/Agent）
     ↓
 happy-server（Docker 部署）
     ↓
@@ -93,7 +93,7 @@ docker compose exec server npx prisma migrate deploy
 cat packages/happy-cli/package.json | grep '"version"'
 
 # 2. 修改版本号（手动编辑 packages/happy-cli/package.json）
-# 例如：0.14.0 → 0.15.0
+# 例如：0.60.0 → 0.61.0
 
 # 3. 构建
 yarn workspace @kmmao/happy-coder build

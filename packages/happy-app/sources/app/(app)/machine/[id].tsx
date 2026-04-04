@@ -520,6 +520,19 @@ function MachineDetailScreen() {
         <ItemGroup title={t("machine.automation")}>
           <AutomationSummaryItem machine={machine} machineId={machineId} />
           <AgentLoopsSummaryItem machine={machine} machineId={machineId} />
+          <Item
+            title={t("tasks.title")}
+            subtitle={t("tasks.noTasks")}
+            icon={<Ionicons name="list-outline" size={20} color={theme.colors.textLink} />}
+            onPress={() => router.push(`/machine/${machineId}/tasks` as any)}
+            showChevron
+          />
+          <Item
+            title={t("triggers.title")}
+            icon={<Ionicons name="timer-outline" size={20} color={theme.colors.textLink} />}
+            onPress={() => router.push(`/machine/${machineId}/triggers` as any)}
+            showChevron
+          />
         </ItemGroup>
 
         {/* Network Services */}

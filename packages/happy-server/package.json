@@ -49,6 +49,7 @@
     "@types/semver": "^7.7.0",
     "axios": "^1.13.5",
     "chalk": "4.1.2",
+    "cron-parser": "^5.5.0",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.5",
     "expo-server-sdk": "^6.1.0",

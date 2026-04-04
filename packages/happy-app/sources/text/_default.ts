@@ -1070,6 +1070,8 @@ export const en = {
     changesTab: "Changes",
     directory: "Directory",
     emptyDirectory: "This directory is empty",
+    filterFiles: "Filter...",
+    noMatchingFiles: "No matching files",
     submodule: "Submodule",
     submoduleNotInitialized: "Not initialized",
     childReposSummary: ({ count }: { count: number }) =>

@@ -1099,6 +1099,8 @@ export const pl: TranslationStructure = {
     changesTab: "Zmiany",
     directory: "Katalog",
     emptyDirectory: "Ten katalog jest pusty",
+    filterFiles: "Filtruj...",
+    noMatchingFiles: "Brak pasujących plików",
     submodule: "Submoduł",
     submoduleNotInitialized: "Nie zainicjalizowany",
     childReposSummary: ({ count }) =>

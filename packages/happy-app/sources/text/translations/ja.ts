@@ -1164,6 +1164,8 @@ export const ja: TranslationStructure = {
     changesTab: "変更",
     directory: "ディレクトリ",
     emptyDirectory: "このディレクトリは空です",
+    filterFiles: "フィルター...",
+    noMatchingFiles: "一致するファイルなし",
     submodule: "サブモジュール",
     submoduleNotInitialized: "未初期化",
     childReposSummary: ({ count }: { count: number }) =>

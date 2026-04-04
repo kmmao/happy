@@ -27,6 +27,7 @@ import { accessKeyHandler } from "./socket/accessKeyHandler";
 import { sessionPreferencesHandler } from "./socket/sessionPreferencesHandler";
 import { knowledgeHandler } from "./socket/knowledgeHandler";
 import { taskLogHandler } from "./socket/taskLogHandler";
+import { taskStatusHandler } from "./socket/taskStatusHandler";
 
 export function startSocket(app: Fastify) {
   const io = new Server(app.server, {
@@ -231,6 +232,7 @@ export function startSocket(app: Fastify) {
     supervisorFixStatusHandler(socket, userId);
     knowledgeHandler(userId, socket);
     taskLogHandler(userId, socket);
+    taskStatusHandler(socket, userId);
     // Ready
     log({ module: "websocket" }, `User connected: ${userId}`);
   });
