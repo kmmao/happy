@@ -112,6 +112,12 @@ interface DaemonToServerEvents {
   }) => void;
   "supervisor-run-status": (data: SupervisorRunStatusData) => void;
   "supervisor-fix-status": (data: SupervisorFixStatusData) => void;
+  "task-status": (data: {
+    taskId: string;
+    status: string;
+    sessionId?: string;
+    errorMessage?: string;
+  }) => void;
   "transcript-knowledge": (data: {
     turns: Array<{
       sessionId: string;
@@ -296,6 +302,7 @@ export class ApiMachineClient {
     | ((data: SupervisorTriggerData) => void)
     | null = null;
 
+  private taskHandler: ((data: { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; skillContents?: Array<{ name: string; content: string }> }) => void) | null = null;
   private fixKillHandler:
     | ((data: { fixSessionId: string; projectId: string; fixStatus: string }) => void)
     | null = null;
@@ -307,6 +314,12 @@ export class ApiMachineClient {
   }> = [];
   private pendingSupervisorStatuses: Array<SupervisorRunStatusData> = [];
   private pendingFixStatuses: Array<SupervisorFixStatusData> = [];
+  private pendingTaskStatuses: Array<{
+    taskId: string;
+    status: string;
+    sessionId?: string;
+    errorMessage?: string;
+  }> = [];
 
 
   constructor(
@@ -707,6 +720,14 @@ export class ApiMachineClient {
   }
 
   /**
+   * Set handler for incoming task trigger events.
+   * Called when Server dispatches a task-trigger ephemeral event to this machine.
+   */
+  setTaskHandler(handler: (data: { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; skillContents?: Array<{ name: string; content: string }> }) => void) {
+    this.taskHandler = handler;
+  }
+
+  /**
    * Set handler for fix-kill-session events.
    * Called when Server signals that a fix session should be terminated.
    */
@@ -779,6 +800,35 @@ export class ApiMachineClient {
       return;
     }
     this.socket.emit("supervisor-fix-status", data);
+  }
+
+  /**
+   * Report task execution status back to server.
+   * Queues the status if the socket is disconnected and flushes on reconnect.
+   */
+  taskStatus(
+    taskId: string,
+    status: string,
+    sessionId?: string,
+    errorMessage?: string,
+  ) {
+    const data = { taskId, status, sessionId, errorMessage };
+    if (!this.socket.connected) {
+      logger.debug(
+        `[TASK] Socket disconnected, queuing status for task ${taskId}`,
+      );
+      this.pendingTaskStatuses.push(data);
+      return;
+    }
+    this.socket.emit("task-status", data);
+  }
+
+  private flushPendingTaskStatuses() {
+    const pending = [...this.pendingTaskStatuses];
+    this.pendingTaskStatuses = [];
+    for (const item of pending) {
+      this.socket.emit("task-status", item);
+    }
   }
 
   /**
@@ -959,6 +1009,7 @@ export class ApiMachineClient {
       this.flushPendingWebhookStatuses();
       this.flushPendingSupervisorStatuses();
       this.flushPendingFixStatuses();
+      this.flushPendingTaskStatuses();
 
       // Start keep-alive
       this.startKeepAlive();
@@ -1041,6 +1092,13 @@ export class ApiMachineClient {
           `[API MACHINE] Received supervisor-trigger for project ${data.projectId}, run ${data.runId}`,
         );
         this.supervisorHandler(data as SupervisorTriggerData);
+      }
+
+      if (data.type === "task-trigger" && this.taskHandler) {
+        logger.debug(
+          `[API MACHINE] Received task-trigger for task ${data.taskId}`,
+        );
+        this.taskHandler(data as { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; skillContents?: Array<{ name: string; content: string }> });
       }
 
       if (data.type === "supervisor-fix-kill-session" && this.fixKillHandler) {

@@ -27,6 +27,10 @@ describe("Automation status snapshot shape", () => {
           agentLoop: {
             spawnSession: async () => ({ type: "success", sessionId: "sid" }),
           },
+          task: {
+            spawnSession: async () => ({ type: "success", sessionId: "sid" }),
+            onTaskStatusChange: () => {},
+          },
         },
         maxConcurrentDispatches: 0,
         runJob: async () => ({ completion: "immediate" }),

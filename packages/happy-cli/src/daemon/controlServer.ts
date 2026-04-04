@@ -22,7 +22,7 @@ import type { AutoDreamProfile } from "@/automation/AutoDreamStore";
 
 const automationJobSchema = z.object({
   id: z.string(),
-  kind: z.enum(["supervisor", "webhook", "agent_loop"]),
+  kind: z.enum(["supervisor", "webhook", "agent_loop", "task"]),
   status: z.enum(["queued", "dispatching", "running", "completed", "failed", "cancelled"]),
   priority: z.enum(["urgent", "user", "background"]),
   dedupeKey: z.string(),

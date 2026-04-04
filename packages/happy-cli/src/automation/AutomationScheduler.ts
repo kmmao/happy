@@ -17,6 +17,7 @@ import type {
   AutomationPriority,
   AutomationRecoveryResult,
   AutomationRunResult,
+  TaskTriggerData,
 } from "./types";
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
@@ -30,7 +31,8 @@ function buildAutomationJobMetadata(
   input:
     | { kind: "supervisor"; payload: SupervisorTriggerData }
     | { kind: "webhook"; payload: WebhookTriggerData }
-    | { kind: "agent_loop"; payload: AgentLoopTriggerData },
+    | { kind: "agent_loop"; payload: AgentLoopTriggerData }
+    | { kind: "task"; payload: TaskTriggerData },
 ): Pick<AutomationJob, "label" | "projectId" | "runId" | "loopId" | "loopIteration" | "continuityKey"> {
   if (input.kind === "supervisor") {
     const { payload } = input;
@@ -69,6 +71,15 @@ function buildAutomationJobMetadata(
       loopId: payload.loopId,
       loopIteration: payload.iteration,
       continuityKey: `agent-loop:${payload.loopId}`,
+    };
+  }
+
+  if (input.kind === "task") {
+    const { payload } = input;
+    const promptPreview = payload.prompt.trim().replace(/\s+/g, " ").slice(0, 48);
+    return {
+      label: `Task: ${promptPreview}`,
+      projectId: payload.projectId,
     };
   }
 
@@ -186,6 +197,19 @@ export class AutomationScheduler {
       payload: data,
       priority: "background",
       dedupeKey: `agent-loop:${data.loopId}:${data.iteration}`,
+      maxAttempts: 3,
+    });
+  }
+
+  async enqueueTask(
+    data: TaskTriggerData,
+  ): Promise<AutomationEnqueueResult> {
+    await this.ensureLoaded();
+    return this.enqueueJob({
+      kind: "task",
+      payload: data,
+      priority: data.priority ?? "user",
+      dedupeKey: `task:${data.taskId}`,
       maxAttempts: 3,
     });
   }
@@ -382,6 +406,13 @@ export class AutomationScheduler {
       | {
           kind: "agent_loop";
           payload: AgentLoopTriggerData;
+          priority: AutomationPriority;
+          dedupeKey: string;
+          maxAttempts: number;
+        }
+      | {
+          kind: "task";
+          payload: TaskTriggerData;
           priority: AutomationPriority;
           dedupeKey: string;
           maxAttempts: number;

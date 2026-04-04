@@ -16,7 +16,7 @@ export interface TrackedSession {
   terminationRequestedAt?: number;
   terminationReason?: string;
   automationContext?: {
-    kind: "supervisor" | "webhook" | "agent_loop";
+    kind: "supervisor" | "webhook" | "agent_loop" | "task";
     trigger?: string;
     projectId?: string;
     runId?: string;

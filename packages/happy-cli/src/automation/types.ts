@@ -70,7 +70,17 @@ export interface AgentLoopTriggerData {
   eventDetails?: string;
 }
 
-export type AutomationJobKind = "supervisor" | "webhook" | "agent_loop";
+export interface TaskTriggerData {
+  type: "task-trigger";
+  taskId: string;
+  prompt: string;
+  directory: string;
+  priority: AutomationPriority;
+  projectId?: string;
+  skillContents?: Array<{ name: string; content: string }>;
+}
+
+export type AutomationJobKind = "supervisor" | "webhook" | "agent_loop" | "task";
 
 export type AutomationJobStatus =
   | "queued"
@@ -117,7 +127,9 @@ export type WebhookAutomationJob = AutomationJobBase<"webhook", WebhookTriggerDa
 
 export type AgentLoopAutomationJob = AutomationJobBase<"agent_loop", AgentLoopTriggerData>;
 
-export type AutomationJob = SupervisorAutomationJob | WebhookAutomationJob | AgentLoopAutomationJob;
+export type TaskAutomationJob = AutomationJobBase<"task", TaskTriggerData>;
+
+export type AutomationJob = SupervisorAutomationJob | WebhookAutomationJob | AgentLoopAutomationJob | TaskAutomationJob;
 
 export interface AutomationStoreFile {
   version: 1;

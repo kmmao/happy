@@ -39,6 +39,10 @@ function createScheduler(
       agentLoop: {
         spawnSession: async () => ({ type: "success", sessionId: "sid" }),
       },
+      task: {
+        spawnSession: async () => ({ type: "success", sessionId: "sid" }),
+        onTaskStatusChange: () => {},
+      },
     },
     pollIntervalMs: 50,
     maxConcurrentDispatches: options?.maxConcurrentDispatches ?? 1,

@@ -2287,6 +2287,16 @@ export async function startDaemon(): Promise<void> {
             return agentLoopCoordinator?.onJobSessionStarted(data.loopId, sessionId);
           },
         },
+        task: {
+          spawnSession,
+          onTaskStatusChange: (taskId, status, sessionId, errorMessage) => {
+            try {
+              apiMachine?.taskStatus(taskId, status, sessionId, errorMessage);
+            } catch (err) {
+              logger.debug(`[TASK] Failed to report status for ${taskId}: ${err}`);
+            }
+          },
+        },
       },
       onChange: () => scheduleAutomationStatePublish(),
     });
@@ -2434,6 +2444,35 @@ export async function startDaemon(): Promise<void> {
         });
     });
 
+    // Set up task trigger handler: enqueue task jobs from server
+    apiMachine.setTaskHandler((data) => {
+      void automationScheduler!
+        .enqueueTask({
+          type: "task-trigger",
+          taskId: data.taskId,
+          prompt: data.prompt,
+          directory: data.directory,
+          priority: data.priority as "urgent" | "user" | "background",
+          projectId: data.projectId,
+          skillContents: data.skillContents,
+        })
+        .then((result) => {
+          if (!result.deduped) {
+            void recordAutomationAuditEvent({
+              kind: "job_enqueued",
+              jobId: result.job.id,
+              dedupeKey: result.job.dedupeKey,
+              projectId: result.job.projectId,
+              trigger: "task",
+              status: result.job.status,
+              message: result.job.label,
+            });
+          }
+        })
+        .catch((error) => {
+          logger.debug(`[DAEMON RUN] Failed to enqueue task job: ${error}`);
+        });
+    });
 
     // Set up fix-kill handler: terminate fix sessions after completion/failure
     apiMachine.setFixKillHandler((data) => {

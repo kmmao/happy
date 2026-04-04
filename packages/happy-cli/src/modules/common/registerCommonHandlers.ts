@@ -183,7 +183,7 @@ export interface SpawnSessionOptions {
   /** Profile ID from GUI — if it matches a locally configured profile, operator-only env vars are trusted */
   profileId?: string;
   automationContext?: {
-    kind: "supervisor" | "webhook" | "agent_loop";
+    kind: "supervisor" | "webhook" | "agent_loop" | "task";
     trigger?: string;
     projectId?: string;
     runId?: string;
