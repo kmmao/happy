@@ -97,6 +97,7 @@ export interface AutomationSchedulerOptions {
   runJob?: (job: AutomationJob) => Promise<AutomationRunResult>;
   onChange?: (jobs: AutomationJob[]) => void;
   sendPushNotification?: (title: string, body: string) => void;
+  onTaskStatusReport?: (taskId: string, status: string, sessionId?: string, errorMessage?: string) => void;
 }
 
 export class AutomationScheduler {
@@ -108,6 +109,7 @@ export class AutomationScheduler {
   private readonly runJob: (job: AutomationJob) => Promise<AutomationRunResult>;
   private readonly onChange?: (jobs: AutomationJob[]) => void;
   private readonly sendPushNotification?: (title: string, body: string) => void;
+  private readonly onTaskStatusReport?: (taskId: string, status: string, sessionId?: string, errorMessage?: string) => void;
   private readonly inFlight = new Set<string>();
   private readonly activeDispatches = new Set<Promise<void>>();
   private interval: NodeJS.Timeout | null = null;
@@ -126,6 +128,7 @@ export class AutomationScheduler {
       options.runJob ?? ((job) => runAutomationJob(job, this.runnerDeps));
     this.onChange = options.onChange;
     this.sendPushNotification = options.sendPushNotification;
+    this.onTaskStatusReport = options.onTaskStatusReport;
   }
 
   async start(recoveredRunningSessionIds?: ReadonlySet<string>): Promise<AutomationRecoveryResult> {
@@ -365,6 +368,7 @@ export class AutomationScheduler {
     };
     await this.store.upsert(updated);
     this.notifyChange();
+    this.reportTaskStatus(updated);
     return updated;
   }
 
@@ -374,6 +378,18 @@ export class AutomationScheduler {
     }
     await this.store.load();
     this.loaded = true;
+  }
+
+  private reportTaskStatus(job: AutomationJob): void {
+    if (job.kind !== "task" || !this.onTaskStatusReport) {
+      return;
+    }
+    const taskId = (job.payload as TaskTriggerData).taskId;
+    try {
+      this.onTaskStatusReport(taskId, job.status, job.sessionId, job.errorMessage);
+    } catch (err) {
+      logger.debug(`[AUTOMATION] Failed to report task status for ${taskId}: ${err}`);
+    }
   }
 
   private notifyChange(): void {
@@ -587,6 +603,7 @@ export class AutomationScheduler {
         };
         await this.store.upsert(running);
         this.notifyChange();
+        this.reportTaskStatus(running);
         logger.info(
           `[AUTOMATION] ${job.kind} job ${job.id} is now running in session ${result.sessionId}`,
         );
@@ -602,6 +619,7 @@ export class AutomationScheduler {
       };
       await this.store.upsert(completed);
       this.notifyChange();
+      this.reportTaskStatus(completed);
       logger.info(`[AUTOMATION] Completed ${job.kind} job ${job.id}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -615,6 +633,9 @@ export class AutomationScheduler {
       };
       await this.store.upsert(failed);
       this.notifyChange();
+      if (!canRetry) {
+        this.reportTaskStatus(failed);
+      }
       logger.debug(
         `[AUTOMATION] ${canRetry ? "Retrying" : "Failed"} ${job.kind} job ${job.id}: ${errorMessage}`,
       );

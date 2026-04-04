@@ -2299,6 +2299,13 @@ export async function startDaemon(): Promise<void> {
         },
       },
       onChange: () => scheduleAutomationStatePublish(),
+      onTaskStatusReport: (taskId, status, sessionId, errorMessage) => {
+        try {
+          apiMachine?.taskStatus(taskId, status, sessionId, errorMessage);
+        } catch (err) {
+          logger.debug(`[TASK] Failed to report task status for ${taskId}: ${err}`);
+        }
+      },
     });
     const automationRecovery = await automationScheduler.start(recoveredRunningSessionIds);
     const agentLoopStore = new AgentLoopStore(
