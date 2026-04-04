@@ -158,8 +158,9 @@ export function supervisorActionRoutes(app: Fastify) {
                     accountId: userId,
                     approval: fromApproval,
                     // Block restore to pending if fix is actively running
+                    // Prisma: notIn does not match NULL, so explicitly allow null
                     ...(approval === "pending"
-                        ? { fixStatus: { notIn: ["pending", "running"] } }
+                        ? { OR: [{ fixStatus: null }, { fixStatus: { notIn: ["pending", "running"] } }] }
                         : {}),
                 },
                 data: {
