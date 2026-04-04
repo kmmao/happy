@@ -200,6 +200,7 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                     <GitChangesTab
                         sessionId={sessionId}
                         repoPath={selectedRepoPath ?? undefined}
+                        compact
                         onPullDown={hasSubmodules ? handlePullDown : undefined}
                         onScrollUp={hasSubmodules ? handleScrollUp : undefined}
                     />

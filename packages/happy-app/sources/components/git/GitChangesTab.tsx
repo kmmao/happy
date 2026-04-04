@@ -101,9 +101,10 @@ const SCROLL_COLLAPSE_THRESHOLD = 20;
 const GitChangesTab = React.memo<{
   sessionId: string;
   repoPath?: string;
+  compact?: boolean;
   onPullDown?: () => void;
   onScrollUp?: () => void;
-}>(({ sessionId, repoPath, onPullDown, onScrollUp }) => {
+}>(({ sessionId, repoPath, compact, onPullDown, onScrollUp }) => {
   const router = useRouter();
 
   const [gitStatusFiles, setGitStatusFiles] =
@@ -357,7 +358,7 @@ const GitChangesTab = React.memo<{
   );
 
   const renderFileIcon = (file: GitFileStatus) => {
-    return <FileIcon fileName={file.fileName} size={32} />;
+    return <FileIcon fileName={file.fileName} size={compact ? 18 : 32} />;
   };
 
   const renderStatusIcon = (file: GitFileStatus) => {
@@ -389,7 +390,7 @@ const GitChangesTab = React.memo<{
         return null;
     }
 
-    return <Octicons name={statusIcon as any} size={16} color={statusColor} />;
+    return <Octicons name={statusIcon as any} size={compact ? 13 : 16} color={statusColor} />;
   };
 
   const renderLineChanges = (file: GitFileStatus) => {
@@ -435,6 +436,10 @@ const GitChangesTab = React.memo<{
     (gitStatusFiles.submodules?.length ?? 0) > 0;
 
   // File item rendering with selection support
+  const compactItemStyle = compact
+    ? { paddingVertical: 6, minHeight: 36 }
+    : undefined;
+
   const renderGitFileItem = (
     file: GitFileStatus,
     key: string,
@@ -459,6 +464,7 @@ const GitChangesTab = React.memo<{
         selectionMode ? undefined : () => enterSelectionMode(file.fullPath)
       }
       showDivider={showDivider}
+      style={compactItemStyle}
     />
   );
 
@@ -482,7 +488,7 @@ const GitChangesTab = React.memo<{
       {/* Search Input - Always Visible */}
       <View
         style={{
-          padding: 16,
+          padding: compact ? 8 : 16,
           borderBottomWidth: Platform.select({ ios: 0.33, default: 1 }),
           borderBottomColor: theme.colors.divider,
         }}
@@ -523,7 +529,8 @@ const GitChangesTab = React.memo<{
       {!isLoading && gitStatusFiles && (
         <View
           style={{
-            padding: 16,
+            paddingHorizontal: compact ? 10 : 16,
+            paddingVertical: compact ? 6 : 16,
             borderBottomWidth: Platform.select({ ios: 0.33, default: 1 }),
             borderBottomColor: theme.colors.divider,
           }}
@@ -532,18 +539,18 @@ const GitChangesTab = React.memo<{
             style={{
               flexDirection: "row",
               alignItems: "center",
-              marginBottom: 8,
+              marginBottom: compact ? 2 : 8,
             }}
           >
             <Octicons
               name={isChildRepoMode ? "repo-forked" : "git-branch"}
-              size={16}
+              size={compact ? 13 : 16}
               color={theme.colors.textSecondary}
               style={{ marginRight: 6 }}
             />
             <Text
               style={{
-                fontSize: 16,
+                fontSize: compact ? 13 : 16,
                 fontWeight: "600",
                 color: theme.colors.text,
                 ...Typography.default(),
@@ -757,8 +764,8 @@ const GitChangesTab = React.memo<{
                 <View
                   style={{
                     backgroundColor: theme.colors.surfaceHigh,
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
+                    paddingHorizontal: compact ? 10 : 16,
+                    paddingVertical: compact ? 5 : 10,
                     borderBottomWidth: Platform.select({
                       ios: 0.33,
                       default: 1,
@@ -779,7 +786,7 @@ const GitChangesTab = React.memo<{
                   >
                     <Text
                       style={{
-                        fontSize: 14,
+                        fontSize: compact ? 12 : 14,
                         fontWeight: "600",
                         color: theme.colors.success,
                         ...Typography.default(),
@@ -793,7 +800,7 @@ const GitChangesTab = React.memo<{
                       name={
                         stagedCollapsed ? "chevron-forward" : "chevron-down"
                       }
-                      size={16}
+                      size={compact ? 13 : 16}
                       color={theme.colors.textSecondary}
                       style={{ marginLeft: 4 }}
                     />
@@ -832,8 +839,8 @@ const GitChangesTab = React.memo<{
                 <View
                   style={{
                     backgroundColor: theme.colors.surfaceHigh,
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
+                    paddingHorizontal: compact ? 10 : 16,
+                    paddingVertical: compact ? 5 : 10,
                     borderBottomWidth: Platform.select({
                       ios: 0.33,
                       default: 1,
@@ -854,7 +861,7 @@ const GitChangesTab = React.memo<{
                   >
                     <Text
                       style={{
-                        fontSize: 14,
+                        fontSize: compact ? 12 : 14,
                         fontWeight: "600",
                         color: theme.colors.warning,
                         ...Typography.default(),
@@ -868,7 +875,7 @@ const GitChangesTab = React.memo<{
                       name={
                         unstagedCollapsed ? "chevron-forward" : "chevron-down"
                       }
-                      size={16}
+                      size={compact ? 13 : 16}
                       color={theme.colors.textSecondary}
                       style={{ marginLeft: 4 }}
                     />
