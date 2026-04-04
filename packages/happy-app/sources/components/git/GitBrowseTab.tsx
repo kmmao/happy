@@ -375,20 +375,20 @@ export const GitBrowseTab = React.memo<{
                                     flexDirection: "row",
                                     alignItems: "center",
                                     paddingHorizontal: 8,
-                                    paddingVertical: 2,
-                                    gap: 4,
+                                    paddingVertical: 3,
+                                    gap: 5,
                                     backgroundColor: pressed ? theme.colors.surfacePressedOverlay : "transparent",
                                 })}
                             >
                                 {isDir ? (
-                                    <Octicons name="file-directory" size={14} color="#007AFF" />
+                                    <Octicons name="file-directory" size={15} color="#007AFF" />
                                 ) : (
-                                    <FileIcon fileName={entry.name} size={14} />
+                                    <FileIcon fileName={entry.name} size={15} />
                                 )}
                                 <Text
                                     style={{
                                         flex: 1,
-                                        fontSize: 12,
+                                        fontSize: 13,
                                         color: theme.colors.text,
                                         ...Typography.default(),
                                     }}
@@ -402,17 +402,17 @@ export const GitBrowseTab = React.memo<{
                                             e.stopPropagation();
                                             onReference(entryRelPath);
                                         }}
-                                        hitSlop={4}
+                                        hitSlop={6}
                                         style={({ pressed }) => ({
-                                            padding: 1,
+                                            padding: 2,
                                             opacity: pressed ? 0.5 : 1,
                                         })}
                                     >
-                                        <Octicons name="mention" size={12} color={theme.colors.textLink} />
+                                        <Octicons name="mention" size={13} color={theme.colors.textLink} />
                                     </Pressable>
                                 )}
                                 {isDir && (
-                                    <Octicons name="chevron-right" size={12} color={theme.colors.textSecondary} />
+                                    <Octicons name="chevron-right" size={13} color={theme.colors.textSecondary} />
                                 )}
                             </Pressable>
                         );
