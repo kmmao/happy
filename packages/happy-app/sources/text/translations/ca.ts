@@ -3475,6 +3475,7 @@ export const ca: TranslationStructure = {
     tabAnalyzing: "Analitzant",
     tabAnalyzed: "Analitzat",
     tabDone: "Fet",
+    tabFailed: "Fallat",
     tabDismissed: "Descartat",
     categoryAll: "Tots",
     noActions: "Sense accions",

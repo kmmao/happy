@@ -3470,6 +3470,7 @@ export const es: TranslationStructure = {
     tabAnalyzing: "Analizando",
     tabAnalyzed: "Analizado",
     tabDone: "Hecho",
+    tabFailed: "Fallido",
     tabDismissed: "Descartado",
     categoryAll: "Todos",
     noActions: "Sin acciones",

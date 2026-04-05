@@ -28,7 +28,7 @@ export function supervisorActionRoutes(app: Fastify) {
                             .enum(["pending", "approved", "skipped", "ignored"])
                             .optional(),
                         view: z
-                            .enum(["approved", "fixing", "analyzing", "analyzed", "done", "dismissed"])
+                            .enum(["approved", "fixing", "analyzing", "analyzed", "done", "failed", "dismissed"])
                             .optional(),
                         category: z.string().optional(),
                         runId: z.string().optional(),
@@ -86,7 +86,10 @@ export function supervisorActionRoutes(app: Fastify) {
                 where.fixStatus = "analyzed";
             } else if (view === "done") {
                 where.approval = "approved";
-                where.fixStatus = { in: ["completed", "failed"] };
+                where.fixStatus = "completed";
+            } else if (view === "failed") {
+                where.approval = "approved";
+                where.fixStatus = "failed";
             } else if (view === "dismissed") {
                 where.approval = { in: ["skipped", "ignored"] };
             } else if (approval) {

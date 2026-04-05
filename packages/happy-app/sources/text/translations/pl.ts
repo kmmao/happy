@@ -3491,6 +3491,7 @@ export const pl: TranslationStructure = {
     tabAnalyzing: "Analiza",
     tabAnalyzed: "Przeanalizowane",
     tabDone: "Gotowe",
+    tabFailed: "Nieudane",
     tabDismissed: "Odrzucone",
     categoryAll: "Wszystkie",
     noActions: "Brak akcji",

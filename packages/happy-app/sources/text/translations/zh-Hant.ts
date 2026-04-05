@@ -3380,6 +3380,7 @@ export const zhHant: TranslationStructure = {
     tabAnalyzing: "分析中",
     tabAnalyzed: "已分析",
     tabDone: "已完成",
+    tabFailed: "已失敗",
     tabDismissed: "已忽略",
     categoryAll: "全部",
     noActions: "沒有操作",

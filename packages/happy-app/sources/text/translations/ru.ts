@@ -3489,6 +3489,7 @@ export const ru: TranslationStructure = {
     tabAnalyzing: "Анализ",
     tabAnalyzed: "Проанализировано",
     tabDone: "Готово",
+    tabFailed: "Ошибка",
     tabDismissed: "Отклонено",
     categoryAll: "Все",
     noActions: "Нет действий",

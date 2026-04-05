@@ -3472,6 +3472,7 @@ export const pt: TranslationStructure = {
     tabAnalyzing: "Analisando",
     tabAnalyzed: "Analisado",
     tabDone: "Concluído",
+    tabFailed: "Falhou",
     tabDismissed: "Descartado",
     categoryAll: "Todos",
     noActions: "Nenhuma ação",

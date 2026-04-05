@@ -3378,6 +3378,7 @@ export const zhHans: TranslationStructure = {
     tabAnalyzing: "分析中",
     tabAnalyzed: "已分析",
     tabDone: "已完成",
+    tabFailed: "已失败",
     tabDismissed: "已忽略",
     categoryAll: "全部",
     noActions: "暂无操作",

@@ -37,10 +37,10 @@ import {
 
 // --- Types ---
 
-type ActionTab = "pending" | "approved" | "fixing" | "analyzing" | "analyzed" | "done" | "dismissed";
+type ActionTab = "pending" | "approved" | "fixing" | "analyzing" | "analyzed" | "done" | "failed" | "dismissed";
 type UrgencyFilter = "all" | UrgencyLevel;
 
-const TABS: ActionTab[] = ["pending", "approved", "fixing", "analyzing", "analyzed", "done", "dismissed"];
+const TABS: ActionTab[] = ["pending", "approved", "fixing", "analyzing", "analyzed", "done", "failed", "dismissed"];
 const SORT_FIELDS: SortField[] = ["severity", "category", "confidence", "urgency"];
 const URGENCY_FILTERS: UrgencyFilter[] = ["all", "urgent", "must-fix", "optional"];
 const PAGE_SIZE = 20;
@@ -61,6 +61,8 @@ function getTabLabel(tab: ActionTab): string {
             return t("supervisor.tabAnalyzed");
         case "done":
             return t("supervisor.tabDone");
+        case "failed":
+            return t("supervisor.tabFailed");
         case "dismissed":
             return t("supervisor.tabDismissed");
     }
@@ -89,7 +91,10 @@ function getTabCount(
             count = stats.fixAnalyzed ?? 0;
             break;
         case "done":
-            count = (stats.fixCompleted ?? 0) + (stats.fixFailed ?? 0);
+            count = stats.fixCompleted ?? 0;
+            break;
+        case "failed":
+            count = stats.fixFailed ?? 0;
             break;
         case "dismissed":
             count = (stats.skipped ?? 0) + (stats.ignored ?? 0);

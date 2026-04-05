@@ -3447,6 +3447,7 @@ export const ja: TranslationStructure = {
     tabAnalyzing: "分析中",
     tabAnalyzed: "分析済み",
     tabDone: "完了",
+    tabFailed: "失敗",
     tabDismissed: "却下",
     categoryAll: "すべて",
     noActions: "アクションなし",
