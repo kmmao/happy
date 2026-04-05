@@ -139,6 +139,7 @@ model Session {
     usageReports      UsageReport[]
     accessKeys        AccessKey[]
     sessionEvents     SessionEvent[]
+    knowledgeAccesses KnowledgeAccess[]
 
     @@unique([accountId, tag])
     @@index([accountId, updatedAt(sort: Desc)])
@@ -704,6 +705,8 @@ model ProjectKnowledge {
     // User curation
     pinned          Boolean  @default(false)
 
+    accesses        KnowledgeAccess[]
+
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
 
@@ -736,6 +739,27 @@ model KnowledgeRelation {
     @@index([fromEntryId])
     @@index([toEntryId])
     @@index([relationType])
+}
+
+//
+// Knowledge Access Log (session-level reference tracking)
+//
+
+model KnowledgeAccess {
+    id          String   @id @default(cuid())
+
+    sessionId   String
+    session     Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    knowledgeId String
+    knowledge   ProjectKnowledge @relation(fields: [knowledgeId], references: [id], onDelete: Cascade)
+
+    projectId   String
+    at          DateTime @default(now())
+
+    @@index([sessionId])
+    @@index([knowledgeId])
+    @@index([projectId, sessionId])
 }
 
 model ProjectProfile {

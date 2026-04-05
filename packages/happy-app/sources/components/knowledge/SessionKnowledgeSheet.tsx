@@ -3,10 +3,12 @@ import { Animated, Pressable, Text, View, ScrollView, ActivityIndicator } from "
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { layout } from "@/components/layout";
 import { useSessionKnowledge, type SessionKnowledgeEntry } from "@/hooks/useSessionKnowledge";
+import { useSessionKnowledgeAccesses, type SessionKnowledgeAccessEntry } from "@/hooks/useSessionKnowledgeAccesses";
 
 const TYPE_COLORS: Record<string, string> = {
     discovery: "#3B82F6",
@@ -37,13 +39,24 @@ function formatTime(timestamp: number): string {
     });
 }
 
-const EntryRow = React.memo<{ entry: SessionKnowledgeEntry }>(({ entry }) => {
+type Tab = "changes" | "references";
+
+interface EntryRowProps {
+    entry: SessionKnowledgeEntry | SessionKnowledgeAccessEntry;
+    onPress?: () => void;
+}
+
+const EntryRow = React.memo<EntryRowProps>(({ entry, onPress }) => {
     const { theme } = useUnistyles();
     const typeColor = TYPE_COLORS[entry.entryType] ?? theme.colors.textSecondary;
     const statusColor = STATUS_COLORS[entry.status] ?? theme.colors.textSecondary;
 
     return (
-        <View style={[styles.entryRow, { backgroundColor: theme.colors.surface }]}>
+        <Pressable
+            style={[styles.entryRow, { backgroundColor: theme.colors.surface }]}
+            onPress={onPress}
+            disabled={!onPress}
+        >
             <View style={styles.entryHeader}>
                 <View style={[styles.typeBadge, { backgroundColor: typeColor + "20" }]}>
                     <Text style={[styles.typeBadgeText, { color: typeColor }]}>
@@ -75,7 +88,15 @@ const EntryRow = React.memo<{ entry: SessionKnowledgeEntry }>(({ entry }) => {
                     ))}
                 </View>
             )}
-        </View>
+            {onPress && (
+                <View style={styles.sourceRow}>
+                    <Ionicons name="arrow-forward-outline" size={12} color={theme.colors.textSecondary} />
+                    <Text style={[styles.sourceText, { color: theme.colors.textSecondary }]}>
+                        {t("session.knowledgeAccessGoToSource")}
+                    </Text>
+                </View>
+            )}
+        </Pressable>
     );
 });
 
@@ -83,10 +104,17 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
     ({ visible, onClose, projectServerId, sessionId }) => {
         const { theme } = useUnistyles();
         const insets = useSafeAreaInsets();
+        const router = useRouter();
         const opacity = React.useRef(new Animated.Value(0)).current;
         const [shouldRender, setShouldRender] = React.useState(false);
+        const [activeTab, setActiveTab] = React.useState<Tab>("changes");
 
-        const { entries, loading } = useSessionKnowledge(
+        const { entries, loading: changesLoading } = useSessionKnowledge(
+            visible ? projectServerId : undefined,
+            visible ? sessionId : undefined,
+        );
+
+        const { accesses, loading: accessesLoading } = useSessionKnowledgeAccesses(
             visible ? projectServerId : undefined,
             visible ? sessionId : undefined,
         );
@@ -112,7 +140,17 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
             return () => anim?.stop();
         }, [visible, opacity]);
 
+        const handleAccessEntryPress = React.useCallback((entry: SessionKnowledgeAccessEntry) => {
+            if (!entry.sessionId) return;
+            onClose();
+            router.push(`/session/${entry.sessionId}` as any);
+        }, [onClose, router]);
+
         if (!shouldRender) return null;
+
+        const isChangesTab = activeTab === "changes";
+        const loading = isChangesTab ? changesLoading : accessesLoading;
+        const isEmpty = isChangesTab ? entries.length === 0 : accesses.length === 0;
 
         return (
             <Animated.View style={[styles.overlay, { opacity }]}>
@@ -136,26 +174,85 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                             <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
                         </Pressable>
                     </View>
+
+                    {/* Tabs */}
+                    <View style={[styles.tabBar, { borderBottomColor: theme.colors.surfaceHighest }]}>
+                        <Pressable
+                            style={[
+                                styles.tab,
+                                isChangesTab && { borderBottomColor: theme.colors.primary, borderBottomWidth: 2 },
+                            ]}
+                            onPress={() => setActiveTab("changes")}
+                        >
+                            <Text style={[
+                                styles.tabText,
+                                { color: isChangesTab ? theme.colors.primary : theme.colors.textSecondary },
+                            ]}>
+                                {t("session.knowledgeTabChanges")}
+                            </Text>
+                            {entries.length > 0 && (
+                                <View style={[styles.tabBadge, { backgroundColor: theme.colors.primary + "20" }]}>
+                                    <Text style={[styles.tabBadgeText, { color: theme.colors.primary }]}>
+                                        {entries.length}
+                                    </Text>
+                                </View>
+                            )}
+                        </Pressable>
+                        <Pressable
+                            style={[
+                                styles.tab,
+                                !isChangesTab && { borderBottomColor: theme.colors.primary, borderBottomWidth: 2 },
+                            ]}
+                            onPress={() => setActiveTab("references")}
+                        >
+                            <Text style={[
+                                styles.tabText,
+                                { color: !isChangesTab ? theme.colors.primary : theme.colors.textSecondary },
+                            ]}>
+                                {t("session.knowledgeTabReferences")}
+                            </Text>
+                            {accesses.length > 0 && (
+                                <View style={[styles.tabBadge, { backgroundColor: theme.colors.primary + "20" }]}>
+                                    <Text style={[styles.tabBadgeText, { color: theme.colors.primary }]}>
+                                        {accesses.length}
+                                    </Text>
+                                </View>
+                            )}
+                        </Pressable>
+                    </View>
+
                     <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-                        {t("session.knowledgeChangesSubtitle")}
+                        {isChangesTab
+                            ? t("session.knowledgeChangesSubtitle")
+                            : t("session.knowledgeAccessesSubtitle")}
                     </Text>
 
-                    {loading && entries.length === 0 ? (
+                    {loading && isEmpty ? (
                         <View style={styles.centerContainer}>
                             <ActivityIndicator size="small" color={theme.colors.primary} />
                         </View>
-                    ) : entries.length === 0 ? (
+                    ) : isEmpty ? (
                         <View style={styles.centerContainer}>
                             <Ionicons name="document-outline" size={32} color={theme.colors.textSecondary} />
                             <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                                {t("session.knowledgeChangesEmpty")}
+                                {isChangesTab
+                                    ? t("session.knowledgeChangesEmpty")
+                                    : t("session.knowledgeAccessesEmpty")}
                             </Text>
                         </View>
                     ) : (
                         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-                            {entries.map((entry) => (
-                                <EntryRow key={entry.id} entry={entry} />
-                            ))}
+                            {isChangesTab
+                                ? entries.map((entry) => (
+                                    <EntryRow key={entry.id} entry={entry} />
+                                ))
+                                : accesses.map((entry) => (
+                                    <EntryRow
+                                        key={entry.id}
+                                        entry={entry}
+                                        onPress={entry.sessionId ? () => handleAccessEntryPress(entry) : undefined}
+                                    />
+                                ))}
                         </ScrollView>
                     )}
                 </View>
@@ -202,10 +299,38 @@ const styles = StyleSheet.create({
         fontSize: 16,
         flex: 1,
     },
+    tabBar: {
+        flexDirection: "row",
+        marginHorizontal: 16,
+        marginTop: 8,
+        borderBottomWidth: 1,
+    },
+    tab: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+        marginRight: 20,
+    },
+    tabText: {
+        ...Typography.default("semiBold"),
+        fontSize: 13,
+    },
+    tabBadge: {
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 10,
+    },
+    tabBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 10,
+    },
     subtitle: {
         ...Typography.default("regular"),
         fontSize: 12,
         paddingHorizontal: 16,
+        paddingTop: 8,
         paddingBottom: 12,
     },
     scroll: {
@@ -277,6 +402,16 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     tagText: {
+        ...Typography.default("regular"),
+        fontSize: 10,
+    },
+    sourceRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        marginTop: 2,
+    },
+    sourceText: {
         ...Typography.default("regular"),
         fontSize: 10,
     },

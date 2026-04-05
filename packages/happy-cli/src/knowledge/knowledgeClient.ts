@@ -104,7 +104,7 @@ export class KnowledgeClient {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${this.authToken}`,
         },
-        body: JSON.stringify({ mode, contextHints }),
+        body: JSON.stringify({ mode, contextHints, sessionId: this.sessionId }),
       });
 
       if (!resp.ok) {

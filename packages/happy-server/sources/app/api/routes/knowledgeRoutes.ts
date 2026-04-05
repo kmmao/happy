@@ -12,6 +12,7 @@ import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { inboxCreate } from "@/modules/inboxCreate";
+import { recordKnowledgeAccess, getSessionKnowledgeAccesses } from "@/modules/knowledgeAccess";
 
 // Inline Zod schemas (mirrors @kmmao/happy-wire/knowledge.ts)
 // Server uses CommonJS resolution which can't import ESM-only wire values directly.
@@ -70,6 +71,7 @@ const QueryKnowledgeParamsSchema = z.object({
 const KnowledgeInjectionRequestSchema = z.object({
     mode: z.enum(["auto", "full", "minimal"]),
     contextHints: z.array(z.string()).optional(),
+    sessionId: z.string().optional(),
 });
 
 /**
@@ -661,7 +663,7 @@ export function knowledgeRoutes(app: Fastify) {
         async (request, reply) => {
             const userId = request.userId;
             const { id } = request.params;
-            const { mode, contextHints } = request.body;
+            const { mode, contextHints, sessionId } = request.body;
 
             const project = await db.project.findFirst({
                 where: { id, accountId: userId },
@@ -717,16 +719,20 @@ export function knowledgeRoutes(app: Fastify) {
                 });
             }
 
-            // Fire-and-forget: update lastAccessedAt for injected entries
+            // Fire-and-forget: record access log + update lastAccessedAt
             if (entries.length > 0) {
                 const ids = entries.map((e) => e.id);
-                void db.projectKnowledge.updateMany({
-                    where: { id: { in: ids } },
-                    data: {
-                        lastAccessedAt: new Date(),
-                        accessCount: { increment: 1 },
-                    },
-                });
+                if (sessionId) {
+                    void recordKnowledgeAccess(sessionId, id, ids);
+                } else {
+                    void db.projectKnowledge.updateMany({
+                        where: { id: { in: ids } },
+                        data: {
+                            lastAccessedAt: new Date(),
+                            accessCount: { increment: 1 },
+                        },
+                    });
+                }
             }
 
             return reply.send({
@@ -739,6 +745,43 @@ export function knowledgeRoutes(app: Fastify) {
                     tags: safeParseJsonArray(e.tags),
                     confidence: e.confidence,
                     createdAt: e.createdAt.toISOString(),
+                })),
+            });
+        },
+    );
+
+    // ─── Knowledge accesses for a session ───
+    app.get(
+        "/v1/projects/:id/knowledge/accesses",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                querystring: z.object({
+                    sessionId: z.string(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+            const { sessionId } = request.query;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const accesses = await getSessionKnowledgeAccesses(id, sessionId);
+
+            return reply.send({
+                accesses: accesses.map(({ knowledge, at }) => ({
+                    ...knowledge,
+                    tags: safeParseJsonArray(knowledge.tags),
+                    createdAt: knowledge.createdAt.getTime(),
+                    accessedAt: at.getTime(),
                 })),
             });
         },
