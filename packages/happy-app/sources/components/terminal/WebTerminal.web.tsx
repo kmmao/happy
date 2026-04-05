@@ -104,11 +104,8 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
 
             terminal.open(containerRef.current);
 
-            // Small delay to ensure DOM is ready for fit
-            requestAnimationFrame(() => {
-                if (!mounted) return;
-                try { fitAddon.fit(); } catch { /* ignore initial fit errors */ }
-            });
+            // Fit synchronously so cols/rows reflect actual container size before spawn
+            try { fitAddon.fit(); } catch { /* ignore initial fit errors */ }
 
             const cols = terminal.cols;
             const rows = terminal.rows;

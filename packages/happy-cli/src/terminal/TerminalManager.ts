@@ -92,6 +92,12 @@ try:
         dbg(f"TIOCSWINSZ warn: {e}")
 
     pid = os.fork()
+    # Install SIGTERM handler (parent only) so killing python3 also kills the shell child
+    def _sigterm(sig, frame):
+        try: os.kill(pid, signal.SIGTERM)
+        except OSError: pass
+        sys.exit(0)
+    signal.signal(signal.SIGTERM, _sigterm)
     if pid == 0:
         # Child: set up controlling terminal and exec shell
         os.close(master_fd)
