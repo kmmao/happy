@@ -1389,31 +1389,32 @@ export async function claudeRemoteLauncher(
                 // the query_project_knowledge MCP tool to fetch relevant details on demand.
                 pendingKnowledgeRefresh = false;
                 const hints = extractKnowledgeHints(msg.message, 8);
-                if (hints.length > 0) {
-                  try {
-                    const fetchMode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
-                    const refreshResult = await Promise.race([
-                      session.client.fetchKnowledge(fetchMode, hints),
-                      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
-                    ]);
-                    if (refreshResult && refreshResult.entries.length > 0) {
-                      const newEntries = refreshResult.entries.filter((e) => !knowledgeEntryIds.has(e.id));
-                      if (newEntries.length > 0) {
-                        for (const e of newEntries) {
-                          knowledgeEntryIds.add(e.id);
-                        }
-                        // Prepend a lightweight hint — Claude uses query_project_knowledge to get details
-                        const titles = newEntries.map((e) => `"${e.title}"`).join(", ");
-                        const hint = `[Knowledge base update: ${newEntries.length} new ${newEntries.length === 1 ? "entry" : "entries"} added (${titles}). Use query_project_knowledge tool if relevant to this task.]\n\n`;
-                        return {
-                          message: hint + msg.message,
-                          mode: msg.mode,
-                        };
+                logger.debug(`[knowledge] Per-turn refresh check: ${hints.length} hints from message`);
+                try {
+                  const refreshResult = await Promise.race([
+                    session.client.fetchKnowledge("auto", hints.length > 0 ? hints : undefined),
+                    new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+                  ]);
+                  if (refreshResult && refreshResult.entries.length > 0) {
+                    const newEntries = refreshResult.entries.filter((e) => !knowledgeEntryIds.has(e.id));
+                    logger.debug(`[knowledge] Per-turn refresh: ${refreshResult.entries.length} total, ${newEntries.length} new`);
+                    if (newEntries.length > 0) {
+                      for (const e of newEntries) {
+                        knowledgeEntryIds.add(e.id);
                       }
+                      // Prepend a lightweight hint — Claude uses query_project_knowledge to get details
+                      const titles = newEntries.map((e) => `"${e.title}"`).join(", ");
+                      const hint = `[Knowledge base update: ${newEntries.length} new ${newEntries.length === 1 ? "entry" : "entries"} added (${titles}). Use query_project_knowledge tool if relevant to this task.]\n\n`;
+                      return {
+                        message: hint + msg.message,
+                        mode: msg.mode,
+                      };
                     }
-                  } catch (err) {
-                    logger.debug(`[knowledge] Per-turn refresh failed: ${err}`);
+                  } else {
+                    logger.debug(`[knowledge] Per-turn refresh: timeout or no entries`);
                   }
+                } catch (err) {
+                  logger.debug(`[knowledge] Per-turn refresh failed: ${err}`);
                 }
               }
 
