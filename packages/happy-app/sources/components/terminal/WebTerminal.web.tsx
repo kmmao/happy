@@ -13,6 +13,7 @@ import { apiSocket } from "@/sync/apiSocket";
 import {
     machineTerminalSpawn,
     machineTerminalClose,
+    machineTerminalCloseAll,
     machineTerminalResize,
     machineTerminalInput,
     machineUpgradeCli,
@@ -136,6 +137,9 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
                     onClose?.();
                 }
             });
+
+            // Close any stale PTY sessions before spawning (avoids "Maximum N terminals reached")
+            await machineTerminalCloseAll(machineId).catch(() => {});
 
             // Spawn PTY on the machine
             const result = await machineTerminalSpawn(machineId, { cwd, cols, rows });
