@@ -9,7 +9,6 @@
 import { spawn, ChildProcess } from "child_process";
 import { createId } from "@paralleldrive/cuid2";
 import { logger } from "@/ui/logger";
-import { platform } from "os";
 
 export interface TerminalSession {
   id: string;
@@ -66,18 +65,12 @@ export class TerminalManager {
 
       let child: ChildProcess;
 
-      if (platform() === "darwin") {
-        // macOS: script -q /dev/null <shell> works fine (doesn't require stdin to be a TTY)
-        child = spawn("script", ["-q", "/dev/null", shell], {
-          cwd,
-          env,
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-      } else {
-        // Linux: 'script' calls tcgetattr() on its own stdin to save terminal settings.
-        // When stdin is a pipe (not a TTY), this fails with "Operation not supported on socket".
-        // Use Python3's pty.openpty() instead — it allocates a real PTY pair without
-        // requiring the parent process to have a controlling terminal.
+      {
+        // Both macOS and Linux: 'script' calls tcgetattr() on stdin to save terminal
+        // settings. When the daemon's stdin is a pipe/socket (not a TTY), this fails with
+        // "Operation not supported on socket". Use Python3's pty.openpty() on all platforms
+        // — it allocates a real PTY pair without requiring the parent to have a controlling
+        // terminal, and works identically on macOS and Linux.
         const ptyScript = `
 import os, sys, pty, select, struct, termios, fcntl, signal, traceback
 
