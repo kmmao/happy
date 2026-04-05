@@ -422,11 +422,13 @@ export async function claudeRemoteLauncher(
   // Track files that have been Read by the SDK (for seedReadState after compact)
   const readFilePaths = new Set<string>();
 
-  // Session timeline event reporter (fire-and-forget to server)
-  const reportSessionEvent = session.onSessionEvent && session.sessionId
+  // Session timeline event reporter (fire-and-forget to server).
+  // getSessionId is called lazily so new sessions work even before Claude
+  // assigns a session ID at launcher startup.
+  const reportSessionEvent = session.onSessionEvent
     ? createSessionEventReporter(
         { sessionEvent: session.onSessionEvent },
-        session.sessionId,
+        () => session.sessionId,
       )
     : null;
 

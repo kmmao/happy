@@ -30,12 +30,16 @@ function truncate(s: string, max: number): string {
 
 /**
  * Create a reporter function that can be called from onMessage.
+ * getSessionId is called lazily on each message so it works even when
+ * the session ID is not yet known at reporter creation time.
  */
 export function createSessionEventReporter(
   sink: SessionEventSink,
-  sessionId: string,
+  getSessionId: () => string | null | undefined,
 ) {
   return function reportMessage(message: SDKMessage): void {
+    const sessionId = getSessionId();
+    if (!sessionId) return;
     try {
       if (message.type !== "assistant") return;
 
