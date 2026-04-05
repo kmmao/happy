@@ -374,6 +374,7 @@ const ChatListInternal = React.memo(
         onScrollToIndexFailed={handleScrollToIndexFailed}
         onScroll={handleScroll}
         scrollEventThrottle={400}
+        showsVerticalScrollIndicator={false}
         viewabilityConfigCallbackPairs={viewabilityPairs.current}
         ListHeaderComponent={<ListFooter sessionId={props.sessionId} />}
         ListFooterComponent={<ListHeader />}
