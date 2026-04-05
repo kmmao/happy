@@ -78,41 +78,92 @@ export class TerminalManager {
         // When stdin is a pipe (not a TTY), this fails with "Operation not supported on socket".
         // Use Python3's pty.openpty() instead — it allocates a real PTY pair without
         // requiring the parent process to have a controlling terminal.
-        const ptyScript = [
-          "import os,sys,pty,select,struct,termios,fcntl,signal",
-          "shell=os.environ['PTY_SHELL']",
-          "cols=int(os.environ['PTY_COLS'])",
-          "rows=int(os.environ['PTY_ROWS'])",
-          "master_fd,slave_fd=pty.openpty()",
-          "try:fcntl.ioctl(slave_fd,termios.TIOCSWINSZ,struct.pack('HHHH',rows,cols,0,0))",
-          "except:pass",
-          "pid=os.fork()",
-          "if pid==0:",
-          " os.close(master_fd)",
-          " try:os.setsid();fcntl.ioctl(slave_fd,termios.TIOCSCTTY,0)",
-          " except:pass",
-          " [os.dup2(slave_fd,fd) for fd in(0,1,2)]",
-          " os.close(slave_fd)",
-          " e=dict(os.environ);e.update({'TERM':'xterm-256color','COLUMNS':str(cols),'LINES':str(rows)})",
-          " os.execve(shell,[shell],e)",
-          " sys.exit(1)",
-          "os.close(slave_fd)",
-          "fin=sys.stdin.fileno();fout=sys.stdout.fileno()",
-          "while True:",
-          " try:r=select.select([master_fd,fin],[],[],1.0)[0]",
-          " except:break",
-          " if master_fd in r:",
-          "  try:d=os.read(master_fd,4096);os.write(fout,d)",
-          "  except:break",
-          " if fin in r:",
-          "  try:d=os.read(fin,4096);os.write(master_fd,d)",
-          "  except:break",
-          " try:rc=os.waitpid(pid,os.WNOHANG)",
-          " except:break",
-          " if rc[0]:break",
-          "try:os.kill(pid,signal.SIGTERM)",
-          "except:pass",
-        ].join("\n");
+        const ptyScript = `
+import os, sys, pty, select, struct, termios, fcntl, signal, traceback
+
+def dbg(msg):
+    sys.stdout.write(f"[happy-pty] {msg}\\r\\n")
+    sys.stdout.flush()
+
+try:
+    shell = os.environ['PTY_SHELL']
+    cols  = int(os.environ.get('PTY_COLS', '80'))
+    rows  = int(os.environ.get('PTY_ROWS', '24'))
+
+    master_fd, slave_fd = pty.openpty()
+    dbg(f"openpty ok: master={master_fd} slave={slave_fd} shell={shell}")
+
+    try:
+        fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, struct.pack('HHHH', rows, cols, 0, 0))
+    except Exception as e:
+        dbg(f"TIOCSWINSZ warn: {e}")
+
+    pid = os.fork()
+    if pid == 0:
+        # Child: set up controlling terminal and exec shell
+        os.close(master_fd)
+        try:
+            os.setsid()
+            fcntl.ioctl(slave_fd, termios.TIOCSCTTY, 0)
+        except Exception as e:
+            pass  # non-fatal: PTY still usable without controlling terminal
+        for fd in (0, 1, 2):
+            os.dup2(slave_fd, fd)
+        if slave_fd > 2:
+            os.close(slave_fd)
+        env = dict(os.environ)
+        env.update({
+            'TERM': 'xterm-256color',
+            'COLORTERM': 'truecolor',
+            'COLUMNS': str(cols),
+            'LINES': str(rows),
+            'HAPPY_TERMINAL': '1',  # let startup scripts skip re-wrapping with script
+        })
+        os.execve(shell, [shell], env)
+        sys.exit(127)
+
+    # Parent: relay between PTY master and our stdin/stdout pipes
+    os.close(slave_fd)
+    fin  = sys.stdin.fileno()
+    fout = sys.stdout.fileno()
+
+    while True:
+        try:
+            r, _, _ = select.select([master_fd, fin], [], [], 1.0)
+        except (OSError, ValueError):
+            break
+        if master_fd in r:
+            try:
+                data = os.read(master_fd, 4096)
+                os.write(fout, data)
+            except OSError:
+                break
+        if fin in r:
+            try:
+                data = os.read(fin, 4096)
+                if not data:
+                    break
+                os.write(master_fd, data)
+            except OSError:
+                break
+        try:
+            wpid, wstatus = os.waitpid(pid, os.WNOHANG)
+            if wpid != 0:
+                break
+        except ChildProcessError:
+            break
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError:
+        pass
+
+except Exception:
+    sys.stdout.write("[happy-pty ERROR]\\r\\n")
+    sys.stdout.write(traceback.format_exc().replace("\\n", "\\r\\n"))
+    sys.stdout.flush()
+    sys.exit(1)
+`;
 
         child = spawn("python3", ["-c", ptyScript], {
           cwd,

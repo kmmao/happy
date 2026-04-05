@@ -52,6 +52,7 @@ export function terminalHandler(userId: string, socket: Socket) {
             if (!payload?.machineId || !payload?.terminalId) {
                 return;
             }
+            log({ module: "terminal" }, `terminal-exit: machineId=${payload.machineId} terminalId=${payload.terminalId} exitCode=${payload.exitCode}`);
             eventRouter.emitEphemeral({
                 userId,
                 payload: {
