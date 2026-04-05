@@ -11,6 +11,7 @@ import { buildKnowledgeCountEphemeral, eventRouter } from "@/app/events/eventRou
 import { inTx } from "@/storage/inTx";
 import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
+import { recordKnowledgeAccess } from "@/modules/knowledgeAccess";
 
 // Zod schemas for socket knowledge events (defense-in-depth)
 const FetchKnowledgeSchema = z.object({
@@ -177,7 +178,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 callback({ profile: null, entries: [] });
                 return;
             }
-            const { sid, mode, contextHints } = parsed.data;
+            const { sid, contextHints } = parsed.data;
 
             const session = await db.session.findFirst({
                 where: { id: sid, accountId: userId },
@@ -185,11 +186,15 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             });
 
             if (!session?.projectId) {
-                callback({ profile: null, entries: [] });
+                callback({ profile: null, entries: [], actionItems: [] });
                 return;
             }
 
             const projectId = session.projectId;
+
+            // Resolve project-level config first — use stored mode, not client-sent mode
+            const knowledgeConfig = await resolveKnowledgeConfig(projectId);
+            const effectiveMode = knowledgeConfig.mode;
 
             // Get profile (L1)
             const profileRecord = await db.projectProfile.findUnique({
@@ -199,13 +204,13 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 ? parseProfileContent(profileRecord.content)
                 : null;
 
-            if (mode === "minimal") {
-                callback({ profile, entries: [] });
+            if (effectiveMode === "minimal") {
+                callback({ profile, entries: [], actionItems: [], knowledgeConfig });
                 return;
             }
 
-            // Determine entry limit based on mode
-            const entryLimit = mode === "full" ? 20 : 5;
+            // Determine entry limit based on stored mode
+            const entryLimit = effectiveMode === "full" ? 20 : 5;
 
             let entries;
             if (contextHints && contextHints.length > 0) {
@@ -233,20 +238,34 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 });
             }
 
-            // Fire-and-forget: update lastAccessedAt for injected entries
+            // Fire-and-forget: record access log (writes knowledgeAccess records + bumps counters)
             if (entries.length > 0) {
                 const ids = entries.map((e) => e.id);
-                void db.projectKnowledge.updateMany({
-                    where: { id: { in: ids } },
-                    data: {
-                        lastAccessedAt: new Date(),
-                        accessCount: { increment: 1 },
-                    },
-                });
+                void recordKnowledgeAccess(sid, projectId, ids);
             }
 
-            // Resolve project-level knowledge config for CLI
-            const knowledgeConfig = await resolveKnowledgeConfig(projectId);
+            // Fetch action items: warning/decision entries + high-confidence not recently accessed
+            const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+            const mainEntryIds = entries.map((e) => e.id);
+            const actionItems = await db.projectKnowledge.findMany({
+                where: {
+                    projectId,
+                    status: "active",
+                    ...(mainEntryIds.length > 0 ? { id: { notIn: mainEntryIds } } : {}),
+                    OR: [
+                        { entryType: { in: ["warning", "decision"] } },
+                        {
+                            confidence: "high",
+                            OR: [
+                                { lastAccessedAt: null },
+                                { lastAccessedAt: { lt: fourteenDaysAgo } },
+                            ],
+                        },
+                    ],
+                },
+                orderBy: [{ pinned: "desc" }, { confidence: "desc" }, { lastAccessedAt: "asc" }],
+                take: 5,
+            });
 
             callback({
                 profile,
@@ -260,10 +279,19 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                     confidence: e.confidence,
                     createdAt: e.createdAt.toISOString(),
                 })),
+                actionItems: actionItems.map((e) => ({
+                    id: e.id,
+                    entryType: e.entryType,
+                    title: e.title,
+                    content: e.content,
+                    tags: safeParseJsonArray(e.tags),
+                    confidence: e.confidence,
+                    createdAt: e.createdAt.toISOString(),
+                })),
                 knowledgeConfig,
             });
 
-            log({ module: "knowledge" }, `Injected ${entries.length} entries for session ${sid} (mode=${mode})`);
+            log({ module: "knowledge" }, `Injected ${entries.length} entries + ${actionItems.length} action items for session ${sid} (mode=${effectiveMode})`);
         } catch (err) {
             log({ module: "knowledge" }, `Error fetching knowledge: ${err}`);
             if (callback) callback({ profile: null, entries: [] });

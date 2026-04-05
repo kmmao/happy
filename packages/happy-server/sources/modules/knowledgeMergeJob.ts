@@ -30,6 +30,7 @@ interface ClusterEntry {
     tags: string;
     confidence: string;
     createdAt: Date;
+    sessionId: string | null;
 }
 
 // ─── Zod schema for LLM merge output ───
@@ -168,6 +169,7 @@ async function findMergeClusters(projectId: string): Promise<MergeCluster[]> {
             tags: true,
             confidence: true,
             createdAt: true,
+            sessionId: true,
         },
         orderBy: { createdAt: "desc" },
         take: 100,
@@ -325,6 +327,11 @@ async function executeClusterMerge(
                 structured: JSON.stringify({
                     request: `Merged from ${sourceIds.length} entries`,
                     findings: `Source IDs: ${sourceIds.join(", ")}`,
+                    sources: cluster.entries.map((e) => ({
+                        id: e.id,
+                        title: e.title,
+                        sessionId: e.sessionId,
+                    })),
                 }),
                 tags: JSON.stringify(merged.tags),
                 confidence: merged.confidence,

@@ -7,6 +7,7 @@ import { Switch } from "@/components/Switch";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 import type { KnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
+import { showKnowledgeFlowModal } from "@/components/knowledge/KnowledgeFlowDiagram";
 
 interface Props {
     config: KnowledgeConfig;
@@ -95,6 +96,15 @@ export const ProjectKnowledgeConfigCard = React.memo<Props>(
 
                         {config.enabled && (
                             <>
+                                {/* Learn more button — opens flow modal */}
+                                <Pressable style={styles.learnMoreBtn} onPress={showKnowledgeFlowModal} hitSlop={4}>
+                                    <Ionicons name="information-circle-outline" size={13} color={theme.colors.header.tint} />
+                                    <Text style={[styles.learnMoreText, { color: theme.colors.header.tint }]}>
+                                        {t("projects.knowledgeFlowLearnMore")}
+                                    </Text>
+                                    <Ionicons name="chevron-forward" size={11} color={theme.colors.header.tint} />
+                                </Pressable>
+
                                 {/* Mode selector */}
                                 <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
                                     {t("projects.knowledgeConfigMode")}
@@ -351,5 +361,17 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 11,
         marginLeft: 28,
         marginTop: 2,
+    },
+    learnMoreBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        marginTop: 6,
+        marginBottom: 2,
+        alignSelf: "flex-start",
+    },
+    learnMoreText: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
     },
 }));

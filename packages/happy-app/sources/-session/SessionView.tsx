@@ -22,6 +22,8 @@ import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
 import { OptionsPopover } from "@/components/OptionsPopover";
 import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
 import { EmptyMessages } from "@/components/EmptyMessages";
+import { SessionRecommendationsCard } from "@/components/SessionRecommendationsCard";
+import { useProjectActionItems } from "@/hooks/useProjectActionItems";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
 import { useLatestOptions } from "@/hooks/useLatestOptions";
@@ -454,6 +456,8 @@ function SessionViewInner({
   const realtimeStatus = useRealtimeStatus();
   const { messages, isLoaded } = useSessionMessages(sessionId);
   const isConnected = session.presence === "online";
+  const sessionProjectInner = useProjectForSession(sessionId);
+  const { actionItems } = useProjectActionItems(sessionProjectInner?.serverId ?? undefined);
   const backgroundTaskEntries = useBackgroundTaskEntries(sessionId);
   const { tasks: backgroundTasks, dismissTask: dismissBackgroundTask } = useBackgroundTasks(backgroundTaskEntries, isConnected);
   const [viewingTask, setViewingTask] = React.useState<BackgroundTask | null>(null);
@@ -934,7 +938,14 @@ function SessionViewInner({
     messages.length === 0 ? (
       <>
         {isLoaded ? (
-          <EmptyMessages session={session} />
+          actionItems.length > 0 ? (
+            <SessionRecommendationsCard
+              actionItems={actionItems}
+              onSelect={setMessage}
+            />
+          ) : (
+            <EmptyMessages session={session} />
+          )
         ) : (
           <ActivityIndicator size="small" color={theme.colors.textSecondary} />
         )}

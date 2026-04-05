@@ -13,6 +13,7 @@ import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { inboxCreate } from "@/modules/inboxCreate";
 import { recordKnowledgeAccess, getSessionKnowledgeAccesses } from "@/modules/knowledgeAccess";
+import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
 
 // Inline Zod schemas (mirrors @kmmao/happy-wire/knowledge.ts)
 // Server uses CommonJS resolution which can't import ESM-only wire values directly.
@@ -663,7 +664,7 @@ export function knowledgeRoutes(app: Fastify) {
         async (request, reply) => {
             const userId = request.userId;
             const { id } = request.params;
-            const { mode, contextHints, sessionId } = request.body;
+            const { contextHints, sessionId } = request.body;
 
             const project = await db.project.findFirst({
                 where: { id, accountId: userId },
@@ -671,6 +672,10 @@ export function knowledgeRoutes(app: Fastify) {
             if (!project) {
                 return reply.code(404).send({ error: "Project not found" });
             }
+
+            // Resolve project-level config — use stored mode, not client-sent mode
+            const knowledgeConfig = await resolveKnowledgeConfig(id);
+            const effectiveMode = knowledgeConfig.mode;
 
             // Get project profile (L1)
             const profileRecord = await db.projectProfile.findUnique({
@@ -680,12 +685,12 @@ export function knowledgeRoutes(app: Fastify) {
                 ? parseProfileContent(profileRecord.content)
                 : null;
 
-            if (mode === "minimal") {
-                return reply.send({ profile, entries: [] });
+            if (effectiveMode === "minimal") {
+                return reply.send({ profile, entries: [], actionItems: [], knowledgeConfig });
             }
 
             // Determine how many entries to fetch
-            const entryLimit = mode === "full" ? 20 : 5;
+            const entryLimit = effectiveMode === "full" ? 20 : 5;
 
             let entries;
             if (contextHints && contextHints.length > 0) {
@@ -735,9 +740,96 @@ export function knowledgeRoutes(app: Fastify) {
                 }
             }
 
+            // Fetch action items: warning/decision + high-confidence not recently accessed
+            const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+            const mainEntryIds = entries.map((e) => e.id);
+            const actionItems = await db.projectKnowledge.findMany({
+                where: {
+                    projectId: id,
+                    status: "active",
+                    ...(mainEntryIds.length > 0 ? { id: { notIn: mainEntryIds } } : {}),
+                    OR: [
+                        { entryType: { in: ["warning", "decision"] } },
+                        {
+                            confidence: "high",
+                            OR: [
+                                { lastAccessedAt: null },
+                                { lastAccessedAt: { lt: fourteenDaysAgo } },
+                            ],
+                        },
+                    ],
+                },
+                orderBy: [{ pinned: "desc" }, { confidence: "desc" }, { lastAccessedAt: "asc" }],
+                take: 5,
+            });
+
             return reply.send({
                 profile,
                 entries: entries.map((e) => ({
+                    id: e.id,
+                    entryType: e.entryType,
+                    title: e.title,
+                    content: e.content,
+                    tags: safeParseJsonArray(e.tags),
+                    confidence: e.confidence,
+                    createdAt: e.createdAt.toISOString(),
+                })),
+                actionItems: actionItems.map((e) => ({
+                    id: e.id,
+                    entryType: e.entryType,
+                    title: e.title,
+                    content: e.content,
+                    tags: safeParseJsonArray(e.tags),
+                    confidence: e.confidence,
+                    createdAt: e.createdAt.toISOString(),
+                })),
+                knowledgeConfig,
+            });
+        },
+    );
+
+    // ─── Action items (for App session recommendations) ───
+    app.get(
+        "/v1/projects/:id/knowledge/action-items",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+            const actionItems = await db.projectKnowledge.findMany({
+                where: {
+                    projectId: id,
+                    status: "active",
+                    OR: [
+                        { entryType: { in: ["warning", "decision"] } },
+                        {
+                            confidence: "high",
+                            OR: [
+                                { lastAccessedAt: null },
+                                { lastAccessedAt: { lt: fourteenDaysAgo } },
+                            ],
+                        },
+                    ],
+                },
+                orderBy: [{ pinned: "desc" }, { confidence: "desc" }, { lastAccessedAt: "asc" }],
+                take: 5,
+            });
+
+            return reply.send({
+                actionItems: actionItems.map((e) => ({
                     id: e.id,
                     entryType: e.entryType,
                     title: e.title,

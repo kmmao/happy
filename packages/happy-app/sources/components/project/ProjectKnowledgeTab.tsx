@@ -178,6 +178,21 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             [projectServerId, router],
         );
 
+        const handleNavigateToSession = React.useCallback(
+            (sessionId: string) => {
+                router.push(`/session/${sessionId}` as any);
+            },
+            [router],
+        );
+
+        const handleNavigateToSourceEntry = React.useCallback(
+            (entryId: string) => {
+                if (!projectServerId) return;
+                router.push(`/project/${projectServerId}/knowledge/${entryId}/evolution` as any);
+            },
+            [router, projectServerId],
+        );
+
         const handleExtractSkill = React.useCallback(
             (entry: { id: string; title: string; content: string }) => {
                 router.push({
@@ -231,9 +246,11 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                     onExtractSkill={isArchivedFilter ? undefined : handleExtractSkill}
                     isArchived={isArchivedFilter}
                     onViewEvolution={handleViewEvolution}
+                    onNavigateToSession={handleNavigateToSession}
+                    onNavigateToSourceEntry={handleNavigateToSourceEntry}
                 />
             ),
-            [updateEntry, deleteEntry, refineEntry, handleExtractSkill, isArchivedFilter, handleViewEvolution],
+            [updateEntry, deleteEntry, refineEntry, handleExtractSkill, isArchivedFilter, handleViewEvolution, handleNavigateToSession, handleNavigateToSourceEntry],
         );
 
         const keyExtractor = React.useCallback(

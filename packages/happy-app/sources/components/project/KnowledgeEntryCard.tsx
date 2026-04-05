@@ -20,6 +20,7 @@ interface KnowledgeEntryCardProps {
             analysis?: string;
             outcome?: string;
             nextSteps?: string;
+            sources?: Array<{ id: string; title: string; sessionId: string | null }>;
         } | null;
         tags: string[];
         confidence: string;
@@ -34,6 +35,8 @@ interface KnowledgeEntryCardProps {
     onExtractSkill?: (entry: KnowledgeEntryCardProps["entry"]) => void;
     isArchived?: boolean;
     onViewEvolution?: (entryId: string) => void;
+    onNavigateToSession?: (sessionId: string) => void;
+    onNavigateToSourceEntry?: (entryId: string) => void;
 }
 
 function entryTypeLabel(entryType: string): string {
@@ -117,7 +120,7 @@ function soapLabel(field: string): string {
 }
 
 export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
-    ({ entry, onUpdate, onDelete, onRefine, onExtractSkill, isArchived, onViewEvolution }) => {
+    ({ entry, onUpdate, onDelete, onRefine, onExtractSkill, isArchived, onViewEvolution, onNavigateToSession, onNavigateToSourceEntry }) => {
         const { theme } = useUnistyles();
         const [expanded, setExpanded] = React.useState(false);
         const [refining, setRefining] = React.useState(false);
@@ -201,19 +204,41 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
             onDelete(entry.id);
         }, [entry.id, onDelete]);
 
+        const MERGED_FROM_RE = /^Merged from (\d+) entries$/;
+        const SOURCE_IDS_RE = /^Source IDs: (.+)$/;
+
         const soapFields = React.useMemo(() => {
-            if (!entry.structured) {
-                return [];
-            }
+            if (!entry.structured) return [];
             const fields: { key: string; value: string }[] = [];
             const order = ["request", "findings", "analysis", "outcome", "nextSteps"] as const;
             for (const key of order) {
                 const value = entry.structured[key];
-                if (value) {
-                    fields.push({ key, value });
+                if (!value) continue;
+                if (key === "findings" && SOURCE_IDS_RE.test(value)) continue; // shown as chips
+                if (key === "request") {
+                    const m = MERGED_FROM_RE.exec(value);
+                    if (m) {
+                        fields.push({ key, value: t("projects.knowledgeMergedFrom", { count: parseInt(m[1], 10) }) });
+                        continue;
+                    }
                 }
+                fields.push({ key, value });
             }
             return fields;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [entry.structured]);
+
+        // New data: structured.sources has title + sessionId
+        // Old data: parse IDs from findings string "Source IDs: id1, id2"
+        const sources = React.useMemo(() => {
+            if (entry.structured?.sources && entry.structured.sources.length > 0) {
+                return entry.structured.sources;
+            }
+            const findings = entry.structured?.findings ?? "";
+            const m = SOURCE_IDS_RE.exec(findings);
+            if (!m) return [];
+            return m[1].split(",").map((id) => ({ id: id.trim(), title: null as string | null, sessionId: null }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [entry.structured]);
 
         return (
@@ -310,7 +335,12 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
                     </Animated.View>
                 ) : (
                     <>
-                        {/* Expanded: SOAP fields */}
+                        {/* Expanded: SOAP fields or merged content */}
+                        {expanded && !!entry.content && (
+                            <Text style={[styles.soapValue, { color: theme.colors.text, marginBottom: 8 }]}>
+                                {entry.content}
+                            </Text>
+                        )}
                         {expanded && soapFields.length > 0 && (
                             <View style={styles.soapSection}>
                                 {soapFields.map((field) => (
@@ -323,6 +353,45 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
                                         </Text>
                                     </View>
                                 ))}
+                            </View>
+                        )}
+                        {/* Sources: clickable chips for merged entries */}
+                        {expanded && sources.length > 0 && (
+                            <View style={styles.sourcesSection}>
+                                <Text style={[styles.soapLabel, { color: theme.colors.textSecondary }]}>
+                                    {t("projects.knowledgeSources")}
+                                </Text>
+                                <View style={styles.sourcesRow}>
+                                    {sources.map((src) => {
+                                        const isNavigable = !!(src.sessionId || onNavigateToSourceEntry);
+                                        const handlePress = () => {
+                                            if (src.sessionId) {
+                                                onNavigateToSession?.(src.sessionId);
+                                            } else {
+                                                onNavigateToSourceEntry?.(src.id);
+                                            }
+                                        };
+                                        return (
+                                            <Pressable
+                                                key={src.id}
+                                                style={[styles.sourceChip, { backgroundColor: theme.colors.groupped.background }]}
+                                                onPress={isNavigable ? handlePress : undefined}
+                                                hitSlop={4}
+                                            >
+                                                <Ionicons name="git-merge-outline" size={11} color={theme.colors.textSecondary} />
+                                                <Text
+                                                    style={[styles.sourceChipText, { color: isNavigable ? theme.colors.header.tint : theme.colors.textSecondary }]}
+                                                    numberOfLines={1}
+                                                >
+                                                    {src.title ?? src.id.slice(-8)}
+                                                </Text>
+                                                {isNavigable && (
+                                                    <Ionicons name="arrow-forward" size={10} color={theme.colors.header.tint} />
+                                                )}
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
                             </View>
                         )}
 
@@ -346,16 +415,25 @@ export const KnowledgeEntryCard = React.memo<KnowledgeEntryCardProps>(
 
                 {/* Footer: timestamp + contributor + actions */}
                 <View style={styles.footerRow}>
-                    <View style={styles.footerLeft}>
+                    <Pressable
+                        style={styles.footerLeft}
+                        onPress={entry.sessionId ? () => onNavigateToSession?.(entry.sessionId!) : undefined}
+                        hitSlop={8}
+                    >
                         <Text style={[styles.timestamp, { color: theme.colors.textSecondary }]}>
                             {formatTimestamp(entry.createdAt)}
                         </Text>
-                        <Text style={[styles.contributorText, { color: theme.colors.textSecondary }]}>
-                            {entry.contributorType === "human"
-                                ? t("projects.knowledgeContributorHuman")
-                                : t("projects.knowledgeContributorAgent")}
-                        </Text>
-                    </View>
+                        {entry.contributorType !== "session" && (
+                            <Text style={[styles.contributorText, { color: entry.sessionId ? theme.colors.header.tint : theme.colors.textSecondary }]}>
+                                {entry.contributorType === "user"
+                                    ? t("projects.knowledgeContributorHuman")
+                                    : t("projects.knowledgeContributorAgent")}
+                            </Text>
+                        )}
+                        {!!entry.sessionId && (
+                            <Ionicons name="arrow-forward" size={10} color={theme.colors.header.tint} />
+                        )}
+                    </Pressable>
                     <View style={styles.actionRow}>
                         {isArchived ? (
                             <>
@@ -616,5 +694,28 @@ const styles = StyleSheet.create((theme) => ({
     evolutionBadgeText: {
         ...Typography.default("semiBold"),
         fontSize: 10,
+    },
+    sourcesSection: {
+        marginBottom: 8,
+    },
+    sourcesRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 6,
+        marginTop: 4,
+    },
+    sourceChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        maxWidth: 220,
+    },
+    sourceChipText: {
+        ...Typography.default("regular"),
+        fontSize: 12,
+        flex: 1,
     },
 }));
