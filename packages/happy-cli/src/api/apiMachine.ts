@@ -719,6 +719,7 @@ export class ApiMachineClient {
         cwd: params?.cwd,
         cols: params?.cols,
         rows: params?.rows,
+        sessionId: params?.sessionId,
       });
     });
 

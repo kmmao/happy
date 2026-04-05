@@ -11,6 +11,7 @@ import { t } from "@/text";
 interface WebTerminalProps {
     machineId: string;
     cwd?: string;
+    sessionId?: string;
     onClose?: () => void;
 }
 

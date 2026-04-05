@@ -2,18 +2,22 @@
  * WebTerminal — xterm.js-based web terminal emulator.
  * Connects to a CLI daemon's PTY via Socket.IO relay.
  *
+ * Each Claude session owns one persistent PTY (keyed by sessionId).
+ * Switching tabs detaches the listener but keeps the process alive.
+ * Re-opening replays buffered output and resumes the session.
+ *
  * Web-only component (uses DOM APIs).
  */
 import React, { useRef, useEffect, useCallback, useState } from "react";
-import { View } from "react-native";
+import { View, Pressable } from "react-native";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
+import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
 import { apiSocket } from "@/sync/apiSocket";
 import {
     machineTerminalSpawn,
     machineTerminalClose,
-    machineTerminalCloseAll,
     machineTerminalResize,
     machineTerminalInput,
     machineUpgradeCli,
@@ -25,12 +29,13 @@ import { t } from "@/text";
 interface WebTerminalProps {
     machineId: string;
     cwd?: string;
+    sessionId?: string; // Claude session ID — used to persist PTY across tab switches
     onClose?: () => void;
 }
 
 type TerminalState = "connecting" | "connected" | "disconnected" | "error";
 
-function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
+function WebTerminalComponent({ machineId, cwd, sessionId, onClose }: WebTerminalProps) {
     const { theme } = useUnistyles();
     const containerRef = useRef<HTMLDivElement | null>(null);
     const terminalRef = useRef<any>(null);
@@ -46,7 +51,8 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
     const currentCliVersion = machine?.daemonState?.startedWithCliVersion;
     const { latestVersion, hasUpdate } = useCliVersionCheck(currentCliVersion);
 
-    const cleanup = useCallback(() => {
+    // Explicitly close the PTY — called only by user action or shell exit, not on unmount
+    const closeTerminal = useCallback(() => {
         if (terminalIdRef.current) {
             machineTerminalClose(machineId, terminalIdRef.current);
             terminalIdRef.current = null;
@@ -55,7 +61,9 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
             terminalRef.current.dispose();
             terminalRef.current = null;
         }
-    }, [machineId]);
+        setState("disconnected");
+        onClose?.();
+    }, [machineId, onClose]);
 
     useEffect(() => {
         let mounted = true;
@@ -63,13 +71,11 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
         let exitCleanup: (() => void) | null = null;
 
         async function init() {
-            // Dynamically import xterm (web-only, avoids Metro bundling for native)
             const [{ Terminal }, { FitAddon }] = await Promise.all([
                 import("@xterm/xterm"),
                 import("@xterm/addon-fit"),
             ]);
 
-            // Also load xterm CSS
             if (!document.querySelector('link[data-xterm-css]')) {
                 const link = document.createElement("link");
                 link.rel = "stylesheet";
@@ -98,22 +104,18 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
 
             const fitAddon = new FitAddon();
             terminal.loadAddon(fitAddon);
-
             terminalRef.current = terminal;
             fitAddonRef.current = fitAddon;
 
             terminal.open(containerRef.current);
 
             // Fit synchronously so cols/rows reflect actual container size before spawn
-            try { fitAddon.fit(); } catch { /* ignore initial fit errors */ }
+            try { fitAddon.fit(); } catch { /* ignore */ }
 
             const cols = terminal.cols;
             const rows = terminal.rows;
 
-            // Register socket listener BEFORE spawn to avoid race condition:
-            // terminal-exit can fire within ms of spawn (e.g. PTY allocation failure),
-            // before the async spawn RPC response returns and we set terminalIdRef.
-            // Buffer events until terminalId is known, then replay them.
+            // Register listener BEFORE spawn to buffer events arriving during RPC round-trip
             const pendingEvents: any[] = [];
             outputCleanup = apiSocket.addEphemeralListener((data: any) => {
                 if (data.machineId !== machineId) return;
@@ -135,11 +137,8 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
                 }
             });
 
-            // Close any stale PTY sessions before spawning (avoids "Maximum N terminals reached")
-            await machineTerminalCloseAll(machineId).catch(() => {});
-
-            // Spawn PTY on the machine
-            const result = await machineTerminalSpawn(machineId, { cwd, cols, rows });
+            // Spawn or reattach. CLI returns existing PTY if sessionId matches.
+            const result = await machineTerminalSpawn(machineId, { cwd, cols, rows, sessionId });
             if (!mounted) return;
 
             if (!result.success || !result.terminalId) {
@@ -149,9 +148,15 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
             }
 
             terminalIdRef.current = result.terminalId;
+
+            // Reattach: replay buffered output from CLI so the screen is up to date
+            if (result.isExisting && result.recentOutput) {
+                terminal.write(result.recentOutput);
+            }
+
             setState("connected");
 
-            // Replay any buffered events that arrived before terminalId was set
+            // Replay any socket events that arrived during the spawn RPC
             for (const data of pendingEvents) {
                 if (data.terminalId !== terminalIdRef.current) continue;
                 if (data.type === "terminal-output") {
@@ -166,21 +171,18 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
                 }
             }
 
-            // Send input to the machine
             terminal.onData((data: string) => {
                 if (terminalIdRef.current) {
                     machineTerminalInput(machineId, terminalIdRef.current, data);
                 }
             });
 
-            // Handle resize
             terminal.onResize(({ cols, rows }: { cols: number; rows: number }) => {
                 if (terminalIdRef.current) {
                     machineTerminalResize(machineId, terminalIdRef.current, cols, rows);
                 }
             });
 
-            // Window resize → fit terminal
             const onWindowResize = () => {
                 try { fitAddon.fit(); } catch { /* ignore */ }
             };
@@ -199,9 +201,14 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
             mounted = false;
             outputCleanup?.();
             exitCleanup?.();
-            cleanup();
+            // Detach only: don't close the PTY — it stays alive for reattach
+            if (terminalRef.current) {
+                terminalRef.current.dispose();
+                terminalRef.current = null;
+            }
+            terminalIdRef.current = null;
         };
-    }, [machineId, cwd, theme.colors.groupped?.background, cleanup, onClose, retryKey]);
+    }, [machineId, cwd, sessionId, theme.colors.groupped?.background, onClose, retryKey]);
 
     const handleRetry = React.useCallback(() => {
         setState("connecting");
@@ -222,7 +229,6 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
                 return;
             }
             setUpdateMsg(t("webTerminal.updateWaiting"));
-            // Daemon detects version change and restarts within ~60s
             setTimeout(() => {
                 setIsUpdating(false);
                 handleRetry();
@@ -293,6 +299,24 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
 
     return (
         <View style={{ flex: 1, position: "relative" }}>
+            {/* Close button — top-right corner, only when connected */}
+            {state === "connected" && (
+                <Pressable
+                    onPress={closeTerminal}
+                    style={{
+                        position: "absolute",
+                        top: 6,
+                        right: 8,
+                        zIndex: 20,
+                        padding: 4,
+                        borderRadius: 4,
+                        backgroundColor: "rgba(0,0,0,0.3)",
+                    }}
+                    hitSlop={8}
+                >
+                    <Ionicons name="close" size={14} color="#fff" />
+                </Pressable>
+            )}
             {state === "connecting" && (
                 <View style={{
                     position: "absolute",
@@ -302,21 +326,14 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
                     zIndex: 10,
                     backgroundColor: theme.colors.groupped?.background,
                 }}>
-                    <Text style={{
-                        ...Typography.default(),
-                        color: theme.colors.textSecondary,
-                    }}>
+                    <Text style={{ ...Typography.default(), color: theme.colors.textSecondary }}>
                         {t("webTerminal.connecting")}
                     </Text>
                 </View>
             )}
             <div
                 ref={containerRef}
-                style={{
-                    width: "100%",
-                    height: "100%",
-                    overflow: "hidden",
-                }}
+                style={{ width: "100%", height: "100%", overflow: "hidden", cursor: "text" }}
             />
         </View>
     );

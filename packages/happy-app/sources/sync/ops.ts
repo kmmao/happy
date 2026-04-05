@@ -2180,12 +2180,14 @@ export async function sessionElicitationResponse(
 export interface TerminalSpawnResult {
     success: boolean;
     terminalId?: string;
+    recentOutput?: string; // buffered output for reattach replay
+    isExisting?: boolean;  // true when reattaching to an existing session terminal
     error?: string;
 }
 
 export async function machineTerminalSpawn(
     machineId: string,
-    options?: { shell?: string; cwd?: string; cols?: number; rows?: number },
+    options?: { shell?: string; cwd?: string; cols?: number; rows?: number; sessionId?: string },
 ): Promise<TerminalSpawnResult> {
     try {
         return await apiSocket.machineRPC<TerminalSpawnResult, typeof options>(

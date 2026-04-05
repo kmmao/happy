@@ -12,22 +12,26 @@ import { logger } from "@/ui/logger";
 
 export interface TerminalSession {
   id: string;
+  sessionId?: string; // owning Claude session — used for persistent reattach
   process: ChildProcess;
   cols: number;
   rows: number;
   shell: string;
   cwd: string;
   createdAt: number;
+  outputBuffer: string; // rolling buffer of recent output for reattach replay
 }
 
 export type TerminalOutputHandler = (terminalId: string, data: string) => void;
 export type TerminalExitHandler = (terminalId: string, exitCode: number) => void;
 
 const MAX_TERMINALS = 5;
-const MAX_OUTPUT_CHUNK = 8 * 1024; // 8KB per chunk
+const MAX_OUTPUT_CHUNK = 8 * 1024;  // 8KB per chunk
+const MAX_OUTPUT_BUFFER = 64 * 1024; // 64KB replay buffer per terminal
 
 export class TerminalManager {
   private terminals = new Map<string, TerminalSession>();
+  private sessionIndex = new Map<string, string>(); // sessionId → terminalId
   private onOutput: TerminalOutputHandler | null = null;
   private onExit: TerminalExitHandler | null = null;
 
@@ -44,7 +48,26 @@ export class TerminalManager {
     cwd?: string;
     cols?: number;
     rows?: number;
-  }): { success: boolean; terminalId?: string; error?: string } {
+    sessionId?: string;
+  }): { success: boolean; terminalId?: string; recentOutput?: string; isExisting?: boolean; error?: string } {
+    // Reattach to existing session-owned terminal if available
+    if (options.sessionId) {
+      const existingId = this.sessionIndex.get(options.sessionId);
+      if (existingId && this.terminals.has(existingId)) {
+        const session = this.terminals.get(existingId)!;
+        // Resize to new client dimensions if provided
+        if (options.cols && options.rows) {
+          this.resize(existingId, options.cols, options.rows);
+        }
+        return {
+          success: true,
+          terminalId: existingId,
+          recentOutput: session.outputBuffer,
+          isExisting: true,
+        };
+      }
+    }
+
     if (this.terminals.size >= MAX_TERMINALS) {
       return { success: false, error: `Maximum ${MAX_TERMINALS} terminals reached` };
     }
@@ -178,21 +201,33 @@ except Exception:
 
       const session: TerminalSession = {
         id,
+        sessionId: options.sessionId,
         process: child,
         cols,
         rows,
         shell,
         cwd,
         createdAt: Date.now(),
+        outputBuffer: "",
       };
 
       this.terminals.set(id, session);
+      if (options.sessionId) {
+        this.sessionIndex.set(options.sessionId, id);
+      }
+
+      const appendToBuffer = (text: string) => {
+        session.outputBuffer += text;
+        if (session.outputBuffer.length > MAX_OUTPUT_BUFFER) {
+          session.outputBuffer = session.outputBuffer.slice(session.outputBuffer.length - MAX_OUTPUT_BUFFER);
+        }
+      };
 
       // Stream stdout
       child.stdout?.on("data", (data: Buffer) => {
+        const text = data.toString("utf-8");
+        appendToBuffer(text);
         if (this.onOutput) {
-          const text = data.toString("utf-8");
-          // Split into chunks if too large
           for (let i = 0; i < text.length; i += MAX_OUTPUT_CHUNK) {
             this.onOutput(id, text.slice(i, i + MAX_OUTPUT_CHUNK));
           }
@@ -201,8 +236,9 @@ except Exception:
 
       // Stream stderr (merge into output)
       child.stderr?.on("data", (data: Buffer) => {
+        const text = data.toString("utf-8");
+        appendToBuffer(text);
         if (this.onOutput) {
-          const text = data.toString("utf-8");
           for (let i = 0; i < text.length; i += MAX_OUTPUT_CHUNK) {
             this.onOutput(id, text.slice(i, i + MAX_OUTPUT_CHUNK));
           }
@@ -212,6 +248,7 @@ except Exception:
       child.on("exit", (code) => {
         logger.debug(`[TERMINAL] Terminal ${id} exited with code ${code}`);
         this.terminals.delete(id);
+        if (session.sessionId) this.sessionIndex.delete(session.sessionId);
         if (this.onExit) {
           this.onExit(id, code ?? -1);
         }
@@ -220,6 +257,7 @@ except Exception:
       child.on("error", (err) => {
         logger.debug(`[TERMINAL] Terminal ${id} error: ${err.message}`);
         this.terminals.delete(id);
+        if (session.sessionId) this.sessionIndex.delete(session.sessionId);
         if (this.onExit) {
           this.onExit(id, -1);
         }
@@ -278,6 +316,7 @@ except Exception:
       // Already dead
     }
     this.terminals.delete(terminalId);
+    if (session.sessionId) this.sessionIndex.delete(session.sessionId);
     return true;
   }
 

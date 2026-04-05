@@ -34,7 +34,7 @@ export const SidePanelTerminalTab = React.memo<SidePanelTerminalTabProps>(
 
         return (
             <View style={{ flex: 1 }}>
-                <WebTerminal machineId={machineId} cwd={cwd} />
+                <WebTerminal machineId={machineId} cwd={cwd} sessionId={sessionId} />
             </View>
         );
     },
