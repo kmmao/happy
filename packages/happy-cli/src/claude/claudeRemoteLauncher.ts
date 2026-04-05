@@ -21,6 +21,8 @@ import type {
   SDKPromptSuggestionMessage,
   SDKSessionStateChangedMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
 import { SDKToLogConverter } from "./utils/sdkToLogConverter";
@@ -183,6 +185,8 @@ export async function claudeRemoteLauncher(
   const turnCollector = knowledgeEnabled ? new TurnCollector(turnCollectorConfig) : null;
   let knowledgeInjected = false; // Track whether knowledge was already injected
   let knowledgeContext: string | null = null; // Cached knowledge for system prompt
+  let pendingKnowledgeRefresh = false; // Whether a per-turn refresh is pending
+  let knowledgeEntryIds = new Set<string>(); // IDs of already-injected knowledge entries
 
   // Pre-fetch knowledge context for injection (non-blocking)
   if (knowledgeEnabled) {
@@ -190,6 +194,9 @@ export async function claudeRemoteLauncher(
     session.client.fetchKnowledge(mode).then((result) => {
       if (result && (result.profile || result.entries.length > 0)) {
         knowledgeContext = formatKnowledgeForInjection(result);
+        for (const e of result.entries) {
+          knowledgeEntryIds.add(e.id);
+        }
         logger.debug(`[knowledge] Pre-fetched context: ${knowledgeContext!.length} chars, ${result.entries.length} entries`);
       }
     }).catch((err) => {
@@ -1018,6 +1025,22 @@ export async function claudeRemoteLauncher(
         logger.debug(
           `[remote]: New session detected (previous: ${previousSessionId}, current: ${session.sessionId})`,
         );
+        // Reset knowledge injection state for the new session (/clear creates a new session)
+        knowledgeInjected = false;
+        knowledgeContext = null;
+        knowledgeEntryIds = new Set<string>();
+        pendingKnowledgeRefresh = false;
+        if (knowledgeEnabled) {
+          const mode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
+          session.client.fetchKnowledge(mode).then((result) => {
+            if (result && (result.profile || result.entries.length > 0)) {
+              knowledgeContext = formatKnowledgeForInjection(result);
+              logger.debug(`[knowledge] Re-fetched context after session reset: ${knowledgeContext!.length} chars, ${result.entries.length} entries`);
+            }
+          }).catch((err) => {
+            logger.debug(`[knowledge] Failed to re-fetch after session reset: ${err}`);
+          });
+        }
       } else {
         messageBuffer.addMessage("Continuing Claude session...", "status");
         logger.debug(
@@ -1192,12 +1215,42 @@ export async function claudeRemoteLauncher(
         turnDrainController = null;
       }
 
+      const knowledgeMcpServer = knowledgeEnabled ? createSdkMcpServer({
+        name: "happy-knowledge",
+        tools: [
+          {
+            name: "query_project_knowledge",
+            description: "Search the project knowledge base for relevant context, past decisions, known pitfalls, and conventions. Use this when you need to understand project-specific patterns or recall past work.",
+            inputSchema: { query: z.string().describe("Search query describing what you want to know") },
+            handler: async (args: { [x: string]: unknown }) => {
+              const query = typeof args["query"] === "string" ? args["query"] : "";
+              try {
+                const result = await session.client.fetchKnowledge("auto", [query]);
+                if (!result || result.entries.length === 0) {
+                  return { content: [{ type: "text" as const, text: "No relevant knowledge found." }] };
+                }
+                const lines = result.entries.map((e: { entryType: string; title: string; content: string; confidence: string }) =>
+                  `[${e.entryType}] ${e.title} (${e.confidence})\n${e.content.slice(0, 500)}`
+                );
+                return { content: [{ type: "text" as const, text: lines.join("\n\n") }] };
+              } catch (err) {
+                logger.debug(`[knowledge] MCP tool query_project_knowledge failed: ${err}`);
+                return { content: [{ type: "text" as const, text: "Knowledge query failed." }] };
+              }
+            },
+          },
+        ],
+      }) : null;
+
       try {
         const remoteResult = await claudeRemote({
           sessionId: session.sessionId,
           path: session.path,
           allowedTools: session.allowedTools ?? [],
-          mcpServers: session.mcpServers,
+          mcpServers: {
+            ...session.mcpServers,
+            ...(knowledgeMcpServer ? { "happy-knowledge": knowledgeMcpServer } : {}),
+          },
           hookSettingsPath: session.hookSettingsPath,
           jsRuntime: session.jsRuntime,
           canCallTool: permissionHandler.handleToolCall,
@@ -1301,16 +1354,72 @@ export async function claudeRemoteLauncher(
               startMidTurnDrain();
 
               // Knowledge injection: append to first message's system prompt
-              const returnMode = !knowledgeInjected && knowledgeContext
+              let effectiveKnowledgeContext = knowledgeContext;
+
+              if (!knowledgeInjected && knowledgeEnabled) {
+                // If pre-fetch hasn't completed yet, do a contextual fetch with hints (max 1500ms)
+                if (!effectiveKnowledgeContext) {
+                  const hints = extractKnowledgeHints(msg.message, 8);
+                  if (hints.length > 0) {
+                    try {
+                      const fetchMode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
+                      const contextualResult = await Promise.race([
+                        session.client.fetchKnowledge(fetchMode, hints),
+                        new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
+                      ]);
+                      if (contextualResult && (contextualResult.profile || contextualResult.entries.length > 0)) {
+                        effectiveKnowledgeContext = formatKnowledgeForInjection(contextualResult);
+                        knowledgeContext = effectiveKnowledgeContext;
+                        logger.debug(`[knowledge] Contextual fetch on first message: ${effectiveKnowledgeContext.length} chars, ${contextualResult.entries.length} entries`);
+                      }
+                    } catch (err) {
+                      logger.debug(`[knowledge] Contextual fetch failed: ${err}`);
+                    }
+                  }
+                }
+              } else if (knowledgeInjected && pendingKnowledgeRefresh && knowledgeEnabled) {
+                // Per-turn refresh: fetch new knowledge based on current user message
+                pendingKnowledgeRefresh = false;
+                const hints = extractKnowledgeHints(msg.message, 8);
+                if (hints.length > 0) {
+                  try {
+                    const fetchMode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
+                    const refreshResult = await Promise.race([
+                      session.client.fetchKnowledge(fetchMode, hints),
+                      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+                    ]);
+                    if (refreshResult && refreshResult.entries.length > 0) {
+                      const newEntries = refreshResult.entries.filter((e) => !knowledgeEntryIds.has(e.id));
+                      if (newEntries.length > 0) {
+                        // New entries found — reset injection so they get included
+                        const updatedResult = { ...refreshResult, entries: newEntries };
+                        knowledgeContext = formatKnowledgeForInjection(updatedResult);
+                        effectiveKnowledgeContext = knowledgeContext;
+                        knowledgeInjected = false;
+                        for (const e of newEntries) {
+                          knowledgeEntryIds.add(e.id);
+                        }
+                        logger.debug(`[knowledge] Per-turn refresh: ${newEntries.length} new entries found`);
+                      }
+                    }
+                  } catch (err) {
+                    logger.debug(`[knowledge] Per-turn refresh failed: ${err}`);
+                  }
+                }
+              }
+
+              const returnMode = !knowledgeInjected && effectiveKnowledgeContext
                 ? {
                   ...msg.mode,
                   appendSystemPrompt: msg.mode.appendSystemPrompt
-                    ? msg.mode.appendSystemPrompt + "\n\n" + knowledgeContext
-                    : knowledgeContext,
+                    ? msg.mode.appendSystemPrompt + "\n\n" + effectiveKnowledgeContext
+                    : effectiveKnowledgeContext,
                 }
                 : msg.mode;
-              if (!knowledgeInjected && knowledgeContext) {
+              if (!knowledgeInjected && effectiveKnowledgeContext) {
                 knowledgeInjected = true;
+                // Track injected entry IDs (parse from context — use knowledgeContext from pre-fetch if available)
+                // IDs are tracked separately via knowledgeEntryIds when we have the raw result
                 logger.debug("[knowledge] Injected knowledge into first message system prompt");
               }
 
@@ -1410,6 +1519,7 @@ export async function claudeRemoteLauncher(
                   : 0;
                 const readyTurns = turnCollector.onTurnEnd(outputTokens);
                 if (readyTurns) {
+                  pendingKnowledgeRefresh = true;
                   logger.debug(`[knowledge] Submitting ${readyTurns.length} turns`);
                   for (const turn of readyTurns) {
                     session.client.submitKnowledge({
@@ -1696,4 +1806,15 @@ function formatKnowledgeForInjection(result: {
   }
 
   return parts.join("\n");
+}
+
+// Extract meaningful keywords from user message for contextual knowledge hints
+function extractKnowledgeHints(message: string, maxHints: number): string[] {
+  const stopWords = new Set(["the", "and", "for", "are", "but", "not", "you", "all", "can", "her", "was", "one", "our", "out", "day", "get", "has", "him", "his", "how", "its", "let", "man", "new", "now", "old", "see", "two", "way", "who", "did", "yes", "any", "had", "its", "may"]);
+  const text = message.slice(0, 300);
+  return text
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-zA-Z0-9_\-.]/g, ""))
+    .filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !stopWords.has(w.toLowerCase()))
+    .slice(0, maxHints);
 }
