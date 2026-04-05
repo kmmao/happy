@@ -103,6 +103,31 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
             const cols = terminal.cols;
             const rows = terminal.rows;
 
+            // Register socket listener BEFORE spawn to avoid race condition:
+            // terminal-exit can fire within ms of spawn (e.g. PTY allocation failure),
+            // before the async spawn RPC response returns and we set terminalIdRef.
+            // Buffer events until terminalId is known, then replay them.
+            const pendingEvents: any[] = [];
+            outputCleanup = apiSocket.onMessage("ephemeral", (data: any) => {
+                if (data.machineId !== machineId) return;
+                if (!terminalIdRef.current) {
+                    if (data.type === "terminal-output" || data.type === "terminal-exit") {
+                        pendingEvents.push(data);
+                    }
+                    return;
+                }
+                if (data.terminalId !== terminalIdRef.current) return;
+                if (data.type === "terminal-output") {
+                    terminal.write(data.data);
+                }
+                if (data.type === "terminal-exit") {
+                    terminal.write(`\r\n\x1b[90m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
+                    setState("disconnected");
+                    terminalIdRef.current = null;
+                    onClose?.();
+                }
+            });
+
             // Spawn PTY on the machine
             const result = await machineTerminalSpawn(machineId, { cwd, cols, rows });
             if (!mounted) return;
@@ -116,22 +141,20 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
             terminalIdRef.current = result.terminalId;
             setState("connected");
 
-            // Listen for terminal output from server
-            outputCleanup = apiSocket.onMessage("ephemeral", (data: any) => {
-                if (data.type === "terminal-output" &&
-                    data.machineId === machineId &&
-                    data.terminalId === terminalIdRef.current) {
+            // Replay any buffered events that arrived before terminalId was set
+            for (const data of pendingEvents) {
+                if (data.terminalId !== terminalIdRef.current) continue;
+                if (data.type === "terminal-output") {
                     terminal.write(data.data);
                 }
-                if (data.type === "terminal-exit" &&
-                    data.machineId === machineId &&
-                    data.terminalId === terminalIdRef.current) {
+                if (data.type === "terminal-exit") {
                     terminal.write(`\r\n\x1b[90m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
                     setState("disconnected");
                     terminalIdRef.current = null;
                     onClose?.();
+                    break;
                 }
-            });
+            }
 
             // Send input to the machine
             terminal.onData((data: string) => {
