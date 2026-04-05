@@ -428,7 +428,7 @@ export async function claudeRemoteLauncher(
   const reportSessionEvent = session.onSessionEvent
     ? createSessionEventReporter(
         { sessionEvent: session.onSessionEvent },
-        () => session.sessionId,
+        () => session.client.sessionId,
       )
     : null;
 
