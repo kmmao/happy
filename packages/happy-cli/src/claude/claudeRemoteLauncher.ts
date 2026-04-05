@@ -1856,9 +1856,11 @@ function formatKnowledgeForInjection(result: {
 function extractKnowledgeHints(message: string, maxHints: number): string[] {
   const stopWords = new Set(["the", "and", "for", "are", "but", "not", "you", "all", "can", "her", "was", "one", "our", "out", "day", "get", "has", "him", "his", "how", "its", "let", "man", "new", "now", "old", "see", "two", "way", "who", "did", "yes", "any", "had", "its", "may"]);
   const text = message.slice(0, 300);
-  return text
+  // Extract CJK phrases (2–6 char chunks) separately, then ASCII tokens
+  const cjkHints = (text.match(/[\u4e00-\u9fff\u3040-\u30ff]{2,6}/g) ?? []).slice(0, Math.floor(maxHints / 2));
+  const asciiHints = text
     .split(/\s+/)
     .map((w) => w.replace(/[^a-zA-Z0-9_\-.]/g, ""))
-    .filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !stopWords.has(w.toLowerCase()))
-    .slice(0, maxHints);
+    .filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !stopWords.has(w.toLowerCase()));
+  return [...cjkHints, ...asciiHints].slice(0, maxHints);
 }
