@@ -187,6 +187,8 @@ export async function claudeRemoteLauncher(
   let knowledgeContext: string | null = null; // Cached knowledge for system prompt
   let pendingKnowledgeRefresh = false; // Whether a per-turn refresh is pending
   let knowledgeEntryIds = new Set<string>(); // IDs of already-injected knowledge entries
+  let pendingFileHint: string | null = null; // File-based knowledge hint for next message
+  let currentTurnFilePaths = new Set<string>(); // Files edited in the current turn
 
   // Pre-fetch knowledge context for injection (non-blocking)
   if (knowledgeEnabled) {
@@ -527,6 +529,7 @@ export async function claudeRemoteLauncher(
                   const filePath = (c.input as Record<string, unknown>)?.file_path;
                   if (typeof filePath === "string") {
                     turnCollector.collectFileEdit(filePath, c.name === "Write" ? "create" : "edit");
+                    currentTurnFilePaths.add(filePath);
                   }
                 }
               }
@@ -1030,6 +1033,8 @@ export async function claudeRemoteLauncher(
         knowledgeContext = null;
         knowledgeEntryIds = new Set<string>();
         pendingKnowledgeRefresh = false;
+        pendingFileHint = null;
+        currentTurnFilePaths = new Set<string>();
         if (knowledgeEnabled) {
           const mode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
           session.client.fetchKnowledge(mode).then((result) => {
@@ -1412,6 +1417,16 @@ export async function claudeRemoteLauncher(
                 }
               }
 
+              // File-aware hint: prepend if available and no higher-priority injection is pending
+              if (knowledgeInjected && pendingFileHint) {
+                const hint = pendingFileHint;
+                pendingFileHint = null;
+                return {
+                  message: hint + msg.message,
+                  mode: msg.mode,
+                };
+              }
+
               const returnMode = !knowledgeInjected && effectiveKnowledgeContext
                 ? {
                   ...msg.mode,
@@ -1546,6 +1561,29 @@ export async function claudeRemoteLauncher(
               }
             } catch (err) {
               logger.debug(`[knowledge] Error in onReady turn processing: ${err}`);
+            }
+
+            // File-aware knowledge hint: check edited files against knowledge base
+            // Fire-and-forget — result stored for next message prefix
+            if (knowledgeEnabled && currentTurnFilePaths.size > 0) {
+              const editedPaths = [...currentTurnFilePaths];
+              currentTurnFilePaths = new Set<string>();
+              const fileHints = extractTags(editedPaths.map((p) => ({ path: p, type: "edit" as const })));
+              if (fileHints.length > 0) {
+                session.client.fetchKnowledge("auto", fileHints).then((result) => {
+                  if (!result || result.entries.length === 0) return;
+                  const newEntries = result.entries.filter((e) => !knowledgeEntryIds.has(e.id));
+                  if (newEntries.length === 0) return;
+                  const fileNames = editedPaths.map((p) => p.split("/").pop()).filter(Boolean).join(", ");
+                  const titles = newEntries.slice(0, 3).map((e) => `"${e.title}"`).join(", ");
+                  pendingFileHint = `[File knowledge hint: you edited ${fileNames} — ${newEntries.length} related knowledge ${newEntries.length === 1 ? "entry" : "entries"} found (${titles}). Use query_project_knowledge if relevant.]\n\n`;
+                  logger.debug(`[knowledge] File-aware hint queued for ${newEntries.length} entries`);
+                }).catch((err) => {
+                  logger.debug(`[knowledge] File-aware hint fetch failed: ${err}`);
+                });
+              }
+            } else {
+              currentTurnFilePaths = new Set<string>();
             }
 
             // Flush queued messages before closing the turn to prevent
@@ -1808,6 +1846,8 @@ function formatKnowledgeForInjection(result: {
       parts.push(`  ${item.content.slice(0, 200)}`);
     }
   }
+
+  parts.push("\n> Use the `query_project_knowledge` tool to search for additional project knowledge, past decisions, and conventions whenever you need them during this session.");
 
   return parts.join("\n");
 }
