@@ -1068,7 +1068,7 @@ export class ApiMachineClient {
 
       // Set up terminal streaming handlers
       this.terminalManager.setOutputHandler((terminalId, data) => {
-        this.socket.volatile.emit("terminal-output", {
+        this.socket.emit("terminal-output", {
           machineId: this.machine.id,
           terminalId,
           data,
