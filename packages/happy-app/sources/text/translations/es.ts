@@ -3729,6 +3729,10 @@ export const es: TranslationStructure = {
     requiresOnline: "La máquina debe estar en línea para abrir un terminal.",
     disconnected: "La sesión del terminal ha finalizado.",
     retry: "Reconectar",
+    updating: "Actualizando CLI...",
+    updateWaiting: "¡CLI actualizado! El demonio se está reiniciando (~60s)...",
+    updateFailed: "Error al actualizar CLI.",
+    updateCli: ({ version }: { version: string }) => `Actualizar CLI a v${version}`,
   },
 } as const;
 

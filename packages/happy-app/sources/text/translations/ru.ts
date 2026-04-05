@@ -3748,6 +3748,10 @@ export const ru: TranslationStructure = {
     requiresOnline: "Для открытия терминала устройство должно быть онлайн.",
     disconnected: "Сеанс терминала завершён.",
     retry: "Переподключиться",
+    updating: "Обновление CLI...",
+    updateWaiting: "CLI обновлён! Перезапуск демона (~60с)...",
+    updateFailed: "Ошибка обновления CLI.",
+    updateCli: ({ version }: { version: string }) => `Обновить CLI до v${version}`,
   },
 } as const;
 

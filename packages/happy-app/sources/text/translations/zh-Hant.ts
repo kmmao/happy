@@ -3641,5 +3641,9 @@ export const zhHant: TranslationStructure = {
     requiresOnline: "裝置必須在線才能開啟終端機。",
     disconnected: "終端會話已結束。",
     retry: "重新連接",
+    updating: "正在更新 CLI...",
+    updateWaiting: "CLI 已更新！Daemon 重啟中（約60秒）...",
+    updateFailed: "CLI 更新失敗。",
+    updateCli: ({ version }: { version: string }) => `更新 CLI 到 v${version}`,
   },
 } as const;

@@ -3637,5 +3637,9 @@ export const zhHans: TranslationStructure = {
     requiresOnline: "设备必须在线才能打开终端。",
     disconnected: "终端会话已结束。",
     retry: "重新连接",
+    updating: "正在更新 CLI...",
+    updateWaiting: "CLI 已更新！Daemon 重启中（约60秒）...",
+    updateFailed: "CLI 更新失败。",
+    updateCli: ({ version }: { version: string }) => `更新 CLI 到 v${version}`,
   },
 } as const;

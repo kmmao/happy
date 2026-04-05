@@ -15,7 +15,10 @@ import {
     machineTerminalClose,
     machineTerminalResize,
     machineTerminalInput,
+    machineUpgradeCli,
 } from "@/sync/ops";
+import { useMachine } from "@/sync/storage";
+import { useCliVersionCheck } from "@/hooks/useCliVersionCheck";
 import { t } from "@/text";
 
 interface WebTerminalProps {
@@ -35,6 +38,12 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
     const [state, setState] = useState<TerminalState>("connecting");
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [retryKey, setRetryKey] = useState(0);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+
+    const machine = useMachine(machineId);
+    const currentCliVersion = machine?.daemonState?.startedWithCliVersion;
+    const { latestVersion, hasUpdate } = useCliVersionCheck(currentCliVersion);
 
     const cleanup = useCallback(() => {
         if (terminalIdRef.current) {
@@ -196,10 +205,44 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
     const handleRetry = React.useCallback(() => {
         setState("connecting");
         setErrorMsg(null);
+        setUpdateMsg(null);
         setRetryKey((k) => k + 1);
     }, []);
 
+    const handleUpdateCli = React.useCallback(async () => {
+        if (!latestVersion || isUpdating) return;
+        setIsUpdating(true);
+        setUpdateMsg(t("webTerminal.updating"));
+        try {
+            const result = await machineUpgradeCli(machineId, latestVersion);
+            if (!result.success) {
+                setUpdateMsg(result.error ?? t("webTerminal.updateFailed"));
+                setIsUpdating(false);
+                return;
+            }
+            setUpdateMsg(t("webTerminal.updateWaiting"));
+            // Daemon detects version change and restarts within ~60s
+            setTimeout(() => {
+                setIsUpdating(false);
+                handleRetry();
+            }, 65_000);
+        } catch {
+            setUpdateMsg(t("webTerminal.updateFailed"));
+            setIsUpdating(false);
+        }
+    }, [latestVersion, isUpdating, machineId, handleRetry]);
+
     if (state === "error" || state === "disconnected") {
+        const btnBase: React.CSSProperties = {
+            marginTop: 8,
+            padding: "8px 20px",
+            borderRadius: 8,
+            border: "none",
+            fontSize: 14,
+            cursor: isUpdating ? "not-allowed" : "pointer",
+            fontFamily: "inherit",
+            opacity: isUpdating ? 0.6 : 1,
+        };
         return (
             <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 32 }}>
                 <Text style={{
@@ -211,7 +254,7 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
                 }}>
                     {state === "error" ? t("webTerminal.connectionFailed") : t("webTerminal.disconnected")}
                 </Text>
-                {errorMsg && (
+                {(errorMsg || updateMsg) && (
                     <Text style={{
                         ...Typography.default(),
                         fontSize: 13,
@@ -219,25 +262,30 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
                         textAlign: "center",
                         marginBottom: 20,
                     }}>
-                        {errorMsg}
+                        {updateMsg ?? errorMsg}
                     </Text>
                 )}
-                <button
-                    onClick={handleRetry}
-                    style={{
-                        marginTop: 8,
-                        padding: "8px 20px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: theme.colors.accentBlue ?? "#007aff",
-                        color: "#fff",
-                        fontSize: 14,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                    }}
-                >
-                    {t("webTerminal.retry")}
-                </button>
+                {!isUpdating && (
+                    <button
+                        onClick={handleRetry}
+                        style={{ ...btnBase, background: theme.colors.accentBlue ?? "#007aff", color: "#fff" }}
+                    >
+                        {t("webTerminal.retry")}
+                    </button>
+                )}
+                {hasUpdate && latestVersion && !isUpdating && (
+                    <button
+                        onClick={handleUpdateCli}
+                        style={{ ...btnBase, background: "transparent", color: theme.colors.textSecondary, border: `1px solid ${theme.colors.divider}` }}
+                    >
+                        {t("webTerminal.updateCli", { version: latestVersion })}
+                    </button>
+                )}
+                {isUpdating && (
+                    <Text style={{ ...Typography.default(), fontSize: 13, color: theme.colors.textSecondary, marginTop: 8 }}>
+                        {updateMsg}
+                    </Text>
+                )}
             </View>
         );
     }

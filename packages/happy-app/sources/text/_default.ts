@@ -3790,6 +3790,10 @@ export const en = {
     requiresOnline: "Machine must be online to open a terminal.",
     disconnected: "Terminal session ended.",
     retry: "Reconnect",
+    updating: "Updating CLI...",
+    updateWaiting: "CLI updated! Daemon is restarting (~60s)...",
+    updateFailed: "CLI update failed.",
+    updateCli: ({ version }: { version: string }) => `Update CLI to v${version}`,
   },
 } as const;
 

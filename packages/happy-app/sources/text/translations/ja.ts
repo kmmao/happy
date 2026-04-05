@@ -3706,5 +3706,9 @@ export const ja: TranslationStructure = {
     requiresOnline: "ターミナルを開くにはマシンがオンラインである必要があります。",
     disconnected: "ターミナルセッションが終了しました。",
     retry: "再接続",
+    updating: "CLIを更新中...",
+    updateWaiting: "CLIが更新されました！デーモンを再起動中（〜60秒）...",
+    updateFailed: "CLIの更新に失敗しました。",
+    updateCli: ({ version }: { version: string }) => `CLIをv${version}に更新`,
   },
 } as const;

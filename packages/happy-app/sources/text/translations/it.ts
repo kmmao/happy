@@ -3728,6 +3728,10 @@ export const it: TranslationStructure = {
     requiresOnline: "La macchina deve essere online per aprire un terminale.",
     disconnected: "La sessione del terminale è terminata.",
     retry: "Riconnetti",
+    updating: "Aggiornamento CLI...",
+    updateWaiting: "CLI aggiornato! Riavvio del demone in corso (~60s)...",
+    updateFailed: "Aggiornamento CLI non riuscito.",
+    updateCli: ({ version }: { version: string }) => `Aggiorna CLI a v${version}`,
   },
 } as const;
 

@@ -3734,6 +3734,10 @@ export const ca: TranslationStructure = {
     requiresOnline: "La màquina ha d'estar en línia per obrir un terminal.",
     disconnected: "La sessió del terminal ha finalitzat.",
     retry: "Reconnectar",
+    updating: "Actualitzant CLI...",
+    updateWaiting: "CLI actualitzat! El dimoni s'està reiniciant (~60s)...",
+    updateFailed: "Error en actualitzar CLI.",
+    updateCli: ({ version }: { version: string }) => `Actualitza CLI a v${version}`,
   },
 } as const;
 
