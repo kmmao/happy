@@ -117,7 +117,7 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
             // before the async spawn RPC response returns and we set terminalIdRef.
             // Buffer events until terminalId is known, then replay them.
             const pendingEvents: any[] = [];
-            outputCleanup = apiSocket.onMessage("ephemeral", (data: any) => {
+            outputCleanup = apiSocket.addEphemeralListener((data: any) => {
                 if (data.machineId !== machineId) return;
                 if (!terminalIdRef.current) {
                     if (data.type === "terminal-output" || data.type === "terminal-exit") {

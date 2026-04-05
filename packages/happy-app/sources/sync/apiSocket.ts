@@ -29,6 +29,7 @@ class ApiSocket {
   private config: SyncSocketConfig | null = null;
   private encryption: Encryption | null = null;
   private messageHandlers: Map<string, (data: any) => void> = new Map();
+  private ephemeralListeners: Set<(data: any) => void> = new Set();
   private reconnectedListeners: Set<() => void> = new Set();
   private statusListeners: Set<
     (status: "disconnected" | "connecting" | "connected" | "error") => void
@@ -110,8 +111,14 @@ class ApiSocket {
     return () => this.messageHandlers.delete(event);
   }
 
-  offMessage(event: string, handler: (data: any) => void) {
+  offMessage(event: string, _handler: (data: any) => void) {
     this.messageHandlers.delete(event);
+  }
+
+  /** Register an additional ephemeral listener — supports multiple concurrent listeners. */
+  addEphemeralListener(handler: (data: any) => void): () => void {
+    this.ephemeralListeners.add(handler);
+    return () => this.ephemeralListeners.delete(handler);
   }
 
   /**
@@ -348,6 +355,11 @@ class ApiSocket {
       const handler = this.messageHandlers.get(event);
       if (handler) {
         handler(data);
+      }
+      if (event === "ephemeral") {
+        for (const listener of this.ephemeralListeners) {
+          listener(data);
+        }
       }
     });
   }
