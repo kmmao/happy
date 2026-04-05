@@ -2185,9 +2185,28 @@ export interface TerminalSpawnResult {
     error?: string;
 }
 
+export interface TerminalListItem {
+    id: string;
+    createdAt: number;
+    cols: number;
+    rows: number;
+    cwd: string;
+}
+
+export async function machineTerminalList(
+    machineId: string,
+    sessionId: string,
+): Promise<{ success: boolean; terminals?: TerminalListItem[]; error?: string }> {
+    try {
+        return await apiSocket.machineRPC(machineId, "terminal-list", { sessionId });
+    } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+    }
+}
+
 export async function machineTerminalSpawn(
     machineId: string,
-    options?: { shell?: string; cwd?: string; cols?: number; rows?: number; sessionId?: string },
+    options?: { shell?: string; cwd?: string; cols?: number; rows?: number; sessionId?: string; terminalId?: string },
 ): Promise<TerminalSpawnResult> {
     try {
         return await apiSocket.machineRPC<TerminalSpawnResult, typeof options>(

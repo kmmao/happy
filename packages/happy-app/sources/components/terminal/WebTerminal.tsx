@@ -12,6 +12,9 @@ interface WebTerminalProps {
     machineId: string;
     cwd?: string;
     sessionId?: string;
+    terminalId?: string;
+    isActive?: boolean;
+    showInternalCloseButton?: boolean;
     onClose?: () => void;
 }
 

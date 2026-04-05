@@ -720,7 +720,15 @@ export class ApiMachineClient {
         cols: params?.cols,
         rows: params?.rows,
         sessionId: params?.sessionId,
+        terminalId: params?.terminalId,
       });
+    });
+
+    this.rpcHandlerManager.registerHandler("terminal-list", async (params: any) => {
+      const { sessionId } = params || {};
+      if (!sessionId) return { success: false, error: "sessionId required" };
+      const terminals = this.terminalManager.listBySession(sessionId);
+      return { success: true, terminals };
     });
 
     this.rpcHandlerManager.registerHandler("terminal-resize", async (params: any) => {

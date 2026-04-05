@@ -29,13 +29,16 @@ import { t } from "@/text";
 interface WebTerminalProps {
     machineId: string;
     cwd?: string;
-    sessionId?: string; // Claude session ID — used to persist PTY across tab switches
+    sessionId?: string;   // Claude session ID — used to persist PTY across tab switches
+    terminalId?: string;  // specific PTY ID to reattach (set by multi-terminal parent)
+    isActive?: boolean;   // triggers fitAddon.fit() when tab becomes visible
+    showInternalCloseButton?: boolean; // default true; set false when parent manages close button
     onClose?: () => void;
 }
 
 type TerminalState = "connecting" | "connected" | "disconnected" | "error";
 
-function WebTerminalComponent({ machineId, cwd, sessionId, onClose }: WebTerminalProps) {
+function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalIdProp, isActive, showInternalCloseButton = true, onClose }: WebTerminalProps) {
     const { theme } = useUnistyles();
     const containerRef = useRef<HTMLDivElement | null>(null);
     const terminalRef = useRef<any>(null);
@@ -137,8 +140,8 @@ function WebTerminalComponent({ machineId, cwd, sessionId, onClose }: WebTermina
                 }
             });
 
-            // Spawn or reattach. CLI returns existing PTY if sessionId matches.
-            const result = await machineTerminalSpawn(machineId, { cwd, cols, rows, sessionId });
+            // Spawn or reattach. Pass terminalId for precise reattach; otherwise sessionId for session-scoped creation.
+            const result = await machineTerminalSpawn(machineId, { cwd, cols, rows, sessionId, terminalId: terminalIdProp });
             if (!mounted) return;
 
             if (!result.success || !result.terminalId) {
@@ -208,7 +211,16 @@ function WebTerminalComponent({ machineId, cwd, sessionId, onClose }: WebTermina
             }
             terminalIdRef.current = null;
         };
-    }, [machineId, cwd, sessionId, theme.colors.groupped?.background, onClose, retryKey]);
+    }, [machineId, cwd, sessionId, terminalIdProp, theme.colors.groupped?.background, onClose, retryKey]);
+
+    // When this terminal's tab becomes active after being hidden, re-fit so dimensions are correct
+    useEffect(() => {
+        if (isActive && fitAddonRef.current) {
+            requestAnimationFrame(() => {
+                try { fitAddonRef.current?.fit(); } catch { /* ignore */ }
+            });
+        }
+    }, [isActive]);
 
     const handleRetry = React.useCallback(() => {
         setState("connecting");
@@ -299,8 +311,8 @@ function WebTerminalComponent({ machineId, cwd, sessionId, onClose }: WebTermina
 
     return (
         <View style={{ flex: 1, position: "relative" }}>
-            {/* Close button — top-right corner, only when connected */}
-            {state === "connected" && (
+            {/* Close button — top-right corner, only when connected and not managed by parent */}
+            {state === "connected" && showInternalCloseButton && (
                 <Pressable
                     onPress={closeTerminal}
                     style={{

@@ -25,13 +25,14 @@ export interface TerminalSession {
 export type TerminalOutputHandler = (terminalId: string, data: string) => void;
 export type TerminalExitHandler = (terminalId: string, exitCode: number) => void;
 
-const MAX_TERMINALS = 5;
+const MAX_TERMINALS_PER_SESSION = 5;
+const MAX_TERMINALS_GLOBAL = 20;
 const MAX_OUTPUT_CHUNK = 8 * 1024;  // 8KB per chunk
 const MAX_OUTPUT_BUFFER = 64 * 1024; // 64KB replay buffer per terminal
 
 export class TerminalManager {
   private terminals = new Map<string, TerminalSession>();
-  private sessionIndex = new Map<string, string>(); // sessionId → terminalId
+  private sessionIndex = new Map<string, string[]>(); // sessionId → terminalId[]
   private onOutput: TerminalOutputHandler | null = null;
   private onExit: TerminalExitHandler | null = null;
 
@@ -49,27 +50,36 @@ export class TerminalManager {
     cols?: number;
     rows?: number;
     sessionId?: string;
+    terminalId?: string; // if provided, reattach to this specific PTY
   }): { success: boolean; terminalId?: string; recentOutput?: string; isExisting?: boolean; error?: string } {
-    // Reattach to existing session-owned terminal if available
-    if (options.sessionId) {
-      const existingId = this.sessionIndex.get(options.sessionId);
-      if (existingId && this.terminals.has(existingId)) {
-        const session = this.terminals.get(existingId)!;
-        // Resize to new client dimensions if provided
+    // Reattach to a specific terminal by ID
+    if (options.terminalId) {
+      const existing = this.terminals.get(options.terminalId);
+      if (existing) {
         if (options.cols && options.rows) {
-          this.resize(existingId, options.cols, options.rows);
+          this.resize(options.terminalId, options.cols, options.rows);
         }
         return {
           success: true,
-          terminalId: existingId,
-          recentOutput: session.outputBuffer,
+          terminalId: options.terminalId,
+          recentOutput: existing.outputBuffer,
           isExisting: true,
         };
       }
+      // Terminal not found — fall through to create new
     }
 
-    if (this.terminals.size >= MAX_TERMINALS) {
-      return { success: false, error: `Maximum ${MAX_TERMINALS} terminals reached` };
+    // Check per-session limit
+    if (options.sessionId) {
+      const sessionTerminals = this.sessionIndex.get(options.sessionId) ?? [];
+      if (sessionTerminals.length >= MAX_TERMINALS_PER_SESSION) {
+        return { success: false, error: `Maximum ${MAX_TERMINALS_PER_SESSION} terminals per session reached` };
+      }
+    }
+
+    // Check global limit
+    if (this.terminals.size >= MAX_TERMINALS_GLOBAL) {
+      return { success: false, error: `Maximum ${MAX_TERMINALS_GLOBAL} terminals reached` };
     }
 
     const id = createId();
@@ -213,7 +223,8 @@ except Exception:
 
       this.terminals.set(id, session);
       if (options.sessionId) {
-        this.sessionIndex.set(options.sessionId, id);
+        const existing = this.sessionIndex.get(options.sessionId) ?? [];
+        this.sessionIndex.set(options.sessionId, [...existing, id]);
       }
 
       const appendToBuffer = (text: string) => {
@@ -248,7 +259,7 @@ except Exception:
       child.on("exit", (code) => {
         logger.debug(`[TERMINAL] Terminal ${id} exited with code ${code}`);
         this.terminals.delete(id);
-        if (session.sessionId) this.sessionIndex.delete(session.sessionId);
+        this.removeFromSessionIndex(session.sessionId, id);
         if (this.onExit) {
           this.onExit(id, code ?? -1);
         }
@@ -257,7 +268,7 @@ except Exception:
       child.on("error", (err) => {
         logger.debug(`[TERMINAL] Terminal ${id} error: ${err.message}`);
         this.terminals.delete(id);
-        if (session.sessionId) this.sessionIndex.delete(session.sessionId);
+        this.removeFromSessionIndex(session.sessionId, id);
         if (this.onExit) {
           this.onExit(id, -1);
         }
@@ -301,6 +312,17 @@ except Exception:
     return true;
   }
 
+  private removeFromSessionIndex(sessionId: string | undefined, terminalId: string): void {
+    if (!sessionId) return;
+    const ids = this.sessionIndex.get(sessionId) ?? [];
+    const updated = ids.filter((id) => id !== terminalId);
+    if (updated.length === 0) {
+      this.sessionIndex.delete(sessionId);
+    } else {
+      this.sessionIndex.set(sessionId, updated);
+    }
+  }
+
   close(terminalId: string): boolean {
     const session = this.terminals.get(terminalId);
     if (!session) {
@@ -316,8 +338,16 @@ except Exception:
       // Already dead
     }
     this.terminals.delete(terminalId);
-    if (session.sessionId) this.sessionIndex.delete(session.sessionId);
+    this.removeFromSessionIndex(session.sessionId, terminalId);
     return true;
+  }
+
+  listBySession(sessionId: string): Array<{ id: string; createdAt: number; cols: number; rows: number; cwd: string }> {
+    const ids = this.sessionIndex.get(sessionId) ?? [];
+    return ids
+      .map((id) => this.terminals.get(id))
+      .filter((s): s is TerminalSession => s !== undefined)
+      .map((s) => ({ id: s.id, createdAt: s.createdAt, cols: s.cols, rows: s.rows, cwd: s.cwd }));
   }
 
   closeAll(): void {
