@@ -3603,4 +3603,16 @@ export const zhHant: TranslationStructure = {
     refresh: "重新整理",
     refreshing: "重新整理中...",
   },
+  webTerminal: {
+    title: "終端機",
+    webOnly: "Web 終端機僅在瀏覽器中可用。",
+    connecting: "正在連接終端機...",
+    connectionFailed: "終端機連接失敗",
+    spawnFailed: "無法啟動終端機程序。",
+    initFailed: "無法初始化終端機。",
+    openTerminal: "開啟終端機",
+    closeTerminal: "關閉終端機",
+    terminalExited: "終端機工作階段已結束。",
+    requiresOnline: "裝置必須在線才能開啟終端機。",
+  },
 } as const;

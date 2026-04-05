@@ -3710,6 +3710,18 @@ export const ru: TranslationStructure = {
     refresh: "Обновить",
     refreshing: "Обновление...",
   },
+  webTerminal: {
+    title: "Терминал",
+    webOnly: "Веб-терминал доступен только в браузере.",
+    connecting: "Подключение к терминалу...",
+    connectionFailed: "Ошибка подключения к терминалу",
+    spawnFailed: "Не удалось запустить процесс терминала.",
+    initFailed: "Не удалось инициализировать терминал.",
+    openTerminal: "Открыть терминал",
+    closeTerminal: "Закрыть терминал",
+    terminalExited: "Сеанс терминала завершён.",
+    requiresOnline: "Для открытия терминала устройство должно быть онлайн.",
+  },
 } as const;
 
 export type TranslationsRu = typeof ru;

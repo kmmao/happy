@@ -538,6 +538,18 @@ function MachineDetailScreen() {
         {/* Network Services */}
         <NetworkServicesSummaryItem machineId={machineId} machine={machine} />
 
+        {/* Web Terminal (web only) */}
+        {Platform.OS === "web" && isMachineOnline(machine) && (
+          <MachineNavigationSummaryItem
+            groupTitle={t("webTerminal.title")}
+            title={t("webTerminal.openTerminal")}
+            subtitle={t("webTerminal.title")}
+            iconName="code-slash-outline"
+            iconColor={theme.colors.textLink}
+            onPress={() => router.push(`/machine/${machineId}/terminal` as any)}
+          />
+        )}
+
         {/* Background processes */}
         <MachineNavigationSummaryItem
           groupTitle={t("processManager.title")}

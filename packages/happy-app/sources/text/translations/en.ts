@@ -3689,6 +3689,18 @@ export const en: TranslationStructure = {
     refresh: "Refresh",
     refreshing: "Refreshing...",
   },
+  webTerminal: {
+    title: "Terminal",
+    webOnly: "Web terminal is only available in the browser.",
+    connecting: "Connecting to terminal...",
+    connectionFailed: "Terminal Connection Failed",
+    spawnFailed: "Failed to spawn terminal process.",
+    initFailed: "Failed to initialize terminal.",
+    openTerminal: "Open Terminal",
+    closeTerminal: "Close Terminal",
+    terminalExited: "Terminal session ended.",
+    requiresOnline: "Machine must be online to open a terminal.",
+  },
 } as const;
 
 export type TranslationsEn = typeof en;

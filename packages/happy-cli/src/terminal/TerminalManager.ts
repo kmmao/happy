@@ -1,0 +1,204 @@
+/**
+ * TerminalManager — manages PTY sessions for the web terminal feature.
+ *
+ * Each terminal is a child process with piped stdio.
+ * node-pty would give a real PTY, but to avoid native dependencies
+ * we use child_process.spawn with 'script' wrapper for pseudo-TTY support.
+ */
+
+import { spawn, ChildProcess } from "child_process";
+import { createId } from "@paralleldrive/cuid2";
+import { logger } from "@/ui/logger";
+import { platform } from "os";
+
+export interface TerminalSession {
+  id: string;
+  process: ChildProcess;
+  cols: number;
+  rows: number;
+  shell: string;
+  cwd: string;
+  createdAt: number;
+}
+
+export type TerminalOutputHandler = (terminalId: string, data: string) => void;
+export type TerminalExitHandler = (terminalId: string, exitCode: number) => void;
+
+const MAX_TERMINALS = 5;
+const MAX_OUTPUT_CHUNK = 8 * 1024; // 8KB per chunk
+
+export class TerminalManager {
+  private terminals = new Map<string, TerminalSession>();
+  private onOutput: TerminalOutputHandler | null = null;
+  private onExit: TerminalExitHandler | null = null;
+
+  setOutputHandler(handler: TerminalOutputHandler): void {
+    this.onOutput = handler;
+  }
+
+  setExitHandler(handler: TerminalExitHandler): void {
+    this.onExit = handler;
+  }
+
+  spawn(options: {
+    shell?: string;
+    cwd?: string;
+    cols?: number;
+    rows?: number;
+  }): { success: boolean; terminalId?: string; error?: string } {
+    if (this.terminals.size >= MAX_TERMINALS) {
+      return { success: false, error: `Maximum ${MAX_TERMINALS} terminals reached` };
+    }
+
+    const id = createId();
+    const shell = options.shell || process.env.SHELL || "/bin/sh";
+    const cwd = options.cwd || process.env.HOME || "/";
+    const cols = options.cols || 80;
+    const rows = options.rows || 24;
+
+    try {
+      const env = {
+        ...process.env,
+        TERM: "xterm-256color",
+        COLUMNS: String(cols),
+        LINES: String(rows),
+      };
+
+      let child: ChildProcess;
+
+      // Use 'script' command to allocate a real PTY without node-pty
+      if (platform() === "darwin") {
+        // macOS: script -q /dev/null <shell>
+        child = spawn("script", ["-q", "/dev/null", shell], {
+          cwd,
+          env,
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      } else {
+        // Linux: script -qfc <shell> /dev/null
+        child = spawn("script", ["-qfc", shell, "/dev/null"], {
+          cwd,
+          env,
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      }
+
+      const session: TerminalSession = {
+        id,
+        process: child,
+        cols,
+        rows,
+        shell,
+        cwd,
+        createdAt: Date.now(),
+      };
+
+      this.terminals.set(id, session);
+
+      // Stream stdout
+      child.stdout?.on("data", (data: Buffer) => {
+        if (this.onOutput) {
+          const text = data.toString("utf-8");
+          // Split into chunks if too large
+          for (let i = 0; i < text.length; i += MAX_OUTPUT_CHUNK) {
+            this.onOutput(id, text.slice(i, i + MAX_OUTPUT_CHUNK));
+          }
+        }
+      });
+
+      // Stream stderr (merge into output)
+      child.stderr?.on("data", (data: Buffer) => {
+        if (this.onOutput) {
+          const text = data.toString("utf-8");
+          for (let i = 0; i < text.length; i += MAX_OUTPUT_CHUNK) {
+            this.onOutput(id, text.slice(i, i + MAX_OUTPUT_CHUNK));
+          }
+        }
+      });
+
+      child.on("exit", (code) => {
+        logger.debug(`[TERMINAL] Terminal ${id} exited with code ${code}`);
+        this.terminals.delete(id);
+        if (this.onExit) {
+          this.onExit(id, code ?? -1);
+        }
+      });
+
+      child.on("error", (err) => {
+        logger.debug(`[TERMINAL] Terminal ${id} error: ${err.message}`);
+        this.terminals.delete(id);
+        if (this.onExit) {
+          this.onExit(id, -1);
+        }
+      });
+
+      logger.debug(`[TERMINAL] Spawned terminal ${id} (shell=${shell}, cwd=${cwd}, ${cols}x${rows})`);
+      return { success: true, terminalId: id };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.debug(`[TERMINAL] Failed to spawn terminal: ${message}`);
+      return { success: false, error: message };
+    }
+  }
+
+  write(terminalId: string, data: string): boolean {
+    const session = this.terminals.get(terminalId);
+    if (!session || !session.process.stdin?.writable) {
+      return false;
+    }
+    session.process.stdin.write(data);
+    return true;
+  }
+
+  resize(terminalId: string, cols: number, rows: number): boolean {
+    const session = this.terminals.get(terminalId);
+    if (!session) {
+      return false;
+    }
+    session.cols = cols;
+    session.rows = rows;
+    // Send SIGWINCH to the child process to signal resize
+    // The 'script' wrapper should propagate this to the inner shell
+    try {
+      if (session.process.pid) {
+        // Set env vars for subsequent commands
+        this.write(terminalId, `stty cols ${cols} rows ${rows}\n`);
+      }
+    } catch {
+      // Best-effort resize
+    }
+    return true;
+  }
+
+  close(terminalId: string): boolean {
+    const session = this.terminals.get(terminalId);
+    if (!session) {
+      return false;
+    }
+    try {
+      session.process.kill("SIGTERM");
+      // Force kill after 3 seconds
+      setTimeout(() => {
+        try { session.process.kill("SIGKILL"); } catch { /* already dead */ }
+      }, 3000);
+    } catch {
+      // Already dead
+    }
+    this.terminals.delete(terminalId);
+    return true;
+  }
+
+  closeAll(): void {
+    for (const [id] of this.terminals) {
+      this.close(id);
+    }
+  }
+
+  getActiveCount(): number {
+    return this.terminals.size;
+  }
+
+  hasTerminal(terminalId: string): boolean {
+    return this.terminals.has(terminalId);
+  }
+}

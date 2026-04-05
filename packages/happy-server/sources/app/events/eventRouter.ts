@@ -399,6 +399,24 @@ export type EphemeralEvent =
         createdAt: number;
       };
     }
+  | {
+      type: "terminal-output";
+      machineId: string;
+      terminalId: string;
+      data: string;
+    }
+  | {
+      type: "terminal-exit";
+      machineId: string;
+      terminalId: string;
+      exitCode: number;
+    }
+  | {
+      type: "terminal-input";
+      machineId: string;
+      terminalId: string;
+      data: string;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===

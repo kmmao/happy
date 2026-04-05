@@ -3668,4 +3668,16 @@ export const ja: TranslationStructure = {
     refresh: "更新",
     refreshing: "更新中...",
   },
+  webTerminal: {
+    title: "ターミナル",
+    webOnly: "Webターミナルはブラウザでのみ利用可能です。",
+    connecting: "ターミナルに接続中...",
+    connectionFailed: "ターミナル接続失敗",
+    spawnFailed: "ターミナルプロセスの起動に失敗しました。",
+    initFailed: "ターミナルの初期化に失敗しました。",
+    openTerminal: "ターミナルを開く",
+    closeTerminal: "ターミナルを閉じる",
+    terminalExited: "ターミナルセッションが終了しました。",
+    requiresOnline: "ターミナルを開くにはマシンがオンラインである必要があります。",
+  },
 } as const;

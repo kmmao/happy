@@ -3599,4 +3599,16 @@ export const zhHans: TranslationStructure = {
     refresh: "刷新",
     refreshing: "刷新中...",
   },
+  webTerminal: {
+    title: "终端",
+    webOnly: "Web 终端仅在浏览器中可用。",
+    connecting: "正在连接终端...",
+    connectionFailed: "终端连接失败",
+    spawnFailed: "无法启动终端进程。",
+    initFailed: "无法初始化终端。",
+    openTerminal: "打开终端",
+    closeTerminal: "关闭终端",
+    terminalExited: "终端会话已结束。",
+    requiresOnline: "设备必须在线才能打开终端。",
+  },
 } as const;

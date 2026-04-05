@@ -31,6 +31,7 @@ import { backoff } from "@/utils/time";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "@/utils/tailscale";
 import type { TunnelManager } from "@/tunnel";
+import { TerminalManager } from "@/terminal/TerminalManager";
 
 
 interface ServerToDaemonEvents {
@@ -137,6 +138,16 @@ interface DaemonToServerEvents {
     eventType: string;
     summary: string;
     detail?: Record<string, unknown>;
+  }) => void;
+  "terminal-output": (data: {
+    machineId: string;
+    terminalId: string;
+    data: string;
+  }) => void;
+  "terminal-exit": (data: {
+    machineId: string;
+    terminalId: string;
+    exitCode: number;
   }) => void;
 
 }
@@ -326,6 +337,7 @@ export class ApiMachineClient {
     sessionId?: string;
     errorMessage?: string;
   }> = [];
+  private terminalManager = new TerminalManager();
 
 
   constructor(
@@ -699,6 +711,30 @@ export class ApiMachineClient {
       }
       return result;
     });
+
+    // --- Terminal RPC handlers ---
+    this.rpcHandlerManager.registerHandler("terminal-spawn", async (params: any) => {
+      return this.terminalManager.spawn({
+        shell: params?.shell,
+        cwd: params?.cwd,
+        cols: params?.cols,
+        rows: params?.rows,
+      });
+    });
+
+    this.rpcHandlerManager.registerHandler("terminal-resize", async (params: any) => {
+      const { terminalId, cols, rows } = params || {};
+      if (!terminalId) return { success: false, error: "terminalId required" };
+      const ok = this.terminalManager.resize(terminalId, cols, rows);
+      return { success: ok, error: ok ? undefined : "Terminal not found" };
+    });
+
+    this.rpcHandlerManager.registerHandler("terminal-close", async (params: any) => {
+      const { terminalId } = params || {};
+      if (!terminalId) return { success: false, error: "terminalId required" };
+      const ok = this.terminalManager.close(terminalId);
+      return { success: ok, error: ok ? undefined : "Terminal not found" };
+    });
   }
 
   /**
@@ -1024,6 +1060,22 @@ export class ApiMachineClient {
       // Register all handlers
       this.rpcHandlerManager.onSocketConnect(this.socket);
 
+      // Set up terminal streaming handlers
+      this.terminalManager.setOutputHandler((terminalId, data) => {
+        this.socket.volatile.emit("terminal-output", {
+          machineId: this.machine.id,
+          terminalId,
+          data,
+        });
+      });
+      this.terminalManager.setExitHandler((terminalId, exitCode) => {
+        this.socket.emit("terminal-exit", {
+          machineId: this.machine.id,
+          terminalId,
+          exitCode,
+        });
+      });
+
       // Flush any webhook statuses queued during disconnect
       this.flushPendingWebhookStatuses();
       this.flushPendingSupervisorStatuses();
@@ -1042,6 +1094,7 @@ export class ApiMachineClient {
       this.rpcHandlerManager.onSocketDisconnect();
       this.stopKeepAlive();
       this.stopTailscaleRefresh();
+      this.terminalManager.closeAll();
     });
 
     // Single consolidated RPC handler
@@ -1125,6 +1178,11 @@ export class ApiMachineClient {
           `[API MACHINE] Received fix-kill-session for session ${data.fixSessionId}`,
         );
         this.fixKillHandler(data as unknown as { fixSessionId: string; projectId: string; fixStatus: string });
+      }
+
+      // Terminal input forwarding (from App via Server)
+      if (data.type === "terminal-input" && data.terminalId && data.data) {
+        this.terminalManager.write(data.terminalId, data.data);
       }
     });
 

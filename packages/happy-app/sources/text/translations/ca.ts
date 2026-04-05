@@ -3696,6 +3696,18 @@ export const ca: TranslationStructure = {
     refresh: "Actualitza",
     refreshing: "Actualitzant...",
   },
+  webTerminal: {
+    title: "Terminal",
+    webOnly: "El terminal web només està disponible al navegador.",
+    connecting: "Connectant al terminal...",
+    connectionFailed: "Error de connexió del terminal",
+    spawnFailed: "No s'ha pogut iniciar el procés del terminal.",
+    initFailed: "No s'ha pogut inicialitzar el terminal.",
+    openTerminal: "Obrir terminal",
+    closeTerminal: "Tancar terminal",
+    terminalExited: "La sessió del terminal ha finalitzat.",
+    requiresOnline: "La màquina ha d'estar en línia per obrir un terminal.",
+  },
 } as const;
 
 export type TranslationsCa = typeof ca;

@@ -3691,6 +3691,18 @@ export const es: TranslationStructure = {
     refresh: "Actualizar",
     refreshing: "Actualizando...",
   },
+  webTerminal: {
+    title: "Terminal",
+    webOnly: "El terminal web solo está disponible en el navegador.",
+    connecting: "Conectando al terminal...",
+    connectionFailed: "Error de conexión del terminal",
+    spawnFailed: "No se pudo iniciar el proceso del terminal.",
+    initFailed: "No se pudo inicializar el terminal.",
+    openTerminal: "Abrir terminal",
+    closeTerminal: "Cerrar terminal",
+    terminalExited: "La sesión del terminal ha finalizado.",
+    requiresOnline: "La máquina debe estar en línea para abrir un terminal.",
+  },
 } as const;
 
 export type TranslationsEs = typeof es;

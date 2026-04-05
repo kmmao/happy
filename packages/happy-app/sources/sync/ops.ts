@@ -2172,3 +2172,64 @@ export async function sessionElicitationResponse(
         // Best-effort — elicitation may have already been cancelled
     }
 }
+
+// ---------------------------------------------------------------------------
+// Web Terminal
+// ---------------------------------------------------------------------------
+
+export interface TerminalSpawnResult {
+    success: boolean;
+    terminalId?: string;
+    error?: string;
+}
+
+export async function machineTerminalSpawn(
+    machineId: string,
+    options?: { shell?: string; cwd?: string; cols?: number; rows?: number },
+): Promise<TerminalSpawnResult> {
+    try {
+        return await apiSocket.machineRPC<TerminalSpawnResult, typeof options>(
+            machineId,
+            "terminal-spawn",
+            options ?? {},
+        );
+    } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+    }
+}
+
+export async function machineTerminalResize(
+    machineId: string,
+    terminalId: string,
+    cols: number,
+    rows: number,
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        return await apiSocket.machineRPC(machineId, "terminal-resize", { terminalId, cols, rows });
+    } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+    }
+}
+
+export async function machineTerminalClose(
+    machineId: string,
+    terminalId: string,
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        return await apiSocket.machineRPC(machineId, "terminal-close", { terminalId });
+    } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+    }
+}
+
+/**
+ * Send terminal input (keystrokes) via ephemeral socket event.
+ * Not using RPC because terminal input needs lowest latency.
+ */
+export function machineTerminalInput(
+    machineId: string,
+    terminalId: string,
+    data: string,
+): void {
+    apiSocket.send("terminal-input", { machineId, terminalId, data });
+}
