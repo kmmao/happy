@@ -3703,5 +3703,7 @@ export const ja: TranslationStructure = {
     closeTerminal: "ターミナルを閉じる",
     terminalExited: "ターミナルセッションが終了しました。",
     requiresOnline: "ターミナルを開くにはマシンがオンラインである必要があります。",
+    disconnected: "ターミナルセッションが終了しました。",
+    retry: "再接続",
   },
 } as const;

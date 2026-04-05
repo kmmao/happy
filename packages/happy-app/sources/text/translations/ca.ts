@@ -3731,6 +3731,8 @@ export const ca: TranslationStructure = {
     closeTerminal: "Tancar terminal",
     terminalExited: "La sessió del terminal ha finalitzat.",
     requiresOnline: "La màquina ha d'estar en línia per obrir un terminal.",
+    disconnected: "La sessió del terminal ha finalitzat.",
+    retry: "Reconnectar",
   },
 } as const;
 

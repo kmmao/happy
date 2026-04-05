@@ -66,19 +66,62 @@ export class TerminalManager {
 
       let child: ChildProcess;
 
-      // Use 'script' command to allocate a real PTY without node-pty
       if (platform() === "darwin") {
-        // macOS: script -q /dev/null <shell>
+        // macOS: script -q /dev/null <shell> works fine (doesn't require stdin to be a TTY)
         child = spawn("script", ["-q", "/dev/null", shell], {
           cwd,
           env,
           stdio: ["pipe", "pipe", "pipe"],
         });
       } else {
-        // Linux: script -qfc <shell> /dev/null
-        child = spawn("script", ["-qfc", shell, "/dev/null"], {
+        // Linux: 'script' calls tcgetattr() on its own stdin to save terminal settings.
+        // When stdin is a pipe (not a TTY), this fails with "Operation not supported on socket".
+        // Use Python3's pty.openpty() instead — it allocates a real PTY pair without
+        // requiring the parent process to have a controlling terminal.
+        const ptyScript = [
+          "import os,sys,pty,select,struct,termios,fcntl,signal",
+          "shell=os.environ['PTY_SHELL']",
+          "cols=int(os.environ['PTY_COLS'])",
+          "rows=int(os.environ['PTY_ROWS'])",
+          "master_fd,slave_fd=pty.openpty()",
+          "try:fcntl.ioctl(slave_fd,termios.TIOCSWINSZ,struct.pack('HHHH',rows,cols,0,0))",
+          "except:pass",
+          "pid=os.fork()",
+          "if pid==0:",
+          " os.close(master_fd)",
+          " try:os.setsid();fcntl.ioctl(slave_fd,termios.TIOCSCTTY,0)",
+          " except:pass",
+          " [os.dup2(slave_fd,fd) for fd in(0,1,2)]",
+          " os.close(slave_fd)",
+          " e=dict(os.environ);e.update({'TERM':'xterm-256color','COLUMNS':str(cols),'LINES':str(rows)})",
+          " os.execve(shell,[shell],e)",
+          " sys.exit(1)",
+          "os.close(slave_fd)",
+          "fin=sys.stdin.fileno();fout=sys.stdout.fileno()",
+          "while True:",
+          " try:r=select.select([master_fd,fin],[],[],1.0)[0]",
+          " except:break",
+          " if master_fd in r:",
+          "  try:d=os.read(master_fd,4096);os.write(fout,d)",
+          "  except:break",
+          " if fin in r:",
+          "  try:d=os.read(fin,4096);os.write(master_fd,d)",
+          "  except:break",
+          " try:rc=os.waitpid(pid,os.WNOHANG)",
+          " except:break",
+          " if rc[0]:break",
+          "try:os.kill(pid,signal.SIGTERM)",
+          "except:pass",
+        ].join("\n");
+
+        child = spawn("python3", ["-c", ptyScript], {
           cwd,
-          env,
+          env: {
+            ...env,
+            PTY_SHELL: shell,
+            PTY_COLS: String(cols),
+            PTY_ROWS: String(rows),
+          },
           stdio: ["pipe", "pipe", "pipe"],
         });
       }

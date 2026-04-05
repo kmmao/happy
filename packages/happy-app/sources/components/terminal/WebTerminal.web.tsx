@@ -34,6 +34,7 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
     const terminalIdRef = useRef<string | null>(null);
     const [state, setState] = useState<TerminalState>("connecting");
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [retryKey, setRetryKey] = useState(0);
 
     const cleanup = useCallback(() => {
         if (terminalIdRef.current) {
@@ -167,19 +168,25 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
             exitCleanup?.();
             cleanup();
         };
-    }, [machineId, cwd, theme.colors.groupped?.background, cleanup, onClose]);
+    }, [machineId, cwd, theme.colors.groupped?.background, cleanup, onClose, retryKey]);
 
-    if (state === "error") {
+    const handleRetry = React.useCallback(() => {
+        setState("connecting");
+        setErrorMsg(null);
+        setRetryKey((k) => k + 1);
+    }, []);
+
+    if (state === "error" || state === "disconnected") {
         return (
             <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 32 }}>
                 <Text style={{
                     ...Typography.default("semiBold"),
                     fontSize: 16,
-                    color: theme.colors.textDestructive ?? "#ff3b30",
+                    color: state === "error" ? (theme.colors.textDestructive ?? "#ff3b30") : theme.colors.textSecondary,
                     textAlign: "center",
                     marginBottom: 8,
                 }}>
-                    {t("webTerminal.connectionFailed")}
+                    {state === "error" ? t("webTerminal.connectionFailed") : t("webTerminal.disconnected")}
                 </Text>
                 {errorMsg && (
                     <Text style={{
@@ -187,10 +194,27 @@ function WebTerminalComponent({ machineId, cwd, onClose }: WebTerminalProps) {
                         fontSize: 13,
                         color: theme.colors.textSecondary,
                         textAlign: "center",
+                        marginBottom: 20,
                     }}>
                         {errorMsg}
                     </Text>
                 )}
+                <button
+                    onClick={handleRetry}
+                    style={{
+                        marginTop: 8,
+                        padding: "8px 20px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: theme.colors.accentBlue ?? "#007aff",
+                        color: "#fff",
+                        fontSize: 14,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                    }}
+                >
+                    {t("webTerminal.retry")}
+                </button>
             </View>
         );
     }

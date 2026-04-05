@@ -3787,6 +3787,8 @@ export const en = {
     closeTerminal: "Close Terminal",
     terminalExited: "Terminal session ended.",
     requiresOnline: "Machine must be online to open a terminal.",
+    disconnected: "Terminal session ended.",
+    retry: "Reconnect",
   },
 } as const;
 

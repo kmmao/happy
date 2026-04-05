@@ -3725,6 +3725,8 @@ export const it: TranslationStructure = {
     closeTerminal: "Chiudi terminale",
     terminalExited: "La sessione del terminale è terminata.",
     requiresOnline: "La macchina deve essere online per aprire un terminale.",
+    disconnected: "La sessione del terminale è terminata.",
+    retry: "Riconnetti",
   },
 } as const;
 

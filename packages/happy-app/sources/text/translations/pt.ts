@@ -3728,6 +3728,8 @@ export const pt: TranslationStructure = {
     closeTerminal: "Fechar terminal",
     terminalExited: "A sessão do terminal foi encerrada.",
     requiresOnline: "A máquina deve estar online para abrir um terminal.",
+    disconnected: "A sessão do terminal terminou.",
+    retry: "Reconectar",
   },
 } as const;
 

@@ -3745,6 +3745,8 @@ export const ru: TranslationStructure = {
     closeTerminal: "Закрыть терминал",
     terminalExited: "Сеанс терминала завершён.",
     requiresOnline: "Для открытия терминала устройство должно быть онлайн.",
+    disconnected: "Сеанс терминала завершён.",
+    retry: "Переподключиться",
   },
 } as const;
 

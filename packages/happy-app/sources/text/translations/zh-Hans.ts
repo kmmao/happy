@@ -3634,5 +3634,7 @@ export const zhHans: TranslationStructure = {
     closeTerminal: "关闭终端",
     terminalExited: "终端会话已结束。",
     requiresOnline: "设备必须在线才能打开终端。",
+    disconnected: "终端会话已结束。",
+    retry: "重新连接",
   },
 } as const;

@@ -3638,5 +3638,7 @@ export const zhHant: TranslationStructure = {
     closeTerminal: "關閉終端機",
     terminalExited: "終端機工作階段已結束。",
     requiresOnline: "裝置必須在線才能開啟終端機。",
+    disconnected: "終端會話已結束。",
+    retry: "重新連接",
   },
 } as const;
