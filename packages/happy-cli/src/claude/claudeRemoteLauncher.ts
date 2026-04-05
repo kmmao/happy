@@ -1645,6 +1645,14 @@ function formatKnowledgeForInjection(result: {
     confidence: string;
     createdAt: string;
   }[];
+  actionItems?: {
+    entryType: string;
+    title: string;
+    content: string;
+    tags: string[];
+    confidence: string;
+    createdAt: string;
+  }[];
 }): string {
   const parts: string[] = ["## Project Knowledge Base"];
 
@@ -1674,6 +1682,16 @@ function formatKnowledgeForInjection(result: {
       if (entry.tags.length > 0) {
         parts.push(`  Tags: ${entry.tags.map((t) => `#${t}`).join(" ")}`);
       }
+    }
+  }
+
+  if (result.actionItems && result.actionItems.length > 0) {
+    parts.push("\n### 🎯 Pending Action Items");
+    parts.push("The following items may need attention in this session:");
+    const icons: Record<string, string> = { discovery: "💡", decision: "📋", fix: "🔧", convention: "📏", warning: "⚠️" };
+    for (const item of result.actionItems) {
+      parts.push(`${icons[item.entryType] || "📝"} **${item.title}** (${item.entryType}, ${item.confidence})`);
+      parts.push(`  ${item.content.slice(0, 200)}`);
     }
   }
 

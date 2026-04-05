@@ -1015,6 +1015,15 @@ export class ApiSessionClient extends EventEmitter {
       confidence: string;
       createdAt: string;
     }[];
+    actionItems: {
+      id: string;
+      entryType: string;
+      title: string;
+      content: string;
+      tags: string[];
+      confidence: string;
+      createdAt: string;
+    }[];
   } | null> {
     try {
       const result = await this.socket.timeout(10_000).emitWithAck("fetch-knowledge", {
