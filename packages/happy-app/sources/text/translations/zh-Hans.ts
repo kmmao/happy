@@ -3543,6 +3543,8 @@ export const zhHans: TranslationStructure = {
     additionalNotesPlaceholder: "额外关注点或具体问题（可选）",
     customRules: "自定义规则",
     customRulesPlaceholder: "例如：只关注开源竞品，忽略企业级解决方案",
+    featureDirection: "开发方向",
+    featureDirectionPlaceholder: "描述你想实现的功能，如：实时协同编辑、PDF 解析、向量检索…（填写后自动切换为开源方案发现模式）",
     syncSaving: "保存中…",
     syncSaved: "已保存",
     syncFailed: "同步失败",

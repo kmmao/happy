@@ -3633,6 +3633,8 @@ export const en: TranslationStructure = {
     additionalNotesPlaceholder: "Any extra focus areas or specific questions (optional)",
     customRules: "Custom Rules",
     customRulesPlaceholder: "e.g. Focus on open-source competitors only, ignore enterprise solutions",
+    featureDirection: "Feature Direction",
+    featureDirectionPlaceholder: "Describe what you want to build, e.g. real-time collaboration, PDF parsing, vector search… (fills this to switch to open-source discovery mode)",
     syncSaving: "Saving…",
     syncSaved: "Saved",
     syncFailed: "Sync failed",

@@ -62,6 +62,7 @@ export async function triggerSupervisorRun(
             knownCompetitors?: string;
             focusAreas?: string;
             additionalNotes?: string;
+            featureDirection?: string;
         };
     },
 ): Promise<SupervisorRun> {

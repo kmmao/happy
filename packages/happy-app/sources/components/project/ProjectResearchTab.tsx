@@ -122,6 +122,9 @@ export const ProjectResearchTab = React.memo(
         const [customRules, setCustomRules] = React.useState(
             savedPrefs?.customRules ?? "",
         );
+        const [featureDirection, setFeatureDirection] = React.useState(
+            savedPrefs?.featureDirection ?? "",
+        );
 
         // KV Store version tracking for optimistic concurrency
         const kvVersionRef = React.useRef(-1);
@@ -137,8 +140,8 @@ export const ProjectResearchTab = React.memo(
         const syncFadeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
         // Persist prefs: local MMKV (instant) + KV Store (multi-device sync)
-        const prefsRef = React.useRef({ dimensions, knownCompetitors, additionalNotes, customRules });
-        prefsRef.current = { dimensions, knownCompetitors, additionalNotes, customRules };
+        const prefsRef = React.useRef({ dimensions, knownCompetitors, additionalNotes, customRules, featureDirection });
+        prefsRef.current = { dimensions, knownCompetitors, additionalNotes, customRules, featureDirection };
 
         const persistTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -200,6 +203,7 @@ export const ProjectResearchTab = React.memo(
                         setDimensions({ ...defaultDimensions, ...remote.dimensions });
                         setAdditionalNotes(remote.additionalNotes ?? "");
                         setCustomRules(remote.customRules ?? "");
+                        setFeatureDirection(remote.featureDirection ?? "");
                         // Update local cache
                         saveResearchPrefs(serverId!, remote);
                     }
@@ -232,6 +236,7 @@ export const ProjectResearchTab = React.memo(
                 setDimensions({ ...defaultDimensions, ...remote.dimensions });
                 setAdditionalNotes(remote.additionalNotes);
                 setCustomRules(remote.customRules);
+                setFeatureDirection(remote.featureDirection);
                 saveResearchPrefs(serverId!, remote);
             });
             return unsubscribe;
@@ -334,10 +339,11 @@ export const ProjectResearchTab = React.memo(
         );
 
         const handleTextChange = React.useCallback(
-            (field: "knownCompetitors" | "additionalNotes" | "customRules") => (text: string) => {
+            (field: "knownCompetitors" | "additionalNotes" | "customRules" | "featureDirection") => (text: string) => {
                 if (field === "knownCompetitors") setKnownCompetitors(text);
                 else if (field === "additionalNotes") setAdditionalNotes(text);
-                else setCustomRules(text);
+                else if (field === "customRules") setCustomRules(text);
+                else setFeatureDirection(text);
                 prefsRef.current = { ...prefsRef.current, [field]: text };
                 debouncedPersist();
             },
@@ -365,6 +371,7 @@ export const ProjectResearchTab = React.memo(
                                 additionalNotes.trim(),
                                 customRules.trim() ? `Custom rules:\n${customRules.trim()}` : "",
                             ].filter(Boolean).join("\n\n") || undefined,
+                            featureDirection: featureDirection.trim() || undefined,
                         },
                     });
                     setRuns((prev) => [run, ...prev]);
@@ -374,7 +381,7 @@ export const ProjectResearchTab = React.memo(
                     }
                     throw e;
                 }
-            }, [serverId, knownCompetitors, selectedDimensions, additionalNotes, customRules, loadData]),
+            }, [serverId, knownCompetitors, selectedDimensions, additionalNotes, customRules, featureDirection, loadData]),
         );
 
         const [cancelLoading, doCancel] = useHappyAction(
@@ -481,6 +488,32 @@ export const ProjectResearchTab = React.memo(
                                     placeholderTextColor={theme.colors.textSecondary}
                                     value={customRules}
                                     onChangeText={handleTextChange("customRules")}
+                                    multiline
+                                    numberOfLines={2}
+                                    editable={!isRunning}
+                                />
+                            </View>
+
+                            {/* Feature Direction — triggers open-source discovery mode when filled */}
+                            <View style={styles.inputSection}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                    {t("competitorResearch.featureDirection")}
+                                </Text>
+                                <TextInput
+                                    style={[
+                                        styles.textInput,
+                                        {
+                                            color: theme.colors.text,
+                                            backgroundColor: theme.colors.groupped.background,
+                                            borderColor: featureDirection.trim()
+                                                ? theme.colors.header.tint
+                                                : theme.colors.divider,
+                                        },
+                                    ]}
+                                    placeholder={t("competitorResearch.featureDirectionPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={featureDirection}
+                                    onChangeText={handleTextChange("featureDirection")}
                                     multiline
                                     numberOfLines={2}
                                     editable={!isRunning}

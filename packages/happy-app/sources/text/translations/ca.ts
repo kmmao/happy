@@ -3640,6 +3640,8 @@ export const ca: TranslationStructure = {
     additionalNotesPlaceholder: "Àrees d'interès addicionals o preguntes específiques (opcional)",
     customRules: "Regles personalitzades",
     customRulesPlaceholder: "Ex. centrar-se només en competidors de codi obert, ignorar solucions empresarials",
+    featureDirection: "Direcció de funcionalitat",
+    featureDirectionPlaceholder: "Descriu el que vols implementar, ex: col·laboració en temps real, anàlisi de PDF, cerca vectorial… (activa el mode de descoberta OSS)",
     syncSaving: "Desant…",
     syncSaved: "Desat",
     syncFailed: "Error de sincronització",

@@ -11,14 +11,19 @@ export interface ResearchPromptOptions {
   readonly runId: string;
   readonly repoPath: string;
   readonly serverUrl: string;
-  /** JSON string: { knownCompetitors?: string, focusAreas?: string } */
+  /** JSON string: { knownCompetitors?: string, focusAreas?: string, additionalNotes?: string, featureDirection?: string } */
   readonly researchParams?: string;
 }
 
 export function buildResearchPrompt(options: ResearchPromptOptions): string {
   const reportUrl = `${options.serverUrl}/v1/projects/${options.projectId}/supervisor/runs/${options.runId}/status`;
 
-  let parsedParams: { knownCompetitors?: string; focusAreas?: string } = {};
+  let parsedParams: {
+    knownCompetitors?: string;
+    focusAreas?: string;
+    additionalNotes?: string;
+    featureDirection?: string;
+  } = {};
   if (options.researchParams) {
     try {
       parsedParams = JSON.parse(options.researchParams);
@@ -27,25 +32,113 @@ export function buildResearchPrompt(options: ResearchPromptOptions): string {
     }
   }
 
+  const featureDirection = parsedParams.featureDirection?.trim() ?? "";
+  const isOpenSourceMode = featureDirection.length > 0;
+
+  // Dimensions not meaningful when evaluating open-source libraries
+  const OSS_IRRELEVANT_DIMS = new Set(["pricing", "funding", "positioning", "userFeedback"]);
+
+  // Dimension labels for OSS evaluation (covers both user-selected and OSS-specific)
+  const OSS_DIM_LABELS: Record<string, string> = {
+    features: "Core capabilities and feature completeness",
+    devExperience: "API design, documentation quality, ease of integration",
+    techStack: "Tech stack alignment with this project",
+    community: "GitHub stars, contributor count, issue responsiveness",
+    license: "License type (MIT/Apache/GPL) — commercial use implications",
+    maintenance: "Last commit date, release cadence, open issue backlog",
+    bundleSize: "Bundle size / runtime performance overhead",
+    stackCompatibility: "Compatibility with existing dependencies (no version conflicts)",
+  };
+
   const competitorsSection = parsedParams.knownCompetitors?.trim()
     ? `
-## Known Competitors (User-Provided)
-The user has identified these competitors for comparison:
-
+## Known Competitors / Reference Projects (User-Provided)
 ${parsedParams.knownCompetitors.trim()}
 
-Include these in your analysis. You may also identify additional competitors.
+${isOpenSourceMode ? "Use these as additional reference points for comparison." : "Include these in your analysis. You may also identify additional competitors."}
 `
     : "";
 
-  const focusSection = parsedParams.focusAreas?.trim()
-    ? `
+  // In OSS mode: filter out irrelevant dims, always append OSS-specific dims
+  const effectiveFocusSection = (() => {
+    if (!isOpenSourceMode) {
+      return parsedParams.focusAreas?.trim()
+        ? `
 ## Focus Areas (User-Provided)
 The user wants the analysis to focus on:
 
 ${parsedParams.focusAreas.trim()}
 `
+        : "";
+    }
+    const userDims = (parsedParams.focusAreas ?? "")
+      .split(",")
+      .map((d) => d.trim())
+      .filter(Boolean);
+    const relevantUserDims = userDims.filter((d) => !OSS_IRRELEVANT_DIMS.has(d));
+    const ossDims = ["license", "maintenance", "bundleSize", "stackCompatibility"];
+    const effectiveDims = [...new Set([...relevantUserDims, ...ossDims])];
+    return `
+## Evaluation Dimensions for Open Source Libraries
+Evaluate each candidate on these dimensions:
+
+${effectiveDims
+  .map((d) => `- **${d}**: ${OSS_DIM_LABELS[d] ?? d}`)
+  .join("\n")}
+`;
+  })();
+
+  const additionalNotesSection = parsedParams.additionalNotes?.trim()
+    ? `
+## Additional Context (User-Provided)
+${parsedParams.additionalNotes.trim()}
+`
     : "";
+
+  const openSourceModeHeader = isOpenSourceMode
+    ? `
+## Mode: Open Source Discovery (PRIORITY)
+The user wants to implement the following feature/direction:
+
+> ${featureDirection}
+
+**Skip standard competitor analysis. Your sole goal is finding the best open source library or project to implement this.**
+`
+    : "";
+
+  const step2 = isOpenSourceMode
+    ? `## Step 2: Open Source Candidate Discovery
+Identify 5-8 open source libraries/projects that could implement the feature direction above.
+For each candidate, evaluate all dimensions listed in the Evaluation Dimensions section.`
+    : `## Step 2: Competitor Analysis
+Based on your knowledge, identify 3-5 similar products/tools in the same space.
+For each competitor, analyze:
+- Core features and unique selling points
+- Target audience overlap
+- Technology approach
+- Pricing model (if known)
+- Strengths and weaknesses relative to this project`;
+
+  const step3ReportStructure = isOpenSourceMode
+    ? `### Report Structure
+1. **Project Overview** — Brief summary of what this project does and its current tech stack
+2. **§ Open Source Candidates** — Markdown table: | Library | Stars | License | Last Active | Bundle Size | Integration | Verdict |
+3. **§ Recommendation**
+   - **Primary**: best choice with reasoning
+   - **Alternative**: runner-up and when to prefer it
+   - **Avoid**: what to skip and why
+4. **§ Implementation Path** — Step-by-step integration guide referencing actual file paths from Step 1
+5. **§ Risks & Trade-offs** — Known gotchas, migration cost, long-term maintenance risk`
+    : `### Report Structure
+1. **Project Overview** — Brief summary of what this project does
+2. **Competitor Landscape** — Table listing identified competitors with key attributes
+3. **Feature Matrix** — Markdown table comparing features across products (use checkmarks)
+4. **Differentiation Analysis** — What makes this project unique vs competitors
+5. **Gap Analysis** — Features competitors have that this project lacks
+6. **Technology Comparison** — Tech stack differences and trade-offs
+7. **Strategic Recommendations** — Prioritized list of features/improvements to develop`;
+
+  const step4Category = isOpenSourceMode ? "opensource-integration" : "research";
 
   return `You are a **Competitor Research Analyst** running a product analysis.
 
@@ -68,27 +161,13 @@ Read the following files to understand what this project does:
 - Any other top-level documentation files
 
 Extract: project name, core purpose, target users, key features, tech stack.
-${competitorsSection}${focusSection}
-## Step 2: Competitor Analysis
-Based on your knowledge, identify 3-5 similar products/tools in the same space.
-For each competitor, analyze:
-- Core features and unique selling points
-- Target audience overlap
-- Technology approach
-- Pricing model (if known)
-- Strengths and weaknesses relative to this project
+${competitorsSection}${effectiveFocusSection}${additionalNotesSection}${openSourceModeHeader}
+${step2}
 
 ## Step 3: Generate Report
 Write a comprehensive Markdown report with these sections:
 
-### Report Structure
-1. **Project Overview** — Brief summary of what this project does
-2. **Competitor Landscape** — Table listing identified competitors with key attributes
-3. **Feature Matrix** — Markdown table comparing features across products (use checkmarks)
-4. **Differentiation Analysis** — What makes this project unique vs competitors
-5. **Gap Analysis** — Features competitors have that this project lacks
-6. **Technology Comparison** — Tech stack differences and trade-offs
-7. **Strategic Recommendations** — Prioritized list of features/improvements to develop
+${step3ReportStructure}
 
 ## Step 4: Verify & Extract Actionable Items
 After writing the report, extract **concrete, implementable tasks** — but **verify each one against the actual codebase first**.
@@ -105,7 +184,7 @@ This verification is critical to avoid suggesting features the project already h
 ### 4b: Structure each action
 For each verified actionable item, determine:
 - **severity**: "critical" | "high" | "medium" | "low" — based on strategic priority
-- **category**: use "research" as the category for all research-derived actions
+- **category**: use "${step4Category}" as the category for all actions derived from this analysis
 - **title**: short, actionable title (e.g., "Add team collaboration with shared sessions")
 - **description**: what needs to be built and why (reference competitor evidence). If partially exists, describe what's missing.
 - **suggestedFix**: concrete implementation approach for this codebase, referencing actual file paths and modules you found during verification

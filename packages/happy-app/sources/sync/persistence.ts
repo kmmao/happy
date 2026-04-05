@@ -569,6 +569,7 @@ export const ResearchPrefsSchema = z.object({
   knownCompetitors: z.string(),
   additionalNotes: z.string(),
   customRules: z.string(),
+  featureDirection: z.string(),
 });
 
 export type ResearchPrefs = z.infer<typeof ResearchPrefsSchema>;
@@ -584,6 +585,7 @@ export function loadResearchPrefs(projectId: string): ResearchPrefs | null {
           knownCompetitors: parsed.data.knownCompetitors ?? "",
           additionalNotes: parsed.data.additionalNotes ?? "",
           customRules: parsed.data.customRules ?? "",
+          featureDirection: parsed.data.featureDirection ?? "",
         };
       }
     } catch (e) {
@@ -602,6 +604,7 @@ export function loadResearchPrefs(projectId: string): ResearchPrefs | null {
           knownCompetitors: "",
           additionalNotes: "",
           customRules: "",
+          featureDirection: "",
         };
       }
     } catch {

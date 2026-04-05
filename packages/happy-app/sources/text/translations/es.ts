@@ -3635,6 +3635,8 @@ export const es: TranslationStructure = {
     additionalNotesPlaceholder: "Áreas de enfoque adicionales o preguntas específicas (opcional)",
     customRules: "Reglas personalizadas",
     customRulesPlaceholder: "Ej. enfocarse solo en competidores open-source, ignorar soluciones empresariales",
+    featureDirection: "Dirección de funcionalidad",
+    featureDirectionPlaceholder: "Describe lo que quieres implementar, ej: colaboración en tiempo real, análisis de PDF, búsqueda vectorial… (activa el modo de descubrimiento OSS)",
     syncSaving: "Guardando…",
     syncSaved: "Guardado",
     syncFailed: "Error de sincronización",

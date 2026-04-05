@@ -3612,6 +3612,8 @@ export const ja: TranslationStructure = {
     additionalNotesPlaceholder: "追加の関心事項や具体的な質問（任意）",
     customRules: "カスタムルール",
     customRulesPlaceholder: "例：オープンソースの競合のみに焦点を当て、エンタープライズソリューションは無視",
+    featureDirection: "開発方向",
+    featureDirectionPlaceholder: "実装したい機能を説明してください。例：リアルタイム協同編集、PDF解析、ベクトル検索…（入力するとOSS探索モードに切り替わります）",
     syncSaving: "保存中…",
     syncSaved: "保存済み",
     syncFailed: "同期失敗",

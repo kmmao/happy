@@ -3654,6 +3654,8 @@ export const ru: TranslationStructure = {
     additionalNotesPlaceholder: "Дополнительные направления или конкретные вопросы (необязательно)",
     customRules: "Пользовательские правила",
     customRulesPlaceholder: "Например: фокус только на open-source конкурентах, игнорировать корпоративные решения",
+    featureDirection: "Направление разработки",
+    featureDirectionPlaceholder: "Опишите функцию, которую хотите реализовать, например: совместное редактирование, парсинг PDF, векторный поиск… (переключает в режим поиска OSS)",
     syncSaving: "Сохранение…",
     syncSaved: "Сохранено",
     syncFailed: "Ошибка синхронизации",

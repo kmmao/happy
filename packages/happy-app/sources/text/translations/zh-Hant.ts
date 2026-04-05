@@ -3547,6 +3547,8 @@ export const zhHant: TranslationStructure = {
     additionalNotesPlaceholder: "額外關注點或具體問題（可選）",
     customRules: "自訂規則",
     customRulesPlaceholder: "例如：只關注開源競品，忽略企業級解決方案",
+    featureDirection: "開發方向",
+    featureDirectionPlaceholder: "描述你想實現的功能，如：即時協作編輯、PDF 解析、向量搜尋…（填寫後自動切換為開源方案探索模式）",
     syncSaving: "儲存中…",
     syncSaved: "已儲存",
     syncFailed: "同步失敗",
