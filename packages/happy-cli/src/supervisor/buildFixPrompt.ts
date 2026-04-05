@@ -71,12 +71,13 @@ ${options.suggestedFix}
 ${options.description}
 ${suggestedFixSection}
 ## Rules (CRITICAL)
-1. **Fix ONLY the specific issue described above.** Do not refactor unrelated code.
-2. **Make minimal, targeted changes.** Smaller diffs are better.
-3. **Run existing tests after your fix** to ensure nothing breaks.
+1. **Address ONLY the specific issue described above.** Do not touch unrelated code.
+2. **For bug fixes**: make minimal, targeted changes. Smaller diffs are better. For new features or enhancements: implement the full solution as described — larger diffs are expected and acceptable.
+3. **Run existing tests after your changes** to ensure nothing breaks.
 4. **Do NOT modify unrelated files.**
-5. **Verify before fixing**: The finding description may contain inaccurate line numbers or code snippets. Always search the actual codebase to locate the issue yourself. If the described code pattern does not exist in the codebase, report the fix as **failed** — do NOT attempt to fix something that isn't there.
-6. **If the finding is a false positive** (the described issue does not actually exist in the code), report \`{"fixStatus":"failed"}\` immediately. Do not waste time on non-existent issues.
+5. **Verify before acting**: The finding description may contain inaccurate line numbers or code snippets. Always search the actual codebase first. If the described code pattern does not exist AND this is clearly a bug fix (not a new feature), report the fix as **failed** — do NOT attempt to fix something that isn't there. For new features, the code not existing yet is expected — proceed with implementation.
+6. **If the finding is a false positive** (the described bug does not actually exist in the code), report \`{"fixStatus":"failed"}\` immediately. Do not apply this rule to new feature requests — those never have pre-existing code.
+7. **If this task requires substantial new development** (new feature, new module, significant enhancement): you are fully authorized to implement it. Use PR mode (push a branch and create a PR) rather than direct push. Do NOT self-abort because the scope seems large — implement the solution and let the PR review process handle it.
 
 ${processSection}
 

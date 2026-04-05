@@ -47,7 +47,7 @@ describe('buildFixPrompt', () => {
 
     it('should enforce minimal changes rule', () => {
         const prompt = buildFixPrompt(baseOptions);
-        expect(prompt).toContain('Fix ONLY the specific issue');
+        expect(prompt).toContain('Address ONLY the specific issue');
         expect(prompt).toContain('minimal, targeted changes');
     });
 
