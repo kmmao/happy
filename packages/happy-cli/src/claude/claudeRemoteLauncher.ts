@@ -1378,7 +1378,10 @@ export async function claudeRemoteLauncher(
                   }
                 }
               } else if (knowledgeInjected && pendingKnowledgeRefresh && knowledgeEnabled) {
-                // Per-turn refresh: fetch new knowledge based on current user message
+                // Per-turn refresh: check if new knowledge entries exist since last injection.
+                // Instead of re-injecting via appendSystemPrompt (which accumulates tokens),
+                // prepend a lightweight notification to the user message so Claude can use
+                // the query_project_knowledge MCP tool to fetch relevant details on demand.
                 pendingKnowledgeRefresh = false;
                 const hints = extractKnowledgeHints(msg.message, 8);
                 if (hints.length > 0) {
@@ -1391,15 +1394,16 @@ export async function claudeRemoteLauncher(
                     if (refreshResult && refreshResult.entries.length > 0) {
                       const newEntries = refreshResult.entries.filter((e) => !knowledgeEntryIds.has(e.id));
                       if (newEntries.length > 0) {
-                        // New entries found — reset injection so they get included
-                        const updatedResult = { ...refreshResult, entries: newEntries };
-                        knowledgeContext = formatKnowledgeForInjection(updatedResult);
-                        effectiveKnowledgeContext = knowledgeContext;
-                        knowledgeInjected = false;
                         for (const e of newEntries) {
                           knowledgeEntryIds.add(e.id);
                         }
-                        logger.debug(`[knowledge] Per-turn refresh: ${newEntries.length} new entries found`);
+                        // Prepend a lightweight hint — Claude uses query_project_knowledge to get details
+                        const titles = newEntries.map((e) => `"${e.title}"`).join(", ");
+                        const hint = `[Knowledge base update: ${newEntries.length} new ${newEntries.length === 1 ? "entry" : "entries"} added (${titles}). Use query_project_knowledge tool if relevant to this task.]\n\n`;
+                        return {
+                          message: hint + msg.message,
+                          mode: msg.mode,
+                        };
                       }
                     }
                   } catch (err) {
