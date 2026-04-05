@@ -2368,6 +2368,29 @@ export const pl: TranslationStructure = {
     noData: "Brak danych o użyciu",
   },
 
+  analytics: {
+    usageOverview: "Przegląd użycia",
+    totalTokens: "Łączne tokeny",
+    totalCost: "Łączny koszt",
+    last7Days: "7 dni",
+    last30Days: "30 dni",
+    tokenTrend: "Trend tokenów",
+    costTrend: "Trend kosztów",
+    costByModel: "Koszt wg modelu",
+    tokensByModel: "Tokeny wg modelu",
+    supervisorCost: "Koszt nadzorcy",
+    totalRuns: "Uruchomienia",
+    agentEfficiency: "Wydajność agenta",
+    completionRate: "Wskaźnik ukończenia",
+    avgDuration: "Średni czas",
+    avgCostPerRun: "Średni koszt/uruchomienie",
+    avgTokensPerRun: "Średnie tokeny/uruchomienie",
+    completed: "Ukończone",
+    failed: "Nieudane",
+    noData: "Brak danych analitycznych",
+    noDataSubtitle: "Dane o użyciu pojawią się po uruchomieniu sesji",
+  },
+
   feed: {
     // Feed notifications for friend requests and acceptances
     friendRequestFrom: ({ name }: { name: string }) =>
@@ -2980,6 +3003,7 @@ export const pl: TranslationStructure = {
     tabHealth: "Zdrowie",
     tabActions: "Akcje",
     tabResearch: "Badania",
+    tabAnalytics: "Analityka",
     tabConfig: "Konfiguracja",
     configEmpty: "Brak elementów konfiguracji",
     configProjectInfo: "Informacje o projekcie",

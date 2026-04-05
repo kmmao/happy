@@ -2415,6 +2415,29 @@ export const ja: TranslationStructure = {
     noData: "使用データがありません",
   },
 
+  analytics: {
+    usageOverview: "使用量概要",
+    totalTokens: "合計トークン",
+    totalCost: "合計コスト",
+    last7Days: "7日間",
+    last30Days: "30日間",
+    tokenTrend: "トークン使用量推移",
+    costTrend: "コスト推移",
+    costByModel: "モデル別コスト",
+    tokensByModel: "モデル別トークン",
+    supervisorCost: "スーパーバイザーコスト",
+    totalRuns: "実行回数",
+    agentEfficiency: "エージェント効率",
+    completionRate: "完了率",
+    avgDuration: "平均所要時間",
+    avgCostPerRun: "平均コスト/回",
+    avgTokensPerRun: "平均トークン/回",
+    completed: "完了",
+    failed: "失敗",
+    noData: "分析データなし",
+    noDataSubtitle: "セッション実行後に使用量データが表示されます",
+  },
+
   feed: {
     // Feed notifications for friend requests and acceptances
     friendRequestFrom: ({ name }: { name: string }) =>
@@ -2934,6 +2957,7 @@ export const ja: TranslationStructure = {
     tabHealth: "ヘルス",
     tabActions: "操作",
     tabResearch: "調査",
+    tabAnalytics: "分析",
     tabConfig: "設定",
     configEmpty: "設定項目はまだありません",
     configProjectInfo: "プロジェクト情報",

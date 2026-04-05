@@ -2337,6 +2337,29 @@ export const en = {
     noData: "No usage data available",
   },
 
+  analytics: {
+    usageOverview: "Usage Overview",
+    totalTokens: "Total Tokens",
+    totalCost: "Total Cost",
+    last7Days: "7 Days",
+    last30Days: "30 Days",
+    tokenTrend: "Token Usage Trend",
+    costTrend: "Cost Trend",
+    costByModel: "Cost by Model",
+    tokensByModel: "Tokens by Model",
+    supervisorCost: "Supervisor Cost",
+    totalRuns: "Runs",
+    agentEfficiency: "Agent Efficiency",
+    completionRate: "Completion Rate",
+    avgDuration: "Avg Duration",
+    avgCostPerRun: "Avg Cost/Run",
+    avgTokensPerRun: "Avg Tokens/Run",
+    completed: "Completed",
+    failed: "Failed",
+    noData: "No Analytics Data",
+    noDataSubtitle: "Usage data will appear here once sessions start running",
+  },
+
   feed: {
     // Feed notifications for friend requests and acceptances
     friendRequestFrom: ({ name }: { name: string }) =>
@@ -2952,6 +2975,7 @@ export const en = {
     tabHealth: "Health",
     tabActions: "Actions",
     tabResearch: "Research",
+    tabAnalytics: "Analytics",
     tabConfig: "Config",
     configEmpty: "No configuration items yet",
     configProjectInfo: "Project Info",
