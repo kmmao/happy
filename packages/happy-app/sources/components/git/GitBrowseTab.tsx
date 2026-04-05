@@ -71,10 +71,7 @@ export const GitBrowseTab = React.memo<{
     const router = useRouter();
     const { theme } = useUnistyles();
 
-    const basePath = React.useMemo(
-        () => storage.getState().sessions[sessionId]?.metadata?.path ?? null,
-        [sessionId],
-    );
+    const basePath = storage((state) => state.sessions[sessionId]?.metadata?.path ?? null);
 
     const [currentPath, setCurrentPath] = React.useState<string | null>(null);
     const [entries, setEntries] = React.useState<DirectoryEntry[]>([]);

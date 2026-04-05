@@ -154,11 +154,11 @@ export const SessionView = React.memo((props: { id: string }) => {
   React.useEffect(() => {
     if (hasAutoExpanded.current || !showSidePanelOuter || sidePanelCollapsed || effectiveWidth <= 0) return;
     const idealPanel = effectiveWidth - layout.maxWidth - DIVIDER_WIDTH;
-    if (idealPanel > storedPanelWidth) {
+    if (idealPanel >= MIN_PANEL_WIDTH) {
       storage.getState().applyLocalSettings({ sidePanelWidth: idealPanel });
     }
     hasAutoExpanded.current = true;
-  }, [showSidePanelOuter, sidePanelCollapsed, effectiveWidth, storedPanelWidth]);
+  }, [showSidePanelOuter, sidePanelCollapsed, effectiveWidth]);
 
   const activePanelWidth = dragPanelWidth ?? storedPanelWidth;
 

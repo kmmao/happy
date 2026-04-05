@@ -26,7 +26,7 @@ interface SessionSidePanelProps {
 }
 
 export const SessionSidePanel = React.memo<SessionSidePanelProps>(
-    function SessionSidePanel({ sessionId, collapsed, onToggleCollapse, width }) {
+    function SessionSidePanel({ sessionId, collapsed, onToggleCollapse }) {
         const { theme } = useUnistyles();
         const [activeTab, setActiveTab] = React.useState<TabKey>("files");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
@@ -154,6 +154,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                         <View style={{ flex: 1 }}>
                             {activeTab === "files" && (
                                 <GitBrowseTab
+                                    key={sessionId}
                                     sessionId={sessionId}
                                     embedded
                                     onFilePress={handleFilePress}

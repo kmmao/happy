@@ -27,6 +27,10 @@ export function terminalHandler(userId: string, socket: Socket) {
             if (payload.data.length > MAX_TERMINAL_CHUNK) {
                 return;
             }
+            // Log first chunk of each terminal output for debugging
+            if (payload.data.trim()) {
+                log({ module: "terminal" }, `terminal-output: machineId=${payload.machineId} terminalId=${payload.terminalId} data=${JSON.stringify(payload.data.slice(0, 200))}`);
+            }
             eventRouter.emitEphemeral({
                 userId,
                 payload: {
