@@ -36,6 +36,8 @@ export function supervisorRunRoutes(app: Fastify) {
                         researchParams: z.object({
                             knownCompetitors: z.string().max(1000).optional(),
                             focusAreas: z.string().max(1000).optional(),
+                            additionalNotes: z.string().max(2000).optional(),
+                            featureDirection: z.string().max(1000).optional(),
                         }).optional(),
                     })
                     .optional(),
