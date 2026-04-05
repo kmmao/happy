@@ -36,7 +36,7 @@ function getMaxLayoutWidth(): number {
     }
 
     if (isRunningOnMac() || isDesktopWeb() || Platform.OS === 'web') {
-        return 1400;
+        return 1000;
     }
 
     // For tablets, use 800px
