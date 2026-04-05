@@ -2222,6 +2222,16 @@ export async function machineTerminalClose(
     }
 }
 
+export async function machineTerminalCloseAll(
+    machineId: string,
+): Promise<{ success: boolean; closed?: number; error?: string }> {
+    try {
+        return await apiSocket.machineRPC(machineId, "terminal-closeAll", {});
+    } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+    }
+}
+
 /**
  * Send terminal input (keystrokes) via ephemeral socket event.
  * Not using RPC because terminal input needs lowest latency.

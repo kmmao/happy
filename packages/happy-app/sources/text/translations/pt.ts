@@ -3735,6 +3735,11 @@ export const pt: TranslationStructure = {
     updateWaiting: "CLI atualizado! O daemon está reiniciando (~60s)...",
     updateFailed: "Falha ao atualizar CLI.",
     updateCli: ({ version }: { version: string }) => `Atualizar CLI para v${version}`,
+    sessionLabel: ({ n }: { n: number }) => `Terminal ${n}`,
+    newSession: "Nova sessão de terminal",
+    closeSession: "Fechar sessão",
+    clearingAll: "Limpando sessões obsoletas...",
+    clearAllSessions: "Limpar todas as sessões e tentar novamente",
   },
 } as const;
 

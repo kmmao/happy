@@ -3645,5 +3645,10 @@ export const zhHant: TranslationStructure = {
     updateWaiting: "CLI 已更新！Daemon 重啟中（約60秒）...",
     updateFailed: "CLI 更新失敗。",
     updateCli: ({ version }: { version: string }) => `更新 CLI 到 v${version}`,
+    sessionLabel: ({ n }: { n: number }) => `終端機 ${n}`,
+    newSession: "新增終端機工作階段",
+    closeSession: "關閉工作階段",
+    clearingAll: "正在清除殘留工作階段...",
+    clearAllSessions: "清除所有工作階段並重試",
   },
 } as const;

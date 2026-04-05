@@ -3754,6 +3754,11 @@ export const pl: TranslationStructure = {
     updateWaiting: "CLI zaktualizowane! Demon uruchamia się ponownie (~60s)...",
     updateFailed: "Aktualizacja CLI nie powiodła się.",
     updateCli: ({ version }: { version: string }) => `Zaktualizuj CLI do v${version}`,
+    sessionLabel: ({ n }: { n: number }) => `Terminal ${n}`,
+    newSession: "Nowa sesja terminala",
+    closeSession: "Zamknij sesję",
+    clearingAll: "Czyszczenie nieaktywnych sesji...",
+    clearAllSessions: "Wyczyść wszystkie sesje i ponów",
   },
 } as const;
 

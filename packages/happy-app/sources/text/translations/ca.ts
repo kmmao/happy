@@ -3738,6 +3738,11 @@ export const ca: TranslationStructure = {
     updateWaiting: "CLI actualitzat! El dimoni s'està reiniciant (~60s)...",
     updateFailed: "Error en actualitzar CLI.",
     updateCli: ({ version }: { version: string }) => `Actualitza CLI a v${version}`,
+    sessionLabel: ({ n }: { n: number }) => `Terminal ${n}`,
+    newSession: "Nova sessió de terminal",
+    closeSession: "Tanca la sessió",
+    clearingAll: "Netejant sessions obsoletes...",
+    clearAllSessions: "Esborra totes les sessions i reintenta",
   },
 } as const;
 

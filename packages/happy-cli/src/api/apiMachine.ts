@@ -735,6 +735,12 @@ export class ApiMachineClient {
       const ok = this.terminalManager.close(terminalId);
       return { success: ok, error: ok ? undefined : "Terminal not found" };
     });
+
+    this.rpcHandlerManager.registerHandler("terminal-closeAll", async () => {
+      const count = this.terminalManager.getActiveCount();
+      this.terminalManager.closeAll();
+      return { success: true, closed: count };
+    });
   }
 
   /**

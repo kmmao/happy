@@ -3710,5 +3710,10 @@ export const ja: TranslationStructure = {
     updateWaiting: "CLIが更新されました！デーモンを再起動中（〜60秒）...",
     updateFailed: "CLIの更新に失敗しました。",
     updateCli: ({ version }: { version: string }) => `CLIをv${version}に更新`,
+    sessionLabel: ({ n }: { n: number }) => `ターミナル ${n}`,
+    newSession: "新しいターミナルセッション",
+    closeSession: "セッションを閉じる",
+    clearingAll: "古いセッションを削除中...",
+    clearAllSessions: "全セッションを削除して再試行",
   },
 } as const;

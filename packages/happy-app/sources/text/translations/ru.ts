@@ -3752,6 +3752,11 @@ export const ru: TranslationStructure = {
     updateWaiting: "CLI обновлён! Перезапуск демона (~60с)...",
     updateFailed: "Ошибка обновления CLI.",
     updateCli: ({ version }: { version: string }) => `Обновить CLI до v${version}`,
+    sessionLabel: ({ n }: { n: number }) => `Терминал ${n}`,
+    newSession: "Новый сеанс терминала",
+    closeSession: "Закрыть сеанс",
+    clearingAll: "Очистка устаревших сеансов...",
+    clearAllSessions: "Очистить все сеансы и повторить",
   },
 } as const;
 

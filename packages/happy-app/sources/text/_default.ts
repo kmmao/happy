@@ -3794,6 +3794,11 @@ export const en = {
     updateWaiting: "CLI updated! Daemon is restarting (~60s)...",
     updateFailed: "CLI update failed.",
     updateCli: ({ version }: { version: string }) => `Update CLI to v${version}`,
+    sessionLabel: ({ n }: { n: number }) => `Terminal ${n}`,
+    newSession: "New terminal session",
+    closeSession: "Close session",
+    clearingAll: "Clearing stale sessions...",
+    clearAllSessions: "Clear all sessions & retry",
   },
 } as const;
 

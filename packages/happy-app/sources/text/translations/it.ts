@@ -3732,6 +3732,11 @@ export const it: TranslationStructure = {
     updateWaiting: "CLI aggiornato! Riavvio del demone in corso (~60s)...",
     updateFailed: "Aggiornamento CLI non riuscito.",
     updateCli: ({ version }: { version: string }) => `Aggiorna CLI a v${version}`,
+    sessionLabel: ({ n }: { n: number }) => `Terminale ${n}`,
+    newSession: "Nuova sessione terminale",
+    closeSession: "Chiudi sessione",
+    clearingAll: "Pulizia sessioni obsolete...",
+    clearAllSessions: "Cancella tutte le sessioni e riprova",
   },
 } as const;
 

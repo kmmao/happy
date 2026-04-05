@@ -3641,5 +3641,10 @@ export const zhHans: TranslationStructure = {
     updateWaiting: "CLI 已更新！Daemon 重启中（约60秒）...",
     updateFailed: "CLI 更新失败。",
     updateCli: ({ version }: { version: string }) => `更新 CLI 到 v${version}`,
+    sessionLabel: ({ n }: { n: number }) => `终端 ${n}`,
+    newSession: "新建终端会话",
+    closeSession: "关闭会话",
+    clearingAll: "正在清除残余会话...",
+    clearAllSessions: "清除所有会话并重试",
   },
 } as const;
