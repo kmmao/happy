@@ -50,6 +50,11 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
     const [isUpdating, setIsUpdating] = useState(false);
     const [updateMsg, setUpdateMsg] = useState<string | null>(null);
 
+    // Stable ref for onClose — avoids including onClose in effect dep arrays,
+    // which would cause the terminal to re-initialize every time the parent re-renders.
+    const onCloseRef = useRef(onClose);
+    useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
     const machine = useMachine(machineId);
     const currentCliVersion = machine?.daemonState?.startedWithCliVersion;
     const { latestVersion, hasUpdate } = useCliVersionCheck(currentCliVersion);
@@ -65,8 +70,8 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
             terminalRef.current = null;
         }
         setState("disconnected");
-        onClose?.();
-    }, [machineId, onClose]);
+        onCloseRef.current?.();
+    }, [machineId]);
 
     useEffect(() => {
         let mounted = true;
@@ -136,7 +141,7 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
                     terminal.write(`\r\n\x1b[90m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
                     setState("disconnected");
                     terminalIdRef.current = null;
-                    onClose?.();
+                    onCloseRef.current?.();
                 }
             });
 
@@ -169,7 +174,7 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
                     terminal.write(`\r\n\x1b[90m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
                     setState("disconnected");
                     terminalIdRef.current = null;
-                    onClose?.();
+                    onCloseRef.current?.();
                     break;
                 }
             }
@@ -211,11 +216,16 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
             }
             terminalIdRef.current = null;
         };
-    }, [machineId, cwd, sessionId, terminalIdProp, theme.colors.groupped?.background, onClose, retryKey]);
+    }, [machineId, cwd, sessionId, terminalIdProp, theme.colors.groupped?.background, retryKey]);
 
-    // When this terminal's tab becomes active after being hidden, re-fit so dimensions are correct
+    // When this terminal's tab becomes active after being HIDDEN, re-fit so dimensions are correct.
+    // Skip the initial mount — the terminal is already sized correctly by the init effect's synchronous fit().
+    const isActivePrevRef = useRef<boolean | undefined>(undefined);
     useEffect(() => {
-        if (isActive && fitAddonRef.current) {
+        const prev = isActivePrevRef.current;
+        isActivePrevRef.current = isActive;
+        // Only fit when transitioning false → true (not on initial mount)
+        if (isActive && prev === false && fitAddonRef.current) {
             requestAnimationFrame(() => {
                 try { fitAddonRef.current?.fit(); } catch { /* ignore */ }
             });
