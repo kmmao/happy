@@ -343,56 +343,59 @@ export const SessionView = React.memo((props: { id: string }) => {
                 : 0,
             }}
           >
-            {!isDataReady ? (
-              // Loading state
-              <View
-                style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-              >
-                <ActivityIndicator
-                  size="small"
-                  color={theme.colors.textSecondary}
-                />
-              </View>
-            ) : !session ? (
-              // Deleted state
-              <View
-                style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-              >
-                <Ionicons
-                  name="trash-outline"
-                  size={48}
-                  color={theme.colors.textSecondary}
-                />
-                <Text
-                  style={{
-                    color: theme.colors.text,
-                    fontSize: 20,
-                    marginTop: 16,
-                    fontWeight: "600",
-                  }}
+            {/* Centered max-width container — keeps chat content readable on very wide displays */}
+            <View style={{ flex: 1, maxWidth: layout.maxWidth, alignSelf: "center", width: "100%" }}>
+              {!isDataReady ? (
+                // Loading state
+                <View
+                  style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
                 >
-                  {t("errors.sessionDeleted")}
-                </Text>
-                <Text
-                  style={{
-                    color: theme.colors.textSecondary,
-                    fontSize: 15,
-                    marginTop: 8,
-                    textAlign: "center",
-                    paddingHorizontal: 32,
-                  }}
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.textSecondary}
+                  />
+                </View>
+              ) : !session ? (
+                // Deleted state
+                <View
+                  style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
                 >
-                  {t("errors.sessionDeletedDescription")}
-                </Text>
-              </View>
-            ) : (
-              // Normal session view
-              <SessionViewLoaded
-                key={sessionId}
-                sessionId={sessionId}
-                session={session}
-              />
-            )}
+                  <Ionicons
+                    name="trash-outline"
+                    size={48}
+                    color={theme.colors.textSecondary}
+                  />
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontSize: 20,
+                      marginTop: 16,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {t("errors.sessionDeleted")}
+                  </Text>
+                  <Text
+                    style={{
+                      color: theme.colors.textSecondary,
+                      fontSize: 15,
+                      marginTop: 8,
+                      textAlign: "center",
+                      paddingHorizontal: 32,
+                    }}
+                  >
+                    {t("errors.sessionDeletedDescription")}
+                  </Text>
+                </View>
+              ) : (
+                // Normal session view
+                <SessionViewLoaded
+                  key={sessionId}
+                  sessionId={sessionId}
+                  session={session}
+                />
+              )}
+            </View>
           </View>
         </View>
 
