@@ -10,6 +10,7 @@ import { t } from "@/text";
 
 interface WebTerminalProps {
     machineId: string;
+    cwd?: string;
     onClose?: () => void;
 }
 

@@ -1151,6 +1151,7 @@ export const ru: TranslationStructure = {
     changes: "Изменения",
     summary: "Сводка",
     timeline: "Хронология",
+    terminal: "Терминал",
     collapse: "Свернуть",
     expand: "Развернуть",
     noProject: "Проект не привязан",

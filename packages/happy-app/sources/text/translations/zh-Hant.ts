@@ -1099,6 +1099,7 @@ export const zhHant: TranslationStructure = {
     changes: "變更",
     summary: "摘要",
     timeline: "時間軸",
+    terminal: "終端",
     collapse: "收起",
     expand: "展開",
     noProject: "未關聯專案",

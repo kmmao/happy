@@ -1151,6 +1151,7 @@ export const pl: TranslationStructure = {
     changes: "Zmiany",
     summary: "Podsumowanie",
     timeline: "Oś czasu",
+    terminal: "Terminal",
     collapse: "Zwiń",
     expand: "Rozwiń",
     noProject: "Brak powiązanego projektu",

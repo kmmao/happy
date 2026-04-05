@@ -1228,6 +1228,7 @@ export const it: TranslationStructure = {
     changes: "Modifiche",
     summary: "Riepilogo",
     timeline: "Cronologia",
+    terminal: "Terminale",
     collapse: "Comprimi",
     expand: "Espandi",
     noProject: "Nessun progetto collegato",

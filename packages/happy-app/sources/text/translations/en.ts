@@ -1136,6 +1136,7 @@ export const en: TranslationStructure = {
     changes: "Changes",
     summary: "Summary",
     timeline: "Timeline",
+    terminal: "Terminal",
     collapse: "Collapse",
     expand: "Expand",
     noProject: "No project linked",

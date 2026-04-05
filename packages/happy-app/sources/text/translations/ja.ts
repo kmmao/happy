@@ -1216,6 +1216,7 @@ export const ja: TranslationStructure = {
     changes: "変更",
     summary: "概要",
     timeline: "タイムライン",
+    terminal: "ターミナル",
     collapse: "折りたたむ",
     expand: "展開する",
     noProject: "プロジェクト未連携",

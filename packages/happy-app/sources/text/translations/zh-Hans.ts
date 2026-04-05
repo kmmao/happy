@@ -1099,6 +1099,7 @@ export const zhHans: TranslationStructure = {
     changes: "变更",
     summary: "摘要",
     timeline: "时间轴",
+    terminal: "终端",
     collapse: "收起",
     expand: "展开",
     noProject: "未关联项目",

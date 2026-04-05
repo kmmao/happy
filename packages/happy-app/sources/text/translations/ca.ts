@@ -1140,6 +1140,7 @@ export const ca: TranslationStructure = {
     changes: "Canvis",
     summary: "Resum",
     timeline: "Cronologia",
+    terminal: "Terminal",
     collapse: "Replega",
     expand: "Desplega",
     noProject: "Cap projecte vinculat",
