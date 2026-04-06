@@ -28,6 +28,29 @@ import {
   isNetworkError,
 } from "@/utils/serverConnectionErrors";
 
+/**
+ * Some server builds omitted `session.tag` in POST /v1/sessions JSON; the CLI schema requires it.
+ * Fill from the request tag so older backends keep working until redeployed.
+ */
+function withCreateSessionTagFallback(body: unknown, fallbackTag: string): unknown {
+  if (!body || typeof body !== "object") {
+    return body;
+  }
+  const o = body as Record<string, unknown>;
+  const session = o.session;
+  if (!session || typeof session !== "object") {
+    return body;
+  }
+  const s = session as Record<string, unknown>;
+  if (typeof s.tag === "string") {
+    return body;
+  }
+  return {
+    ...o,
+    session: { ...s, tag: fallbackTag },
+  };
+}
+
 export class ApiClient {
   static async create(credential: Credentials) {
     return new ApiClient(credential);
@@ -107,7 +130,9 @@ export class ApiClient {
         },
       );
 
-      const parsed = CreateSessionResponseSchema.safeParse(response.data);
+      const parsed = CreateSessionResponseSchema.safeParse(
+        withCreateSessionTagFallback(response.data, opts.tag),
+      );
       if (!parsed.success) {
         logger.debug("[API] Session response validation failed:", parsed.error.issues);
         throw new Error("Invalid session response from server");
@@ -425,7 +450,9 @@ export class ApiClient {
         },
       );
 
-      const parsed = CreateSessionResponseSchema.safeParse(response.data);
+      const parsed = CreateSessionResponseSchema.safeParse(
+        withCreateSessionTagFallback(response.data, "reconnect"),
+      );
       if (!parsed.success) {
         logger.debug("[API] Reconnect response validation failed:", parsed.error.issues);
         throw new Error("Invalid session response from server");
