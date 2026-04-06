@@ -12,12 +12,13 @@ import { ProjectConfigTab } from "./ProjectConfigTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
 import { ProjectAnalyticsTab } from "./ProjectAnalyticsTab";
 import { ProjectRolesTab } from "./ProjectRolesTab";
+import { ProjectGoalsTab } from "./ProjectGoalsTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { storage, useSetting } from "@/sync/storage";
 import { gitStatusSync } from "@/sync/gitStatusSync";
 
-type TabKey = "sessions" | "git" | "health" | "actions" | "research" | "knowledge" | "roles" | "analytics" | "config";
+type TabKey = "sessions" | "git" | "health" | "actions" | "research" | "knowledge" | "goals" | "roles" | "analytics" | "config";
 
 interface ProjectDetailViewProps {
     project: Project;
@@ -57,6 +58,7 @@ export const ProjectDetailView = React.memo(
                 if (knowledgeBaseEnabled) {
                     base.push({ key: "knowledge", label: t("projects.tabKnowledge") });
                 }
+                base.push({ key: "goals", label: t("projects.tabGoals") });
                 base.push({ key: "roles", label: t("projects.tabRoles") });
                 base.push({ key: "analytics", label: t("projects.tabAnalytics") });
                 base.push({ key: "config", label: t("projects.tabConfig") });
@@ -177,6 +179,15 @@ export const ProjectDetailView = React.memo(
                             <ProjectKnowledgeTab projectServerId={project.serverId ?? undefined} isActive={activeTab === "knowledge"} />
                         </View>
                     )}
+                    <View
+                        style={
+                            activeTab === "goals"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectGoalsTab project={project} isActive={activeTab === "goals"} />
+                    </View>
                     <View
                         style={
                             activeTab === "roles"

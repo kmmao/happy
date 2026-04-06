@@ -2289,6 +2289,8 @@ export async function startDaemon(): Promise<void> {
         },
         task: {
           spawnSession,
+          serverUrl: configuration.serverUrl,
+          authToken: credentials.token,
           onTaskStatusChange: (taskId, status, sessionId, errorMessage) => {
             try {
               apiMachine?.taskStatus(taskId, status, sessionId, errorMessage);

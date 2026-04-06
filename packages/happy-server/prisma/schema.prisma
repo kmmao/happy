@@ -62,6 +62,7 @@ model Account {
     InboxItem           InboxItem[]
     AgentRole           AgentRole[]
     Decision            Decision[]
+    Goal                Goal[]
 }
 
 model TerminalAuthRequest {
@@ -460,6 +461,7 @@ model Project {
     webhookTriggers    WebhookTrigger[]
     agentRoles         AgentRole[]
     decisions          Decision[]
+    goals              Goal[]
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
@@ -817,6 +819,10 @@ model Task {
     // Skill bindings
     skillBindings   TaskSkillBinding[]
 
+    // Goal relation (Phase 3)
+    goalId          String?
+    goal            Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
+
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 
@@ -824,6 +830,7 @@ model Task {
     @@index([accountId, machineId, status])
     @@index([machineId, status])
     @@index([projectId])
+    @@index([goalId])
     @@index([accountId, createdAt(sort: Desc)])
 }
 
@@ -1058,6 +1065,10 @@ model Decision {
     knowledgeId     String?                         // 生成的 Knowledge 条目 ID
     precedentKey    String?                         // 判例分类 key（用于匹配同类问题）
 
+    // Goal relation (Phase 3)
+    goalId          String?
+    goal            Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
+
     // Lifecycle
     expiresAt       DateTime?
     decidedAt       DateTime?
@@ -1067,4 +1078,49 @@ model Decision {
     @@index([accountId, projectId, status])
     @@index([projectId, precedentKey])
     @@index([status, expiresAt])
+    @@index([goalId])
+}
+
+// World Model — Phase 3: Goals (Goal Engine)
+model Goal {
+    id              String    @id @default(cuid())
+    accountId       String
+    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    projectId       String
+    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    // Content (plaintext — Server needs for prompt injection and progress tracking)
+    title           String
+    description     String?
+
+    // State
+    status          String    @default("planning")  // planning | in_progress | blocked | completed | cancelled
+    progress        Int       @default(0)           // 0-100
+
+    // Priority & deadline
+    priority        String    @default("normal")    // urgent | normal | low
+    deadline        DateTime?
+
+    // Hierarchy
+    parentGoalId    String?
+    parentGoal      Goal?     @relation("GoalHierarchy", fields: [parentGoalId], references: [id], onDelete: SetNull)
+    subGoals        Goal[]    @relation("GoalHierarchy")
+
+    // Execution
+    machineId       String                          // Target machine for task dispatch
+    createdBy       String    @default("user")      // user | planner_agent
+
+    // Planner task reference (the task that decomposes this goal)
+    plannerTaskId   String?
+
+    // Relations
+    tasks           Task[]
+    decisions       Decision[]
+
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    @@index([accountId, projectId, status])
+    @@index([projectId, status])
+    @@index([parentGoalId])
 }

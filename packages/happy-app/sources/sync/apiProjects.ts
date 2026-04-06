@@ -381,3 +381,123 @@ export async function deleteAgentRole(
         }
     });
 }
+
+// === Goal API ===
+
+export interface GoalSummary {
+    id: string;
+    projectId: string;
+    title: string;
+    description: string | null;
+    status: string;
+    progress: number;
+    priority: string;
+    deadline: number | null;
+    parentGoalId: string | null;
+    machineId: string;
+    createdBy: string;
+    plannerTaskId: string | null;
+    createdAt: number;
+    updatedAt: number;
+    subGoalCount: number;
+    taskCount: number;
+    decisionCount: number;
+}
+
+interface GoalsResponse {
+    goals: GoalSummary[];
+    total: number;
+}
+
+export async function fetchGoals(
+    credentials: AuthCredentials,
+    projectId: string,
+    opts?: { status?: string; parentGoalId?: string },
+): Promise<GoalSummary[]> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const params = new URLSearchParams();
+        if (opts?.status) params.set("status", opts.status);
+        if (opts?.parentGoalId !== undefined) params.set("parentGoalId", opts.parentGoalId);
+        const qs = params.toString();
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/goals${qs ? `?${qs}` : ""}`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch goals: ${response.status}`);
+        }
+        const data = (await response.json()) as GoalsResponse;
+        return data.goals;
+    });
+}
+
+export async function createGoal(
+    credentials: AuthCredentials,
+    projectId: string,
+    body: {
+        title: string;
+        description?: string;
+        priority?: string;
+        deadline?: string;
+        parentGoalId?: string;
+        machineId: string;
+        autoDecompose?: boolean;
+    },
+): Promise<GoalSummary> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(`${API_ENDPOINT}/v1/projects/${projectId}/goals`, {
+            method: "POST",
+            headers: authHeaders(credentials),
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to create goal: ${response.status}`);
+        }
+        const data = (await response.json()) as { goal: GoalSummary };
+        return data.goal;
+    });
+}
+
+export async function cancelGoal(
+    credentials: AuthCredentials,
+    projectId: string,
+    goalId: string,
+): Promise<GoalSummary> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/goals/${goalId}/cancel`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+            },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to cancel goal: ${response.status}`);
+        }
+        const data = (await response.json()) as { goal: GoalSummary };
+        return data.goal;
+    });
+}
+
+export async function deleteGoal(
+    credentials: AuthCredentials,
+    projectId: string,
+    goalId: string,
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+    await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/goals/${goalId}`,
+            {
+                method: "DELETE",
+                headers: authHeaders(credentials),
+            },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to delete goal: ${response.status}`);
+        }
+    });
+}

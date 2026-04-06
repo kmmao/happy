@@ -13,6 +13,10 @@ export interface TaskHandlerDeps {
     options: SpawnSessionOptions,
   ) => Promise<SpawnSessionResult>;
   readonly onTaskStatusChange?: (taskId: string, status: string, sessionId?: string, errorMessage?: string) => Promise<void> | void;
+  /** Server URL for tasks that need to POST results back (e.g., planner tasks). */
+  readonly serverUrl?: string;
+  /** Auth token for tasks that need to authenticate with the server. */
+  readonly authToken?: string;
 }
 
 /**
@@ -76,6 +80,8 @@ export async function runTaskJob(
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
       HAPPY_TASK_ID: data.taskId,
       HAPPY_TASK_PRIORITY: data.priority,
+      ...(deps.serverUrl ? { HAPPY_TASK_SERVER_URL: deps.serverUrl } : {}),
+      ...(deps.authToken ? { HAPPY_TASK_AUTH_TOKEN: deps.authToken } : {}),
     },
   });
 

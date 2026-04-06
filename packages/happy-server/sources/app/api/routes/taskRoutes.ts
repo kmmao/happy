@@ -7,6 +7,7 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
+import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
 
 // Inline schemas (mirrored from @kmmao/happy-wire/tasks — will import after wire publish)
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
@@ -401,6 +402,14 @@ export function taskRoutes(app: Fastify) {
                 }),
                 recipientFilter: { type: "user-scoped-only" },
             });
+
+            // Update goal progress if task is bound to a goal
+            if (isTerminal && updated.goalId) {
+                void goalProgressUpdate({
+                    goalId: updated.goalId,
+                    accountId: request.userId,
+                });
+            }
 
             log({ module: "task" }, `Task ${taskId} status → ${status}`);
             return reply.send({ task: serializeTask(updated) });

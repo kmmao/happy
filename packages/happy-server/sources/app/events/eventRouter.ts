@@ -417,6 +417,19 @@ export type EphemeralEvent =
       terminalId: string;
       data: string;
     }
+  | {
+      type: "goal-created";
+      goalId: string;
+      projectId: string;
+      title: string;
+    }
+  | {
+      type: "goal-progress";
+      goalId: string;
+      projectId: string;
+      status: string;
+      progress: number;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -1199,6 +1212,29 @@ export function buildSessionEventCreatedEphemeral(event: {
   return {
     type: "session-event-created",
     event,
+  };
+}
+
+export function buildGoalCreatedEphemeral(opts: {
+  goalId: string;
+  projectId: string;
+  title: string;
+}): EphemeralPayload {
+  return {
+    type: "goal-created",
+    ...opts,
+  };
+}
+
+export function buildGoalProgressEphemeral(opts: {
+  goalId: string;
+  projectId: string;
+  status: string;
+  progress: number;
+}): EphemeralPayload {
+  return {
+    type: "goal-progress",
+    ...opts,
   };
 }
 
