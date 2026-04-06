@@ -80,7 +80,7 @@ export const QueryKnowledgeParamsSchema = z.object({
   entryType: KnowledgeEntryTypeSchema.optional(),
   status: KnowledgeStatusSchema.optional(),
   tags: z.array(z.string()).optional(),
-  search: z.string().optional(),
+  search: z.string().max(500).optional(),
   limit: z.number().int().min(1).max(100).default(20),
   offset: z.number().int().min(0).default(0),
 });
