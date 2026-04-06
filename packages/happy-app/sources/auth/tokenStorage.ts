@@ -4,6 +4,12 @@ import { log } from '@/log';
 
 const AUTH_KEY = 'auth_credentials';
 
+// SECURITY: Web platform uses sessionStorage which is accessible to any JS running in the
+// same origin (XSS risk). Native platforms use expo-secure-store (hardware-backed keychain).
+// sessionStorage is preferred over localStorage: credentials are cleared when the tab closes,
+// reducing the exposure window. A fully secure web solution would require httpOnly cookies
+// with server-side session management — out of scope while web remains a secondary platform.
+
 // Cache for synchronous access
 let credentialsCache: string | null = null;
 
@@ -15,7 +21,7 @@ export interface AuthCredentials {
 export const TokenStorage = {
     async getCredentials(): Promise<AuthCredentials | null> {
         if (Platform.OS === 'web') {
-            return localStorage.getItem(AUTH_KEY) ? JSON.parse(localStorage.getItem(AUTH_KEY)!) as AuthCredentials : null;
+            return sessionStorage.getItem(AUTH_KEY) ? JSON.parse(sessionStorage.getItem(AUTH_KEY)!) as AuthCredentials : null;
         }
         try {
             const stored = await SecureStore.getItemAsync(AUTH_KEY);
@@ -30,7 +36,7 @@ export const TokenStorage = {
 
     async setCredentials(credentials: AuthCredentials): Promise<boolean> {
         if (Platform.OS === 'web') {
-            localStorage.setItem(AUTH_KEY, JSON.stringify(credentials));
+            sessionStorage.setItem(AUTH_KEY, JSON.stringify(credentials));
             return true;
         }
         try {
@@ -46,7 +52,7 @@ export const TokenStorage = {
 
     async removeCredentials(): Promise<boolean> {
         if (Platform.OS === 'web') {    
-            localStorage.removeItem(AUTH_KEY);
+            sessionStorage.removeItem(AUTH_KEY);
             return true;
         }
         try {

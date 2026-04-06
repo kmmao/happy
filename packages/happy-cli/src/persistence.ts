@@ -589,6 +589,7 @@ export async function writeCredentialsLegacy(credentials: {
       null,
       2,
     ),
+    { mode: 0o600 },
   );
 }
 
@@ -613,6 +614,7 @@ export async function writeCredentialsDataKey(credentials: {
       null,
       2,
     ),
+    { mode: 0o600 },
   );
 }
 

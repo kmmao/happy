@@ -1,6 +1,7 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
 import { getServerUrl } from "./serverConfig";
+import * as z from "zod";
 
 /**
  * Server-side project representation
@@ -27,6 +28,15 @@ export interface ServerProject {
     createdAt: number;
     updatedAt: number;
 }
+
+// Zod schema for validating project list responses from the server
+const ProjectListResponseSchema = z.object({
+    projects: z.array(z.looseObject({
+        id: z.string(),
+        machineId: z.string(),
+        path: z.string(),
+    })),
+});
 
 interface ProjectListResponse {
     projects: ServerProject[];
@@ -89,8 +99,12 @@ export async function fetchProjects(
             throw new Error(`Failed to fetch projects: ${response.status}`);
         }
 
-        const data = (await response.json()) as ProjectListResponse;
-        return data.projects;
+        const json = await response.json();
+        const parsed = ProjectListResponseSchema.safeParse(json);
+        if (!parsed.success) {
+            throw new Error(`Invalid projects response: ${parsed.error.issues[0]?.message}`);
+        }
+        return parsed.data.projects as unknown as ServerProject[];
     });
 }
 
@@ -274,6 +288,12 @@ export async function fetchRelatedProjects(
 
 // === Agent Roles ===
 
+export interface RoleActiveTask {
+    id: string;
+    status: string;
+    sessionId: string | null;
+}
+
 export interface AgentRoleSummary {
     id: string;
     projectId: string;
@@ -284,6 +304,7 @@ export interface AgentRoleSummary {
     skillIds: string[];
     maxConcurrency: number;
     enabled: boolean;
+    activeTasks: RoleActiveTask[];
     createdAt: number;
     updatedAt: number;
 }
@@ -384,6 +405,13 @@ export async function deleteAgentRole(
 
 // === Goal API ===
 
+export interface GoalTaskSummary {
+    id: string;
+    status: string;
+    sessionId: string | null;
+    roleType: string | null;
+}
+
 export interface GoalSummary {
     id: string;
     projectId: string;
@@ -402,6 +430,7 @@ export interface GoalSummary {
     subGoalCount: number;
     taskCount: number;
     decisionCount: number;
+    tasks: GoalTaskSummary[];
 }
 
 interface GoalsResponse {

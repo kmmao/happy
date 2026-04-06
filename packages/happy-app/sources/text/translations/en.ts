@@ -3869,6 +3869,8 @@ export const en: TranslationStructure = {
     typePlanner: "Planner",
     typeMessenger: "Messenger",
     typeCustom: "Custom",
+    activeTasks: ({ count }: { count: number }) => `${count} active ${count === 1 ? "task" : "tasks"}`,
+    taskStatus: ({ index, status }: { index: number; status: string }) => `Task #${index} · ${status}`,
   },
   goals: {
     title: "Goals",
@@ -3905,6 +3907,8 @@ export const en: TranslationStructure = {
     retryDecompose: "Retry Decomposition",
     decomposeTriggered: "Decomposition triggered",
     decomposeError: "Failed to trigger decomposition",
+    viewSession: "View Session",
+    taskIndex: ({ index }: { index: number }) => `Task #${index}`,
     progress: ({ value }: { value: number }) => `${value}%`,
     created: "Goal created",
     createError: "Failed to create goal",

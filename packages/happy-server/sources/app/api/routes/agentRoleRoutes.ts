@@ -146,7 +146,7 @@ export function agentRoleRoutes(app: Fastify) {
         },
     );
 
-    // GET /v1/agent-roles — list roles for a project
+    // GET /v1/agent-roles — list roles for a project (with active task/session stats)
     app.get(
         "/v1/agent-roles",
         {
@@ -171,8 +171,33 @@ export function agentRoleRoutes(app: Fastify) {
                 db.agentRole.count({ where }),
             ]);
 
+            // Fetch active tasks grouped by roleType for this project
+            const activeTasks = await db.task.findMany({
+                where: {
+                    accountId: request.userId,
+                    projectId,
+                    roleType: { not: null },
+                    status: { in: ["queued", "dispatching", "running"] },
+                },
+                select: { id: true, status: true, sessionId: true, roleType: true },
+            });
+
+            const roleTaskMap = new Map<string, Array<{ id: string; status: string; sessionId: string | null }>>();
+            for (const task of activeTasks) {
+                if (!task.roleType) continue;
+                let arr = roleTaskMap.get(task.roleType);
+                if (!arr) {
+                    arr = [];
+                    roleTaskMap.set(task.roleType, arr);
+                }
+                arr.push({ id: task.id, status: task.status, sessionId: task.sessionId });
+            }
+
             return reply.send({
-                roles: roles.map(serializeAgentRole),
+                roles: roles.map((role) => ({
+                    ...serializeAgentRole(role),
+                    activeTasks: roleTaskMap.get(role.type) ?? [],
+                })),
                 total,
             });
         },

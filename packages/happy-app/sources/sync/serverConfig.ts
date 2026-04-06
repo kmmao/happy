@@ -17,6 +17,10 @@ export function getServerUrl(): string {
 
 export function setServerUrl(url: string | null): void {
   if (url && url.trim()) {
+    const validation = validateServerUrl(url.trim());
+    if (!validation.valid) {
+      throw new Error(validation.error || "Invalid server URL");
+    }
     serverConfigStorage.set(SERVER_KEY, url.trim());
   } else {
     serverConfigStorage.delete(SERVER_KEY);

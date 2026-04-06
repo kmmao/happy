@@ -32,12 +32,15 @@ import { sessionEventHandler } from "./socket/sessionEventHandler";
 import { terminalHandler } from "./socket/terminalHandler";
 
 export function startSocket(app: Fastify) {
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+    : ["http://localhost:3000", "http://localhost:8081"];
   const io = new Server(app.server, {
     cors: {
-      origin: "*",
+      origin: allowedOrigins,
       methods: ["GET", "POST", "OPTIONS"],
       credentials: true,
-      allowedHeaders: ["*"],
+      allowedHeaders: ["Content-Type", "Authorization"],
     },
     transports: ["websocket", "polling"],
     pingTimeout: 45000,

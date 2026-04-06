@@ -9,6 +9,7 @@ import { log } from "@/utils/log";
 import crypto from "crypto";
 import { inTx } from "@/storage/inTx";
 import { inboxCreate } from "@/modules/inboxCreate";
+import { WEBHOOK_INBOUND_RATE_LIMIT } from "../utils/enableRateLimit";
 
 const MAX_WEBHOOK_PAYLOAD_SIZE = 65536; // 64KB
 const MAX_PROMPT_LENGTH = 50000;
@@ -75,7 +76,7 @@ export function webhookTriggerRoutes(app: Fastify) {
             schema: {
                 params: z.object({ slug: z.string() }),
             },
-            config: { rawBody: true } as Record<string, unknown>,
+            config: { rawBody: true, rateLimit: WEBHOOK_INBOUND_RATE_LIMIT } as Record<string, unknown>,
         },
         async (request, reply) => {
             const { slug } = request.params as { slug: string };

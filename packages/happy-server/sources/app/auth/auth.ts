@@ -1,4 +1,5 @@
 import * as privacyKit from "privacy-kit";
+import { LRUCache } from "lru-cache";
 import { log } from "@/utils/log";
 
 interface TokenCacheEntry {
@@ -14,28 +15,40 @@ interface AuthTokens {
     githubGenerator: Awaited<ReturnType<typeof privacyKit.createEphemeralTokenGenerator>>;
 }
 
+const TOKEN_CACHE_MAX = 100_000;
+const TOKEN_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutes
+
 class AuthModule {
-    private tokenCache = new Map<string, TokenCacheEntry>();
+    private tokenCache: LRUCache<string, TokenCacheEntry>;
     private tokens: AuthTokens | null = null;
+    private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+    constructor(options?: { max?: number; ttl?: number }) {
+        this.tokenCache = new LRUCache<string, TokenCacheEntry>({
+            max: options?.max ?? TOKEN_CACHE_MAX,
+            ttl: options?.ttl ?? TOKEN_CACHE_TTL,
+        });
+    }
     
     async init(): Promise<void> {
         if (this.tokens) {
             return; // Already initialized
         }
-        
+
         log({ module: 'auth' }, 'Initializing auth module...');
-        
+
         const generator = await privacyKit.createPersistentTokenGenerator({
             service: 'handy',
             seed: process.env.HANDY_MASTER_SECRET!
         });
 
-        
+
         const verifier = await privacyKit.createPersistentTokenVerifier({
             service: 'handy',
             publicKey: Uint8Array.from(generator.publicKey)
         });
-        
+
         const githubGenerator = await privacyKit.createEphemeralTokenGenerator({
             service: 'github-happy',
             seed: process.env.HANDY_MASTER_SECRET!,
@@ -49,7 +62,9 @@ class AuthModule {
 
 
         this.tokens = { generator, verifier, githubVerifier, githubGenerator };
-        
+
+        this.startCleanupInterval();
+
         log({ module: 'auth' }, 'Auth module initialized');
     }
     
@@ -99,7 +114,7 @@ class AuthModule {
             const userId = verified.user as string;
             const extras = verified.extras;
             
-            // Cache the result permanently
+            // Cache the verified result
             this.tokenCache.set(token, {
                 userId,
                 extras,
@@ -115,33 +130,35 @@ class AuthModule {
     }
     
     invalidateUserTokens(userId: string): void {
-        // Remove all tokens for a specific user
-        // This is expensive but rarely needed
+        const keysToDelete: string[] = [];
         for (const [token, entry] of this.tokenCache.entries()) {
-            if (entry.userId === userId) {
-                this.tokenCache.delete(token);
+            if (entry && entry.userId === userId) {
+                keysToDelete.push(token);
             }
         }
-        
-        log({ module: 'auth' }, `Invalidated tokens for user: ${userId}`);
+        for (const key of keysToDelete) {
+            this.tokenCache.delete(key);
+        }
+
+        log({ module: 'auth' }, `Invalidated ${keysToDelete.length} tokens for user: ${userId}`);
     }
-    
+
     invalidateToken(token: string): void {
         this.tokenCache.delete(token);
     }
-    
+
     getCacheStats(): { size: number; oldestEntry: number | null } {
         if (this.tokenCache.size === 0) {
             return { size: 0, oldestEntry: null };
         }
-        
+
         let oldest = Date.now();
         for (const entry of this.tokenCache.values()) {
-            if (entry.cachedAt < oldest) {
+            if (entry && entry.cachedAt < oldest) {
                 oldest = entry.cachedAt;
             }
         }
-        
+
         return {
             size: this.tokenCache.size,
             oldestEntry: oldest
@@ -177,14 +194,30 @@ class AuthModule {
         }
     }
 
-    // Cleanup old entries (optional - can be called periodically)
     cleanup(): void {
-        // Note: Since tokens are cached "forever" as requested,
-        // we don't do automatic cleanup. This method exists if needed later.
+        this.tokenCache.purgeStale();
         const stats = this.getCacheStats();
-        log({ module: 'auth' }, `Token cache size: ${stats.size} entries`);
+        log({ module: 'auth' }, `Token cache cleanup: ${stats.size} entries remaining`);
+    }
+
+    private startCleanupInterval(): void {
+        if (this.cleanupTimer) {
+            return;
+        }
+        this.cleanupTimer = setInterval(() => this.cleanup(), CLEANUP_INTERVAL);
+        this.cleanupTimer.unref();
+    }
+
+    stopCleanupInterval(): void {
+        if (this.cleanupTimer) {
+            clearInterval(this.cleanupTimer);
+            this.cleanupTimer = null;
+        }
     }
 }
 
 // Global instance
 export const auth = new AuthModule();
+
+// Exported for testing
+export { AuthModule, TOKEN_CACHE_MAX, TOKEN_CACHE_TTL };

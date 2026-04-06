@@ -8,6 +8,7 @@ import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal } from "@/modal";
+import { useRouter } from "expo-router";
 import {
     fetchAgentRoles,
     createAgentRole,
@@ -110,12 +111,23 @@ interface WorldRolesTabProps {
     isActive: boolean;
 }
 
+const TASK_STATUS_COLORS: Record<string, string> = {
+    running: "#10B981",
+    dispatching: "#F59E0B",
+    queued: "#6B7280",
+};
+
 export const WorldRolesTab = React.memo(
     ({ project, isActive }: WorldRolesTabProps) => {
         const { theme } = useUnistyles();
+        const router = useRouter();
         const [roles, setRoles] = React.useState<AgentRoleSummary[]>([]);
         const [loading, setLoading] = React.useState(false);
         const [editingRole, setEditingRole] = React.useState<AgentRoleSummary | "new" | null>(null);
+
+        const handleViewSession = React.useCallback((sessionId: string) => {
+            router.push(`/session/${sessionId}`);
+        }, [router]);
 
         const loadRoles = React.useCallback(async () => {
             if (!project.serverId) return;
@@ -230,6 +242,30 @@ export const WorldRolesTab = React.memo(
                                     <Text style={styles.roleDescription} numberOfLines={2}>
                                         {role.description}
                                     </Text>
+                                )}
+                                {role.activeTasks && role.activeTasks.length > 0 && (
+                                    <View style={styles.activeTasksContainer}>
+                                        <Text style={styles.activeTasksLabel}>
+                                            {t("roles.activeTasks", { count: role.activeTasks.length })}
+                                        </Text>
+                                        {role.activeTasks.map((task, idx) => (
+                                            <View key={task.id} style={styles.activeTaskRow}>
+                                                <View style={[styles.taskStatusDot, { backgroundColor: TASK_STATUS_COLORS[task.status] ?? "#6B7280" }]} />
+                                                <Text style={styles.activeTaskStatus}>
+                                                    {t("roles.taskStatus", { index: idx + 1, status: task.status })}
+                                                </Text>
+                                                {task.sessionId && (
+                                                    <Pressable
+                                                        style={styles.viewSessionButton}
+                                                        onPress={(e) => { e.stopPropagation(); handleViewSession(task.sessionId!); }}
+                                                    >
+                                                        <Ionicons name="open-outline" size={14} color={theme.colors.accentPurple} />
+                                                        <Text style={styles.viewSessionText}>{t("goals.viewSession")}</Text>
+                                                    </Pressable>
+                                                )}
+                                            </View>
+                                        ))}
+                                    </View>
                                 )}
                             </Pressable>
                         ))
@@ -583,6 +619,49 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         marginTop: 8,
         lineHeight: 18,
+    },
+    activeTasksContainer: {
+        marginTop: 10,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.groupped.background,
+    },
+    activeTasksLabel: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        color: theme.colors.text,
+        marginBottom: 6,
+    },
+    activeTaskRow: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        paddingVertical: 4,
+        gap: 6,
+    },
+    taskStatusDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    activeTaskStatus: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        flex: 1,
+    },
+    viewSessionButton: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        backgroundColor: theme.colors.groupped.background,
+    },
+    viewSessionText: {
+        ...Typography.default("semiBold"),
+        fontSize: 11,
+        color: theme.colors.accentPurple,
     },
     templateGrid: {
         flexDirection: "row" as const,

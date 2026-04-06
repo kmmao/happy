@@ -76,6 +76,7 @@ services:
       S3_BUCKET: handy
       # 客户端（浏览器/App）访问对象存储的地址，宿主机访问用 localhost
       S3_PUBLIC_URL: http://localhost:9000/handy
+      ALLOWED_ORIGINS: "https://w.sangreal.code.xycloud.info:2443,http://localhost:3000,http://localhost:8081"
       # Anthropic API: key 从 .env 读取，URL 通过宿主机 socat 转发到 Tailscale 代理
       # 宿主机 launchd: com.happy.anthropic-proxy → socat 0.0.0.0:8899 → 100.85.22.83:8899
       ANTHROPIC_BASE_URL: http://host.docker.internal:8899

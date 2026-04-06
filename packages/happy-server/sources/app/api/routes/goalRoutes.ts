@@ -54,6 +54,7 @@ const PlanResultBodySchema = z.object({
 
 const PLANNING_RESULT_TIMEOUT_MINUTES = 10;
 const PLANNING_RESULT_TIMEOUT_MS = PLANNING_RESULT_TIMEOUT_MINUTES * 60 * 1000;
+const DISPATCHING_RECOVERY_MS = 2 * 60 * 1000;
 
 async function applyPlanningTimeoutFallback(opts: {
     goals: Array<{
@@ -106,6 +107,106 @@ async function applyPlanningTimeoutFallback(opts: {
         `Marked ${timedOutGoalIds.length} planning goals as blocked due to plan-result timeout (${PLANNING_RESULT_TIMEOUT_MINUTES}m)`,
     );
     return new Set(timedOutGoalIds);
+}
+
+/**
+ * Re-dispatch tasks stuck in "dispatching" for longer than DISPATCHING_RECOVERY_MS.
+ * Ephemeral events are fire-and-forget; if CLI was offline when the event was sent,
+ * the task stays in "dispatching" forever. This recovers from that.
+ */
+async function recoverStuckDispatchingTasks(opts: {
+    goalIds: string[];
+    userId: string;
+    projectId: string;
+}): Promise<void> {
+    if (opts.goalIds.length === 0) return;
+
+    const now = Date.now();
+    const stuckTasks = await db.task.findMany({
+        where: {
+            goalId: { in: opts.goalIds },
+            accountId: opts.userId,
+            status: "dispatching",
+            createdAt: { lt: new Date(now - DISPATCHING_RECOVERY_MS) },
+        },
+        select: { id: true, prompt: true, priority: true, machineId: true, projectId: true },
+    });
+
+    if (stuckTasks.length === 0) return;
+
+    const project = await db.project.findFirst({
+        where: { id: opts.projectId, accountId: opts.userId },
+        select: { path: true },
+    });
+    if (!project) return;
+
+    for (const task of stuckTasks) {
+        eventRouter.emitEphemeral({
+            userId: opts.userId,
+            payload: buildTaskTriggerEphemeral({
+                taskId: task.id,
+                prompt: task.prompt,
+                directory: project.path,
+                priority: task.priority,
+                projectId: task.projectId ?? undefined,
+            }),
+            recipientFilter: {
+                type: "machine-scoped-only",
+                machineId: task.machineId,
+            },
+        });
+    }
+
+    log(
+        { module: "goal" },
+        `Re-dispatched ${stuckTasks.length} stuck tasks for project ${opts.projectId}`,
+    );
+}
+
+function safeParseJsonArray(json: string): string[] {
+    try {
+        const parsed = JSON.parse(json);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Build a role identity prefix to inject into a task's prompt.
+ * Matches suggestedRole (e.g. "builder") to an enabled AgentRole's description + duties.
+ */
+function buildRoleIdentityPrefix(
+    suggestedRole: string | undefined,
+    roleMap: Map<string, { name: string; type: string; description: string | null; duties: string }>,
+    project: { narrative: string | null; laws: string | null },
+): string | null {
+    if (!suggestedRole) return null;
+    const role = roleMap.get(suggestedRole);
+    if (!role) return null;
+
+    const parts: string[] = [];
+    parts.push(`## Your Role: ${role.name} (${role.type})`);
+    if (role.description) {
+        parts.push(`\n${role.description}`);
+    }
+
+    const duties = safeParseJsonArray(role.duties);
+    if (duties.length > 0) {
+        parts.push(`\n### Duties`);
+        for (const duty of duties) {
+            parts.push(`- ${duty}`);
+        }
+    }
+
+    if (project.narrative) {
+        parts.push(`\n### World Narrative\n${project.narrative}`);
+    }
+    if (project.laws) {
+        parts.push(`\n### World Laws\n${project.laws}`);
+    }
+
+    return parts.join("\n");
 }
 
 /**
@@ -208,6 +309,11 @@ export function goalRoutes(app: Fastify) {
                     take: limit,
                     skip: offset,
                     include: {
+                        tasks: {
+                            select: { id: true, status: true, sessionId: true, roleType: true },
+                            orderBy: { createdAt: "asc" },
+                            take: 30,
+                        },
                         _count: { select: { subGoals: true, tasks: true, decisions: true } },
                     },
                 }),
@@ -224,6 +330,12 @@ export function goalRoutes(app: Fastify) {
                 userId,
                 projectId,
             });
+
+            // Fire-and-forget: re-dispatch stuck tasks
+            const activeGoalIds = goals
+                .filter((g) => !["completed", "cancelled"].includes(g.status))
+                .map((g) => g.id);
+            void recoverStuckDispatchingTasks({ goalIds: activeGoalIds, userId, projectId });
 
             return reply.send({
                 goals: goals.map((goal) => serializeGoal(
@@ -538,11 +650,18 @@ export function goalRoutes(app: Fastify) {
             // Resolve project directory
             const project = await db.project.findFirst({
                 where: { id: projectId, accountId: userId },
-                select: { path: true },
+                select: { path: true, narrative: true, laws: true },
             });
             if (!project) {
                 return reply.code(404).send({ error: "Project not found" });
             }
+
+            // Load all enabled roles for role identity injection
+            const roles = await db.agentRole.findMany({
+                where: { accountId: userId, projectId, enabled: true },
+                select: { name: true, type: true, description: true, duties: true },
+            });
+            const roleMap = new Map(roles.map((r) => [r.type, r]));
 
             // Map priority from goal format to task format
             const priorityMap: Record<string, string> = {
@@ -551,20 +670,24 @@ export function goalRoutes(app: Fastify) {
                 low: "background",
             };
 
-            // Create tasks in order
+            // Create tasks in order, injecting role identity into prompt
             const createdTasks: Array<{ id: string; prompt: string; priority: string }> = [];
             for (const taskDef of taskDefs) {
+                const roleIdentity = buildRoleIdentityPrefix(taskDef.suggestedRole, roleMap, project);
+                const fullPrompt = roleIdentity ? `${roleIdentity}\n\n---\n\n${taskDef.prompt}` : taskDef.prompt;
+
                 const task = await db.task.create({
                     data: {
                         accountId: userId,
                         projectId,
                         machineId: goal.machineId,
-                        prompt: taskDef.prompt,
+                        prompt: fullPrompt,
                         priority: priorityMap[taskDef.priority] ?? "user",
                         maxAttempts: 3,
                         triggerType: "manual",
                         status: "dispatching",
                         goalId: goal.id,
+                        roleType: taskDef.suggestedRole ?? null,
                     },
                 });
                 createdTasks.push({ id: task.id, prompt: task.prompt, priority: task.priority });
@@ -634,6 +757,7 @@ function serializeGoal(goal: Record<string, unknown>): Record<string, unknown> {
         plannerTaskId: string | null;
         createdAt: Date;
         updatedAt: Date;
+        tasks?: Array<{ id: string; status: string; sessionId: string | null; roleType: string | null }>;
         _count?: { subGoals: number; tasks: number; decisions: number };
     };
 
@@ -655,6 +779,12 @@ function serializeGoal(goal: Record<string, unknown>): Record<string, unknown> {
         subGoalCount: g._count?.subGoals ?? 0,
         taskCount: g._count?.tasks ?? 0,
         decisionCount: g._count?.decisions ?? 0,
+        tasks: g.tasks?.map((t) => ({
+            id: t.id,
+            status: t.status,
+            sessionId: t.sessionId,
+            roleType: t.roleType,
+        })) ?? [],
     };
 }
 

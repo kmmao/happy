@@ -8,6 +8,7 @@ import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal } from "@/modal";
+import { useRouter } from "expo-router";
 import {
     fetchGoals,
     createGoal,
@@ -157,6 +158,12 @@ export const WorldGoalsTab = React.memo(
             }
         }, [project.serverId]);
 
+        const router = useRouter();
+
+        const handleViewSession = React.useCallback((sessionId: string) => {
+            router.push(`/session/${sessionId}` as any);
+        }, [router]);
+
         const handleCreated = React.useCallback((goal: GoalSummary) => {
             setGoals((prev) => [goal, ...prev]);
             setShowCreate(false);
@@ -200,6 +207,7 @@ export const WorldGoalsTab = React.memo(
                                     onDecompose={handleDecompose}
                                     onCancel={handleCancel}
                                     onDelete={handleDelete}
+                                    onViewSession={handleViewSession}
                                 />
                             ))}
                             {doneGoals.length > 0 && activeGoals.length > 0 && (
@@ -213,6 +221,7 @@ export const WorldGoalsTab = React.memo(
                                     onDecompose={handleDecompose}
                                     onCancel={handleCancel}
                                     onDelete={handleDelete}
+                                    onViewSession={handleViewSession}
                                 />
                             ))}
                         </>
@@ -233,18 +242,38 @@ export const WorldGoalsTab = React.memo(
 
 // === Goal Card ===
 
+const TASK_STATUS_COLORS: Record<string, string> = {
+    dispatching: "#F59E0B",
+    queued: "#8B5CF6",
+    running: "#3B82F6",
+    completed: "#10B981",
+    failed: "#EF4444",
+    cancelled: "#6B7280",
+};
+
+const TASK_STATUS_ICONS: Record<string, string> = {
+    dispatching: "push-outline",
+    queued: "time-outline",
+    running: "play-circle",
+    completed: "checkmark-circle",
+    failed: "alert-circle",
+    cancelled: "close-circle",
+};
+
 const GoalCard = React.memo(function GoalCard({
     goal,
     nowTs,
     onDecompose,
     onCancel,
     onDelete,
+    onViewSession,
 }: {
     goal: GoalSummary;
     nowTs: number;
     onDecompose: (goal: GoalSummary) => void;
     onCancel: (goal: GoalSummary) => void;
     onDelete: (goal: GoalSummary) => void;
+    onViewSession: (sessionId: string) => void;
 }) {
     const { theme } = useUnistyles();
     const statusColor = STATUS_COLORS[goal.status] ?? "#6B7280";
@@ -260,6 +289,15 @@ const GoalCard = React.memo(function GoalCard({
         ? Math.max(0, goal.updatedAt + PLANNER_TIMEOUT_MS - nowTs)
         : 0;
     const plannerCountdown = `${Math.floor(plannerRemainingMs / 60000)}:${Math.floor((plannerRemainingMs % 60000) / 1000).toString().padStart(2, "0")}`;
+
+    const nonPlannerTasks = React.useMemo(
+        () => (goal.tasks ?? []).filter((t) => t.id !== goal.plannerTaskId),
+        [goal.tasks, goal.plannerTaskId],
+    );
+    const tasksWithSession = React.useMemo(
+        () => (goal.tasks ?? []).filter((t) => t.sessionId),
+        [goal.tasks],
+    );
 
     return (
         <View style={[styles.goalCard, isTerminal && { opacity: 0.6 }]}>
@@ -312,6 +350,33 @@ const GoalCard = React.memo(function GoalCard({
                 </View>
             )}
 
+            {/* Task list */}
+            {nonPlannerTasks.length > 0 && (
+                <View style={styles.taskListContainer}>
+                    {nonPlannerTasks.map((task, idx) => {
+                        const tColor = TASK_STATUS_COLORS[task.status] ?? "#6B7280";
+                        const tIcon = TASK_STATUS_ICONS[task.status] ?? "help-circle-outline";
+                        return (
+                            <Pressable
+                                key={task.id}
+                                style={styles.taskRow}
+                                disabled={!task.sessionId}
+                                onPress={() => task.sessionId && onViewSession(task.sessionId)}
+                            >
+                                <Ionicons name={tIcon as any} size={14} color={tColor} />
+                                <Text style={[styles.taskLabel, { color: tColor }]}>
+                                    {t("goals.taskIndex", { index: idx + 1 })}
+                                </Text>
+                                <Text style={styles.taskStatus}>{task.status}</Text>
+                                {task.sessionId && (
+                                    <Ionicons name="open-outline" size={12} color={theme.colors.textLink} style={{ marginLeft: 2 }} />
+                                )}
+                            </Pressable>
+                        );
+                    })}
+                </View>
+            )}
+
             {/* Meta row */}
             <View style={styles.metaRow}>
                 <Text style={[styles.statusBadge, { color: statusColor }]}>
@@ -340,6 +405,17 @@ const GoalCard = React.memo(function GoalCard({
                         <Ionicons name="play-outline" size={16} color={theme.colors.accentPurple} />
                         <Text style={[styles.actionText, { color: theme.colors.accentPurple }]}>
                             {showPlannerTimeoutBlocked ? t("goals.retryDecompose") : t("goals.startDecompose")}
+                        </Text>
+                    </Pressable>
+                )}
+                {tasksWithSession.length > 0 && (
+                    <Pressable
+                        style={styles.actionButton}
+                        onPress={() => onViewSession(tasksWithSession[0].sessionId!)}
+                    >
+                        <Ionicons name="terminal-outline" size={16} color={theme.colors.textLink} />
+                        <Text style={[styles.actionText, { color: theme.colors.textLink }]}>
+                            {t("goals.viewSession")}
                         </Text>
                     </Pressable>
                 )}
@@ -630,6 +706,27 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 13,
         color: theme.colors.textSecondary,
         fontStyle: "italic" as const,
+    },
+    taskListContainer: {
+        marginTop: 10,
+        gap: 4,
+    },
+    taskRow: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 6,
+        paddingVertical: 3,
+        paddingHorizontal: 4,
+        borderRadius: 6,
+    },
+    taskLabel: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+    },
+    taskStatus: {
+        ...Typography.default(),
+        fontSize: 11,
+        color: theme.colors.textSecondary,
     },
     metaRow: {
         flexDirection: "row" as const,

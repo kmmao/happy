@@ -8,6 +8,7 @@ import {
     ensureRemoteWebhook,
     deleteRemoteWebhook,
 } from "@/app/webhook/webhookProviderApi";
+import { WEBHOOK_INBOUND_RATE_LIMIT } from "../utils/enableRateLimit";
 
 export function webhookRoutes(app: Fastify) {
   // ── Receive webhook from GitHub/Gitea/GitLab ────────────
@@ -16,6 +17,7 @@ export function webhookRoutes(app: Fastify) {
   app.post(
     "/v1/webhooks/:provider",
     {
+      config: { rateLimit: WEBHOOK_INBOUND_RATE_LIMIT },
       schema: {
         params: z.object({
           provider: z.enum(["github", "gitea", "gitlab"]),

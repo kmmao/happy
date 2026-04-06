@@ -21,6 +21,7 @@ import { accessKeysRoutes } from "./routes/accessKeysRoutes";
 import { enableMonitoring } from "./utils/enableMonitoring";
 import { enableErrorHandlers } from "./utils/enableErrorHandlers";
 import { enableAuthentication } from "./utils/enableAuthentication";
+import { enableRateLimit } from "./utils/enableRateLimit";
 import { userRoutes } from "./routes/userRoutes";
 import { feedRoutes } from "./routes/feedRoutes";
 import { kvRoutes } from "./routes/kvRoutes";
@@ -60,15 +61,41 @@ export async function startApi() {
   // Configure
   log("Starting API...");
 
+  // Production safety: block dangerous debug logging flag
+  if (process.env.NODE_ENV === "production" && process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING) {
+    throw new Error("DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING must not be enabled in production");
+  }
+
   // Start API
   const app = fastify({
     loggerInstance: logger,
-    bodyLimit: 1024 * 1024 * 100, // 100MB
+    bodyLimit: 1024 * 1024, // 1MB default
   });
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+    : ["http://localhost:3000", "http://localhost:8081"];
   app.register(import("@fastify/cors"), {
-    origin: "*",
-    allowedHeaders: "*",
+    origin: allowedOrigins,
+    allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PATCH", "DELETE"],
+  });
+  app.register(import("@fastify/helmet"), {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+    },
+    frameguard: { action: "deny" },
+    noSniff: true,
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   });
   app.register(import("@fastify/multipart"), {
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max audio file
@@ -86,6 +113,7 @@ export async function startApi() {
   enableMonitoring(typed);
   enableErrorHandlers(typed);
   enableAuthentication(typed);
+  await enableRateLimit(typed);
 
   // Serve local files when using local storage
   if (isLocalStorage()) {

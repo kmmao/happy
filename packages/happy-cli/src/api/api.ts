@@ -9,6 +9,7 @@ import type {
   MachineMetadata,
   DaemonState,
 } from "@/api/types";
+import { CreateSessionResponseSchema } from "@/api/types";
 import { ApiSessionClient } from "./apiSession";
 import { ApiMachineClient } from "./apiMachine";
 import {
@@ -106,10 +107,15 @@ export class ApiClient {
         },
       );
 
+      const parsed = CreateSessionResponseSchema.safeParse(response.data);
+      if (!parsed.success) {
+        logger.debug("[API] Session response validation failed:", parsed.error.issues);
+        throw new Error("Invalid session response from server");
+      }
       logger.debug(
-        `Session created/loaded: ${response.data.session.id} (tag: ${opts.tag})`,
+        `Session created/loaded: ${parsed.data.session.id} (tag: ${opts.tag})`,
       );
-      let raw = response.data.session;
+      let raw = parsed.data.session;
       let session: Session = {
         id: raw.id,
         seq: raw.seq,
@@ -419,8 +425,13 @@ export class ApiClient {
         },
       );
 
-      logger.debug(`[API] Reconnected to session: ${response.data.session.id}`);
-      let raw = response.data.session;
+      const parsed = CreateSessionResponseSchema.safeParse(response.data);
+      if (!parsed.success) {
+        logger.debug("[API] Reconnect response validation failed:", parsed.error.issues);
+        throw new Error("Invalid session response from server");
+      }
+      logger.debug(`[API] Reconnected to session: ${parsed.data.session.id}`);
+      let raw = parsed.data.session;
       let session: Session = {
         id: raw.id,
         seq: raw.seq,

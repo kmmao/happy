@@ -1,6 +1,7 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
 import { getServerUrl } from "./serverConfig";
+import * as z from "zod";
 
 export interface ServerInboxItem {
     id: string;
@@ -17,14 +18,24 @@ export interface ServerInboxItem {
     createdAt: number;
 }
 
-interface InboxListResponse {
-    items: ServerInboxItem[];
-    total: number;
-}
+const InboxItemSchema = z.looseObject({
+    id: z.string(),
+    category: z.string(),
+    eventType: z.string(),
+    severity: z.string(),
+    title: z.string(),
+    read: z.boolean(),
+    createdAt: z.number(),
+});
 
-interface InboxCountResponse {
-    count: number;
-}
+const InboxListResponseSchema = z.object({
+    items: z.array(InboxItemSchema),
+    total: z.number(),
+});
+
+const InboxCountResponseSchema = z.object({
+    count: z.number(),
+});
 
 function authHeaders(credentials: AuthCredentials) {
     return {
@@ -59,7 +70,12 @@ export async function fetchInboxItems(
         if (!response.ok) {
             throw new Error(`Failed to fetch inbox: ${response.status}`);
         }
-        return (await response.json()) as InboxListResponse;
+        const json = await response.json();
+        const parsed = InboxListResponseSchema.safeParse(json);
+        if (!parsed.success) {
+            throw new Error(`Invalid inbox response: ${parsed.error.issues[0]?.message}`);
+        }
+        return parsed.data;
     });
 }
 
@@ -76,8 +92,12 @@ export async function fetchInboxUnreadCount(
         if (!response.ok) {
             throw new Error(`Failed to fetch inbox count: ${response.status}`);
         }
-        const data = (await response.json()) as InboxCountResponse;
-        return data.count;
+        const json = await response.json();
+        const parsed = InboxCountResponseSchema.safeParse(json);
+        if (!parsed.success) {
+            throw new Error(`Invalid inbox count response: ${parsed.error.issues[0]?.message}`);
+        }
+        return parsed.data.count;
     });
 }
 

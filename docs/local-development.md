@@ -328,6 +328,7 @@ Server 启动时依次加载 `.env` 和 `.env.dev`（后者覆盖前者）。
 | `PORT` | `3005` | 服务监听端口 |
 | `PUBLIC_URL` | `http://localhost:3005` | 公网可访问的 Server URL，用于生成文件下载链接 |
 | `NODE_ENV` | `development` | 运行环境 |
+| `ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:8081` | CORS 允许的来源（逗号分隔）。生产环境必须设为实际域名 |
 
 ### S3/MinIO 存储
 

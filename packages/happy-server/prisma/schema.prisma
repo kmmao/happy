@@ -825,6 +825,9 @@ model Task {
     goalId          String?
     goal            Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
 
+    // Role identity (e.g. "builder", "healer") assigned by the Planner
+    roleType        String?
+
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 

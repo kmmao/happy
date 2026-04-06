@@ -4,9 +4,11 @@ import * as privacyKit from "privacy-kit";
 import { db } from "@/storage/db";
 import { auth } from "@/app/auth/auth";
 import { log } from "@/utils/log";
+import { AUTH_RATE_LIMIT } from "../utils/enableRateLimit";
 
 export function authRoutes(app: Fastify) {
     app.post('/v1/auth', {
+        config: { rateLimit: AUTH_RATE_LIMIT },
         schema: {
             body: z.object({
                 publicKey: z.string(),
@@ -39,6 +41,7 @@ export function authRoutes(app: Fastify) {
     });
 
     app.post('/v1/auth/request', {
+        config: { rateLimit: AUTH_RATE_LIMIT },
         schema: {
             body: z.object({
                 publicKey: z.string(),
@@ -167,6 +170,7 @@ export function authRoutes(app: Fastify) {
 
     // Account auth request
     app.post('/v1/auth/account/request', {
+        config: { rateLimit: AUTH_RATE_LIMIT },
         schema: {
             body: z.object({
                 publicKey: z.string(),
