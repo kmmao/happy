@@ -380,10 +380,12 @@ export async function startDaemon(): Promise<void> {
 
       const now = Date.now();
       for (const job of automationScheduler.getJobsSnapshot()) {
+        const isSupervisor = job.kind === "supervisor";
+        const isTask = job.kind === "task";
         if (
-          job.kind !== "supervisor" ||
+          (!isSupervisor && !isTask) ||
           job.status !== "running" ||
-          job.payload.trigger === "fix" ||
+          (isSupervisor && job.payload.trigger === "fix") ||
           !job.sessionId
         ) {
           continue;
@@ -413,11 +415,13 @@ export async function startDaemon(): Promise<void> {
           ? `Automation watchdog aborted session after ${formatDurationMs(runtimeMs)} of runtime`
           : `Automation watchdog aborted session after ${formatDurationMs(inactivityMs)} of inactivity`;
         logger.warn(
-          `[DAEMON RUN] Automation watchdog stopping session ${job.sessionId} for job ${job.id}: ${failureReason}`,
+          `[DAEMON RUN] Automation watchdog stopping ${job.kind} session ${job.sessionId} for job ${job.id}: ${failureReason}`,
         );
-        await guardianSessionRegistry.forgetSession(job.sessionId).catch((error) => {
-          logger.debug(`[DAEMON RUN] Failed to forget guardian session ${job.sessionId}: ${error}`);
-        });
+        if (isSupervisor) {
+          await guardianSessionRegistry.forgetSession(job.sessionId).catch((error) => {
+            logger.debug(`[DAEMON RUN] Failed to forget guardian session ${job.sessionId}: ${error}`);
+          });
+        }
         requestTrackedSessionTermination(
           trackedSession.pid,
           trackedSession,
@@ -518,6 +522,18 @@ export async function startDaemon(): Promise<void> {
 
         const recoveredPid = await resolveLikelyRecoverableHappyPid(persisted);
         if (!recoveredPid) {
+          // Report failed status for orphaned task sessions so the server
+          // doesn't leave them stuck in "running" forever.
+          if (persisted.automationContext?.kind === "task" && persisted.automationContext.dedupeKey) {
+            const taskIdMatch = persisted.automationContext.dedupeKey.match(/^task:(.+)$/);
+            if (taskIdMatch) {
+              const taskId = taskIdMatch[1];
+              logger.debug(
+                `[DAEMON RUN] Reporting failed status for orphaned task ${taskId} (session ${persisted.happySessionId})`,
+              );
+              apiMachine.taskStatus(taskId, "failed", persisted.happySessionId, "CLI daemon restarted while task was running");
+            }
+          }
           await trackedSessionRegistry.forgetSession(persisted.happySessionId).catch(() => {});
           continue;
         }

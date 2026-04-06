@@ -54,6 +54,7 @@ import { agentMessageRoutes } from "./routes/agentMessageRoutes";
 import { sessionEventRoutes } from "./routes/sessionEventRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
+import { startTaskStaleReaper, stopTaskStaleReaper } from "@/modules/taskStaleReaper";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -190,6 +191,12 @@ export async function startApi() {
   startKnowledgeLifecycleScheduler();
   onShutdown("knowledge-lifecycle", async () => {
     stopKnowledgeLifecycleScheduler();
+  });
+
+  // Start stale task reaper (server-side timeout safety net)
+  startTaskStaleReaper();
+  onShutdown("task-reaper", async () => {
+    stopTaskStaleReaper();
   });
 
   // End
