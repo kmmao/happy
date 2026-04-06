@@ -12,6 +12,7 @@ import {
     fetchGoals,
     createGoal,
     cancelGoal,
+    decomposeGoal,
     deleteGoal,
     type GoalSummary,
 } from "@/sync/apiProjects";
@@ -61,6 +62,10 @@ function priorityLabel(priority: string): string {
         low: () => t("goals.priorityLow"),
     };
     return map[priority]?.() ?? priority;
+}
+
+function isPlannerTimeoutBlocked(goal: GoalSummary): boolean {
+    return goal.status === "blocked" && Boolean(goal.plannerTaskId) && goal.taskCount === 0;
 }
 
 // === Main Component ===
@@ -139,6 +144,19 @@ export const WorldGoalsTab = React.memo(
             }
         }, [project.serverId]);
 
+        const handleDecompose = React.useCallback(async (goal: GoalSummary) => {
+            if (!project.serverId) return;
+            try {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                const updated = await decomposeGoal(credentials, project.serverId, goal.id);
+                setGoals((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
+                Modal.toast(t("goals.decomposeTriggered"));
+            } catch {
+                Modal.toast(t("goals.decomposeError"));
+            }
+        }, [project.serverId]);
+
         const handleCreated = React.useCallback((goal: GoalSummary) => {
             setGoals((prev) => [goal, ...prev]);
             setShowCreate(false);
@@ -179,6 +197,7 @@ export const WorldGoalsTab = React.memo(
                                     key={goal.id}
                                     goal={goal}
                                     nowTs={nowTs}
+                                    onDecompose={handleDecompose}
                                     onCancel={handleCancel}
                                     onDelete={handleDelete}
                                 />
@@ -191,6 +210,7 @@ export const WorldGoalsTab = React.memo(
                                     key={goal.id}
                                     goal={goal}
                                     nowTs={nowTs}
+                                    onDecompose={handleDecompose}
                                     onCancel={handleCancel}
                                     onDelete={handleDelete}
                                 />
@@ -216,11 +236,13 @@ export const WorldGoalsTab = React.memo(
 const GoalCard = React.memo(function GoalCard({
     goal,
     nowTs,
+    onDecompose,
     onCancel,
     onDelete,
 }: {
     goal: GoalSummary;
     nowTs: number;
+    onDecompose: (goal: GoalSummary) => void;
     onCancel: (goal: GoalSummary) => void;
     onDelete: (goal: GoalSummary) => void;
 }) {
@@ -232,7 +254,8 @@ const GoalCard = React.memo(function GoalCard({
     const isPlanning = goal.status === "planning";
     const isPlanningRunning = isPlanning && Boolean(goal.plannerTaskId);
     const isPlanningPending = isPlanning && !goal.plannerTaskId;
-    const isPlannerTimeoutBlocked = goal.status === "blocked" && Boolean(goal.plannerTaskId) && goal.taskCount === 0;
+    const showPlannerTimeoutBlocked = isPlannerTimeoutBlocked(goal);
+    const canManualDecompose = (isPlanningPending || showPlannerTimeoutBlocked) && !isTerminal;
     const plannerRemainingMs = isPlanningRunning
         ? Math.max(0, goal.updatedAt + PLANNER_TIMEOUT_MS - nowTs)
         : 0;
@@ -282,7 +305,7 @@ const GoalCard = React.memo(function GoalCard({
                     <Text style={styles.plannerText}>{t("goals.plannerPending")}</Text>
                 </View>
             )}
-            {isPlannerTimeoutBlocked && (
+            {showPlannerTimeoutBlocked && (
                 <View style={styles.plannerRow}>
                     <Ionicons name="alert-circle-outline" size={16} color={statusColor} />
                     <Text style={styles.plannerText}>{t("goals.plannerTimeoutBlocked")}</Text>
@@ -309,6 +332,17 @@ const GoalCard = React.memo(function GoalCard({
 
             {/* Actions */}
             <View style={styles.actionRow}>
+                {canManualDecompose && (
+                    <Pressable
+                        style={styles.actionButton}
+                        onPress={() => onDecompose(goal)}
+                    >
+                        <Ionicons name="play-outline" size={16} color={theme.colors.accentPurple} />
+                        <Text style={[styles.actionText, { color: theme.colors.accentPurple }]}>
+                            {showPlannerTimeoutBlocked ? t("goals.retryDecompose") : t("goals.startDecompose")}
+                        </Text>
+                    </Pressable>
+                )}
                 {!isTerminal && (
                     <Pressable
                         style={styles.actionButton}

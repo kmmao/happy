@@ -8,7 +8,7 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
-import { goalCreate } from "@/modules/goalCreate";
+import { goalCreate, goalDecompose } from "@/modules/goalCreate";
 import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
 
 const GoalStatusSchema = z.enum(["planning", "in_progress", "blocked", "completed", "cancelled"]);
@@ -343,6 +343,54 @@ export function goalRoutes(app: Fastify) {
             });
 
             return reply.send({ goal: serializeGoal(updated) });
+        },
+    );
+
+    // POST /v1/projects/:id/goals/:goalId/decompose — manually trigger planner decomposition
+    app.post(
+        "/v1/projects/:id/goals/:goalId/decompose",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string(), goalId: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const projectId = request.params.id;
+            const goalId = request.params.goalId;
+
+            const goal = await db.goal.findFirst({
+                where: { id: goalId, projectId, accountId: userId },
+            });
+            if (!goal) {
+                return reply.code(404).send({ error: "Goal not found" });
+            }
+
+            const taskCount = await db.task.count({
+                where: { goalId: goal.id, accountId: userId, projectId },
+            });
+            if (taskCount > 0) {
+                return reply.code(400).send({ error: "Goal already has tasks" });
+            }
+
+            try {
+                const result = await goalDecompose({ accountId: userId, projectId, goalId });
+                if (!result.plannerTaskId) {
+                    return reply.code(400).send({ error: "Planner unavailable, unable to dispatch decomposition" });
+                }
+
+                const updated = await db.goal.findUnique({
+                    where: { id: goal.id },
+                    include: {
+                        _count: { select: { subGoals: true, tasks: true, decisions: true } },
+                    },
+                });
+
+                return reply.send({ goal: serializeGoal(updated!) });
+            } catch (e: any) {
+                return reply.code(400).send({ error: e.message ?? "Failed to trigger decomposition" });
+            }
         },
     );
 

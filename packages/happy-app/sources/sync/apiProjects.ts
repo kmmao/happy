@@ -482,6 +482,28 @@ export async function cancelGoal(
     });
 }
 
+export async function decomposeGoal(
+    credentials: AuthCredentials,
+    projectId: string,
+    goalId: string,
+): Promise<GoalSummary> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/goals/${goalId}/decompose`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+            },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to decompose goal: ${response.status}`);
+        }
+        const data = (await response.json()) as { goal: GoalSummary };
+        return data.goal;
+    });
+}
+
 export async function deleteGoal(
     credentials: AuthCredentials,
     projectId: string,

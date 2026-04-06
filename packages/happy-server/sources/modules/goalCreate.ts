@@ -28,6 +28,11 @@ interface GoalCreateResult {
     plannerTaskId: string | null;
 }
 
+interface GoalDecomposeResult {
+    goalId: string;
+    plannerTaskId: string | null;
+}
+
 export async function goalCreate(input: GoalCreateInput): Promise<GoalCreateResult> {
     const {
         accountId,
@@ -113,6 +118,60 @@ export async function goalCreate(input: GoalCreateInput): Promise<GoalCreateResu
     log({ module: "goal" }, `Created goal ${goal.id} for project ${projectId} (autoDecompose=${autoDecompose})`);
 
     return { id: goal.id, plannerTaskId };
+}
+
+export async function goalDecompose(input: {
+    accountId: string;
+    projectId: string;
+    goalId: string;
+}): Promise<GoalDecomposeResult> {
+    const { accountId, projectId, goalId } = input;
+    const goal = await db.goal.findFirst({
+        where: { id: goalId, accountId, projectId },
+        select: {
+            id: true,
+            title: true,
+            description: true,
+            priority: true,
+            deadline: true,
+            machineId: true,
+            status: true,
+            plannerTaskId: true,
+        },
+    });
+    if (!goal) {
+        throw new Error("Goal not found");
+    }
+    if (goal.status === "completed" || goal.status === "cancelled" || goal.status === "in_progress") {
+        throw new Error(`Cannot decompose goal in '${goal.status}' state`);
+    }
+    if (goal.plannerTaskId) {
+        const existingPlannerTask = await db.task.findFirst({
+            where: { id: goal.plannerTaskId, goalId: goal.id, accountId, projectId },
+            select: { status: true },
+        });
+        if (existingPlannerTask && ["queued", "dispatching", "running"].includes(existingPlannerTask.status)) {
+            return { goalId: goal.id, plannerTaskId: goal.plannerTaskId };
+        }
+    }
+
+    const plannerTaskId = await dispatchPlannerTask({
+        accountId,
+        projectId,
+        machineId: goal.machineId,
+        goal,
+    });
+    if (plannerTaskId) {
+        await db.goal.update({
+            where: { id: goal.id },
+            data: {
+                status: "planning",
+                plannerTaskId,
+            },
+        });
+    }
+
+    return { goalId: goal.id, plannerTaskId };
 }
 
 // === Planner Task Dispatch ===
