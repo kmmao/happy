@@ -39,16 +39,19 @@ const PRIORITY_COLORS: Record<string, string> = {
     normal: "#3B82F6",
     low: "#6B7280",
 };
+const PLANNER_TIMEOUT_MS = 10 * 60 * 1000;
 
-function statusLabel(status: string): string {
+function statusLabel(goal: GoalSummary): string {
+    if (goal.status === "planning") {
+        return goal.plannerTaskId ? t("goals.statusPlanningRunning") : t("goals.statusPlanningPending");
+    }
     const map: Record<string, () => string> = {
-        planning: () => t("goals.statusPlanning"),
         in_progress: () => t("goals.statusInProgress"),
         blocked: () => t("goals.statusBlocked"),
         completed: () => t("goals.statusCompleted"),
         cancelled: () => t("goals.statusCancelled"),
     };
-    return map[status]?.() ?? status;
+    return map[goal.status]?.() ?? goal.status;
 }
 
 function priorityLabel(priority: string): string {
@@ -73,6 +76,7 @@ export const WorldGoalsTab = React.memo(
         const [goals, setGoals] = React.useState<GoalSummary[]>([]);
         const [loading, setLoading] = React.useState(false);
         const [showCreate, setShowCreate] = React.useState(false);
+        const [nowTs, setNowTs] = React.useState(Date.now());
 
         const loadGoals = React.useCallback(async () => {
             if (!project.serverId) return;
@@ -94,6 +98,12 @@ export const WorldGoalsTab = React.memo(
                 loadGoals();
             }
         }, [isActive, loadGoals]);
+
+        React.useEffect(() => {
+            if (!isActive) return;
+            const timer = setInterval(() => setNowTs(Date.now()), 1000);
+            return () => clearInterval(timer);
+        }, [isActive]);
 
         const handleCancel = React.useCallback(async (goal: GoalSummary) => {
             const confirmed = await Modal.confirm(
@@ -168,6 +178,7 @@ export const WorldGoalsTab = React.memo(
                                 <GoalCard
                                     key={goal.id}
                                     goal={goal}
+                                    nowTs={nowTs}
                                     onCancel={handleCancel}
                                     onDelete={handleDelete}
                                 />
@@ -179,6 +190,7 @@ export const WorldGoalsTab = React.memo(
                                 <GoalCard
                                     key={goal.id}
                                     goal={goal}
+                                    nowTs={nowTs}
                                     onCancel={handleCancel}
                                     onDelete={handleDelete}
                                 />
@@ -203,10 +215,12 @@ export const WorldGoalsTab = React.memo(
 
 const GoalCard = React.memo(function GoalCard({
     goal,
+    nowTs,
     onCancel,
     onDelete,
 }: {
     goal: GoalSummary;
+    nowTs: number;
     onCancel: (goal: GoalSummary) => void;
     onDelete: (goal: GoalSummary) => void;
 }) {
@@ -216,6 +230,13 @@ const GoalCard = React.memo(function GoalCard({
     const priorityColor = PRIORITY_COLORS[goal.priority] ?? "#6B7280";
     const isTerminal = ["completed", "cancelled"].includes(goal.status);
     const isPlanning = goal.status === "planning";
+    const isPlanningRunning = isPlanning && Boolean(goal.plannerTaskId);
+    const isPlanningPending = isPlanning && !goal.plannerTaskId;
+    const isPlannerTimeoutBlocked = goal.status === "blocked" && Boolean(goal.plannerTaskId) && goal.taskCount === 0;
+    const plannerRemainingMs = isPlanningRunning
+        ? Math.max(0, goal.updatedAt + PLANNER_TIMEOUT_MS - nowTs)
+        : 0;
+    const plannerCountdown = `${Math.floor(plannerRemainingMs / 60000)}:${Math.floor((plannerRemainingMs % 60000) / 1000).toString().padStart(2, "0")}`;
 
     return (
         <View style={[styles.goalCard, isTerminal && { opacity: 0.6 }]}>
@@ -247,17 +268,31 @@ const GoalCard = React.memo(function GoalCard({
             )}
 
             {/* Planner working indicator */}
-            {isPlanning && (
+            {isPlanningRunning && (
                 <View style={styles.plannerRow}>
                     <ActivityIndicator size="small" color={statusColor} />
-                    <Text style={styles.plannerText}>{t("goals.plannerWorking")}</Text>
+                    <Text style={styles.plannerText}>
+                        {t("goals.plannerWorking")} · {t("goals.plannerCountdown", { time: plannerCountdown })}
+                    </Text>
+                </View>
+            )}
+            {isPlanningPending && (
+                <View style={styles.plannerRow}>
+                    <Ionicons name="pause-circle-outline" size={16} color={statusColor} />
+                    <Text style={styles.plannerText}>{t("goals.plannerPending")}</Text>
+                </View>
+            )}
+            {isPlannerTimeoutBlocked && (
+                <View style={styles.plannerRow}>
+                    <Ionicons name="alert-circle-outline" size={16} color={statusColor} />
+                    <Text style={styles.plannerText}>{t("goals.plannerTimeoutBlocked")}</Text>
                 </View>
             )}
 
             {/* Meta row */}
             <View style={styles.metaRow}>
                 <Text style={[styles.statusBadge, { color: statusColor }]}>
-                    {statusLabel(goal.status)}
+                    {statusLabel(goal)}
                 </Text>
                 {goal.taskCount > 0 && (
                     <Text style={styles.metaText}>{t("goals.tasks", { count: goal.taskCount })}</Text>

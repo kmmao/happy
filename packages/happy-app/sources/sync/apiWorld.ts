@@ -76,7 +76,7 @@ export interface WorldGenerateResult {
 export async function generateWorld(
     credentials: AuthCredentials,
     projectId: string,
-    opts: { mode: "auto" | "custom"; prompt?: string },
+    opts: { mode: "auto" | "custom"; prompt?: string; goalMode?: "draft" | "auto_decompose" },
 ): Promise<WorldGenerateResult> {
     const API_ENDPOINT = getServerUrl();
     const response = await fetch(

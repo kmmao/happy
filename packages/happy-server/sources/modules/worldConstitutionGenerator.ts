@@ -8,6 +8,7 @@
  */
 
 import { db } from "@/storage/db";
+import { goalCreate } from "@/modules/goalCreate";
 import { log } from "@/utils/log";
 
 // ── Types ──
@@ -318,7 +319,7 @@ function buildGoals(projectName: string, customPrompt?: string): Array<{ title: 
 export async function generateWorldConstitution(
     projectId: string,
     accountId: string,
-    opts: { mode: "auto" | "custom"; prompt?: string },
+    opts: { mode: "auto" | "custom"; prompt?: string; goalMode?: "draft" | "auto_decompose" },
 ): Promise<WorldGenerateResult> {
     const project = await db.project.findFirst({
         where: { id: projectId, accountId },
@@ -355,6 +356,7 @@ export async function generateWorldConstitution(
     ]);
 
     const isAuto = opts.mode === "auto";
+    const goalMode = opts.goalMode ?? "draft";
 
     // ── Narrative ──
     let narrative: string | null = null;
@@ -445,17 +447,26 @@ export async function generateWorldConstitution(
 
         for (const def of goalDefs) {
             try {
-                const goal = await db.goal.create({
-                    data: {
-                        accountId,
-                        projectId,
-                        machineId: machine.id,
-                        title: def.title,
-                        description: def.description,
-                        priority: def.priority,
-                        createdBy: "user",
-                    },
+                const created = await goalCreate({
+                    accountId,
+                    projectId,
+                    machineId: machine.id,
+                    title: def.title,
+                    description: def.description,
+                    priority: def.priority,
+                    autoDecompose: goalMode === "auto_decompose",
                 });
+                const goal = await db.goal.findFirst({
+                    where: { id: created.id, accountId, projectId },
+                    select: { id: true, title: true, description: true, priority: true },
+                });
+                if (!goal) {
+                    throw new Error("Goal created but not found");
+                }
+
+                if (goalMode === "auto_decompose" && !created.plannerTaskId) {
+                    errors.push(`goal-planner:${def.title}`);
+                }
                 createdGoals.push({
                     id: goal.id,
                     title: goal.title,

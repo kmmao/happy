@@ -52,6 +52,62 @@ const PlanResultBodySchema = z.object({
     tasks: z.array(PlanResultTaskSchema).min(1).max(20),
 });
 
+const PLANNING_RESULT_TIMEOUT_MINUTES = 10;
+const PLANNING_RESULT_TIMEOUT_MS = PLANNING_RESULT_TIMEOUT_MINUTES * 60 * 1000;
+
+async function applyPlanningTimeoutFallback(opts: {
+    goals: Array<{
+        id: string;
+        status: string;
+        plannerTaskId: string | null;
+        updatedAt: Date;
+    }>;
+    userId: string;
+    projectId: string;
+}): Promise<Set<string>> {
+    const now = Date.now();
+    const timedOutGoalIds = opts.goals
+        .filter((goal) => (
+            goal.status === "planning"
+            && goal.plannerTaskId
+            && (now - goal.updatedAt.getTime()) > PLANNING_RESULT_TIMEOUT_MS
+        ))
+        .map((goal) => goal.id);
+
+    if (timedOutGoalIds.length === 0) {
+        return new Set<string>();
+    }
+
+    await db.goal.updateMany({
+        where: {
+            id: { in: timedOutGoalIds },
+            accountId: opts.userId,
+            projectId: opts.projectId,
+            status: "planning",
+        },
+        data: { status: "blocked" },
+    });
+
+    for (const goalId of timedOutGoalIds) {
+        eventRouter.emitEphemeral({
+            userId: opts.userId,
+            payload: buildGoalProgressEphemeral({
+                goalId,
+                projectId: opts.projectId,
+                status: "blocked",
+                progress: 0,
+            }),
+            recipientFilter: { type: "user-scoped-only" },
+        });
+    }
+
+    log(
+        { module: "goal" },
+        `Marked ${timedOutGoalIds.length} planning goals as blocked due to plan-result timeout (${PLANNING_RESULT_TIMEOUT_MINUTES}m)`,
+    );
+    return new Set(timedOutGoalIds);
+}
+
 /**
  * Goal CRUD + plan-result routes.
  * Goals represent high-level objectives that decompose into Tasks.
@@ -158,8 +214,21 @@ export function goalRoutes(app: Fastify) {
                 db.goal.count({ where }),
             ]);
 
+            const timedOutGoalIds = await applyPlanningTimeoutFallback({
+                goals: goals.map((goal) => ({
+                    id: goal.id,
+                    status: goal.status,
+                    plannerTaskId: goal.plannerTaskId,
+                    updatedAt: goal.updatedAt,
+                })),
+                userId,
+                projectId,
+            });
+
             return reply.send({
-                goals: goals.map(serializeGoal),
+                goals: goals.map((goal) => serializeGoal(
+                    timedOutGoalIds.has(goal.id) ? { ...goal, status: "blocked" } : goal,
+                )),
                 total,
             });
         },
@@ -220,7 +289,18 @@ export function goalRoutes(app: Fastify) {
             if (!goal) {
                 return reply.code(404).send({ error: "Goal not found" });
             }
-            return reply.send({ goal: serializeGoalDetail(goal) });
+            const timedOutGoalIds = await applyPlanningTimeoutFallback({
+                goals: [{
+                    id: goal.id,
+                    status: goal.status,
+                    plannerTaskId: goal.plannerTaskId,
+                    updatedAt: goal.updatedAt,
+                }],
+                userId: request.userId,
+                projectId: request.params.id,
+            });
+            const normalizedGoal = timedOutGoalIds.has(goal.id) ? { ...goal, status: "blocked" } : goal;
+            return reply.send({ goal: serializeGoalDetail(normalizedGoal) });
         },
     );
 
