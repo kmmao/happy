@@ -371,6 +371,7 @@ export function sessionRoutes(app: Fastify) {
         return reply.send({
           session: {
             id: updated.id,
+            tag: updated.tag,
             seq: updated.seq,
             metadata: updated.metadata,
             metadataVersion: updated.metadataVersion,
@@ -408,6 +409,7 @@ export function sessionRoutes(app: Fastify) {
         return reply.send({
           session: {
             id: session.id,
+            tag: session.tag,
             seq: session.seq,
             metadata: session.metadata,
             metadataVersion: session.metadataVersion,
@@ -475,6 +477,7 @@ export function sessionRoutes(app: Fastify) {
         return reply.send({
           session: {
             id: session.id,
+            tag: session.tag,
             seq: session.seq,
             metadata: session.metadata,
             metadataVersion: session.metadataVersion,
