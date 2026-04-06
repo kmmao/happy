@@ -32,7 +32,14 @@ function ProjectDetailScreen() {
     }
 
     const initialTab =
-        tab === "health" || tab === "git" || tab === "sessions" || tab === "research" || tab === "config"
+        tab === "world" ||
+        tab === "roles" ||
+        tab === "goals" ||
+        tab === "health" ||
+        tab === "git" ||
+        tab === "sessions" ||
+        tab === "research" ||
+        tab === "config"
             ? tab
             : undefined;
 

@@ -30,7 +30,7 @@ export const ProjectDetailView = React.memo(
     ({ project, initialTab }: ProjectDetailViewProps) => {
         const { theme } = useUnistyles();
         const [activeTab, setActiveTab] = React.useState<TabKey>(
-            initialTab ?? "sessions",
+            initialTab ?? "world",
         );
         const [researchSyncStatus, setResearchSyncStatus] =
             React.useState<ResearchSyncStatus>("idle");
@@ -50,6 +50,9 @@ export const ProjectDetailView = React.memo(
         const tabs: { key: TabKey; label: string }[] = React.useMemo(
             () => {
                 const base: { key: TabKey; label: string }[] = [
+                    { key: "world", label: t("projects.tabWorld") },
+                    { key: "roles", label: t("projects.tabRoles") },
+                    { key: "goals", label: t("projects.tabGoals") },
                     { key: "sessions", label: t("projects.tabSessions") },
                     { key: "git", label: t("projects.tabGit") },
                     { key: "health", label: t("projects.tabHealth") },
@@ -59,9 +62,6 @@ export const ProjectDetailView = React.memo(
                 if (knowledgeBaseEnabled) {
                     base.push({ key: "knowledge", label: t("projects.tabKnowledge") });
                 }
-                base.push({ key: "goals", label: t("projects.tabGoals") });
-                base.push({ key: "world", label: t("projects.tabWorld") });
-                base.push({ key: "roles", label: t("projects.tabRoles") });
                 base.push({ key: "analytics", label: t("projects.tabAnalytics") });
                 base.push({ key: "config", label: t("projects.tabConfig") });
                 return base;
@@ -183,15 +183,6 @@ export const ProjectDetailView = React.memo(
                     )}
                     <View
                         style={
-                            activeTab === "goals"
-                                ? styles.tabVisible
-                                : styles.tabHidden
-                        }
-                    >
-                        <ProjectGoalsTab project={project} isActive={activeTab === "goals"} />
-                    </View>
-                    <View
-                        style={
                             activeTab === "world"
                                 ? styles.tabVisible
                                 : styles.tabHidden
@@ -207,6 +198,15 @@ export const ProjectDetailView = React.memo(
                         }
                     >
                         <ProjectRolesTab project={project} isActive={activeTab === "roles"} />
+                    </View>
+                    <View
+                        style={
+                            activeTab === "goals"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectGoalsTab project={project} isActive={activeTab === "goals"} />
                     </View>
                     <View
                         style={
@@ -253,7 +253,6 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surface,
         borderRadius: 8,
         padding: 2,
-        maxWidth: layout.maxWidth - 32,
         alignSelf: "center",
     },
     segmentButton: {

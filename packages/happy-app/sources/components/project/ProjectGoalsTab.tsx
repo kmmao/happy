@@ -140,52 +140,53 @@ export const ProjectGoalsTab = React.memo(
         const doneGoals = goals.filter((g) => ["completed", "cancelled"].includes(g.status));
 
         return (
-            <ScrollView
-                style={styles.container}
-                contentContainerStyle={styles.scrollContent}
-            >
-                {/* Header */}
-                <View style={styles.header}>
-                    <Text style={styles.title}>{t("goals.title")}</Text>
-                    <Pressable style={styles.createButton} onPress={() => setShowCreate(true)}>
-                        <Ionicons name="add-circle" size={22} color={theme.colors.accentPurple} />
-                        <Text style={styles.createButtonText}>{t("goals.createGoal")}</Text>
-                    </Pressable>
-                </View>
-
-                {loading && goals.length === 0 ? (
-                    <ActivityIndicator style={{ marginTop: 40 }} />
-                ) : goals.length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                        <Ionicons name="flag-outline" size={48} color={theme.colors.textSecondary} />
-                        <Text style={styles.emptyText}>{t("goals.emptyGoals")}</Text>
-                        <Text style={styles.emptyHint}>{t("goals.emptyGoalsHint")}</Text>
+            <View style={styles.container}>
+                <ScrollView
+                    style={styles.scroll}
+                    contentContainerStyle={styles.scrollContent}
+                >
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <Text style={styles.title}>{t("goals.title")}</Text>
+                        <Pressable style={styles.createButton} onPress={() => setShowCreate(true)}>
+                            <Ionicons name="add-circle" size={22} color={theme.colors.accentPurple} />
+                            <Text style={styles.createButtonText}>{t("goals.createGoal")}</Text>
+                        </Pressable>
                     </View>
-                ) : (
-                    <>
-                        {activeGoals.map((goal) => (
-                            <GoalCard
-                                key={goal.id}
-                                goal={goal}
-                                onCancel={handleCancel}
-                                onDelete={handleDelete}
-                            />
-                        ))}
-                        {doneGoals.length > 0 && activeGoals.length > 0 && (
-                            <View style={styles.divider} />
-                        )}
-                        {doneGoals.map((goal) => (
-                            <GoalCard
-                                key={goal.id}
-                                goal={goal}
-                                onCancel={handleCancel}
-                                onDelete={handleDelete}
-                            />
-                        ))}
-                    </>
-                )}
 
-                {/* Create Modal */}
+                    {loading && goals.length === 0 ? (
+                        <ActivityIndicator style={{ marginTop: 40 }} />
+                    ) : goals.length === 0 ? (
+                        <View style={styles.emptyContainer}>
+                            <Ionicons name="flag-outline" size={48} color={theme.colors.textSecondary} />
+                            <Text style={styles.emptyText}>{t("goals.emptyGoals")}</Text>
+                            <Text style={styles.emptyHint}>{t("goals.emptyGoalsHint")}</Text>
+                        </View>
+                    ) : (
+                        <>
+                            {activeGoals.map((goal) => (
+                                <GoalCard
+                                    key={goal.id}
+                                    goal={goal}
+                                    onCancel={handleCancel}
+                                    onDelete={handleDelete}
+                                />
+                            ))}
+                            {doneGoals.length > 0 && activeGoals.length > 0 && (
+                                <View style={styles.divider} />
+                            )}
+                            {doneGoals.map((goal) => (
+                                <GoalCard
+                                    key={goal.id}
+                                    goal={goal}
+                                    onCancel={handleCancel}
+                                    onDelete={handleDelete}
+                                />
+                            ))}
+                        </>
+                    )}
+                </ScrollView>
+
                 {showCreate && (
                     <GoalCreateSheet
                         project={project}
@@ -193,7 +194,7 @@ export const ProjectGoalsTab = React.memo(
                         onClose={() => setShowCreate(false)}
                     />
                 )}
-            </ScrollView>
+            </View>
         );
     },
 );
@@ -344,7 +345,11 @@ const GoalCreateSheet = React.memo(function GoalCreateSheet({
     return (
         <View style={styles.modalOverlay}>
             <Pressable style={styles.modalBackdrop} onPress={onClose} />
-            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+            <ScrollView
+                style={styles.modalScroll}
+                contentContainerStyle={styles.modalScrollContent}
+                showsVerticalScrollIndicator={false}
+            >
                 <View style={styles.modalContent}>
                     <Text style={styles.modalTitle}>{t("goals.createGoal")}</Text>
 
@@ -428,6 +433,9 @@ const styles = StyleSheet.create((theme) => ({
     container: {
         flex: 1,
         backgroundColor: theme.colors.groupped.background,
+    },
+    scroll: {
+        flex: 1,
     },
     scrollContent: {
         paddingBottom: 32,
@@ -588,7 +596,7 @@ const styles = StyleSheet.create((theme) => ({
         left: 0,
         right: 0,
         bottom: 0,
-        justifyContent: "center" as const,
+        justifyContent: "flex-start" as const,
         alignItems: "center" as const,
         zIndex: 100,
     },
@@ -598,16 +606,18 @@ const styles = StyleSheet.create((theme) => ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
+        backgroundColor: "transparent",
     },
     modalScroll: {
         width: "90%" as const,
         maxWidth: 440,
-        maxHeight: "85%" as const,
+        maxHeight: "100%" as const,
     },
     modalScrollContent: {
         flexGrow: 1,
-        justifyContent: "center" as const,
+        justifyContent: "flex-start" as const,
+        paddingTop: 16,
+        paddingBottom: 16,
     },
     modalContent: {
         backgroundColor: theme.colors.surface,

@@ -2,7 +2,6 @@ import * as React from "react";
 import { ScrollView } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { Project, projectManager, getProjectDisplayName } from "@/sync/projectManager";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
@@ -34,7 +33,6 @@ interface ProjectConfigTabProps {
 export const ProjectConfigTab = React.memo(
     ({ project }: ProjectConfigTabProps) => {
         const { theme } = useUnistyles();
-        const router = useRouter();
         const [config, setConfig] = React.useState<ProjectConfig>(() =>
             parseProjectConfig(project.serverMetadata),
         );
@@ -226,17 +224,6 @@ export const ProjectConfigTab = React.memo(
                             />
                         );
                     })}
-                </ItemGroup>
-
-                {/* World Constitution */}
-                <ItemGroup title={t("world.title")}>
-                    <Item
-                        title={t("world.title")}
-                        subtitle={t("world.narrativeDesc")}
-                        onPress={() => router.push(`/project/${project.id}/world-laws` as any)}
-                        showChevron
-                        disabled={!project.serverId}
-                    />
                 </ItemGroup>
 
                 {/* Archive */}

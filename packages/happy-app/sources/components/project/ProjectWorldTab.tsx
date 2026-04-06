@@ -5,9 +5,11 @@ import {
     ScrollView,
     ActivityIndicator,
     RefreshControl,
+    Pressable,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Project } from "@/sync/projectManager";
@@ -23,6 +25,7 @@ interface ProjectWorldTabProps {
 export const ProjectWorldTab = React.memo(
     ({ project, isActive }: ProjectWorldTabProps) => {
         const { theme } = useUnistyles();
+        const router = useRouter();
         const [data, setData] = React.useState<WorldDashboard | null>(null);
         const [loading, setLoading] = React.useState(false);
         const [refreshing, setRefreshing] = React.useState(false);
@@ -84,6 +87,24 @@ export const ProjectWorldTab = React.memo(
                     <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />
                 }
             >
+                <View style={styles.sectionCard}>
+                    <Pressable
+                        style={styles.constitutionRow}
+                        onPress={() => router.push(`/project/${project.id}/world-laws` as any)}
+                        disabled={!project.serverId}
+                    >
+                        <View style={styles.constitutionContent}>
+                            <Text style={styles.sectionTitle}>{t("world.title")}</Text>
+                            <Text style={styles.constitutionHint}>{t("world.narrativeDesc")}</Text>
+                        </View>
+                        <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color={theme.colors.textSecondary}
+                        />
+                    </Pressable>
+                </View>
+
                 {/* Autonomy Score Card */}
                 <View style={styles.autonomyCard}>
                     <Text style={styles.sectionTitle}>{t("world.dashboardTitle")}</Text>
@@ -350,6 +371,21 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
         fontSize: 15,
         color: theme.colors.text,
+    },
+    constitutionRow: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "space-between" as const,
+        gap: 12,
+    },
+    constitutionContent: {
+        flex: 1,
+    },
+    constitutionHint: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        marginTop: 4,
     },
 
     // Goals Row
