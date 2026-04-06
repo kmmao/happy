@@ -13,12 +13,13 @@ import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
 import { ProjectAnalyticsTab } from "./ProjectAnalyticsTab";
 import { ProjectRolesTab } from "./ProjectRolesTab";
 import { ProjectGoalsTab } from "./ProjectGoalsTab";
+import { ProjectWorldTab } from "./ProjectWorldTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { storage, useSetting } from "@/sync/storage";
 import { gitStatusSync } from "@/sync/gitStatusSync";
 
-type TabKey = "sessions" | "git" | "health" | "actions" | "research" | "knowledge" | "goals" | "roles" | "analytics" | "config";
+type TabKey = "sessions" | "git" | "health" | "actions" | "research" | "knowledge" | "goals" | "world" | "roles" | "analytics" | "config";
 
 interface ProjectDetailViewProps {
     project: Project;
@@ -59,6 +60,7 @@ export const ProjectDetailView = React.memo(
                     base.push({ key: "knowledge", label: t("projects.tabKnowledge") });
                 }
                 base.push({ key: "goals", label: t("projects.tabGoals") });
+                base.push({ key: "world", label: t("projects.tabWorld") });
                 base.push({ key: "roles", label: t("projects.tabRoles") });
                 base.push({ key: "analytics", label: t("projects.tabAnalytics") });
                 base.push({ key: "config", label: t("projects.tabConfig") });
@@ -187,6 +189,15 @@ export const ProjectDetailView = React.memo(
                         }
                     >
                         <ProjectGoalsTab project={project} isActive={activeTab === "goals"} />
+                    </View>
+                    <View
+                        style={
+                            activeTab === "world"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectWorldTab project={project} isActive={activeTab === "world"} />
                     </View>
                     <View
                         style={

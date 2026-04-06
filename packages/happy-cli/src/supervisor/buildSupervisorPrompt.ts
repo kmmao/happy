@@ -221,6 +221,8 @@ curl -s -X POST "${reportUrl}" \\
 \`\`\`
 
 ${buildDecisionReportingSection(options.serverUrl, options.projectId)}
+${buildLawEvolutionSection(options.serverUrl, options.projectId, options.laws)}
+${buildAgentCommunicationSection(options.serverUrl, options.projectId)}
 Begin your analysis now.`;
 }
 
@@ -377,5 +379,67 @@ curl -s -X POST "${decisionUrl}" \\
 \`\`\`
 
 Then **continue with your best judgment** — do NOT wait for a response. The project owner will adjudicate later, and the result becomes a precedent for future runs.
+`;
+}
+
+function buildLawEvolutionSection(serverUrl: string, projectId: string, lawsJson: string | undefined): string {
+  // Only inject law evolution when the project already has laws
+  if (!lawsJson || lawsJson.trim().length === 0) return "";
+
+  let hasLaws = false;
+  try {
+    const laws = JSON.parse(lawsJson) as unknown[];
+    hasLaws = Array.isArray(laws) && laws.length > 0;
+  } catch {
+    return "";
+  }
+  if (!hasLaws) return "";
+
+  const messageUrl = `${serverUrl}/v1/projects/${projectId}/agent-messages`;
+
+  return `
+## Law Evolution (Optional)
+
+If during your analysis you discover a **recurring pattern** that is NOT covered by any
+existing law above, and you believe it should become a permanent project rule, you MAY
+suggest a new law.
+
+To suggest a law:
+\`\`\`
+curl -s -X POST "${messageUrl}" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"fromRole":"guardian","msgType":"law_suggestion","content":"{\\"category\\":\\"<category>\\",\\"description\\":\\"<law description>\\",\\"severity\\":\\"<low|medium|high|critical>\\"}"}'
+\`\`\`
+
+**Rules for law suggestions:**
+- Only suggest laws based on **clear, repeated evidence** (not one-off issues)
+- Do NOT suggest laws that duplicate existing laws
+- Keep descriptions concise and actionable
+- The project owner will review and approve/reject via the Decision system
+`;
+}
+
+function buildAgentCommunicationSection(serverUrl: string, projectId: string): string {
+  const messageUrl = `${serverUrl}/v1/projects/${projectId}/agent-messages`;
+
+  return `
+## Agent Communication (Optional)
+
+If you need to report a finding to another role, or flag a conflict between competing
+approaches, send an AgentMessage:
+
+\`\`\`
+curl -s -X POST "${messageUrl}" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"fromRole":"<your-role>","toRole":"<target-role>","msgType":"request|report|conflict","content":"<message>"}'
+\`\`\`
+
+- **request**: Ask another role for assistance or input
+- **report**: Share findings or results with another role
+- **conflict**: Flag a disagreement (auto-escalates to Decision for the project owner)
+
+Only use this when genuinely needed. Most analyses complete without inter-agent communication.
 `;
 }

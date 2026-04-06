@@ -430,6 +430,14 @@ export type EphemeralEvent =
       status: string;
       progress: number;
     }
+  | {
+      type: "agent-message";
+      messageId: string;
+      projectId: string;
+      fromRole: string;
+      toRole: string | null;
+      msgType: string;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -1234,6 +1242,19 @@ export function buildGoalProgressEphemeral(opts: {
 }): EphemeralPayload {
   return {
     type: "goal-progress",
+    ...opts,
+  };
+}
+
+export function buildAgentMessageEphemeral(opts: {
+  messageId: string;
+  projectId: string;
+  fromRole: string;
+  toRole: string | null;
+  msgType: string;
+}): EphemeralPayload {
+  return {
+    type: "agent-message",
     ...opts,
   };
 }

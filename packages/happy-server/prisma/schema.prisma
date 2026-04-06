@@ -63,6 +63,7 @@ model Account {
     AgentRole           AgentRole[]
     Decision            Decision[]
     Goal                Goal[]
+    AgentMessage        AgentMessage[]
 }
 
 model TerminalAuthRequest {
@@ -462,6 +463,7 @@ model Project {
     agentRoles         AgentRole[]
     decisions          Decision[]
     goals              Goal[]
+    agentMessages      AgentMessage[]
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
@@ -1123,4 +1125,30 @@ model Goal {
     @@index([accountId, projectId, status])
     @@index([projectId, status])
     @@index([parentGoalId])
+}
+
+// World Model — Phase 4: Agent Messages (Inter-agent communication)
+model AgentMessage {
+    id          String   @id @default(cuid())
+    accountId   String
+    account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    projectId   String
+    project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    fromRole    String                          // Sender role name
+    toRole      String?                         // Receiver role name (null = broadcast)
+    msgType     String                          // request | report | conflict | law_suggestion
+    content     String                          // Message content (plaintext)
+    status      String   @default("unread")     // unread | read | resolved
+
+    // Context references
+    sessionId   String?
+    decisionId  String?                         // If conflict escalated to Decision
+
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@index([accountId, projectId, status])
+    @@index([projectId, createdAt(sort: Desc)])
+    @@index([projectId, msgType])
 }

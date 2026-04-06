@@ -4,6 +4,7 @@
 
 import { db } from "@/storage/db";
 import { inboxCreate } from "./inboxCreate";
+import { lawSuggestionApply } from "./lawSuggestionApply";
 import { log } from "@/utils/log";
 
 interface AdjudicateInput {
@@ -96,6 +97,9 @@ export async function decisionAdjudicate(input: AdjudicateInput): Promise<Adjudi
 
     log({ module: "decision" }, `Decision ${decision.id} adjudicated → option "${input.chosenOption}", precedent ${knowledge.id}`);
 
+    // Post-adjudication: handle law_suggestion approval
+    void handleLawSuggestionIfApproved(decision.id, decision.projectId, input.accountId, input.chosenOption);
+
     return {
         decision: {
             id: updated.id,
@@ -103,4 +107,37 @@ export async function decisionAdjudicate(input: AdjudicateInput): Promise<Adjudi
             knowledgeId: knowledge.id,
         },
     };
+}
+
+/**
+ * If this Decision was created from a law_suggestion AgentMessage and the
+ * chosen option is "approve", apply the suggested law to the project.
+ */
+async function handleLawSuggestionIfApproved(
+    decisionId: string,
+    projectId: string,
+    accountId: string,
+    chosenOption: string,
+): Promise<void> {
+    try {
+        if (chosenOption !== "approve") return;
+
+        const agentMessage = await db.agentMessage.findFirst({
+            where: { decisionId, msgType: "law_suggestion" },
+            select: { id: true, content: true },
+        });
+
+        if (!agentMessage) return;
+
+        await lawSuggestionApply(projectId, accountId, agentMessage.content);
+
+        await db.agentMessage.update({
+            where: { id: agentMessage.id },
+            data: { status: "resolved" },
+        });
+
+        log({ module: "decision" }, `Law suggestion ${agentMessage.id} approved and applied`);
+    } catch (err) {
+        log({ module: "decision", level: "error" }, `Failed to handle law suggestion post-adjudication: ${err}`);
+    }
 }

@@ -48,6 +48,8 @@ import { inboxRoutes } from "./routes/inboxRoutes";
 import { agentRoleRoutes } from "./routes/agentRoleRoutes";
 import { decisionRoutes } from "./routes/decisionRoutes";
 import { goalRoutes } from "./routes/goalRoutes";
+import { worldDashboardRoutes } from "./routes/worldDashboardRoutes";
+import { agentMessageRoutes } from "./routes/agentMessageRoutes";
 import { sessionEventRoutes } from "./routes/sessionEventRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
@@ -143,6 +145,8 @@ export async function startApi() {
   agentRoleRoutes(typed);
   decisionRoutes(typed);
   goalRoutes(typed);
+  worldDashboardRoutes(typed);
+  agentMessageRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
