@@ -7,6 +7,8 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { useProjects } from "@/hooks/useProjects";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { createTask } from "@/sync/apiTasks";
+import { createWorktree } from "@/utils/createWorktree";
+import { Modal } from "@/modal";
 import { ItemList } from "@/components/ItemList";
 import { ItemGroup } from "@/components/ItemGroup";
 import { Item } from "@/components/Item";
@@ -46,15 +48,40 @@ function NewTaskPage() {
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) return;
 
+            let taskDirectory: string | undefined;
+            if (selectedProjectId) {
+                const proj = machineProjects.find(
+                    (p) => (p.serverId ?? p.id) === selectedProjectId,
+                );
+                if (proj?.key.path) {
+                    const wt = await createWorktree(machineId, proj.key.path);
+                    if (!wt.success) {
+                        if (wt.error === "Not a Git repository") {
+                            Modal.alert(t("common.error"), t("newSession.worktree.notGitRepo"));
+                        } else {
+                            Modal.alert(
+                                t("common.error"),
+                                t("newSession.worktree.failed", {
+                                    error: wt.error ?? "Unknown error",
+                                }),
+                            );
+                        }
+                        return;
+                    }
+                    taskDirectory = wt.worktreePath;
+                }
+            }
+
             await createTask(credentials, {
                 machineId,
                 prompt: prompt.trim(),
                 priority,
                 maxAttempts: Math.max(1, parseInt(maxAttempts, 10) || 3),
                 projectId: selectedProjectId ?? undefined,
+                directory: taskDirectory,
             });
             router.back();
-        }, [machineId, prompt, priority, maxAttempts, selectedProjectId, router]),
+        }, [machineId, prompt, priority, maxAttempts, selectedProjectId, router, machineProjects]),
     );
 
     return (
@@ -110,7 +137,7 @@ function NewTaskPage() {
 
             {/* Project (optional) */}
             {machineProjects.length > 0 && (
-                <ItemGroup title={t("tasks.project")}>
+                <ItemGroup title={t("tasks.project")} footer={t("tasks.worktreeWhenProject")}>
                     <Item
                         title={t("tasks.projectNone")}
                         onPress={() => setSelectedProjectId(null)}

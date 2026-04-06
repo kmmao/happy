@@ -20,7 +20,18 @@ const CreateTaskBodySchema = z.object({
     priority: TaskPrioritySchema.default("user"),
     maxAttempts: z.number().int().min(1).max(10).default(3),
     skillIds: z.array(z.string()).max(10).default([]),
+    /** Optional absolute directory on the machine (e.g. Git worktree). Must be under project.path when projectId is set. */
+    directory: z.string().min(1).max(4096).optional(),
 });
+
+function isDirectoryUnderProject(projectPath: string, candidate: string): boolean {
+    if (!candidate || candidate.includes("..")) {
+        return false;
+    }
+    const base = projectPath.replace(/\/+$/, "") || projectPath;
+    const dir = candidate.replace(/\/+$/, "") || candidate;
+    return dir === base || dir.startsWith(`${base}/`);
+}
 
 const TaskStatusReportSchema = z.object({
     taskId: z.string(),
@@ -46,7 +57,8 @@ export function taskRoutes(app: Fastify) {
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { machineId, prompt, priority, maxAttempts, skillIds, projectId } = request.body;
+            const { machineId, prompt, priority, maxAttempts, skillIds, projectId, directory: bodyDirectory } =
+                request.body;
 
             // Verify machine belongs to user
             const machine = await db.machine.findFirst({
@@ -64,9 +76,19 @@ export function taskRoutes(app: Fastify) {
                     where: { id: projectId, accountId: userId },
                 });
                 if (project) {
-                    directory = project.path;
                     resolvedProjectId = project.id;
+                    if (bodyDirectory?.trim()) {
+                        const candidate = bodyDirectory.trim();
+                        if (!isDirectoryUnderProject(project.path, candidate)) {
+                            return reply.code(400).send({ error: "directory must be under the selected project path" });
+                        }
+                        directory = candidate;
+                    } else {
+                        directory = project.path;
+                    }
                 }
+            } else if (bodyDirectory?.trim()) {
+                return reply.code(400).send({ error: "directory override requires projectId" });
             }
 
             // Load skills if bound

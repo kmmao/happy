@@ -2071,6 +2071,8 @@ export const en = {
     maxAttempts: "Max Attempts",
     project: "Project",
     projectNone: "None",
+    worktreeWhenProject:
+      'When a project is selected, a dedicated Git worktree and branch are created for this task (same as "Worktree" when starting a new session).',
     statusQueued: "Queued",
     statusDispatching: "Dispatching",
     statusRunning: "Running",

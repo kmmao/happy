@@ -2148,6 +2148,8 @@ export const ja: TranslationStructure = {
     maxAttempts: "最大リトライ",
     project: "プロジェクト",
     projectNone: "なし",
+    worktreeWhenProject:
+      "プロジェクトを選ぶと、このタスク用に Git worktree とブランチが作成されます（新規セッションの「Worktree」と同じ動作です）。",
     statusQueued: "待機中",
     statusDispatching: "配信中",
     statusRunning: "実行中",

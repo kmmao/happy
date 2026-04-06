@@ -79,6 +79,8 @@ export async function createTask(
         maxAttempts?: number;
         skillIds?: string[];
         projectId?: string;
+        /** Absolute path on machine (e.g. Git worktree); server requires projectId and validates prefix. */
+        directory?: string;
     },
 ): Promise<ServerTask> {
     const API_ENDPOINT = getServerUrl();

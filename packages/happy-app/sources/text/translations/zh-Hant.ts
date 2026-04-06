@@ -2024,6 +2024,8 @@ export const zhHant: TranslationStructure = {
     maxAttempts: "最大重試",
     project: "專案",
     projectNone: "無",
+    worktreeWhenProject:
+      "選擇專案後，會為此任務建立獨立 Git worktree 與分支（與新建工作階段中的「Worktree」模式相同）。",
     statusQueued: "排隊中",
     statusDispatching: "分派中",
     statusRunning: "執行中",

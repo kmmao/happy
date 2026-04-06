@@ -2023,6 +2023,8 @@ export const zhHans: TranslationStructure = {
     maxAttempts: "最大重试",
     project: "项目",
     projectNone: "无",
+    worktreeWhenProject:
+      "选择项目后，会为此任务创建独立 Git worktree 与分支（与新建会话中的「Worktree」模式一致）。",
     statusQueued: "排队中",
     statusDispatching: "分发中",
     statusRunning: "运行中",
