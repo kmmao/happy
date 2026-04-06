@@ -41,6 +41,10 @@ export const LocalSettingsSchema = z.object({
   sidePanelWidth: z
     .number()
     .describe("Width of the session side panel in pixels"),
+  // Favorited file paths in the Files browser, keyed by sessionId
+  fileFavorites: z
+    .record(z.string(), z.array(z.string()))
+    .describe("Favorited file paths per session, keyed by sessionId"),
 });
 
 //
@@ -67,6 +71,7 @@ export const localSettingsDefaults: LocalSettings = {
   inputExpandedSessions: {},
   sidePanelCollapsed: false,
   sidePanelWidth: 400,
+  fileFavorites: {},
 };
 Object.freeze(localSettingsDefaults);
 

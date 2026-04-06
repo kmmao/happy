@@ -8,6 +8,7 @@ import {
     NativeScrollEvent,
     NativeSyntheticEvent,
     TextInput,
+    ScrollView,
 } from "react-native";
 import { t } from "@/text";
 import { useRouter } from "expo-router";
@@ -18,7 +19,7 @@ import { Item } from "@/components/Item";
 import { ItemList } from "@/components/ItemList";
 import { Typography } from "@/constants/Typography";
 import { sessionListDirectory, DirectoryEntry } from "@/sync/ops";
-import { storage } from "@/sync/storage";
+import { storage, useLocalSetting } from "@/sync/storage";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { FileIcon } from "@/components/FileIcon";
@@ -80,6 +81,23 @@ export const GitBrowseTab = React.memo<{
     const [refreshKey, setRefreshKey] = React.useState(0);
     const [filterText, setFilterText] = React.useState("");
     const [showHidden, setShowHidden] = React.useState(false);
+
+    // File favorites: keyed by sessionId, values are relative paths
+    const fileFavorites = useLocalSetting("fileFavorites");
+    const sessionFavorites: string[] = fileFavorites[sessionId] ?? [];
+
+    const toggleFavorite = React.useCallback(
+        (relPath: string) => {
+            const current: string[] = fileFavorites[sessionId] ?? [];
+            const next = current.includes(relPath)
+                ? current.filter((p) => p !== relPath)
+                : [...current, relPath];
+            storage.getState().applyLocalSettings({
+                fileFavorites: { ...fileFavorites, [sessionId]: next },
+            });
+        },
+        [fileFavorites, sessionId],
+    );
 
     // Initialize to basePath once
     React.useEffect(() => {
@@ -166,11 +184,30 @@ export const GitBrowseTab = React.memo<{
 
     const canGoBack = pathHistory.length > 0;
 
-    // Show path relative to basePath
-    const displayPath =
-        basePath && currentPath
-            ? currentPath.slice(basePath.length) || "/"
-            : currentPath ?? "/";
+    // Breadcrumb segments: root "/" + each directory segment
+    const pathSegments = React.useMemo(() => {
+        if (!basePath || !currentPath) {
+            return [{ label: "/", path: currentPath ?? "/" }];
+        }
+        const relPath = currentPath.slice(basePath.length);
+        const parts = relPath.split("/").filter(Boolean);
+        return [
+            { label: "/", path: basePath },
+            ...parts.map((part, idx) => ({
+                label: part,
+                path: `${basePath}/${parts.slice(0, idx + 1).join("/")}`,
+            })),
+        ];
+    }, [basePath, currentPath]);
+
+    const handleBreadcrumbPress = React.useCallback(
+        (targetPath: string) => {
+            if (targetPath === currentPath) return;
+            setPathHistory((prev) => [...prev, currentPath!]);
+            setCurrentPath(targetPath);
+        },
+        [currentPath],
+    );
 
     // Clear filter when navigating directories
     React.useEffect(() => {
@@ -237,17 +274,46 @@ export const GitBrowseTab = React.memo<{
                     size={16}
                     color={theme.colors.textSecondary}
                 />
-                <Text
-                    style={{
-                        flex: 1,
-                        fontSize: embedded ? 12 : 13,
-                        color: theme.colors.textSecondary,
-                        ...Typography.mono(),
-                    }}
-                    numberOfLines={1}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ flexDirection: "row", alignItems: "center" }}
                 >
-                    {displayPath}
-                </Text>
+                    {pathSegments.map((seg, idx) => (
+                        <React.Fragment key={idx}>
+                            {idx > 0 && (
+                                <Text
+                                    style={{
+                                        fontSize: embedded ? 11 : 12,
+                                        color: theme.colors.textSecondary,
+                                        paddingHorizontal: 2,
+                                        ...Typography.mono(),
+                                    }}
+                                >
+                                    {"/"}
+                                </Text>
+                            )}
+                            <Pressable
+                                onPress={() => handleBreadcrumbPress(seg.path)}
+                                disabled={seg.path === currentPath}
+                                hitSlop={4}
+                            >
+                                <Text
+                                    style={{
+                                        fontSize: embedded ? 12 : 13,
+                                        color: seg.path === currentPath
+                                            ? theme.colors.text
+                                            : theme.colors.textLink,
+                                        ...Typography.mono(),
+                                    }}
+                                >
+                                    {seg.label}
+                                </Text>
+                            </Pressable>
+                        </React.Fragment>
+                    ))}
+                </ScrollView>
                 {embedded && (
                     <Pressable
                         onPress={() => setShowHidden((v) => !v)}
@@ -315,6 +381,93 @@ export const GitBrowseTab = React.memo<{
                     )
                 }
             >
+                {/* Favorites section */}
+                {sessionFavorites.length > 0 && !filterText && (
+                    <>
+                        <View
+                            style={{
+                                paddingHorizontal: embedded ? 12 : 16,
+                                paddingTop: 6,
+                                paddingBottom: 2,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    fontSize: 11,
+                                    fontWeight: "600",
+                                    color: theme.colors.textSecondary,
+                                    textTransform: "uppercase",
+                                    letterSpacing: 0.5,
+                                    ...Typography.default("semiBold"),
+                                }}
+                            >
+                                {t("files.favorites")}
+                            </Text>
+                        </View>
+                        {sessionFavorites.map((relPath) => {
+                            const fullPath = basePath ? `${basePath}/${relPath}` : relPath;
+                            const fileName = relPath.split("/").pop() ?? relPath;
+                            return (
+                                <Pressable
+                                    key={`fav-${relPath}`}
+                                    onPress={() => {
+                                        if (onFilePress) {
+                                            onFilePress(fullPath);
+                                        } else {
+                                            onFileOpen?.();
+                                            const encodedPath = utf8ToBase64(fullPath);
+                                            router.push(`/session/${sessionId}/file?path=${encodedPath}`);
+                                        }
+                                    }}
+                                    style={({ pressed }) => ({
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        paddingHorizontal: embedded ? 12 : 16,
+                                        paddingVertical: embedded ? 5 : 8,
+                                        gap: 8,
+                                        backgroundColor: pressed ? theme.colors.surfacePressedOverlay : "transparent",
+                                    })}
+                                >
+                                    <Octicons name="star-fill" size={embedded ? 15 : 18} color="#FFD700" />
+                                    <Text
+                                        style={{
+                                            flex: 1,
+                                            fontSize: embedded ? 13 : 15,
+                                            color: theme.colors.text,
+                                            ...Typography.default(),
+                                        }}
+                                        numberOfLines={1}
+                                    >
+                                        {fileName}
+                                    </Text>
+                                    {relPath.includes("/") && (
+                                        <Text
+                                            style={{
+                                                fontSize: 11,
+                                                color: theme.colors.textSecondary,
+                                                ...Typography.mono(),
+                                            }}
+                                            numberOfLines={1}
+                                        >
+                                            {relPath.slice(0, relPath.lastIndexOf("/"))}
+                                        </Text>
+                                    )}
+                                    <Pressable
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            toggleFavorite(relPath);
+                                        }}
+                                        hitSlop={6}
+                                        style={({ pressed }) => ({ padding: 2, opacity: pressed ? 0.5 : 1 })}
+                                    >
+                                        <Octicons name="x" size={12} color={theme.colors.textSecondary} />
+                                    </Pressable>
+                                </Pressable>
+                            );
+                        })}
+                        <View style={{ height: 1, backgroundColor: theme.colors.divider, marginHorizontal: embedded ? 8 : 16, marginVertical: 4 }} />
+                    </>
+                )}
                 {isLoading ? (
                     <View
                         style={{
@@ -408,6 +561,20 @@ export const GitBrowseTab = React.memo<{
                                         <Octicons name="mention" size={15} color={theme.colors.textLink} />
                                     </Pressable>
                                 )}
+                                <Pressable
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        toggleFavorite(entryRelPath);
+                                    }}
+                                    hitSlop={6}
+                                    style={({ pressed }) => ({ padding: 2, opacity: pressed ? 0.5 : 1 })}
+                                >
+                                    <Octicons
+                                        name={sessionFavorites.includes(entryRelPath) ? "star-fill" : "star"}
+                                        size={14}
+                                        color={sessionFavorites.includes(entryRelPath) ? "#FFD700" : theme.colors.textSecondary}
+                                    />
+                                </Pressable>
                                 {isDir && (
                                     <Octicons name="chevron-right" size={15} color={theme.colors.textSecondary} />
                                 )}
@@ -454,29 +621,54 @@ export const GitBrowseTab = React.memo<{
                             </Text>
                         ) : undefined;
 
-                        const rightEl = onReference ? (
+                        const isFavorited = sessionFavorites.includes(entryRelPath);
+                        const starEl = (
+                            <Pressable
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    toggleFavorite(entryRelPath);
+                                }}
+                                hitSlop={6}
+                                style={({ pressed }) => ({
+                                    padding: 4,
+                                    borderRadius: 6,
+                                    opacity: pressed ? 0.5 : 1,
+                                })}
+                            >
+                                <Octicons
+                                    name={isFavorited ? "star-fill" : "star"}
+                                    size={16}
+                                    color={isFavorited ? "#FFD700" : theme.colors.textSecondary}
+                                />
+                            </Pressable>
+                        );
+
+                        const rightEl = (
                             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                                <Pressable
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        onReference(entryRelPath);
-                                    }}
-                                    hitSlop={6}
-                                    style={({ pressed }) => ({
-                                        padding: 4,
-                                        borderRadius: 6,
-                                        opacity: pressed ? 0.5 : 1,
-                                    })}
-                                >
-                                    <Octicons
-                                        name="mention"
-                                        size={16}
-                                        color={theme.colors.textLink}
-                                    />
-                                </Pressable>
+                                {onReference && (
+                                    <Pressable
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            onReference(entryRelPath);
+                                        }}
+                                        hitSlop={6}
+                                        style={({ pressed }) => ({
+                                            padding: 4,
+                                            borderRadius: 6,
+                                            opacity: pressed ? 0.5 : 1,
+                                        })}
+                                    >
+                                        <Octicons
+                                            name="mention"
+                                            size={16}
+                                            color={theme.colors.textLink}
+                                        />
+                                    </Pressable>
+                                )}
+                                {starEl}
                                 {baseRightEl}
                             </View>
-                        ) : baseRightEl;
+                        );
 
                         return (
                             <Item

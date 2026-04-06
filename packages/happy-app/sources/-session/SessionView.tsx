@@ -138,6 +138,12 @@ export const SessionView = React.memo((props: { id: string }) => {
     storage.getState().applyLocalSettings({ sidePanelCollapsed: !sidePanelCollapsed });
   }, [sidePanelCollapsed]);
 
+  // Ref bridge: lets SessionSidePanel (outside inner InputContext.Provider) append to input
+  const appendToInputRef = React.useRef<(text: string) => void>(() => {});
+  const appendToInputOuter = React.useCallback((text: string) => {
+    appendToInputRef.current(text);
+  }, []);
+
   // Actual container width (excludes sidebar navigator etc.)
   const [containerWidth, setContainerWidth] = React.useState(0);
   const handleContainerLayout = React.useCallback((e: { nativeEvent: { layout: { width: number } } }) => {
@@ -265,7 +271,8 @@ export const SessionView = React.memo((props: { id: string }) => {
   }, [session, isDataReady, sessionId, router, showAgentActivity, theme]);
 
   return (
-    <>
+    <InputContext.Provider value={{ appendToInput: appendToInputOuter }}>
+      <>
       {/* Two-column layout: left (header + content) + divider + right (side panel) */}
       <View style={{ flex: 1, flexDirection: showSidePanelOuter ? "row" : "column" }} onLayout={handleContainerLayout}>
         {/* Left column: header + chat content, capped to layout.maxWidth */}
@@ -395,6 +402,7 @@ export const SessionView = React.memo((props: { id: string }) => {
                   key={sessionId}
                   sessionId={sessionId}
                   session={session}
+                  appendToInputRef={appendToInputRef}
                 />
               )}
             </View>
@@ -422,20 +430,23 @@ export const SessionView = React.memo((props: { id: string }) => {
         projectServerId={sessionProject?.serverId ?? undefined}
         sessionId={sessionId}
       />
-    </>
+      </>
+    </InputContext.Provider>
   );
 });
 
 function SessionViewLoaded({
   sessionId,
   session,
+  appendToInputRef,
 }: {
   sessionId: string;
   session: Session;
+  appendToInputRef: { current: (text: string) => void };
 }) {
   return (
     <BookmarkProvider sessionId={sessionId}>
-      <SessionViewInner sessionId={sessionId} session={session} />
+      <SessionViewInner sessionId={sessionId} session={session} appendToInputRef={appendToInputRef} />
     </BookmarkProvider>
   );
 }
@@ -443,9 +454,11 @@ function SessionViewLoaded({
 function SessionViewInner({
   sessionId,
   session,
+  appendToInputRef,
 }: {
   sessionId: string;
   session: Session;
+  appendToInputRef: { current: (text: string) => void };
 }) {
   const { theme } = useUnistyles();
   const router = useRouter();
@@ -671,6 +684,11 @@ function SessionViewInner({
     () => ({ appendToInput }),
     [appendToInput],
   );
+
+  // Keep outer InputContext.Provider (SessionView level) in sync so SessionSidePanel can use it
+  React.useEffect(() => {
+    appendToInputRef.current = appendToInput;
+  }, [appendToInput, appendToInputRef]);
 
   // Use draft hook for auto-saving message drafts
   const { clearDraft } = useDraft(sessionId, message, setMessage);
