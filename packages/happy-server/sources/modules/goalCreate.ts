@@ -298,6 +298,18 @@ function buildPlannerPrompt(opts: {
     sections.push("3. You MAY read files and run diagnostic commands to understand the codebase.");
     sections.push("");
 
+    sections.push("## World context model");
+    sections.push(
+        "- **Narrative + laws** (below) are the shared baseline for all sessions on this project; every sub-task you define should remain consistent with them.",
+    );
+    sections.push(
+        "- **Roles**: this prompt lists roles only by name and type for assignment. Full role descriptions and duties are injected when an execution task is dispatched with a `suggestedRole` — not repeated here.",
+    );
+    sections.push(
+        "- **Decisions and inter-role messages** are not bundled into this prompt; assume they must be retrieved on demand when relevant to the goal.",
+    );
+    sections.push("");
+
     // Goal info
     sections.push("## Goal");
     sections.push(`- **Title**: ${opts.goalTitle}`);
@@ -311,26 +323,25 @@ function buildPlannerPrompt(opts: {
     sections.push(`- **Goal ID**: ${opts.goalId}`);
     sections.push("");
 
-    // Project context
+    // Project context (session baseline — same material as execution tasks receive up front)
     if (opts.projectNarrative) {
-        sections.push("## Project Narrative");
+        sections.push("## World narrative (session baseline)");
         sections.push(opts.projectNarrative);
         sections.push("");
     }
 
     if (opts.projectLaws) {
-        sections.push("## Project Laws");
+        sections.push("## World laws (session baseline)");
         sections.push("Ensure all sub-tasks comply with these laws:");
         sections.push(opts.projectLaws);
         sections.push("");
     }
 
-    // Available roles
     if (opts.roles.length > 0) {
-        sections.push("## Available Roles");
+        sections.push("## Role roster (for suggestedRole only)");
+        sections.push("Pick the `type` value (e.g. `builder`, `planner`) as `suggestedRole` per task. Do not rely on duty text here — it is injected only on the execution task.");
         for (const role of opts.roles) {
-            const duties = role.duties.length > 0 ? ` — duties: ${role.duties.join(", ")}` : "";
-            sections.push(`- **${role.name}** (${role.type})${duties}`);
+            sections.push(`- **${role.name}** (\`${role.type}\`)`);
         }
         sections.push("");
     }

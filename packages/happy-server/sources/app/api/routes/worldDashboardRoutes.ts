@@ -167,7 +167,7 @@ export function worldDashboardRoutes(app: Fastify) {
                 body: z.object({
                     mode: z.enum(["auto", "custom"]).default("auto"),
                     prompt: z.string().max(5000).optional(),
-                    goalMode: z.enum(["draft", "auto_decompose"]).default("draft"),
+                    contentLanguage: z.enum(["en", "zh"]).default("en"),
                 }),
             },
         },
@@ -176,7 +176,11 @@ export function worldDashboardRoutes(app: Fastify) {
                 const result = await generateWorldConstitution(
                     request.params.id,
                     request.userId,
-                    { mode: request.body.mode, prompt: request.body.prompt, goalMode: request.body.goalMode },
+                    {
+                        mode: request.body.mode,
+                        prompt: request.body.prompt,
+                        contentLanguage: request.body.contentLanguage,
+                    },
                 );
                 return reply.send(result);
             } catch (e: any) {

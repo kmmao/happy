@@ -173,13 +173,35 @@ function safeParseJsonArray(json: string): string[] {
 }
 
 /**
- * Build a role identity prefix to inject into a task's prompt.
- * Matches suggestedRole (e.g. "builder") to an enabled AgentRole's description + duties.
+ * Narrative + laws are the universal baseline for all sessions; injected once at the top of each task prompt.
+ */
+function buildWorldSessionBaseline(project: { narrative: string | null; laws: string | null }): string | null {
+    const narrative = project.narrative?.trim();
+    const laws = project.laws?.trim();
+    if (!narrative && !laws) {
+        return null;
+    }
+    const parts: string[] = [
+        "## World session baseline",
+        "",
+        "The **narrative** and **laws** below apply to every agent session for this project. Formal decisions, inter-role messages, and any context not shown here must be fetched on demand (e.g. via app/API tools) when a workflow requires them.",
+        "",
+    ];
+    if (narrative) {
+        parts.push("### Narrative", narrative, "");
+    }
+    if (laws) {
+        parts.push("### Laws", laws, "");
+    }
+    return parts.join("\n").trimEnd();
+}
+
+/**
+ * Role-specific slice for a task (on-demand). World narrative/laws are not repeated here — see baseline above.
  */
 function buildRoleIdentityPrefix(
     suggestedRole: string | undefined,
     roleMap: Map<string, { name: string; type: string; description: string | null; duties: string }>,
-    project: { narrative: string | null; laws: string | null },
 ): string | null {
     if (!suggestedRole) return null;
     const role = roleMap.get(suggestedRole);
@@ -197,13 +219,6 @@ function buildRoleIdentityPrefix(
         for (const duty of duties) {
             parts.push(`- ${duty}`);
         }
-    }
-
-    if (project.narrative) {
-        parts.push(`\n### World Narrative\n${project.narrative}`);
-    }
-    if (project.laws) {
-        parts.push(`\n### World Laws\n${project.laws}`);
     }
 
     return parts.join("\n");
@@ -673,7 +688,8 @@ export function goalRoutes(app: Fastify) {
             // Create tasks in order, injecting role identity and branch instructions
             const createdTasks: Array<{ id: string; prompt: string; priority: string }> = [];
             for (const taskDef of taskDefs) {
-                const roleIdentity = buildRoleIdentityPrefix(taskDef.suggestedRole, roleMap, project);
+                const worldBaseline = buildWorldSessionBaseline(project);
+                const roleIdentity = buildRoleIdentityPrefix(taskDef.suggestedRole, roleMap);
                 const branchName = `goal/${goal.id.slice(-8)}/${taskDef.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`;
                 const branchInstructions = [
                     `## Git Branch Policy`,
@@ -683,7 +699,9 @@ export function goalRoutes(app: Fastify) {
                     `3. Commit your changes on this branch`,
                     `4. Do NOT push to or modify the main/master branch directly`,
                 ].join("\n");
-                const promptParts = [branchInstructions];
+                const promptParts: string[] = [];
+                if (worldBaseline) promptParts.push(worldBaseline);
+                promptParts.push(branchInstructions);
                 if (roleIdentity) promptParts.push(roleIdentity);
                 promptParts.push(`## Your Task\n\n${taskDef.prompt}`);
                 const fullPrompt = promptParts.join("\n\n---\n\n");

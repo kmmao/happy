@@ -1,6 +1,15 @@
 import { sessionAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
-import { buildNewMessageUpdate, buildSessionActivityEphemeral, buildUpdateSessionUpdate, ClientConnection, eventRouter } from "@/app/events/eventRouter";
+import {
+    buildNewMessageUpdate,
+    buildSessionActivityEphemeral,
+    buildTaskStatusChangedEphemeral,
+    buildUpdateSessionUpdate,
+    ClientConnection,
+    eventRouter,
+} from "@/app/events/eventRouter";
+import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
+import { inboxCreate } from "@/modules/inboxCreate";
 import { db } from "@/storage/db";
 import { allocateSessionSeq, allocateUserSeq } from "@/storage/seq";
 import { AsyncLock } from "@/utils/lock";
@@ -283,6 +292,61 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
 
             // Evict from cache so heartbeats are immediately rejected
             activityCache.invalidateSession(sid);
+
+            // Any task bound to this session that never received a terminal task-status
+            // (e.g. lost socket event) would otherwise stay "running"; session-end is a
+            // reliable signal that the CLI session is done, so converge task state here.
+            const inProgressTasks = await db.task.findMany({
+                where: {
+                    accountId: userId,
+                    sessionId: sid,
+                    status: { in: ["running", "dispatching"] },
+                },
+            });
+            const completedAt = new Date();
+            for (const task of inProgressTasks) {
+                const updated = await db.task.update({
+                    where: { id: task.id },
+                    data: {
+                        status: "completed",
+                        completedAt,
+                    },
+                });
+                const taskLabel = updated.title ?? `Task ${task.id.slice(-6)}`;
+                void inboxCreate({
+                    accountId: userId,
+                    category: "task",
+                    eventType: "task.completed",
+                    severity: "info",
+                    title: `${taskLabel}: completed`,
+                    referenceUrl: updated.sessionId ? `/session/${updated.sessionId}` : undefined,
+                    refType: "task",
+                    refId: task.id,
+                    groupKey: `task:${task.id}:completed`,
+                });
+                eventRouter.emitEphemeral({
+                    userId,
+                    payload: buildTaskStatusChangedEphemeral({
+                        taskId: task.id,
+                        status: "completed",
+                        sessionId: updated.sessionId ?? undefined,
+                        completedAt: completedAt.getTime(),
+                    }),
+                    recipientFilter: { type: "user-scoped-only" },
+                });
+                if (updated.goalId) {
+                    void goalProgressUpdate({
+                        goalId: updated.goalId,
+                        accountId: userId,
+                    });
+                }
+            }
+            if (inProgressTasks.length > 0) {
+                log(
+                    { module: "websocket" },
+                    `session-end: marked ${inProgressTasks.length} task(s) completed for session ${sid}`,
+                );
+            }
 
             // Emit session activity update
             const sessionActivity = buildSessionActivityEphemeral(sid, false, t, false);

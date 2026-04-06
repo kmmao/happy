@@ -163,7 +163,6 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
     }, []);
 
     const [genMode, setGenMode] = React.useState<"auto" | "custom">("auto");
-    const [goalMode, setGoalMode] = React.useState<"draft" | "auto_decompose">("draft");
     const [customPrompt, setCustomPrompt] = React.useState("");
 
     const applyResult = React.useCallback((result: WorldGenerateResult) => {
@@ -174,7 +173,6 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
         if (result.narrative) parts.push(t("world.narrativeLabel"));
         if (result.laws) parts.push(t("world.lawsLabel"));
         if (result.roles && result.roles.length > 0) parts.push(`${result.roles.length} ${t("roles.title")}`);
-        if (result.goals && result.goals.length > 0) parts.push(`${result.goals.length} ${t("goals.title")}`);
 
         const messages: string[] = [t("world.generateSuccess")];
 
@@ -184,7 +182,6 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
                     narrative: t("world.narrativeLabel"),
                     laws: t("world.lawsLabel"),
                     roles: t("roles.title"),
-                    goals: t("goals.title"),
                 };
                 return map[s] ?? s;
             }).join(", ");
@@ -221,7 +218,6 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
             const result = await generateWorld(credentials, project.serverId, {
                 mode,
                 prompt: mode === "custom" ? customPrompt.trim() : undefined,
-                goalMode,
             });
             if (!mountedRef.current) return;
             applyResult(result);
@@ -230,7 +226,7 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
         } finally {
             if (mountedRef.current) setGenerating(false);
         }
-    }, [project?.serverId, customPrompt, goalMode, narrative, laws, applyResult]);
+    }, [project?.serverId, customPrompt, narrative, laws, applyResult]);
 
     if (!project) {
         return (
@@ -283,42 +279,6 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
                     <Text style={styles.modeHint}>
                         {genMode === "auto" ? t("world.modeAutoHint") : t("world.modeCustomHint")}
                     </Text>
-
-                    {/* Goal Initialization Mode */}
-                    <View style={styles.goalModePanel}>
-                        <Text style={styles.goalModeTitle}>{t("world.goalModeTitle")}</Text>
-                        <Pressable
-                            style={[
-                                styles.goalModeOption,
-                                goalMode === "draft" && styles.goalModeOptionActive,
-                            ]}
-                            onPress={() => setGoalMode("draft")}
-                        >
-                            <Ionicons
-                                name={goalMode === "draft" ? "radio-button-on" : "radio-button-off"}
-                                size={16}
-                                color={goalMode === "draft" ? theme.colors.accentPurple : theme.colors.textSecondary}
-                            />
-                            <Text style={styles.goalModeLabel}>{t("world.goalModeDraft")}</Text>
-                        </Pressable>
-                        <Pressable
-                            style={[
-                                styles.goalModeOption,
-                                goalMode === "auto_decompose" && styles.goalModeOptionActive,
-                            ]}
-                            onPress={() => setGoalMode("auto_decompose")}
-                        >
-                            <Ionicons
-                                name={goalMode === "auto_decompose" ? "radio-button-on" : "radio-button-off"}
-                                size={16}
-                                color={goalMode === "auto_decompose" ? theme.colors.accentPurple : theme.colors.textSecondary}
-                            />
-                            <Text style={styles.goalModeLabel}>{t("world.goalModeAutoDecompose")}</Text>
-                        </Pressable>
-                        <Text style={styles.goalModeHint}>
-                            {goalMode === "draft" ? t("world.goalModeDraftHint") : t("world.goalModeAutoDecomposeHint")}
-                        </Text>
-                    </View>
 
                     {/* Custom Prompt Input */}
                     {genMode === "custom" && (
@@ -644,37 +604,6 @@ const styles = StyleSheet.create((theme) => ({
     modeHint: {
         ...Typography.default(),
         fontSize: 12,
-        color: theme.colors.textSecondary,
-        lineHeight: 16,
-    },
-    goalModePanel: {
-        gap: 8,
-        padding: 10,
-        borderRadius: 8,
-        backgroundColor: theme.colors.groupped.background,
-    },
-    goalModeTitle: {
-        ...Typography.default("semiBold"),
-        fontSize: 12,
-        color: theme.colors.text,
-    },
-    goalModeOption: {
-        flexDirection: "row" as const,
-        alignItems: "center" as const,
-        gap: 8,
-        paddingVertical: 4,
-    },
-    goalModeOptionActive: {
-        opacity: 1,
-    },
-    goalModeLabel: {
-        ...Typography.default(),
-        fontSize: 13,
-        color: theme.colors.text,
-    },
-    goalModeHint: {
-        ...Typography.default(),
-        fontSize: 11,
         color: theme.colors.textSecondary,
         lineHeight: 16,
     },

@@ -1,6 +1,13 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
+import { getCurrentLanguage, type SupportedLanguage } from "@/text";
 import { backoff } from "@/utils/time";
 import { getServerUrl } from "./serverConfig";
+
+/** Maps app appearance language to world generation copy (en | zh). */
+export function worldContentLanguageForGenerate(): "en" | "zh" {
+    const code: SupportedLanguage = getCurrentLanguage();
+    return code === "zh-Hans" || code === "zh-Hant" ? "zh" : "en";
+}
 
 function authHeaders(credentials: AuthCredentials) {
     return {
@@ -63,12 +70,7 @@ export interface WorldGenerateResult {
         description: string;
         duties: string[];
     }> | null;
-    goals: Array<{
-        id: string;
-        title: string;
-        description: string;
-        priority: string;
-    }> | null;
+    goals: null;
     skipped: string[];
     errors: string[];
 }
@@ -76,15 +78,16 @@ export interface WorldGenerateResult {
 export async function generateWorld(
     credentials: AuthCredentials,
     projectId: string,
-    opts: { mode: "auto" | "custom"; prompt?: string; goalMode?: "draft" | "auto_decompose" },
+    opts: { mode: "auto" | "custom"; prompt?: string; contentLanguage?: "en" | "zh" },
 ): Promise<WorldGenerateResult> {
     const API_ENDPOINT = getServerUrl();
+    const contentLanguage = opts.contentLanguage ?? worldContentLanguageForGenerate();
     const response = await fetch(
         `${API_ENDPOINT}/v1/projects/${projectId}/world/generate`,
         {
             method: "POST",
             headers: authHeaders(credentials),
-            body: JSON.stringify(opts),
+            body: JSON.stringify({ ...opts, contentLanguage }),
         },
     );
     if (!response.ok) {
