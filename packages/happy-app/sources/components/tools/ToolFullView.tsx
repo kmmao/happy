@@ -16,23 +16,18 @@ import { layout } from "../layout";
 import { useLocalSetting, useLocalSettingMutable } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
-import { ReviewFooter } from "./ReviewFooter";
 import { ToolSimpleContent } from "./ToolSimpleContent";
 
 interface ToolFullViewProps {
   tool: ToolCall;
   metadata?: Metadata | null;
   messages?: Message[];
-  sessionId?: string;
-  messageId?: string;
 }
 
 export const ToolFullView = React.memo(function ToolFullView({
   tool,
   metadata,
   messages = [],
-  sessionId,
-  messageId,
 }: ToolFullViewProps) {
   // Check if there's a specialized content view for this tool
   const SpecializedFullView = getToolFullViewComponent(tool.name);
@@ -216,16 +211,6 @@ export const ToolFullView = React.memo(function ToolFullView({
               </View>
             )}
           </>
-        )}
-
-        {/* Code Review Footer */}
-        {sessionId && messageId && (
-          <ReviewFooter
-            tool={tool}
-            sessionId={sessionId}
-            messageId={messageId}
-            metadata={metadata || null}
-          />
         )}
 
         {/* Raw JSON View (Dev Mode Only) */}

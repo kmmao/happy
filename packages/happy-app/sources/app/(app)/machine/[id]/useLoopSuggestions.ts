@@ -19,7 +19,6 @@ interface UseLoopSuggestionsParams {
     profileId: string;
     projectId: string;
     load: (kind: "initial" | "refresh") => Promise<void>;
-    removeSuggestionAfterAdopt: (repoPath: string, key: string) => void;
 }
 
 interface UseLoopSuggestionsResult {
@@ -33,7 +32,6 @@ interface UseLoopSuggestionsResult {
 
     readonly loadSuggestions: (targetDirectory: string) => Promise<void>;
     readonly adoptSuggestion: (suggestion: MachineAgentLoopSuggestion) => Promise<void>;
-    readonly adoptSuggestionFromOneClickConfirm: (repoPath: string, suggestion: MachineAgentLoopSuggestion) => Promise<void>;
     readonly adoptAllSuggestions: () => Promise<void>;
     readonly scanBootstrapRepos: () => Promise<void>;
     readonly adoptRepoSuggestions: (entry: RepoBootstrapEntry, runNow: boolean) => Promise<void>;
@@ -44,7 +42,6 @@ export function useLoopSuggestions({
     profileId,
     projectId,
     load,
-    removeSuggestionAfterAdopt,
 }: UseLoopSuggestionsParams): UseLoopSuggestionsResult {
     const [suggestions, setSuggestions] = React.useState<MachineAgentLoopSuggestion[]>([]);
     const [suggesting, setSuggesting] = React.useState(false);
@@ -187,26 +184,6 @@ export function useLoopSuggestions({
         }
     }, [createLoopFromSuggestion, load, machineId, reloadSuggestionsAfterAdopts, suggestions]);
 
-    const adoptSuggestionFromOneClickConfirm = React.useCallback(
-        async (repoPath: string, suggestion: MachineAgentLoopSuggestion) => {
-            if (!machineId) {
-                return;
-            }
-            setCreatingSuggestionKey(suggestion.key);
-            try {
-                await createLoopFromSuggestion(suggestion);
-                removeSuggestionAfterAdopt(repoPath, suggestion.key);
-                await load("refresh");
-                await reloadSuggestionsAfterAdopts(suggestions.length > 0 ? suggestions : [suggestion]);
-            } catch (error) {
-                Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
-            } finally {
-                setCreatingSuggestionKey(null);
-            }
-        },
-        [createLoopFromSuggestion, load, machineId, reloadSuggestionsAfterAdopts, removeSuggestionAfterAdopt, suggestions],
-    );
-
     const adoptAllSuggestions = React.useCallback(async () => {
         if (!machineId) {
             return;
@@ -310,7 +287,6 @@ export function useLoopSuggestions({
         bootstrappingRepoPath,
         loadSuggestions,
         adoptSuggestion,
-        adoptSuggestionFromOneClickConfirm,
         adoptAllSuggestions,
         scanBootstrapRepos,
         adoptRepoSuggestions,

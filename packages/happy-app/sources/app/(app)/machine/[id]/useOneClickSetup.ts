@@ -48,8 +48,6 @@ export interface UseOneClickSetupReturn {
     setIncludeAutomationProfiles: (value: boolean) => void;
     ignoreRepo: (repoPath: string) => void;
     unignoreRepo: (repoPath: string) => void;
-    /** After creating a single loop from the confirm list, drop that suggestion (and empty repos). */
-    removeSuggestionAfterAdopt: (repoPath: string, suggestionKey: string) => void;
     reset: () => void;
 }
 
@@ -151,43 +149,6 @@ export function useOneClickSetup(
             return next;
         });
     }, [machineId]);
-
-    const removeSuggestionAfterAdopt = React.useCallback((repoPath: string, suggestionKey: string) => {
-        setState((prev) => {
-            if (prev.phase !== "confirming") {
-                return prev;
-            }
-            const repos = prev.repos
-                .map((entry) => {
-                    if (entry.repo.repoPath !== repoPath) {
-                        return entry;
-                    }
-                    const nextSuggestions = entry.suggestions.filter((s) => s.key !== suggestionKey);
-                    return { ...entry, suggestions: nextSuggestions };
-                })
-                .filter((entry) => entry.suggestions.length > 0);
-            const totalSuggestions = repos.reduce((sum, e) => sum + e.suggestions.length, 0);
-            const nextCreated = prev.createdCount + 1;
-            if (repos.length === 0) {
-                return {
-                    ...prev,
-                    phase: "done",
-                    repos: [],
-                    totalSuggestions: 0,
-                    creatableCount: 0,
-                    createdCount: nextCreated,
-                    automationOutcome: "none",
-                };
-            }
-            return {
-                ...prev,
-                repos,
-                totalSuggestions,
-                creatableCount: totalSuggestions,
-                createdCount: nextCreated,
-            };
-        });
-    }, []);
 
     /** Scan repos and collect entries (shared by start and startAdvanced). */
     const scanAndCollect = React.useCallback(async (): Promise<OneClickSetupRepo[] | null> => {
@@ -420,7 +381,6 @@ export function useOneClickSetup(
         setIncludeAutomationProfiles,
         ignoreRepo,
         unignoreRepo,
-        removeSuggestionAfterAdopt,
         reset,
     };
 }

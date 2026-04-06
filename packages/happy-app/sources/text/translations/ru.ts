@@ -962,17 +962,6 @@ export const ru: TranslationStructure = {
     },
   },
 
-  codeReview: {
-    accept: "Принять",
-    reject: "Отклонить",
-    accepted: "Принято",
-    rejected: "Отклонено",
-    rejectConfirmTitle: "Отклонить изменение",
-    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
-      `Попросить Claude отменить изменения в ${filePath}?`,
-    rejectConfirm: "Отклонить и отменить",
-  },
-
   tools: {
     fullView: {
       description: "Описание",

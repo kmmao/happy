@@ -917,17 +917,6 @@ export const zhHans: TranslationStructure = {
     },
   },
 
-  codeReview: {
-    accept: "接受",
-    reject: "拒绝",
-    accepted: "已接受",
-    rejected: "已拒绝",
-    rejectConfirmTitle: "拒绝修改",
-    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
-      `让 Claude 撤回对 ${filePath} 的修改？`,
-    rejectConfirm: "拒绝并撤回",
-  },
-
   tools: {
     fullView: {
       description: "描述",

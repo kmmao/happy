@@ -949,16 +949,6 @@ export const en: TranslationStructure = {
     },
   },
 
-  codeReview: {
-    accept: "Accept",
-    reject: "Reject",
-    accepted: "Accepted",
-    rejected: "Rejected",
-    rejectConfirmTitle: "Reject Change",
-    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
-      `Ask Claude to revert changes to ${filePath}?`,
-    rejectConfirm: "Reject & Revert",
-  },
 
   tools: {
     fullView: {

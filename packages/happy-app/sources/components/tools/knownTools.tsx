@@ -123,7 +123,6 @@ export const knownTools = {
     minimal: true,
     hideDefaultError: true,
     isMutable: true,
-    isReviewable: false,
     input: z.object({
       command: z.string().describe("The command to execute"),
       timeout: z
@@ -786,7 +785,6 @@ export const knownTools = {
     minimal: true,
     hideDefaultError: true,
     isMutable: true,
-    isReviewable: false,
     input: z
       .object({
         command: z.array(z.string()).describe("The command array to execute"),
@@ -1497,7 +1495,6 @@ export const knownTools = {
     hideDefaultError?: boolean;
     hidden?: boolean;
     isMutable?: boolean;
-    isReviewable?: boolean;
     input?: z.ZodObject<any>;
     result?: z.ZodObject<any>;
     minimal?:
@@ -1544,22 +1541,3 @@ export function isMutableTool(toolName: string): boolean {
   return true;
 }
 
-/**
- * Check if a tool should show accept/reject review buttons.
- * Defaults to isMutable unless explicitly overridden by isReviewable.
- * Tools like Bash are mutable (for git status refresh) but not reviewable
- * since most commands are read-only and don't have clear undo semantics.
- */
-export function isReviewableTool(toolName: string): boolean {
-  const tool = knownTools[toolName as keyof typeof knownTools];
-  if (tool) {
-    if ("isReviewable" in tool) {
-      return Boolean(tool.isReviewable);
-    }
-    if ("isMutable" in tool) {
-      return tool.isMutable === true;
-    }
-  }
-  // Unknown tools should not be reviewable by default
-  return false;
-}

@@ -98,14 +98,11 @@ export default React.memo(function MachineLoopsPage() {
         projectId,
         profileId,
     );
-    const { removeSuggestionAfterAdopt } = oneClickSetup;
-
     const loopSuggestions = useLoopSuggestions({
         machineId,
         profileId,
         projectId,
         load,
-        removeSuggestionAfterAdopt,
     });
     const {
         suggestions,
@@ -117,7 +114,6 @@ export default React.memo(function MachineLoopsPage() {
         bootstrappingRepoPath,
         loadSuggestions,
         adoptSuggestion,
-        adoptSuggestionFromOneClickConfirm,
         adoptAllSuggestions,
         scanBootstrapRepos,
         adoptRepoSuggestions,
@@ -362,8 +358,6 @@ export default React.memo(function MachineLoopsPage() {
                 <OneClickSetupCard
                     setup={oneClickSetup}
                     onRefresh={() => void load("refresh")}
-                    onAdoptConfirmSuggestion={adoptSuggestionFromOneClickConfirm}
-                    adoptingSuggestionKey={creatingSuggestionKey}
                 />
 
                 <ItemGroup title={t("machine.agentLoops")}>

@@ -120,8 +120,6 @@ function FullView(props: {
       <ToolFullView
         tool={props.message.tool}
         messages={props.message.children}
-        sessionId={props.sessionId}
-        messageId={props.messageId}
       />
     );
   }

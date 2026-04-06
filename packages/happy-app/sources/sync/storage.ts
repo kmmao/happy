@@ -151,11 +151,7 @@ interface StorageState {
   // Project list version counter (bumped on manual add/delete to trigger re-render)
   projectVersion: number;
   bumpProjectVersion: () => void;
-  // Code review state (in-memory only, not persisted)
   sessionLastViewed: Record<string, number>;
-  reviewedTools: Record<string, "accepted" | "rejected">;
-  setToolReview: (messageId: string, state: "accepted" | "rejected") => void;
-  getToolReview: (messageId: string) => "accepted" | "rejected" | undefined;
   applySessions: (
     sessions: (Omit<Session, "presence"> & { presence?: "online" | number })[],
     replace?: boolean,
@@ -477,12 +473,6 @@ export const storage = create<StorageState>()((set, get) => {
     projectVersion: 0,
     bumpProjectVersion: () => set((prev) => ({ projectVersion: prev.projectVersion + 1 })),
     sessionLastViewed,
-    reviewedTools: {},
-    setToolReview: (messageId: string, state: "accepted" | "rejected") =>
-      set((prev) => ({
-        reviewedTools: { ...prev.reviewedTools, [messageId]: state },
-      })),
-    getToolReview: (messageId: string) => get().reviewedTools[messageId],
     isMutableToolCall: (sessionId: string, callId: string) => {
       const sessionMessages = get().sessionMessages[sessionId];
       if (!sessionMessages) {
@@ -1924,16 +1914,6 @@ export function useMessage(
       const session = state.sessionMessages[sessionId];
       return session?.messagesMap[messageId] ?? null;
     }),
-  );
-}
-
-export function useToolReviewState(
-  messageId: string | undefined,
-): "accepted" | "rejected" | undefined {
-  return storage(
-    useShallow((state) =>
-      messageId ? state.reviewedTools[messageId] : undefined,
-    ),
   );
 }
 

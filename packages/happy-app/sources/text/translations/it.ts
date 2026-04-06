@@ -1038,17 +1038,6 @@ export const it: TranslationStructure = {
     },
   },
 
-  codeReview: {
-    accept: "Accetta",
-    reject: "Rifiuta",
-    accepted: "Accettato",
-    rejected: "Rifiutato",
-    rejectConfirmTitle: "Rifiuta modifica",
-    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
-      `Chiedere a Claude di annullare le modifiche a ${filePath}?`,
-    rejectConfirm: "Rifiuta e annulla",
-  },
-
   tools: {
     fullView: {
       description: "Descrizione",

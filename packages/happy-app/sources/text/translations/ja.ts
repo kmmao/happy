@@ -1026,17 +1026,6 @@ export const ja: TranslationStructure = {
     },
   },
 
-  codeReview: {
-    accept: "承認",
-    reject: "拒否",
-    accepted: "承認済み",
-    rejected: "拒否済み",
-    rejectConfirmTitle: "変更を拒否",
-    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
-      `Claude に ${filePath} の変更を元に戻すよう依頼しますか？`,
-    rejectConfirm: "拒否して元に戻す",
-  },
-
   tools: {
     fullView: {
       description: "説明",

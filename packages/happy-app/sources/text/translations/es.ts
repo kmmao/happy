@@ -953,17 +953,6 @@ export const es: TranslationStructure = {
     },
   },
 
-  codeReview: {
-    accept: "Aceptar",
-    reject: "Rechazar",
-    accepted: "Aceptado",
-    rejected: "Rechazado",
-    rejectConfirmTitle: "Rechazar cambio",
-    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
-      `Pedir a Claude que revierta los cambios en ${filePath}?`,
-    rejectConfirm: "Rechazar y revertir",
-  },
-
   tools: {
     fullView: {
       description: "Descripción",

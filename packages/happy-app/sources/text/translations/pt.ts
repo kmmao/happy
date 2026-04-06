@@ -950,17 +950,6 @@ export const pt: TranslationStructure = {
     },
   },
 
-  codeReview: {
-    accept: "Aceitar",
-    reject: "Rejeitar",
-    accepted: "Aceite",
-    rejected: "Rejeitado",
-    rejectConfirmTitle: "Rejeitar alteração",
-    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
-      `Pedir ao Claude para reverter as alterações em ${filePath}?`,
-    rejectConfirm: "Rejeitar e reverter",
-  },
-
   tools: {
     fullView: {
       description: "Descrição",

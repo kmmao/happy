@@ -952,17 +952,6 @@ export const ca: TranslationStructure = {
     },
   },
 
-  codeReview: {
-    accept: "Acceptar",
-    reject: "Rebutjar",
-    accepted: "Acceptat",
-    rejected: "Rebutjat",
-    rejectConfirmTitle: "Rebutjar canvi",
-    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
-      `Demanar a Claude que reverteixi els canvis a ${filePath}?`,
-    rejectConfirm: "Rebutjar i revertir",
-  },
-
   tools: {
     fullView: {
       description: "Descripció",

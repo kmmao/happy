@@ -961,17 +961,6 @@ export const pl: TranslationStructure = {
     },
   },
 
-  codeReview: {
-    accept: "Akceptuj",
-    reject: "Odrzuć",
-    accepted: "Zaakceptowano",
-    rejected: "Odrzucono",
-    rejectConfirmTitle: "Odrzuć zmianę",
-    rejectConfirmMessage: ({ filePath }: { filePath: string }) =>
-      `Poprosić Claude o cofnięcie zmian w ${filePath}?`,
-    rejectConfirm: "Odrzuć i cofnij",
-  },
-
   tools: {
     fullView: {
       description: "Opis",

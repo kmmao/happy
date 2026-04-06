@@ -26,7 +26,6 @@ import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal/ModalManager";
 import { sessionAllow } from "@/sync/ops";
-import { useToolReview } from "./useToolReview";
 import { PermissionFooter } from "./PermissionFooter";
 import { shouldAutoApprove } from "@/utils/shouldAutoApprove";
 import { log } from '@/log';
@@ -104,13 +103,6 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     buttons.push({ text: t("common.cancel") });
     Modal.alert(tool.name, undefined, buttons);
   }, [tool]);
-
-  // Code review accept/reject for completed mutable tools
-  const { isReviewable, reviewState, onAccept, onReject } = useToolReview({
-    tool,
-    messageId,
-    sessionId,
-  });
 
   // Auto-approve tool permissions based on permission mode.
   // In default mode: never auto-approve — show PermissionFooter for manual review.
@@ -378,44 +370,6 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         }
         break;
       case "completed":
-        if (isReviewable) {
-          if (reviewState === "accepted") {
-            statusIcon = (
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={theme.colors.diff.success}
-              />
-            );
-          } else if (reviewState === "rejected") {
-            statusIcon = (
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={theme.colors.diff.error}
-              />
-            );
-          } else {
-            statusIcon = (
-              <View style={styles.quickApproveContainer}>
-                <Pressable onPress={onAccept} style={styles.quickApproveBtn}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={24}
-                    color={theme.colors.diff.success}
-                  />
-                </Pressable>
-                <Pressable onPress={onReject} style={styles.quickApproveBtn}>
-                  <Ionicons
-                    name="close-circle"
-                    size={24}
-                    color={theme.colors.diff.error}
-                  />
-                </Pressable>
-              </View>
-            );
-          }
-        }
         break;
       case "error":
         statusIcon = (
@@ -684,13 +638,5 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: 12,
     paddingTop: 8,
     overflow: "visible",
-  },
-  quickApproveContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  quickApproveBtn: {
-    padding: 2,
   },
 }));

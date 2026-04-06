@@ -9,10 +9,6 @@ import type { UseOneClickSetupReturn } from "./useOneClickSetup";
 interface OneClickSetupCardProps {
     setup: UseOneClickSetupReturn;
     onRefresh?: () => void;
-    /** @deprecated No longer used in confirming UI — kept for call-site compatibility. */
-    onAdoptConfirmSuggestion?: (...args: any[]) => void | Promise<void>;
-    /** @deprecated No longer used in confirming UI — kept for call-site compatibility. */
-    adoptingSuggestionKey?: string | null;
 }
 
 function OneClickIgnoredReposModal(props: {
