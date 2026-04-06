@@ -209,6 +209,7 @@ export function webhookTriggerRoutes(app: Fastify) {
                 severity: "info",
                 title: `Webhook '${trigger.slug}' triggered`,
                 body: trigger.name ?? undefined,
+                referenceUrl: `/machine/${trigger.machineId}/tasks`,
                 refType: "webhookTrigger",
                 refId: trigger.id,
                 groupKey: `webhook:${trigger.id}:triggered`,

@@ -189,6 +189,7 @@ export async function checkAndTriggerSchedules(
                 severity: "info",
                 title: `Cron schedule fired`,
                 body: schedule.name ?? schedule.cronExpression,
+                referenceUrl: `/machine/${machineId}/tasks`,
                 refType: "triggerSchedule",
                 refId: schedule.id,
                 groupKey: `schedule:${schedule.id}:triggered`,

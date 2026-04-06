@@ -307,9 +307,10 @@ export function knowledgeRoutes(app: Fastify) {
                 severity: "info",
                 title: `New knowledge: ${body.title.substring(0, 50)}`,
                 body: `Type: ${body.entryType}`,
+                referenceUrl: `/project/${id}/knowledge/${entry.id}/evolution`,
                 refType: "projectKnowledge",
                 refId: entry.id,
-                groupKey: `knowledge:${id}:created`,
+                groupKey: `knowledge:${entry.id}:created`,
                 skipPush: true,
             });
 

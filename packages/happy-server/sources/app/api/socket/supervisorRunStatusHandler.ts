@@ -271,6 +271,7 @@ export function supervisorRunStatusHandler(
                         ? `Supervisor: ${actionCount} issue(s) found`
                         : "Supervisor run failed",
                     body: data.status === "failed" ? (data.errorMessage ?? undefined) : undefined,
+                    referenceUrl: `/project/${data.projectId}/supervisor-run/${data.runId}`,
                     refType: "supervisorRun",
                     refId: data.runId,
                     groupKey: `supervisor:${data.runId}:${data.status}`,
