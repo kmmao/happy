@@ -41,10 +41,13 @@ export const LocalSettingsSchema = z.object({
   sidePanelWidth: z
     .number()
     .describe("Width of the session side panel in pixels"),
-  // Favorited file paths in the Files browser, keyed by sessionId
+  // Favorited entries in the Files browser, keyed by basePath
   fileFavorites: z
-    .record(z.string(), z.array(z.string()))
-    .describe("Favorited file paths per session, keyed by sessionId"),
+    .record(
+      z.string(),
+      z.array(z.object({ path: z.string(), type: z.enum(["file", "directory"]) })),
+    )
+    .describe("Favorited file/directory entries per project, keyed by basePath"),
 });
 
 //

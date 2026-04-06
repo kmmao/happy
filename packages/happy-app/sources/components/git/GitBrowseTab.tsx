@@ -85,14 +85,15 @@ export const GitBrowseTab = React.memo<{
     // File favorites: keyed by basePath so same project shares favorites across sessions
     const fileFavorites = useLocalSetting("fileFavorites");
     const favKey = basePath ?? sessionId;
-    const sessionFavorites: string[] = fileFavorites[favKey] ?? [];
+    type FavEntry = { path: string; type: "file" | "directory" };
+    const sessionFavorites: FavEntry[] = fileFavorites[favKey] ?? [];
 
     const toggleFavorite = React.useCallback(
-        (relPath: string) => {
-            const current: string[] = fileFavorites[favKey] ?? [];
-            const next = current.includes(relPath)
-                ? current.filter((p) => p !== relPath)
-                : [...current, relPath];
+        (relPath: string, entryType: "file" | "directory") => {
+            const current: FavEntry[] = fileFavorites[favKey] ?? [];
+            const next = current.some((e) => e.path === relPath)
+                ? current.filter((e) => e.path !== relPath)
+                : [...current, { path: relPath, type: entryType }];
             storage.getState().applyLocalSettings({
                 fileFavorites: { ...fileFavorites, [favKey]: next },
             });
@@ -421,15 +422,16 @@ export const GitBrowseTab = React.memo<{
                                 {t("files.favorites")}
                             </Text>
                         </View>
-                        {sessionFavorites.map((relPath) => {
-                            const fullPath = basePath ? `${basePath}/${relPath}` : relPath;
-                            const fileName = relPath.split("/").pop() ?? relPath;
-                            const parentDir = relPath.includes("/")
-                                ? relPath.slice(0, relPath.lastIndexOf("/"))
+                        {sessionFavorites.map((fav) => {
+                            const fullPath = basePath ? `${basePath}/${fav.path}` : fav.path;
+                            const fileName = fav.path.split("/").pop() ?? fav.path;
+                            const parentDir = fav.path.includes("/")
+                                ? fav.path.slice(0, fav.path.lastIndexOf("/"))
                                 : null;
+                            const isDir = fav.type === "directory";
                             return (
                                 <View
-                                    key={`fav-${relPath}`}
+                                    key={`fav-${fav.path}`}
                                     style={{
                                         flexDirection: "row",
                                         alignItems: "center",
@@ -438,17 +440,31 @@ export const GitBrowseTab = React.memo<{
                                         gap: 8,
                                     }}
                                 >
-                                    <Octicons name="star-fill" size={embedded ? 15 : 18} color="#FFD700" />
-                                    {/* Filename — tap to navigate to parent dir then open file */}
+                                    {/* Type icon */}
+                                    {isDir ? (
+                                        <Octicons name="file-directory" size={embedded ? 16 : 20} color="#007AFF" />
+                                    ) : (
+                                        <FileIcon fileName={fileName} size={embedded ? 16 : 20} />
+                                    )}
+                                    {/* Filename — directories: navigate into; files: navigate to parent then open */}
                                     <Pressable
                                         onPress={() => {
-                                            navigateToParentDir(relPath);
-                                            if (onFilePress) {
-                                                onFilePress(fullPath);
+                                            if (isDir) {
+                                                // Navigate directly into the directory
+                                                const targetPath = basePath ? `${basePath}/${fav.path}` : fav.path;
+                                                if (targetPath !== currentPath) {
+                                                    setPathHistory((prev) => [...prev, currentPath!]);
+                                                    setCurrentPath(targetPath);
+                                                }
                                             } else {
-                                                onFileOpen?.();
-                                                const encodedPath = utf8ToBase64(fullPath);
-                                                router.push(`/session/${sessionId}/file?path=${encodedPath}`);
+                                                navigateToParentDir(fav.path);
+                                                if (onFilePress) {
+                                                    onFilePress(fullPath);
+                                                } else {
+                                                    onFileOpen?.();
+                                                    const encodedPath = utf8ToBase64(fullPath);
+                                                    router.push(`/session/${sessionId}/file?path=${encodedPath}`);
+                                                }
                                             }
                                         }}
                                         style={({ pressed }) => ({
@@ -467,10 +483,10 @@ export const GitBrowseTab = React.memo<{
                                             {fileName}
                                         </Text>
                                     </Pressable>
-                                    {/* Parent directory path — tap to navigate to that dir only */}
+                                    {/* Parent dir path — tap to navigate there */}
                                     {parentDir && (
                                         <Pressable
-                                            onPress={() => navigateToParentDir(relPath)}
+                                            onPress={() => navigateToParentDir(fav.path)}
                                             hitSlop={4}
                                         >
                                             <Text
@@ -486,7 +502,7 @@ export const GitBrowseTab = React.memo<{
                                         </Pressable>
                                     )}
                                     <Pressable
-                                        onPress={() => toggleFavorite(relPath)}
+                                        onPress={() => toggleFavorite(fav.path, fav.type)}
                                         hitSlop={6}
                                         style={({ pressed }) => ({ padding: 2, opacity: pressed ? 0.5 : 1 })}
                                     >
@@ -594,15 +610,15 @@ export const GitBrowseTab = React.memo<{
                                 <Pressable
                                     onPress={(e) => {
                                         e.stopPropagation();
-                                        toggleFavorite(entryRelPath);
+                                        toggleFavorite(entryRelPath, isDir ? "directory" : "file");
                                     }}
                                     hitSlop={6}
                                     style={({ pressed }) => ({ padding: 2, opacity: pressed ? 0.5 : 1 })}
                                 >
                                     <Octicons
-                                        name={sessionFavorites.includes(entryRelPath) ? "star-fill" : "star"}
+                                        name={sessionFavorites.some((f) => f.path === entryRelPath) ? "star-fill" : "star"}
                                         size={14}
-                                        color={sessionFavorites.includes(entryRelPath) ? "#FFD700" : theme.colors.textSecondary}
+                                        color={sessionFavorites.some((f) => f.path === entryRelPath) ? "#FFD700" : theme.colors.textSecondary}
                                     />
                                 </Pressable>
                                 {isDir && (
@@ -651,12 +667,12 @@ export const GitBrowseTab = React.memo<{
                             </Text>
                         ) : undefined;
 
-                        const isFavorited = sessionFavorites.includes(entryRelPath);
+                        const isFavorited = sessionFavorites.some((f) => f.path === entryRelPath);
                         const starEl = (
                             <Pressable
                                 onPress={(e) => {
                                     e.stopPropagation();
-                                    toggleFavorite(entryRelPath);
+                                    toggleFavorite(entryRelPath, isDir ? "directory" : "file");
                                 }}
                                 hitSlop={6}
                                 style={({ pressed }) => ({
