@@ -272,6 +272,7 @@ function SessionInfoContent({ session }: { session: Session }) {
 
   // Use HappyAction for resume - reconnects to the same Happy session with --resume
   const [resumingSession, performResume] = useHappyAction(async () => {
+    const worktree = session.metadata?.worktree;
     const result = await machineSpawnNewSession({
       machineId: session.metadata!.machineId!,
       directory: session.metadata!.path!,
@@ -279,6 +280,25 @@ function SessionInfoContent({ session }: { session: Session }) {
       happySessionId: session.id,
       agent: "claude",
     });
+
+    // Worktree directory was deleted — fall back to parent repo path
+    if (result.type === "requestToApproveDirectoryCreation" && worktree?.isWorktree && worktree.parentRepoPath) {
+      const fallback = await machineSpawnNewSession({
+        machineId: session.metadata!.machineId!,
+        directory: worktree.parentRepoPath,
+        claudeSessionId: session.metadata!.claudeSessionId!,
+        happySessionId: session.id,
+        agent: "claude",
+      });
+      if (fallback.type === "error") {
+        throw new HappyError(fallback.errorMessage, false);
+      }
+      if (fallback.type === "success") {
+        router.back();
+      }
+      return;
+    }
+
     if (result.type === "error") {
       throw new HappyError(result.errorMessage, false);
     }

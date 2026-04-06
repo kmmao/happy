@@ -88,6 +88,9 @@ export interface AgentLoopDefinition {
   lastCompletedAt?: number;
   lastSessionId?: string;
   lastError?: string;
+  roleId?: string;
+  roleName?: string;
+  roleType?: string;
 }
 
 interface AgentLoopStoreFile {

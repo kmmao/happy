@@ -1066,6 +1066,8 @@ export interface SupervisorTriggerOptions {
   maxConcurrentAnalysis?: number;
   maxConcurrentFix?: number;
   maxFindings?: number;
+  narrative?: string;
+  laws?: string;
 }
 
 export function buildSupervisorTriggerEphemeral(opts: SupervisorTriggerOptions): EphemeralPayload {

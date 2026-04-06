@@ -263,6 +263,10 @@ export type SupervisorTriggerData = {
   maxConcurrentFix?: number;
   /** Max findings per analysis run. 0 or negative = unlimited. */
   maxFindings?: number;
+  /** Project narrative (World Model Phase 0). */
+  narrative?: string;
+  /** Project laws JSON array (World Model Phase 0). */
+  laws?: string;
   existingActions?: ReadonlyArray<{
     category: string;
     title: string;

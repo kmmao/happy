@@ -68,6 +68,9 @@ export interface AgentLoopTriggerData {
   eventSource?: string;
   eventTitle?: string;
   eventDetails?: string;
+  roleId?: string;
+  roleName?: string;
+  roleType?: string;
 }
 
 export interface TaskTriggerData {

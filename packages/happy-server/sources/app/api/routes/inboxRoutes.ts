@@ -3,7 +3,7 @@ import { db } from "@/storage/db";
 import { z } from "zod";
 
 const InboxCategorySchema = z.enum([
-    "task", "trigger", "supervisor", "session", "knowledge", "system",
+    "task", "trigger", "supervisor", "session", "knowledge", "system", "decision",
 ]);
 
 function serializeInboxItem(item: {

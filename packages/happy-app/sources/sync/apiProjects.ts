@@ -20,6 +20,8 @@ export interface ServerProject {
     supervisorEnabledDimensions: string | null;
     supervisorPushTriggerEnabled: boolean;
     supervisorCustomRules: string | null;
+    narrative: string | null;
+    laws: string | null;
     archived: boolean;
     sessionCount?: number;
     createdAt: number;
@@ -163,6 +165,8 @@ export async function updateProject(
         metadata?: string | null;
         repoUrl?: string | null;
         archived?: boolean;
+        narrative?: string | null;
+        laws?: string | null;
     },
 ): Promise<ServerProject> {
     const API_ENDPOINT = getServerUrl();
@@ -265,5 +269,115 @@ export async function fetchRelatedProjects(
 
         const data = (await response.json()) as RelatedProjectsResponse;
         return data.related;
+    });
+}
+
+// === Agent Roles ===
+
+export interface AgentRoleSummary {
+    id: string;
+    projectId: string;
+    name: string;
+    type: string;
+    description: string | null;
+    duties: string[];
+    skillIds: string[];
+    maxConcurrency: number;
+    enabled: boolean;
+    createdAt: number;
+    updatedAt: number;
+}
+
+interface AgentRolesResponse {
+    roles: AgentRoleSummary[];
+    total: number;
+}
+
+export async function fetchAgentRoles(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<AgentRoleSummary[]> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/agent-roles?projectId=${projectId}`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch agent roles: ${response.status}`);
+        }
+        const data = (await response.json()) as AgentRolesResponse;
+        return data.roles;
+    });
+}
+
+export async function createAgentRole(
+    credentials: AuthCredentials,
+    body: {
+        projectId: string;
+        name: string;
+        type?: string;
+        description?: string;
+        duties?: string[];
+        skillIds?: string[];
+        templateType?: string;
+    },
+): Promise<AgentRoleSummary> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(`${API_ENDPOINT}/v1/agent-roles`, {
+            method: "POST",
+            headers: authHeaders(credentials),
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to create agent role: ${response.status}`);
+        }
+        const data = (await response.json()) as { role: AgentRoleSummary };
+        return data.role;
+    });
+}
+
+export async function updateAgentRole(
+    credentials: AuthCredentials,
+    roleId: string,
+    body: {
+        name?: string;
+        type?: string;
+        description?: string | null;
+        duties?: string[];
+        skillIds?: string[];
+        maxConcurrency?: number;
+        enabled?: boolean;
+    },
+): Promise<AgentRoleSummary> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(`${API_ENDPOINT}/v1/agent-roles/${roleId}`, {
+            method: "PATCH",
+            headers: authHeaders(credentials),
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to update agent role: ${response.status}`);
+        }
+        const data = (await response.json()) as { role: AgentRoleSummary };
+        return data.role;
+    });
+}
+
+export async function deleteAgentRole(
+    credentials: AuthCredentials,
+    roleId: string,
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+    await backoff(async () => {
+        const response = await fetch(`${API_ENDPOINT}/v1/agent-roles/${roleId}`, {
+            method: "DELETE",
+            headers: authHeaders(credentials),
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to delete agent role: ${response.status}`);
+        }
     });
 }

@@ -49,7 +49,7 @@ export function supervisorRunRoutes(app: Fastify) {
 
             const project = await db.project.findFirst({
                 where: { id, accountId: userId },
-                select: { id: true, machineId: true, path: true, supervisorMode: true, supervisorEnabledDimensions: true, supervisorCustomRules: true, supervisorConfig: true },
+                select: { id: true, machineId: true, path: true, supervisorMode: true, supervisorEnabledDimensions: true, supervisorCustomRules: true, supervisorConfig: true, narrative: true, laws: true },
             });
 
             if (!project) {
@@ -143,6 +143,8 @@ export function supervisorRunRoutes(app: Fastify) {
                     mode: triggerType === "research" ? undefined : (project.supervisorMode ?? undefined),
                     dimensions: triggerType === "research" ? undefined : parseDimensions(project.supervisorEnabledDimensions),
                     customRules: triggerType === "research" ? undefined : (project.supervisorCustomRules ?? undefined),
+                    narrative: triggerType === "research" ? undefined : (project.narrative ?? undefined),
+                    laws: triggerType === "research" ? undefined : (project.laws ?? undefined),
                     researchParams: researchParams ? JSON.stringify(researchParams) : undefined,
                     existingActions,
                     maxConcurrentAnalysis: concurrency.maxAnalysis,

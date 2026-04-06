@@ -192,4 +192,87 @@ describe('buildSupervisorPrompt', () => {
         expect(prompt).toContain('skipped');
         expect(prompt).toContain('ignored');
     });
+
+    // === World Model (narrative + laws) ===
+
+    it('should include narrative section when provided', () => {
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            narrative: 'This is a high-performance API gateway focused on security',
+        });
+        expect(prompt).toContain('Project Narrative');
+        expect(prompt).toContain('high-performance API gateway focused on security');
+    });
+
+    it('should not include narrative section when empty', () => {
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            narrative: '   ',
+        });
+        expect(prompt).not.toContain('Project Narrative');
+    });
+
+    it('should include laws section with enabled laws sorted by severity', () => {
+        const laws = JSON.stringify([
+            { id: '1', category: 'quality', description: 'Test coverage >= 80%', enabled: true, severity: 'high' },
+            { id: '2', category: 'security', description: 'No hardcoded API keys', enabled: true, severity: 'critical' },
+            { id: '3', category: 'convention', description: 'Use ESLint', enabled: false, severity: 'low' },
+        ]);
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            laws,
+        });
+        expect(prompt).toContain('Project Laws (MANDATORY');
+        expect(prompt).toContain('No hardcoded API keys');
+        expect(prompt).toContain('Test coverage >= 80%');
+        // Disabled law should be filtered out
+        expect(prompt).not.toContain('Use ESLint');
+        // Critical should appear before high (sorted by severity)
+        const criticalIdx = prompt.indexOf('No hardcoded API keys');
+        const highIdx = prompt.indexOf('Test coverage >= 80%');
+        expect(criticalIdx).toBeLessThan(highIdx);
+    });
+
+    it('should not include laws section when all laws are disabled', () => {
+        const laws = JSON.stringify([
+            { id: '1', category: 'quality', description: 'Disabled law', enabled: false, severity: 'high' },
+        ]);
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            laws,
+        });
+        expect(prompt).not.toContain('Project Laws');
+    });
+
+    it('should not include laws section when laws is empty array', () => {
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            laws: '[]',
+        });
+        expect(prompt).not.toContain('Project Laws');
+    });
+
+    it('should gracefully handle invalid laws JSON', () => {
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            laws: 'not valid json{{{',
+        });
+        expect(prompt).not.toContain('Project Laws');
+        // Should not throw
+    });
+
+    it('should include both narrative and laws when both provided', () => {
+        const laws = JSON.stringify([
+            { id: '1', category: 'security', description: 'No secrets in code', enabled: true, severity: 'critical' },
+        ]);
+        const prompt = buildSupervisorPrompt({
+            ...baseOptions,
+            narrative: 'A secure microservice',
+            laws,
+        });
+        expect(prompt).toContain('Project Narrative');
+        expect(prompt).toContain('A secure microservice');
+        expect(prompt).toContain('Project Laws');
+        expect(prompt).toContain('No secrets in code');
+    });
 });

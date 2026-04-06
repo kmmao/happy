@@ -81,6 +81,9 @@ export interface AgentLoopCreateInput {
   notifyEvents?: AgentLoopNotificationEvent[];
   notificationChannels?: AgentLoopNotificationChannel[];
   notificationWebhookUrl?: string;
+  roleId?: string;
+  roleName?: string;
+  roleType?: string;
   runNow?: boolean;
 }
 
@@ -116,6 +119,9 @@ export interface AgentLoopUpdateInput {
   notifyEvents?: AgentLoopNotificationEvent[] | null;
   notificationChannels?: AgentLoopNotificationChannel[] | null;
   notificationWebhookUrl?: string | null;
+  roleId?: string | null;
+  roleName?: string | null;
+  roleType?: string | null;
 }
 
 export interface AgentLoopEventInput {
@@ -430,6 +436,9 @@ export class AgentLoopCoordinator {
       notifyEvents: normalizeNotificationEvents(input.notifyEvents),
       notificationChannels: normalizeNotificationChannels(input.notificationChannels),
       notificationWebhookUrl: normalizeOptionalString(input.notificationWebhookUrl),
+      roleId: normalizeOptionalString(input.roleId),
+      roleName: normalizeOptionalString(input.roleName),
+      roleType: normalizeOptionalString(input.roleType),
       consecutiveFailures: 0,
       autoRunsToday: 0,
       autoRunWindowStartedAt: localDayStartAt(now),
@@ -503,6 +512,9 @@ export class AgentLoopCoordinator {
       notifyEvents: input.notifyEvents === undefined ? existing.notifyEvents : normalizeNotificationEvents(input.notifyEvents),
       notificationChannels: input.notificationChannels === undefined ? existing.notificationChannels : normalizeNotificationChannels(input.notificationChannels),
       notificationWebhookUrl: input.notificationWebhookUrl === undefined ? existing.notificationWebhookUrl : normalizeOptionalString(input.notificationWebhookUrl),
+      roleId: input.roleId === undefined ? existing.roleId : normalizeOptionalString(input.roleId),
+      roleName: input.roleName === undefined ? existing.roleName : normalizeOptionalString(input.roleName),
+      roleType: input.roleType === undefined ? existing.roleType : normalizeOptionalString(input.roleType),
       memoryUpdatedAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -993,6 +1005,9 @@ export class AgentLoopCoordinator {
       eventSource: event?.source,
       eventTitle: event?.title,
       eventDetails: event?.details,
+      roleId: loop.roleId,
+      roleName: loop.roleName,
+      roleType: loop.roleType,
     });
 
     if (result.deduped) {

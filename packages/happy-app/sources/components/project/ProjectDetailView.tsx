@@ -11,12 +11,13 @@ import { ProjectActionsTab } from "./ProjectActionsTab";
 import { ProjectConfigTab } from "./ProjectConfigTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
 import { ProjectAnalyticsTab } from "./ProjectAnalyticsTab";
+import { ProjectRolesTab } from "./ProjectRolesTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { storage, useSetting } from "@/sync/storage";
 import { gitStatusSync } from "@/sync/gitStatusSync";
 
-type TabKey = "sessions" | "git" | "health" | "actions" | "research" | "knowledge" | "analytics" | "config";
+type TabKey = "sessions" | "git" | "health" | "actions" | "research" | "knowledge" | "roles" | "analytics" | "config";
 
 interface ProjectDetailViewProps {
     project: Project;
@@ -56,6 +57,7 @@ export const ProjectDetailView = React.memo(
                 if (knowledgeBaseEnabled) {
                     base.push({ key: "knowledge", label: t("projects.tabKnowledge") });
                 }
+                base.push({ key: "roles", label: t("projects.tabRoles") });
                 base.push({ key: "analytics", label: t("projects.tabAnalytics") });
                 base.push({ key: "config", label: t("projects.tabConfig") });
                 return base;
@@ -175,6 +177,15 @@ export const ProjectDetailView = React.memo(
                             <ProjectKnowledgeTab projectServerId={project.serverId ?? undefined} isActive={activeTab === "knowledge"} />
                         </View>
                     )}
+                    <View
+                        style={
+                            activeTab === "roles"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectRolesTab project={project} isActive={activeTab === "roles"} />
+                    </View>
                     <View
                         style={
                             activeTab === "analytics"

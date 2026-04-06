@@ -60,6 +60,8 @@ model Account {
     TriggerSchedule     TriggerSchedule[]
     WebhookTrigger      WebhookTrigger[]
     InboxItem           InboxItem[]
+    AgentRole           AgentRole[]
+    Decision            Decision[]
 }
 
 model TerminalAuthRequest {
@@ -437,6 +439,10 @@ model Project {
     // null = inherit hardcoded defaults (enabled:false, mode:auto, sensitivity:balanced)
     knowledgeConfig                   String?   // JSON: KnowledgeConfig
 
+    // World Model — Phase 0: narrative & laws
+    narrative                         String?   // Project vision/narrative (plaintext, injected into supervisor prompt)
+    laws                              String?   // JSON array: [{id, category, description, enabled, severity}]
+
     // Lifecycle
     archived        Boolean   @default(false)
     createdAt       DateTime  @default(now())
@@ -452,6 +458,8 @@ model Project {
     skills             Skill[]
     triggerSchedules   TriggerSchedule[]
     webhookTriggers    WebhookTrigger[]
+    agentRoles         AgentRole[]
+    decisions          Decision[]
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
@@ -996,4 +1004,67 @@ model SessionEvent {
 
     @@index([sessionId, createdAt(sort: Desc)])
     @@index([sessionId, eventType])
+}
+
+// World Model — Phase 1: Agent Roles
+model AgentRole {
+    id              String    @id @default(cuid())
+    accountId       String
+    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    projectId       String
+    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    name            String
+    type            String    @default("custom")    // guardian | builder | healer | chronicler | planner | custom
+    description     String?                         // Role description and behavior instructions (injected into prompt)
+    duties          String    @default("[]")        // JSON array of duty strings
+    skillIds        String    @default("[]")        // JSON array of Skill IDs to bind
+
+    maxConcurrency  Int       @default(1)           // Max concurrent loops (Phase 1: recorded only, not enforced)
+    enabled         Boolean   @default(true)
+
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    @@unique([accountId, projectId, name])
+    @@index([accountId, projectId])
+    @@index([projectId])
+}
+
+// World Model — Phase 2: Decisions (Adjudication)
+model Decision {
+    id              String    @id @default(cuid())
+    accountId       String
+    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    projectId       String
+    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    // Source
+    agentRole       String?                         // 发起角色名
+    sessionId       String?                         // 关联会话
+    loopId          String?                         // Agent Loop ID
+
+    // Content (plaintext — Server needs to do embedding match)
+    question        String                          // 问题描述
+    context         String?                         // 上下文信息
+    options         String                          // JSON: [{id, description, pros, cons}]
+
+    // State
+    status          String    @default("pending")   // pending | decided | expired | auto_resolved
+    chosenOption    String?                         // 选中的选项 ID
+    rationale       String?                         // 决策理由
+
+    // Precedent
+    knowledgeId     String?                         // 生成的 Knowledge 条目 ID
+    precedentKey    String?                         // 判例分类 key（用于匹配同类问题）
+
+    // Lifecycle
+    expiresAt       DateTime?
+    decidedAt       DateTime?
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    @@index([accountId, projectId, status])
+    @@index([projectId, precedentKey])
+    @@index([status, expiresAt])
 }

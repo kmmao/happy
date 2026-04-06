@@ -148,6 +148,7 @@ function formatLoopContext(data: AgentLoopTriggerData): string {
     `- Directory: ${data.directory}`,
     `- Project: ${data.projectId ?? "-"}`,
     `- Profile: ${data.profileId ?? "-"}`,
+    ...(data.roleId ? [`- Role: ${data.roleName ?? "-"} (${data.roleType ?? "custom"})`] : []),
     "",
     "## Mission",
     data.prompt.trim(),
@@ -166,10 +167,26 @@ function formatLoopContext(data: AgentLoopTriggerData): string {
     "- Before finishing, update memory.md with any durable changes.",
     "- Keep Current Focus and Reflection Summary accurate for the next wakeup.",
     "",
+    ...(data.projectId ? [
+      "## Decision Support",
+      "If you encounter a decision requiring human judgment, you can report it:",
+      "```",
+      `curl -s -X POST "$HAPPY_DECISION_API_URL" \\`,
+      `  -H "Authorization: Bearer $HAPPY_AGENT_LOOP_AUTH_TOKEN" \\`,
+      `  -H "Content-Type: application/json" \\`,
+      `  -d '{"question":"...","options":[{"id":"a","description":"..."},{"id":"b","description":"..."}],"precedentKey":"..."}'`,
+      "```",
+      "First check for existing precedents: `curl -s \"$HAPPY_DECISION_API_URL/match?precedentKey=<KEY>\" -H \"Authorization: Bearer $HAPPY_AGENT_LOOP_AUTH_TOKEN\"`",
+      "If matched, follow the precedent. If not, report and continue with your best judgment.",
+      "",
+    ] : []),
   ].join("\n");
 }
 
-export async function prepareAgentLoopPromptArtifacts(data: AgentLoopTriggerData): Promise<AgentLoopPromptArtifacts> {
+export async function prepareAgentLoopPromptArtifacts(
+  data: AgentLoopTriggerData,
+  roleIdentitySection?: string,
+): Promise<AgentLoopPromptArtifacts> {
   const supportDir = getAgentLoopSupportDir(data.directory, data.loopId);
   await mkdir(supportDir, { recursive: true });
   const memoryFilePath = await ensureMemoryFile(data.directory, data.loopId, {
@@ -188,6 +205,7 @@ export async function prepareAgentLoopPromptArtifacts(data: AgentLoopTriggerData
     "You are running inside a durable autonomous loop managed by the Happy daemon.",
     "Read the loop context first, then act on the highest-value next step.",
     "",
+    ...(roleIdentitySection ? [roleIdentitySection, ""] : []),
     `- Context file: ${contextFilePath}`,
     `- Memory file: ${memoryFilePath}`,
     "",
