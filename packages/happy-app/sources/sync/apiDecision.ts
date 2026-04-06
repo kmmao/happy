@@ -84,6 +84,24 @@ export async function fetchDecision(
     });
 }
 
+export async function fetchDecisionById(
+    credentials: AuthCredentials,
+    decisionId: string,
+): Promise<ServerDecision> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/decisions/${decisionId}`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch decision: ${response.status}`);
+        }
+        const data = (await response.json()) as { decision: ServerDecision };
+        return data.decision;
+    });
+}
+
 export async function adjudicateDecision(
     credentials: AuthCredentials,
     projectId: string,

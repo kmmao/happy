@@ -12,6 +12,7 @@ import { projectManager } from "@/sync/projectManager";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
+import { generateWorld, type WorldGenerateResult } from "@/sync/apiWorld";
 
 interface Law {
     id: string;
@@ -21,7 +22,7 @@ interface Law {
     severity: string;
 }
 
-const LAW_CATEGORIES = ["quality", "security", "architecture", "convention", "custom"] as const;
+const LAW_CATEGORIES = ["quality", "security", "architecture", "convention", "process", "ops", "custom"] as const;
 const LAW_SEVERITIES = ["critical", "high", "medium", "low"] as const;
 
 const CATEGORY_LABELS: Record<string, () => string> = {
@@ -29,6 +30,8 @@ const CATEGORY_LABELS: Record<string, () => string> = {
     security: () => t("world.categorySecurity"),
     architecture: () => t("world.categoryArchitecture"),
     convention: () => t("world.categoryConvention"),
+    process: () => t("world.categoryProcess"),
+    ops: () => t("world.categoryOps"),
     custom: () => t("world.categoryCustom"),
 };
 
@@ -71,6 +74,7 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
     const [initialNarrative, setInitialNarrative] = React.useState("");
     const [initialLaws, setInitialLaws] = React.useState<Law[]>([]);
     const [saving, setSaving] = React.useState(false);
+    const [generating, setGenerating] = React.useState(false);
     const [editingLaw, setEditingLaw] = React.useState<Law | null>(null);
 
     React.useEffect(() => {
@@ -158,14 +162,163 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
         setLaws((prev) => prev.map((l) => (l.id === lawId ? { ...l, enabled: !l.enabled } : l)));
     }, []);
 
-    if (!project) return null;
+    const [genMode, setGenMode] = React.useState<"auto" | "custom">("auto");
+    const [customPrompt, setCustomPrompt] = React.useState("");
+
+    const applyResult = React.useCallback((result: WorldGenerateResult) => {
+        if (result.narrative) setNarrative(result.narrative);
+        if (result.laws) setLaws(result.laws);
+
+        const parts: string[] = [];
+        if (result.narrative) parts.push(t("world.narrativeLabel"));
+        if (result.laws) parts.push(t("world.lawsLabel"));
+        if (result.roles && result.roles.length > 0) parts.push(`${result.roles.length} ${t("roles.title")}`);
+        if (result.goals && result.goals.length > 0) parts.push(`${result.goals.length} ${t("goals.title")}`);
+
+        const messages: string[] = [t("world.generateSuccess")];
+
+        if (result.skipped.length > 0) {
+            const skippedLabel = result.skipped.map((s) => {
+                const map: Record<string, string> = {
+                    narrative: t("world.narrativeLabel"),
+                    laws: t("world.lawsLabel"),
+                    roles: t("roles.title"),
+                    goals: t("goals.title"),
+                };
+                return map[s] ?? s;
+            }).join(", ");
+            messages.push(`${t("world.generateSkipped")}: ${skippedLabel}`);
+        }
+
+        if (result.errors && result.errors.length > 0) {
+            messages.push(`${t("world.generatePartialError")}: ${result.errors.join(", ")}`);
+        }
+
+        Modal.toast(messages.join("\n"));
+    }, []);
+
+    const handleGenerate = React.useCallback(async (mode: "auto" | "custom") => {
+        if (!project?.serverId) return;
+
+        if (mode === "custom" && !customPrompt.trim()) return;
+
+        if (mode === "custom") {
+            const hasExisting = narrative.trim().length > 0 || laws.length > 0;
+            if (hasExisting) {
+                const confirmed = await Modal.confirm(
+                    t("world.generateConfirmTitle"),
+                    t("world.generateConfirmBody"),
+                );
+                if (!confirmed) return;
+            }
+        }
+
+        setGenerating(true);
+        try {
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return;
+            const result = await generateWorld(credentials, project.serverId, {
+                mode,
+                prompt: mode === "custom" ? customPrompt.trim() : undefined,
+            });
+            if (!mountedRef.current) return;
+            applyResult(result);
+        } catch {
+            if (mountedRef.current) Modal.toast(t("world.generateError"));
+        } finally {
+            if (mountedRef.current) setGenerating(false);
+        }
+    }, [project?.serverId, customPrompt, narrative, laws, applyResult]);
+
+    if (!project) {
+        return (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.groupped.background }}>
+                <ActivityIndicator />
+            </View>
+        );
+    }
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.colors.groupped.background }}>
             <ScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
             >
+                {/* World Initialization Panel */}
+                <View style={styles.generateBanner}>
+                    <View style={styles.generateBannerContent}>
+                        <Ionicons name="sparkles" size={20} color={theme.colors.accentPurple} />
+                        <View style={styles.generateBannerText}>
+                            <Text style={styles.generateBannerTitle}>{t("world.generateTitle")}</Text>
+                            <Text style={styles.generateBannerHint}>{t("world.generateHint")}</Text>
+                        </View>
+                    </View>
+
+                    {/* Mode Tabs */}
+                    <View style={styles.modeTabs}>
+                        <Pressable
+                            style={[styles.modeTab, genMode === "auto" && styles.modeTabActive]}
+                            onPress={() => setGenMode("auto")}
+                        >
+                            <Ionicons name="flash-outline" size={14} color={genMode === "auto" ? "#fff" : theme.colors.text} />
+                            <Text style={[styles.modeTabText, genMode === "auto" && styles.modeTabTextActive]}>
+                                {t("world.modeAuto")}
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            style={[styles.modeTab, genMode === "custom" && styles.modeTabActive]}
+                            onPress={() => setGenMode("custom")}
+                        >
+                            <Ionicons name="create-outline" size={14} color={genMode === "custom" ? "#fff" : theme.colors.text} />
+                            <Text style={[styles.modeTabText, genMode === "custom" && styles.modeTabTextActive]}>
+                                {t("world.modeCustom")}
+                            </Text>
+                        </Pressable>
+                    </View>
+
+                    {/* Mode Description */}
+                    <Text style={styles.modeHint}>
+                        {genMode === "auto" ? t("world.modeAutoHint") : t("world.modeCustomHint")}
+                    </Text>
+
+                    {/* Custom Prompt Input */}
+                    {genMode === "custom" && (
+                        <TextInput
+                            style={styles.customPromptInput}
+                            value={customPrompt}
+                            onChangeText={setCustomPrompt}
+                            placeholder={t("world.customPromptPlaceholder")}
+                            placeholderTextColor={theme.colors.textSecondary}
+                            multiline
+                            numberOfLines={3}
+                            textAlignVertical="top"
+                            maxLength={5000}
+                        />
+                    )}
+
+                    {/* Generate Button */}
+                    <Pressable
+                        style={[
+                            styles.generateButton,
+                            (generating || !project.serverId || (genMode === "custom" && !customPrompt.trim())) && { opacity: 0.4 },
+                        ]}
+                        onPress={() => handleGenerate(genMode)}
+                        disabled={generating || !project.serverId || (genMode === "custom" && !customPrompt.trim())}
+                    >
+                        {generating ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <>
+                                <Ionicons name={genMode === "auto" ? "flash" : "color-wand"} size={16} color="#fff" />
+                                <Text style={styles.generateButtonText}>
+                                    {genMode === "auto" ? t("world.generateAutoAction") : t("world.generateCustomAction")}
+                                </Text>
+                            </>
+                        )}
+                    </Pressable>
+                </View>
+
                 {/* Narrative */}
                 <ItemGroup title={t("world.narrativeLabel")}>
                     <View style={styles.card}>
@@ -218,7 +371,7 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
                                         </View>
                                     </View>
                                     <Text style={[styles.lawDesc, !law.enabled && styles.lawDescDisabled]}>
-                                        {law.description || "(empty)"}
+                                        {law.description || t("world.emptyDescription")}
                                     </Text>
                                 </View>
                                 <Switch
@@ -282,93 +435,104 @@ const LawEditor = React.memo(function LawEditor({ law, onSave, onDelete, onClose
     return (
         <View style={styles.modalOverlay}>
             <Pressable style={styles.modalBackdrop} onPress={onClose} />
-            <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>
-                    {isNew ? t("world.addLaw") : t("world.editLaw")}
-                </Text>
-
-                {/* Description */}
-                <Text style={styles.fieldLabel}>{t("world.lawDescription")}</Text>
-                <TextInput
-                    style={styles.modalInput}
-                    value={draft.description}
-                    onChangeText={(text) => setDraft((d) => ({ ...d, description: text }))}
-                    placeholder={t("world.narrativePlaceholder")}
-                    placeholderTextColor={theme.colors.textSecondary}
-                    multiline
-                    numberOfLines={3}
-                    textAlignVertical="top"
-                    maxLength={500}
-                    autoFocus
-                />
-
-                {/* Category */}
-                <Text style={styles.fieldLabel}>{t("world.lawCategory")}</Text>
-                <View style={styles.chipRow}>
-                    {LAW_CATEGORIES.map((cat) => (
-                        <Pressable
-                            key={cat}
-                            style={[
-                                styles.chip,
-                                draft.category === cat && styles.chipSelected,
-                            ]}
-                            onPress={() => setDraft((d) => ({ ...d, category: cat }))}
-                        >
-                            <Text style={[
-                                styles.chipText,
-                                draft.category === cat && styles.chipTextSelected,
-                            ]}>
-                                {CATEGORY_LABELS[cat]?.() ?? cat}
-                            </Text>
+            <ScrollView
+                style={styles.modalScroll}
+                contentContainerStyle={styles.modalScrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>
+                            {isNew ? t("world.addLaw") : t("world.editLaw")}
+                        </Text>
+                        <Pressable style={styles.closeButton} onPress={onClose}>
+                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
                         </Pressable>
-                    ))}
-                </View>
+                    </View>
 
-                {/* Severity */}
-                <Text style={styles.fieldLabel}>{t("world.lawSeverity")}</Text>
-                <View style={styles.chipRow}>
-                    {LAW_SEVERITIES.map((sev) => (
-                        <Pressable
-                            key={sev}
-                            style={[
-                                styles.chip,
-                                draft.severity === sev && { backgroundColor: SEVERITY_COLORS[sev] },
-                            ]}
-                            onPress={() => setDraft((d) => ({ ...d, severity: sev }))}
-                        >
-                            <Text style={[
-                                styles.chipText,
-                                draft.severity === sev && { color: "#fff" },
-                            ]}>
-                                {SEVERITY_LABELS[sev]?.() ?? sev}
-                            </Text>
-                        </Pressable>
-                    ))}
-                </View>
+                    {/* Description */}
+                    <Text style={styles.fieldLabel}>{t("world.lawDescription")}</Text>
+                    <TextInput
+                        style={styles.modalInput}
+                        value={draft.description}
+                        onChangeText={(text) => setDraft((d) => ({ ...d, description: text }))}
+                        placeholder={t("world.narrativePlaceholder")}
+                        placeholderTextColor={theme.colors.textSecondary}
+                        multiline
+                        numberOfLines={3}
+                        textAlignVertical="top"
+                        maxLength={500}
+                        autoFocus
+                    />
 
-                {/* Actions */}
-                <View style={styles.modalActions}>
-                    {!isNew && (
-                        <Pressable
-                            style={styles.deleteButton}
-                            onPress={() => { onDelete(draft.id); onClose(); }}
-                        >
-                            <Text style={styles.deleteButtonText}>{t("world.deleteLaw")}</Text>
+                    {/* Category */}
+                    <Text style={styles.fieldLabel}>{t("world.lawCategory")}</Text>
+                    <View style={styles.chipRow}>
+                        {LAW_CATEGORIES.map((cat) => (
+                            <Pressable
+                                key={cat}
+                                style={[
+                                    styles.chip,
+                                    draft.category === cat && styles.chipSelected,
+                                ]}
+                                onPress={() => setDraft((d) => ({ ...d, category: cat }))}
+                            >
+                                <Text style={[
+                                    styles.chipText,
+                                    draft.category === cat && styles.chipTextSelected,
+                                ]}>
+                                    {CATEGORY_LABELS[cat]?.() ?? cat}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </View>
+
+                    {/* Severity */}
+                    <Text style={styles.fieldLabel}>{t("world.lawSeverity")}</Text>
+                    <View style={styles.chipRow}>
+                        {LAW_SEVERITIES.map((sev) => (
+                            <Pressable
+                                key={sev}
+                                style={[
+                                    styles.chip,
+                                    draft.severity === sev && { backgroundColor: SEVERITY_COLORS[sev] },
+                                ]}
+                                onPress={() => setDraft((d) => ({ ...d, severity: sev }))}
+                            >
+                                <Text style={[
+                                    styles.chipText,
+                                    draft.severity === sev && { color: "#fff" },
+                                ]}>
+                                    {SEVERITY_LABELS[sev]?.() ?? sev}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </View>
+
+                    {/* Actions */}
+                    <View style={styles.modalActions}>
+                        {!isNew && (
+                            <Pressable
+                                style={styles.deleteButton}
+                                onPress={() => { onDelete(draft.id); onClose(); }}
+                            >
+                                <Text style={styles.deleteButtonText}>{t("world.deleteLaw")}</Text>
+                            </Pressable>
+                        )}
+                        <View style={{ flex: 1 }} />
+                        <Pressable style={styles.cancelButton} onPress={onClose}>
+                            <Text style={styles.cancelButtonText}>{t("common.cancel")}</Text>
                         </Pressable>
-                    )}
-                    <View style={{ flex: 1 }} />
-                    <Pressable style={styles.cancelButton} onPress={onClose}>
-                        <Text style={styles.cancelButtonText}>{t("common.cancel")}</Text>
-                    </Pressable>
-                    <Pressable
-                        style={[styles.confirmButton, !draft.description.trim() && styles.saveButtonDisabled]}
-                        disabled={!draft.description.trim()}
-                        onPress={() => onSave(draft)}
-                    >
-                        <Text style={styles.confirmButtonText}>{t("world.save")}</Text>
-                    </Pressable>
+                        <Pressable
+                            style={[styles.confirmButton, !draft.description.trim() && styles.saveButtonDisabled]}
+                            disabled={!draft.description.trim()}
+                            onPress={() => onSave(draft)}
+                        >
+                            <Text style={styles.confirmButtonText}>{t("world.save")}</Text>
+                        </Pressable>
+                    </View>
                 </View>
-            </View>
+            </ScrollView>
         </View>
     );
 });
@@ -385,6 +549,89 @@ const styles = StyleSheet.create((theme) => ({
         maxWidth: layout.maxWidth,
         alignSelf: "center" as const,
         width: "100%" as const,
+    },
+    generateBanner: {
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 4,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 12,
+        padding: 14,
+        gap: 12,
+    },
+    generateBannerContent: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 10,
+    },
+    generateBannerText: {
+        flex: 1,
+    },
+    generateBannerTitle: {
+        ...Typography.default("semiBold"),
+        fontSize: 14,
+        color: theme.colors.text,
+    },
+    generateBannerHint: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        marginTop: 2,
+    },
+    modeTabs: {
+        flexDirection: "row" as const,
+        gap: 8,
+    },
+    modeTab: {
+        flex: 1,
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+        gap: 6,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: theme.colors.groupped.background,
+    },
+    modeTabActive: {
+        backgroundColor: theme.colors.accentPurple,
+    },
+    modeTabText: {
+        ...Typography.default("semiBold"),
+        fontSize: 13,
+        color: theme.colors.text,
+    },
+    modeTabTextActive: {
+        color: "#fff",
+    },
+    modeHint: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        lineHeight: 16,
+    },
+    customPromptInput: {
+        ...Typography.default(),
+        fontSize: 14,
+        color: theme.colors.text,
+        backgroundColor: theme.colors.groupped.background,
+        borderRadius: 8,
+        padding: 12,
+        minHeight: 80,
+        textAlignVertical: "top" as const,
+    },
+    generateButton: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+        gap: 6,
+        backgroundColor: theme.colors.accentPurple,
+        borderRadius: 10,
+        paddingVertical: 10,
+    },
+    generateButtonText: {
+        ...Typography.default("semiBold"),
+        fontSize: 14,
+        color: "#fff",
     },
     card: {
         padding: 16,
@@ -504,7 +751,7 @@ const styles = StyleSheet.create((theme) => ({
         left: 0,
         right: 0,
         bottom: 0,
-        justifyContent: "center" as const,
+        justifyContent: "flex-start" as const,
         alignItems: "center" as const,
         zIndex: 100,
     },
@@ -514,20 +761,42 @@ const styles = StyleSheet.create((theme) => ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
+        backgroundColor: "transparent",
+    },
+    modalScroll: {
+        width: "90%" as const,
+        maxWidth: 440,
+        maxHeight: "100%" as const,
+    },
+    modalScrollContent: {
+        flexGrow: 1,
+        justifyContent: "flex-start" as const,
+        paddingTop: 16,
+        paddingBottom: 16,
     },
     modalContent: {
-        width: "90%" as const,
-        maxWidth: 400,
         backgroundColor: theme.colors.surface,
         borderRadius: 16,
         padding: 20,
+    },
+    modalHeader: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "space-between" as const,
+        marginBottom: 4,
     },
     modalTitle: {
         ...Typography.default("semiBold"),
         fontSize: 18,
         color: theme.colors.text,
-        marginBottom: 16,
+    },
+    closeButton: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+        backgroundColor: theme.colors.groupped.background,
     },
     fieldLabel: {
         ...Typography.default("semiBold"),

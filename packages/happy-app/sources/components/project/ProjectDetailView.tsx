@@ -11,9 +11,9 @@ import { ProjectActionsTab } from "./ProjectActionsTab";
 import { ProjectConfigTab } from "./ProjectConfigTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
 import { ProjectAnalyticsTab } from "./ProjectAnalyticsTab";
-import { ProjectRolesTab } from "./ProjectRolesTab";
-import { ProjectGoalsTab } from "./ProjectGoalsTab";
-import { ProjectWorldTab } from "./ProjectWorldTab";
+import { WorldRolesTab } from "./WorldRolesTab";
+import { WorldGoalsTab } from "./WorldGoalsTab";
+import { WorldOverviewTab } from "./WorldOverviewTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { storage, useSetting } from "@/sync/storage";
@@ -188,7 +188,7 @@ export const ProjectDetailView = React.memo(
                                 : styles.tabHidden
                         }
                     >
-                        <ProjectWorldTab project={project} isActive={activeTab === "world"} />
+                        <WorldOverviewTab project={project} isActive={activeTab === "world"} />
                     </View>
                     <View
                         style={
@@ -197,7 +197,7 @@ export const ProjectDetailView = React.memo(
                                 : styles.tabHidden
                         }
                     >
-                        <ProjectRolesTab project={project} isActive={activeTab === "roles"} />
+                        <WorldRolesTab project={project} isActive={activeTab === "roles"} />
                     </View>
                     <View
                         style={
@@ -206,7 +206,7 @@ export const ProjectDetailView = React.memo(
                                 : styles.tabHidden
                         }
                     >
-                        <ProjectGoalsTab project={project} isActive={activeTab === "goals"} />
+                        <WorldGoalsTab project={project} isActive={activeTab === "goals"} />
                     </View>
                     <View
                         style={

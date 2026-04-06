@@ -24,6 +24,7 @@ This folder documents how Happy works internally, with a focus on protocol, back
 - architecture-project-supervisor.md: Architecture design for Project as first-class citizen with Supervisor Agent.
 - supervisor-operations-guide.md: Project Supervisor operations guide for autonomous code health analysis and fixes.
 - automation-operations-guide.md: Automation / Agent Loop operations guide covering daemon automation, loop management, guardian continuity, and recovered-session troubleshooting.
+- plans/world-project-naming-guideline.md: Naming boundary between Project (technical container) and World (governance semantics).
 
 ## Conventions
 - Paths and field names reflect the current implementation in `packages/happy-server`.

@@ -3,7 +3,7 @@ import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
 
-const ROLE_TYPES = ["guardian", "builder", "healer", "chronicler", "planner", "custom"] as const;
+const ROLE_TYPES = ["guardian", "builder", "healer", "chronicler", "planner", "messenger", "custom"] as const;
 
 const CreateAgentRoleBodySchema = z.object({
     projectId: z.string(),
@@ -36,11 +36,11 @@ const QueryAgentRolesSchema = z.object({
 
 const ROLE_TEMPLATES: Record<string, { description: string; duties: string[] }> = {
     guardian: {
-        description: "You are the Guardian of this project. Your mission is to protect code quality, security, and compliance with project laws.",
+        description: "You are the Guardian of this world. Your mission is to protect code quality, security, and compliance with world laws.",
         duties: [
             "Scan for security vulnerabilities",
             "Check dependency updates and known CVEs",
-            "Verify compliance with project laws",
+            "Verify compliance with world laws",
             "Report violations with evidence",
         ],
     },
@@ -49,7 +49,7 @@ const ROLE_TEMPLATES: Record<string, { description: string; duties: string[] }> 
         duties: [
             "Implement assigned tasks and features",
             "Write tests for new code",
-            "Follow project conventions and style guides",
+            "Follow world conventions and style guides",
             "Update documentation when needed",
         ],
     },
@@ -63,7 +63,7 @@ const ROLE_TEMPLATES: Record<string, { description: string; duties: string[] }> 
         ],
     },
     chronicler: {
-        description: "You are the Chronicler. Your mission is to maintain the project's knowledge base and documentation.",
+        description: "You are the Chronicler. Your mission is to maintain this world's knowledge base and documentation.",
         duties: [
             "Update knowledge base entries after significant changes",
             "Write changelog entries for releases",
@@ -74,10 +74,19 @@ const ROLE_TEMPLATES: Record<string, { description: string; duties: string[] }> 
     planner: {
         description: "You are the Planner. Your mission is to analyze goals, break them into tasks, and create execution plans.",
         duties: [
-            "Analyze high-level project goals",
+            "Analyze high-level world goals",
             "Break goals into actionable tasks with estimates",
             "Assess risks and dependencies",
             "Prioritize task execution order",
+        ],
+    },
+    messenger: {
+        description: "You are the Messenger. Your mission is to coordinate communication across roles and keep shared context aligned.",
+        duties: [
+            "Route requests and updates between roles with clear ownership",
+            "Summarize key decisions and unresolved conflicts",
+            "Ensure law suggestions and conflict reports reach the right reviewers",
+            "Keep communication concise, traceable, and actionable",
         ],
     },
 };

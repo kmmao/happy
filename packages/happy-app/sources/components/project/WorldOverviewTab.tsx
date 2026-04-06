@@ -17,13 +17,13 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { layout } from "@/components/layout";
 import { fetchWorldDashboard, type WorldDashboard } from "@/sync/apiWorld";
 
-interface ProjectWorldTabProps {
+interface WorldOverviewTabProps {
     project: Project;
     isActive: boolean;
 }
 
-export const ProjectWorldTab = React.memo(
-    ({ project, isActive }: ProjectWorldTabProps) => {
+export const WorldOverviewTab = React.memo(
+    ({ project, isActive }: WorldOverviewTabProps) => {
         const { theme } = useUnistyles();
         const router = useRouter();
         const [data, setData] = React.useState<WorldDashboard | null>(null);
@@ -87,7 +87,7 @@ export const ProjectWorldTab = React.memo(
                     <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />
                 }
             >
-                <View style={styles.sectionCard}>
+                <View style={[styles.sectionCard, { marginTop: 12 }]}>
                     <Pressable
                         style={styles.constitutionRow}
                         onPress={() => router.push(`/project/${project.id}/world-laws` as any)}
@@ -125,7 +125,7 @@ export const ProjectWorldTab = React.memo(
                             </Text>
                             {data.autonomy.total30d > 0 && (
                                 <Text style={styles.autonomyStatsText}>
-                                    {data.autonomy.decided30d} decided, {data.autonomy.autoResolved30d} auto, {data.autonomy.pending30d} pending
+                                    {data.autonomy.decided30d} {t("world.autonomyDecided")}, {data.autonomy.autoResolved30d} {t("world.autonomyAuto")}, {data.autonomy.pending30d} {t("world.autonomyPending")}
                                 </Text>
                             )}
                         </View>
@@ -151,6 +151,7 @@ export const ProjectWorldTab = React.memo(
                         label={t("world.lawCount")}
                         value={String(data.lawCount)}
                         color="#3B82F6"
+                        onPress={project.serverId ? () => router.push(`/project/${project.id}/world-laws` as any) : undefined}
                     />
                     <MetricCard
                         icon="chatbubbles"
@@ -198,12 +199,17 @@ export const ProjectWorldTab = React.memo(
                     <View style={styles.sectionCard}>
                         <Text style={styles.sectionTitle}>{t("world.recentDecisions")}</Text>
                         {data.decisions.recentDecided.map((d) => (
-                            <View key={d.id} style={styles.decisionRow}>
+                            <Pressable
+                                key={d.id}
+                                style={styles.decisionRow}
+                                onPress={() => router.push(`/decision/${d.id}` as any)}
+                            >
                                 <Ionicons name="checkmark-circle" size={16} color="#10B981" />
                                 <Text style={styles.decisionText} numberOfLines={2}>
                                     {d.question}
                                 </Text>
-                            </View>
+                                <Ionicons name="chevron-forward" size={14} color="#9CA3AF" />
+                            </Pressable>
                         ))}
                     </View>
                 )}
@@ -219,19 +225,29 @@ const MetricCard = React.memo(function MetricCard({
     label,
     value,
     color,
+    onPress,
 }: {
     icon: string;
     label: string;
     value: string;
     color: string;
+    onPress?: () => void;
 }) {
-    return (
-        <View style={styles.metricCard}>
+    const content = (
+        <>
             <Ionicons name={icon as any} size={20} color={color} />
             <Text style={[styles.metricValue, { color }]}>{value}</Text>
             <Text style={styles.metricLabel}>{label}</Text>
-        </View>
+        </>
     );
+    if (onPress) {
+        return (
+            <Pressable style={styles.metricCard} onPress={onPress}>
+                {content}
+            </Pressable>
+        );
+    }
+    return <View style={styles.metricCard}>{content}</View>;
 });
 
 // === Goal Stat ===

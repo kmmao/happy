@@ -62,13 +62,13 @@ function priorityLabel(priority: string): string {
 
 // === Main Component ===
 
-interface ProjectGoalsTabProps {
+interface WorldGoalsTabProps {
     project: Project;
     isActive: boolean;
 }
 
-export const ProjectGoalsTab = React.memo(
-    ({ project, isActive }: ProjectGoalsTabProps) => {
+export const WorldGoalsTab = React.memo(
+    ({ project, isActive }: WorldGoalsTabProps) => {
         const { theme } = useUnistyles();
         const [goals, setGoals] = React.useState<GoalSummary[]>([]);
         const [loading, setLoading] = React.useState(false);
@@ -351,7 +351,12 @@ const GoalCreateSheet = React.memo(function GoalCreateSheet({
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>{t("goals.createGoal")}</Text>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>{t("goals.createGoal")}</Text>
+                        <Pressable style={styles.closeButton} onPress={onClose}>
+                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+                        </Pressable>
+                    </View>
 
                     {/* Title */}
                     <Text style={styles.fieldLabel}>{t("goals.goalTitle")}</Text>
@@ -624,11 +629,24 @@ const styles = StyleSheet.create((theme) => ({
         borderRadius: 16,
         padding: 20,
     },
+    modalHeader: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "space-between" as const,
+        marginBottom: 4,
+    },
     modalTitle: {
         ...Typography.default("semiBold"),
         fontSize: 18,
         color: theme.colors.text,
-        marginBottom: 16,
+    },
+    closeButton: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+        backgroundColor: theme.colors.groupped.background,
     },
     fieldLabel: {
         ...Typography.default("semiBold"),

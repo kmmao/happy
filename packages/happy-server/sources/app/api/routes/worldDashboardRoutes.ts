@@ -2,6 +2,7 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { autonomyScore } from "@/modules/autonomyScore";
+import { generateWorldConstitution } from "@/modules/worldConstitutionGenerator";
 
 /**
  * World Dashboard — aggregated project world state.
@@ -153,6 +154,33 @@ export function worldDashboardRoutes(app: Fastify) {
                     lawSuggestions30d,
                 },
             });
+        },
+    );
+
+    // POST /v1/projects/:id/world/generate — auto-generate world elements from project context
+    app.post(
+        "/v1/projects/:id/world/generate",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                body: z.object({
+                    mode: z.enum(["auto", "custom"]).default("auto"),
+                    prompt: z.string().max(5000).optional(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            try {
+                const result = await generateWorldConstitution(
+                    request.params.id,
+                    request.userId,
+                    { mode: request.body.mode, prompt: request.body.prompt },
+                );
+                return reply.send(result);
+            } catch (e: any) {
+                return reply.code(404).send({ error: e.message ?? "Failed to generate" });
+            }
         },
     );
 }

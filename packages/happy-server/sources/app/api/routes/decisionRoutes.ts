@@ -181,6 +181,29 @@ export function decisionRoutes(app: Fastify) {
         },
     );
 
+    // GET /v1/decisions/:decisionId — get single decision without project context (from App Inbox)
+    app.get(
+        "/v1/decisions/:decisionId",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ decisionId: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const decision = await db.decision.findFirst({
+                where: {
+                    id: request.params.decisionId,
+                    accountId: request.userId,
+                },
+            });
+            if (!decision) {
+                return reply.code(404).send({ error: "Decision not found" });
+            }
+            return reply.send({ decision: serializeDecision(decision) });
+        },
+    );
+
     // GET /v1/projects/:id/decisions/match — match precedent (from CLI Agent)
     app.get(
         "/v1/projects/:id/decisions/match",

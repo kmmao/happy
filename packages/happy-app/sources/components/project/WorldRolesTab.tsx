@@ -16,7 +16,7 @@ import {
     type AgentRoleSummary,
 } from "@/sync/apiProjects";
 
-const ROLE_TYPES = ["guardian", "builder", "healer", "chronicler", "planner", "custom"] as const;
+const ROLE_TYPES = ["guardian", "builder", "healer", "chronicler", "planner", "messenger", "custom"] as const;
 
 const TYPE_LABELS: Record<string, () => string> = {
     guardian: () => t("roles.typeGuardian"),
@@ -24,6 +24,7 @@ const TYPE_LABELS: Record<string, () => string> = {
     healer: () => t("roles.typeHealer"),
     chronicler: () => t("roles.typeChronicler"),
     planner: () => t("roles.typePlanner"),
+    messenger: () => t("roles.typeMessenger"),
     custom: () => t("roles.typeCustom"),
 };
 
@@ -33,6 +34,7 @@ const TYPE_ICONS: Record<string, string> = {
     healer: "medkit",
     chronicler: "book",
     planner: "map",
+    messenger: "mail",
     custom: "person",
 };
 
@@ -42,16 +44,17 @@ const TYPE_COLORS: Record<string, string> = {
     healer: "#10B981",
     chronicler: "#8B5CF6",
     planner: "#EC4899",
+    messenger: "#06B6D4",
     custom: "#6B7280",
 };
 const TEMPLATE_TYPES = ROLE_TYPES.filter((type) => type !== "custom");
 const ROLE_TEMPLATE_DEFAULTS: Record<string, { description: string; duties: string[] }> = {
     guardian: {
-        description: "You are the Guardian of this project. Your mission is to protect code quality, security, and compliance with project laws.",
+        description: "You are the Guardian of this world. Your mission is to protect code quality, security, and compliance with world laws.",
         duties: [
             "Scan for security vulnerabilities",
             "Check dependency updates and known CVEs",
-            "Verify compliance with project laws",
+            "Verify compliance with world laws",
             "Report violations with evidence",
         ],
     },
@@ -60,7 +63,7 @@ const ROLE_TEMPLATE_DEFAULTS: Record<string, { description: string; duties: stri
         duties: [
             "Implement assigned tasks and features",
             "Write tests for new code",
-            "Follow project conventions and style guides",
+            "Follow world conventions and style guides",
             "Update documentation when needed",
         ],
     },
@@ -74,7 +77,7 @@ const ROLE_TEMPLATE_DEFAULTS: Record<string, { description: string; duties: stri
         ],
     },
     chronicler: {
-        description: "You are the Chronicler. Your mission is to maintain the project's knowledge base and documentation.",
+        description: "You are the Chronicler. Your mission is to maintain this world's knowledge base and documentation.",
         duties: [
             "Update knowledge base entries after significant changes",
             "Write changelog entries for releases",
@@ -85,21 +88,30 @@ const ROLE_TEMPLATE_DEFAULTS: Record<string, { description: string; duties: stri
     planner: {
         description: "You are the Planner. Your mission is to analyze goals, break them into tasks, and create execution plans.",
         duties: [
-            "Analyze high-level project goals",
+            "Analyze high-level world goals",
             "Break goals into actionable tasks with estimates",
             "Assess risks and dependencies",
             "Prioritize task execution order",
         ],
     },
+    messenger: {
+        description: "You are the Messenger. Your mission is to coordinate communication across roles and keep shared context aligned.",
+        duties: [
+            "Route requests and updates between roles with clear ownership",
+            "Summarize key decisions and unresolved conflicts",
+            "Ensure law suggestions and conflict reports reach the right reviewers",
+            "Keep communication concise, traceable, and actionable",
+        ],
+    },
 };
 
-interface ProjectRolesTabProps {
+interface WorldRolesTabProps {
     project: Project;
     isActive: boolean;
 }
 
-export const ProjectRolesTab = React.memo(
-    ({ project, isActive }: ProjectRolesTabProps) => {
+export const WorldRolesTab = React.memo(
+    ({ project, isActive }: WorldRolesTabProps) => {
         const { theme } = useUnistyles();
         const [roles, setRoles] = React.useState<AgentRoleSummary[]>([]);
         const [loading, setLoading] = React.useState(false);
@@ -205,8 +217,8 @@ export const ProjectRolesTab = React.memo(
                                         <Text style={styles.roleName}>{role.name}</Text>
                                         <Text style={styles.roleType}>
                                             {TYPE_LABELS[role.type]?.() ?? role.type}
-                                            {role.duties.length > 0 ? ` \u00B7 ${role.duties.length} duties` : ""}
-                                            {role.skillIds.length > 0 ? ` \u00B7 ${role.skillIds.length} skills` : ""}
+                                            {role.duties.length > 0 ? ` \u00B7 ${t("roles.dutiesCount", { count: role.duties.length })}` : ""}
+                                            {role.skillIds.length > 0 ? ` \u00B7 ${t("roles.skillsCount", { count: role.skillIds.length })}` : ""}
                                         </Text>
                                     </View>
                                     <Switch

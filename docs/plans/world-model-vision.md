@@ -7,6 +7,8 @@ _Status: 设计阶段_
 
 **用户是上帝，项目是世界，Agent 是居民。**
 
+> 命名边界规范见：[world-project-naming-guideline.md](./world-project-naming-guideline.md)
+
 传统模式下，AI Agent 是被动执行器——人类发指令，Agent 跑一次，返回结果。Happy 要实现的是一种根本性的转变：
 
 - **声明式而非命令式**：你描述"世界应该是什么样"，而不是"做什么"
@@ -20,6 +22,8 @@ _Status: 设计阶段_
 ## 概念模型
 
 ### 一个项目 = 一个世界 (World)
+
+> 这里的“=”是业务语义映射，不是底层数据模型替换；技术承载层仍以 Project 为主。
 
 ```
 World {

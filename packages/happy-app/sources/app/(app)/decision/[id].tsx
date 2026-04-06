@@ -10,6 +10,7 @@ import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
 import {
     adjudicateDecision,
+    fetchDecisionById,
     type ServerDecision,
     type DecisionOption,
 } from "@/sync/apiDecision";
@@ -25,6 +26,7 @@ const STATUS_LABELS: Record<string, () => string> = {
     pending: () => t("decision.pending"),
     decided: () => t("decision.decided"),
     expired: () => t("decision.expired"),
+    auto_resolved: () => t("decision.autoResolved"),
 };
 
 const DecisionDetailScreen = React.memo(function DecisionDetailScreen() {
@@ -48,15 +50,11 @@ const DecisionDetailScreen = React.memo(function DecisionDetailScreen() {
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials || !id) return;
-                // Decision ID is the param; we need projectId from the decision itself
-                // The route is /decision/[id] — we fetch by iterating (or we get projectId from referrer)
-                // For now, use a direct fetch approach — the server accepts GET by decision ID
-                // Actually we need projectId... let's extract from the decision route
-                // WORKAROUND: fetch from inbox item context or use a project-agnostic endpoint
-                // For simplicity, we'll find the decision by scanning projects
-                // TODO: Add a project-agnostic GET /v1/decisions/:id endpoint
-                setLoading(false);
+                const fetched = await fetchDecisionById(credentials, id);
+                setDecision(fetched);
             } catch {
+                // decision not found or network error
+            } finally {
                 setLoading(false);
             }
         })();
@@ -84,7 +82,7 @@ const DecisionDetailScreen = React.memo(function DecisionDetailScreen() {
             } : prev);
             Modal.toast(t("decision.precedentGenerated"));
         } catch {
-            Modal.toast(t("roles.saveError"));
+            Modal.toast(t("decision.adjudicateError"));
         } finally {
             setSubmitting(false);
         }
@@ -101,6 +99,7 @@ const DecisionDetailScreen = React.memo(function DecisionDetailScreen() {
     if (!decision) {
         return (
             <View style={styles.centerContainer}>
+                <Ionicons name="scale-outline" size={48} color={theme.colors.textSecondary} />
                 <Text style={styles.emptyText}>{t("decision.emptyState")}</Text>
             </View>
         );
@@ -255,11 +254,13 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center" as const,
         justifyContent: "center" as const,
         backgroundColor: theme.colors.groupped.background,
+        gap: 12,
     },
     emptyText: {
         ...Typography.default(),
         fontSize: 15,
         color: theme.colors.textSecondary,
+        textAlign: "center" as const,
     },
     scroll: {
         flex: 1,
