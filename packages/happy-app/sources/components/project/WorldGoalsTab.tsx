@@ -364,8 +364,8 @@ const GoalCard = React.memo(function GoalCard({
                                 onPress={() => task.sessionId && onViewSession(task.sessionId)}
                             >
                                 <Ionicons name={tIcon as any} size={14} color={tColor} />
-                                <Text style={[styles.taskLabel, { color: tColor }]}>
-                                    {t("goals.taskIndex", { index: idx + 1 })}
+                                <Text style={[styles.taskLabel, { color: tColor }]} numberOfLines={1}>
+                                    {task.title ?? t("goals.taskIndex", { index: idx + 1 })}
                                 </Text>
                                 <Text style={styles.taskStatus}>{task.status}</Text>
                                 {task.sessionId && (

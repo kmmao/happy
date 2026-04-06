@@ -310,7 +310,7 @@ export function goalRoutes(app: Fastify) {
                     skip: offset,
                     include: {
                         tasks: {
-                            select: { id: true, status: true, sessionId: true, roleType: true },
+                            select: { id: true, title: true, status: true, sessionId: true, roleType: true },
                             orderBy: { createdAt: "asc" },
                             take: 30,
                         },
@@ -670,17 +670,30 @@ export function goalRoutes(app: Fastify) {
                 low: "background",
             };
 
-            // Create tasks in order, injecting role identity into prompt
+            // Create tasks in order, injecting role identity and branch instructions
             const createdTasks: Array<{ id: string; prompt: string; priority: string }> = [];
             for (const taskDef of taskDefs) {
                 const roleIdentity = buildRoleIdentityPrefix(taskDef.suggestedRole, roleMap, project);
-                const fullPrompt = roleIdentity ? `${roleIdentity}\n\n---\n\n${taskDef.prompt}` : taskDef.prompt;
+                const branchName = `goal/${goal.id.slice(-8)}/${taskDef.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`;
+                const branchInstructions = [
+                    `## Git Branch Policy`,
+                    `Before making any code changes, you MUST:`,
+                    `1. Create and switch to a new branch: \`git checkout -b ${branchName}\``,
+                    `2. Do all your work on this branch`,
+                    `3. Commit your changes on this branch`,
+                    `4. Do NOT push to or modify the main/master branch directly`,
+                ].join("\n");
+                const promptParts = [branchInstructions];
+                if (roleIdentity) promptParts.push(roleIdentity);
+                promptParts.push(`## Your Task\n\n${taskDef.prompt}`);
+                const fullPrompt = promptParts.join("\n\n---\n\n");
 
                 const task = await db.task.create({
                     data: {
                         accountId: userId,
                         projectId,
                         machineId: goal.machineId,
+                        title: taskDef.title,
                         prompt: fullPrompt,
                         priority: priorityMap[taskDef.priority] ?? "user",
                         maxAttempts: 3,
@@ -757,7 +770,7 @@ function serializeGoal(goal: Record<string, unknown>): Record<string, unknown> {
         plannerTaskId: string | null;
         createdAt: Date;
         updatedAt: Date;
-        tasks?: Array<{ id: string; status: string; sessionId: string | null; roleType: string | null }>;
+        tasks?: Array<{ id: string; title: string | null; status: string; sessionId: string | null; roleType: string | null }>;
         _count?: { subGoals: number; tasks: number; decisions: number };
     };
 
@@ -781,6 +794,7 @@ function serializeGoal(goal: Record<string, unknown>): Record<string, unknown> {
         decisionCount: g._count?.decisions ?? 0,
         tasks: g.tasks?.map((t) => ({
             id: t.id,
+            title: t.title,
             status: t.status,
             sessionId: t.sessionId,
             roleType: t.roleType,

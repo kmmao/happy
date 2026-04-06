@@ -407,6 +407,7 @@ export async function deleteAgentRole(
 
 export interface GoalTaskSummary {
     id: string;
+    title: string | null;
     status: string;
     sessionId: string | null;
     roleType: string | null;

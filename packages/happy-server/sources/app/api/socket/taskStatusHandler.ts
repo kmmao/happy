@@ -9,6 +9,7 @@ import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { eventRouter, buildTaskStatusChangedEphemeral } from "@/app/events/eventRouter";
 import { inboxCreate } from "@/modules/inboxCreate";
+import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
 
 const taskStatusSchema = z.object({
     taskId: z.string().min(1),
@@ -57,16 +58,17 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
 
             // Create inbox item for terminal statuses
             if (isTerminal) {
+                const taskLabel = updated.title ?? `Task ${data.taskId.slice(-6)}`;
                 void inboxCreate({
                     accountId: userId,
                     category: "task",
                     eventType: `task.${data.status}`,
                     severity: data.status === "failed" ? "error" : "info",
                     title: data.status === "completed"
-                        ? "Task completed"
+                        ? `${taskLabel}: completed`
                         : data.status === "failed"
-                            ? "Task failed"
-                            : "Task cancelled",
+                            ? `${taskLabel}: failed`
+                            : `${taskLabel}: cancelled`,
                     body: data.status === "failed" ? data.errorMessage : undefined,
                     referenceUrl: updated.sessionId ? `/session/${updated.sessionId}` : undefined,
                     refType: "task",
@@ -87,6 +89,14 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                 }),
                 recipientFilter: { type: "user-scoped-only" },
             });
+
+            // Update goal progress when task reaches terminal state
+            if (isTerminal && updated.goalId) {
+                void goalProgressUpdate({
+                    goalId: updated.goalId,
+                    accountId: userId,
+                });
+            }
 
             log({ module: "task" }, `task-status: task ${data.taskId} → ${data.status}`);
         } catch (error) {

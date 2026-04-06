@@ -799,6 +799,7 @@ model Task {
     machineId       String    // Target machine for execution
 
     // Content (encrypted by App, decrypted by CLI)
+    title           String?                         // Human-readable title (set by Planner or user)
     prompt          String
     promptVersion   Int       @default(0)
 
