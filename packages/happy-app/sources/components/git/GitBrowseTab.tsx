@@ -82,21 +82,38 @@ export const GitBrowseTab = React.memo<{
     const [filterText, setFilterText] = React.useState("");
     const [showHidden, setShowHidden] = React.useState(false);
 
-    // File favorites: keyed by sessionId, values are relative paths
+    // File favorites: keyed by basePath so same project shares favorites across sessions
     const fileFavorites = useLocalSetting("fileFavorites");
-    const sessionFavorites: string[] = fileFavorites[sessionId] ?? [];
+    const favKey = basePath ?? sessionId;
+    const sessionFavorites: string[] = fileFavorites[favKey] ?? [];
 
     const toggleFavorite = React.useCallback(
         (relPath: string) => {
-            const current: string[] = fileFavorites[sessionId] ?? [];
+            const current: string[] = fileFavorites[favKey] ?? [];
             const next = current.includes(relPath)
                 ? current.filter((p) => p !== relPath)
                 : [...current, relPath];
             storage.getState().applyLocalSettings({
-                fileFavorites: { ...fileFavorites, [sessionId]: next },
+                fileFavorites: { ...fileFavorites, [favKey]: next },
             });
         },
-        [fileFavorites, sessionId],
+        [fileFavorites, favKey],
+    );
+
+    // Navigate to the parent directory of a favorited path
+    const navigateToParentDir = React.useCallback(
+        (relPath: string) => {
+            if (!basePath) return;
+            const lastSlash = relPath.lastIndexOf("/");
+            const parentDir = lastSlash > 0
+                ? `${basePath}/${relPath.slice(0, lastSlash)}`
+                : basePath;
+            if (parentDir !== currentPath) {
+                setPathHistory((prev) => [...prev, currentPath!]);
+                setCurrentPath(parentDir);
+            }
+        },
+        [basePath, currentPath],
     );
 
     // Initialize to basePath once
@@ -407,62 +424,75 @@ export const GitBrowseTab = React.memo<{
                         {sessionFavorites.map((relPath) => {
                             const fullPath = basePath ? `${basePath}/${relPath}` : relPath;
                             const fileName = relPath.split("/").pop() ?? relPath;
+                            const parentDir = relPath.includes("/")
+                                ? relPath.slice(0, relPath.lastIndexOf("/"))
+                                : null;
                             return (
-                                <Pressable
+                                <View
                                     key={`fav-${relPath}`}
-                                    onPress={() => {
-                                        if (onFilePress) {
-                                            onFilePress(fullPath);
-                                        } else {
-                                            onFileOpen?.();
-                                            const encodedPath = utf8ToBase64(fullPath);
-                                            router.push(`/session/${sessionId}/file?path=${encodedPath}`);
-                                        }
-                                    }}
-                                    style={({ pressed }) => ({
+                                    style={{
                                         flexDirection: "row",
                                         alignItems: "center",
                                         paddingHorizontal: embedded ? 12 : 16,
                                         paddingVertical: embedded ? 5 : 8,
                                         gap: 8,
-                                        backgroundColor: pressed ? theme.colors.surfacePressedOverlay : "transparent",
-                                    })}
+                                    }}
                                 >
                                     <Octicons name="star-fill" size={embedded ? 15 : 18} color="#FFD700" />
-                                    <Text
-                                        style={{
-                                            flex: 1,
-                                            fontSize: embedded ? 13 : 15,
-                                            color: theme.colors.text,
-                                            ...Typography.default(),
+                                    {/* Filename — tap to navigate to parent dir then open file */}
+                                    <Pressable
+                                        onPress={() => {
+                                            navigateToParentDir(relPath);
+                                            if (onFilePress) {
+                                                onFilePress(fullPath);
+                                            } else {
+                                                onFileOpen?.();
+                                                const encodedPath = utf8ToBase64(fullPath);
+                                                router.push(`/session/${sessionId}/file?path=${encodedPath}`);
+                                            }
                                         }}
-                                        numberOfLines={1}
+                                        style={({ pressed }) => ({
+                                            flex: 1,
+                                            opacity: pressed ? 0.6 : 1,
+                                        })}
                                     >
-                                        {fileName}
-                                    </Text>
-                                    {relPath.includes("/") && (
                                         <Text
                                             style={{
-                                                fontSize: 11,
-                                                color: theme.colors.textSecondary,
-                                                ...Typography.mono(),
+                                                fontSize: embedded ? 13 : 15,
+                                                color: theme.colors.text,
+                                                ...Typography.default(),
                                             }}
                                             numberOfLines={1}
                                         >
-                                            {relPath.slice(0, relPath.lastIndexOf("/"))}
+                                            {fileName}
                                         </Text>
+                                    </Pressable>
+                                    {/* Parent directory path — tap to navigate to that dir only */}
+                                    {parentDir && (
+                                        <Pressable
+                                            onPress={() => navigateToParentDir(relPath)}
+                                            hitSlop={4}
+                                        >
+                                            <Text
+                                                style={{
+                                                    fontSize: 11,
+                                                    color: theme.colors.textLink,
+                                                    ...Typography.mono(),
+                                                }}
+                                                numberOfLines={1}
+                                            >
+                                                {parentDir}
+                                            </Text>
+                                        </Pressable>
                                     )}
                                     <Pressable
-                                        onPress={(e) => {
-                                            e.stopPropagation();
-                                            toggleFavorite(relPath);
-                                        }}
+                                        onPress={() => toggleFavorite(relPath)}
                                         hitSlop={6}
                                         style={({ pressed }) => ({ padding: 2, opacity: pressed ? 0.5 : 1 })}
                                     >
                                         <Octicons name="x" size={12} color={theme.colors.textSecondary} />
                                     </Pressable>
-                                </Pressable>
+                                </View>
                             );
                         })}
                         <View style={{ height: 1, backgroundColor: theme.colors.divider, marginHorizontal: embedded ? 8 : 16, marginVertical: 4 }} />
