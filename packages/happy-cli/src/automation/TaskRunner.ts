@@ -6,13 +6,17 @@ import type {
   SpawnSessionOptions,
   SpawnSessionResult,
 } from "@/modules/common/registerCommonHandlers";
-import type { TaskTriggerData } from "./types";
+import type { AutomationAuditEvent, TaskTriggerData } from "./types";
 
 export interface TaskHandlerDeps {
   readonly spawnSession: (
     options: SpawnSessionOptions,
   ) => Promise<SpawnSessionResult>;
   readonly onTaskStatusChange?: (taskId: string, status: string, sessionId?: string, errorMessage?: string) => Promise<void> | void;
+  /** Optional audit hook for task lifecycle diagnostics (daemon automation audit store). */
+  readonly recordTaskAudit?: (
+    event: Omit<AutomationAuditEvent, "id" | "occurredAt"> & { occurredAt?: number },
+  ) => void;
   /** Server URL for tasks that need to POST results back (e.g., planner tasks). */
   readonly serverUrl?: string;
   /** Auth token for tasks that need to authenticate with the server. */
@@ -53,6 +57,10 @@ async function cleanupPromptFile(path: string): Promise<void> {
   }
 }
 
+function isSessionWebhookTimeout(errorMessage: string): boolean {
+  return errorMessage.includes("Session webhook timeout for PID");
+}
+
 export async function runTaskJob(
   data: TaskTriggerData,
   deps: TaskHandlerDeps,
@@ -86,10 +94,23 @@ export async function runTaskJob(
   });
 
   if (spawnResult.type !== "success") {
-    await cleanupPromptFile(promptFilePath);
     const errorMessage = spawnResult.type === "error"
       ? spawnResult.errorMessage
       : "Failed to spawn task session";
+    if (isSessionWebhookTimeout(errorMessage)) {
+      logger.warn(
+        `[TASK] Session webhook timeout for ${data.taskId}; treat as running and wait for terminal signal`,
+      );
+      deps.recordTaskAudit?.({
+        kind: "task_session_webhook_timeout",
+        dedupeKey: `task:${data.taskId}`,
+        projectId: data.projectId,
+        trigger: "task",
+        message: errorMessage,
+      });
+      return { success: true };
+    }
+    await cleanupPromptFile(promptFilePath);
     await deps.onTaskStatusChange?.(data.taskId, "failed", undefined, errorMessage);
     return { success: false, errorMessage };
   }

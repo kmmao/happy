@@ -165,6 +165,10 @@ export type AutomationAuditKind =
   | "job_enqueued"
   | "job_session_started"
   | "job_terminal"
+  /** Task spawn: local session webhook did not arrive before timeout; job kept in session mode. */
+  | "task_session_webhook_timeout"
+  /** Task exit: happySessionId was missing; terminal state applied via dedupeKey fallback. */
+  | "task_terminal_dedupe_fallback"
   | "guardian_reused"
   | "guardian_remembered"
   | "guardian_cleared"

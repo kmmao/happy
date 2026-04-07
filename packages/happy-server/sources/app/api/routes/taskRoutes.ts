@@ -40,6 +40,31 @@ const TaskStatusReportSchema = z.object({
     errorMessage: z.string().optional(),
 });
 
+const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "cancelled"]);
+const TASK_STATUS_PROGRESS: Record<string, number> = {
+    queued: 0,
+    dispatching: 1,
+    running: 2,
+};
+
+function shouldApplyTaskStatus(current: string, incoming: string): boolean {
+    if (current === incoming) return true;
+    if (TERMINAL_TASK_STATUSES.has(current)) {
+        // Terminal status is final: only idempotent repeats are accepted.
+        return false;
+    }
+    if (TERMINAL_TASK_STATUSES.has(incoming)) {
+        return true;
+    }
+
+    const currentOrder = TASK_STATUS_PROGRESS[current];
+    const incomingOrder = TASK_STATUS_PROGRESS[incoming];
+    if (currentOrder == null || incomingOrder == null) {
+        return true;
+    }
+    return incomingOrder >= currentOrder;
+}
+
 /**
  * Task queue routes — create, list, cancel, retry tasks.
  * Tasks are dispatched to CLI daemons via ephemeral events.
@@ -397,6 +422,14 @@ export function taskRoutes(app: Fastify) {
             });
             if (!task) {
                 return reply.code(404).send({ error: "Task not found" });
+            }
+
+            if (!shouldApplyTaskStatus(task.status, status)) {
+                log(
+                    { module: "task", level: "warn" },
+                    `Ignored stale task status transition ${taskId}: ${task.status} -> ${status}`,
+                );
+                return reply.send({ task: serializeTask(task), ignored: true });
             }
 
             const isTerminal = ["completed", "failed", "cancelled"].includes(status);

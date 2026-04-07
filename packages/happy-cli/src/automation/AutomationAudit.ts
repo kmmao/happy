@@ -99,6 +99,7 @@ export function deriveAutomationAuditStats(
         }
         break;
       case "job_terminal":
+      case "task_terminal_dedupe_fallback":
         if (event.status === "completed") stats.terminalCompletedCount += 1;
         if (event.status === "failed") stats.terminalFailedCount += 1;
         if (event.status === "cancelled") stats.terminalCancelledCount += 1;

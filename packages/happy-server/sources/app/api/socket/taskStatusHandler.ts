@@ -18,6 +18,33 @@ const taskStatusSchema = z.object({
     errorMessage: z.string().optional(),
 });
 
+const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
+const TASK_STATUS_ORDER: Record<string, number> = {
+    queued: 0,
+    dispatching: 1,
+    running: 2,
+};
+
+function shouldApplyTaskStatus(current: string, incoming: string): boolean {
+    if (current === incoming) return true;
+    if (TERMINAL_STATUSES.has(current)) {
+        // Terminal status is final: only idempotent repeats are accepted.
+        return false;
+    }
+    if (TERMINAL_STATUSES.has(incoming)) {
+        return true;
+    }
+
+    const currentOrder = TASK_STATUS_ORDER[current];
+    const incomingOrder = TASK_STATUS_ORDER[incoming];
+    if (currentOrder == null || incomingOrder == null) {
+        // Unknown statuses should not block updates for compatibility.
+        return true;
+    }
+    // Block non-terminal regressions, e.g. running -> dispatching.
+    return incomingOrder >= currentOrder;
+}
+
 export function taskStatusHandler(socket: Socket, userId: string): void {
     socket.on("task-status", async (rawData: unknown) => {
         try {
@@ -39,6 +66,14 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                 log(
                     { module: "task", level: "warn" },
                     `task-status: task ${data.taskId} not found for user ${userId}`,
+                );
+                return;
+            }
+
+            if (!shouldApplyTaskStatus(task.status, data.status)) {
+                log(
+                    { module: "task", level: "warn" },
+                    `task-status: ignored stale transition for ${data.taskId}: ${task.status} -> ${data.status}`,
                 );
                 return;
             }

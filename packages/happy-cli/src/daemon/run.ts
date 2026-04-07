@@ -71,6 +71,10 @@ import { TunnelManager, TailscaleProvider, UpnpProvider, CaddyProvider } from "@
 
 
 const execFileAsync = promisify(execFileCb);
+const SESSION_WEBHOOK_TIMEOUT_MS = Math.max(
+  15_000,
+  Number.parseInt(process.env.HAPPY_SESSION_WEBHOOK_TIMEOUT_MS ?? "90000", 10) || 90_000,
+);
 
 // Prepare initial metadata
 export const initialMachineMetadata: MachineMetadata = {
@@ -522,18 +526,9 @@ export async function startDaemon(): Promise<void> {
 
         const recoveredPid = await resolveLikelyRecoverableHappyPid(persisted);
         if (!recoveredPid) {
-          // Report failed status for orphaned task sessions so the server
-          // doesn't leave them stuck in "running" forever.
-          if (persisted.automationContext?.kind === "task" && persisted.automationContext.dedupeKey) {
-            const taskIdMatch = persisted.automationContext.dedupeKey.match(/^task:(.+)$/);
-            if (taskIdMatch) {
-              const taskId = taskIdMatch[1];
-              logger.debug(
-                `[DAEMON RUN] Reporting failed status for orphaned task ${taskId} (session ${persisted.happySessionId})`,
-              );
-              apiMachine.taskStatus(taskId, "failed", persisted.happySessionId, "CLI daemon restarted while task was running");
-            }
-          }
+          // For task sessions, do not force a terminal status during daemon restart.
+          // Scheduler recovery will requeue non-terminal jobs when possible, which
+          // avoids spurious "failed" caused only by CLI process restarts/upgrades.
           await trackedSessionRegistry.forgetSession(persisted.happySessionId).catch(() => {});
           continue;
         }
@@ -1056,7 +1051,7 @@ export async function startDaemon(): Promise<void> {
                   type: "error",
                   errorMessage: `Session webhook timeout for PID ${tmuxResult.pid} (tmux)`,
                 });
-              }, 15_000); // Same timeout as regular sessions
+              }, SESSION_WEBHOOK_TIMEOUT_MS);
 
               // Register awaiter for tmux session (exact same as regular flow)
               pidToAwaiter.set(tmuxResult.pid!, (completedSession) => {
@@ -1245,7 +1240,7 @@ export async function startDaemon(): Promise<void> {
               });
               // 15 second timeout - I have seen timeouts on 10 seconds
               // even though session was still created successfully in ~2 more seconds
-            }, 15_000);
+            }, SESSION_WEBHOOK_TIMEOUT_MS);
 
             // Register awaiter
             pidToAwaiter.set(happyProcess.pid!, (completedSession) => {
@@ -1312,7 +1307,7 @@ export async function startDaemon(): Promise<void> {
       pidToTrackedSession.delete(pid);
       pidToAwaiter.delete(pid);
 
-      if (!session?.happySessionId) {
+      if (!session) {
         return;
       }
 
@@ -1329,11 +1324,35 @@ export async function startDaemon(): Promise<void> {
           ? session.terminationReason
           : `Session exited with code ${code ?? "unknown"}${signal ? ` (signal ${signal})` : ""}`
         : undefined;
-      void automationScheduler?.markJobTerminalBySession(
-        session.happySessionId,
-        terminalStatus,
-        terminalError,
-      );
+      if (session.happySessionId) {
+        void automationScheduler?.markJobTerminalBySession(
+          session.happySessionId,
+          terminalStatus,
+          terminalError,
+        );
+      } else if (session.automationContext?.dedupeKey) {
+        // Fallback for delayed/missing local webhook: still finalize automation state.
+        void automationScheduler?.markJobTerminalByDedupeKey(
+          session.automationContext.dedupeKey,
+          terminalStatus,
+          terminalError,
+        );
+        if (session.automationContext.kind === "task") {
+          void recordAutomationAuditEvent({
+            kind: "task_terminal_dedupe_fallback",
+            dedupeKey: session.automationContext.dedupeKey,
+            projectId: session.automationContext.projectId,
+            trigger: session.automationContext.trigger ?? "task",
+            status: terminalStatus,
+            message:
+              terminalError
+              ?? `pid=${pid} exited without happySessionId; terminal via dedupeKey`,
+          });
+        }
+      }
+      if (!session.happySessionId) {
+        return;
+      }
       void agentLoopCoordinator?.onJobTerminal({
         loopId: session.automationContext?.kind === "agent_loop" ? session.automationContext?.loopId : undefined,
         status: terminalStatus,
@@ -2307,6 +2326,9 @@ export async function startDaemon(): Promise<void> {
           spawnSession,
           serverUrl: configuration.serverUrl,
           authToken: credentials.token,
+          recordTaskAudit: (event) => {
+            void recordAutomationAuditEvent(event);
+          },
           onTaskStatusChange: (taskId, status, sessionId, errorMessage) => {
             try {
               apiMachine?.taskStatus(taskId, status, sessionId, errorMessage);

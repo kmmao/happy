@@ -593,7 +593,7 @@ export class AutomationScheduler {
 
     try {
       const result = await this.runJob(started);
-      if (result.completion === "session" && result.sessionId) {
+      if (result.completion === "session") {
         const running: AutomationJob = {
           ...started,
           status: "running",
@@ -604,9 +604,9 @@ export class AutomationScheduler {
         await this.store.upsert(running);
         this.notifyChange();
         this.reportTaskStatus(running);
-        logger.info(
-          `[AUTOMATION] ${job.kind} job ${job.id} is now running in session ${result.sessionId}`,
-        );
+        logger.info(result.sessionId
+          ? `[AUTOMATION] ${job.kind} job ${job.id} is now running in session ${result.sessionId}`
+          : `[AUTOMATION] ${job.kind} job ${job.id} is running (session id pending)`);
         return;
       }
 

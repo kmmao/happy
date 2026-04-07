@@ -45,7 +45,7 @@ export async function runAutomationJob(
       throw new Error(result.errorMessage ?? "Task job failed");
     }
     return {
-      completion: result.sessionId ? "session" : "immediate",
+      completion: "session",
       sessionId: result.sessionId,
     };
   }

@@ -131,6 +131,14 @@ function describeAutomationAuditEvent(event: {
       return event.sessionId ? `session started in ${event.sessionId}` : "session started";
     case "job_terminal":
       return event.message ? `${event.status ?? "terminal"}: ${event.message}` : (event.status ?? "terminal");
+    case "task_session_webhook_timeout":
+      return event.message
+        ? `task webhook timeout (still running): ${event.message}`
+        : "task webhook timeout (session id pending)";
+    case "task_terminal_dedupe_fallback":
+      return event.message
+        ? `task terminal via dedupeKey: ${event.message}`
+        : `task terminal via dedupeKey (${event.status ?? "terminal"})`;
     case "guardian_reused":
       return event.guardianKey
         ? `reused ${event.guardianKey}${event.guardianSessionId ? ` -> ${event.guardianSessionId}` : ""}`
