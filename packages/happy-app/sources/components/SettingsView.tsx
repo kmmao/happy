@@ -1,4 +1,4 @@
-import { View, ScrollView, Pressable, Platform, Linking } from "react-native";
+import { View, ScrollView, Platform, Linking } from "react-native";
 import { Image } from "expo-image";
 import * as React from "react";
 import { Text } from "@/components/StyledText";
@@ -32,95 +32,6 @@ import { useProfile } from "@/sync/storage";
 import { getDisplayName, getAvatarUrl, getBio } from "@/sync/profile";
 import { Avatar } from "@/components/Avatar";
 import { t } from "@/text";
-import { useSub2ApiUsage } from "@/sub2api";
-import type { UsageProgress } from "@/sub2api";
-import { UsageBar } from "@/components/usage/UsageBar";
-
-function Sub2ApiInlineUsage({ onPress }: { onPress: () => void }) {
-    const { theme } = useUnistyles();
-    const { data, loading, configured } = useSub2ApiUsage();
-
-    const getColor = (u: number) => u >= 90 ? "#FF3B30" : u >= 70 ? "#FF9500" : "#34C759";
-    const formatTime = (s: number) => {
-        if (s <= 0) return "";
-        const totalHours = Math.floor(s / 3600);
-        const m = Math.floor((s % 3600) / 60);
-        if (totalHours >= 24) {
-            const d = Math.floor(totalHours / 24);
-            const h = totalHours % 24;
-            return h > 0 ? `${d}d ${h}h` : `${d}d`;
-        }
-        return totalHours > 0 ? (m > 0 ? `${totalHours}h${m}m` : `${totalHours}h`) : `${m}m`;
-    };
-
-    const renderBar = (label: string, p: UsageProgress) => (
-        <View key={label} style={{ marginBottom: 6 }}>
-            <UsageBar
-                label={label}
-                value={p.utilization}
-                maxValue={100}
-                color={getColor(p.utilization)}
-                formatValue={(v) => `${Math.round(v)}%`}
-            />
-            {p.remaining_seconds > 0 && (
-                <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 1 }}>
-                    {t("sub2api.resetsIn", { time: formatTime(p.remaining_seconds) })}
-                </Text>
-            )}
-        </View>
-    );
-
-    // Not configured — show setup entry
-    if (!configured && !loading) {
-        return (
-            <Item
-                title={t("sub2api.title")}
-                subtitle={t("sub2api.subtitle")}
-                icon={<Ionicons name="speedometer-outline" size={29} color={theme.colors.accentTeal} />}
-                onPress={onPress}
-            />
-        );
-    }
-
-    // Loading
-    if (loading && data.length === 0) {
-        return (
-            <Item
-                title={t("sub2api.title")}
-                subtitle={t("sub2api.refreshing")}
-                icon={<Ionicons name="speedometer-outline" size={29} color={theme.colors.accentTeal} />}
-                onPress={onPress}
-                showChevron={false}
-            />
-        );
-    }
-
-    // Show inline usage bars
-    return (
-        <Pressable onPress={onPress}>
-            <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-                {data.map(({ account, usage }, index) => (
-                    <View key={account.id}>
-                        {index > 0 && (
-                            <View style={{ height: 1, backgroundColor: theme.colors.divider, marginVertical: 10 }} />
-                        )}
-                        <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.text, marginBottom: 4 }}>
-                            {account.name}
-                        </Text>
-                        {usage.five_hour && renderBar(t("sub2api.fiveHourLimit"), usage.five_hour)}
-                        {usage.seven_day && renderBar(t("sub2api.sevenDayLimit"), usage.seven_day)}
-                        {usage.seven_day_sonnet && renderBar(t("sub2api.sevenDaySonnetLimit"), usage.seven_day_sonnet)}
-                    </View>
-                ))}
-                {data.length === 0 && (
-                    <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>
-                        {t("sub2api.noAccounts")}
-                    </Text>
-                )}
-            </View>
-        </Pressable>
-    );
-}
 
 export const SettingsView = React.memo(function SettingsView() {
   const { theme } = useUnistyles();
@@ -427,7 +338,12 @@ export const SettingsView = React.memo(function SettingsView() {
 
       {/* Sub2API Usage Monitor */}
       <ItemGroup title={t("sub2api.title")}>
-        <Sub2ApiInlineUsage onPress={() => router.push("/(app)/sub2api")} />
+        <Item
+          title={t("sub2api.title")}
+          subtitle={t("sub2api.subtitle")}
+          icon={<Ionicons name="speedometer-outline" size={29} color={theme.colors.accentTeal} />}
+          onPress={() => router.push("/(app)/sub2api")}
+        />
       </ItemGroup>
 
       {/* Developer */}

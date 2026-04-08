@@ -25,6 +25,7 @@ export interface AgentInputSettingsOverlayProps {
     isCodex: boolean;
     isGemini: boolean;
     withSandboxSuffix: (label: string, modeKey?: string) => string;
+    maxHeight?: number;
 }
 
 export const AgentInputSettingsOverlay = React.memo(
@@ -44,6 +45,7 @@ export const AgentInputSettingsOverlay = React.memo(
             isCodex,
             isGemini,
             withSandboxSuffix,
+            maxHeight,
         } = props;
 
         const styles = stylesheet;
@@ -65,7 +67,7 @@ export const AgentInputSettingsOverlay = React.memo(
                     ]}
                 >
                     <FloatingOverlay
-                        maxHeight={400}
+                        maxHeight={maxHeight ?? 400}
                         keyboardShouldPersistTaps="always"
                     >
                         {/* Permission Mode Section */}

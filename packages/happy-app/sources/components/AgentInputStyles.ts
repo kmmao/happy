@@ -75,7 +75,6 @@ export const stylesheet = StyleSheet.create((theme, runtime) => ({
         zIndex: 1000,
     },
     fileBrowserContainer: {
-        maxHeight: 450,
         borderRadius: 12,
         overflow: "hidden",
         backgroundColor: theme.colors.surface,

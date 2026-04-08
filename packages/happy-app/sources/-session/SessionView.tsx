@@ -467,6 +467,14 @@ function SessionViewInner({
   const deviceType = useDeviceType();
   const [message, setMessage] = React.useState("");
   const realtimeStatus = useRealtimeStatus();
+  // Track session column height + AgentInput height to compute exact overlay max height
+  const [sessionColumnHeight, setSessionColumnHeight] = React.useState(0);
+  const [agentInputHeight, setAgentInputHeight] = React.useState(0);
+  // Available space above AgentInput = session column minus the input itself minus a small margin
+  const agentInputOverlayMaxHeight =
+    sessionColumnHeight > 0 && agentInputHeight > 0
+      ? Math.max(80, sessionColumnHeight - agentInputHeight - 8)
+      : undefined;
   const { messages, isLoaded } = useSessionMessages(sessionId);
   const isConnected = session.presence === "online";
   const sessionProjectInner = useProjectForSession(sessionId);
@@ -987,11 +995,13 @@ function SessionViewInner({
         onStop={handleCloseTask}
         onPreview={handlePreview}
       />
+      <View onLayout={(e) => setAgentInputHeight(e.nativeEvent.layout.height)}>
       <AgentInput
         placeholder={t("session.inputPlaceholder")}
         value={message}
         onChangeText={setMessage}
         sessionId={sessionId}
+        overlayMaxHeight={agentInputOverlayMaxHeight}
         permissionMode={permissionMode}
         onPermissionModeChange={updatePermissionMode}
         availableModes={availableModes}
@@ -1146,6 +1156,7 @@ function SessionViewInner({
         isThinking={session.thinking === true}
         turnStartedAt={turnStartedAt}
       />
+      </View>
     </>
   );
 
@@ -1207,6 +1218,7 @@ function SessionViewInner({
             safeArea.bottom +
             (isRunningOnMac() || Platform.OS === "web" ? 16 : 0),
         }}
+        onLayout={(e) => setSessionColumnHeight(e.nativeEvent.layout.height)}
       >
         {/* Issue summary header for issue-linked sessions */}
         {issueLink && (

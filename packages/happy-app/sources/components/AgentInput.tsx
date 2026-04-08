@@ -60,7 +60,10 @@ export const AgentInput = React.memo(
   React.forwardRef<MultiTextInputHandle, AgentInputProps>((props, ref) => {
     const styles = stylesheet;
     const { theme } = useUnistyles();
-    const screenWidth = useWindowDimensions().width;
+    const { width: screenWidth } = useWindowDimensions();
+    // Overlay max height: caller passes available space above input (accurate);
+    // fall back to a safe default when not provided (e.g. new-session screen).
+    const overlayMaxHeight = props.overlayMaxHeight ?? 400;
 
     const hasText = props.value.trim().length > 0;
     const hasImages = (props.images?.imagePaths?.length ?? 0) > 0;
@@ -587,6 +590,7 @@ export const AgentInput = React.memo(
             isCodex={isCodex}
             isGemini={isGemini}
             withSandboxSuffix={withSandboxSuffix}
+            maxHeight={overlayMaxHeight}
           />
 
           {/* Slash Command List - toggled by slash command button */}
@@ -604,7 +608,7 @@ export const AgentInput = React.memo(
                 ]}
               >
                 <FloatingOverlay
-                  maxHeight={420}
+                  maxHeight={overlayMaxHeight}
                   keyboardShouldPersistTaps="always"
                 >
                   <CommandListPopover
@@ -634,7 +638,7 @@ export const AgentInput = React.memo(
                 ]}
               >
                 <FloatingOverlay
-                  maxHeight={400}
+                  maxHeight={overlayMaxHeight}
                   keyboardShouldPersistTaps="always"
                 >
                   <QuickCommandsPanel
@@ -665,7 +669,7 @@ export const AgentInput = React.memo(
                   { paddingHorizontal: screenWidth > 700 ? 0 : 8 },
                 ]}
               >
-                <View style={styles.fileBrowserContainer}>
+                <View style={[styles.fileBrowserContainer, { maxHeight: overlayMaxHeight }]}>
                   <GitBrowseTab
                     sessionId={props.sessionId}
                     embedded
