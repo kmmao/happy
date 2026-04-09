@@ -405,6 +405,34 @@ export async function deleteAgentRole(
 
 // === Goal API ===
 
+export interface GoalBlockerSummary {
+    kind: "planner_timeout" | "task_failed" | "agent_conflict" | "agent_request";
+    summary: string;
+    sourceTaskId?: string;
+    sourceMessageId?: string;
+    requiresHuman: boolean;
+    sessionId?: string;
+    decisionId?: string;
+    messageStatus?: "unread" | "read" | "resolved";
+}
+
+export interface GoalTaskStatusSummary {
+    dispatching: number;
+    queued: number;
+    running: number;
+    completed: number;
+    failed: number;
+    cancelled: number;
+}
+
+export interface GoalLatestSessionSummary {
+    sessionId: string;
+    taskId: string;
+    taskTitle: string | null;
+    status: string;
+    updatedAt: number;
+}
+
 export interface GoalTaskSummary {
     id: string;
     title: string | null;
@@ -431,12 +459,171 @@ export interface GoalSummary {
     subGoalCount: number;
     taskCount: number;
     decisionCount: number;
+    taskStatusSummary?: GoalTaskStatusSummary;
+    latestSession?: GoalLatestSessionSummary | null;
+    blocker?: GoalBlockerSummary | null;
     tasks: GoalTaskSummary[];
 }
 
-interface GoalsResponse {
-    goals: GoalSummary[];
-    total: number;
+export interface GoalDetailTask {
+    id: string;
+    title: string | null;
+    status: string;
+    sessionId: string | null;
+    roleType: string | null;
+    promptPreview: string;
+    priority: string;
+    createdAt: number;
+    completedAt: number | null;
+}
+
+export interface GoalDetailDecision {
+    id: string;
+    question: string;
+    status: string;
+    createdAt: number;
+}
+
+export interface GoalDetailSubGoal {
+    id: string;
+    title: string;
+    status: string;
+    progress: number;
+    priority: string;
+}
+
+export interface GoalDetail extends GoalSummary {
+    tasks: GoalDetailTask[];
+    subGoals: GoalDetailSubGoal[];
+    blockers: GoalBlockerSummary[];
+    decisions: GoalDetailDecision[];
+}
+
+const GoalBlockerSummarySchema = z.object({
+    kind: z.enum(["planner_timeout", "task_failed", "agent_conflict", "agent_request"]),
+    summary: z.string(),
+    sourceTaskId: z.string().optional(),
+    sourceMessageId: z.string().optional(),
+    requiresHuman: z.boolean(),
+    sessionId: z.string().optional(),
+    decisionId: z.string().optional(),
+    messageStatus: z.enum(["unread", "read", "resolved"]).optional(),
+});
+
+
+const GoalTaskStatusSummarySchema = z.object({
+    dispatching: z.number().int().min(0),
+    queued: z.number().int().min(0),
+    running: z.number().int().min(0),
+    completed: z.number().int().min(0),
+    failed: z.number().int().min(0),
+    cancelled: z.number().int().min(0),
+});
+
+const GoalLatestSessionSummarySchema = z.object({
+    sessionId: z.string(),
+    taskId: z.string(),
+    taskTitle: z.string().nullable(),
+    status: z.string(),
+    updatedAt: z.number().int().nonnegative(),
+});
+
+const GoalTaskSummarySchema = z.object({
+    id: z.string(),
+    title: z.string().nullable(),
+    status: z.string(),
+    sessionId: z.string().nullable(),
+    roleType: z.string().nullable(),
+});
+
+const GoalSummarySchema = z.object({
+    id: z.string(),
+    projectId: z.string(),
+    title: z.string(),
+    description: z.string().nullable(),
+    status: z.enum(["planning", "in_progress", "blocked", "completed", "cancelled"]),
+    progress: z.number().int().min(0).max(100),
+    priority: z.enum(["urgent", "normal", "low"]),
+    deadline: z.number().int().nullable(),
+    parentGoalId: z.string().nullable(),
+    machineId: z.string(),
+    createdBy: z.string(),
+    plannerTaskId: z.string().nullable(),
+    createdAt: z.number().int().nonnegative(),
+    updatedAt: z.number().int().nonnegative(),
+    subGoalCount: z.number().int().min(0),
+    taskCount: z.number().int().min(0),
+    decisionCount: z.number().int().min(0),
+    taskStatusSummary: GoalTaskStatusSummarySchema.optional(),
+    latestSession: GoalLatestSessionSummarySchema.nullable().optional(),
+    blocker: GoalBlockerSummarySchema.nullable().optional(),
+    tasks: z.array(GoalTaskSummarySchema),
+});
+
+const GoalDetailTaskSchema = z.object({
+    id: z.string(),
+    title: z.string().nullable(),
+    status: z.string(),
+    sessionId: z.string().nullable(),
+    roleType: z.string().nullable(),
+    promptPreview: z.string(),
+    priority: z.string(),
+    createdAt: z.number().int().nonnegative(),
+    completedAt: z.number().int().nullable(),
+});
+
+const GoalDetailDecisionSchema = z.object({
+    id: z.string(),
+    question: z.string(),
+    status: z.string(),
+    createdAt: z.number().int().nonnegative(),
+});
+
+const GoalDetailSubGoalSchema = z.object({
+    id: z.string(),
+    title: z.string(),
+    status: z.string(),
+    progress: z.number().int().min(0).max(100),
+    priority: z.string(),
+});
+
+const GoalDetailSchema = GoalSummarySchema.extend({
+    tasks: z.array(GoalDetailTaskSchema),
+    subGoals: z.array(GoalDetailSubGoalSchema),
+    blockers: z.array(GoalBlockerSummarySchema),
+    decisions: z.array(GoalDetailDecisionSchema),
+});
+
+const GoalsResponseSchema = z.object({
+    goals: z.array(GoalSummarySchema),
+    total: z.number().int().min(0),
+});
+
+const GoalDetailResponseSchema = z.object({
+    goal: GoalDetailSchema,
+});
+
+export async function fetchGoalDetail(
+    credentials: AuthCredentials,
+    projectId: string,
+    goalId: string,
+): Promise<GoalDetail> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/goals/${goalId}`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch goal detail: ${response.status}`);
+        }
+        const json = await response.json();
+        const parsed = GoalDetailResponseSchema.safeParse(json);
+        if (!parsed.success) {
+            throw new Error(`Invalid goal detail response: ${parsed.error.issues[0]?.message}`);
+        }
+        return parsed.data.goal as GoalDetail;
+    });
 }
 
 export async function fetchGoals(
@@ -457,8 +644,12 @@ export async function fetchGoals(
         if (!response.ok) {
             throw new Error(`Failed to fetch goals: ${response.status}`);
         }
-        const data = (await response.json()) as GoalsResponse;
-        return data.goals;
+        const json = await response.json();
+        const parsed = GoalsResponseSchema.safeParse(json);
+        if (!parsed.success) {
+            throw new Error(`Invalid goals response: ${parsed.error.issues[0]?.message}`);
+        }
+        return parsed.data.goals as GoalSummary[];
     });
 }
 

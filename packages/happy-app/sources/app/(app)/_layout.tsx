@@ -426,9 +426,8 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
-        name="project/[id]/knowledge/[entryId]/evolution"
+        name="project/[id]/goal/[goalId]"
         options={{
-          headerTitle: t("projects.knowledgeEvolutionTitle"),
           headerBackTitle: t("common.back"),
         }}
       />

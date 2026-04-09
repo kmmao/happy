@@ -17,6 +17,7 @@ import {
     buildUsageEphemeral,
     buildMachineStatusEphemeral,
     buildUpdateMachineUpdate,
+    buildGoalProgressEphemeral,
 } from "./eventRouter";
 
 describe("buildSessionActivityEphemeral", () => {
@@ -265,6 +266,7 @@ describe("buildMachineStatusEphemeral", () => {
     });
 });
 
+
 describe("buildUpdateMachineUpdate", () => {
     it("should build update machine payload", () => {
         const result = buildUpdateMachineUpdate(
@@ -278,5 +280,23 @@ describe("buildUpdateMachineUpdate", () => {
         expect(result.body.machineId).toBe("machine-1");
         expect(result.body.metadata).toEqual({ value: "meta", version: 1 });
         expect(result.body.daemonState).toEqual({ value: "daemon-state", version: 2 });
+    });
+});
+
+describe("buildGoalProgressEphemeral", () => {
+    it("should build goal progress ephemeral payload", () => {
+        const result = buildGoalProgressEphemeral({
+            goalId: "goal-1",
+            projectId: "proj-1",
+            status: "in_progress",
+            progress: 42,
+        });
+        expect(result).toEqual({
+            type: "goal-progress",
+            goalId: "goal-1",
+            projectId: "proj-1",
+            status: "in_progress",
+            progress: 42,
+        });
     });
 });

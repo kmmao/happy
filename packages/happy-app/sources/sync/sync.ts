@@ -188,6 +188,12 @@ class Sync {
   }) => void>();
   private researchConfigListeners = new Set<(event: ResearchConfigChange) => void>();
   private taskLogListeners = new Set<(sessionId: string, taskId: string, chunk: string) => void>();
+  private goalProgressListeners = new Set<(event: {
+    goalId: string;
+    projectId: string;
+    status: string;
+    progress: number;
+  }) => void>();
   private taskStatusListeners = new Set<(event: {
     taskId: string;
     status: string;
@@ -2485,6 +2491,18 @@ class Sync {
       }
     }
 
+    // Handle goal-progress: notify listeners for real-time goal progress updates
+    if (updateData.type === "goal-progress") {
+      for (const listener of this.goalProgressListeners) {
+        listener({
+          goalId: updateData.goalId,
+          projectId: updateData.projectId,
+          status: updateData.status,
+          progress: updateData.progress,
+        });
+      }
+    }
+
     // Handle task-status-changed: notify listeners for real-time task status updates
     if (updateData.type === "task-status-changed") {
       for (const listener of this.taskStatusListeners) {
@@ -2780,6 +2798,16 @@ class Sync {
   onTaskLog(listener: (sessionId: string, taskId: string, chunk: string) => void): () => void {
     this.taskLogListeners.add(listener);
     return () => { this.taskLogListeners.delete(listener); };
+  }
+
+  onGoalProgress(listener: (event: {
+    goalId: string;
+    projectId: string;
+    status: string;
+    progress: number;
+  }) => void): () => void {
+    this.goalProgressListeners.add(listener);
+    return () => { this.goalProgressListeners.delete(listener); };
   }
 
   onTaskStatusChanged(listener: (event: {

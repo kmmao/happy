@@ -65,6 +65,8 @@ export async function goalProgressUpdate(input: GoalProgressInput, depth: number
         let newStatus: string;
         if (completedCount === tasks.length) {
             newStatus = "completed";
+        } else if (cancelledCount === tasks.length) {
+            newStatus = "cancelled";
         } else if (failedCount > 0 && terminalCount === tasks.length) {
             // All tasks are terminal but some failed
             newStatus = "blocked";

@@ -320,6 +320,14 @@ export const ApiEphemeralTaskLogSchema = z.object({
     offset: z.number(),
 });
 
+export const ApiEphemeralGoalProgressSchema = z.object({
+    type: z.literal("goal-progress"),
+    goalId: z.string(),
+    projectId: z.string(),
+    status: z.string(),
+    progress: z.number(),
+});
+
 export const ApiEphemeralTaskStatusChangedSchema = z.object({
     type: z.literal("task-status-changed"),
     taskId: z.string(),
@@ -376,6 +384,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralSupervisorLoopStatusSchema,
   ApiEphemeralKnowledgeCountSchema,
   ApiEphemeralTaskLogSchema,
+  ApiEphemeralGoalProgressSchema,
   ApiEphemeralTaskStatusChangedSchema,
   ApiEphemeralInboxNewItemSchema,
   ApiEphemeralInboxUnreadCountSchema,

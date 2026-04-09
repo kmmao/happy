@@ -19,7 +19,9 @@ import { t } from "@/text";
 import { storage, useSetting } from "@/sync/storage";
 import { gitStatusSync } from "@/sync/gitStatusSync";
 
-type TabKey = "sessions" | "git" | "health" | "actions" | "research" | "knowledge" | "goals" | "world" | "roles" | "analytics" | "config";
+import { resolveProjectDetailInitialTab, type ProjectDetailTabKey } from "./projectDetailTabs";
+
+type TabKey = ProjectDetailTabKey;
 
 interface ProjectDetailViewProps {
     project: Project;
@@ -29,9 +31,7 @@ interface ProjectDetailViewProps {
 export const ProjectDetailView = React.memo(
     ({ project, initialTab }: ProjectDetailViewProps) => {
         const { theme } = useUnistyles();
-        const [activeTab, setActiveTab] = React.useState<TabKey>(
-            initialTab ?? "world",
-        );
+        const [activeTab, setActiveTab] = React.useState<TabKey>("world");
         const [researchSyncStatus, setResearchSyncStatus] =
             React.useState<ResearchSyncStatus>("idle");
         const knowledgeBaseEnabled = useSetting("knowledgeBase");
@@ -46,6 +46,14 @@ export const ProjectDetailView = React.memo(
                 gitStatusSync.getSync(activeSessionId).invalidate();
             }
         }, [project.sessionIds]);
+
+        React.useEffect(() => {
+            const nextTab = resolveProjectDetailInitialTab({
+                requestedTab: initialTab,
+                knowledgeBaseEnabled,
+            });
+            setActiveTab(nextTab);
+        }, [initialTab, knowledgeBaseEnabled]);
 
         const tabs: { key: TabKey; label: string }[] = React.useMemo(
             () => {

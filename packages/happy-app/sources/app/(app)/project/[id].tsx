@@ -4,9 +4,10 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { useProject } from "@/hooks/useProjects";
-import { ProjectDetailView } from "@/components/project/ProjectDetailView";
 import { getProjectDisplayName } from "@/sync/projectManager";
 import { t } from "@/text";
+import { ProjectDetailView } from "@/components/project/ProjectDetailView";
+import { resolveProjectDetailInitialTab } from "@/components/project/projectDetailTabs";
 
 function ProjectDetailScreen() {
     const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
@@ -31,17 +32,10 @@ function ProjectDetailScreen() {
         );
     }
 
-    const initialTab =
-        tab === "world" ||
-        tab === "roles" ||
-        tab === "goals" ||
-        tab === "health" ||
-        tab === "git" ||
-        tab === "sessions" ||
-        tab === "research" ||
-        tab === "config"
-            ? tab
-            : undefined;
+    const initialTab = resolveProjectDetailInitialTab({
+        requestedTab: tab,
+        knowledgeBaseEnabled: true,
+    });
 
     return <ProjectDetailView project={project} initialTab={initialTab} />;
 }

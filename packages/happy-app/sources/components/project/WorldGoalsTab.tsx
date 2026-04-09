@@ -17,8 +17,7 @@ import {
     deleteGoal,
     type GoalSummary,
 } from "@/sync/apiProjects";
-
-// === Status / Priority Helpers ===
+import { sync } from "@/sync/sync";
 
 const STATUS_COLORS: Record<string, string> = {
     planning: "#8B5CF6",
@@ -41,7 +40,27 @@ const PRIORITY_COLORS: Record<string, string> = {
     normal: "#3B82F6",
     low: "#6B7280",
 };
+
+const TASK_STATUS_COLORS: Record<string, string> = {
+    dispatching: "#F59E0B",
+    queued: "#8B5CF6",
+    running: "#3B82F6",
+    completed: "#10B981",
+    failed: "#EF4444",
+    cancelled: "#6B7280",
+};
+
+const TASK_STATUS_ICONS: Record<string, string> = {
+    dispatching: "push-outline",
+    queued: "time-outline",
+    running: "play-circle",
+    completed: "checkmark-circle",
+    failed: "alert-circle",
+    cancelled: "close-circle",
+};
+
 const PLANNER_TIMEOUT_MS = 10 * 60 * 1000;
+type GoalFilterKey = "all" | "blocked" | "active" | "done";
 
 function statusLabel(goal: GoalSummary): string {
     if (goal.status === "planning") {
@@ -65,11 +84,23 @@ function priorityLabel(priority: string): string {
     return map[priority]?.() ?? priority;
 }
 
+function filterLabel(filter: GoalFilterKey): string {
+    const labels: Record<GoalFilterKey, string> = {
+        all: t("goals.title"),
+        blocked: t("goals.statusBlocked"),
+        active: t("goals.statusInProgress"),
+        done: t("goals.statusCompleted"),
+    };
+    return labels[filter];
+}
+
+function isSafeId(value: string | undefined): value is string {
+    return Boolean(value && /^[A-Za-z0-9_-]+$/.test(value));
+}
+
 function isPlannerTimeoutBlocked(goal: GoalSummary): boolean {
     return goal.status === "blocked" && Boolean(goal.plannerTaskId) && goal.taskCount === 0;
 }
-
-// === Main Component ===
 
 interface WorldGoalsTabProps {
     project: Project;
@@ -83,6 +114,7 @@ export const WorldGoalsTab = React.memo(
         const [loading, setLoading] = React.useState(false);
         const [showCreate, setShowCreate] = React.useState(false);
         const [nowTs, setNowTs] = React.useState(Date.now());
+        const [filter, setFilter] = React.useState<GoalFilterKey>("all");
 
         const loadGoals = React.useCallback(async () => {
             if (!project.serverId) return;
@@ -101,7 +133,7 @@ export const WorldGoalsTab = React.memo(
 
         React.useEffect(() => {
             if (isActive) {
-                loadGoals();
+                void loadGoals();
             }
         }, [isActive, loadGoals]);
 
@@ -110,6 +142,33 @@ export const WorldGoalsTab = React.memo(
             const timer = setInterval(() => setNowTs(Date.now()), 1000);
             return () => clearInterval(timer);
         }, [isActive]);
+
+        React.useEffect(() => {
+            if (!isActive || !project.serverId) return;
+
+            return sync.onGoalProgress((event) => {
+                if (event.projectId !== project.serverId) return;
+
+                let shouldRefresh = false;
+                setGoals((prev) => prev.map((goal) => {
+                    if (goal.id !== event.goalId) return goal;
+                    shouldRefresh = [
+                        goal.status === "planning" && event.status === "in_progress",
+                        goal.status === "planning" && event.status === "blocked",
+                        goal.status === "in_progress" && event.status === "completed",
+                    ].some(Boolean);
+                    return {
+                        ...goal,
+                        status: event.status,
+                        progress: event.progress,
+                    };
+                }));
+
+                if (shouldRefresh) {
+                    void loadGoals();
+                }
+            });
+        }, [isActive, loadGoals, project.serverId]);
 
         const handleCancel = React.useCallback(async (goal: GoalSummary) => {
             const confirmed = await Modal.confirm(
@@ -160,7 +219,12 @@ export const WorldGoalsTab = React.memo(
 
         const router = useRouter();
 
+        const handleOpenGoal = React.useCallback((goalId: string) => {
+            router.push(`/project/${project.id}/goal/${goalId}` as any);
+        }, [project.id, router]);
+
         const handleViewSession = React.useCallback((sessionId: string) => {
+            if (!isSafeId(sessionId)) return;
             router.push(`/session/${sessionId}` as any);
         }, [router]);
 
@@ -170,9 +234,25 @@ export const WorldGoalsTab = React.memo(
             Modal.toast(t("goals.created"));
         }, []);
 
-        // Group goals: active first, then completed/cancelled
-        const activeGoals = goals.filter((g) => !["completed", "cancelled"].includes(g.status));
-        const doneGoals = goals.filter((g) => ["completed", "cancelled"].includes(g.status));
+        const summary = React.useMemo(() => ({
+            total: goals.length,
+            blocked: goals.filter((goal) => goal.status === "blocked").length,
+            active: goals.filter((goal) => ["planning", "in_progress", "blocked"].includes(goal.status)).length,
+            done: goals.filter((goal) => ["completed", "cancelled"].includes(goal.status)).length,
+        }), [goals]);
+
+        const filteredGoals = React.useMemo(() => {
+            if (filter === "blocked") {
+                return goals.filter((goal) => goal.status === "blocked");
+            }
+            if (filter === "active") {
+                return goals.filter((goal) => ["planning", "in_progress", "blocked"].includes(goal.status));
+            }
+            if (filter === "done") {
+                return goals.filter((goal) => ["completed", "cancelled"].includes(goal.status));
+            }
+            return goals;
+        }, [filter, goals]);
 
         return (
             <View style={styles.container}>
@@ -180,7 +260,6 @@ export const WorldGoalsTab = React.memo(
                     style={styles.scroll}
                     contentContainerStyle={styles.scrollContent}
                 >
-                    {/* Header */}
                     <View style={styles.header}>
                         <Text style={styles.title}>{t("goals.title")}</Text>
                         <Pressable style={styles.createButton} onPress={() => setShowCreate(true)}>
@@ -189,42 +268,69 @@ export const WorldGoalsTab = React.memo(
                         </Pressable>
                     </View>
 
+                    {goals.length > 0 ? (
+                        <View style={styles.summaryCard}>
+                            <View style={styles.summaryRow}>
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryValue}>{summary.total}</Text>
+                                    <Text style={styles.summaryLabel}>{filterLabel("all")}</Text>
+                                </View>
+                                <View style={styles.summaryItem}>
+                                    <Text style={[styles.summaryValue, { color: STATUS_COLORS.blocked }]}>{summary.blocked}</Text>
+                                    <Text style={styles.summaryLabel}>{filterLabel("blocked")}</Text>
+                                </View>
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryValue}>{summary.active}</Text>
+                                    <Text style={styles.summaryLabel}>{filterLabel("active")}</Text>
+                                </View>
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryValue}>{summary.done}</Text>
+                                    <Text style={styles.summaryLabel}>{filterLabel("done")}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.filterRow}>
+                                {(["all", "blocked", "active", "done"] as GoalFilterKey[]).map((item) => (
+                                    <Pressable
+                                        key={item}
+                                        style={[
+                                            styles.filterChip,
+                                            filter === item && styles.filterChipActive,
+                                        ]}
+                                        onPress={() => setFilter(item)}
+                                    >
+                                        <Text style={[
+                                            styles.filterChipText,
+                                            filter === item && styles.filterChipTextActive,
+                                        ]}>
+                                            {filterLabel(item)}
+                                        </Text>
+                                    </Pressable>
+                                ))}
+                            </View>
+                        </View>
+                    ) : null}
+
                     {loading && goals.length === 0 ? (
                         <ActivityIndicator style={{ marginTop: 40 }} />
-                    ) : goals.length === 0 ? (
+                    ) : filteredGoals.length === 0 ? (
                         <View style={styles.emptyContainer}>
                             <Ionicons name="flag-outline" size={48} color={theme.colors.textSecondary} />
                             <Text style={styles.emptyText}>{t("goals.emptyGoals")}</Text>
                             <Text style={styles.emptyHint}>{t("goals.emptyGoalsHint")}</Text>
                         </View>
                     ) : (
-                        <>
-                            {activeGoals.map((goal) => (
-                                <GoalCard
-                                    key={goal.id}
-                                    goal={goal}
-                                    nowTs={nowTs}
-                                    onDecompose={handleDecompose}
-                                    onCancel={handleCancel}
-                                    onDelete={handleDelete}
-                                    onViewSession={handleViewSession}
-                                />
-                            ))}
-                            {doneGoals.length > 0 && activeGoals.length > 0 && (
-                                <View style={styles.divider} />
-                            )}
-                            {doneGoals.map((goal) => (
-                                <GoalCard
-                                    key={goal.id}
-                                    goal={goal}
-                                    nowTs={nowTs}
-                                    onDecompose={handleDecompose}
-                                    onCancel={handleCancel}
-                                    onDelete={handleDelete}
-                                    onViewSession={handleViewSession}
-                                />
-                            ))}
-                        </>
+                        filteredGoals.map((goal) => (
+                            <GoalCard
+                                key={goal.id}
+                                goal={goal}
+                                nowTs={nowTs}
+                                onDecompose={handleDecompose}
+                                onCancel={handleCancel}
+                                onDelete={handleDelete}
+                                onOpenGoal={handleOpenGoal}
+                                onViewSession={handleViewSession}
+                            />
+                        ))
                     )}
                 </ScrollView>
 
@@ -240,32 +346,13 @@ export const WorldGoalsTab = React.memo(
     },
 );
 
-// === Goal Card ===
-
-const TASK_STATUS_COLORS: Record<string, string> = {
-    dispatching: "#F59E0B",
-    queued: "#8B5CF6",
-    running: "#3B82F6",
-    completed: "#10B981",
-    failed: "#EF4444",
-    cancelled: "#6B7280",
-};
-
-const TASK_STATUS_ICONS: Record<string, string> = {
-    dispatching: "push-outline",
-    queued: "time-outline",
-    running: "play-circle",
-    completed: "checkmark-circle",
-    failed: "alert-circle",
-    cancelled: "close-circle",
-};
-
 const GoalCard = React.memo(function GoalCard({
     goal,
     nowTs,
     onDecompose,
     onCancel,
     onDelete,
+    onOpenGoal,
     onViewSession,
 }: {
     goal: GoalSummary;
@@ -273,6 +360,7 @@ const GoalCard = React.memo(function GoalCard({
     onDecompose: (goal: GoalSummary) => void;
     onCancel: (goal: GoalSummary) => void;
     onDelete: (goal: GoalSummary) => void;
+    onOpenGoal: (goalId: string) => void;
     onViewSession: (sessionId: string) => void;
 }) {
     const { theme } = useUnistyles();
@@ -300,153 +388,154 @@ const GoalCard = React.memo(function GoalCard({
     );
 
     return (
-        <View style={[styles.goalCard, isTerminal && { opacity: 0.6 }]}>
-            {/* Top row: status + title + priority badge */}
-            <View style={styles.goalCardHeader}>
-                <Ionicons name={statusIcon as any} size={20} color={statusColor} />
-                <Text style={styles.goalTitle} numberOfLines={2}>{goal.title}</Text>
-                <View style={[styles.priorityBadge, { backgroundColor: priorityColor }]}>
-                    <Text style={styles.priorityBadgeText}>{priorityLabel(goal.priority)}</Text>
-                </View>
-            </View>
-
-            {/* Progress bar */}
-            {!isTerminal && !isPlanning && (
-                <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                        <View
-                            style={[
-                                styles.progressFill,
-                                {
-                                    width: `${goal.progress}%` as any,
-                                    backgroundColor: statusColor,
-                                },
-                            ]}
-                        />
+        <Pressable onPress={() => onOpenGoal(goal.id)}>
+            <View style={[styles.goalCard, isTerminal && { opacity: 0.6 }]}>
+                <View style={styles.goalCardHeader}>
+                    <Ionicons name={statusIcon as any} size={20} color={statusColor} />
+                    <Text style={styles.goalTitle} numberOfLines={2}>{goal.title}</Text>
+                    <View style={[styles.priorityBadge, { backgroundColor: priorityColor }]}>
+                        <Text style={styles.priorityBadgeText}>{priorityLabel(goal.priority)}</Text>
                     </View>
-                    <Text style={styles.progressText}>{t("goals.progress", { value: goal.progress })}</Text>
                 </View>
-            )}
 
-            {/* Planner working indicator */}
-            {isPlanningRunning && (
-                <View style={styles.plannerRow}>
-                    <ActivityIndicator size="small" color={statusColor} />
-                    <Text style={styles.plannerText}>
-                        {t("goals.plannerWorking")} · {t("goals.plannerCountdown", { time: plannerCountdown })}
+                {goal.blocker ? (
+                    <View style={styles.blockerBanner}>
+                        <Ionicons name="warning-outline" size={14} color={STATUS_COLORS.blocked} />
+                        <Text style={styles.blockerText} numberOfLines={2}>{goal.blocker.summary}</Text>
+                    </View>
+                ) : null}
+
+                {!isTerminal && !isPlanning ? (
+                    <View style={styles.progressContainer}>
+                        <View style={styles.progressBar}>
+                            <View
+                                style={[
+                                    styles.progressFill,
+                                    {
+                                        width: `${goal.progress}%` as any,
+                                        backgroundColor: statusColor,
+                                    },
+                                ]}
+                            />
+                        </View>
+                        <Text style={styles.progressText}>{t("goals.progress", { value: goal.progress })}</Text>
+                    </View>
+                ) : null}
+
+                {isPlanningRunning ? (
+                    <View style={styles.plannerRow}>
+                        <ActivityIndicator size="small" color={statusColor} />
+                        <Text style={styles.plannerText}>
+                            {t("goals.plannerWorking")} · {t("goals.plannerCountdown", { time: plannerCountdown })}
+                        </Text>
+                    </View>
+                ) : null}
+                {isPlanningPending ? (
+                    <View style={styles.plannerRow}>
+                        <Ionicons name="pause-circle-outline" size={16} color={statusColor} />
+                        <Text style={styles.plannerText}>{t("goals.plannerPending")}</Text>
+                    </View>
+                ) : null}
+                {showPlannerTimeoutBlocked ? (
+                    <View style={styles.plannerRow}>
+                        <Ionicons name="alert-circle-outline" size={16} color={statusColor} />
+                        <Text style={styles.plannerText}>{t("goals.plannerTimeoutBlocked")}</Text>
+                    </View>
+                ) : null}
+
+                {nonPlannerTasks.length > 0 ? (
+                    <View style={styles.taskListContainer}>
+                        {nonPlannerTasks.slice(0, 2).map((task, idx) => {
+                            const tColor = TASK_STATUS_COLORS[task.status] ?? "#6B7280";
+                            const tIcon = TASK_STATUS_ICONS[task.status] ?? "help-circle-outline";
+                            return (
+                                <Pressable
+                                    key={task.id}
+                                    style={styles.taskRow}
+                                    disabled={!task.sessionId || !isSafeId(task.sessionId)}
+                                    onPress={() => task.sessionId && isSafeId(task.sessionId) && onViewSession(task.sessionId)}
+                                >
+                                    <Ionicons name={tIcon as any} size={14} color={tColor} />
+                                    <Text style={[styles.taskLabel, { color: tColor }]} numberOfLines={1}>
+                                        {task.title ?? t("goals.taskIndex", { index: idx + 1 })}
+                                    </Text>
+                                    <Text style={styles.taskStatus}>{task.status}</Text>
+                                    {task.sessionId ? (
+                                        <Ionicons name="open-outline" size={12} color={theme.colors.textLink} style={{ marginLeft: 2 }} />
+                                    ) : null}
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                ) : null}
+
+                <View style={styles.metaRow}>
+                    <Text style={[styles.statusBadge, { color: statusColor }]}>
+                        {statusLabel(goal)}
                     </Text>
+                    {goal.taskCount > 0 ? (
+                        <Text style={styles.metaText}>{t("goals.tasks", { count: goal.taskCount })}</Text>
+                    ) : null}
+                    {goal.subGoalCount > 0 ? (
+                        <Text style={styles.metaText}>{t("goals.subGoals", { count: goal.subGoalCount })}</Text>
+                    ) : null}
+                    {goal.deadline ? (
+                        <Text style={styles.metaText}>
+                            {new Date(goal.deadline).toLocaleDateString()}
+                        </Text>
+                    ) : null}
                 </View>
-            )}
-            {isPlanningPending && (
-                <View style={styles.plannerRow}>
-                    <Ionicons name="pause-circle-outline" size={16} color={statusColor} />
-                    <Text style={styles.plannerText}>{t("goals.plannerPending")}</Text>
-                </View>
-            )}
-            {showPlannerTimeoutBlocked && (
-                <View style={styles.plannerRow}>
-                    <Ionicons name="alert-circle-outline" size={16} color={statusColor} />
-                    <Text style={styles.plannerText}>{t("goals.plannerTimeoutBlocked")}</Text>
-                </View>
-            )}
 
-            {/* Task list */}
-            {nonPlannerTasks.length > 0 && (
-                <View style={styles.taskListContainer}>
-                    {nonPlannerTasks.map((task, idx) => {
-                        const tColor = TASK_STATUS_COLORS[task.status] ?? "#6B7280";
-                        const tIcon = TASK_STATUS_ICONS[task.status] ?? "help-circle-outline";
-                        return (
-                            <Pressable
-                                key={task.id}
-                                style={styles.taskRow}
-                                disabled={!task.sessionId}
-                                onPress={() => task.sessionId && onViewSession(task.sessionId)}
-                            >
-                                <Ionicons name={tIcon as any} size={14} color={tColor} />
-                                <Text style={[styles.taskLabel, { color: tColor }]} numberOfLines={1}>
-                                    {task.title ?? t("goals.taskIndex", { index: idx + 1 })}
-                                </Text>
-                                <Text style={styles.taskStatus}>{task.status}</Text>
-                                {task.sessionId && (
-                                    <Ionicons name="open-outline" size={12} color={theme.colors.textLink} style={{ marginLeft: 2 }} />
-                                )}
-                            </Pressable>
-                        );
-                    })}
+                <View style={styles.actionRow}>
+                    {canManualDecompose ? (
+                        <Pressable
+                            style={styles.actionButton}
+                            onPress={() => onDecompose(goal)}
+                        >
+                            <Ionicons name="play-outline" size={16} color={theme.colors.accentPurple} />
+                            <Text style={[styles.actionText, { color: theme.colors.accentPurple }]}>
+                                {showPlannerTimeoutBlocked ? t("goals.retryDecompose") : t("goals.startDecompose")}
+                            </Text>
+                        </Pressable>
+                    ) : null}
+                    {tasksWithSession.length > 0 ? (
+                        <Pressable
+                            style={styles.actionButton}
+                            onPress={() => onViewSession(tasksWithSession[0].sessionId!)}
+                        >
+                            <Ionicons name="terminal-outline" size={16} color={theme.colors.textLink} />
+                            <Text style={[styles.actionText, { color: theme.colors.textLink }]}>
+                                {t("goals.viewSession")}
+                            </Text>
+                        </Pressable>
+                    ) : null}
+                    {!isTerminal ? (
+                        <Pressable
+                            style={styles.actionButton}
+                            onPress={() => onCancel(goal)}
+                        >
+                            <Ionicons name="close-circle-outline" size={16} color={theme.colors.deleteAction} />
+                            <Text style={[styles.actionText, { color: theme.colors.deleteAction }]}>
+                                {t("goals.cancelGoal")}
+                            </Text>
+                        </Pressable>
+                    ) : null}
+                    {isTerminal ? (
+                        <Pressable
+                            style={styles.actionButton}
+                            onPress={() => onDelete(goal)}
+                        >
+                            <Ionicons name="trash-outline" size={16} color={theme.colors.deleteAction} />
+                            <Text style={[styles.actionText, { color: theme.colors.deleteAction }]}>
+                                {t("goals.deleteGoal")}
+                            </Text>
+                        </Pressable>
+                    ) : null}
                 </View>
-            )}
-
-            {/* Meta row */}
-            <View style={styles.metaRow}>
-                <Text style={[styles.statusBadge, { color: statusColor }]}>
-                    {statusLabel(goal)}
-                </Text>
-                {goal.taskCount > 0 && (
-                    <Text style={styles.metaText}>{t("goals.tasks", { count: goal.taskCount })}</Text>
-                )}
-                {goal.subGoalCount > 0 && (
-                    <Text style={styles.metaText}>{t("goals.subGoals", { count: goal.subGoalCount })}</Text>
-                )}
-                {goal.deadline && (
-                    <Text style={styles.metaText}>
-                        {new Date(goal.deadline).toLocaleDateString()}
-                    </Text>
-                )}
             </View>
-
-            {/* Actions */}
-            <View style={styles.actionRow}>
-                {canManualDecompose && (
-                    <Pressable
-                        style={styles.actionButton}
-                        onPress={() => onDecompose(goal)}
-                    >
-                        <Ionicons name="play-outline" size={16} color={theme.colors.accentPurple} />
-                        <Text style={[styles.actionText, { color: theme.colors.accentPurple }]}>
-                            {showPlannerTimeoutBlocked ? t("goals.retryDecompose") : t("goals.startDecompose")}
-                        </Text>
-                    </Pressable>
-                )}
-                {tasksWithSession.length > 0 && (
-                    <Pressable
-                        style={styles.actionButton}
-                        onPress={() => onViewSession(tasksWithSession[0].sessionId!)}
-                    >
-                        <Ionicons name="terminal-outline" size={16} color={theme.colors.textLink} />
-                        <Text style={[styles.actionText, { color: theme.colors.textLink }]}>
-                            {t("goals.viewSession")}
-                        </Text>
-                    </Pressable>
-                )}
-                {!isTerminal && (
-                    <Pressable
-                        style={styles.actionButton}
-                        onPress={() => onCancel(goal)}
-                    >
-                        <Ionicons name="close-circle-outline" size={16} color={theme.colors.deleteAction} />
-                        <Text style={[styles.actionText, { color: theme.colors.deleteAction }]}>
-                            {t("goals.cancelGoal")}
-                        </Text>
-                    </Pressable>
-                )}
-                {isTerminal && (
-                    <Pressable
-                        style={styles.actionButton}
-                        onPress={() => onDelete(goal)}
-                    >
-                        <Ionicons name="trash-outline" size={16} color={theme.colors.deleteAction} />
-                        <Text style={[styles.actionText, { color: theme.colors.deleteAction }]}>
-                            {t("goals.deleteGoal")}
-                        </Text>
-                    </Pressable>
-                )}
-            </View>
-        </View>
+        </Pressable>
     );
 });
-
-// === Goal Create Sheet ===
 
 interface GoalCreateSheetProps {
     project: Project;
@@ -503,7 +592,6 @@ const GoalCreateSheet = React.memo(function GoalCreateSheet({
                         </Pressable>
                     </View>
 
-                    {/* Title */}
                     <Text style={styles.fieldLabel}>{t("goals.goalTitle")}</Text>
                     <TextInput
                         style={styles.textInput}
@@ -515,7 +603,6 @@ const GoalCreateSheet = React.memo(function GoalCreateSheet({
                         autoFocus
                     />
 
-                    {/* Description */}
                     <Text style={styles.fieldLabel}>{t("goals.goalDescription")}</Text>
                     <TextInput
                         style={[styles.textInput, { minHeight: 80 }]}
@@ -528,7 +615,6 @@ const GoalCreateSheet = React.memo(function GoalCreateSheet({
                         maxLength={5000}
                     />
 
-                    {/* Priority */}
                     <Text style={styles.fieldLabel}>{t("goals.goalPriority")}</Text>
                     <View style={styles.chipRow}>
                         {(["urgent", "normal", "low"] as const).map((p) => (
@@ -547,13 +633,11 @@ const GoalCreateSheet = React.memo(function GoalCreateSheet({
                         ))}
                     </View>
 
-                    {/* Auto-decompose */}
                     <View style={styles.switchRow}>
                         <Text style={styles.switchLabel}>{t("goals.autoDecompose")}</Text>
                         <Switch value={autoDecompose} onValueChange={setAutoDecompose} />
                     </View>
 
-                    {/* Actions */}
                     <View style={styles.modalActions}>
                         <View style={{ flex: 1 }} />
                         <Pressable style={styles.cancelButton} onPress={onClose}>
@@ -576,8 +660,6 @@ const GoalCreateSheet = React.memo(function GoalCreateSheet({
         </View>
     );
 });
-
-// === Styles ===
 
 const styles = StyleSheet.create((theme) => ({
     container: {
@@ -615,6 +697,57 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 15,
         color: theme.colors.accentPurple,
     },
+    summaryCard: {
+        marginHorizontal: 16,
+        marginBottom: 12,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 12,
+        padding: 14,
+        gap: 12,
+    },
+    summaryRow: {
+        flexDirection: "row" as const,
+        gap: 10,
+    },
+    summaryItem: {
+        flex: 1,
+        backgroundColor: theme.colors.groupped.background,
+        borderRadius: 10,
+        padding: 10,
+    },
+    summaryValue: {
+        ...Typography.default("semiBold"),
+        fontSize: 18,
+        color: theme.colors.text,
+    },
+    summaryLabel: {
+        ...Typography.default(),
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        marginTop: 4,
+    },
+    filterRow: {
+        flexDirection: "row" as const,
+        flexWrap: "wrap" as const,
+        gap: 8,
+    },
+    filterChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        backgroundColor: theme.colors.groupped.background,
+    },
+    filterChipActive: {
+        backgroundColor: theme.colors.accentPurple,
+    },
+    filterChipText: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+    },
+    filterChipTextActive: {
+        color: "#fff",
+    },
     emptyContainer: {
         alignItems: "center" as const,
         paddingVertical: 60,
@@ -633,15 +766,6 @@ const styles = StyleSheet.create((theme) => ({
         textAlign: "center" as const,
         paddingHorizontal: 40,
     },
-    divider: {
-        height: 1,
-        backgroundColor: theme.colors.textSecondary,
-        opacity: 0.2,
-        marginHorizontal: 16,
-        marginVertical: 12,
-    },
-
-    // Goal Card
     goalCard: {
         marginHorizontal: 16,
         marginBottom: 8,
@@ -670,6 +794,22 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 10,
         color: "#fff",
         textTransform: "uppercase" as const,
+    },
+    blockerBanner: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 6,
+        marginTop: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 10,
+        backgroundColor: theme.colors.groupped.background,
+    },
+    blockerText: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        color: theme.colors.text,
+        flex: 1,
     },
     progressContainer: {
         flexDirection: "row" as const,
@@ -722,6 +862,7 @@ const styles = StyleSheet.create((theme) => ({
     taskLabel: {
         ...Typography.default("semiBold"),
         fontSize: 12,
+        flex: 1,
     },
     taskStatus: {
         ...Typography.default(),
@@ -759,8 +900,6 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 12,
     },
-
-    // Create Sheet
     modalOverlay: {
         position: "absolute" as const,
         top: 0,

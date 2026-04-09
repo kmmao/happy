@@ -19,12 +19,15 @@ const CreateMessageBodySchema = z.object({
     sessionId: z.string().optional(),
 });
 
+const UserWritableMessageStatusSchema = z.enum(["unread", "read"]);
+
 const QueryMessagesSchema = z.object({
     msgType: MsgTypeSchema.optional(),
     status: z.enum(["unread", "read", "resolved"]).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     offset: z.coerce.number().int().min(0).default(0),
 });
+
 
 /**
  * AgentMessage CRUD — inter-agent communication records.
@@ -199,7 +202,7 @@ export function agentMessageRoutes(app: Fastify) {
             schema: {
                 params: z.object({ id: z.string(), msgId: z.string() }),
                 body: z.object({
-                    status: z.enum(["unread", "read", "resolved"]),
+                    status: UserWritableMessageStatusSchema,
                 }),
             },
         },

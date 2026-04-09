@@ -8,11 +8,28 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
+import {
+    buildGoalBlockerSummary,
+    buildGoalTaskStatusSummary,
+    selectLatestGoalSession,
+} from "@/modules/goalSummary";
 import { goalCreate, goalDecompose } from "@/modules/goalCreate";
 import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
 
 const GoalStatusSchema = z.enum(["planning", "in_progress", "blocked", "completed", "cancelled"]);
 const GoalPrioritySchema = z.enum(["urgent", "normal", "low"]);
+const BLOCKER_MESSAGE_TYPES = ["conflict", "request"] as const;
+
+type GoalAgentMessageSummary = {
+    id: string;
+    fromRole: string;
+    msgType: string;
+    content: string;
+    status: string;
+    sessionId: string | null;
+    decisionId: string | null;
+    createdAt: Date;
+};
 
 const CreateGoalBodySchema = z.object({
     title: z.string().min(1).max(500),
@@ -172,6 +189,97 @@ function safeParseJsonArray(json: string): string[] {
     }
 }
 
+async function fetchAgentMessagesBySessions(opts: {
+    accountId: string;
+    projectId: string;
+    sessionIds: string[];
+}): Promise<Map<string, GoalAgentMessageSummary[]>> {
+    const sessionIds = Array.from(new Set(opts.sessionIds.filter(Boolean)));
+    if (sessionIds.length === 0) {
+        return new Map();
+    }
+
+    const messages = await db.agentMessage.findMany({
+        where: {
+            accountId: opts.accountId,
+            projectId: opts.projectId,
+            status: { in: ["unread", "read"] },
+            msgType: { in: [...BLOCKER_MESSAGE_TYPES] },
+            sessionId: { in: sessionIds },
+        },
+        select: {
+            id: true,
+            fromRole: true,
+            msgType: true,
+            content: true,
+            status: true,
+            sessionId: true,
+            decisionId: true,
+            createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+    });
+
+    const bySessionId = new Map<string, GoalAgentMessageSummary[]>();
+    for (const message of messages) {
+        if (!message.sessionId) continue;
+        const current = bySessionId.get(message.sessionId) ?? [];
+        current.push(message);
+        bySessionId.set(message.sessionId, current);
+    }
+    return bySessionId;
+}
+
+function dedupeAgentMessages(messages: GoalAgentMessageSummary[]): GoalAgentMessageSummary[] {
+    const seen = new Set<string>();
+    const deduped: GoalAgentMessageSummary[] = [];
+    for (const message of messages) {
+        if (seen.has(message.id)) continue;
+        seen.add(message.id);
+        deduped.push(message);
+    }
+    return deduped;
+}
+
+async function fetchAgentMessagesForGoalDetail(opts: {
+    accountId: string;
+    projectId: string;
+    sessionIds: string[];
+    decisionIds: string[];
+}): Promise<GoalAgentMessageSummary[]> {
+    const sessionIds = Array.from(new Set(opts.sessionIds.filter(Boolean)));
+    const decisionIds = Array.from(new Set(opts.decisionIds.filter(Boolean)));
+    if (sessionIds.length === 0 && decisionIds.length === 0) {
+        return [];
+    }
+
+    const messages = await db.agentMessage.findMany({
+        where: {
+            accountId: opts.accountId,
+            projectId: opts.projectId,
+            status: { in: ["unread", "read"] },
+            msgType: { in: [...BLOCKER_MESSAGE_TYPES] },
+            OR: [
+                ...(sessionIds.length > 0 ? [{ sessionId: { in: sessionIds } }] : []),
+                ...(decisionIds.length > 0 ? [{ decisionId: { in: decisionIds } }] : []),
+            ],
+        },
+        select: {
+            id: true,
+            fromRole: true,
+            msgType: true,
+            content: true,
+            status: true,
+            sessionId: true,
+            decisionId: true,
+            createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+    });
+
+    return dedupeAgentMessages(messages);
+}
+
 /**
  * Narrative + laws are the universal baseline for all sessions; injected once at the top of each task prompt.
  */
@@ -325,7 +433,15 @@ export function goalRoutes(app: Fastify) {
                     skip: offset,
                     include: {
                         tasks: {
-                            select: { id: true, title: true, status: true, sessionId: true, roleType: true },
+                            select: {
+                                id: true,
+                                title: true,
+                                status: true,
+                                sessionId: true,
+                                roleType: true,
+                                createdAt: true,
+                                completedAt: true,
+                            },
                             orderBy: { createdAt: "asc" },
                             take: 30,
                         },
@@ -346,7 +462,13 @@ export function goalRoutes(app: Fastify) {
                 projectId,
             });
 
-            // Fire-and-forget: re-dispatch stuck tasks
+            const sessionIds = goals.flatMap((goal) => goal.tasks.map((task) => task.sessionId).filter(Boolean) as string[]);
+            const agentMessagesBySessionId = await fetchAgentMessagesBySessions({
+                accountId: userId,
+                projectId,
+                sessionIds,
+            });
+
             const activeGoalIds = goals
                 .filter((g) => !["completed", "cancelled"].includes(g.status))
                 .map((g) => g.id);
@@ -355,6 +477,7 @@ export function goalRoutes(app: Fastify) {
             return reply.send({
                 goals: goals.map((goal) => serializeGoal(
                     timedOutGoalIds.has(goal.id) ? { ...goal, status: "blocked" } : goal,
+                    dedupeAgentMessages(goal.tasks.flatMap((task) => task.sessionId ? (agentMessagesBySessionId.get(task.sessionId) ?? []) : [])),
                 )),
                 total,
             });
@@ -381,7 +504,10 @@ export function goalRoutes(app: Fastify) {
                     tasks: {
                         select: {
                             id: true,
+                            title: true,
                             status: true,
+                            sessionId: true,
+                            roleType: true,
                             prompt: true,
                             priority: true,
                             createdAt: true,
@@ -426,8 +552,14 @@ export function goalRoutes(app: Fastify) {
                 userId: request.userId,
                 projectId: request.params.id,
             });
+            const relatedAgentMessages = await fetchAgentMessagesForGoalDetail({
+                accountId: request.userId,
+                projectId: request.params.id,
+                sessionIds: goal.tasks.map((task) => task.sessionId).filter(Boolean) as string[],
+                decisionIds: goal.decisions.map((decision) => decision.id),
+            });
             const normalizedGoal = timedOutGoalIds.has(goal.id) ? { ...goal, status: "blocked" } : goal;
-            return reply.send({ goal: serializeGoalDetail(normalizedGoal) });
+            return reply.send({ goal: serializeGoalDetail(normalizedGoal, relatedAgentMessages) });
         },
     );
 
@@ -454,6 +586,12 @@ export function goalRoutes(app: Fastify) {
             }
 
             const { title, description, priority, deadline, status } = request.body;
+
+            if (status !== undefined) {
+                return reply.code(400).send({
+                    error: "Goal status is system-managed; use dedicated actions instead",
+                });
+            }
 
             const updated = await db.goal.update({
                 where: { id: goal.id },
@@ -772,7 +910,7 @@ export function goalRoutes(app: Fastify) {
 
 // === Serialization ===
 
-function serializeGoal(goal: Record<string, unknown>): Record<string, unknown> {
+function serializeGoal(goal: Record<string, unknown>, agentMessages: GoalAgentMessageSummary[] = []): Record<string, unknown> {
     const g = goal as {
         id: string;
         projectId: string;
@@ -788,9 +926,37 @@ function serializeGoal(goal: Record<string, unknown>): Record<string, unknown> {
         plannerTaskId: string | null;
         createdAt: Date;
         updatedAt: Date;
-        tasks?: Array<{ id: string; title: string | null; status: string; sessionId: string | null; roleType: string | null }>;
+        tasks?: Array<{
+            id: string;
+            title: string | null;
+            status: string;
+            sessionId: string | null;
+            roleType: string | null;
+            createdAt: Date;
+            completedAt: Date | null;
+        }>;
         _count?: { subGoals: number; tasks: number; decisions: number };
     };
+
+    const tasks = g.tasks ?? [];
+    const taskStatusSummary = buildGoalTaskStatusSummary(tasks);
+    const latestSession = selectLatestGoalSession(tasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        sessionId: task.sessionId,
+        updatedAt: task.completedAt ?? task.createdAt,
+    })));
+    const blocker = buildGoalBlockerSummary({
+        goalStatus: g.status,
+        plannerTimedOut: g.status === "blocked" && Boolean(g.plannerTaskId) && tasks.length === 0,
+        tasks: tasks.map((task) => ({
+            id: task.id,
+            title: task.title,
+            status: task.status,
+        })),
+        agentMessages,
+    });
 
     return {
         id: g.id,
@@ -810,22 +976,28 @@ function serializeGoal(goal: Record<string, unknown>): Record<string, unknown> {
         subGoalCount: g._count?.subGoals ?? 0,
         taskCount: g._count?.tasks ?? 0,
         decisionCount: g._count?.decisions ?? 0,
-        tasks: g.tasks?.map((t) => ({
+        taskStatusSummary,
+        latestSession,
+        blocker,
+        tasks: tasks.map((t) => ({
             id: t.id,
             title: t.title,
             status: t.status,
             sessionId: t.sessionId,
             roleType: t.roleType,
-        })) ?? [],
+        })),
     };
 }
 
-function serializeGoalDetail(goal: Record<string, unknown>): Record<string, unknown> {
-    const base = serializeGoal(goal);
+function serializeGoalDetail(goal: Record<string, unknown>, agentMessages: GoalAgentMessageSummary[] = []): Record<string, unknown> {
+    const base = serializeGoal(goal, agentMessages);
     const g = goal as {
         tasks?: Array<{
             id: string;
+            title: string | null;
             status: string;
+            sessionId: string | null;
+            roleType: string | null;
             prompt: string;
             priority: string;
             createdAt: Date;
@@ -850,13 +1022,17 @@ function serializeGoalDetail(goal: Record<string, unknown>): Record<string, unkn
         ...base,
         tasks: g.tasks?.map((t) => ({
             id: t.id,
+            title: t.title,
             status: t.status,
+            sessionId: t.sessionId,
+            roleType: t.roleType,
             promptPreview: t.prompt.length > 100 ? t.prompt.slice(0, 100) : t.prompt,
             priority: t.priority,
             createdAt: t.createdAt.getTime(),
             completedAt: t.completedAt?.getTime() ?? null,
         })) ?? [],
         subGoals: g.subGoals ?? [],
+        blockers: base.blocker ? [base.blocker] : [],
         decisions: g.decisions?.map((d) => ({
             id: d.id,
             question: d.question,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ApiUpdateSchema } from './apiTypes';
+import { ApiEphemeralUpdateSchema, ApiUpdateSchema } from './apiTypes';
 
 describe('ApiUpdateSchema', () => {
     it('accepts shared wire update-session payload', () => {
@@ -16,6 +16,19 @@ describe('ApiUpdateSchema', () => {
             id: 'session-2',
             createdAt: 1,
             updatedAt: 1,
+        });
+        expect(parsed.success).toBe(true);
+    });
+});
+
+describe('ApiEphemeralUpdateSchema', () => {
+    it('accepts goal-progress payload', () => {
+        const parsed = ApiEphemeralUpdateSchema.safeParse({
+            type: 'goal-progress',
+            goalId: 'goal-1',
+            projectId: 'project-1',
+            status: 'in_progress',
+            progress: 42,
         });
         expect(parsed.success).toBe(true);
     });
