@@ -833,4 +833,79 @@ World 逐步从 Goal list 演进为：
 | 2026-04-10 | 阶段 C 实施计划定稿：3 Phase 拆解（Server 真相源 → App 展示 → Skill 可选闭环），新增 `WorldSuggestion` 模型设计、4 类输入源、3 条 generator 规则、REST/ephemeral 接口草案 |
 | 2026-04-10 | 阶段 C 全部完成：Phase 1 Server 真相源（WorldSuggestion Prisma 模型 + generate/query/accept/dismiss 模块 + 4 REST 路由 + ephemeral + inTx 原子性 + task-trigger 派发）；Phase 2 App 展示（API client + SuggestionCard + WorldOverviewTab 集成 + ephemeral 订阅 + i18n 11 语言）；Phase 3 Skill 闭环（completedTaskSkill generator）；code review 修复 5 项（TOCTOU/N+1/dedup 语义/task 派发/evidence 关联） |
 
+| 2026-04-10 | 补充阶段 A/B/C 最小实现核对附录：为已完成声明补上关键代码落点，明确当前状态为“激活主线已完成、D-H 仍属规划” |
+
 （后续每一轮活化：在此表追加一行，并勾选上方清单。）
+
+---
+
+## 附录：阶段 A/B/C 实现状态核对（最小版）
+
+> **结论**：阶段 A/B/C 已在代码中找到明确实现落点；当前应视为**激活主线已完成**，阶段 D-H 仍属规划。
+
+### 阶段 A：Goal 主入口 / blocker / 实时同步
+
+关键落点：
+
+- `packages/happy-server/sources/app/api/routes/goalRoutes.ts:943`
+- `packages/happy-server/sources/app/api/routes/goalRoutes.ts:951`
+- `packages/happy-server/sources/app/api/routes/goalRoutes.ts:1037`
+- `packages/happy-app/sources/components/project/WorldGoalsTab.tsx:110`
+- `packages/happy-app/sources/components/project/WorldGoalsTab.tsx:149`
+- `packages/happy-app/sources/sync/sync.ts:2503`
+- `packages/happy-app/sources/app/(app)/project/[id]/goal/[goalId].tsx:203`
+
+已实现：
+
+- Goal 聚合字段：`taskStatusSummary` / `latestSession` / `blocker`
+- WorldGoalsTab 作为 Goal 主入口
+- `goal-progress` 实时 patch + 关键跃迁 refresh
+- Goal 详情页 blocker 展示与最小处理动作
+
+### 阶段 B：任务结果显式上报 / 语义完成
+
+关键落点：
+
+- `packages/happy-cli/src/automation/TaskRunner.ts:39`
+- `packages/happy-cli/src/automation/TaskRunner.ts:117`
+- `packages/happy-server/sources/app/api/routes/taskRoutes.ts:437`
+- `packages/happy-server/sources/app/api/routes/taskRoutes.ts:468`
+- `packages/happy-server/sources/modules/taskStatusLogic.ts:11`
+- `packages/happy-server/sources/app/auth/auth.ts:168`
+- `packages/happy-server/prisma/schema.prisma:203`
+
+已实现：
+
+- task session 注入 `HAPPY_TASK_*` 结果上报上下文
+- `/v1/tasks/result` 路由
+- result/status 共用统一状态机
+- `task-result` scope token + `jti` + `RepeatKey` 防重放
+- task 终态回写 Goal 进度
+
+### 阶段 C：Suggested Next Steps 建议系统
+
+关键落点：
+
+- `packages/happy-server/prisma/schema.prisma:1166`
+- `packages/happy-server/sources/app/api/routes/worldSuggestionRoutes.ts:17`
+- `packages/happy-server/sources/modules/worldSuggestionGenerate.ts:228`
+- `packages/happy-server/sources/modules/worldSuggestionAccept.ts:56`
+- `packages/happy-app/sources/components/project/WorldOverviewTab.tsx:53`
+- `packages/happy-app/sources/components/project/WorldOverviewTab.tsx:272`
+- `packages/happy-app/sources/components/project/SuggestionCard.tsx:27`
+- `packages/happy-app/sources/sync/sync.ts:2571`
+
+已实现：
+
+- `WorldSuggestion` 服务端真相源
+- query / refresh / accept / dismiss
+- failed task / blocked goal / pending decision / completed task 的建议生成
+- WorldOverview 中的 `Suggested Next Steps`
+- suggestion 的 evidence / reason 展示与实时收口
+
+### 最终判定
+
+当前 World Model Activation 应表述为：
+
+> **阶段 A/B/C 已完成，实现了 Goal 驱动、Task 结果回写、Suggestion 提议闭环；阶段 D-H 仍为自治演进规划。**
+
