@@ -1,5 +1,6 @@
 import { unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { logger } from "@/ui/logger";
 import type {
@@ -19,14 +20,12 @@ export interface TaskHandlerDeps {
   ) => void;
   /** Server URL for tasks that need to POST results back (e.g., planner tasks). */
   readonly serverUrl?: string;
-  /** Auth token for tasks that need to authenticate with the server. */
-  readonly authToken?: string;
 }
 
 /**
  * Build the full prompt for a task, prepending skill contents if bound.
  */
-function buildTaskPrompt(data: TaskTriggerData): string {
+function buildTaskPrompt(data: TaskTriggerData, deps?: Pick<TaskHandlerDeps, "serverUrl">): string {
   const parts: string[] = [];
 
   if (data.skillContents && data.skillContents.length > 0) {
@@ -37,10 +36,38 @@ function buildTaskPrompt(data: TaskTriggerData): string {
     parts.push("---\n");
   }
 
+  if (deps?.serverUrl && data.resultToken) {
+    const reportUrl = `${deps.serverUrl.replace(/\/$/, "")}/v1/tasks/result`;
+    parts.push("## Task Result Reporting\n");
+    parts.push(
+      [
+        "When you reach a clear terminal outcome, report it back to Happy before ending the task.",
+        `Use the HAPPY_TASK_REPORT_URL environment variable (value: ${reportUrl}).`,
+        "Authenticate with Authorization: Bearer $HAPPY_TASK_RESULT_TOKEN.",
+        "Send JSON with taskId from HAPPY_TASK_ID, outcome, optional summary, optional sessionId, and optional errorMessage.",
+        'Use outcome: "completed" when the task is done successfully.',
+        'Use outcome: "failed" when the task cannot be completed due to an execution error.',
+        'Use outcome: "blocked" when progress requires human input, a decision, or an external dependency.',
+        "Always include summary as a short human-readable sentence explaining the result.",
+      ].join("\n"),
+    );
+    parts.push("---\n");
+  }
+
   parts.push("## Your Task\n");
   parts.push(data.prompt);
 
   return parts.join("\n");
+}
+
+function resolveTaskDirectory(directory: string): string {
+  if (directory === "~") {
+    return homedir();
+  }
+  if (directory.startsWith("~/")) {
+    return join(homedir(), directory.slice(2));
+  }
+  return directory;
 }
 
 async function writePromptFile(directory: string, taskId: string, prompt: string): Promise<string> {
@@ -65,17 +92,18 @@ export async function runTaskJob(
   data: TaskTriggerData,
   deps: TaskHandlerDeps,
 ): Promise<{ success: boolean; errorMessage?: string; sessionId?: string }> {
-  const fullPrompt = buildTaskPrompt(data);
-  const promptFilePath = await writePromptFile(data.directory, data.taskId, fullPrompt);
+  const resolvedDirectory = resolveTaskDirectory(data.directory);
+  const fullPrompt = buildTaskPrompt(data, deps);
+  const promptFilePath = await writePromptFile(resolvedDirectory, data.taskId, fullPrompt);
 
   logger.debug(
-    `[TASK] Running task ${data.taskId} at ${data.directory}`,
+    `[TASK] Running task ${data.taskId} at ${resolvedDirectory}`,
   );
 
   await deps.onTaskStatusChange?.(data.taskId, "running");
 
   const spawnResult = await deps.spawnSession({
-    directory: data.directory,
+    directory: resolvedDirectory,
     approvedNewDirectoryCreation: false,
     agent: "claude",
     automationContext: {
@@ -89,7 +117,8 @@ export async function runTaskJob(
       HAPPY_TASK_ID: data.taskId,
       HAPPY_TASK_PRIORITY: data.priority,
       ...(deps.serverUrl ? { HAPPY_TASK_SERVER_URL: deps.serverUrl } : {}),
-      ...(deps.authToken ? { HAPPY_TASK_AUTH_TOKEN: deps.authToken } : {}),
+      ...(data.resultToken ? { HAPPY_TASK_RESULT_TOKEN: data.resultToken } : {}),
+      ...(deps.serverUrl ? { HAPPY_TASK_REPORT_URL: `${deps.serverUrl.replace(/\/$/, "")}/v1/tasks/result` } : {}),
     },
   });
 

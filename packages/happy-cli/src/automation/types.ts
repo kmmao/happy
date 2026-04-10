@@ -80,6 +80,7 @@ export interface TaskTriggerData {
   directory: string;
   priority: AutomationPriority;
   projectId?: string;
+  resultToken?: string;
   skillContents?: Array<{ name: string; content: string }>;
 }
 

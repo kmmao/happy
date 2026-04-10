@@ -1161,6 +1161,7 @@ export function buildTaskTriggerEphemeral(opts: {
   directory: string;
   priority: string;
   projectId?: string;
+  resultToken?: string;
   skillContents?: Array<{ name: string; content: string }>;
 }): EphemeralPayload {
   return {

@@ -99,6 +99,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUnistyles } from "react-native-unistyles";
 import { Message } from "@/sync/typesMessage";
+import {
+  buildOptionsHash,
+  createInitialAutoOptionSendState,
+  reduceAutoOptionSendEvent,
+  type SessionFollowUpOptionsSnapshot,
+} from "./autoOptionSend";
 import { log } from '@/log';
 
 const FILE_EDIT_TOOLS = new Set(["Edit", "edit", "MultiEdit", "Write"]);
@@ -110,6 +116,24 @@ function hasFileChanges(messages: readonly Message[]): boolean {
         return true;
       }
       if (msg.children.length > 0 && hasFileChanges(msg.children)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function hasPendingAskUserQuestion(messages: readonly Message[]): boolean {
+  for (const msg of messages) {
+    if (msg.kind === "tool-call") {
+      if (
+        msg.tool.name === "AskUserQuestion" &&
+        msg.tool.state === "running" &&
+        msg.tool.permission?.status === "pending"
+      ) {
+        return true;
+      }
+      if (msg.children.length > 0 && hasPendingAskUserQuestion(msg.children)) {
         return true;
       }
     }
@@ -466,6 +490,9 @@ function SessionViewInner({
   const isLandscape = useIsLandscape();
   const deviceType = useDeviceType();
   const [message, setMessage] = React.useState("");
+  const [autoOptionSend, setAutoOptionSend] = React.useState(
+    createInitialAutoOptionSendState,
+  );
   const realtimeStatus = useRealtimeStatus();
   // Track session column height + AgentInput height to compute exact overlay max height
   const [sessionColumnHeight, setSessionColumnHeight] = React.useState(0);
@@ -651,9 +678,24 @@ function SessionViewInner({
   // Floating options from AI reply at visible/navigated position (or latest)
   const effectiveAnchor = showScrollToBottom ? scrollAnchor : -1;
   const latestOptions = useLatestOptions(messages, effectiveAnchor);
+  const hasPendingAskUserQuestionVisible = React.useMemo(
+    () => hasPendingAskUserQuestion(messages),
+    [messages],
+  );
+  const currentOptionsSnapshot = React.useMemo<SessionFollowUpOptionsSnapshot | null>(() => {
+    if (latestOptions.length < 2) return null;
+    return {
+      sourceType: "markdown-options",
+      sourceMessageId: null,
+      items: [...latestOptions],
+      recommendedIndex: 0,
+      optionsHash: buildOptionsHash(latestOptions),
+    };
+  }, [latestOptions]);
   const [showOptionsPopover, setShowOptionsPopover] = React.useState(false);
   const handleFloatingOptionPress = React.useCallback(
     (option: string) => {
+      setAutoOptionSend(createInitialAutoOptionSendState());
       setShowOptionsPopover(false);
       sync.sendMessage(sessionId, option);
       trackMessageSent();
@@ -661,7 +703,6 @@ function SessionViewInner({
     [sessionId],
   );
 
-  // Bookmarks
   const { bookmarks, toggleBookmark } = useBookmarks();
   const [showBookmarksPopover, setShowBookmarksPopover] = React.useState(false);
   const handleBookmarkOptionPress = React.useCallback(
@@ -721,6 +762,126 @@ function SessionViewInner({
     fileNameMap,
     removeImageByPath,
   } = useImageUpload(sessionId);
+
+  const handleAutoOptionSendToggle = React.useCallback((enabled: boolean) => {
+    setAutoOptionSend((prev) =>
+      reduceAutoOptionSendEvent(
+        prev,
+        { type: "toggle", enabled },
+        {
+          sessionId,
+          currentSessionId: sessionId,
+          inputText: message,
+          hasPendingImages: pendingImagePathsRef.current.length > 0,
+          isSttListening: false,
+          hasAskUserQuestionVisible: hasPendingAskUserQuestionVisible,
+          isCurrentSessionActive: true,
+          now: Date.now(),
+          durationMs: 10_000,
+          snapshot: currentOptionsSnapshot,
+        },
+      ),
+    );
+  }, [sessionId, message, hasPendingAskUserQuestionVisible, currentOptionsSnapshot, pendingImagePathsRef]);
+
+  React.useEffect(() => {
+    if (autoOptionSend.status !== "armed" || autoOptionSend.candidate == null) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const remaining = Math.max(
+        0,
+        autoOptionSend.candidate!.startedAt +
+          autoOptionSend.candidate!.durationMs -
+          Date.now(),
+      );
+      setAutoOptionSend((prev) => ({ ...prev, remainingMs: remaining }));
+      if (remaining <= 0) {
+        setAutoOptionSend((prev) =>
+          reduceAutoOptionSendEvent(
+            prev,
+            { type: "timer-finished" },
+            {
+              sessionId,
+              currentSessionId: sessionId,
+              inputText: message,
+              hasPendingImages: pendingImagePathsRef.current.length > 0,
+              isSttListening: false,
+              hasAskUserQuestionVisible: hasPendingAskUserQuestionVisible,
+              isCurrentSessionActive: true,
+              now: Date.now(),
+              durationMs: 10_000,
+              snapshot: currentOptionsSnapshot,
+            },
+          ),
+        );
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [autoOptionSend.status, autoOptionSend.candidate, sessionId, message, hasPendingAskUserQuestionVisible, currentOptionsSnapshot, pendingImagePathsRef]);
+
+  React.useEffect(() => {
+    if (autoOptionSend.status !== "ready") return;
+    setAutoOptionSend((prev) =>
+      reduceAutoOptionSendEvent(
+        prev,
+        { type: "attempt-fire" },
+        {
+          sessionId,
+          currentSessionId: sessionId,
+          inputText: message,
+          hasPendingImages: pendingImagePathsRef.current.length > 0,
+          isSttListening: false,
+          hasAskUserQuestionVisible: hasPendingAskUserQuestionVisible,
+          isCurrentSessionActive: true,
+          now: Date.now(),
+          durationMs: 10_000,
+          snapshot: currentOptionsSnapshot,
+        },
+      ),
+    );
+  }, [autoOptionSend.status, sessionId, message, hasPendingAskUserQuestionVisible, currentOptionsSnapshot, pendingImagePathsRef]);
+
+  React.useEffect(() => {
+    if (!autoOptionSend.shouldSendText) return;
+    sync.sendMessage(sessionId, autoOptionSend.shouldSendText);
+    trackMessageSent();
+    setAutoOptionSend((prev) => ({ ...prev, shouldSendText: null, status: "off" }));
+  }, [autoOptionSend.shouldSendText, sessionId]);
+
+  React.useEffect(() => {
+    if (!autoOptionSend.enabled) return;
+    if (message.trim().length === 0 && !hasPendingAskUserQuestionVisible && currentOptionsSnapshot) {
+      return;
+    }
+    setAutoOptionSend((prev) =>
+      reduceAutoOptionSendEvent(
+        prev,
+        {
+          type: "context-invalidated",
+          reason: message.trim().length > 0
+            ? "user-typed"
+            : hasPendingAskUserQuestionVisible
+              ? "ask-user-question"
+              : "options-missing",
+        },
+        {
+          sessionId,
+          currentSessionId: sessionId,
+          inputText: message,
+          hasPendingImages: pendingImagePathsRef.current.length > 0,
+          isSttListening: false,
+          hasAskUserQuestionVisible: hasPendingAskUserQuestionVisible,
+          isCurrentSessionActive: true,
+          now: Date.now(),
+          durationMs: 10_000,
+          snapshot: currentOptionsSnapshot,
+        },
+      ),
+    );
+  }, [autoOptionSend.enabled, message, hasPendingAskUserQuestionVisible, currentOptionsSnapshot, sessionId, pendingImagePathsRef]);
 
   // Collapsible input state
   const collapsibleInput = useCollapsibleInput({
@@ -888,6 +1049,19 @@ function SessionViewInner({
   }
   const turnStartedAt = reducerTurnStart ?? fallbackTurnStartRef.current;
 
+  const autoOptionSendControl = React.useMemo(
+    () => ({
+      visible: latestOptions.length >= 2,
+      enabled: autoOptionSend.enabled,
+      remainingMs:
+        autoOptionSend.status === "armed" || autoOptionSend.status === "ready"
+          ? (autoOptionSend.remainingMs ?? 0)
+          : null,
+      onToggle: handleAutoOptionSendToggle,
+    }),
+    [latestOptions.length, autoOptionSend.enabled, autoOptionSend.status, autoOptionSend.remainingMs, handleAutoOptionSendToggle],
+  );
+
   const fabStatusInfo = React.useMemo<InputFABStatusInfo>(
     () => ({
       statusText: sessionStatus.statusText,
@@ -956,6 +1130,7 @@ function SessionViewInner({
             !showScrollToBottom && collapsibleInput.hasPendingAction
           }
           onPendingActionPress={collapsibleInput.expand}
+          autoOptionSend={autoOptionSendControl}
         />
       )}
     </>
@@ -1263,6 +1438,7 @@ function SessionViewInner({
               onScrollDown={handleScrollDown}
               {...scrollNavProps}
               statusInfo={fabStatusInfo}
+              autoOptionSend={autoOptionSendControl}
             />
           }
         />
@@ -1271,6 +1447,8 @@ function SessionViewInner({
           options={latestOptions}
           onOptionPress={handleFloatingOptionPress}
           onClose={() => setShowOptionsPopover(false)}
+          recommendedIndex={latestOptions.length >= 2 ? 0 : null}
+          recommendedRemainingMs={autoOptionSendControl.remainingMs}
         />
         <OptionsPopover
           visible={showBookmarksPopover && bookmarks.length > 0}

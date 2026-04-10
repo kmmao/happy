@@ -55,6 +55,23 @@ describe("AuthModule", () => {
         });
     });
 
+    describe("task result tokens", () => {
+        it("should create and verify a task result token", async () => {
+            const token = await auth.createTaskResultToken({
+                userId: "user-1",
+                taskId: "task-1",
+                expiresInMs: 60_000,
+            });
+
+            const result = await auth.verifyTaskResultToken(token);
+            expect(result).not.toBeNull();
+            expect(result!.userId).toBe("user-1");
+            expect(result!.taskId).toBe("task-1");
+            expect(result!.scope).toBe("task-result");
+            expect(result!.jti).toBeTypeOf("string");
+        });
+    });
+
     describe("invalidateToken", () => {
         it("should remove token from cache", async () => {
             const token = await auth.createToken("user-inv");
@@ -70,13 +87,12 @@ describe("AuthModule", () => {
 
     describe("invalidateUserTokens", () => {
         it("should invalidate all tokens for a user", async () => {
-            const token1 = await auth.createToken("user-multi");
-            const token2 = await auth.createToken("user-multi");
+            await auth.createToken("user-multi");
+            await auth.createToken("user-multi");
             const otherToken = await auth.createToken("user-other");
 
             auth.invalidateUserTokens("user-multi");
 
-            // Other user's token should still be in cache
             const otherResult = await auth.verifyToken(otherToken);
             expect(otherResult).not.toBeNull();
             expect(otherResult!.userId).toBe("user-other");

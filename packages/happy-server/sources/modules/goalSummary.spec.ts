@@ -116,6 +116,7 @@ describe("buildGoalBlockerSummary", () => {
                     id: "task-1",
                     title: "Fix API",
                     status: "failed",
+                    errorMessage: null,
                 },
             ],
             agentMessages: [
@@ -140,6 +141,29 @@ describe("buildGoalBlockerSummary", () => {
         });
     });
 
+    it("should use failed task error message as blocker summary when present", () => {
+        const result = buildGoalBlockerSummary({
+            goalStatus: "blocked",
+            plannerTimedOut: false,
+            tasks: [
+                {
+                    id: "task-1",
+                    title: "Fix API",
+                    status: "failed",
+                    errorMessage: "Blocked: waiting for design decision from user",
+                },
+            ],
+            agentMessages: [],
+        });
+
+        expect(result).toEqual({
+            kind: "task_failed",
+            summary: "Blocked: waiting for design decision from user",
+            sourceTaskId: "task-1",
+            requiresHuman: false,
+        });
+    });
+
     it("should build failed task blocker summary", () => {
         const result = buildGoalBlockerSummary({
             goalStatus: "blocked",
@@ -149,6 +173,7 @@ describe("buildGoalBlockerSummary", () => {
                     id: "task-1",
                     title: "Fix API",
                     status: "failed",
+                    errorMessage: null,
                 },
             ],
             agentMessages: [],
@@ -171,6 +196,7 @@ describe("buildGoalBlockerSummary", () => {
                     id: "task-1",
                     title: "Fix API",
                     status: "failed",
+                    errorMessage: null,
                 },
             ],
             agentMessages: [],

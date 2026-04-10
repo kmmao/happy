@@ -70,6 +70,7 @@ export const TaskTriggerDataSchema = z.object({
   directory: z.string(),          // Project directory on machine
   priority: TaskPrioritySchema,
   projectId: z.string().optional(),
+  resultToken: z.string().optional(),
   skillContents: z.array(z.object({
     name: z.string(),
     content: z.string(),
@@ -78,9 +79,17 @@ export const TaskTriggerDataSchema = z.object({
 export type TaskTriggerData = z.infer<typeof TaskTriggerDataSchema>;
 
 // ===== Task Status Report (CLI → Server) =====
+export const TaskOutcomeSchema = z.enum([
+  "completed",
+  "failed",
+  "blocked",
+]);
+export type TaskOutcome = z.infer<typeof TaskOutcomeSchema>;
+
 export const TaskStatusReportSchema = z.object({
   taskId: z.string(),
   status: TaskStatusSchema,
+  outcome: TaskOutcomeSchema.optional(),
   sessionId: z.string().optional(),
   errorMessage: z.string().optional(),
 });

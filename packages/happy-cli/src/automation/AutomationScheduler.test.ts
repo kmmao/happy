@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,6 +19,7 @@ function createScheduler(
   options?: {
     maxConcurrentDispatches?: number;
     runJob?: any;
+    onTaskStatusReport?: any;
   },
 ) {
   const store = new AutomationStore(join(dir, "jobs.json"));
@@ -47,6 +48,7 @@ function createScheduler(
     pollIntervalMs: 50,
     maxConcurrentDispatches: options?.maxConcurrentDispatches ?? 1,
     runJob: options?.runJob ?? (async () => ({ completion: "immediate" as const })),
+    onTaskStatusReport: options?.onTaskStatusReport,
   });
 }
 
@@ -164,7 +166,6 @@ describe("AutomationScheduler", () => {
       await scheduler.stop();
     }
   });
-
 
   it("annotates supervisor jobs with project and loop metadata", async () => {
     const dir = await mkdtemp(join(tmpdir(), "happy-automation-scheduler-"));
@@ -320,6 +321,45 @@ describe("AutomationScheduler", () => {
       const cleared = await scheduler.clearTerminalJobs();
       expect(cleared.success).toBe(true);
       expect(scheduler.getJobsSnapshot()).toHaveLength(0);
+    } finally {
+      await scheduler.stop();
+    }
+  });
+
+  it("reports explicit completed outcome for task jobs finalized by session", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "happy-automation-scheduler-"));
+    tempDirs.push(dir);
+    const onTaskStatusReport = vi.fn();
+    const scheduler = createScheduler(dir, {
+      runJob: async () => ({ completion: "session", sessionId: "sid-task-1" }),
+      onTaskStatusReport,
+    });
+
+    try {
+      await scheduler.start();
+      await scheduler.enqueueTask({
+        type: "task-trigger",
+        taskId: "task-1",
+        prompt: "do work",
+        directory: "/tmp/repo",
+        priority: "user",
+      });
+
+      let running = scheduler.getJobsSnapshot()[0];
+      for (let attempt = 0; attempt < 20 && running?.status !== "running"; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        running = scheduler.getJobsSnapshot()[0];
+      }
+
+      await scheduler.markJobTerminalBySession("sid-task-1", "completed");
+
+      expect(onTaskStatusReport).toHaveBeenCalledWith(
+        "task-1",
+        "completed",
+        "sid-task-1",
+        undefined,
+        "completed",
+      );
     } finally {
       await scheduler.stop();
     }

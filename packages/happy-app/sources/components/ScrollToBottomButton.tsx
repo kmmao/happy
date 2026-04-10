@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as React from "react";
-import { Animated, Pressable, View } from "react-native";
+import { Animated, Pressable, View, Text } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const stylesheet = StyleSheet.create((theme) => ({
@@ -29,7 +29,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.radio.dot,
   },
   button: {
-    width: 36,
+    minWidth: 36,
     height: 36,
     borderRadius: 18,
     alignItems: "center" as const,
@@ -39,6 +39,9 @@ const stylesheet = StyleSheet.create((theme) => ({
     shadowRadius: 2,
     shadowOpacity: theme.colors.shadow.opacity,
     elevation: 3,
+    paddingHorizontal: 10,
+    flexDirection: "row" as const,
+    gap: 4,
   },
   buttonDefault: {
     backgroundColor: theme.colors.fab.background,
@@ -48,6 +51,11 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   buttonDisabled: {
     backgroundColor: theme.colors.fab.background,
+  },
+  buttonLabel: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    color: theme.colors.fab.icon,
   },
 }));
 
@@ -67,6 +75,12 @@ interface ScrollToBottomButtonProps {
   hasPendingAction?: boolean;
   /** Callback when the pending action button is pressed */
   onPendingActionPress?: () => void;
+  autoOptionSend?: {
+    visible: boolean;
+    enabled: boolean;
+    remainingMs: number | null;
+    onToggle: (next: boolean) => void;
+  };
 }
 
 export const ScrollToBottomButton = React.memo(
@@ -83,6 +97,7 @@ export const ScrollToBottomButton = React.memo(
     onCollapseInput,
     hasPendingAction,
     onPendingActionPress,
+    autoOptionSend,
   }: ScrollToBottomButtonProps) => {
     const { theme } = useUnistyles();
     const styles = stylesheet;
@@ -144,6 +159,21 @@ export const ScrollToBottomButton = React.memo(
               disabledIconColor={disabledIconColor}
               disabled={!sparklesActive}
             />
+            {autoOptionSend?.visible && (
+              <PulseButton
+                icon={autoOptionSend.enabled ? "pause" : "play"}
+                label={
+                  autoOptionSend.enabled && autoOptionSend.remainingMs != null
+                    ? `${Math.max(1, Math.ceil(autoOptionSend.remainingMs / 1000))}s`
+                    : undefined
+                }
+                onPress={() => autoOptionSend.onToggle(!autoOptionSend.enabled)}
+                size={18}
+                styles={styles}
+                iconColor={iconColor}
+                disabledIconColor={disabledIconColor}
+              />
+            )}
             <PulseButton
               icon="bookmark"
               onPress={onBookmarksPress ?? noop}
@@ -214,6 +244,7 @@ const PulseButton = React.memo(function PulseButton({
   icon,
   onPress,
   size = 20,
+  label,
   styles,
   iconColor,
   disabledIconColor,
@@ -222,6 +253,7 @@ const PulseButton = React.memo(function PulseButton({
   icon: React.ComponentProps<typeof Ionicons>["name"];
   onPress: () => void;
   size?: number;
+  label?: string;
   styles: typeof stylesheet;
   iconColor: string;
   disabledIconColor: string;
@@ -265,6 +297,16 @@ const PulseButton = React.memo(function PulseButton({
           size={size}
           color={disabled ? disabledIconColor : iconColor}
         />
+        {label ? (
+          <Text
+            style={[
+              styles.buttonLabel,
+              { color: disabled ? disabledIconColor : iconColor },
+            ]}
+          >
+            {label}
+          </Text>
+        ) : null}
       </Pressable>
     </Animated.View>
   );

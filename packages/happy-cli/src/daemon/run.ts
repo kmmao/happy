@@ -2325,7 +2325,6 @@ export async function startDaemon(): Promise<void> {
         task: {
           spawnSession,
           serverUrl: configuration.serverUrl,
-          authToken: credentials.token,
           recordTaskAudit: (event) => {
             void recordAutomationAuditEvent(event);
           },
@@ -2339,9 +2338,9 @@ export async function startDaemon(): Promise<void> {
         },
       },
       onChange: () => scheduleAutomationStatePublish(),
-      onTaskStatusReport: (taskId, status, sessionId, errorMessage) => {
+      onTaskStatusReport: (taskId, status, sessionId, errorMessage, outcome) => {
         try {
-          apiMachine?.taskStatus(taskId, status, sessionId, errorMessage);
+          apiMachine?.taskStatus(taskId, status, sessionId, errorMessage, outcome);
         } catch (err) {
           logger.debug(`[TASK] Failed to report task status for ${taskId}: ${err}`);
         }

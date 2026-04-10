@@ -45,7 +45,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     gap: 4,
   },
   button: {
-    width: 36,
+    minWidth: 36,
     height: 36,
     borderRadius: 18,
     alignItems: "center" as const,
@@ -55,6 +55,9 @@ const stylesheet = StyleSheet.create((theme) => ({
     shadowRadius: 2,
     shadowOpacity: theme.colors.shadow.opacity,
     elevation: 3,
+    paddingHorizontal: 10,
+    flexDirection: "row" as const,
+    gap: 4,
   },
   buttonDefault: {
     backgroundColor: theme.colors.fab.background,
@@ -72,6 +75,10 @@ const stylesheet = StyleSheet.create((theme) => ({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  buttonLabel: {
+    fontSize: 11,
+    ...Typography.default("semiBold"),
   },
 }));
 
@@ -109,6 +116,12 @@ interface InputFABProps {
   bookmarkCount?: number;
   onBookmarksPress?: () => void;
   statusInfo?: InputFABStatusInfo;
+  autoOptionSend?: {
+    visible: boolean;
+    enabled: boolean;
+    remainingMs: number | null;
+    onToggle: (next: boolean) => void;
+  };
 }
 
 export const InputFAB = React.memo(function InputFAB({
@@ -125,6 +138,7 @@ export const InputFAB = React.memo(function InputFAB({
   bookmarkCount = 0,
   onBookmarksPress,
   statusInfo,
+  autoOptionSend,
 }: InputFABProps) {
   const { theme } = useUnistyles();
   const styles = stylesheet;
@@ -186,6 +200,22 @@ export const InputFAB = React.memo(function InputFAB({
             disabledIconColor={disabledIconColor}
             disabled={!showOptions}
           />
+          {autoOptionSend?.visible && (
+            <FABButton
+              key="auto-option-send"
+              icon={autoOptionSend.enabled ? "pause" : "play"}
+              label={
+                autoOptionSend.enabled && autoOptionSend.remainingMs != null
+                  ? `${Math.max(1, Math.ceil(autoOptionSend.remainingMs / 1000))}s`
+                  : undefined
+              }
+              onPress={() => autoOptionSend.onToggle(!autoOptionSend.enabled)}
+              badgeColor={autoOptionSend.enabled ? badgeColor : undefined}
+              styles={styles}
+              iconColor={iconColor}
+              disabledIconColor={disabledIconColor}
+            />
+          )}
           <FABButton
             key="bookmarks"
             icon="bookmark"
@@ -403,6 +433,7 @@ const FABButton = React.memo(function FABButton({
   icon,
   onPress,
   size = 18,
+  label,
   badgeColor,
   styles,
   iconColor,
@@ -412,6 +443,7 @@ const FABButton = React.memo(function FABButton({
   icon: React.ComponentProps<typeof Ionicons>["name"];
   onPress: () => void;
   size?: number;
+  label?: string;
   badgeColor?: string;
   styles: typeof stylesheet;
   iconColor: string;
@@ -458,6 +490,16 @@ const FABButton = React.memo(function FABButton({
           size={size}
           color={disabled ? disabledIconColor : iconColor}
         />
+        {label ? (
+          <Text
+            style={[
+              styles.buttonLabel,
+              { color: disabled ? disabledIconColor : iconColor },
+            ]}
+          >
+            {label}
+          </Text>
+        ) : null}
       </Pressable>
       {badgeColor && !disabled && (
         <View style={[styles.badge, { backgroundColor: badgeColor }]} />

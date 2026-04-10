@@ -932,6 +932,7 @@ function serializeGoal(goal: Record<string, unknown>, agentMessages: GoalAgentMe
             status: string;
             sessionId: string | null;
             roleType: string | null;
+            errorMessage: string | null;
             createdAt: Date;
             completedAt: Date | null;
         }>;
@@ -954,6 +955,7 @@ function serializeGoal(goal: Record<string, unknown>, agentMessages: GoalAgentMe
             id: task.id,
             title: task.title,
             status: task.status,
+            errorMessage: task.errorMessage,
         })),
         agentMessages,
     });

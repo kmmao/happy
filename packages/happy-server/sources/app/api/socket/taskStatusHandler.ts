@@ -10,40 +10,20 @@ import { log } from "@/utils/log";
 import { eventRouter, buildTaskStatusChangedEphemeral } from "@/app/events/eventRouter";
 import { inboxCreate } from "@/modules/inboxCreate";
 import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
+import {
+    normalizeTaskStatusReport,
+    shouldApplyTaskStatus,
+} from "@/modules/taskStatusLogic";
 
 const taskStatusSchema = z.object({
     taskId: z.string().min(1),
     status: z.enum(["queued", "dispatching", "running", "completed", "failed", "cancelled"]),
+    outcome: z.enum(["completed", "failed", "blocked"]).optional(),
     sessionId: z.string().min(1).optional(),
     errorMessage: z.string().optional(),
 });
 
-const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
-const TASK_STATUS_ORDER: Record<string, number> = {
-    queued: 0,
-    dispatching: 1,
-    running: 2,
-};
 
-function shouldApplyTaskStatus(current: string, incoming: string): boolean {
-    if (current === incoming) return true;
-    if (TERMINAL_STATUSES.has(current)) {
-        // Terminal status is final: only idempotent repeats are accepted.
-        return false;
-    }
-    if (TERMINAL_STATUSES.has(incoming)) {
-        return true;
-    }
-
-    const currentOrder = TASK_STATUS_ORDER[current];
-    const incomingOrder = TASK_STATUS_ORDER[incoming];
-    if (currentOrder == null || incomingOrder == null) {
-        // Unknown statuses should not block updates for compatibility.
-        return true;
-    }
-    // Block non-terminal regressions, e.g. running -> dispatching.
-    return incomingOrder >= currentOrder;
-}
 
 export function taskStatusHandler(socket: Socket, userId: string): void {
     socket.on("task-status", async (rawData: unknown) => {
@@ -57,6 +37,11 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                 return;
             }
             const data = parsed.data;
+            const normalized = normalizeTaskStatusReport({
+                status: data.status,
+                outcome: data.outcome,
+            });
+            const resolvedStatus = normalized.status;
 
             const task = await db.task.findFirst({
                 where: { id: data.taskId, accountId: userId },
@@ -70,23 +55,27 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                 return;
             }
 
-            if (!shouldApplyTaskStatus(task.status, data.status)) {
+            if (task.status === resolvedStatus && ["completed", "failed", "cancelled"].includes(task.status)) {
+                return;
+            }
+
+            if (!shouldApplyTaskStatus(task.status, resolvedStatus)) {
                 log(
                     { module: "task", level: "warn" },
-                    `task-status: ignored stale transition for ${data.taskId}: ${task.status} -> ${data.status}`,
+                    `task-status: ignored stale transition for ${data.taskId}: ${task.status} -> ${resolvedStatus}`,
                 );
                 return;
             }
 
-            const isTerminal = ["completed", "failed", "cancelled"].includes(data.status);
+            const isTerminal = ["completed", "failed", "cancelled"].includes(resolvedStatus);
 
             const updated = await db.task.update({
                 where: { id: data.taskId },
                 data: {
-                    status: data.status,
+                    status: resolvedStatus,
                     sessionId: data.sessionId ?? task.sessionId,
                     errorMessage: data.errorMessage ?? task.errorMessage,
-                    dispatchedAt: data.status === "running" && !task.dispatchedAt ? new Date() : task.dispatchedAt,
+                    dispatchedAt: resolvedStatus === "running" && !task.dispatchedAt ? new Date() : task.dispatchedAt,
                     completedAt: isTerminal ? new Date() : task.completedAt,
                 },
             });
@@ -97,18 +86,18 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                 void inboxCreate({
                     accountId: userId,
                     category: "task",
-                    eventType: `task.${data.status}`,
-                    severity: data.status === "failed" ? "error" : "info",
-                    title: data.status === "completed"
+                    eventType: `task.${resolvedStatus}`,
+                    severity: resolvedStatus === "failed" ? "error" : "info",
+                    title: resolvedStatus === "completed"
                         ? `${taskLabel}: completed`
-                        : data.status === "failed"
+                        : resolvedStatus === "failed"
                             ? `${taskLabel}: failed`
                             : `${taskLabel}: cancelled`,
-                    body: data.status === "failed" ? data.errorMessage : undefined,
+                    body: resolvedStatus === "failed" ? data.errorMessage : undefined,
                     referenceUrl: updated.sessionId ? `/session/${updated.sessionId}` : undefined,
                     refType: "task",
                     refId: data.taskId,
-                    groupKey: `task:${data.taskId}:${data.status}`,
+                    groupKey: `task:${data.taskId}:${resolvedStatus}`,
                 });
             }
 
@@ -117,7 +106,7 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                 userId,
                 payload: buildTaskStatusChangedEphemeral({
                     taskId: data.taskId,
-                    status: data.status,
+                    status: resolvedStatus,
                     sessionId: updated.sessionId ?? undefined,
                     errorMessage: updated.errorMessage ?? undefined,
                     completedAt: updated.completedAt?.getTime(),
@@ -133,7 +122,7 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                 });
             }
 
-            log({ module: "task" }, `task-status: task ${data.taskId} → ${data.status}`);
+            log({ module: "task" }, `task-status: task ${data.taskId} → ${resolvedStatus}`);
         } catch (error) {
             log(
                 { module: "task", level: "error" },

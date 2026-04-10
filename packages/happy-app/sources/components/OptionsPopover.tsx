@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Animated, Platform, Pressable, Text, View } from "react-native";
+import { Animated, Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +19,8 @@ interface OptionsPopoverProps {
   onClose: () => void;
   title?: string;
   onRemoveOption?: (text: string) => void;
+  recommendedIndex?: number | null;
+  recommendedRemainingMs?: number | null;
 }
 
 function normalizeOption(option: string | OptionItem): OptionItem {
@@ -33,6 +35,8 @@ export const OptionsPopover = React.memo(
     onClose,
     title,
     onRemoveOption,
+    recommendedIndex,
+    recommendedRemainingMs,
   }: OptionsPopoverProps) => {
     const { theme } = useUnistyles();
     const appendToInput = useAppendToInput();
@@ -58,16 +62,13 @@ export const OptionsPopover = React.memo(
           }
         });
       }
-    }, [visible]);
+    }, [visible, opacity]);
 
     if (!shouldRender) return null;
 
     return (
       <Animated.View style={[styles.overlay, { opacity }]}>
-        {/* Backdrop */}
         <Pressable style={styles.backdrop} onPress={onClose} />
-
-        {/* Centered bubble */}
         <View style={styles.centerAnchor} pointerEvents="box-none">
           <View style={styles.bubble}>
             {title && (
@@ -77,9 +78,15 @@ export const OptionsPopover = React.memo(
             )}
             {options.map((raw, index) => {
               const option = normalizeOption(raw);
+              const isRecommended = recommendedIndex === index;
+              const countdownLabel =
+                isRecommended && recommendedRemainingMs != null
+                  ? `${Math.max(0, Math.ceil(recommendedRemainingMs / 1000))}s`
+                  : null;
+
               return (
                 <View
-                  key={index}
+                  key={`${option.source ?? "plain"}:${option.text}:${index}`}
                   style={[
                     styles.optionRow,
                     index < options.length - 1 && styles.optionItemBorder,
@@ -89,6 +96,7 @@ export const OptionsPopover = React.memo(
                     style={({ pressed }) => [
                       styles.optionItem,
                       onRemoveOption && styles.optionItemFlex,
+                      isRecommended && styles.optionItemRecommended,
                       pressed && styles.optionItemPressed,
                     ]}
                     onPress={() => onOptionPress(option.text)}
@@ -97,6 +105,23 @@ export const OptionsPopover = React.memo(
                       <Text style={styles.optionText} numberOfLines={2}>
                         {option.text}
                       </Text>
+                      {isRecommended && (
+                        <View style={styles.recommendedTag}>
+                          <Ionicons
+                            name="sparkles"
+                            size={11}
+                            color={theme.colors.radio.active}
+                          />
+                          <Text style={styles.recommendedTagText}>
+                            {t("tools.askUserQuestion.recommended")}
+                          </Text>
+                          {countdownLabel ? (
+                            <Text style={styles.recommendedCountdownText}>
+                              {countdownLabel}
+                            </Text>
+                          ) : null}
+                        </View>
+                      )}
                       {option.source && (
                         <View
                           style={[
@@ -173,7 +198,7 @@ export const OptionsPopover = React.memo(
 
 const styles = StyleSheet.create((theme) => ({
   overlay: {
-    position: "absolute",
+    position: "absolute" as const,
     top: 0,
     left: 0,
     right: 0,
@@ -181,7 +206,7 @@ const styles = StyleSheet.create((theme) => ({
     zIndex: 100,
   },
   backdrop: {
-    position: "absolute",
+    position: "absolute" as const,
     top: 0,
     left: 0,
     right: 0,
@@ -190,8 +215,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   centerAnchor: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
   },
   bubble: {
     maxWidth: layout.maxWidth - 32,
@@ -205,7 +230,7 @@ const styles = StyleSheet.create((theme) => ({
     shadowRadius: 16,
     shadowOpacity: theme.colors.shadow.opacity * 2,
     elevation: 12,
-    overflow: "hidden",
+    overflow: "hidden" as const,
   },
   titleContainer: {
     paddingHorizontal: 16,
@@ -231,6 +256,9 @@ const styles = StyleSheet.create((theme) => ({
   optionItemFlex: {
     flex: 1,
   },
+  optionItemRecommended: {
+    backgroundColor: theme.colors.radio.active + "08",
+  },
   optionItemBorder: {
     borderBottomWidth: 0.5,
     borderBottomColor: theme.colors.divider,
@@ -249,6 +277,26 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 22,
     color: theme.colors.text,
     flexShrink: 1,
+  },
+  recommendedTag: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: theme.colors.radio.active + "20",
+    flexShrink: 0,
+  },
+  recommendedTagText: {
+    fontSize: 10,
+    color: theme.colors.radio.active,
+    ...Typography.default("semiBold"),
+  },
+  recommendedCountdownText: {
+    fontSize: 10,
+    color: theme.colors.radio.active,
+    ...Typography.default("semiBold"),
   },
   sourceTag: {
     paddingHorizontal: 6,

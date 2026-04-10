@@ -97,7 +97,7 @@ export interface AutomationSchedulerOptions {
   runJob?: (job: AutomationJob) => Promise<AutomationRunResult>;
   onChange?: (jobs: AutomationJob[]) => void;
   sendPushNotification?: (title: string, body: string) => void;
-  onTaskStatusReport?: (taskId: string, status: string, sessionId?: string, errorMessage?: string) => void;
+  onTaskStatusReport?: (taskId: string, status: string, sessionId?: string, errorMessage?: string, outcome?: "completed" | "failed" | "blocked") => void;
 }
 
 export class AutomationScheduler {
@@ -109,7 +109,7 @@ export class AutomationScheduler {
   private readonly runJob: (job: AutomationJob) => Promise<AutomationRunResult>;
   private readonly onChange?: (jobs: AutomationJob[]) => void;
   private readonly sendPushNotification?: (title: string, body: string) => void;
-  private readonly onTaskStatusReport?: (taskId: string, status: string, sessionId?: string, errorMessage?: string) => void;
+  private readonly onTaskStatusReport?: (taskId: string, status: string, sessionId?: string, errorMessage?: string, outcome?: "completed" | "failed" | "blocked") => void;
   private readonly inFlight = new Set<string>();
   private readonly activeDispatches = new Set<Promise<void>>();
   private interval: NodeJS.Timeout | null = null;
@@ -385,8 +385,11 @@ export class AutomationScheduler {
       return;
     }
     const taskId = (job.payload as TaskTriggerData).taskId;
+    const outcome = job.status === "completed" || job.status === "failed" || job.status === "cancelled"
+      ? (job.status === "cancelled" ? "failed" : job.status)
+      : undefined;
     try {
-      this.onTaskStatusReport(taskId, job.status, job.sessionId, job.errorMessage);
+      this.onTaskStatusReport(taskId, job.status, job.sessionId, job.errorMessage, outcome);
     } catch (err) {
       logger.debug(`[AUTOMATION] Failed to report task status for ${taskId}: ${err}`);
     }

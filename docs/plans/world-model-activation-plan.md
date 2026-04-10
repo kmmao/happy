@@ -18,7 +18,7 @@
 
 - [x] **阶段 A — 板子入口**：强化 World / Goal 为主入口 UI，聚合子 Task 状态与会话链接；设备任务队列为二级排障
 - [x] **阶段 A — 阻塞**：用 AgentMessage（或约定 `content` 结构）表达阻塞，与 Goal `blocked` 规则对齐
-- [ ] **阶段 B — 语义完成**：CLI 窄权限任务结果上报 + Server 与 `shouldApplyTaskStatus` 统一；默认仍进程退出结算
+- [x] **阶段 B — 语义完成**：CLI 任务结果上报闭环、Server 状态机统一与 task-scoped 窄权限 token 已落地；默认仍进程退出结算
 - [ ] **阶段 C — 主动性**：基于 narrative / decisions / failures 生成建议 Goal/Task（先确认后派发）+ 可选 Skill 提炼闭环
 
 ---
@@ -157,6 +157,25 @@ Goal 的“活起来”不能依赖手动刷新。现有服务端已具备 `goal
 - **默认**：无上报时仍按 **进程退出** 逻辑结算。
 
 **验收**：长会话、多轮工具调用下，Goal 进度不会在「进程仍活着」时被误判；阻塞可被世界层读懂。
+
+### 阶段 B 当前进展（2026-04-10）
+
+已落地的核心闭环：
+
+- **Task 会话结果上报入口**：普通 task 启动时已注入 `HAPPY_TASK_ID`、`HAPPY_TASK_PRIORITY`、`HAPPY_TASK_SERVER_URL`、`HAPPY_TASK_REPORT_URL`、`HAPPY_TASK_RESULT_TOKEN`，并在 `TaskRunner` 前置说明中加入结果上报约定，要求任务会话可显式上报 `completed / failed / blocked + summary`。
+- **task-scoped 窄权限 token**：Server 已为普通 task 签发 `task-result` scope 的短期 token，并随 `task-trigger` ephemeral 下发；`/v1/tasks/result` 已优先支持 task token 鉴权，校验 `taskId / accountId / scope / 过期时间`，普通 task 不再注入用户级 `HAPPY_TASK_AUTH_TOKEN`。
+- **jti / 重放防护**：task result token 已补 `jti`，`/v1/tasks/result` 的 task-token 分支已使用 `RepeatKey` 做一次性消费；同一 token 在有效期内重复提交会被识别并返回冲突，避免把“终态幂等”误当成“防重放”。
+- **Server 结果真相源**：[`taskRoutes.ts`](../../packages/happy-server/sources/app/api/routes/taskRoutes.ts) 已新增 `POST /v1/tasks/result`，并与现有 `POST /v1/tasks/status` / socket `task-status` 统一复用 `normalizeTaskStatusReport` 与 `shouldApplyTaskStatus`。
+- **blocked 兼容策略落地**：阶段 B 继续采用 `blocked -> failed` 的兼容收口，语义通过 `summary / errorMessage` 保留，不新增 Task 正式状态，避免立刻贯穿 wire / app / prisma。
+- **Goal 聚合接入语义摘要**：[`goalSummary.ts`](../../packages/happy-server/sources/modules/goalSummary.ts) 已在 task failed blocker 场景下优先读取任务 `errorMessage`，使 Goal list/detail 能展示任务主动上报的 blocker summary，而不再只回退到 `Task failed: <title>`。
+- **默认兜底仍保留**：若任务会话未主动上报结果，现有 daemon / session 退出结算链仍作为默认终态来源，未引入强依赖。
+- **边界修补**：本轮补齐三类边界问题：传入 `projectId` 但项目不存在时，Server 不再悄悄回退到 `~` 创建“无项目任务”；CLI `TaskRunner` 对 `~` / `~/...` 目录已先展开，避免 prompt 文件写入失败；`apiMachine` 的 spawn 参数日志已脱敏，不再把 token / environmentVariables 直接落盘。
+- **测试覆盖**：已补并通过 `auth.spec.ts`（task result token 签发/验证与 `jti` 回传）、`taskRoutes.spec.ts`（任务结果上报、task token 鉴权、重复 `jti` 拒绝、projectId 非法时拒绝）、`TaskRunner.test.ts`（环境变量注入、prompt 上报说明、`~` 目录展开）以及 `goalSummary.spec.ts`（failed task 的语义摘要优先级）。
+
+当前仍可继续增强，但不再阻塞阶段 B 收口：
+
+- **status 路径进一步收口**：当前 `jti + RepeatKey` 只覆盖 `/v1/tasks/result` 的 task-token 主路径；`/v1/tasks/status` 仍保留现有 daemon / 用户鉴权 fallback，用于兼容既有兜底链路。若后续要进一步收紧，可再评估让 status 路径也引入更窄的鉴权边界。
+- **summary 独立字段/更强结构化**：当前阶段先复用 `errorMessage` 承载 summary；若后续 blocker / suggestion / timeline 需要更细语义，仍可评估单独 `resultSummary` 字段或更结构化 payload。
 
 ### 阶段 C — 主动性（高价值、可分模块）
 
@@ -594,6 +613,8 @@ World 逐步从 Goal list 演进为：
 | 2026-04-08 | 补充双层路线（先激活再自治）、阶段 A 接口契约与 goal-progress 实时同步策略 |
 | 2026-04-08 | 阶段 A 继续打磨：ProjectDetailView tab 白名单回退已补齐，`knowledge` 不可用时自动回退 `world`，避免项目页空白态 |
 | 2026-04-09 | 阶段 A 最终扫尾：补齐列表页 session 跳转白名单校验，复跑 typecheck/tests，并通过收尾复审无新的 HIGH/CRITICAL |
+| 2026-04-10 | 阶段 B 加固：task result token 已补 `jti + RepeatKey` 一次性消费，`/v1/tasks/result` 的 task-token 主路径具备显式重放防护，阶段 B 的最小安全闭环已完整 |
+| 2026-04-10 | 阶段 B 同步：普通 task 已补结果上报闭环（`HAPPY_TASK_*` 注入、`/v1/tasks/result`、Goal blocker 读取任务语义摘要），但 task-scoped 窄权限 token 仍待收口 |
 | 2026-04-09 | 阶段 A 收尾：AgentMessage 驱动的 blocker 真相源已接入 Goal list/detail，详情页补最小处理动作，Goals 列表补聚合摘要与基础筛选 |
 
 （后续每一轮活化：在此表追加一行，并勾选上方清单。）

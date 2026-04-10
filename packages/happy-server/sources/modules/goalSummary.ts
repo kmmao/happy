@@ -32,6 +32,7 @@ export interface GoalTaskBlockerLike {
     id: string;
     title: string | null;
     status: string;
+    errorMessage?: string | null;
 }
 
 export interface GoalAgentMessageBlockerLike {
@@ -164,7 +165,7 @@ export function buildGoalBlockerSummary(input: {
     if (failedTask) {
         return {
             kind: "task_failed",
-            summary: `Task failed: ${failedTask.title ?? failedTask.id}`,
+            summary: failedTask.errorMessage?.trim() || `Task failed: ${failedTask.title ?? failedTask.id}`,
             sourceTaskId: failedTask.id,
             requiresHuman: false,
         };

@@ -323,7 +323,7 @@ export class ApiMachineClient {
     | ((data: SupervisorTriggerData) => void)
     | null = null;
 
-  private taskHandler: ((data: { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; skillContents?: Array<{ name: string; content: string }> }) => void) | null = null;
+  private taskHandler: ((data: { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; resultToken?: string; skillContents?: Array<{ name: string; content: string }> }) => void) | null = null;
   private fixKillHandler:
     | ((data: { fixSessionId: string; projectId: string; fixStatus: string }) => void)
     | null = null;
@@ -417,8 +417,13 @@ export class ApiMachineClient {
           happySessionId,
           profileId,
         } = params || {};
+        const safeParams = {
+          ...params,
+          token: typeof token === "string" ? "[REDACTED]" : token,
+          environmentVariables: environmentVariables ? "[REDACTED_ENV_VARS]" : environmentVariables,
+        };
         logger.debug(
-          `[API MACHINE] Spawning session with params: ${JSON.stringify(params)}`,
+          `[API MACHINE] Spawning session with params: ${JSON.stringify(safeParams)}`,
         );
 
         if (!directory) {
@@ -784,7 +789,7 @@ export class ApiMachineClient {
    * Set handler for incoming task trigger events.
    * Called when Server dispatches a task-trigger ephemeral event to this machine.
    */
-  setTaskHandler(handler: (data: { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; skillContents?: Array<{ name: string; content: string }> }) => void) {
+  setTaskHandler(handler: (data: { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; resultToken?: string; skillContents?: Array<{ name: string; content: string }> }) => void) {
     this.taskHandler = handler;
   }
 
@@ -872,8 +877,9 @@ export class ApiMachineClient {
     status: string,
     sessionId?: string,
     errorMessage?: string,
+    outcome?: "completed" | "failed" | "blocked",
   ) {
-    const data = { taskId, status, sessionId, errorMessage };
+    const data = { taskId, status, sessionId, errorMessage, outcome };
     if (!this.socket.connected) {
       logger.debug(
         `[TASK] Socket disconnected, queuing status for task ${taskId}`,
@@ -1189,7 +1195,7 @@ export class ApiMachineClient {
         logger.debug(
           `[API MACHINE] Received task-trigger for task ${data.taskId}`,
         );
-        this.taskHandler(data as { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; skillContents?: Array<{ name: string; content: string }> });
+        this.taskHandler(data as { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; resultToken?: string; skillContents?: Array<{ name: string; content: string }> });
       }
 
       if (data.type === "supervisor-fix-kill-session" && this.fixKillHandler) {

@@ -8,10 +8,17 @@ import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
 import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
+import { auth } from "@/app/auth/auth";
+import { inTx } from "@/storage/inTx";
+import { fetchRepeatKey, saveRepeatKey } from "@/storage/repeatKey";
+import {
+    normalizeTaskStatusReport,
+    shouldApplyTaskStatus,
+} from "@/modules/taskStatusLogic";
 
-// Inline schemas (mirrored from @kmmao/happy-wire/tasks — will import after wire publish)
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
 const TaskStatusSchema = z.enum(["queued", "dispatching", "running", "completed", "failed", "cancelled"]);
+const TaskOutcomeSchema = z.enum(["completed", "failed", "blocked"]);
 
 const CreateTaskBodySchema = z.object({
     projectId: z.string().optional(),
@@ -20,8 +27,23 @@ const CreateTaskBodySchema = z.object({
     priority: TaskPrioritySchema.default("user"),
     maxAttempts: z.number().int().min(1).max(10).default(3),
     skillIds: z.array(z.string()).max(10).default([]),
-    /** Optional absolute directory on the machine (e.g. Git worktree). Must be under project.path when projectId is set. */
     directory: z.string().min(1).max(4096).optional(),
+});
+
+const TaskStatusReportSchema = z.object({
+    taskId: z.string(),
+    status: TaskStatusSchema,
+    outcome: TaskOutcomeSchema.optional(),
+    sessionId: z.string().optional(),
+    errorMessage: z.string().optional(),
+});
+
+const TaskResultReportSchema = z.object({
+    taskId: z.string(),
+    outcome: TaskOutcomeSchema,
+    summary: z.string().min(1).max(1000).optional(),
+    sessionId: z.string().optional(),
+    errorMessage: z.string().optional(),
 });
 
 function isDirectoryUnderProject(projectPath: string, candidate: string): boolean {
@@ -33,37 +55,61 @@ function isDirectoryUnderProject(projectPath: string, candidate: string): boolea
     return dir === base || dir.startsWith(`${base}/`);
 }
 
-const TaskStatusReportSchema = z.object({
-    taskId: z.string(),
-    status: TaskStatusSchema,
-    sessionId: z.string().optional(),
-    errorMessage: z.string().optional(),
-});
-
-const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "cancelled"]);
-const TASK_STATUS_PROGRESS: Record<string, number> = {
-    queued: 0,
-    dispatching: 1,
-    running: 2,
-};
-
-function shouldApplyTaskStatus(current: string, incoming: string): boolean {
-    if (current === incoming) return true;
-    if (TERMINAL_TASK_STATUSES.has(current)) {
-        // Terminal status is final: only idempotent repeats are accepted.
-        return false;
-    }
-    if (TERMINAL_TASK_STATUSES.has(incoming)) {
-        return true;
+function buildTaskStatusPayload(input: {
+    status?: z.infer<typeof TaskStatusSchema>;
+    outcome?: z.infer<typeof TaskOutcomeSchema>;
+    summary?: string;
+    errorMessage?: string;
+}): { status: z.infer<typeof TaskStatusSchema>; outcome?: z.infer<typeof TaskOutcomeSchema>; errorMessage?: string } {
+    if (!input.outcome && input.status) {
+        return {
+            status: input.status,
+            outcome: undefined,
+            errorMessage: input.summary ?? input.errorMessage,
+        };
     }
 
-    const currentOrder = TASK_STATUS_PROGRESS[current];
-    const incomingOrder = TASK_STATUS_PROGRESS[incoming];
-    if (currentOrder == null || incomingOrder == null) {
-        return true;
-    }
-    return incomingOrder >= currentOrder;
+    const normalized = normalizeTaskStatusReport({
+        status: input.status ?? (input.outcome === "blocked" ? "failed" : input.outcome ?? "failed"),
+        outcome: input.outcome,
+    });
+    return {
+        status: normalized.status,
+        outcome: normalized.outcome,
+        errorMessage: input.summary ?? input.errorMessage,
+    };
 }
+
+interface TaskResultAuthInfo {
+    userId: string;
+    jti?: string;
+}
+
+async function authenticateTaskResult(request: any, reply: any): Promise<TaskResultAuthInfo | null> {
+    const authHeader = request.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return reply.code(401).send({ error: "Missing authorization header" }) as any;
+    }
+
+    const token = authHeader.substring(7);
+    const taskToken = await auth.verifyTaskResultToken(token);
+    if (taskToken) {
+        if (taskToken.taskId !== request.body.taskId) {
+            return reply.code(403).send({ error: "Task token does not match taskId" }) as any;
+        }
+        request.userId = taskToken.userId;
+        (request as any).taskResultJti = taskToken.jti;
+        return { userId: taskToken.userId, jti: taskToken.jti };
+    }
+
+    await appAuthenticate(request, reply);
+    if (!request.userId) {
+        return null;
+    }
+    return { userId: request.userId };
+}
+
+let appAuthenticate: (request: any, reply: any) => Promise<void>;
 
 /**
  * Task queue routes — create, list, cancel, retry tasks.
@@ -71,7 +117,8 @@ function shouldApplyTaskStatus(current: string, incoming: string): boolean {
  * The prompt field is E2E encrypted (opaque to Server).
  */
 export function taskRoutes(app: Fastify) {
-    // POST /v1/tasks — Create a new task and dispatch to CLI
+    appAuthenticate = app.authenticate;
+
     app.post(
         "/v1/tasks",
         {
@@ -82,10 +129,8 @@ export function taskRoutes(app: Fastify) {
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { machineId, prompt, priority, maxAttempts, skillIds, projectId, directory: bodyDirectory } =
-                request.body;
+            const { machineId, prompt, priority, maxAttempts, skillIds, projectId, directory: bodyDirectory } = request.body;
 
-            // Verify machine belongs to user
             const machine = await db.machine.findFirst({
                 where: { id: machineId, accountId: userId },
             });
@@ -93,30 +138,29 @@ export function taskRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Machine not found" });
             }
 
-            // Resolve project directory (if projectId given)
             let directory = "~";
             let resolvedProjectId: string | null = null;
             if (projectId) {
                 const project = await db.project.findFirst({
                     where: { id: projectId, accountId: userId },
                 });
-                if (project) {
-                    resolvedProjectId = project.id;
-                    if (bodyDirectory?.trim()) {
-                        const candidate = bodyDirectory.trim();
-                        if (!isDirectoryUnderProject(project.path, candidate)) {
-                            return reply.code(400).send({ error: "directory must be under the selected project path" });
-                        }
-                        directory = candidate;
-                    } else {
-                        directory = project.path;
+                if (!project) {
+                    return reply.code(404).send({ error: "Project not found" });
+                }
+                resolvedProjectId = project.id;
+                if (bodyDirectory?.trim()) {
+                    const candidate = bodyDirectory.trim();
+                    if (!isDirectoryUnderProject(project.path, candidate)) {
+                        return reply.code(400).send({ error: "directory must be under the selected project path" });
                     }
+                    directory = candidate;
+                } else {
+                    directory = project.path;
                 }
             } else if (bodyDirectory?.trim()) {
                 return reply.code(400).send({ error: "directory override requires projectId" });
             }
 
-            // Load skills if bound
             let skillContents: Array<{ name: string; content: string }> | undefined;
             if (skillIds.length > 0) {
                 const skills = await db.skill.findMany({
@@ -128,14 +172,10 @@ export function taskRoutes(app: Fastify) {
                     orderBy: { name: "asc" },
                 });
                 if (skills.length > 0) {
-                    skillContents = skills.map((s) => ({
-                        name: s.name,
-                        content: s.content,
-                    }));
+                    skillContents = skills.map((s) => ({ name: s.name, content: s.content }));
                 }
             }
 
-            // Create task in DB
             const task = await db.task.create({
                 data: {
                     accountId: userId,
@@ -149,10 +189,7 @@ export function taskRoutes(app: Fastify) {
                     ...(skillIds.length > 0
                         ? {
                               skillBindings: {
-                                  create: skillIds.map((sid, idx) => ({
-                                      skillId: sid,
-                                      order: idx,
-                                  })),
+                                  create: skillIds.map((sid, idx) => ({ skillId: sid, order: idx })),
                               },
                           }
                         : {}),
@@ -162,7 +199,11 @@ export function taskRoutes(app: Fastify) {
                 },
             });
 
-            // Dispatch to CLI daemon via ephemeral
+            const resultToken = await auth.createTaskResultToken({
+                userId,
+                taskId: task.id,
+            });
+
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildTaskTriggerEphemeral({
@@ -171,6 +212,7 @@ export function taskRoutes(app: Fastify) {
                     directory,
                     priority: task.priority,
                     projectId: resolvedProjectId ?? undefined,
+                    resultToken,
                     skillContents,
                 }),
                 recipientFilter: {
@@ -179,40 +221,28 @@ export function taskRoutes(app: Fastify) {
                 },
             });
 
-            log(
-                { module: "task" },
-                `Created task ${task.id} for machine ${machineId} (priority=${priority})`,
-            );
-
-            return reply.code(201).send({
-                task: serializeTask(task),
-            });
+            log({ module: "task" }, `Created task ${task.id} for machine ${machineId} (priority=${priority})`);
+            return reply.code(201).send({ task: serializeTask(task) });
         },
     );
 
-    // GET /v1/tasks — List tasks for the authenticated user
     app.get(
         "/v1/tasks",
         {
             preHandler: app.authenticate,
             schema: {
-                querystring: z
-                    .object({
-                        status: z.string().optional(),
-                        machineId: z.string().optional(),
-                        projectId: z.string().optional(),
-                        limit: z.coerce.number().int().min(1).max(100).default(50),
-                        offset: z.coerce.number().int().min(0).default(0),
-                    })
-                    .optional(),
+                querystring: z.object({
+                    status: z.string().optional(),
+                    machineId: z.string().optional(),
+                    projectId: z.string().optional(),
+                    limit: z.coerce.number().int().min(1).max(100).default(50),
+                    offset: z.coerce.number().int().min(0).default(0),
+                }).optional(),
             },
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { status, machineId, projectId, limit, offset } = request.query ?? {
-                limit: 50,
-                offset: 0,
-            };
+            const { status, machineId, projectId, limit, offset } = request.query ?? { limit: 50, offset: 0 };
 
             const where: Record<string, unknown> = { accountId: userId };
             if (status) where.status = status;
@@ -239,7 +269,6 @@ export function taskRoutes(app: Fastify) {
         },
     );
 
-    // GET /v1/tasks/:id — Get a single task
     app.get(
         "/v1/tasks/:id",
         {
@@ -262,7 +291,6 @@ export function taskRoutes(app: Fastify) {
         },
     );
 
-    // POST /v1/tasks/:id/cancel — Cancel a queued/dispatching task
     app.post(
         "/v1/tasks/:id/cancel",
         {
@@ -287,7 +315,6 @@ export function taskRoutes(app: Fastify) {
                 data: { status: "cancelled", completedAt: new Date() },
             });
 
-            // Notify App clients
             eventRouter.emitEphemeral({
                 userId: request.userId,
                 payload: buildTaskStatusChangedEphemeral({
@@ -303,7 +330,6 @@ export function taskRoutes(app: Fastify) {
         },
     );
 
-    // POST /v1/tasks/:id/retry — Retry a failed task
     app.post(
         "/v1/tasks/:id/retry",
         {
@@ -323,16 +349,17 @@ export function taskRoutes(app: Fastify) {
                 return reply.code(400).send({ error: `Can only retry failed tasks, current: '${task.status}'` });
             }
 
-            // Resolve directory
             let directory = "~";
             if (task.projectId) {
                 const project = await db.project.findFirst({
                     where: { id: task.projectId, accountId: request.userId },
                 });
-                if (project) directory = project.path;
+                if (!project) {
+                    return reply.code(404).send({ error: "Project not found" });
+                }
+                directory = project.path;
             }
 
-            // Load skills
             let skillContents: Array<{ name: string; content: string }> | undefined;
             const bindings = await db.taskSkillBinding.findMany({
                 where: { taskId: task.id },
@@ -340,10 +367,7 @@ export function taskRoutes(app: Fastify) {
                 orderBy: { order: "asc" },
             });
             if (bindings.length > 0) {
-                skillContents = bindings.map((b) => ({
-                    name: b.skill.name,
-                    content: b.skill.content,
-                }));
+                skillContents = bindings.map((b) => ({ name: b.skill.name, content: b.skill.content }));
             }
 
             const updated = await db.task.update({
@@ -358,7 +382,11 @@ export function taskRoutes(app: Fastify) {
                 },
             });
 
-            // Re-dispatch
+            const resultToken = await auth.createTaskResultToken({
+                userId: request.userId,
+                taskId: task.id,
+            });
+
             eventRouter.emitEphemeral({
                 userId: request.userId,
                 payload: buildTaskTriggerEphemeral({
@@ -367,6 +395,7 @@ export function taskRoutes(app: Fastify) {
                     directory,
                     priority: task.priority,
                     projectId: task.projectId ?? undefined,
+                    resultToken,
                     skillContents,
                 }),
                 recipientFilter: {
@@ -380,7 +409,6 @@ export function taskRoutes(app: Fastify) {
         },
     );
 
-    // DELETE /v1/tasks/:id — Delete a completed/failed/cancelled task
     app.delete(
         "/v1/tasks/:id",
         {
@@ -405,7 +433,93 @@ export function taskRoutes(app: Fastify) {
         },
     );
 
-    // POST /v1/tasks/status — CLI reports task status change (called via socket handler, but also as REST fallback)
+    app.post(
+        "/v1/tasks/result",
+        {
+            preHandler: authenticateTaskResult,
+            schema: {
+                body: TaskResultReportSchema,
+            },
+        },
+        async (request, reply) => {
+            const { taskId, outcome, summary, sessionId, errorMessage } = request.body;
+            const payload = buildTaskStatusPayload({ outcome, summary, errorMessage });
+            const resolvedStatus = payload.status;
+            const replayKey = (request as any).taskResultJti ? `task-result-jti:${(request as any).taskResultJti}` : null;
+
+            if (replayKey) {
+                const existing = await fetchRepeatKey(db as any, replayKey).catch(() => null);
+                if (existing) {
+                    return reply.code(409).send({ error: "Task result token already consumed" });
+                }
+            }
+
+            const task = await db.task.findFirst({
+                where: { id: taskId, accountId: request.userId },
+            });
+            if (!task) {
+                return reply.code(404).send({ error: "Task not found" });
+            }
+
+            if (task.status === resolvedStatus && ["completed", "failed", "cancelled"].includes(task.status)) {
+                return reply.send({ task: serializeTask(task), ignored: true });
+            }
+
+            if (!shouldApplyTaskStatus(task.status, resolvedStatus)) {
+                log(
+                    { module: "task", level: "warn" },
+                    `Ignored stale task result transition ${taskId}: ${task.status} -> ${resolvedStatus}`,
+                );
+                return reply.send({ task: serializeTask(task), ignored: true });
+            }
+
+            const updated = replayKey
+                ? await inTx(async (tx) => {
+                    await saveRepeatKey(tx, replayKey, taskId, Date.now() + 6 * 60 * 60 * 1000);
+                    return await tx.task.update({
+                        where: { id: taskId },
+                        data: {
+                            status: resolvedStatus,
+                            sessionId: sessionId ?? task.sessionId,
+                            errorMessage: payload.errorMessage ?? task.errorMessage,
+                            completedAt: new Date(),
+                        },
+                    });
+                })
+                : await db.task.update({
+                    where: { id: taskId },
+                    data: {
+                        status: resolvedStatus,
+                        sessionId: sessionId ?? task.sessionId,
+                        errorMessage: payload.errorMessage ?? task.errorMessage,
+                        completedAt: new Date(),
+                    },
+                });
+
+            eventRouter.emitEphemeral({
+                userId: request.userId,
+                payload: buildTaskStatusChangedEphemeral({
+                    taskId,
+                    status: resolvedStatus,
+                    sessionId: updated.sessionId ?? undefined,
+                    errorMessage: updated.errorMessage ?? undefined,
+                    completedAt: updated.completedAt?.getTime(),
+                }),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+
+            if (updated.goalId) {
+                void goalProgressUpdate({
+                    goalId: updated.goalId,
+                    accountId: request.userId,
+                });
+            }
+
+            log({ module: "task" }, `Task ${taskId} outcome → ${outcome} (status=${resolvedStatus})`);
+            return reply.send({ task: serializeTask(updated) });
+        },
+    );
+
     app.post(
         "/v1/tasks/status",
         {
@@ -415,7 +529,13 @@ export function taskRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const { taskId, status, sessionId, errorMessage } = request.body;
+            const { taskId, status, outcome, sessionId, errorMessage } = request.body;
+            const payload = buildTaskStatusPayload({
+                status,
+                outcome: outcome as z.infer<typeof TaskOutcomeSchema> | undefined,
+                errorMessage,
+            });
+            const resolvedStatus = payload.status;
 
             const task = await db.task.findFirst({
                 where: { id: taskId, accountId: request.userId },
@@ -424,33 +544,36 @@ export function taskRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Task not found" });
             }
 
-            if (!shouldApplyTaskStatus(task.status, status)) {
+            if (task.status === resolvedStatus && ["completed", "failed", "cancelled"].includes(task.status)) {
+                return reply.send({ task: serializeTask(task), ignored: true });
+            }
+
+            if (!shouldApplyTaskStatus(task.status, resolvedStatus)) {
                 log(
                     { module: "task", level: "warn" },
-                    `Ignored stale task status transition ${taskId}: ${task.status} -> ${status}`,
+                    `Ignored stale task status transition ${taskId}: ${task.status} -> ${resolvedStatus}`,
                 );
                 return reply.send({ task: serializeTask(task), ignored: true });
             }
 
-            const isTerminal = ["completed", "failed", "cancelled"].includes(status);
+            const isTerminal = ["completed", "failed", "cancelled"].includes(resolvedStatus);
 
             const updated = await db.task.update({
                 where: { id: taskId },
                 data: {
-                    status,
+                    status: resolvedStatus,
                     sessionId: sessionId ?? task.sessionId,
                     errorMessage: errorMessage ?? task.errorMessage,
-                    dispatchedAt: status === "running" && !task.dispatchedAt ? new Date() : task.dispatchedAt,
+                    dispatchedAt: resolvedStatus === "running" && !task.dispatchedAt ? new Date() : task.dispatchedAt,
                     completedAt: isTerminal ? new Date() : task.completedAt,
                 },
             });
 
-            // Notify App
             eventRouter.emitEphemeral({
                 userId: request.userId,
                 payload: buildTaskStatusChangedEphemeral({
                     taskId,
-                    status,
+                    status: resolvedStatus,
                     sessionId: updated.sessionId ?? undefined,
                     errorMessage: updated.errorMessage ?? undefined,
                     completedAt: updated.completedAt?.getTime(),
@@ -458,7 +581,6 @@ export function taskRoutes(app: Fastify) {
                 recipientFilter: { type: "user-scoped-only" },
             });
 
-            // Update goal progress if task is bound to a goal
             if (isTerminal && updated.goalId) {
                 void goalProgressUpdate({
                     goalId: updated.goalId,
@@ -466,13 +588,11 @@ export function taskRoutes(app: Fastify) {
                 });
             }
 
-            log({ module: "task" }, `Task ${taskId} status → ${status}`);
+            log({ module: "task" }, `Task ${taskId} status → ${resolvedStatus}`);
             return reply.send({ task: serializeTask(updated) });
         },
     );
 }
-
-// === Serialization ===
 
 function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
     const t = task as {
@@ -512,7 +632,6 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         completedAt: t.completedAt?.getTime() ?? null,
         createdAt: t.createdAt.getTime(),
         updatedAt: t.updatedAt.getTime(),
-        // Prompt preview: first 100 chars (still encrypted — App decrypts)
         promptPreview: t.prompt.length > 100 ? t.prompt.slice(0, 100) : t.prompt,
         skillNames: t.skillBindings?.map((b) => b.skill.name) ?? [],
     };
