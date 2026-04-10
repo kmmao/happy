@@ -20,6 +20,11 @@ import {
   getSessionProviderKey,
   getSessionProviderLabel,
 } from "@/utils/sessionUtils";
+import {
+  getBuiltInProfile,
+  LEGACY_BUILT_IN_PROFILE_ALIASES,
+  LEGACY_BUILT_IN_PROFILE_IDS,
+} from "@/sync/profileUtils";
 import { Avatar } from "./Avatar";
 import { Typography } from "@/constants/Typography";
 import { StatusDot } from "./StatusDot";
@@ -134,6 +139,32 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     flexDirection: "row",
     alignItems: "center",
   },
+  sessionMetaRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 4,
+  },
+  sessionMetaItem: {
+    flexGrow: 1,
+    flexBasis: 140,
+    minWidth: 0,
+    maxWidth: "100%",
+  },
+  sessionMetaLabel: {
+    fontSize: 10,
+    lineHeight: 12,
+    color: theme.colors.textSecondary,
+    ...Typography.default(),
+  },
+  sessionMetaValue: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: theme.colors.text,
+    ...Typography.default("semiBold"),
+    marginTop: 1,
+  },
   sessionTitle: {
     fontSize: 15,
     flex: 1,
@@ -219,6 +250,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   tagsRow: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 6,
     marginTop: 2,
   },
@@ -545,6 +577,36 @@ const CompactSessionRow = React.memo(
     const machine = useMachine(session.metadata?.machineId ?? "");
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
+    const sessionProfileLabel = React.useMemo(() => {
+      const rawProfileLabel = session.profileName?.trim() || session.profileId?.trim();
+      if (!rawProfileLabel) return null;
+
+      const normalizedProfileLabel = rawProfileLabel.toLowerCase();
+      const normalizedProviderKey = getSessionProviderKey(session).toLowerCase();
+      const normalizedProviderLabel = getSessionProviderLabel(session).trim().toLowerCase();
+      const normalizedProfileId = session.profileId?.trim()?.toLowerCase() || "";
+      const normalizedBuiltInProfileNames = [
+        getBuiltInProfile(normalizedProfileId)?.name,
+        ...(LEGACY_BUILT_IN_PROFILE_ALIASES[normalizedProviderKey] || []),
+      ]
+        .filter((name): name is string => Boolean(name))
+        .map((name) => name.trim().toLowerCase());
+      const normalizedBuiltInProfileIds = [
+        normalizedProfileId,
+        ...(LEGACY_BUILT_IN_PROFILE_IDS[normalizedProviderKey] || []),
+      ].filter((id) => id.length > 0);
+
+      if (
+        normalizedProfileLabel === normalizedProviderKey ||
+        normalizedProfileLabel === normalizedProviderLabel ||
+        normalizedBuiltInProfileNames.includes(normalizedProfileLabel) ||
+        normalizedBuiltInProfileIds.includes(normalizedProfileLabel)
+      ) {
+        return null;
+      }
+
+      return rawProfileLabel;
+    }, [session]);
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
       const result = await sessionKill(session.id);
@@ -727,6 +789,27 @@ const CompactSessionRow = React.memo(
                 </Text>
               ) : null}
             </View>
+            <View style={styles.sessionMetaRow}>
+              {sessionProfileLabel ? (
+                <View style={styles.sessionMetaItem}>
+                  <Text style={styles.sessionMetaLabel}>
+                    {t("sessionInfo.profile")}
+                  </Text>
+                  <Text style={styles.sessionMetaValue} numberOfLines={1}>
+                    {sessionProfileLabel}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={styles.sessionMetaItem}>
+                <Text style={styles.sessionMetaLabel}>
+                  {t("sessionInfo.aiProvider")}
+                </Text>
+                <Text style={styles.sessionMetaValue} numberOfLines={1}>
+                  {getSessionProviderLabel(session)}
+                </Text>
+              </View>
+            </View>
+
             {/* Tags line */}
             <View style={styles.tagsRow}>
               <View
@@ -748,11 +831,6 @@ const CompactSessionRow = React.memo(
                   {session.metadata?.worktree?.isWorktree
                     ? t("sessionInfo.tagBranch")
                     : t("sessionInfo.tagMain")}
-                </Text>
-              </View>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>
-                  {getSessionProviderLabel(session)}
                 </Text>
               </View>
               {(machine?.metadata?.displayName || session.metadata?.host) && (

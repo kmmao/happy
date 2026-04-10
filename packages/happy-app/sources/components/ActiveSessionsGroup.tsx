@@ -20,6 +20,11 @@ import {
   getSessionProviderKey,
   getSessionProviderLabel,
 } from "@/utils/sessionUtils";
+import {
+  getBuiltInProfile,
+  LEGACY_BUILT_IN_PROFILE_ALIASES,
+  LEGACY_BUILT_IN_PROFILE_IDS,
+} from "@/sync/profileUtils";
 import { Avatar } from "./Avatar";
 import { Typography } from "@/constants/Typography";
 import { StatusDot } from "./StatusDot";
@@ -155,6 +160,32 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   sessionTitleDisconnected: {
     color: theme.colors.textSecondary,
+  },
+  sessionMetaRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 4,
+  },
+  sessionMetaItem: {
+    flexGrow: 1,
+    flexBasis: 140,
+    minWidth: 0,
+    maxWidth: "100%",
+  },
+  sessionMetaLabel: {
+    fontSize: 10,
+    lineHeight: 12,
+    color: theme.colors.textSecondary,
+    ...Typography.default(),
+  },
+  sessionMetaValue: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: theme.colors.text,
+    ...Typography.default("semiBold"),
+    marginTop: 1,
   },
   statusMiddleRow: {
     flexDirection: "row",
@@ -663,16 +694,23 @@ const CompactSessionRow = React.memo(
       const normalizedProfileLabel = rawProfileLabel.toLowerCase();
       const normalizedProviderKey = getSessionProviderKey(session).toLowerCase();
       const normalizedProviderLabel = getSessionProviderLabel(session).trim().toLowerCase();
-      const normalizedProfileProviderKey = getSessionProviderKey({
-        ...session,
-        profileId: rawProfileLabel,
-        profileName: rawProfileLabel,
-      }).toLowerCase();
+      const normalizedProfileId = session.profileId?.trim()?.toLowerCase() || "";
+      const normalizedBuiltInProfileNames = [
+        getBuiltInProfile(normalizedProfileId)?.name,
+        ...(LEGACY_BUILT_IN_PROFILE_ALIASES[normalizedProviderKey] || []),
+      ]
+        .filter((name): name is string => Boolean(name))
+        .map((name) => name.trim().toLowerCase());
+      const normalizedBuiltInProfileIds = [
+        normalizedProfileId,
+        ...(LEGACY_BUILT_IN_PROFILE_IDS[normalizedProviderKey] || []),
+      ].filter((id) => id.length > 0);
 
       if (
         normalizedProfileLabel === normalizedProviderKey ||
         normalizedProfileLabel === normalizedProviderLabel ||
-        normalizedProfileProviderKey === normalizedProviderKey
+        normalizedBuiltInProfileNames.includes(normalizedProfileLabel) ||
+        normalizedBuiltInProfileIds.includes(normalizedProfileLabel)
       ) {
         return null;
       }
@@ -779,6 +817,27 @@ const CompactSessionRow = React.memo(
             </View>
           </View>
 
+          <View style={styles.sessionMetaRow}>
+            {sessionProfileLabel ? (
+              <View style={styles.sessionMetaItem}>
+                <Text style={styles.sessionMetaLabel}>
+                  {t("sessionInfo.profile")}
+                </Text>
+                <Text style={styles.sessionMetaValue} numberOfLines={1}>
+                  {sessionProfileLabel}
+                </Text>
+              </View>
+            ) : null}
+            <View style={styles.sessionMetaItem}>
+              <Text style={styles.sessionMetaLabel}>
+                {t("sessionInfo.aiProvider")}
+              </Text>
+              <Text style={styles.sessionMetaValue} numberOfLines={1}>
+                {getSessionProviderLabel(session)}
+              </Text>
+            </View>
+          </View>
+
           {/* Middle row: status + usage (full width) */}
           <View style={styles.statusMiddleRow}>
             <View style={styles.statusLeft}>
@@ -831,16 +890,6 @@ const CompactSessionRow = React.memo(
                   : t("sessionInfo.tagMain")}
               </Text>
             </View>
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>
-                {getSessionProviderLabel(session)}
-              </Text>
-            </View>
-            {sessionProfileLabel && (
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>{sessionProfileLabel}</Text>
-              </View>
-            )}
             {(machine?.metadata?.displayName || session.metadata?.host) && (
               <View style={styles.tag}>
                 <Text style={styles.tagText}>

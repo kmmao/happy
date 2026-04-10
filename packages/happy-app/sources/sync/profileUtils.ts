@@ -601,6 +601,16 @@ export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
  * Default built-in profiles available to all users.
  * These provide quick-start configurations for popular AI providers.
  */
+export const LEGACY_BUILT_IN_PROFILE_ALIASES: Record<string, string[]> = {
+  codex: ["OpenAI (GPT-4/Codex)"],
+  "azure-openai": ["Azure OpenAI (Codex)"],
+};
+
+export const LEGACY_BUILT_IN_PROFILE_IDS: Record<string, string[]> = {
+  codex: ["openai"],
+  "azure-openai": ["azure-openai-codex"],
+};
+
 export const DEFAULT_PROFILES = [
   {
     id: "anthropic",
