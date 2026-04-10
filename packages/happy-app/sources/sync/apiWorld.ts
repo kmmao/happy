@@ -179,12 +179,19 @@ export async function refreshSuggestions(
     return (await response.json()) as { created: number; unchanged: number; total: number };
 }
 
+export interface AcceptSuggestionResult {
+    suggestionId: string;
+    createdEntityType: "goal" | "task" | "skill";
+    createdEntityId: string;
+    machineId?: string;
+}
+
 export async function acceptSuggestion(
     credentials: AuthCredentials,
     projectId: string,
     suggestionId: string,
     body?: { machineId?: string; priorityOverride?: string; roleOverride?: string },
-): Promise<{ suggestionId: string; createdEntityType: string; createdEntityId: string }> {
+): Promise<AcceptSuggestionResult> {
     const API_ENDPOINT = getServerUrl();
     const response = await fetch(
         `${API_ENDPOINT}/v1/projects/${projectId}/world/suggestions/${suggestionId}/accept`,
@@ -194,7 +201,7 @@ export async function acceptSuggestion(
         const err = await response.json().catch(() => ({}));
         throw new Error((err as any).error ?? `Failed to accept suggestion: ${response.status}`);
     }
-    return (await response.json()) as { suggestionId: string; createdEntityType: string; createdEntityId: string };
+    return (await response.json()) as AcceptSuggestionResult;
 }
 
 export async function dismissSuggestion(

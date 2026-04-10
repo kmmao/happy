@@ -26,6 +26,7 @@ import {
     type WorldDashboard,
     type SuggestionSummary,
 } from "@/sync/apiWorld";
+import type { AcceptSuggestionResult } from "@/sync/apiWorld";
 import { SuggestionCard } from "./SuggestionCard";
 
 interface WorldOverviewTabProps {
@@ -119,20 +120,28 @@ export const WorldOverviewTab = React.memo(
             );
             if (!confirmed) return;
 
-            // Optimistic remove
             setSuggestions((prev) => prev.filter((s) => s.id !== suggestion.id));
 
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                await acceptSuggestion(credentials, project.serverId, suggestion.id);
+                const result: AcceptSuggestionResult = await acceptSuggestion(credentials, project.serverId, suggestion.id);
                 Modal.toast(t("suggestions.accepted"));
+
+                if (result.createdEntityType === "goal") {
+                    router.push(`/project/${project.id}/goal/${result.createdEntityId}` as any);
+                    return;
+                }
+                if (result.createdEntityType === "skill") {
+                    router.push(`/skills/${result.createdEntityId}/edit` as any);
+                    return;
+                }
+                router.push(`/machine/${result.machineId ?? project.key.machineId}/task/${result.createdEntityId}` as any);
             } catch (e: any) {
-                // Rollback on failure
                 setSuggestions((prev) => [...prev, suggestion]);
                 Modal.toast(e.message ?? t("common.error"));
             }
-        }, [project.serverId]);
+        }, [project.key.machineId, project.serverId, router]);
 
         const handleDismiss = React.useCallback(async (suggestion: SuggestionSummary) => {
             if (!project.serverId) return;

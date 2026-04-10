@@ -25,6 +25,7 @@ interface AcceptResult {
     suggestionId: string;
     createdEntityType: "goal" | "task" | "skill";
     createdEntityId: string;
+    machineId?: string;
 }
 
 export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptResult> {
@@ -77,7 +78,12 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
             recipientFilter: { type: "user-scoped-only" },
         });
 
-        return { suggestionId, createdEntityType: "goal", createdEntityId: result.id };
+        return {
+            suggestionId,
+            createdEntityType: "goal",
+            createdEntityId: result.id,
+            machineId: resolvedMachineId,
+        };
     }
 
     if (suggestion.type === "suggested_task" && payload.task) {
@@ -134,7 +140,12 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 });
             });
 
-            return { suggestionId, createdEntityType: "task" as const, createdEntityId: task.id };
+            return {
+                suggestionId,
+                createdEntityType: "task" as const,
+                createdEntityId: task.id,
+                machineId: resolvedMachineId,
+            };
         });
 
         return result;
@@ -173,7 +184,12 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 });
             });
 
-            return { suggestionId, createdEntityType: "skill" as const, createdEntityId: skill.id };
+            return {
+                suggestionId,
+                createdEntityType: "skill" as const,
+                createdEntityId: skill.id,
+                machineId: resolvedMachineId,
+            };
         });
 
         return result;
