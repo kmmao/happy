@@ -48,6 +48,10 @@ export const LocalSettingsSchema = z.object({
       z.array(z.object({ path: z.string(), type: z.enum(["file", "directory"]) })),
     )
     .describe("Favorited file/directory entries per project, keyed by basePath"),
+  // Sessions with auto-option-send enabled
+  autoOptionSendSessions: z
+    .record(z.string(), z.boolean())
+    .describe("Sessions with auto-option-send enabled, keyed by session ID"),
 });
 
 //
@@ -75,6 +79,7 @@ export const localSettingsDefaults: LocalSettings = {
   sidePanelCollapsed: false,
   sidePanelWidth: 400,
   fileFavorites: {},
+  autoOptionSendSessions: {},
 };
 Object.freeze(localSettingsDefaults);
 

@@ -184,7 +184,8 @@ describe("autoOptionSend", () => {
     );
 
     expect(next.shouldSendText).toBeNull();
-    expect(next.status).toBe("off");
+    expect(next.status).toBe("idle");
+    expect(next.enabled).toBe(true);
   });
 
   it("同一轮 candidate 不会再次自动发送", () => {
@@ -214,10 +215,9 @@ describe("autoOptionSend", () => {
     );
 
     expect(next.shouldSendText).toBeNull();
-    expect(next.status).toBe("off");
+    expect(next.status).toBe("idle");
+    expect(next.enabled).toBe(true);
   });
-
-
 
   it("自动发送后保持 on 并进入待命状态", () => {
     const armed = reduceAutoOptionSendEvent(

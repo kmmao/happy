@@ -492,9 +492,14 @@ function SessionViewInner({
   const isLandscape = useIsLandscape();
   const deviceType = useDeviceType();
   const [message, setMessage] = React.useState("");
-  const [autoOptionSend, setAutoOptionSend] = React.useState(
-    createInitialAutoOptionSendState,
-  );
+  const [autoOptionSend, setAutoOptionSend] = React.useState(() => {
+    const persisted =
+      (storage.getState().localSettings.autoOptionSendSessions ?? {})[
+        sessionId
+      ] === true;
+    const initial = createInitialAutoOptionSendState();
+    return persisted ? { ...initial, enabled: true, status: "idle" as const } : initial;
+  });
   const realtimeStatus = useRealtimeStatus();
   // Track session column height + AgentInput height to compute exact overlay max height
   const [sessionColumnHeight, setSessionColumnHeight] = React.useState(0);
@@ -800,6 +805,24 @@ function SessionViewInner({
     dispatchAutoOptionSend({ type: "toggle", enabled });
   }, [dispatchAutoOptionSend]);
 
+  React.useEffect(() => {
+    const current =
+      storage.getState().localSettings.autoOptionSendSessions ?? {};
+    if (autoOptionSend.enabled) {
+      if (current[sessionId] !== true) {
+        storage.getState().applyLocalSettings({
+          autoOptionSendSessions: { ...current, [sessionId]: true },
+        });
+      }
+    } else {
+      if (current[sessionId] != null) {
+        const { [sessionId]: _, ...rest } = current;
+        storage.getState().applyLocalSettings({
+          autoOptionSendSessions: rest,
+        });
+      }
+    }
+  }, [autoOptionSend.enabled, sessionId]);
 
   React.useEffect(() => {
     if (autoOptionSend.status !== "armed" || autoOptionSend.candidate == null) {

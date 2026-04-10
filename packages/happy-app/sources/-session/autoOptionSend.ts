@@ -192,12 +192,12 @@ export function reduceAutoOptionSendEvent(
   if (event.type === "options-updated") {
     if (!state.enabled) return state;
     if (!canArm(context)) {
-      return clearToOff(state, "options-invalid");
+      return clearToIdle(state, "options-invalid");
     }
 
     const candidate = buildAutoOptionCandidate(context);
     if (!candidate) {
-      return clearToOff(state, "options-invalid");
+      return clearToIdle(state, "options-invalid");
     }
 
     if (
@@ -238,7 +238,7 @@ export function reduceAutoOptionSendEvent(
   if (event.type === "attempt-fire") {
     if (state.status !== "ready") return state;
     if (!canFire(state, context)) {
-      return clearToOff(state, "fire-check-failed");
+      return clearToIdle(state, "fire-check-failed");
     }
 
     return {
