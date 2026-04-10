@@ -15,6 +15,7 @@ import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchWebhookEvents, type WebhookEvent } from "@/sync/apiWebhook";
 import { layout } from "@/components/layout";
+import { useProject } from "@/hooks/useProjects";
 
 const PAGE_SIZE = 20;
 
@@ -100,6 +101,7 @@ const EventRow = React.memo<EventRowProps>(function EventRow({ event, isLast }) 
 
 function WebhookEventsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
+    const project = useProject(id);
     const navigation = useNavigation();
     const { theme } = useUnistyles();
 
@@ -108,6 +110,7 @@ function WebhookEventsScreen() {
     const [loading, setLoading] = React.useState(true);
     const [loadingMore, setLoadingMore] = React.useState(false);
     const [refreshing, setRefreshing] = React.useState(false);
+    const waitingForProject = Boolean(id && !project?.serverId);
 
     React.useLayoutEffect(() => {
         navigation.setOptions({
@@ -116,11 +119,15 @@ function WebhookEventsScreen() {
     }, [navigation]);
 
     const loadEvents = React.useCallback(async () => {
+        if (waitingForProject) {
+            return;
+        }
         try {
             const credentials = await TokenStorage.getCredentials();
-            if (!credentials) return;
+            const projectServerId = project?.serverId;
+            if (!credentials || !projectServerId) return;
             const data = await fetchWebhookEvents(credentials, {
-                projectId: id,
+                projectId: projectServerId,
                 limit: PAGE_SIZE,
                 offset: 0,
             });
@@ -129,18 +136,22 @@ function WebhookEventsScreen() {
         } catch {
             // Silently fail — user can pull to refresh
         }
-    }, []);
+    }, [project?.serverId, waitingForProject]);
 
     React.useEffect(() => {
         let cancelled = false;
 
         async function init() {
+            if (waitingForProject) {
+                return;
+            }
             try {
                 setLoading(true);
                 const credentials = await TokenStorage.getCredentials();
-                if (!credentials || cancelled) return;
+                const projectServerId = project?.serverId;
+                if (!credentials || cancelled || !projectServerId) return;
                 const data = await fetchWebhookEvents(credentials, {
-                    projectId: id,
+                    projectId: projectServerId,
                     limit: PAGE_SIZE,
                     offset: 0,
                 });
@@ -161,7 +172,7 @@ function WebhookEventsScreen() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [project?.serverId, waitingForProject]);
 
     const handleRefresh = React.useCallback(async () => {
         setRefreshing(true);
@@ -170,13 +181,14 @@ function WebhookEventsScreen() {
     }, [loadEvents]);
 
     const handleLoadMore = React.useCallback(async () => {
-        if (loadingMore || events.length >= total) return;
+        if (waitingForProject || loadingMore || events.length >= total) return;
         try {
             setLoadingMore(true);
             const credentials = await TokenStorage.getCredentials();
-            if (!credentials) return;
+            const projectServerId = project?.serverId;
+            if (!credentials || !projectServerId) return;
             const data = await fetchWebhookEvents(credentials, {
-                projectId: id,
+                projectId: projectServerId,
                 limit: PAGE_SIZE,
                 offset: events.length,
             });
@@ -187,7 +199,7 @@ function WebhookEventsScreen() {
         } finally {
             setLoadingMore(false);
         }
-    }, [events.length, total, loadingMore]);
+    }, [events.length, total, loadingMore, project?.serverId, waitingForProject]);
 
     const hasMore = events.length < total;
 

@@ -13,9 +13,10 @@ import { KnowledgeEntryCard } from "./KnowledgeEntryCard";
 import { ProjectProfileCard } from "./ProjectProfileCard";
 import { ProjectKnowledgeConfigCard } from "./ProjectKnowledgeConfigCard";
 import { layout } from "@/components/layout";
+import { useProject } from "@/hooks/useProjects";
 
 interface ProjectKnowledgeTabProps {
-    projectServerId: string | undefined;
+    projectId: string;
     isActive: boolean;
 }
 
@@ -66,10 +67,12 @@ function categoryLabel(key: CategoryKey): string {
 const STALE_THRESHOLD_MS = 30_000;
 
 export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
-    ({ projectServerId, isActive }) => {
+    ({ projectId, isActive }) => {
         const { theme } = useUnistyles();
         const [activeFilter, setActiveFilter] = React.useState<FilterKey>("all");
         const [activeCategory, setActiveCategory] = React.useState<CategoryKey>("all");
+        const project = useProject(projectId);
+        const projectServerId = project?.serverId;
 
         const {
             entries,
@@ -90,7 +93,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             fetchLifecycle,
             runDecay,
             runMerge,
-        } = useProjectKnowledge(projectServerId);
+        } = useProjectKnowledge(projectServerId ?? undefined);
 
         const {
             config: knowledgeConfig,
@@ -98,7 +101,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             saving: configSaving,
             update: updateConfig,
             resetToDefaults: resetConfig,
-        } = useProjectKnowledgeConfig(projectServerId);
+        } = useProjectKnowledgeConfig(projectServerId ?? undefined);
 
         const decayEnabled = knowledgeConfig?.decayEnabled ?? false;
         const mergeEnabled = knowledgeConfig?.mergeEnabled ?? false;
@@ -172,10 +175,9 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
         const router = useRouter();
         const handleViewEvolution = React.useCallback(
             (entryId: string) => {
-                if (!projectServerId) return;
-                router.push(`/project/${projectServerId}/knowledge/${entryId}/evolution` as any);
+                router.push(`/project/${projectId}/knowledge/${entryId}/evolution` as any);
             },
-            [projectServerId, router],
+            [projectId, router],
         );
 
         const handleNavigateToSession = React.useCallback(
@@ -187,10 +189,9 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
 
         const handleNavigateToSourceEntry = React.useCallback(
             (entryId: string) => {
-                if (!projectServerId) return;
-                router.push(`/project/${projectServerId}/knowledge/${entryId}/evolution` as any);
+                router.push(`/project/${projectId}/knowledge/${entryId}/evolution` as any);
             },
-            [router, projectServerId],
+            [projectId, router],
         );
 
         const handleExtractSkill = React.useCallback(

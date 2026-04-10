@@ -16,6 +16,7 @@ import {
 import { t } from "@/text";
 import { useUnistyles } from "react-native-unistyles";
 import { Modal } from "@/modal";
+import { projectManager } from "@/sync/projectManager";
 import { useHappyAction } from "@/hooks/useHappyAction";
 
 type Props = {
@@ -320,6 +321,11 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
     const anomalyCount = (auditStats?.watchdogStopCount ?? 0) + (counts.failed ?? 0);
     const activeRunningCount = (counts.running ?? 0) + (counts.dispatching ?? 0);
 
+    const getLocalProjectId = React.useCallback((serverProjectId?: string) => {
+        if (!serverProjectId) return null;
+        return projectManager.getProjectByServerId(serverProjectId)?.id ?? null;
+    }, []);
+
     const triggerJobAction = (action: PendingJobAction) => {
         pendingActionRef.current = action;
         setActiveJobId(action?.jobId ?? null);
@@ -338,14 +344,24 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
         if (job.projectId && job.loopId) {
             buttons.push({
                 text: t("machine.automationOpenLoop"),
-                onPress: () => router.push(`/project/${job.projectId}/supervisor-loop/${job.loopId}` as any),
+                onPress: () => {
+                    const localProjectId = getLocalProjectId(job.projectId);
+                    if (localProjectId) {
+                        router.push(`/project/${localProjectId}/supervisor-loop/${job.loopId}` as any);
+                    }
+                },
             });
         }
 
         if (job.projectId) {
             buttons.push({
                 text: t("machine.automationOpenProject"),
-                onPress: () => router.push(`/project/${job.projectId}` as any),
+                onPress: () => {
+                    const localProjectId = getLocalProjectId(job.projectId);
+                    if (localProjectId) {
+                        router.push(`/project/${localProjectId}` as any);
+                    }
+                },
             });
         }
 
@@ -393,13 +409,23 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
 
         buttons.push({
             text: t("machine.automationOpenProject"),
-            onPress: () => router.push(`/project/${guardian.projectId}` as any),
+            onPress: () => {
+                const localProjectId = getLocalProjectId(guardian.projectId);
+                if (localProjectId) {
+                    router.push(`/project/${localProjectId}` as any);
+                }
+            },
         });
 
         if (guardian.loopId) {
             buttons.push({
                 text: t("machine.automationOpenLoop"),
-                onPress: () => router.push(`/project/${guardian.projectId}/supervisor-loop/${guardian.loopId}` as any),
+                onPress: () => {
+                    const localProjectId = getLocalProjectId(guardian.projectId);
+                    if (localProjectId) {
+                        router.push(`/project/${localProjectId}/supervisor-loop/${guardian.loopId}` as any);
+                    }
+                },
             });
         }
 

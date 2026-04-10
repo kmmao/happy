@@ -1,14 +1,16 @@
 import * as React from "react";
-import { View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { StyleSheet } from "react-native-unistyles";
 import { t } from "@/text";
 import { ProjectActionsTab } from "@/components/project/ProjectActionsTab";
 import { layout } from "@/components/layout";
+import { useProject } from "@/hooks/useProjects";
 
 function SupervisorActionsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const navigation = useNavigation();
+    const localProject = useProject(id);
 
     React.useLayoutEffect(() => {
         navigation.setOptions({
@@ -17,7 +19,15 @@ function SupervisorActionsScreen() {
     }, [navigation]);
 
     // Minimal project-like object — ProjectActionsTab uses project.serverId
-    const project = React.useMemo(() => ({ serverId: id }) as any, [id]);
+    const project = React.useMemo(() => ({ serverId: localProject?.serverId ?? null }) as any, [localProject?.serverId]);
+
+    if (id && !localProject?.serverId) {
+        return (
+            <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+                <ActivityIndicator />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>

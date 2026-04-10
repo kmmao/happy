@@ -186,7 +186,7 @@ export const ProjectDetailView = React.memo(
                                     : styles.tabHidden
                             }
                         >
-                            <ProjectKnowledgeTab projectServerId={project.serverId ?? undefined} isActive={activeTab === "knowledge"} />
+                            <ProjectKnowledgeTab projectId={project.id} isActive={activeTab === "knowledge"} />
                         </View>
                     )}
                     <View

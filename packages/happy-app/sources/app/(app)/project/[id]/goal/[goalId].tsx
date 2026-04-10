@@ -14,6 +14,7 @@ import { layout } from "@/components/layout";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchGoalDetail, type GoalDetail } from "@/sync/apiProjects";
 import { useGoalProgressSubscription } from "@/hooks/useGoalProgressSubscription";
+import { useProject } from "@/hooks/useProjects";
 import { t } from "@/text";
 import { buildGoalDetailSections, deriveGoalDetailScreenState } from "./goalDetailViewModel";
 import { buildGoalDetailRouteState } from "./goalDetailRouteSafety";
@@ -24,17 +25,23 @@ function isSafeId(value: string | undefined): value is string {
 
 function GoalDetailScreen() {
     const { id, goalId } = useLocalSearchParams<{ id: string; goalId: string }>();
-    const routeState = buildGoalDetailRouteState({ projectId: id, goalId });
+    const project = useProject(id);
+    const routeState = buildGoalDetailRouteState({ projectId: project?.serverId ?? undefined, goalId });
     const navigation = useNavigation();
     const router = useRouter();
     const [goal, setGoal] = React.useState<GoalDetail | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
 
+    const projectServerId = project?.serverId;
     const readyProjectId = routeState.kind === "ready" ? routeState.projectId : undefined;
     const readyGoalId = routeState.kind === "ready" ? routeState.goalId : undefined;
+    const waitingForProject = Boolean(id && !projectServerId);
 
     const loadGoal = React.useCallback(async () => {
+        if (waitingForProject) {
+            return;
+        }
         if (!readyProjectId || !readyGoalId) {
             setError(t("common.error"));
             setLoading(false);
@@ -55,7 +62,7 @@ function GoalDetailScreen() {
         } finally {
             setLoading(false);
         }
-    }, [readyGoalId, readyProjectId]);
+    }, [readyGoalId, readyProjectId, waitingForProject]);
 
     React.useEffect(() => {
         void loadGoal();
@@ -85,7 +92,7 @@ function GoalDetailScreen() {
     }, [loadGoal]);
 
     useGoalProgressSubscription({
-        isActive: true,
+        isActive: !waitingForProject,
         projectId: readyProjectId,
         goalId: readyGoalId,
         onPatch: handlePatch,

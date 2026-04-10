@@ -6,6 +6,7 @@ import { SidebarView } from "./SidebarView";
 import { useWindowDimensions } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 import { SidebarStateProvider, useSidebarState } from "./SidebarStateContext";
+import { getExpandedSidebarWidth } from "./sidebarDrawerWidth";
 
 const COLLAPSED_RAIL_WIDTH = 52;
 
@@ -19,7 +20,7 @@ const SidebarNavigatorInner = React.memo(() => {
 
     const expandedDrawerWidth = React.useMemo(() => {
         if (!showPermanentDrawer) return 280;
-        return Math.min(Math.max(Math.floor(windowWidth * 0.3), 250), 360);
+        return getExpandedSidebarWidth(windowWidth);
     }, [windowWidth, showPermanentDrawer]);
 
     const drawerNavigationOptions = React.useMemo(() => {

@@ -13,20 +13,27 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchSupervisorRun, type SupervisorRun } from "@/sync/apiSupervisor";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { layout } from "@/components/layout";
+import { useProject } from "@/hooks/useProjects";
 
 function ResearchReportScreen() {
     const { id, runId } = useLocalSearchParams<{ id: string; runId: string }>();
+    const project = useProject(id);
     const navigation = useNavigation();
     const { theme } = useUnistyles();
     const [run, setRun] = React.useState<SupervisorRun | null>(null);
     const [loading, setLoading] = React.useState(true);
+    const waitingForProject = Boolean(id && !project?.serverId);
 
     React.useEffect(() => {
         async function load() {
+            if (waitingForProject) {
+                return;
+            }
             try {
                 const credentials = await TokenStorage.getCredentials();
-                if (!credentials || !id || !runId) return;
-                const data = await fetchSupervisorRun(credentials, id, runId);
+                const projectServerId = project?.serverId;
+                if (!credentials || !projectServerId || !runId) return;
+                const data = await fetchSupervisorRun(credentials, projectServerId, runId);
                 setRun(data);
             } catch {
                 // silent
@@ -35,7 +42,7 @@ function ResearchReportScreen() {
             }
         }
         load();
-    }, [id, runId]);
+    }, [id, project?.serverId, runId, waitingForProject]);
 
     React.useLayoutEffect(() => {
         if (run?.reportTitle) {

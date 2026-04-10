@@ -15,6 +15,7 @@ import {
     type MachineAutomationJob,
 } from "@/sync/ops";
 import { useMachine } from "@/sync/storage";
+import { projectManager } from "@/sync/projectManager";
 import { t } from "@/text";
 import {
     type AuditFilter,
@@ -138,6 +139,11 @@ export default React.memo(function MachineAutomationPage() {
         initialGuardianFilterParam: typeof initialGuardianFilterParam === "string" ? initialGuardianFilterParam : undefined,
     });
 
+    const getLocalProjectId = React.useCallback((serverProjectId?: string) => {
+        if (!serverProjectId) return null;
+        return projectManager.getProjectByServerId(serverProjectId)?.id ?? null;
+    }, []);
+
     // ── Event handlers ──────────────────────────────────────────────────
 
     const handleJobPress = React.useCallback((job: MachineAutomationJob) => {
@@ -158,8 +164,9 @@ export default React.memo(function MachineAutomationPage() {
                         router.push(`/machine/${machineId}/loops?loopId=${job.loopId}` as any);
                         return;
                     }
-                    if (job.projectId) {
-                        router.push(`/project/${job.projectId}/supervisor-loop/${job.loopId}` as any);
+                    const localProjectId = getLocalProjectId(job.projectId);
+                    if (localProjectId) {
+                        router.push(`/project/${localProjectId}/supervisor-loop/${job.loopId}` as any);
                     }
                 },
             });
@@ -167,7 +174,12 @@ export default React.memo(function MachineAutomationPage() {
         if (job.projectId) {
             buttons.push({
                 text: t("machine.automationOpenProject"),
-                onPress: () => router.push(`/project/${job.projectId}` as any),
+                onPress: () => {
+                    const localProjectId = getLocalProjectId(job.projectId);
+                    if (localProjectId) {
+                        router.push(`/project/${localProjectId}` as any);
+                    }
+                },
             });
         }
         if (job.sessionId) {
@@ -198,7 +210,7 @@ export default React.memo(function MachineAutomationPage() {
         }
 
         Modal.alert(getJobTitle(job), getJobDetailMessage(job, relatedEvents), buttons);
-    }, [data.mutateAndReload, data.recentAuditEvents, data.stopJobSession, machineId, router]);
+    }, [data.mutateAndReload, data.recentAuditEvents, data.stopJobSession, getLocalProjectId, machineId, router]);
 
     const handleGuardianPress = React.useCallback((guardian: MachineAutomationGuardian) => {
         const usage = data.guardianUsage.find((entry) => entry.key === guardian.key);
@@ -209,7 +221,12 @@ export default React.memo(function MachineAutomationPage() {
         if (guardian.projectId) {
             buttons.push({
                 text: t("machine.automationOpenProject"),
-                onPress: () => router.push(`/project/${guardian.projectId}` as any),
+                onPress: () => {
+                    const localProjectId = getLocalProjectId(guardian.projectId);
+                    if (localProjectId) {
+                        router.push(`/project/${localProjectId}` as any);
+                    }
+                },
             });
         }
         if (guardian.loopId) {
@@ -220,8 +237,9 @@ export default React.memo(function MachineAutomationPage() {
                         router.push(`/machine/${machineId}/loops?loopId=${guardian.loopId}` as any);
                         return;
                     }
-                    if (guardian.projectId) {
-                        router.push(`/project/${guardian.projectId}/supervisor-loop/${guardian.loopId}` as any);
+                    const localProjectId = getLocalProjectId(guardian.projectId);
+                    if (localProjectId) {
+                        router.push(`/project/${localProjectId}/supervisor-loop/${guardian.loopId}` as any);
                     }
                 },
             });
@@ -253,7 +271,7 @@ export default React.memo(function MachineAutomationPage() {
             `${getGuardianDetailMessage(guardian, usage, relatedEvents)}\n${t("machine.automationStatusLabel")}: ${getGuardianStateLabel(guardian.attached, guardian.recovered)}`,
             buttons,
         );
-    }, [data.clearGuardians, data.guardianUsage, data.recentAuditEvents, machineId, router]);
+    }, [data.clearGuardians, data.guardianUsage, data.recentAuditEvents, getLocalProjectId, machineId, router]);
 
     const handleAuditEventPress = React.useCallback((event: MachineAutomationAuditEvent) => {
         const relatedJob = data.jobs.find((job) => job.id === event.jobId || job.dedupeKey === event.dedupeKey || (event.sessionId ? job.sessionId === event.sessionId : false));
@@ -274,8 +292,9 @@ export default React.memo(function MachineAutomationPage() {
                         router.push(`/machine/${machineId}/loops?loopId=${event.loopId}` as any);
                         return;
                     }
-                    if (event.projectId) {
-                        router.push(`/project/${event.projectId}/supervisor-loop/${event.loopId}` as any);
+                    const localProjectId = getLocalProjectId(event.projectId);
+                    if (localProjectId) {
+                        router.push(`/project/${localProjectId}/supervisor-loop/${event.loopId}` as any);
                     }
                 },
             });
@@ -283,7 +302,12 @@ export default React.memo(function MachineAutomationPage() {
         if (event.projectId) {
             buttons.push({
                 text: t("machine.automationOpenProject"),
-                onPress: () => router.push(`/project/${event.projectId}` as any),
+                onPress: () => {
+                    const localProjectId = getLocalProjectId(event.projectId);
+                    if (localProjectId) {
+                        router.push(`/project/${localProjectId}` as any);
+                    }
+                },
             });
         }
         if (relatedJob) {
@@ -293,7 +317,7 @@ export default React.memo(function MachineAutomationPage() {
             });
         }
         Modal.alert(getAuditEventTitle(event), getAuditEventDetailMessage(event), buttons);
-    }, [data.jobs, handleJobPress, machineId, router]);
+    }, [data.jobs, getLocalProjectId, handleJobPress, machineId, router]);
 
     // ── Render ──────────────────────────────────────────────────────────
 

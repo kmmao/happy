@@ -19,6 +19,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { ItemGroup } from "@/components/ItemGroup";
 import { layout } from "@/components/layout";
+import { useProject } from "@/hooks/useProjects";
 
 // --- Helpers ---
 
@@ -310,23 +311,29 @@ function SupervisorLoopDetailScreen() {
         id: string;
         loopId: string;
     }>();
+    const project = useProject(id);
     const navigation = useNavigation();
     const { theme } = useUnistyles();
 
     const [detail, setDetail] = React.useState<LoopDetail | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
+    const waitingForProject = Boolean(id && !project?.serverId);
 
     React.useEffect(() => {
         let cancelled = false;
 
         async function load() {
+            if (waitingForProject) {
+                return;
+            }
             try {
                 setLoading(true);
                 setError(null);
                 const credentials = await TokenStorage.getCredentials();
-                if (!credentials || cancelled) return;
-                const data = await fetchLoopDetail(credentials, id, loopId);
+                const projectServerId = project?.serverId;
+                if (!credentials || cancelled || !projectServerId) return;
+                const data = await fetchLoopDetail(credentials, projectServerId, loopId);
                 if (!cancelled) setDetail(data);
             } catch (err) {
                 if (!cancelled) {
@@ -341,7 +348,7 @@ function SupervisorLoopDetailScreen() {
 
         load();
         return () => { cancelled = true; };
-    }, [id, loopId]);
+    }, [id, project?.serverId, loopId, waitingForProject]);
 
     React.useLayoutEffect(() => {
         const title = detail

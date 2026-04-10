@@ -21,6 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { Modal } from "@/modal";
+import { useProject } from "@/hooks/useProjects";
 import {
     SEVERITY_COLORS,
     SEVERITY_KEY_MAP,
@@ -77,6 +78,7 @@ function SupervisorRunDetailScreen() {
         id: string;
         runId: string;
     }>();
+    const project = useProject(id);
     const navigation = useNavigation();
     const { theme } = useUnistyles();
 
@@ -85,15 +87,17 @@ function SupervisorRunDetailScreen() {
     );
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
+    const waitingForProject = Boolean(id && !project?.serverId);
 
     const [exporting, handleExport] = useHappyAction(
         React.useCallback(async () => {
             const credentials = await TokenStorage.getCredentials();
-            if (!credentials) return;
-            const result = await exportRunReport(credentials, id, runId);
+            const projectServerId = project?.serverId;
+            if (!credentials || !projectServerId) return;
+            const result = await exportRunReport(credentials, projectServerId, runId);
             await Clipboard.setStringAsync(result.content);
             Modal.toast(t("supervisor.exportCopied"));
-        }, [id, runId]),
+        }, [project?.serverId, runId]),
     );
 
     // Fetch comparison data
@@ -101,14 +105,18 @@ function SupervisorRunDetailScreen() {
         let cancelled = false;
 
         async function load() {
+            if (waitingForProject) {
+                return;
+            }
             try {
                 setLoading(true);
                 setError(null);
                 const credentials = await TokenStorage.getCredentials();
-                if (!credentials || cancelled) return;
+                const projectServerId = project?.serverId;
+                if (!credentials || cancelled || !projectServerId) return;
                 const data = await fetchRunComparison(
                     credentials,
-                    id,
+                    projectServerId,
                     runId,
                 );
                 if (!cancelled) {
@@ -133,7 +141,7 @@ function SupervisorRunDetailScreen() {
         return () => {
             cancelled = true;
         };
-    }, [id, runId]);
+    }, [id, project?.serverId, runId, waitingForProject]);
 
     // Set header title to run date
     React.useLayoutEffect(() => {

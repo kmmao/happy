@@ -330,7 +330,7 @@ export const ProjectHealthTab = React.memo(
                     onPress: () =>
                         router.push({
                             pathname: "/project/[id]/supervisor-loop/[loopId]",
-                            params: { id: serverId!, loopId: activeLoop.id },
+                            params: { id: project.id, loopId: activeLoop.id },
                         }),
                 };
             }
@@ -648,7 +648,7 @@ export const ProjectHealthTab = React.memo(
                             style={styles.quickActionCard}
                             onPress={() =>
                                 router.push(
-                                    `/project/${serverId}/supervisor-actions` as any,
+                                    `/project/${project.id}/supervisor-actions` as any,
                                 )
                             }
                         >
@@ -732,7 +732,7 @@ export const ProjectHealthTab = React.memo(
                             onPressLoop={activeLoop ? () =>
                                 router.push({
                                     pathname: "/project/[id]/supervisor-loop/[loopId]",
-                                    params: { id: serverId!, loopId: activeLoop.id },
+                                    params: { id: project.id, loopId: activeLoop.id },
                                 }) : undefined
                             }
                             onPressSettings={() =>
@@ -771,7 +771,7 @@ export const ProjectHealthTab = React.memo(
                         style={styles.settingsLink}
                         onPress={() =>
                             router.push(
-                                `/project/${project.serverId}/webhook-events` as any,
+                                `/project/${project.id}/webhook-events` as any,
                             )
                         }
                     >
@@ -828,7 +828,7 @@ export const ProjectHealthTab = React.memo(
                                 onPress={() =>
                                     router.push({
                                         pathname: "/project/[id]/supervisor-loop/[loopId]",
-                                        params: { id: serverId!, loopId: loop.id },
+                                        params: { id: project.id, loopId: loop.id },
                                     })
                                 }
                             />
@@ -871,7 +871,7 @@ export const ProjectHealthTab = React.memo(
                                                       pathname:
                                                           "/project/[id]/supervisor-run/[runId]",
                                                       params: {
-                                                          id: serverId,
+                                                          id: project.id,
                                                           runId: run.id,
                                                       },
                                                   })
@@ -884,7 +884,7 @@ export const ProjectHealthTab = React.memo(
                                     style={styles.showMoreRow}
                                     onPress={() =>
                                         router.push(
-                                            `/project/${serverId}/supervisor-actions` as any,
+                                            `/project/${project.id}/supervisor-actions` as any,
                                         )
                                     }
                                 >

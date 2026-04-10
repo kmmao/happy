@@ -9,9 +9,22 @@ import * as React from "react";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { useRouter } from "expo-router";
+import { projectManager } from "@/sync/projectManager";
 
 export function useNotificationNavigation() {
     const router = useRouter();
+
+    const navigateToSupervisorProject = React.useCallback((serverProjectId: string) => {
+        const localProjectId = projectManager.getProjectByServerId(serverProjectId)?.id;
+        if (!localProjectId) return;
+        router.push({
+            pathname: "/project/[id]",
+            params: {
+                id: localProjectId,
+                tab: "health",
+            },
+        });
+    }, [router]);
 
     React.useEffect(() => {
         // Handle notification taps while app is running
@@ -20,13 +33,7 @@ export function useNotificationNavigation() {
                 (response) => {
                     const data = response.notification.request.content.data;
                     if (data?.type === "supervisor" && data.projectId) {
-                        router.push({
-                            pathname: "/project/[id]",
-                            params: {
-                                id: data.projectId as string,
-                                tab: "health",
-                            },
-                        });
+                        navigateToSupervisorProject(data.projectId as string);
                     }
                 },
             );
@@ -42,13 +49,7 @@ export function useNotificationNavigation() {
                     if (data?.type === "supervisor" && data.projectId) {
                         // Small delay to let the navigation tree mount
                         setTimeout(() => {
-                            router.push({
-                                pathname: "/project/[id]",
-                                params: {
-                                    id: data.projectId as string,
-                                    tab: "health",
-                                },
-                            });
+                            navigateToSupervisorProject(data.projectId as string);
                         }, 500);
                     }
                 },
@@ -56,5 +57,5 @@ export function useNotificationNavigation() {
         }
 
         return () => subscription.remove();
-    }, [router]);
+    }, [navigateToSupervisorProject]);
 }
