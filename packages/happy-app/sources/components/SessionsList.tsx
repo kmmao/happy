@@ -48,6 +48,7 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { sessionDelete, machineSpawnNewSession } from "@/sync/ops";
 import { HappyError } from "@/utils/errors";
 import { Modal } from "@/modal";
+import { useAutoOptionSendEnabled } from "@/hooks/useAutoOptionSendEnabled";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { useIssueSessionBySessionId } from "@/sync/issueSessionStore";
 import {
@@ -200,6 +201,13 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   tagMainText: {
     color: theme.colors.success,
+    ...Typography.default("semiBold"),
+  },
+  autoSendBadge: {
+    backgroundColor: `${theme.colors.accentOrange}1F`,
+  },
+  autoSendBadgeText: {
+    color: theme.colors.accentOrange,
     ...Typography.default("semiBold"),
   },
   issueRow: {
@@ -569,6 +577,7 @@ const SessionItem = React.memo(
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const issueLink = useIssueSessionBySessionId(session.id);
+    const isAutoOptionSend = useAutoOptionSendEnabled(session.id);
 
     const [deletingSession, performDelete] = useHappyAction(async () => {
       const result = await sessionDelete(session.id);
@@ -832,6 +841,19 @@ const SessionItem = React.memo(
               <View style={styles.tag}>
                 <Text style={styles.tagText}>
                   {session.metadata.version}
+                </Text>
+              </View>
+            )}
+            {isAutoOptionSend && (
+              <View style={[styles.tag, styles.autoSendBadge]}>
+                <Ionicons
+                  name="sparkles"
+                  size={10}
+                  color={styles.autoSendBadgeText.color}
+                  style={{ marginRight: 2 }}
+                />
+                <Text style={[styles.tagText, styles.autoSendBadgeText]}>
+                  {t("session.autoOptionSendLabel")}
                 </Text>
               </View>
             )}

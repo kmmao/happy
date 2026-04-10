@@ -49,6 +49,7 @@ import {
   ISSUE_STATUS_COLORS,
   ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
+import { useAutoOptionSendEnabled } from "@/hooks/useAutoOptionSendEnabled";
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
   container: {
@@ -227,6 +228,13 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     fontWeight: "500",
     color: theme.colors.textSecondary,
     ...Typography.default(),
+  },
+  autoSendBadge: {
+    backgroundColor: `${theme.colors.accentOrange}1F`,
+  },
+  autoSendBadgeText: {
+    color: theme.colors.accentOrange,
+    ...Typography.default("semiBold"),
   },
   swipeActionsContainer: {
     flexDirection: "row",
@@ -561,6 +569,7 @@ const CompactSessionRow = React.memo(
     const issueLink = useIssueSessionBySessionId(session.id);
     const machine = useMachine(session.metadata?.machineId ?? "");
     const isTablet = useIsTablet();
+    const isAutoOptionSend = useAutoOptionSendEnabled(session.id);
     const swipeableRef = React.useRef<Swipeable | null>(null);
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
@@ -869,6 +878,20 @@ const CompactSessionRow = React.memo(
                   </View>
                 );
               })()}
+            {/* Auto-send indicator */}
+            {isAutoOptionSend && (
+              <View style={[styles.taskStatusContainer, styles.autoSendBadge]}>
+                <Ionicons
+                  name="sparkles"
+                  size={10}
+                  color={styles.autoSendBadgeText.color}
+                  style={{ marginRight: 2 }}
+                />
+                <Text style={[styles.taskStatusText, styles.autoSendBadgeText]}>
+                  {t("session.autoOptionSendLabel")}
+                </Text>
+              </View>
+            )}
           </View>
         </Pressable>
       </View>
