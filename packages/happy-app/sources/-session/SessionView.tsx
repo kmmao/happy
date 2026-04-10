@@ -972,7 +972,7 @@ function SessionViewInner({
 
   const autoOptionSendControl = React.useMemo(
     () => ({
-      visible: latestOptions.items.length >= 2,
+      visible: true,
       enabled: autoOptionSend.enabled,
       remainingMs:
         autoOptionSend.status === "armed" || autoOptionSend.status === "ready"
