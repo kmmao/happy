@@ -15,6 +15,7 @@ import {
     normalizeTaskStatusReport,
     shouldApplyTaskStatus,
 } from "@/modules/taskStatusLogic";
+import { worldSuggestionRefresh } from "@/modules/worldSuggestionGenerate";
 
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
 const TaskStatusSchema = z.enum(["queued", "dispatching", "running", "completed", "failed", "cancelled"]);
@@ -519,6 +520,9 @@ export function taskRoutes(app: Fastify) {
                     accountId: request.userId,
                 });
             }
+            if (updated.projectId) {
+                void worldSuggestionRefresh(request.userId, updated.projectId);
+            }
 
             log({ module: "task" }, `Task ${taskId} outcome → ${outcome} (status=${resolvedStatus})`);
             return reply.send({ task: serializeTask(updated) });
@@ -592,6 +596,9 @@ export function taskRoutes(app: Fastify) {
                     goalId: updated.goalId,
                     accountId: request.userId,
                 });
+            }
+            if (isTerminal && updated.projectId) {
+                void worldSuggestionRefresh(request.userId, updated.projectId);
             }
 
             log({ module: "task" }, `Task ${taskId} status → ${resolvedStatus}`);

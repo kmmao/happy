@@ -1010,6 +1010,7 @@ export const ja: TranslationStructure = {
     },
     noMachinesAvailable: "マシンなし",
     continue: "続行 — Claudeがターン制限に達しました",
+    requiresAction: "保留中の操作を確認",
   },
 
   machineLauncher: {
@@ -3855,6 +3856,7 @@ export const ja: TranslationStructure = {
     typeGoal: "Goal",
     typeTask: "Task",
     typeSkill: "Skill",
+    typeDecision: "Decision",
   },
   roles: {
     title: "ロール",

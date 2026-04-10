@@ -56,6 +56,7 @@ import { sessionEventRoutes } from "./routes/sessionEventRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
 import { startTaskStaleReaper, stopTaskStaleReaper } from "@/modules/taskStaleReaper";
+import { startDecisionExpiryScheduler, stopDecisionExpiryScheduler } from "@/modules/decisionExpiryScheduler";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -199,6 +200,12 @@ export async function startApi() {
   startTaskStaleReaper();
   onShutdown("task-reaper", async () => {
     stopTaskStaleReaper();
+  });
+
+  // Start decision expiry scheduler (turn pending into expired suggestions)
+  startDecisionExpiryScheduler();
+  onShutdown("decision-expiry", async () => {
+    stopDecisionExpiryScheduler();
   });
 
   // End

@@ -23,7 +23,8 @@ export const systemPrompt = trimIdent(`
     </options>
 
     Rules for <options>:
-    - ONLY use for post-task follow-up suggestions (e.g. "Run tests", "Deploy", "Review changes")
+    - ONLY use for post-task follow-up suggestions (e.g. "Run tests", "Deploy", "Open a PR")
+    - Exclude passive inspection-only actions like viewing diff or browsing logs when they do not lead to a concrete next action or decision; only include actions the user would likely execute next
     - For questions or decisions, use AskUserQuestion instead
     - Output at the very end of your response, not inside other text
     - Do not wrap in a codeblock

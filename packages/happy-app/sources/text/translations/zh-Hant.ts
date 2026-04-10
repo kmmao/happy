@@ -901,6 +901,7 @@ export const zhHant: TranslationStructure = {
     },
     noMachinesAvailable: "無裝置",
     continue: "繼續 — Claude 達到輪次上限",
+    requiresAction: "查看待處理操作",
   },
 
   machineLauncher: {
@@ -3790,6 +3791,7 @@ export const zhHant: TranslationStructure = {
     typeGoal: "Goal",
     typeTask: "Task",
     typeSkill: "Skill",
+    typeDecision: "Decision",
   },
   roles: {
     title: "角色",

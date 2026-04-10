@@ -11,7 +11,7 @@ export async function worldSuggestionDismiss(
     suggestionId: string,
 ): Promise<void> {
     const suggestion = await db.worldSuggestion.findFirst({
-        where: { id: suggestionId, accountId, projectId, status: "open" },
+        where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
         select: { id: true },
     });
     if (!suggestion) {

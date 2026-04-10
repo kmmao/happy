@@ -5,6 +5,7 @@
 import { db } from "@/storage/db";
 import { inboxCreate } from "./inboxCreate";
 import { log } from "@/utils/log";
+import { worldSuggestionRefresh } from "./worldSuggestionGenerate";
 
 export async function expireDecisions(): Promise<number> {
     const now = new Date();
@@ -41,6 +42,7 @@ export async function expireDecisions(): Promise<number> {
             refId: d.id,
             groupKey: `decision:${d.id}:expired`,
         });
+        void worldSuggestionRefresh(d.accountId, d.projectId);
     }
 
     log({ module: "decision" }, `Expired ${expiring.length} decisions`);

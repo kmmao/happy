@@ -76,3 +76,17 @@ CLI 侧已完成 SDK 选项映射（commit aff7302c），以下三个功能需�
 - [ ] （可选）配置 OPENAI_API_KEY / ANTHROPIC_API_KEY 作为云端备选
 - [ ] embedding backfill 脚本在真实数据上运行
 - [ ] 语义检索效果评估（积累真实数据后对比关键词匹配）
+
+## Auto-Option-Send 跨设备同步（2026-04-11 记录）
+
+当前 auto-send 开关存储在 `localSettings`（device-local MMKV），不跨设备同步。
+多设备同时开启同一会话的自动发送时，可能重复发送相同内容。
+
+### 问题
+1. **状态不同步**：设备 A 开了自动，设备 B 看不到
+2. **重复发送**：两台设备各自倒计时并独立调用 sendMessage，导致同一条消息发两遍
+
+### 方案思路
+- 将 `autoOptionSendSessions` 从 localSettings 迁移到 synced settings 或 Session 模型字段
+- 发送前检查最新消息是否已是相同文本（客户端去重）
+- 或使用 sendMessage 的 `localId` 幂等机制（需 server 配合）

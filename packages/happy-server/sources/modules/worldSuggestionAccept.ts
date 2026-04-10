@@ -11,6 +11,7 @@ import {
     buildTaskTriggerEphemeral,
 } from "@/app/events/eventRouter";
 import { SuggestionPayloadSchema } from "./worldSuggestionTypes";
+import { auth } from "@/app/auth/auth";
 
 interface AcceptInput {
     accountId: string;
@@ -23,7 +24,7 @@ interface AcceptInput {
 
 interface AcceptResult {
     suggestionId: string;
-    createdEntityType: "goal" | "task" | "skill";
+    createdEntityType: "goal" | "task" | "skill" | "decision";
     createdEntityId: string;
     machineId?: string;
 }
@@ -31,22 +32,14 @@ interface AcceptResult {
 export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptResult> {
     const { accountId, projectId, suggestionId, machineId, priorityOverride, roleOverride } = input;
 
-    // Resolve machineId early — needed for Goal/Task creation
-    const resolvedMachineId = machineId ?? await findActiveMachine(accountId, projectId);
-    if (!resolvedMachineId) {
-        throw new Error("No active machine found for this project. Please specify a machineId.");
-    }
-
     // Load project path for task dispatch
     const project = await db.project.findFirst({
         where: { id: projectId, accountId },
         select: { path: true },
     });
 
-    // For suggested_goal, goalCreate has its own transaction and dispatch logic
-    // so we handle it outside inTx to avoid nested transaction issues
     const suggestion = await db.worldSuggestion.findFirst({
-        where: { id: suggestionId, accountId, projectId, status: "open" },
+        where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
     });
     if (!suggestion) {
         throw new Error("Suggestion not found or already acted upon");
@@ -55,43 +48,86 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
     const payload = SuggestionPayloadSchema.parse(JSON.parse(suggestion.payload));
 
     if (suggestion.type === "suggested_goal" && payload.goal) {
-        // goalCreate manages its own transaction + planner dispatch
-        const result = await goalCreate({
-            accountId,
-            projectId,
-            machineId: resolvedMachineId,
-            title: payload.goal.title,
-            description: payload.goal.detail,
-            priority: priorityOverride ?? payload.goal.priority ?? "normal",
-            autoDecompose: true,
-        });
+        const resolvedMachineId = machineId ?? await findActiveMachine(accountId, projectId);
+        if (!resolvedMachineId) {
+            throw new Error("No active machine found for this project. Please specify a machineId.");
+        }
 
-        // Mark suggestion as accepted (separate from goalCreate tx)
-        await db.worldSuggestion.update({
-            where: { id: suggestionId },
-            data: { status: "accepted", actedAt: new Date() },
+        await inTx(async (tx) => {
+            const fresh = await tx.worldSuggestion.findFirst({
+                where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
+                select: { id: true },
+            });
+            if (!fresh) {
+                throw new Error("Suggestion not found or already acted upon");
+            }
+
+            await tx.worldSuggestion.update({
+                where: { id: suggestionId },
+                data: { status: "processing", actedAt: new Date() },
+            });
         });
 
         eventRouter.emitEphemeral({
             userId: accountId,
-            payload: buildWorldSuggestionUpdatedEphemeral({ projectId, suggestionId, status: "accepted" }),
+            payload: buildWorldSuggestionUpdatedEphemeral({ projectId, suggestionId, status: "processing" }),
             recipientFilter: { type: "user-scoped-only" },
         });
 
-        return {
-            suggestionId,
-            createdEntityType: "goal",
-            createdEntityId: result.id,
-            machineId: resolvedMachineId,
-        };
+        try {
+            const result = await goalCreate({
+                accountId,
+                projectId,
+                machineId: resolvedMachineId,
+                title: payload.goal.title,
+                description: payload.goal.detail,
+                priority: priorityOverride ?? payload.goal.priority ?? "normal",
+                autoDecompose: true,
+            });
+
+            await db.worldSuggestion.update({
+                where: { id: suggestionId },
+                data: { status: "accepted" },
+            });
+
+            eventRouter.emitEphemeral({
+                userId: accountId,
+                payload: buildWorldSuggestionUpdatedEphemeral({ projectId, suggestionId, status: "accepted" }),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+
+            return {
+                suggestionId,
+                createdEntityType: "goal" as const,
+                createdEntityId: result.id,
+                machineId: resolvedMachineId,
+            };
+        } catch (error) {
+            await db.worldSuggestion.update({
+                where: { id: suggestionId },
+                data: { status: "suspended" },
+            });
+
+            eventRouter.emitEphemeral({
+                userId: accountId,
+                payload: buildWorldSuggestionUpdatedEphemeral({ projectId, suggestionId, status: "suspended" }),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+            throw error;
+        }
     }
 
     if (suggestion.type === "suggested_task" && payload.task) {
+        const resolvedMachineId = machineId ?? await findActiveMachine(accountId, projectId);
+        if (!resolvedMachineId) {
+            throw new Error("No active machine found for this project. Please specify a machineId.");
+        }
+
         // Use inTx for task creation + suggestion status update atomicity
         const result = await inTx(async (tx) => {
             // Re-check status inside transaction to prevent TOCTOU
             const fresh = await tx.worldSuggestion.findFirst({
-                where: { id: suggestionId, accountId, projectId, status: "open" },
+                where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
                 select: { id: true },
             });
             if (!fresh) {
@@ -119,19 +155,34 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 data: { status: "accepted", actedAt: new Date() },
             });
 
-            // Dispatch task to CLI after transaction commits
+            // Dispatch task to CLI after transaction commits.
             afterTx(tx, () => {
-                eventRouter.emitEphemeral({
-                    userId: accountId,
-                    payload: buildTaskTriggerEphemeral({
-                        taskId: task.id,
-                        prompt: payload.task!.prompt,
-                        directory: project?.path ?? "",
-                        priority: task.priority,
-                        projectId,
-                    }),
-                    recipientFilter: { type: "machine-scoped-only", machineId: resolvedMachineId },
-                });
+                void (async () => {
+                    try {
+                        const resultToken = await auth.createTaskResultToken({
+                            userId: accountId,
+                            taskId: task.id,
+                        });
+                        eventRouter.emitEphemeral({
+                            userId: accountId,
+                            payload: buildTaskTriggerEphemeral({
+                                taskId: task.id,
+                                prompt: payload.task!.prompt,
+                                directory: project?.path ?? "",
+                                priority: task.priority,
+                                projectId,
+                                resultToken,
+                            }),
+                            recipientFilter: { type: "machine-scoped-only", machineId: resolvedMachineId },
+                        });
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Unknown dispatch error";
+                        await db.task.update({
+                            where: { id: task.id },
+                            data: { status: "failed", errorMessage: `Task dispatch failed: ${message}` },
+                        });
+                    }
+                })();
 
                 eventRouter.emitEphemeral({
                     userId: accountId,
@@ -154,7 +205,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
     if (suggestion.type === "suggested_skill" && payload.skill) {
         const result = await inTx(async (tx) => {
             const fresh = await tx.worldSuggestion.findFirst({
-                where: { id: suggestionId, accountId, projectId, status: "open" },
+                where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
                 select: { id: true },
             });
             if (!fresh) {
@@ -188,7 +239,59 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 suggestionId,
                 createdEntityType: "skill" as const,
                 createdEntityId: skill.id,
-                machineId: resolvedMachineId,
+            };
+        });
+
+        return result;
+    }
+
+    if (suggestion.type === "suggested_decision" && payload.decision) {
+        const decisionPayload = payload.decision;
+        const result = await inTx(async (tx) => {
+            const fresh = await tx.worldSuggestion.findFirst({
+                where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
+                select: { id: true },
+            });
+            if (!fresh) {
+                throw new Error("Suggestion not found or already acted upon");
+            }
+
+            const decisionId = decisionPayload.existingDecisionId
+                ? await reopenExistingDecision(tx, {
+                    accountId,
+                    projectId,
+                    decisionId: decisionPayload.existingDecisionId,
+                })
+                : (await tx.decision.create({
+                    data: {
+                        accountId,
+                        projectId,
+                        question: decisionPayload.question,
+                        options: JSON.stringify(decisionPayload.options),
+                        context: decisionPayload.context ?? null,
+                        precedentKey: decisionPayload.precedentKey ?? null,
+                        goalId: decisionPayload.goalId ?? suggestion.relatedGoalId ?? null,
+                        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                    },
+                })).id;
+
+            await tx.worldSuggestion.update({
+                where: { id: suggestionId },
+                data: { status: "accepted", actedAt: new Date() },
+            });
+
+            afterTx(tx, () => {
+                eventRouter.emitEphemeral({
+                    userId: accountId,
+                    payload: buildWorldSuggestionUpdatedEphemeral({ projectId, suggestionId, status: "accepted" }),
+                    recipientFilter: { type: "user-scoped-only" },
+                });
+            });
+
+            return {
+                suggestionId,
+                createdEntityType: "decision" as const,
+                createdEntityId: decisionId,
             };
         });
 
@@ -196,6 +299,35 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
     }
 
     throw new Error(`Invalid suggestion type or missing payload for type: ${suggestion.type}`);
+}
+
+async function reopenExistingDecision(tx: { decision: { findFirst: typeof db.decision.findFirst; update: typeof db.decision.update } }, input: {
+    accountId: string;
+    projectId: string;
+    decisionId: string;
+}): Promise<string> {
+    const decision = await tx.decision.findFirst({
+        where: {
+            id: input.decisionId,
+            accountId: input.accountId,
+            projectId: input.projectId,
+            status: { in: ["pending", "expired"] },
+        },
+        select: { id: true, status: true },
+    });
+    if (!decision) {
+        throw new Error("Decision not found or no longer pending");
+    }
+    if (decision.status === "expired") {
+        await tx.decision.update({
+            where: { id: decision.id },
+            data: {
+                status: "pending",
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            },
+        });
+    }
+    return decision.id;
 }
 
 async function findActiveMachine(accountId: string, projectId: string): Promise<string | null> {

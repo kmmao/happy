@@ -122,6 +122,8 @@ export interface AgentInputProps {
     onPromptSuggestionPress?: (text: string) => void;
     needsContinue?: boolean;
     onContinuePress?: () => void;
+    requiresAction?: boolean;
+    onRequiresActionPress?: () => void;
     totalDurationMs?: number;
     completedTurnsDurationMs?: number;
     isThinking?: boolean;

@@ -51,6 +51,31 @@ export function buildOptionsHash(items: string[]): string {
   return JSON.stringify(items);
 }
 
+function normalizeOptionText(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export const PURE_VIEW_ONLY_OPTION_PATTERNS = [
+  "查看 diff",
+  "看日志",
+  "浏览输出",
+] as const;
+
+const PURE_VIEW_ONLY_OPTION_SET = new Set(
+  PURE_VIEW_ONLY_OPTION_PATTERNS.map(normalizeOptionText),
+);
+
+function isPureViewOnlyOption(text: string): boolean {
+  return PURE_VIEW_ONLY_OPTION_SET.has(normalizeOptionText(text));
+}
+
+export function getRecommendedOptionIndex(items: string[]): number | null {
+  if (items.length < 2) return null;
+  const first = items[0]?.trim();
+  if (!first) return null;
+  return isPureViewOnlyOption(first) ? null : 0;
+}
+
 function buildAutoSentKey(candidate: AutoOptionCandidate): string {
   return `${candidate.sourceMessageId ?? "none"}:${candidate.optionsHash}:${candidate.recommendedText}`;
 }
@@ -103,7 +128,7 @@ export function buildAutoOptionCandidate(
 ): AutoOptionCandidate | null {
   const snapshot = context.snapshot;
   if (!snapshot) return null;
-  if (snapshot.recommendedIndex !== 0) return null;
+  if (getRecommendedOptionIndex(snapshot.items) !== 0) return null;
   const recommendedText = snapshot.items[0]?.trim();
   if (!recommendedText) return null;
 
@@ -124,8 +149,7 @@ function canArm(context: AutoOptionSendContext): boolean {
   if (context.inputText.trim().length > 0) return false;
   if (context.hasPendingImages) return false;
   if (context.isSttListening) return false;
-  if (context.snapshot.items.length < 2) return false;
-  return context.snapshot.recommendedIndex === 0;
+  return getRecommendedOptionIndex(context.snapshot.items) === 0;
 }
 
 function canFire(
@@ -140,7 +164,7 @@ function canFire(
   if (context.inputText.trim().length > 0) return false;
   if (context.hasPendingImages) return false;
   if (context.isSttListening) return false;
-  if (context.snapshot.recommendedIndex !== 0) return false;
+  if (getRecommendedOptionIndex(context.snapshot.items) !== 0) return false;
 
   const currentText = context.snapshot.items[0]?.trim() ?? "";
   if (!currentText) return false;

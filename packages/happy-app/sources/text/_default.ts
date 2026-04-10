@@ -920,6 +920,7 @@ export const en = {
     },
     noMachinesAvailable: "No machines",
     continue: "Continue — Claude hit the turn limit",
+    requiresAction: "Review pending action",
   },
 
   machineLauncher: {
@@ -3940,6 +3941,7 @@ export const en = {
     typeGoal: "Goal",
     typeTask: "Task",
     typeSkill: "Skill",
+    typeDecision: "Decision",
   },
   roles: {
     title: "Roles",

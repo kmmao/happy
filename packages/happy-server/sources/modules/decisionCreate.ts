@@ -5,6 +5,7 @@
 
 import { db } from "@/storage/db";
 import { inboxCreate } from "./inboxCreate";
+import { worldSuggestionRefresh } from "./worldSuggestionGenerate";
 
 interface DecisionCreateInput {
     accountId: string;
@@ -13,6 +14,7 @@ interface DecisionCreateInput {
     options: string;        // JSON array: [{id, description, pros, cons}]
     context?: string;
     precedentKey?: string;
+    goalId?: string;
     agentRole?: string;
     sessionId?: string;
     loopId?: string;
@@ -29,6 +31,7 @@ export async function decisionCreate(input: DecisionCreateInput): Promise<{ id: 
             options: input.options,
             context: input.context ?? null,
             precedentKey: input.precedentKey ?? null,
+            goalId: input.goalId ?? null,
             agentRole: input.agentRole ?? null,
             sessionId: input.sessionId ?? null,
             loopId: input.loopId ?? null,
@@ -49,6 +52,7 @@ export async function decisionCreate(input: DecisionCreateInput): Promise<{ id: 
         refId: decision.id,
         groupKey: `decision:${decision.id}:created`,
     });
+    void worldSuggestionRefresh(input.accountId, input.projectId);
 
     return { id: decision.id };
 }

@@ -1021,6 +1021,7 @@ export const it: TranslationStructure = {
     },
     noMachinesAvailable: "Nessuna macchina",
     continue: "Continua — Claude ha raggiunto il limite di turni",
+    requiresAction: "Rivedi l'azione in sospeso",
   },
 
   machineLauncher: {
@@ -3877,6 +3878,7 @@ export const it: TranslationStructure = {
     typeGoal: "Goal",
     typeTask: "Task",
     typeSkill: "Skill",
+    typeDecision: "Decision",
   },
   roles: {
     title: "Roles",

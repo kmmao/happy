@@ -101,6 +101,7 @@ import { useUnistyles } from "react-native-unistyles";
 import { Message } from "@/sync/typesMessage";
 import {
   buildOptionsHash,
+  getRecommendedOptionIndex,
   type SessionFollowUpOptionsSnapshot,
 } from "./autoOptionSend";
 import { autoOptionSendService } from "@/sync/autoOptionSendService";
@@ -693,7 +694,7 @@ function SessionViewInner({
       sourceType: "markdown-options",
       sourceMessageId: latestOptions.sourceMessageId,
       items: [...latestOptions.items],
-      recommendedIndex: 0,
+      recommendedIndex: getRecommendedOptionIndex(latestOptions.items),
       optionsHash: buildOptionsHash(latestOptions.items),
     };
   }, [latestOptions]);
@@ -810,6 +811,7 @@ function SessionViewInner({
     hasMessages: messages.length > 0,
     promptSuggestion,
     needsContinue,
+    requiresAction: session.sdkSessionState === "requires_action",
     isSttListening: false,
     hasPendingImages: pendingImagePaths.length > 0,
   });
@@ -945,6 +947,11 @@ function SessionViewInner({
   };
 
   const handleScrollDown = React.useCallback(() => {
+    chatListRef.current?.scrollToBottom();
+    setScrollAnchor(-1);
+  }, []);
+
+  const handleRequiresActionPress = React.useCallback(() => {
     chatListRef.current?.scrollToBottom();
     setScrollAnchor(-1);
   }, []);
@@ -1247,6 +1254,8 @@ function SessionViewInner({
         onContinuePress={() => {
           sync.sendMessage(sessionId, "", undefined, { continue: true });
         }}
+        requiresAction={session.sdkSessionState === "requires_action"}
+        onRequiresActionPress={handleRequiresActionPress}
         totalDurationMs={usageSource?.totalDurationMs}
         completedTurnsDurationMs={usageSource?.completedTurnsDurationMs}
         isThinking={session.thinking === true}
@@ -1378,7 +1387,7 @@ function SessionViewInner({
                 })
               : t("session.autoOptionSendTitle")
           }
-          recommendedIndex={latestOptions.items.length >= 2 ? 0 : null}
+          recommendedIndex={getRecommendedOptionIndex(latestOptions.items)}
           recommendedRemainingMs={autoOptionSendControl.remainingMs}
         />
         <OptionsPopover

@@ -17,7 +17,7 @@ export async function worldSuggestionQuery(
         where: {
             accountId,
             projectId,
-            status,
+            status: status === "open" ? { in: ["open", "suspended"] } : status,
         },
         orderBy: { createdAt: "desc" },
         take: limit,

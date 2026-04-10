@@ -1178,7 +1178,7 @@ model WorldSuggestion {
     recommendedRole String?
     payload         String    @default("{}")   // JSON: accept 时创建所需参数
     requiresHuman   Boolean   @default(true)
-    status          String    @default("open") // open | accepted | dismissed
+    status          String    @default("open") // open | processing | accepted | suspended | dismissed | expired
     dedupeKey       String
     actedAt         DateTime?
     createdAt       DateTime  @default(now())

@@ -28,6 +28,14 @@ import {
 } from "@/sync/apiWorld";
 import type { AcceptSuggestionResult } from "@/sync/apiWorld";
 import { SuggestionCard } from "./SuggestionCard";
+import {
+    applySuggestionStatusUpdate,
+    getSuggestionTypeLabelKey,
+    mergeFetchedSuggestions,
+    removeSuggestionOptimistically,
+    restoreSuggestionAtIndex,
+    shouldRefetchSuggestions,
+} from "./worldSuggestionViewModel";
 
 interface WorldOverviewTabProps {
     project: Project;
@@ -43,6 +51,8 @@ export const WorldOverviewTab = React.memo(
         const [loading, setLoading] = React.useState(false);
         const [refreshing, setRefreshing] = React.useState(false);
         const [suggestionsRefreshing, setSuggestionsRefreshing] = React.useState(false);
+        const hiddenSuggestionIdsRef = React.useRef<Set<string>>(new Set());
+        const suggestionReloadSeqRef = React.useRef(0);
 
         const loadData = React.useCallback(async (isRefresh = false) => {
             if (!project.serverId) return;
@@ -56,7 +66,7 @@ export const WorldOverviewTab = React.memo(
                     fetchSuggestions(credentials, project.serverId),
                 ]);
                 setData(dashboard);
-                setSuggestions(suggestionsData);
+                setSuggestions(mergeFetchedSuggestions(suggestionsData, hiddenSuggestionIdsRef.current));
             } catch {
                 // best effort
             } finally {
@@ -73,16 +83,33 @@ export const WorldOverviewTab = React.memo(
 
         // Subscribe to ephemeral suggestion updates
         React.useEffect(() => {
-            if (!isActive || !project.serverId) return;
+            const projectServerId = project.serverId;
+            if (!isActive || !projectServerId) return;
 
-            return sync.onWorldSuggestionUpdated((event) => {
-                if (event.projectId !== project.serverId) return;
-                if (event.status === "accepted" || event.status === "dismissed") {
-                    setSuggestions((prev) =>
-                        prev.filter((s) => s.id !== event.suggestionId),
-                    );
+            let isDisposed = false;
+            const unsubscribe = sync.onWorldSuggestionUpdated((event) => {
+                if (event.projectId !== projectServerId) return;
+
+                if (shouldRefetchSuggestions(event)) {
+                    const reloadSeq = ++suggestionReloadSeqRef.current;
+                    void (async () => {
+                        const credentials = await TokenStorage.getCredentials();
+                        if (!credentials || isDisposed) return;
+                        const updated = await fetchSuggestions(credentials, projectServerId);
+                        if (isDisposed || reloadSeq !== suggestionReloadSeqRef.current) return;
+                        setSuggestions(mergeFetchedSuggestions(updated, hiddenSuggestionIdsRef.current));
+                    })();
+                    return;
                 }
+
+                hiddenSuggestionIdsRef.current.add(event.suggestionId);
+                setSuggestions((prev) => applySuggestionStatusUpdate(prev, event));
             });
+
+            return () => {
+                isDisposed = true;
+                unsubscribe();
+            };
         }, [isActive, project.serverId]);
 
         const handleRefreshSuggestions = React.useCallback(async () => {
@@ -93,7 +120,7 @@ export const WorldOverviewTab = React.memo(
                 if (!credentials) return;
                 await refreshSuggestions(credentials, project.serverId);
                 const updated = await fetchSuggestions(credentials, project.serverId);
-                setSuggestions(updated);
+                setSuggestions(mergeFetchedSuggestions(updated, hiddenSuggestionIdsRef.current));
             } catch {
                 // best effort
             } finally {
@@ -104,23 +131,24 @@ export const WorldOverviewTab = React.memo(
         const handleAccept = React.useCallback(async (suggestion: SuggestionSummary) => {
             if (!project.serverId) return;
 
-            const typeLabel = suggestion.type === "suggested_goal"
-                ? t("suggestions.typeGoal")
-                : suggestion.type === "suggested_skill"
-                    ? t("suggestions.typeSkill")
-                    : t("suggestions.typeTask");
+            const typeLabel = t(getSuggestionTypeLabelKey(suggestion.type));
             const payloadTitle = suggestion.payload.goal?.title
                 ?? suggestion.payload.task?.title
                 ?? suggestion.payload.skill?.title
+                ?? suggestion.payload.decision?.question
                 ?? suggestion.title;
 
             const confirmed = await Modal.confirm(
                 t("suggestions.acceptConfirmTitle"),
                 t("suggestions.acceptConfirmBody", { type: typeLabel, title: payloadTitle }),
             );
-            if (!confirmed) return;
+            if (!confirmed) {
+                return;
+            }
 
-            setSuggestions((prev) => prev.filter((s) => s.id !== suggestion.id));
+            hiddenSuggestionIdsRef.current.add(suggestion.id);
+            const { removedIndex } = removeSuggestionOptimistically(suggestions, suggestion.id);
+            setSuggestions((prev) => removeSuggestionOptimistically(prev, suggestion.id).suggestions);
 
             try {
                 const credentials = await TokenStorage.getCredentials();
@@ -136,18 +164,24 @@ export const WorldOverviewTab = React.memo(
                     router.push(`/skills/${result.createdEntityId}/edit` as any);
                     return;
                 }
+                if (result.createdEntityType === "decision") {
+                    router.push(`/decision/${result.createdEntityId}` as any);
+                    return;
+                }
                 router.push(`/machine/${result.machineId ?? project.key.machineId}/task/${result.createdEntityId}` as any);
             } catch (e: any) {
-                setSuggestions((prev) => [...prev, suggestion]);
+                hiddenSuggestionIdsRef.current.delete(suggestion.id);
+                setSuggestions((prev) => restoreSuggestionAtIndex(prev, suggestion, removedIndex));
                 Modal.toast(e.message ?? t("common.error"));
             }
-        }, [project.key.machineId, project.serverId, router]);
+        }, [project.id, project.key.machineId, project.serverId, router, suggestions]);
 
         const handleDismiss = React.useCallback(async (suggestion: SuggestionSummary) => {
             if (!project.serverId) return;
 
-            // Optimistic remove
-            setSuggestions((prev) => prev.filter((s) => s.id !== suggestion.id));
+            hiddenSuggestionIdsRef.current.add(suggestion.id);
+            const { removedIndex } = removeSuggestionOptimistically(suggestions, suggestion.id);
+            setSuggestions((prev) => removeSuggestionOptimistically(prev, suggestion.id).suggestions);
 
             try {
                 const credentials = await TokenStorage.getCredentials();
@@ -155,10 +189,10 @@ export const WorldOverviewTab = React.memo(
                 await dismissSuggestion(credentials, project.serverId, suggestion.id);
                 Modal.toast(t("suggestions.dismissed"));
             } catch {
-                // Rollback on failure
-                setSuggestions((prev) => [...prev, suggestion]);
+                hiddenSuggestionIdsRef.current.delete(suggestion.id);
+                setSuggestions((prev) => restoreSuggestionAtIndex(prev, suggestion, removedIndex));
             }
-        }, [project.serverId]);
+        }, [project.serverId, suggestions]);
 
         if (loading && !data) {
             return (

@@ -3,9 +3,9 @@
  */
 
 import { db } from "@/storage/db";
-import { inboxCreate } from "./inboxCreate";
 import { lawSuggestionApply } from "./lawSuggestionApply";
 import { log } from "@/utils/log";
+import { worldSuggestionRefresh } from "./worldSuggestionGenerate";
 
 interface AdjudicateInput {
     decisionId: string;
@@ -32,11 +32,15 @@ export async function decisionAdjudicate(input: AdjudicateInput): Promise<Adjudi
     try {
         const options = JSON.parse(decision.options) as Array<{ id: string; description: string }>;
         const chosen = options.find((o) => o.id === input.chosenOption);
-        if (chosen) {
-            chosenDesc = chosen.description;
+        if (!chosen) {
+            throw new Error("Invalid decision option");
         }
-    } catch {
-        // best effort
+        chosenDesc = chosen.description;
+    } catch (error) {
+        if (error instanceof Error && error.message === "Invalid decision option") {
+            throw error;
+        }
+        throw new Error("Decision options are invalid");
     }
 
     // Build precedent content
@@ -96,6 +100,8 @@ export async function decisionAdjudicate(input: AdjudicateInput): Promise<Adjudi
     });
 
     log({ module: "decision" }, `Decision ${decision.id} adjudicated → option "${input.chosenOption}", precedent ${knowledge.id}`);
+
+    void worldSuggestionRefresh(input.accountId, decision.projectId);
 
     // Post-adjudication: handle law_suggestion approval
     void handleLawSuggestionIfApproved(decision.id, decision.projectId, input.accountId, input.chosenOption);

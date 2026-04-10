@@ -21,7 +21,7 @@ export function worldSuggestionRoutes(app: Fastify) {
             schema: {
                 params: z.object({ id: z.string() }),
                 querystring: z.object({
-                    status: z.enum(["open", "accepted", "dismissed"]).default("open"),
+                    status: z.enum(["open", "processing", "accepted", "suspended", "dismissed", "expired"]).default("open"),
                     limit: z.coerce.number().int().min(1).max(100).default(50),
                 }),
             },

@@ -945,6 +945,7 @@ export const ru: TranslationStructure = {
     },
     noMachinesAvailable: "Нет машин",
     continue: "Продолжить — Claude достиг лимита ходов",
+    requiresAction: "Проверить ожидающее действие",
   },
 
   machineLauncher: {
@@ -3897,6 +3898,7 @@ export const ru: TranslationStructure = {
     typeGoal: "Goal",
     typeTask: "Task",
     typeSkill: "Skill",
+    typeDecision: "Decision",
   },
   roles: {
     title: "Roles",

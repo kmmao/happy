@@ -125,6 +125,14 @@ export interface SuggestionPayload {
     goal?: { title: string; detail?: string; priority?: string };
     task?: { title: string; prompt: string; roleType?: string; goalId?: string; priority?: string };
     skill?: { title: string; content: string; sourceTaskId?: string };
+    decision?: {
+        question: string;
+        context?: string;
+        goalId?: string;
+        existingDecisionId?: string;
+        precedentKey?: string;
+        options: Array<{ id: string; description: string; pros?: string; cons?: string }>;
+    };
 }
 
 export interface SuggestionSummary {
@@ -181,7 +189,7 @@ export async function refreshSuggestions(
 
 export interface AcceptSuggestionResult {
     suggestionId: string;
-    createdEntityType: "goal" | "task" | "skill";
+    createdEntityType: "goal" | "task" | "skill" | "decision";
     createdEntityId: string;
     machineId?: string;
 }

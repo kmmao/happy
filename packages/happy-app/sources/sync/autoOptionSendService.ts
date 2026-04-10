@@ -7,6 +7,7 @@ import {
     type SessionFollowUpOptionsSnapshot,
     buildOptionsHash,
     createInitialAutoOptionSendState,
+    getRecommendedOptionIndex,
     reduceAutoOptionSendEvent,
 } from "@/-session/autoOptionSend";
 import { type Message } from "@/sync/typesMessage";
@@ -43,7 +44,7 @@ function buildSnapshotFromMessages(
             sourceType: "markdown-options",
             sourceMessageId: result.sourceMessageId,
             items: result.items,
-            recommendedIndex: 0,
+            recommendedIndex: getRecommendedOptionIndex(result.items),
             optionsHash: buildOptionsHash(result.items),
         },
         isFresh,

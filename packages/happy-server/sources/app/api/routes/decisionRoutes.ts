@@ -4,6 +4,7 @@ import { z } from "zod";
 import { decisionCreate } from "@/modules/decisionCreate";
 import { decisionAdjudicate } from "@/modules/decisionAdjudicate";
 import { matchPrecedent } from "@/modules/decisionMatch";
+import { log } from "@/utils/log";
 
 const OptionSchema = z.object({
     id: z.string(),
@@ -176,7 +177,18 @@ export function decisionRoutes(app: Fastify) {
                 });
                 return reply.send(result);
             } catch (e: any) {
-                return reply.code(404).send({ error: e.message ?? "Decision not found or already resolved" });
+                const message = e?.message ?? "Decision not found or already resolved";
+                if (message === "Invalid decision option") {
+                    return reply.code(400).send({ error: message });
+                }
+                if (message === "Decision options are invalid") {
+                    return reply.code(500).send({ error: message });
+                }
+                if (message === "Decision not found or already resolved") {
+                    return reply.code(404).send({ error: message });
+                }
+                log({ module: "decision", level: "error" }, `Failed to adjudicate decision ${request.params.decisionId}: ${message}`);
+                return reply.code(500).send({ error: "Internal server error" });
             }
         },
     );

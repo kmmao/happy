@@ -3,6 +3,8 @@ import {
   buildAutoOptionCandidate,
   buildOptionsHash,
   createInitialAutoOptionSendState,
+  getRecommendedOptionIndex,
+  PURE_VIEW_ONLY_OPTION_PATTERNS,
   reduceAutoOptionSendEvent,
   type AutoOptionSendContext,
 } from "./autoOptionSend";
@@ -71,11 +73,47 @@ describe("autoOptionSend", () => {
     expect(next.candidate?.recommendedText).toBe("继续修 token");
   });
 
+  it("纯查看型词表可配置且驱动推荐判定", () => {
+    expect(PURE_VIEW_ONLY_OPTION_PATTERNS).toEqual([
+      "查看 diff",
+      "看日志",
+      "浏览输出",
+    ]);
+    expect(getRecommendedOptionIndex([PURE_VIEW_ONLY_OPTION_PATTERNS[0], "继续修 token"])).toBeNull();
+    expect(getRecommendedOptionIndex([PURE_VIEW_ONLY_OPTION_PATTERNS[1], "继续排查"])).toBeNull();
+    expect(getRecommendedOptionIndex([PURE_VIEW_ONLY_OPTION_PATTERNS[2], "整理结论"])).toBeNull();
+  });
+
+  it("复合动作首项不会被误伤", () => {
+    expect(getRecommendedOptionIndex(["查看 diff 并修复回归", "整理检查清单"])).toBe(0);
+    expect(getRecommendedOptionIndex(["看日志后继续定位", "总结原因"])).toBe(0);
+  });
+
   it("没有 options 时打开开关会进入待命状态", () => {
     const next = reduceAutoOptionSendEvent(
       createInitialAutoOptionSendState(),
       { type: "toggle", enabled: true },
       createContext({ snapshot: null }),
+    );
+
+    expect(next.enabled).toBe(true);
+    expect(next.status).toBe("idle");
+    expect(next.candidate).toBeNull();
+  });
+
+  it("纯查看型首项时打开开关会保持 idle，不进入 armed", () => {
+    const next = reduceAutoOptionSendEvent(
+      createInitialAutoOptionSendState(),
+      { type: "toggle", enabled: true },
+      createContext({
+        snapshot: {
+          sourceType: "markdown-options",
+          sourceMessageId: "msg-1",
+          items: ["查看 diff", "继续修 token"],
+          recommendedIndex: 0,
+          optionsHash: buildOptionsHash(["查看 diff", "继续修 token"]),
+        },
+      }),
     );
 
     expect(next.enabled).toBe(true);

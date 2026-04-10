@@ -1294,6 +1294,57 @@ export const AgentInput = React.memo(
                 </Pressable>
               )}
 
+            {/* Requires-action chip — surfaces generic SDK user action state */}
+            {props.requiresAction &&
+              props.onRequiresActionPress &&
+              !props.promptSuggestion &&
+              !props.needsContinue && (
+                <Pressable
+                  onPress={() => {
+                    hapticsLight();
+                    props.onRequiresActionPress?.();
+                  }}
+                  style={({ pressed }) => ({
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginHorizontal: 8,
+                    marginTop: 8,
+                    marginBottom: 4,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    backgroundColor: pressed
+                      ? theme.colors.surfacePressed
+                      : `${theme.colors.accentOrange}10`,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: `${theme.colors.accentOrange}30`,
+                    gap: 8,
+                  })}
+                >
+                  <Ionicons
+                    name="alert-circle-outline"
+                    size={14}
+                    color={theme.colors.accentOrange}
+                  />
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      color: theme.colors.text,
+                      ...Typography.default(),
+                    }}
+                    numberOfLines={1}
+                  >
+                    {t("agentInput.requiresAction")}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={18}
+                    color={theme.colors.accentOrange}
+                  />
+                </Pressable>
+              )}
+
             {/* Prompt suggestion chip */}
             {props.promptSuggestion && props.onPromptSuggestionPress && (
               <Pressable

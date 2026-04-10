@@ -1,5 +1,9 @@
 import * as React from "react";
 import { storage } from "@/sync/storage";
+import {
+  didPendingActionAppear,
+  getHasPendingAction,
+} from "./useCollapsibleInputHelpers";
 
 interface UseCollapsibleInputOptions {
   /** Session ID for persisting collapsed state */
@@ -10,6 +14,8 @@ interface UseCollapsibleInputOptions {
   promptSuggestion: string | null | undefined;
   /** Whether the session needs a continue */
   needsContinue: boolean | undefined;
+  /** Whether the SDK session is waiting for user action */
+  requiresAction?: boolean;
   /** Whether STT is currently listening */
   isSttListening?: boolean;
   /** Whether there are pending images to send */
@@ -31,6 +37,7 @@ export function useCollapsibleInput(
     hasMessages,
     promptSuggestion,
     needsContinue,
+    requiresAction,
     isSttListening,
     hasPendingImages,
   } = options;
@@ -69,23 +76,39 @@ export function useCollapsibleInput(
     prevHasMessages.current = hasMessages;
   }, [hasMessages, isPersistedExpanded, collapsibleEnabled]);
 
-  const hasPendingAction = !!(promptSuggestion || needsContinue);
+  const hasPendingAction = getHasPendingAction({
+    promptSuggestion,
+    needsContinue,
+    requiresAction,
+  });
 
-  // Auto-expand when promptSuggestion or needsContinue appears
+  // Auto-expand when a pending action appears
   const prevPromptSuggestion = React.useRef(promptSuggestion);
   const prevNeedsContinue = React.useRef(needsContinue);
+  const prevRequiresAction = React.useRef(requiresAction);
 
   React.useEffect(() => {
-    const promptAppeared = !prevPromptSuggestion.current && !!promptSuggestion;
-    const continueAppeared = !prevNeedsContinue.current && !!needsContinue;
+    const pendingActionAppeared = didPendingActionAppear(
+      {
+        promptSuggestion: prevPromptSuggestion.current,
+        needsContinue: prevNeedsContinue.current,
+        requiresAction: prevRequiresAction.current,
+      },
+      {
+        promptSuggestion,
+        needsContinue,
+        requiresAction,
+      },
+    );
 
-    if (promptAppeared || continueAppeared) {
+    if (pendingActionAppeared) {
       setCollapsed(false);
     }
 
     prevPromptSuggestion.current = promptSuggestion;
     prevNeedsContinue.current = needsContinue;
-  }, [promptSuggestion, needsContinue]);
+    prevRequiresAction.current = requiresAction;
+  }, [promptSuggestion, needsContinue, requiresAction]);
 
   // Persist expanded state to local settings
   const persistExpanded = React.useCallback(
@@ -128,3 +151,4 @@ export function useCollapsibleInput(
     hasPendingAction,
   };
 }
+

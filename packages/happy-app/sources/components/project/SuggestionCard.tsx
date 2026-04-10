@@ -5,12 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { type SuggestionSummary } from "@/sync/apiWorld";
-
-const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
-    suggested_goal: { icon: "flag-outline", color: "#8B5CF6" },
-    suggested_task: { icon: "hammer-outline", color: "#3B82F6" },
-    suggested_skill: { icon: "school-outline", color: "#10B981" },
-};
+import { getSuggestionTypeConfig, getSuggestionTypeLabelKey } from "./worldSuggestionViewModel";
 
 interface SuggestionCardProps {
     suggestion: SuggestionSummary;
@@ -23,12 +18,8 @@ export const SuggestionCard = React.memo(function SuggestionCard({
     onAccept,
     onDismiss,
 }: SuggestionCardProps) {
-    const config = TYPE_CONFIG[suggestion.type] ?? TYPE_CONFIG.suggested_task;
-    const typeLabel = suggestion.type === "suggested_goal"
-        ? t("suggestions.typeGoal")
-        : suggestion.type === "suggested_skill"
-            ? t("suggestions.typeSkill")
-            : t("suggestions.typeTask");
+    const config = getSuggestionTypeConfig(suggestion.type);
+    const typeLabel = t(getSuggestionTypeLabelKey(suggestion.type));
 
     return (
         <View style={styles.card}>

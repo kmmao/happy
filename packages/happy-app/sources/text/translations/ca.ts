@@ -936,6 +936,7 @@ export const ca: TranslationStructure = {
     },
     noMachinesAvailable: "Sense màquines",
     continue: "Continua — Claude ha assolit el límit de torns",
+    requiresAction: "Revisa l'acció pendent",
   },
 
   machineLauncher: {
@@ -3883,6 +3884,7 @@ export const ca: TranslationStructure = {
     typeGoal: "Goal",
     typeTask: "Task",
     typeSkill: "Skill",
+    typeDecision: "Decision",
   },
   roles: {
     title: "Roles",

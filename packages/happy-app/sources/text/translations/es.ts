@@ -937,6 +937,7 @@ export const es: TranslationStructure = {
     },
     noMachinesAvailable: "Sin máquinas",
     continue: "Continuar — Claude alcanzó el límite de turnos",
+    requiresAction: "Revisar acción pendiente",
   },
 
   machineLauncher: {
@@ -3878,6 +3879,7 @@ export const es: TranslationStructure = {
     typeGoal: "Goal",
     typeTask: "Task",
     typeSkill: "Skill",
+    typeDecision: "Decision",
   },
   roles: {
     title: "Roles",
