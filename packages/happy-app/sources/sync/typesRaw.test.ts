@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { createId } from '@paralleldrive/cuid2';
-import { normalizeRawMessage } from './typesRaw';
+import { normalizeRawMessage, collectBatchHistorySignals, collectSequencedHistorySignals } from './typesRaw';
 
 /**
  * WOLOG Content Normalization Tests
@@ -17,6 +17,7 @@ import { normalizeRawMessage } from './typesRaw';
 // Import the actual schemas from typesRaw.ts
 // Note: We're testing the schemas as black boxes through their public API
 import { RawRecordSchema } from './typesRaw';
+import type { RawRecord } from './typesRaw';
 
 describe('Zod Transform - WOLOG Content Normalization', () => {
 
@@ -1488,6 +1489,204 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                     expect((toolCallItem as any).timestamp).toBe(1234567890);
                 }
             }
+        });
+    });
+
+    describe('Historical session signal recovery', () => {
+        it('restores requires_action session state from message history', () => {
+            const records: RawRecord[] = [
+                {
+                    role: 'agent',
+                    content: {
+                        type: 'session',
+                        data: {
+                            id: 'env-state-1',
+                            time: 1,
+                            role: 'agent',
+                            turn: 'turn-1',
+                            ev: { t: 'session-state-changed', state: 'running' }
+                        }
+                    }
+                },
+                {
+                    role: 'agent',
+                    content: {
+                        type: 'session',
+                        data: {
+                            id: 'env-state-2',
+                            time: 2,
+                            role: 'agent',
+                            turn: 'turn-1',
+                            ev: { t: 'session-state-changed', state: 'requires_action' }
+                        }
+                    }
+                }
+            ];
+
+            expect(collectBatchHistorySignals(records)).toMatchObject({
+                promptSuggestion: null,
+                needsContinue: false,
+                sdkSessionState: 'requires_action'
+            });
+        });
+
+        it('clears needsContinue and promptSuggestion on user message without losing requires_action state', () => {
+            const records: RawRecord[] = [
+                {
+                    role: 'agent',
+                    content: {
+                        type: 'session',
+                        data: {
+                            id: 'env-needs-continue-1',
+                            time: 1,
+                            role: 'agent',
+                            turn: 'turn-1',
+                            ev: { t: 'prompt-suggestion', suggestion: '继续处理这个问题' }
+                        }
+                    }
+                },
+                {
+                    role: 'agent',
+                    content: {
+                        type: 'session',
+                        data: {
+                            id: 'env-needs-continue-2',
+                            time: 2,
+                            role: 'agent',
+                            turn: 'turn-1',
+                            ev: { t: 'needs-continue' }
+                        }
+                    }
+                },
+                {
+                    role: 'user',
+                    content: {
+                        type: 'text',
+                        text: '继续'
+                    }
+                },
+                {
+                    role: 'agent',
+                    content: {
+                        type: 'session',
+                        data: {
+                            id: 'env-state-3',
+                            time: 3,
+                            role: 'agent',
+                            turn: 'turn-2',
+                            ev: { t: 'session-state-changed', state: 'requires_action' }
+                        }
+                    }
+                }
+            ];
+
+            expect(collectBatchHistorySignals(records)).toMatchObject({
+                promptSuggestion: null,
+                needsContinue: false,
+                sdkSessionState: 'requires_action'
+            });
+        });
+
+        it('treats session-envelope user messages as clearing promptSuggestion and needsContinue', () => {
+            const records: RawRecord[] = [
+                {
+                    role: 'agent',
+                    content: {
+                        type: 'session',
+                        data: {
+                            id: 'env-prompt-1',
+                            time: 1,
+                            role: 'agent',
+                            turn: 'turn-1',
+                            ev: { t: 'prompt-suggestion', suggestion: '旧建议' }
+                        }
+                    }
+                },
+                {
+                    role: 'session',
+                    content: {
+                        id: 'env-user-session-1',
+                        time: 2,
+                        role: 'user',
+                        ev: { t: 'text', text: '来自 session 协议的用户消息' }
+                    }
+                } as any
+            ];
+
+            expect(collectBatchHistorySignals(records)).toMatchObject({
+                promptSuggestion: null,
+                needsContinue: false,
+                sdkSessionState: null
+            });
+        });
+
+        it('uses global seq order instead of fetch batch order when rebuilding history signals', () => {
+            const newestFirst = [
+                {
+                    seq: 30,
+                    content: {
+                        role: 'agent',
+                        content: {
+                            type: 'session',
+                            data: {
+                                id: 'env-state-newest',
+                                time: 30,
+                                role: 'agent',
+                                turn: 'turn-3',
+                                ev: { t: 'session-state-changed', state: 'requires_action' }
+                            }
+                        }
+                    } satisfies RawRecord
+                },
+                {
+                    seq: 31,
+                    content: {
+                        role: 'agent',
+                        content: {
+                            type: 'session',
+                            data: {
+                                id: 'env-prompt-newest',
+                                time: 31,
+                                role: 'agent',
+                                turn: 'turn-3',
+                                ev: { t: 'prompt-suggestion', suggestion: '最新建议' }
+                            }
+                        }
+                    } satisfies RawRecord
+                },
+                {
+                    seq: 5,
+                    content: {
+                        role: 'agent',
+                        content: {
+                            type: 'session',
+                            data: {
+                                id: 'env-state-old',
+                                time: 5,
+                                role: 'agent',
+                                turn: 'turn-1',
+                                ev: { t: 'session-state-changed', state: 'running' }
+                            }
+                        }
+                    } satisfies RawRecord
+                },
+                {
+                    seq: 6,
+                    content: {
+                        role: 'user',
+                        content: {
+                            type: 'text',
+                            text: '旧消息'
+                        }
+                    } satisfies RawRecord
+                }
+            ];
+
+            expect(collectSequencedHistorySignals(newestFirst)).toMatchObject({
+                promptSuggestion: '最新建议',
+                needsContinue: false,
+                sdkSessionState: 'requires_action'
+            });
         });
     });
 

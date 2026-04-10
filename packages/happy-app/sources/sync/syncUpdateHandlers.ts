@@ -6,6 +6,7 @@ import {
     extractPromptSuggestionFromRaw,
     extractNeedsContinueFromRaw,
     extractSessionStateFromRaw,
+    isUserMessageRaw,
     type NormalizedMessage,
 } from "./typesRaw";
 import type { Session, Machine } from "./storageTypes";
@@ -101,13 +102,17 @@ export async function handleNewMessageUpdate(
     if (body.message) {
         const decrypted = await encryption.decryptMessage(body.message);
         if (decrypted) {
-            // Extract prompt suggestion before normalizing
+            // Keep prompt suggestion / needsContinue in sync for multi-device history and live updates.
+            if (isUserMessageRaw(decrypted.content)) {
+                storage.getState().setPromptSuggestion(body.sid, null);
+                storage.getState().setNeedsContinue(body.sid, false);
+            }
+
             const suggestion = extractPromptSuggestionFromRaw(decrypted.content);
             if (suggestion !== null) {
                 storage.getState().setPromptSuggestion(body.sid, suggestion);
             }
 
-            // Extract needs-continue signal
             if (extractNeedsContinueFromRaw(decrypted.content)) {
                 storage.getState().setNeedsContinue(body.sid, true);
             }

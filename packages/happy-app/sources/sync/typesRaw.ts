@@ -1231,6 +1231,30 @@ function normalizeSessionEnvelope(
  * Extract a prompt suggestion from a raw record, if present.
  * Returns the suggestion text or null if the record is not a prompt-suggestion event.
  */
+function getSessionEnvelope(raw: RawRecord | null | undefined): any {
+  if (!raw) return null;
+  if (raw.role === "session") {
+    return raw.content?.data ?? raw.content ?? null;
+  }
+  if (
+    raw.role === "agent" &&
+    raw.content?.type === "session" &&
+    raw.content?.data
+  ) {
+    return raw.content.data;
+  }
+  return null;
+}
+
+export function isUserMessageRaw(
+  raw: RawRecord | null | undefined,
+): boolean {
+  if (!raw) return false;
+  if (raw.role === "user") return true;
+  const envelope = getSessionEnvelope(raw);
+  return envelope?.role === "user";
+}
+
 export function extractPromptSuggestionFromRaw(
   raw: RawRecord | null | undefined,
 ): string | null {
@@ -1238,16 +1262,7 @@ export function extractPromptSuggestionFromRaw(
   // Session protocol envelope can arrive via two paths:
   // 1. raw.role === "session" → raw.content.data is the envelope
   // 2. raw.role === "agent" && raw.content.type === "session" → raw.content.data is the envelope
-  let envelope: any = null;
-  if (raw.role === "session" && raw.content?.data) {
-    envelope = raw.content.data;
-  } else if (
-    raw.role === "agent" &&
-    raw.content?.type === "session" &&
-    raw.content?.data
-  ) {
-    envelope = raw.content.data;
-  }
+  const envelope = getSessionEnvelope(raw);
   if (
     envelope?.ev?.t === "prompt-suggestion" &&
     typeof envelope.ev.suggestion === "string"
@@ -1266,16 +1281,7 @@ export function extractNeedsContinueFromRaw(
   raw: RawRecord | null | undefined,
 ): boolean {
   if (!raw) return false;
-  let envelope: any = null;
-  if (raw.role === "session" && raw.content?.data) {
-    envelope = raw.content.data;
-  } else if (
-    raw.role === "agent" &&
-    raw.content?.type === "session" &&
-    raw.content?.data
-  ) {
-    envelope = raw.content.data;
-  }
+  const envelope = getSessionEnvelope(raw);
   return envelope?.ev?.t === "needs-continue";
 }
 
@@ -1288,16 +1294,7 @@ export function extractSessionStateFromRaw(
   raw: RawRecord | null | undefined,
 ): "idle" | "running" | "requires_action" | null {
   if (!raw) return null;
-  let envelope: any = null;
-  if (raw.role === "session" && raw.content?.data) {
-    envelope = raw.content.data;
-  } else if (
-    raw.role === "agent" &&
-    raw.content?.type === "session" &&
-    raw.content?.data
-  ) {
-    envelope = raw.content.data;
-  }
+  const envelope = getSessionEnvelope(raw);
   if (
     envelope?.ev?.t === "session-state-changed" &&
     typeof envelope.ev.state === "string"
@@ -1305,6 +1302,51 @@ export function extractSessionStateFromRaw(
     return envelope.ev.state as "idle" | "running" | "requires_action";
   }
   return null;
+}
+
+export type BatchHistorySignals = {
+  promptSuggestion: string | null;
+  needsContinue: boolean;
+  sdkSessionState: "idle" | "running" | "requires_action" | null;
+};
+
+export type SequencedRawRecord = {
+  seq: number;
+  content: RawRecord | null | undefined;
+};
+
+export function collectBatchHistorySignals(
+  contents: Array<RawRecord | null | undefined>,
+): BatchHistorySignals {
+  let promptSuggestion: string | null = null;
+  let needsContinue = false;
+  let sdkSessionState: "idle" | "running" | "requires_action" | null = null;
+
+  for (const content of contents) {
+    const suggestion = extractPromptSuggestionFromRaw(content);
+    if (suggestion !== null) promptSuggestion = suggestion;
+
+    const state = extractSessionStateFromRaw(content);
+    if (state !== null) {
+      sdkSessionState = state;
+    }
+
+    if (extractNeedsContinueFromRaw(content)) {
+      needsContinue = true;
+    } else if (isUserMessageRaw(content)) {
+      needsContinue = false;
+      promptSuggestion = null;
+    }
+  }
+
+  return { promptSuggestion, needsContinue, sdkSessionState };
+}
+
+export function collectSequencedHistorySignals(
+  entries: SequencedRawRecord[],
+): BatchHistorySignals {
+  const ordered = [...entries].sort((a, b) => a.seq - b.seq);
+  return collectBatchHistorySignals(ordered.map((entry) => entry.content));
 }
 
 /**

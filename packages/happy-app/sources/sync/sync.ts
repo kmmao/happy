@@ -23,8 +23,7 @@ import { isRunningOnMac } from "@/utils/platform";
 import {
   NormalizedMessage,
   normalizeRawMessage,
-  extractPromptSuggestionFromRaw,
-  extractNeedsContinueFromRaw,
+  collectSequencedHistorySignals,
   RawRecord,
 } from "./typesRaw";
 import {
@@ -1983,8 +1982,10 @@ class Sync {
       // After the first batch is applied immediately (to exit loading state),
       // remaining batches are collected here and applied all at once at the end.
       const remainingNormalized: NormalizedMessage[] = [];
-      let latestPromptSuggestion: string | null = null;
-      let latestNeedsContinue = false;
+      const historySignalEntries: Array<{
+        seq: number;
+        content: RawRecord | null | undefined;
+      }> = [];
 
       // When starting from seq 0 (no cache, no persisted lastSeq), fetch the
       // NEWEST messages first using reverse pagination (before_seq). This way
@@ -2010,12 +2011,13 @@ class Sync {
             ? newestData.messages
             : [];
           if (newestMessages.length > 0) {
-            const { normalized, promptSuggestion, needsContinue } =
-              await this.decryptAndNormalizeBatch(encryption, newestMessages, sessionId);
-            if (promptSuggestion !== null) {
-              latestPromptSuggestion = promptSuggestion;
-            }
-            latestNeedsContinue = needsContinue;
+            const decryptResult = await this.decryptAndNormalizeBatch(
+              encryption,
+              newestMessages,
+              sessionId,
+            );
+            const normalized = decryptResult.normalized;
+            historySignalEntries.push(...decryptResult.sequencedContents);
 
             totalNormalized += normalized.length;
             if (normalized.length > 0) {
@@ -2085,12 +2087,7 @@ class Sync {
           sessionId,
         );
         const batchNormalized = decryptResult.normalized;
-        if (decryptResult.promptSuggestion !== null) {
-          latestPromptSuggestion = decryptResult.promptSuggestion;
-        }
-        if (decryptResult.needsContinue) {
-          latestNeedsContinue = true;
-        }
+        historySignalEntries.push(...decryptResult.sequencedContents);
 
         totalNormalized += batchNormalized.length;
 
@@ -2144,13 +2141,21 @@ class Sync {
         saveLastSeq(sessionId, backfillMaxSeq);
       }
 
-      // Surface prompt suggestion and needs-continue after all messages processed
-      if (latestPromptSuggestion !== null) {
-        storage
-          .getState()
-          .setPromptSuggestion(sessionId, latestPromptSuggestion);
+      // Surface side-channel session signals after all messages are merged in seq order.
+      const finalHistorySignals = collectSequencedHistorySignals(historySignalEntries);
+      storage.getState().setPromptSuggestion(sessionId, finalHistorySignals.promptSuggestion);
+      storage.getState().setNeedsContinue(sessionId, finalHistorySignals.needsContinue);
+      if (finalHistorySignals.sdkSessionState !== null) {
+        const currentSession = storage.getState().sessions[sessionId];
+        if (currentSession) {
+          this.applySessions([
+            {
+              ...currentSession,
+              sdkSessionState: finalHistorySignals.sdkSessionState,
+            },
+          ]);
+        }
       }
-      storage.getState().setNeedsContinue(sessionId, latestNeedsContinue);
 
       storage.getState().applyMessagesLoaded(sessionId);
       log.log(
@@ -2665,24 +2670,17 @@ class Sync {
     sessionId?: string,
   ): Promise<{
     normalized: NormalizedMessage[];
-    promptSuggestion: string | null;
-    needsContinue: boolean;
+    sequencedContents: Array<{ seq: number; content: RawRecord | null | undefined }>;
   }> {
     const decryptedMessages = await encryption.decryptMessages(rawMessages);
     const normalized: NormalizedMessage[] = [];
-    let promptSuggestion: string | null = null;
-    let needsContinue = false;
+    const sequencedContents: Array<{ seq: number; content: RawRecord | null | undefined }> = [];
     let decryptFailCount = 0;
     for (let i = 0; i < decryptedMessages.length; i++) {
       const decrypted = decryptedMessages[i];
+      const rawMessage = rawMessages[i];
       if (!decrypted) { decryptFailCount++; continue; }
-      const suggestion = extractPromptSuggestionFromRaw(decrypted.content);
-      if (suggestion !== null) promptSuggestion = suggestion;
-      if (extractNeedsContinueFromRaw(decrypted.content)) {
-        needsContinue = true;
-      } else if (decrypted.content?.role === "user") {
-        needsContinue = false;
-      }
+      sequencedContents.push({ seq: rawMessage.seq, content: decrypted.content });
       const msg = normalizeRawMessage(
         decrypted.id,
         decrypted.localId,
@@ -2696,7 +2694,7 @@ class Sync {
         `⚠️ ${decryptFailCount}/${rawMessages.length} messages failed to decrypt for session ${sessionId ?? "unknown"} (possible encryption key mismatch after session reconnect)`,
       );
     }
-    return { normalized, promptSuggestion, needsContinue };
+    return { normalized, sequencedContents };
   }
 
   private applyMessages = (
