@@ -4,6 +4,8 @@ import { fetchTasks, cancelTask, retryTask, deleteTask, ServerTask } from "@/syn
 import { sync } from "@/sync/sync";
 import { Modal } from "@/modal";
 import { t } from "@/text";
+import { matchesTaskFilter, sortTasksByUpdatedAt } from "./task/taskDetailViewModel";
+import { createTaskEventRefreshRetrier } from "./taskEventRefresh";
 
 /**
  * Data hook for the task list page.
@@ -16,6 +18,12 @@ export function useTasksData(machineId: string | undefined) {
     const [refreshing, setRefreshing] = React.useState(false);
     const [statusFilter, setStatusFilter] = React.useState<string | undefined>(undefined);
     const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
+    const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
+    const hasLoadedOnceRef = React.useRef(false);
+    const latestResultRequestIdRef = React.useRef(0);
+    const initialRequestIdRef = React.useRef(0);
+    const refreshRequestIdRef = React.useRef(0);
+    const taskEventRetrierRef = React.useRef<ReturnType<typeof createTaskEventRefreshRetrier> | null>(null);
 
     const getCredentials = React.useCallback(async (): Promise<AuthCredentials | null> => {
         try {
@@ -26,36 +34,43 @@ export function useTasksData(machineId: string | undefined) {
     }, []);
 
     const load = React.useCallback(async (kind: "initial" | "refresh") => {
-        if (!machineId) return;
+        if (!machineId) return false;
+        const resultRequestId = ++latestResultRequestIdRef.current;
+        const activityRequestId = kind === "initial"
+            ? ++initialRequestIdRef.current
+            : ++refreshRequestIdRef.current;
         kind === "initial" ? setLoading(true) : setRefreshing(true);
         try {
             const credentials = await getCredentials();
-            if (!credentials) return;
+            if (!credentials) return false;
 
-            const statusParam = statusFilter === "active"
-                ? undefined // fetch all, filter client-side
-                : statusFilter;
-
+            const statusParam = statusFilter === "active" ? undefined : statusFilter;
             const result = await fetchTasks(credentials, {
                 machineId,
                 status: statusParam,
                 limit: 100,
             });
+            if (resultRequestId !== latestResultRequestIdRef.current) return false;
 
-            if (statusFilter === "active") {
-                const activeTasks = result.tasks.filter((t) =>
-                    ["queued", "dispatching", "running"].includes(t.status),
-                );
-                setTasks(activeTasks);
-                setTotal(activeTasks.length);
-            } else {
-                setTasks(result.tasks);
-                setTotal(result.total);
-            }
+            const nextTasks = sortTasksByUpdatedAt(
+                result.tasks.filter((task) => matchesTaskFilter(task, statusFilter)),
+            );
+            setTasks(nextTasks);
+            setTotal(nextTasks.length);
+            hasLoadedOnceRef.current = true;
+            setHasLoadedOnce(true);
+            setLoading(false);
+            return true;
         } catch {
             // Silently fail — will retry on next refresh
+            return false;
         } finally {
-            kind === "initial" ? setLoading(false) : setRefreshing(false);
+            if (kind === "initial" && activityRequestId === initialRequestIdRef.current) {
+                setLoading(false);
+            }
+            if (kind === "refresh" && activityRequestId === refreshRequestIdRef.current) {
+                setRefreshing(false);
+            }
         }
     }, [machineId, statusFilter, getCredentials]);
 
@@ -64,24 +79,53 @@ export function useTasksData(machineId: string | undefined) {
         void load("initial");
     }, [load]);
 
+    React.useEffect(() => {
+        if (hasLoadedOnce || !machineId) return;
+        let active = true;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let running = false;
+
+        const attempt = async () => {
+            if (!active || running || hasLoadedOnceRef.current) return;
+            running = true;
+            try {
+                const ok = await load("initial");
+                if (!active || hasLoadedOnceRef.current || ok) return;
+                timer = setTimeout(() => {
+                    void attempt();
+                }, 3000);
+            } finally {
+                running = false;
+            }
+        };
+
+        timer = setTimeout(() => {
+            void attempt();
+        }, 3000);
+
+        return () => {
+            active = false;
+            if (timer) clearTimeout(timer);
+        };
+    }, [hasLoadedOnce, load, machineId]);
+
     // Real-time task status updates
     React.useEffect(() => {
+        taskEventRetrierRef.current?.dispose();
+        taskEventRetrierRef.current = createTaskEventRefreshRetrier(() => load("refresh"));
+        return () => {
+            taskEventRetrierRef.current?.dispose();
+            taskEventRetrierRef.current = null;
+        };
+    }, [load]);
+
+    React.useEffect(() => {
         return sync.onTaskStatusChanged((event) => {
-            setTasks((prev) =>
-                prev.map((task) =>
-                    task.id === event.taskId
-                        ? {
-                              ...task,
-                              status: event.status,
-                              sessionId: event.sessionId ?? task.sessionId,
-                              errorMessage: event.errorMessage ?? task.errorMessage,
-                              completedAt: event.completedAt ?? task.completedAt,
-                          }
-                        : task,
-                ),
-            );
+            if (event.machineId !== machineId) return;
+            if (!hasLoadedOnceRef.current) return;
+            taskEventRetrierRef.current?.trigger();
         });
-    }, []);
+    }, [machineId]);
 
     const doCancel = React.useCallback(async (taskId: string) => {
         setActiveTaskId(taskId);

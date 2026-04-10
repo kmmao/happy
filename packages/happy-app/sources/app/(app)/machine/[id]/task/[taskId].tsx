@@ -22,39 +22,14 @@ import {
 } from "@/sync/apiTasks";
 import { sync } from "@/sync/sync";
 import { Typography } from "@/constants/Typography";
-
-function statusBadgeColor(status: string): string {
-    if (status === "running" || status === "dispatching") return "#007AFF";
-    if (status === "completed") return "#34C759";
-    if (status === "failed") return "#FF3B30";
-    if (status === "cancelled") return "#8E8E93";
-    return "#AEAEB2";
-}
-
-function statusLabel(status: string): string {
-    const map: Record<string, string> = {
-        queued: t("tasks.statusQueued"),
-        dispatching: t("tasks.statusDispatching"),
-        running: t("tasks.statusRunning"),
-        completed: t("tasks.statusCompleted"),
-        failed: t("tasks.statusFailed"),
-        cancelled: t("tasks.statusCancelled"),
-    };
-    return map[status] ?? status;
-}
-
-function priorityLabel(priority: string): string {
-    const map: Record<string, string> = {
-        urgent: t("tasks.priorityUrgent"),
-        user: t("tasks.priorityUser"),
-        background: t("tasks.priorityBackground"),
-    };
-    return map[priority] ?? priority;
-}
-
-function formatDate(value: number | null): string {
-    return value ? new Date(value).toLocaleString() : "-";
-}
+import {
+    buildTaskDetailActions,
+    formatTaskDate,
+    getTaskPriorityLabel,
+    getTaskStatusBadgeColor,
+    getTaskStatusLabel,
+} from "./taskDetailViewModel";
+import { createTaskEventRefreshRetrier } from "../taskEventRefresh";
 
 function Row({ label, value }: { label: string; value: string }) {
     return (
@@ -73,30 +48,63 @@ function TaskDetailScreen() {
     const [task, setTask] = React.useState<ServerTask | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [acting, setActing] = React.useState(false);
-    const [error, setError] = React.useState<string | null>(null);
+    const loadRequestIdRef = React.useRef(0);
+    const taskEventRetrierRef = React.useRef<ReturnType<typeof createTaskEventRefreshRetrier> | null>(null);
 
-    const loadTask = React.useCallback(async () => {
-        if (!taskId) return;
-        setLoading(true);
-        setError(null);
+    const loadTask = React.useCallback(async (kind: "initial" | "refresh" = "refresh") => {
+        if (!taskId) return false;
+        const requestId = ++loadRequestIdRef.current;
+        if (kind === "initial") setLoading(true);
         try {
             const credentials = await TokenStorage.getCredentials();
-            if (!credentials) {
-                setError(t("common.error"));
-                return;
-            }
+            if (!credentials) return false;
             const data = await fetchTask(credentials, taskId);
+            if (requestId !== loadRequestIdRef.current) return false;
             setTask(data);
-        } catch (e: any) {
-            setError(e?.message ?? t("common.error"));
+            return true;
+        } catch {
+            // Silently fail — will retry on next status update or refresh.
+            return false;
         } finally {
-            setLoading(false);
+            if (requestId === loadRequestIdRef.current && kind === "initial") {
+                setLoading(false);
+            }
         }
     }, [taskId]);
 
     React.useEffect(() => {
-        void loadTask();
+        void loadTask("initial");
     }, [loadTask]);
+
+    React.useEffect(() => {
+        if (task || !taskId) return;
+        let active = true;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let running = false;
+
+        const attempt = async () => {
+            if (!active || running || task) return;
+            running = true;
+            try {
+                const ok = await loadTask("initial");
+                if (!active || ok) return;
+                timer = setTimeout(() => {
+                    void attempt();
+                }, 3000);
+            } finally {
+                running = false;
+            }
+        };
+
+        timer = setTimeout(() => {
+            void attempt();
+        }, 3000);
+
+        return () => {
+            active = false;
+            if (timer) clearTimeout(timer);
+        };
+    }, [loadTask, task, taskId]);
 
     React.useLayoutEffect(() => {
         navigation.setOptions({
@@ -105,23 +113,27 @@ function TaskDetailScreen() {
     }, [navigation, task?.promptPreview]);
 
     React.useEffect(() => {
+        taskEventRetrierRef.current?.dispose();
+        taskEventRetrierRef.current = createTaskEventRefreshRetrier(() => loadTask("refresh"));
+        return () => {
+            taskEventRetrierRef.current?.dispose();
+            taskEventRetrierRef.current = null;
+        };
+    }, [loadTask]);
+
+    React.useEffect(() => {
         return sync.onTaskStatusChanged((event) => {
+            if (event.machineId !== machineId) return;
             if (event.taskId !== taskId) return;
-            setTask((prev) => prev ? {
-                ...prev,
-                status: event.status,
-                sessionId: event.sessionId ?? prev.sessionId,
-                errorMessage: event.errorMessage ?? prev.errorMessage,
-                completedAt: event.completedAt ?? prev.completedAt,
-            } : prev);
+            taskEventRetrierRef.current?.trigger();
         });
-    }, [taskId]);
+    }, [machineId, taskId]);
 
     const runAction = React.useCallback(async (action: () => Promise<void>) => {
         setActing(true);
         try {
             await action();
-            await loadTask();
+            await loadTask("refresh");
         } catch (e: any) {
             Modal.alert(t("common.error"), e?.message ?? t("common.error"));
         } finally {
@@ -172,17 +184,15 @@ function TaskDetailScreen() {
         );
     }
 
-    if (error || !task) {
+    if (!task) {
         return (
             <View style={styles.centered}>
-                <Text style={styles.emptyText}>{error ?? t("tasks.noTasks")}</Text>
+                <Text style={styles.emptyText}>{t("tasks.noTasks")}</Text>
             </View>
         );
     }
 
-    const isActive = ["queued", "dispatching", "running"].includes(task.status);
-    const isFailed = task.status === "failed";
-    const isTerminal = ["completed", "failed", "cancelled"].includes(task.status);
+    const actions = buildTaskDetailActions(task);
 
     return (
         <ScrollView
@@ -195,14 +205,14 @@ function TaskDetailScreen() {
                         <Text style={styles.title}>{task.promptPreview || task.id}</Text>
                         <Text style={styles.subtitle}>{task.id}</Text>
                     </View>
-                    <View style={[styles.badge, { backgroundColor: statusBadgeColor(task.status) }]}>
-                        <Text style={styles.badgeText}>{statusLabel(task.status)}</Text>
+                    <View style={[styles.badge, { backgroundColor: getTaskStatusBadgeColor(task.status) }]}>
+                        <Text style={styles.badgeText}>{getTaskStatusLabel(task.status, t as (key: string) => string)}</Text>
                     </View>
                 </View>
 
                 <View style={styles.chipRow}>
                     <View style={styles.chip}>
-                        <Text style={styles.chipText}>{priorityLabel(task.priority)}</Text>
+                        <Text style={styles.chipText}>{getTaskPriorityLabel(task.priority, t as (key: string) => string)}</Text>
                     </View>
                     <View style={styles.chip}>
                         <Text style={styles.chipText}>{task.triggerType}</Text>
@@ -212,8 +222,8 @@ function TaskDetailScreen() {
                     </View>
                 </View>
 
-                {task.sessionId ? (
-                    <Pressable style={styles.primaryAction} onPress={() => router.push(`/session/${task.sessionId}` as any)}>
+                {actions.sessionHref ? (
+                    <Pressable style={styles.primaryAction} onPress={() => router.push(actions.sessionHref as any)}>
                         <Ionicons name="open-outline" size={16} color="#FFF" />
                         <Text style={styles.primaryActionText}>{t("tasks.openSession")}</Text>
                     </Pressable>
@@ -222,18 +232,18 @@ function TaskDetailScreen() {
 
             <View style={styles.card}>
                 <Text style={styles.sectionTitle}>{t("profile.details")}</Text>
-                <Row label={t("tasks.priority")} value={priorityLabel(task.priority)} />
-                <Row label={t("profile.status")} value={statusLabel(task.status)} />
+                <Row label={t("tasks.priority")} value={getTaskPriorityLabel(task.priority, t as (key: string) => string)} />
+                <Row label={t("profile.status")} value={getTaskStatusLabel(task.status, t as (key: string) => string)} />
                 <Row label={t("machine.machineId")} value={task.machineId} />
                 <Row label={t("tasks.project")} value={task.projectId ?? "-"} />
                 <Row label="Session" value={task.sessionId ?? "-"} />
                 <Row label="Trigger"
                     value={task.triggerRef ? `${task.triggerType} · ${task.triggerRef}` : task.triggerType}
                 />
-                <Row label="Created" value={formatDate(task.createdAt)} />
-                <Row label="Updated" value={formatDate(task.updatedAt)} />
-                <Row label={t("tasks.statusDispatching")} value={formatDate(task.dispatchedAt)} />
-                <Row label={t("tasks.statusCompleted")} value={formatDate(task.completedAt)} />
+                <Row label="Created" value={formatTaskDate(task.createdAt)} />
+                <Row label="Updated" value={formatTaskDate(task.updatedAt)} />
+                <Row label={t("tasks.statusDispatching")} value={formatTaskDate(task.dispatchedAt)} />
+                <Row label={t("tasks.statusCompleted")} value={formatTaskDate(task.completedAt)} />
             </View>
 
             {task.skillNames.length > 0 ? (
@@ -251,17 +261,17 @@ function TaskDetailScreen() {
             ) : null}
 
             <View style={styles.actionRow}>
-                {isActive ? (
+                {actions.canCancel ? (
                     <Pressable style={[styles.secondaryAction, acting && styles.disabledAction]} disabled={acting} onPress={() => void handleCancel()}>
                         <Text style={styles.secondaryActionText}>{t("tasks.cancelTask")}</Text>
                     </Pressable>
                 ) : null}
-                {isFailed ? (
+                {actions.canRetry ? (
                     <Pressable style={[styles.primaryAction, acting && styles.disabledAction]} disabled={acting} onPress={() => void handleRetry()}>
                         <Text style={styles.primaryActionText}>{t("tasks.retryTask")}</Text>
                     </Pressable>
                 ) : null}
-                {isTerminal ? (
+                {actions.canDelete ? (
                     <Pressable style={[styles.dangerAction, acting && styles.disabledAction]} disabled={acting} onPress={() => void handleDelete()}>
                         <Text style={styles.dangerActionText}>{t("tasks.deleteTask")}</Text>
                     </Pressable>
