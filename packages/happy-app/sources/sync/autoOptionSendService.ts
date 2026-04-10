@@ -13,17 +13,40 @@ import { type Message } from "@/sync/typesMessage";
 
 const DURATION_MS = 10_000;
 
+interface SnapshotWithFreshness {
+    snapshot: SessionFollowUpOptionsSnapshot;
+    /** true when options come from the latest agent turn (no user message after). */
+    isFresh: boolean;
+}
+
 function buildSnapshotFromMessages(
     messages: Message[],
-): SessionFollowUpOptionsSnapshot | null {
+): SnapshotWithFreshness | null {
     const result = extractLatestOptions(messages);
     if (result.items.length < 2) return null;
+
+    // Determine freshness: options are fresh if no user-text appears before
+    // the source message in the (newest-first) message list.
+    let isFresh = true;
+    if (result.sourceMessageId) {
+        for (const msg of messages) {
+            if (msg.id === result.sourceMessageId) break;
+            if (msg.kind === "user-text") {
+                isFresh = false;
+                break;
+            }
+        }
+    }
+
     return {
-        sourceType: "markdown-options",
-        sourceMessageId: result.sourceMessageId,
-        items: result.items,
-        recommendedIndex: 0,
-        optionsHash: buildOptionsHash(result.items),
+        snapshot: {
+            sourceType: "markdown-options",
+            sourceMessageId: result.sourceMessageId,
+            items: result.items,
+            recommendedIndex: 0,
+            optionsHash: buildOptionsHash(result.items),
+        },
+        isFresh,
     };
 }
 
@@ -92,8 +115,8 @@ class AutoOptionSendService {
             this.states.get(sessionId) ?? createInitialAutoOptionSendState();
         const messages =
             storage.getState().sessionMessages[sessionId]?.messages ?? [];
-        const snapshot = buildSnapshotFromMessages(messages);
-        const context = this.buildContext(sessionId, snapshot, messages, Date.now());
+        const result = buildSnapshotFromMessages(messages);
+        const context = this.buildContext(sessionId, result?.snapshot ?? null, messages, Date.now());
 
         const next = reduceAutoOptionSendEvent(
             current,
@@ -101,6 +124,10 @@ class AutoOptionSendService {
             context,
         );
         this.applyStateChange(sessionId, current, next);
+        // If enabled and options are stale (not fresh), fire immediately
+        if (next.status === "armed" && result && !result.isFresh) {
+            this.fireImmediately(sessionId);
+        }
         this.persistEnabled(sessionId, next.enabled);
     }
 
@@ -113,8 +140,8 @@ class AutoOptionSendService {
         if (!state) return;
         const messages =
             storage.getState().sessionMessages[sessionId]?.messages ?? [];
-        const snapshot = buildSnapshotFromMessages(messages);
-        const context = this.buildContext(sessionId, snapshot, messages, Date.now());
+        const result = buildSnapshotFromMessages(messages);
+        const context = this.buildContext(sessionId, result?.snapshot ?? null, messages, Date.now());
         const next = reduceAutoOptionSendEvent(state, event, context);
         this.applyStateChange(sessionId, state, next);
     }
@@ -143,7 +170,8 @@ class AutoOptionSendService {
 
         const messages =
             storage.getState().sessionMessages[sessionId]?.messages ?? [];
-        const snapshot = buildSnapshotFromMessages(messages);
+        const result = buildSnapshotFromMessages(messages);
+        const snapshot = result?.snapshot ?? null;
         const context = this.buildContext(sessionId, snapshot, messages, Date.now());
 
         const event = snapshot
@@ -152,6 +180,11 @@ class AutoOptionSendService {
 
         const next = reduceAutoOptionSendEvent(state, event, context);
         this.applyStateChange(sessionId, state, next);
+
+        // Stale options (from a previous turn): skip countdown, fire now
+        if (next.status === "armed" && result && !result.isFresh) {
+            this.fireImmediately(sessionId);
+        }
     }
 
     private buildContext(
@@ -221,6 +254,44 @@ class AutoOptionSendService {
         this.timers.set(sessionId, interval);
     }
 
+    /** Skip countdown and fire immediately (for stale/old-turn options). */
+    private fireImmediately(sessionId: string): void {
+        this.clearTimer(sessionId);
+        const state = this.states.get(sessionId);
+        if (!state || state.status !== "armed") return;
+
+        const messages =
+            storage.getState().sessionMessages[sessionId]?.messages ?? [];
+        const result = buildSnapshotFromMessages(messages);
+        const context = this.buildContext(
+            sessionId,
+            result?.snapshot ?? null,
+            messages,
+            Date.now(),
+        );
+
+        // armed → ready → fire in one shot
+        const readyState = reduceAutoOptionSendEvent(
+            state,
+            { type: "timer-finished" },
+            context,
+        );
+        if (readyState.status !== "ready") {
+            this.setState(sessionId, readyState);
+            return;
+        }
+        const firedState = reduceAutoOptionSendEvent(
+            readyState,
+            { type: "attempt-fire" },
+            context,
+        );
+        const textToSend = firedState.shouldSendText;
+        this.setState(sessionId, { ...firedState, shouldSendText: null });
+        if (textToSend) {
+            this.sendMessageFn?.(sessionId, textToSend).catch(() => {});
+        }
+    }
+
     private clearTimer(sessionId: string): void {
         const timer = this.timers.get(sessionId);
         if (timer != null) {
@@ -235,9 +306,9 @@ class AutoOptionSendService {
 
         const messages =
             storage.getState().sessionMessages[sessionId]?.messages ?? [];
-        const snapshot = buildSnapshotFromMessages(messages);
+        const result = buildSnapshotFromMessages(messages);
         const now = Date.now();
-        const context = this.buildContext(sessionId, snapshot, messages, now);
+        const context = this.buildContext(sessionId, result?.snapshot ?? null, messages, now);
 
         const readyState = reduceAutoOptionSendEvent(
             state,
