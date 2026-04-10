@@ -101,12 +101,9 @@ import { useUnistyles } from "react-native-unistyles";
 import { Message } from "@/sync/typesMessage";
 import {
   buildOptionsHash,
-  createInitialAutoOptionSendState,
-  reduceAutoOptionSendEvent,
-  type AutoOptionSendContext,
-  type AutoOptionSendEvent,
   type SessionFollowUpOptionsSnapshot,
 } from "./autoOptionSend";
+import { autoOptionSendService } from "@/sync/autoOptionSendService";
 import { log } from '@/log';
 
 const FILE_EDIT_TOOLS = new Set(["Edit", "edit", "MultiEdit", "Write"]);
@@ -492,14 +489,15 @@ function SessionViewInner({
   const isLandscape = useIsLandscape();
   const deviceType = useDeviceType();
   const [message, setMessage] = React.useState("");
-  const [autoOptionSend, setAutoOptionSend] = React.useState(() => {
-    const persisted =
-      (storage.getState().localSettings.autoOptionSendSessions ?? {})[
-        sessionId
-      ] === true;
-    const initial = createInitialAutoOptionSendState();
-    return persisted ? { ...initial, enabled: true, status: "idle" as const } : initial;
-  });
+  const [autoOptionSend, setAutoOptionSend] = React.useState(() =>
+    autoOptionSendService.getState(sessionId),
+  );
+  React.useEffect(
+    () => autoOptionSendService.subscribe(sessionId, () => {
+      setAutoOptionSend(autoOptionSendService.getState(sessionId));
+    }),
+    [sessionId],
+  );
   const realtimeStatus = useRealtimeStatus();
   // Track session column height + AgentInput height to compute exact overlay max height
   const [sessionColumnHeight, setSessionColumnHeight] = React.useState(0);
@@ -702,7 +700,7 @@ function SessionViewInner({
   const [showOptionsPopover, setShowOptionsPopover] = React.useState(false);
   const handleFloatingOptionPress = React.useCallback(
     (option: string) => {
-      setAutoOptionSend(createInitialAutoOptionSendState());
+      autoOptionSendService.toggle(sessionId, false);
       setShowOptionsPopover(false);
       sync.sendMessage(sessionId, option);
       trackMessageSent();
@@ -770,112 +768,40 @@ function SessionViewInner({
     removeImageByPath,
   } = useImageUpload(sessionId);
 
-  const buildAutoOptionSendContext = React.useCallback(
-    (now: number): AutoOptionSendContext => ({
-      sessionId,
-      currentSessionId: sessionId,
-      inputText: message,
-      hasPendingImages: pendingImagePathsRef.current.length > 0,
-      isSttListening: false,
-      hasAskUserQuestionVisible: hasPendingAskUserQuestionVisible,
-      isCurrentSessionActive: true,
-      now,
-      durationMs: 10_000,
-      snapshot: currentOptionsSnapshot,
-    }),
-    [
-      sessionId,
-      message,
-      hasPendingAskUserQuestionVisible,
-      currentOptionsSnapshot,
-      pendingImagePathsRef,
-    ],
-  );
-
-  const dispatchAutoOptionSend = React.useCallback(
-    (event: AutoOptionSendEvent, now = Date.now()) => {
-      setAutoOptionSend((prev) =>
-        reduceAutoOptionSendEvent(prev, event, buildAutoOptionSendContext(now)),
-      );
+  const handleAutoOptionSendToggle = React.useCallback(
+    (enabled: boolean) => {
+      autoOptionSendService.toggle(sessionId, enabled);
     },
-    [buildAutoOptionSendContext],
+    [sessionId],
   );
 
-  const handleAutoOptionSendToggle = React.useCallback((enabled: boolean) => {
-    dispatchAutoOptionSend({ type: "toggle", enabled });
-  }, [dispatchAutoOptionSend]);
-
-  React.useEffect(() => {
-    const current =
-      storage.getState().localSettings.autoOptionSendSessions ?? {};
-    if (autoOptionSend.enabled) {
-      if (current[sessionId] !== true) {
-        storage.getState().applyLocalSettings({
-          autoOptionSendSessions: { ...current, [sessionId]: true },
-        });
-      }
-    } else {
-      if (current[sessionId] != null) {
-        const { [sessionId]: _, ...rest } = current;
-        storage.getState().applyLocalSettings({
-          autoOptionSendSessions: rest,
-        });
-      }
-    }
-  }, [autoOptionSend.enabled, sessionId]);
-
-  React.useEffect(() => {
-    if (autoOptionSend.status !== "armed" || autoOptionSend.candidate == null) {
-      return;
-    }
-
-    const interval = setInterval(() => {
-      const remaining = Math.max(
-        0,
-        autoOptionSend.candidate!.startedAt +
-          autoOptionSend.candidate!.durationMs -
-          Date.now(),
-      );
-      setAutoOptionSend((prev) => ({ ...prev, remainingMs: remaining }));
-      if (remaining <= 0) {
-        dispatchAutoOptionSend({ type: "timer-finished" }, Date.now());
-      }
-    }, 250);
-
-    return () => clearInterval(interval);
-  }, [autoOptionSend.status, autoOptionSend.candidate, dispatchAutoOptionSend]);
-
-  React.useEffect(() => {
-    if (autoOptionSend.status !== "ready") return;
-    dispatchAutoOptionSend({ type: "attempt-fire" });
-  }, [autoOptionSend.status, dispatchAutoOptionSend]);
-
-  React.useEffect(() => {
-    if (!autoOptionSend.shouldSendText) return;
-    sync.sendMessage(sessionId, autoOptionSend.shouldSendText);
-    trackMessageSent();
-    setAutoOptionSend((prev) => ({ ...prev, shouldSendText: null }));
-  }, [autoOptionSend.shouldSendText, sessionId]);
-
-  React.useEffect(() => {
-    if (!autoOptionSend.enabled || !currentOptionsSnapshot) return;
-    dispatchAutoOptionSend({ type: "options-updated" });
-  }, [autoOptionSend.enabled, currentOptionsSnapshot, dispatchAutoOptionSend]);
-
+  // While the user is viewing this session, notify the service about context
+  // changes (typing, ask-user-question) so it can pause appropriately.
   React.useEffect(() => {
     if (!autoOptionSend.enabled) return;
-    if (message.trim().length === 0 && !hasPendingAskUserQuestionVisible && currentOptionsSnapshot) {
+    if (
+      message.trim().length === 0 &&
+      !hasPendingAskUserQuestionVisible &&
+      currentOptionsSnapshot
+    ) {
       return;
     }
-    dispatchAutoOptionSend({
+    autoOptionSendService.dispatch(sessionId, {
       type: "context-invalidated",
-      reason: message.trim().length > 0
-        ? "user-typed"
-        : hasPendingAskUserQuestionVisible
-          ? "ask-user-question"
-          : "options-missing",
+      reason:
+        message.trim().length > 0
+          ? "user-typed"
+          : hasPendingAskUserQuestionVisible
+            ? "ask-user-question"
+            : "options-missing",
     });
-  }, [autoOptionSend.enabled, message, hasPendingAskUserQuestionVisible, currentOptionsSnapshot, dispatchAutoOptionSend]);
+  }, [
+    autoOptionSend.enabled,
+    message,
+    hasPendingAskUserQuestionVisible,
+    currentOptionsSnapshot,
+    sessionId,
+  ]);
 
 
   // Collapsible input state

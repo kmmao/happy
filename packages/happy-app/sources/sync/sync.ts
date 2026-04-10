@@ -102,6 +102,7 @@ import { projectManager } from "./projectManager";
 import { AsyncLock } from "@/utils/lock";
 import { NonRetryableError } from "@/utils/time";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
+import { autoOptionSendService } from "@/sync/autoOptionSendService";
 import { Message } from "./typesMessage";
 import { EncryptionCache } from "./encryption/encryptionCache";
 import { systemPrompt } from "./prompt/systemPrompt";
@@ -361,6 +362,9 @@ class Sync {
   }
 
   async #init() {
+    // Initialize auto-option-send global service
+    autoOptionSendService.init(this.sendMessage.bind(this));
+
     // Register preferences sync callback so storage.ts can trigger server sync
     registerPreferencesSyncCallback((sessionId) => {
       this.syncSessionPreferences(sessionId);
@@ -2692,9 +2696,11 @@ class Sync {
     }
     if (m.length > 0) {
       voiceHooks.onMessages(sessionId, m);
+      autoOptionSendService.onMessages(sessionId);
     }
     if (result.hasReadyEvent) {
       voiceHooks.onReady(sessionId);
+      autoOptionSendService.onReady(sessionId);
     }
 
     // Schedule debounced cache write
