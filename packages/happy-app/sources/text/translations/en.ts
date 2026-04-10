@@ -148,12 +148,14 @@ export const en: TranslationStructure = {
     permissionRequired: "permission required",
     needsAttention: "waiting for you",
     apiRetry: ({
-      attempt,
-      maxRetries,
+      attempt: _attempt,
+      maxRetries: _maxRetries,
+      retryDelaySeconds,
     }: {
       attempt: number;
       maxRetries: number;
-    }) => `retrying API (${attempt}/${maxRetries})…`,
+      retryDelaySeconds: number;
+    }) => `Waiting for rate limit reset (${retryDelaySeconds}s)…`,
     activeNow: "Active now",
     unknown: "unknown",
   },

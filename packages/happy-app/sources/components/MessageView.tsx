@@ -383,6 +383,30 @@ function AgentTextBlock(props: {
         : taskStatus?.status === "stopped"
           ? "stop-circle-outline"
           : "hourglass-outline";
+  const taskStatusTone =
+    taskStatus?.status === "completed"
+      ? {
+          backgroundColor: theme.colors.success + "14",
+          borderColor: theme.colors.success + "2e",
+          textColor: theme.colors.success,
+        }
+      : taskStatus?.status === "failed"
+        ? {
+            backgroundColor: theme.colors.textDestructive + "14",
+            borderColor: theme.colors.textDestructive + "30",
+            textColor: theme.colors.textDestructive,
+          }
+        : taskStatus?.status === "stopped"
+          ? {
+              backgroundColor: theme.colors.textSecondary + "10",
+              borderColor: theme.colors.textSecondary + "24",
+              textColor: theme.colors.textSecondary,
+            }
+          : {
+              backgroundColor: theme.colors.accentOrange + "14",
+              borderColor: theme.colors.accentOrange + "2b",
+              textColor: theme.colors.accentOrange,
+            };
   const taskStatusLabel =
     taskStatus?.status === "start"
       ? t("message.taskStarted")
@@ -409,24 +433,55 @@ function AgentTextBlock(props: {
       </View>
       <View style={styles.agentMessageContainer}>
         {taskStatus && taskStatusLabel ? (
-          <View style={[styles.taskProgressCard, { backgroundColor: theme.colors.surfaceHighest ?? theme.colors.surface }]}>
+          <View
+            style={[
+              styles.taskProgressCard,
+              {
+                backgroundColor: taskStatusTone.backgroundColor,
+                borderColor: taskStatusTone.borderColor,
+              },
+            ]}
+          >
             <View style={styles.taskProgressHeader}>
-              <Ionicons
-                name={taskStatusIcon}
-                size={13}
-                color={theme.colors.textSecondary}
-              />
-              <Text style={[styles.taskProgressLabel, { color: theme.colors.textSecondary }]}>{taskStatusLabel}</Text>
+              <View style={styles.taskProgressMainRow}>
+                <Ionicons
+                  name={taskStatusIcon}
+                  size={10}
+                  color={taskStatusTone.textColor}
+                />
+                <View style={styles.taskProgressTextRow}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.taskProgressLabel,
+                      { color: taskStatusTone.textColor },
+                    ]}
+                  >
+                    {taskStatusLabel}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.taskProgressSummary,
+                      { color: theme.colors.text },
+                    ]}
+                  >
+                    {taskStatus.summary}
+                  </Text>
+                </View>
+              </View>
+              {taskStatus.metrics ? (
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.taskProgressMetrics,
+                    { color: taskStatusTone.textColor },
+                  ]}
+                >
+                  {taskStatus.metrics}
+                </Text>
+              ) : null}
             </View>
-            <MarkdownView
-              markdown={taskStatus.summary}
-              onOptionPress={handleOptionPress}
-            />
-            {taskStatus.metrics ? (
-              <Text style={[styles.taskProgressMetrics, { color: theme.colors.textSecondary }]}>
-                {taskStatus.metrics}
-              </Text>
-            ) : null}
           </View>
         ) : (
           <MarkdownView
@@ -585,7 +640,15 @@ function AgentEventBlock(props: {
     return (
       <View style={styles.turnStatsContainer}>
         {props.hasTurnsWithThinking && (
-          <View style={styles.turnStatBadge}>
+          <View
+            style={[
+              styles.turnStatBadge,
+              {
+                backgroundColor: theme.colors.agentEventText + "12",
+                borderColor: theme.colors.agentEventText + "20",
+              },
+            ]}
+          >
             <Text style={styles.turnStatBadgeText}>
               {t("message.thinkingMarker")}
             </Text>
@@ -595,7 +658,10 @@ function AgentEventBlock(props: {
           <View
             style={[
               styles.turnStatBadge,
-              { backgroundColor: theme.colors.accentPurple + "15" },
+              {
+                backgroundColor: theme.colors.accentPurple + "12",
+                borderColor: theme.colors.accentPurple + "24",
+              },
             ]}
           >
             <Text
@@ -612,7 +678,10 @@ function AgentEventBlock(props: {
           <View
             style={[
               styles.turnStatBadge,
-              { backgroundColor: theme.colors.accentOrange + "15" },
+              {
+                backgroundColor: theme.colors.accentOrange + "12",
+                borderColor: theme.colors.accentOrange + "24",
+              },
             ]}
           >
             <Text
@@ -626,7 +695,15 @@ function AgentEventBlock(props: {
           </View>
         )}
         {props.event.numTurns !== undefined && props.event.numTurns > 0 && (
-          <View style={styles.turnStatBadge}>
+          <View
+            style={[
+              styles.turnStatBadge,
+              {
+                backgroundColor: theme.colors.agentEventText + "12",
+                borderColor: theme.colors.agentEventText + "20",
+              },
+            ]}
+          >
             <Text style={styles.turnStatBadgeText}>
               {t("message.turnCount", { count: props.event.numTurns })}
             </Text>
@@ -636,7 +713,10 @@ function AgentEventBlock(props: {
           <View
             style={[
               styles.turnStatBadge,
-              { backgroundColor: theme.colors.accentTeal + "15" },
+              {
+                backgroundColor: theme.colors.accentTeal + "12",
+                borderColor: theme.colors.accentTeal + "24",
+              },
             ]}
           >
             <Text
@@ -662,8 +742,18 @@ function AgentEventBlock(props: {
           </View>
         )}
         {sessionCost !== undefined && sessionCost > 0 && (
-          <View style={styles.turnStatBadge}>
-            <Text style={styles.turnStatBadgeText}>
+          <View
+            style={[
+              styles.turnStatBadge,
+              {
+                backgroundColor: theme.colors.success + "12",
+                borderColor: theme.colors.success + "22",
+              },
+            ]}
+          >
+            <Text
+              style={[styles.turnStatBadgeText, { color: theme.colors.success }]}
+            >
               {formatCost(sessionCost)}
             </Text>
           </View>
@@ -778,34 +868,60 @@ const styles = StyleSheet.create((theme) => ({
   },
   avatarSlot: {
     width: 32,
-    paddingTop: 14,
+    paddingTop: 11,
     alignItems: "center",
     flexShrink: 0,
   },
   agentMessageContainer: {
     marginRight: 16,
-    marginBottom: 12,
+    marginBottom: 8,
     borderRadius: 16,
     flex: 1,
   },
   taskProgressCard: {
     borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    gap: 1,
   },
   taskProgressHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: 5,
+  },
+  taskProgressMainRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  taskProgressTextRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
     gap: 4,
+    minWidth: 0,
+    flex: 1,
+    flexShrink: 1,
   },
   taskProgressLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
+    letterSpacing: 0.1,
+    ...Typography.default(),
+  },
+  taskProgressSummary: {
+    fontSize: 11.5,
+    lineHeight: 15,
+    flexShrink: 1,
     ...Typography.default(),
   },
   taskProgressMetrics: {
-    fontSize: 12,
+    fontSize: 11,
+    lineHeight: 14,
+    flexShrink: 0,
     ...Typography.default(),
   },
   thinkingHeader: {
@@ -852,23 +968,25 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: 4,
+    gap: 3,
     marginHorizontal: 8,
     marginTop: 2,
-    marginBottom: 8,
+    marginBottom: 6,
     paddingLeft: 40,
   },
   turnStatBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    backgroundColor: theme.colors.agentEventText + "14",
-    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.agentEventText + "12",
+    borderColor: theme.colors.agentEventText + "20",
+    gap: 2,
   },
   turnStatBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "monospace",
     color: theme.colors.agentEventText,
   },

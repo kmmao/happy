@@ -135,12 +135,14 @@ export const zhHans: TranslationStructure = {
     permissionRequired: "需要权限",
     needsAttention: "等你回复",
     apiRetry: ({
-      attempt,
-      maxRetries,
+      attempt: _attempt,
+      maxRetries: _maxRetries,
+      retryDelaySeconds,
     }: {
       attempt: number;
       maxRetries: number;
-    }) => `API 重试中 (${attempt}/${maxRetries})…`,
+      retryDelaySeconds: number;
+    }) => `等待速率限制重置（${retryDelaySeconds} 秒）…`,
     activeNow: "当前活跃",
     unknown: "未知",
   },

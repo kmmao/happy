@@ -6,7 +6,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { layout } from "@/components/layout";
-import { Modal } from "@/modal";
 import { t } from "@/text";
 import { useTasksData } from "./useTasksData";
 import type { ServerTask } from "@/sync/apiTasks";
@@ -56,47 +55,8 @@ function TaskListPage() {
     const data = useTasksData(machineId!);
 
     const handleTaskPress = React.useCallback((task: ServerTask) => {
-        const isActive = task.status === "queued" || task.status === "dispatching" || task.status === "running";
-        const isFailed = task.status === "failed";
-        const isTerminal = task.status === "completed" || task.status === "failed" || task.status === "cancelled";
-
-        const buttons: Array<{ text: string; style?: "cancel" | "destructive"; onPress?: () => void }> = [];
-
-        if (task.sessionId) {
-            buttons.push({
-                text: t("tasks.openSession"),
-                onPress: () => router.push(`/session/${task.sessionId}`),
-            });
-        }
-        if (isActive) {
-            buttons.push({
-                text: t("tasks.cancelTask"),
-                style: "destructive",
-                onPress: () => void data.handleCancel(task.id),
-            });
-        }
-        if (isFailed) {
-            buttons.push({
-                text: t("tasks.retryTask"),
-                onPress: () => void data.handleRetry(task.id),
-            });
-        }
-        if (isTerminal) {
-            buttons.push({
-                text: t("tasks.deleteTask"),
-                style: "destructive",
-                onPress: () => {
-                    Modal.alert(t("tasks.deleteTask"), t("tasks.confirmDelete"), [
-                        { text: t("common.cancel"), style: "cancel" },
-                        { text: t("common.delete"), style: "destructive", onPress: () => void data.handleDelete(task.id) },
-                    ]);
-                },
-            });
-        }
-
-        buttons.push({ text: t("common.cancel"), style: "cancel" });
-        Modal.alert(task.promptPreview || "Task", statusLabel(task.status), buttons);
-    }, [data, router]);
+        router.push(`/machine/${machineId}/task/${task.id}` as any);
+    }, [machineId, router]);
 
     if (data.loading) {
         return (

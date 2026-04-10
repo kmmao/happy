@@ -41,6 +41,12 @@ describe('messageToEvent', () => {
             expect(event!.type).toBe('limit-reached');
         });
 
+        it('does not convert transient retry messages into limit-reached events', () => {
+            const msg = createAgentTextMessage('API rate limit exceeded. Retrying in 8 seconds…');
+            const event = parseMessageAsEvent(msg);
+            expect(event).toBeNull();
+        });
+
         it('does not convert regular agent messages', () => {
             const msg = createAgentTextMessage('Hello, how can I help you?');
             const event = parseMessageAsEvent(msg);

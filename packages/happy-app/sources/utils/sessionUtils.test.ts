@@ -1,16 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getSessionSubtitle, formatPathRelativeToHome, getSessionName } from './sessionUtils';
+import { formatApiRetryStatus, getSessionSubtitle, formatPathRelativeToHome } from './sessionUtils';
 import { Session } from '@/sync/storageTypes';
 
-// Mock @/text to return key-based values for deterministic testing
+// Mock @/text to return deterministic translations for tests
 vi.mock('@/text', () => ({
-    t: (key: string) => {
-        const translations: Record<string, string> = {
+    t: (key: string, params?: Record<string, unknown>) => {
+        const translations: Record<string, string | ((params?: Record<string, unknown>) => string)> = {
             'status.unknown': 'Unknown',
             'session.startedByDaemon': 'daemon',
             'session.startedByTerminal': 'Terminal',
+            'status.apiRetry': (values) => `Waiting for rate limit reset (${String(values?.retryDelaySeconds)}s)…`,
         };
-        return translations[key] || key;
+        const translation = translations[key];
+        if (typeof translation === 'function') {
+            return translation(params);
+        }
+        return translation || key;
     }
 }));
 
@@ -38,6 +43,18 @@ function createSession(overrides: Partial<Session> = {}): Session {
 }
 
 describe('sessionUtils', () => {
+    describe('formatApiRetryStatus', () => {
+        it('shows a friendly retry message with remaining seconds', () => {
+            const statusText = formatApiRetryStatus({
+                attempt: 2,
+                maxRetries: 5,
+                retryDelayMs: 8000,
+            });
+
+            expect(statusText).toBe('Waiting for rate limit reset (8s)…');
+        });
+    });
+
     describe('getSessionSubtitle', () => {
         it('returns path relative to home for terminal sessions', () => {
             const session = createSession();

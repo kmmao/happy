@@ -104,6 +104,10 @@ export function shouldSkipNormalProcessing(msg: NormalizedMessage): boolean {
  */
 export function isRateLimitMessage(text: string): boolean {
   const lower = text.toLowerCase();
+  if (lower.includes("retrying in") || lower.includes("will retry")) {
+    return false;
+  }
+
   return (
     (lower.includes("rate limit") && lower.includes("exceeded")) ||
     (lower.includes("quota") && lower.includes("exceeded")) ||

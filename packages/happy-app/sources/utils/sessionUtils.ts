@@ -19,6 +19,18 @@ export interface SessionStatus {
   isPulsing?: boolean;
 }
 
+export function formatApiRetryStatus(apiRetry: {
+  attempt: number;
+  maxRetries: number;
+  retryDelayMs: number;
+}): string {
+  return t("status.apiRetry", {
+    attempt: apiRetry.attempt,
+    maxRetries: apiRetry.maxRetries,
+    retryDelaySeconds: Math.max(1, Math.ceil(apiRetry.retryDelayMs / 1000)),
+  });
+}
+
 /**
  * Get the current state of a session based on presence and thinking status.
  * Uses centralized session state from storage.ts
@@ -108,10 +120,7 @@ export function useSessionStatus(session: Session): SessionStatus {
       return {
         state: "thinking",
         isConnected: true,
-        statusText: t("status.apiRetry", {
-          attempt: session.apiRetry.attempt,
-          maxRetries: session.apiRetry.maxRetries,
-        }),
+        statusText: formatApiRetryStatus(session.apiRetry),
         shouldShowStatus: true,
         statusColor: "#FF9500",
         statusDotColor: "#FF9500",

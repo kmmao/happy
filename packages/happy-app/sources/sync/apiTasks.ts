@@ -100,6 +100,25 @@ export async function createTask(
     });
 }
 
+export async function fetchTask(
+    credentials: AuthCredentials,
+    taskId: string,
+): Promise<ServerTask> {
+    const API_ENDPOINT = getServerUrl();
+
+    return await backoff(async () => {
+        const response = await fetch(`${API_ENDPOINT}/v1/tasks/${taskId}`, {
+            headers: authHeaders(credentials),
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error((data as Record<string, string>).error ?? `Failed to fetch task: ${response.status}`);
+        }
+        const data = (await response.json()) as TaskResponse;
+        return data.task;
+    });
+}
+
 export async function cancelTask(
     credentials: AuthCredentials,
     taskId: string,

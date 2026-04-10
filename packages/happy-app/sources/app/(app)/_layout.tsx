@@ -495,6 +495,14 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="machine/[id]/task/[taskId]"
+        options={{
+          headerShown: true,
+          headerTitle: t("tasks.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="machine/[id]/triggers"
         options={{
           headerShown: true,
