@@ -230,10 +230,10 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     ...Typography.default(),
   },
   autoSendBadge: {
-    backgroundColor: `${theme.colors.accentOrange}1F`,
+    backgroundColor: `${theme.colors.accentPurple}1F`,
   },
   autoSendBadgeText: {
-    color: theme.colors.accentOrange,
+    color: theme.colors.accentPurple,
     ...Typography.default("semiBold"),
   },
   swipeActionsContainer: {

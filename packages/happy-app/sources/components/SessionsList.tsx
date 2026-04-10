@@ -204,10 +204,10 @@ const stylesheet = StyleSheet.create((theme) => ({
     ...Typography.default("semiBold"),
   },
   autoSendBadge: {
-    backgroundColor: `${theme.colors.accentOrange}1F`,
+    backgroundColor: `${theme.colors.accentPurple}1F`,
   },
   autoSendBadgeText: {
-    color: theme.colors.accentOrange,
+    color: theme.colors.accentPurple,
     ...Typography.default("semiBold"),
   },
   issueRow: {
@@ -680,7 +680,7 @@ const SessionItem = React.memo(
                 flavor={session.metadata?.flavor}
                 provider={getSessionProviderKey(session)}
                 hasUnreadMessages={hasUnreadMessages}
-                glowColor={isAutoOptionSend ? theme.colors.accentOrange : null}
+                glowColor={isAutoOptionSend ? theme.colors.accentPurple : null}
               />
               {session.draft && (
                 <View style={styles.draftIconContainer}>
