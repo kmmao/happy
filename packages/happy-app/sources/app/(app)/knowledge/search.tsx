@@ -8,6 +8,7 @@ import { t } from "@/text";
 import { useKnowledgeSearch, type KnowledgeSearchResult } from "@/hooks/useKnowledgeSearch";
 import { KnowledgeSearchResultCard } from "@/components/knowledge/KnowledgeSearchResultCard";
 import { layout } from "@/components/layout";
+import { projectManager } from "@/sync/projectManager";
 
 function KnowledgeSearchScreen() {
     const { theme } = useUnistyles();
@@ -19,7 +20,9 @@ function KnowledgeSearchScreen() {
             <KnowledgeSearchResultCard
                 result={item}
                 onPress={() => {
-                    router.push(`/project/${item.projectId}?tab=knowledge` as any);
+                    const localProjectId = projectManager.getProjectByServerId(item.projectId)?.id;
+                    if (!localProjectId) return;
+                    router.push(`/project/${localProjectId}?tab=knowledge` as any);
                 }}
             />
         ),
