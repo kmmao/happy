@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View } from "react-native";
+import { Animated, View } from "react-native";
 import { Image } from "expo-image";
 import { AvatarSkia } from "./AvatarSkia";
 import { AvatarGradient } from "./AvatarGradient";
@@ -18,7 +18,55 @@ interface AvatarProps {
   imageUrl?: string | null;
   thumbhash?: string | null;
   hasUnreadMessages?: boolean;
+  glowColor?: string | null;
 }
+
+/** Pulsing glow ring rendered behind the avatar. */
+const GlowRing = React.memo(({ size, color }: { size: number; color: string }) => {
+  const opacity = React.useRef(new Animated.Value(0.4)).current;
+
+  React.useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  const ringSize = size + 6;
+  return (
+    <Animated.View
+      style={{
+        position: "absolute",
+        top: -3,
+        left: -3,
+        width: ringSize,
+        height: ringSize,
+        borderRadius: ringSize / 2,
+        borderWidth: 1.5,
+        borderColor: color,
+        opacity,
+        shadowColor: color,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.6,
+        shadowRadius: 4,
+        elevation: 4,
+      }}
+      pointerEvents="none"
+    />
+  );
+});
 
 const flavorIcons = {
   claude: require("@/assets/images/icon-claude.png"),
@@ -129,11 +177,13 @@ export const Avatar = React.memo((props: AvatarProps) => {
     imageUrl,
     thumbhash,
     hasUnreadMessages,
+    glowColor,
     ...avatarProps
   } = props;
   const avatarStyle = useSetting("avatarStyle");
   const showFlavorIcons = useSetting("showFlavorIcons");
   const { theme } = useUnistyles();
+  const glowElement = glowColor ? <GlowRing size={size} color={glowColor} /> : null;
 
   const unreadBadgeSize = Math.round(size * 0.22);
   const unreadBadgeElement = hasUnreadMessages ? (
@@ -161,7 +211,7 @@ export const Avatar = React.memo((props: AvatarProps) => {
     );
 
     const showFlavorOverlay = showFlavorIcons && (provider || flavor);
-    if (showFlavorOverlay || hasUnreadMessages) {
+    if (showFlavorOverlay || hasUnreadMessages || glowElement) {
       const normalizedFlavor = resolveIconKey(provider, flavor);
       const flavorIcon = flavorIcons[normalizedFlavor];
       const circleSize = Math.round(size * 0.35);
@@ -174,6 +224,7 @@ export const Avatar = React.memo((props: AvatarProps) => {
 
       return (
         <View style={[styles.container, { width: size, height: size }]}>
+          {glowElement}
           {imageElement}
           {showFlavorOverlay && (
             <View
@@ -231,9 +282,10 @@ export const Avatar = React.memo((props: AvatarProps) => {
         ? Math.round(size * 0.28)
         : Math.round(size * 0.35);
 
-  if (showFlavorIcons || hasUnreadMessages) {
+  if (showFlavorIcons || hasUnreadMessages || glowElement) {
     return (
       <View style={[styles.container, { width: size, height: size }]}>
+        {glowElement}
         <AvatarComponent {...avatarProps} size={size} />
         {showFlavorIcons && (
           <View

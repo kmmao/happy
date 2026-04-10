@@ -680,6 +680,7 @@ const SessionItem = React.memo(
                 flavor={session.metadata?.flavor}
                 provider={getSessionProviderKey(session)}
                 hasUnreadMessages={hasUnreadMessages}
+                glowColor={isAutoOptionSend ? theme.colors.accentOrange : null}
               />
               {session.draft && (
                 <View style={styles.draftIconContainer}>

@@ -685,6 +685,7 @@ const CompactSessionRow = React.memo(
                 flavor={session.metadata?.flavor}
                 provider={getSessionProviderKey(session)}
                 hasUnreadMessages={hasUnreadMessages}
+                glowColor={isAutoOptionSend ? styles.autoSendBadgeText.color : null}
               />
             </View>
             <View style={styles.sessionContent}>
