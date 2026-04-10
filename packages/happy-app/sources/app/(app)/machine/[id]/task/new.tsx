@@ -6,8 +6,7 @@ import { Typography } from "@/constants/Typography";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { useProjects } from "@/hooks/useProjects";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { createTask } from "@/sync/apiTasks";
-import { createWorktree } from "@/utils/createWorktree";
+import { submitTask, WorktreeSetupError } from "./submitTask";
 import { Modal } from "@/modal";
 import { ItemList } from "@/components/ItemList";
 import { ItemGroup } from "@/components/ItemGroup";
@@ -40,7 +39,7 @@ function NewTaskPage() {
         [projects, machineId],
     );
 
-    const canSubmit = prompt.trim().length > 0;
+    const canSubmit = prompt.trim().length > 0 && typeof machineId === "string";
 
     const [loading, doCreate] = useHappyAction(
         React.useCallback(async () => {
@@ -48,39 +47,34 @@ function NewTaskPage() {
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) return;
 
-            let taskDirectory: string | undefined;
-            if (selectedProjectId) {
-                const proj = machineProjects.find(
-                    (p) => (p.serverId ?? p.id) === selectedProjectId,
-                );
-                if (proj?.key.path) {
-                    const wt = await createWorktree(machineId, proj.key.path);
-                    if (!wt.success) {
-                        if (wt.error === "Not a Git repository") {
-                            Modal.alert(t("common.error"), t("newSession.worktree.notGitRepo"));
-                        } else {
-                            Modal.alert(
-                                t("common.error"),
-                                t("newSession.worktree.failed", {
-                                    error: wt.error ?? "Unknown error",
-                                }),
-                            );
-                        }
+            try {
+                await submitTask({
+                    credentials,
+                    machineId,
+                    prompt,
+                    priority,
+                    maxAttempts,
+                    selectedProjectId,
+                    machineProjects,
+                });
+                router.back();
+            } catch (error) {
+                const detail = error instanceof Error ? error.message : String(error);
+                if (error instanceof WorktreeSetupError) {
+                    if (error.kind === "not_git_repo") {
+                        Modal.alert(t("common.error"), t("newSession.worktree.notGitRepo"));
                         return;
                     }
-                    taskDirectory = wt.worktreePath;
+                    Modal.alert(
+                        t("common.error"),
+                        t("newSession.worktree.failed", {
+                            error: detail || "Unknown error",
+                        }),
+                    );
+                    return;
                 }
+                throw error;
             }
-
-            await createTask(credentials, {
-                machineId,
-                prompt: prompt.trim(),
-                priority,
-                maxAttempts: Math.max(1, parseInt(maxAttempts, 10) || 3),
-                projectId: selectedProjectId ?? undefined,
-                directory: taskDirectory,
-            });
-            router.back();
         }, [machineId, prompt, priority, maxAttempts, selectedProjectId, router, machineProjects]),
     );
 

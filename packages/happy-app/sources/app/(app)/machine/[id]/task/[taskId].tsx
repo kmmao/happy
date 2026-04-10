@@ -123,7 +123,7 @@ function TaskDetailScreen() {
 
     React.useEffect(() => {
         return sync.onTaskStatusChanged((event) => {
-            if (event.machineId !== machineId) return;
+            if (event.machineId && event.machineId !== machineId) return;
             if (event.taskId !== taskId) return;
             taskEventRetrierRef.current?.trigger();
         });

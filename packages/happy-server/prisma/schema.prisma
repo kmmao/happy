@@ -804,6 +804,7 @@ model Task {
     title           String?                         // Human-readable title (set by Planner or user)
     prompt          String
     promptVersion   Int       @default(0)
+    directory       String?
 
     // Execution
     priority        String    @default("user")     // urgent | user | background

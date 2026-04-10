@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/log', () => ({
+    log: vi.fn(),
+}));
+
 import { ApiEphemeralUpdateSchema, ApiUpdateSchema } from './apiTypes';
 
 describe('ApiUpdateSchema', () => {
@@ -29,6 +34,16 @@ describe('ApiEphemeralUpdateSchema', () => {
             projectId: 'project-1',
             status: 'in_progress',
             progress: 42,
+        });
+        expect(parsed.success).toBe(true);
+    });
+
+    it('keeps task-status-changed backward compatible when machineId is missing', () => {
+        const parsed = ApiEphemeralUpdateSchema.safeParse({
+            type: 'task-status-changed',
+            taskId: 'task-1',
+            status: 'running',
+            sessionId: 'session-1',
         });
         expect(parsed.success).toBe(true);
     });

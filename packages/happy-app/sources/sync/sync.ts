@@ -202,6 +202,7 @@ class Sync {
   }) => void>();
   private taskStatusListeners = new Set<(event: {
     taskId: string;
+    machineId?: string;
     status: string;
     sessionId?: string;
     errorMessage?: string;
@@ -2517,6 +2518,7 @@ class Sync {
       for (const listener of this.taskStatusListeners) {
         listener({
           taskId: updateData.taskId,
+          machineId: updateData.machineId,
           status: updateData.status,
           sessionId: updateData.sessionId,
           errorMessage: updateData.errorMessage,
@@ -2834,6 +2836,7 @@ class Sync {
 
   onTaskStatusChanged(listener: (event: {
     taskId: string;
+    machineId?: string;
     status: string;
     sessionId?: string;
     errorMessage?: string;

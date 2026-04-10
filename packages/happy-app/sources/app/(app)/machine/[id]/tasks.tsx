@@ -9,41 +9,17 @@ import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { useTasksData } from "./useTasksData";
 import type { ServerTask } from "@/sync/apiTasks";
-
-const FILTERS = ["all", "active", "completed", "failed"] as const;
-
-function statusBadgeColor(status: string): string {
-    if (status === "running" || status === "dispatching") return "#007AFF";
-    if (status === "completed") return "#34C759";
-    if (status === "failed") return "#FF3B30";
-    if (status === "cancelled") return "#8E8E93";
-    return "#AEAEB2";
-}
-
-function statusLabel(status: string): string {
-    const map: Record<string, string> = {
-        queued: t("tasks.statusQueued"),
-        dispatching: t("tasks.statusDispatching"),
-        running: t("tasks.statusRunning"),
-        completed: t("tasks.statusCompleted"),
-        failed: t("tasks.statusFailed"),
-        cancelled: t("tasks.statusCancelled"),
-    };
-    return map[status] ?? status;
-}
-
-function filterLabel(f: string): string {
-    if (f === "all") return t("tasks.filterAll");
-    if (f === "active") return t("tasks.filterActive");
-    if (f === "completed") return t("tasks.statusCompleted");
-    if (f === "failed") return t("tasks.statusFailed");
-    return f;
-}
+import {
+    getTaskFilterLabel,
+    getTaskStatusBadgeColor,
+    getTaskStatusLabel,
+    TASK_FILTERS,
+} from "./task/taskDetailViewModel";
 
 function StatusBadge({ status }: { status: string }) {
     return (
-        <View style={[styles.badge, { backgroundColor: statusBadgeColor(status) }]}>
-            <Text style={styles.badgeText}>{statusLabel(status)}</Text>
+        <View style={[styles.badge, { backgroundColor: getTaskStatusBadgeColor(status) }]}>
+            <Text style={styles.badgeText}>{getTaskStatusLabel(status, t as (key: string) => string)}</Text>
         </View>
     );
 }
@@ -83,7 +59,7 @@ function TaskListPage() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.filterRow}
             >
-                {FILTERS.map((f) => {
+                {TASK_FILTERS.map((f) => {
                     const filterValue = f === "all" ? undefined : f;
                     const isActive = data.filter === filterValue;
                     return (
@@ -107,7 +83,7 @@ function TaskListPage() {
                                     { color: isActive ? "#FFF" : theme.colors.text },
                                 ]}
                             >
-                                {filterLabel(f)}
+                                {getTaskFilterLabel(f, t as (key: string) => string)}
                             </Text>
                         </Pressable>
                     );

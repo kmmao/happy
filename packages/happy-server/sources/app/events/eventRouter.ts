@@ -362,6 +362,7 @@ export type EphemeralEvent =
   | {
       type: "task-status-changed";
       taskId: string;
+      machineId: string;
       status: string;
       sessionId?: string;
       errorMessage?: string;
@@ -1178,6 +1179,7 @@ export function buildTaskTriggerEphemeral(opts: {
 
 export function buildTaskStatusChangedEphemeral(opts: {
   taskId: string;
+  machineId: string;
   status: string;
   sessionId?: string;
   errorMessage?: string;

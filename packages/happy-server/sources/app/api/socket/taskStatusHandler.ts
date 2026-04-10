@@ -106,6 +106,7 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                 userId,
                 payload: buildTaskStatusChangedEphemeral({
                     taskId: data.taskId,
+                    machineId: task.machineId,
                     status: resolvedStatus,
                     sessionId: updated.sessionId ?? undefined,
                     errorMessage: updated.errorMessage ?? undefined,

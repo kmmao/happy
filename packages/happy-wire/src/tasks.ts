@@ -99,6 +99,7 @@ export type TaskStatusReport = z.infer<typeof TaskStatusReportSchema>;
 export const TaskStatusChangedSchema = z.object({
   type: z.literal("task-status-changed"),
   taskId: z.string(),
+  machineId: z.string().optional(),
   status: TaskStatusSchema,
   sessionId: z.string().optional(),
   errorMessage: z.string().optional(),

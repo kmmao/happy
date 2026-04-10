@@ -14,6 +14,7 @@ export async function createWorktree(
     worktreePath: string;
     branchName: string;
     parentBranch: string;
+    errorCode?: 'not_git_repo' | 'create_worktree_failed';
     error?: string;
 }> {
     const name = generateWorktreeName(issueNumber);
@@ -31,6 +32,7 @@ export async function createWorktree(
             worktreePath: '',
             branchName: '',
             parentBranch: '',
+            errorCode: 'not_git_repo',
             error: 'Not a Git repository'
         };
     }
@@ -90,6 +92,7 @@ export async function createWorktree(
         worktreePath: '',
         branchName: '',
         parentBranch: '',
+        errorCode: 'create_worktree_failed',
         error: result.stderr || 'Failed to create worktree'
     };
 }

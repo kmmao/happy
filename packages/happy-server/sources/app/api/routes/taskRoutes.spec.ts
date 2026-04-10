@@ -9,6 +9,7 @@ type TaskRecord = {
     projectId: string | null;
     machineId: string;
     prompt: string;
+    directory: string | null;
     priority: "urgent" | "user" | "background";
     status: "queued" | "dispatching" | "running" | "completed" | "failed" | "cancelled";
     attempt: number;
@@ -41,6 +42,7 @@ const { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock } 
             projectId: input.projectId ?? "project-1",
             machineId: input.machineId,
             prompt: input.prompt ?? "encrypted-prompt",
+            directory: input.directory ?? "/repo",
             priority: input.priority ?? "user",
             status: input.status ?? "running",
             attempt: input.attempt ?? 0,
@@ -128,6 +130,32 @@ vi.mock("@/modules/goalProgressUpdate", () => ({
 vi.mock("@/app/auth/auth", () => ({
     auth: authMock,
 }));
+vi.mock("@/storage/inTx", () => ({
+    inTx: vi.fn(async (fn: any) => fn(dbMock as any)),
+}));
+vi.mock("@/storage/repeatKey", () => ({
+    fetchRepeatKey: vi.fn(async (dbArg: any, key: string) => dbArg.repeatKey.findUnique({ where: { key } })),
+    saveRepeatKey: vi.fn(async (dbArg: any, key: string, value: string, expiresAt: number) => dbArg.repeatKey.upsert({ where: { key }, update: { value, expiresAt: new Date(expiresAt) }, create: { key, value, expiresAt: new Date(expiresAt) } })),
+}));
+vi.mock("@/modules/taskStatusLogic", () => ({
+    normalizeTaskStatusReport: vi.fn(({ status, outcome, errorMessage }: any) => {
+        if (outcome === "blocked") {
+            return { status: "failed", errorMessage: errorMessage ?? "Blocked" };
+        }
+        if (outcome === "failed") {
+            return { status: "failed", errorMessage };
+        }
+        if (outcome === "completed") {
+            return { status: "completed", errorMessage };
+        }
+        return { status, errorMessage };
+    }),
+    shouldApplyTaskStatus: vi.fn((current: string, next: string) => {
+        if (["completed", "failed", "cancelled"].includes(current) && current === next) return true;
+        if (["completed", "failed", "cancelled"].includes(current)) return false;
+        return true;
+    }),
+}));
 
 import { taskRoutes } from "./taskRoutes";
 
@@ -202,6 +230,28 @@ describe("taskRoutes POST /v1/tasks", () => {
         const payload = (buildTaskTriggerEphemeral as any).mock.calls[0][0];
         expect(payload.resultToken).toBeTypeOf("string");
     });
+
+    it("persists validated directory override on task record", async () => {
+        app = await createApp();
+
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/tasks",
+            headers: { "x-user-id": "user-1" },
+            payload: {
+                machineId: "machine-1",
+                projectId: "project-1",
+                prompt: "do work",
+                directory: "/repo/.dev/worktree/task-123",
+            },
+        });
+
+        expect(res.statusCode).toBe(201);
+        expect(dbMock.task.create).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ directory: "/repo/.dev/worktree/task-123" }),
+        }));
+        expect(res.json().task.directory).toBe("/repo/.dev/worktree/task-123");
+    });
 });
 
 describe("taskRoutes POST /v1/tasks/status", () => {
@@ -242,6 +292,9 @@ describe("taskRoutes POST /v1/tasks/status", () => {
         expect(res.json().task.status).toBe("failed");
         expect(res.json().task.errorMessage).toContain("Need human decision");
         expect(state.tasks[0]?.status).toBe("failed");
+        const { buildTaskStatusChangedEphemeral } = await import("@/app/events/eventRouter");
+        const payload = (buildTaskStatusChangedEphemeral as any).mock.calls[0][0];
+        expect(payload.machineId).toBe("machine-1");
     });
 
     it("treats repeated terminal status report as idempotent no-op", async () => {
@@ -320,6 +373,9 @@ describe("taskRoutes POST /v1/tasks/result", () => {
 
         expect(res.statusCode).toBe(200);
         expect(res.json().task.status).toBe("failed");
+        const { buildTaskStatusChangedEphemeral } = await import("@/app/events/eventRouter");
+        const payload = (buildTaskStatusChangedEphemeral as any).mock.calls[0][0];
+        expect(payload.machineId).toBe("machine-1");
     });
 
     it("rejects task-scoped token when taskId does not match", async () => {
@@ -366,7 +422,7 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             scope: "task-result",
             jti: "jti-replayed",
         } as any));
-        dbMock.repeatKey.findUnique.mockResolvedValueOnce({ key: "task-result-jti:jti-replayed", value: "used", expiresAt: new Date(Date.now() + 60_000) });
+        dbMock.repeatKey.findUnique.mockResolvedValueOnce({ key: "task-result-jti:jti-replayed", value: "used", expiresAt: new Date(Date.now() + 60_000) } as any);
         app = await createApp();
 
         const res = await app.inject({
@@ -381,5 +437,77 @@ describe("taskRoutes POST /v1/tasks/result", () => {
         });
 
         expect(res.statusCode).toBe(409);
+    });
+
+    it("does not copy success summary into errorMessage for completed outcome", async () => {
+        seedTask({
+            id: "task-1",
+            accountId: "user-1",
+            machineId: "machine-1",
+            status: "running",
+            goalId: "goal-1",
+            errorMessage: null,
+        });
+        authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
+            userId: "user-1",
+            taskId: "task-1",
+            scope: "task-result",
+            jti: "jti-success",
+        } as any));
+        app = await createApp();
+
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/tasks/result",
+            headers: { authorization: "Bearer task-token-1" },
+            payload: {
+                taskId: "task-1",
+                outcome: "completed",
+                summary: "Finished cleanly",
+                sessionId: "session-1",
+            },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.json().task.status).toBe("completed");
+        expect(res.json().task.errorMessage).toBeNull();
+        expect(state.tasks[0]?.errorMessage).toBeNull();
+    });
+});
+
+describe("taskRoutes POST /v1/tasks/:id/retry", () => {
+    let app: Fastify;
+
+    beforeEach(() => {
+        resetState();
+        vi.clearAllMocks();
+    });
+
+    afterEach(async () => {
+        if (app) await app.close();
+    });
+
+    it("reuses persisted task directory instead of resetting to project root", async () => {
+        seedTask({
+            id: "task-1",
+            accountId: "user-1",
+            machineId: "machine-1",
+            status: "failed",
+            projectId: "project-1",
+            directory: "/repo/.dev/worktree/task-1",
+            goalId: null,
+        });
+        app = await createApp();
+
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/tasks/task-1/retry",
+            headers: { "x-user-id": "user-1" },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const { buildTaskTriggerEphemeral } = await import("@/app/events/eventRouter");
+        const payload = (buildTaskTriggerEphemeral as any).mock.calls[0][0];
+        expect(payload.directory).toBe("/repo/.dev/worktree/task-1");
     });
 });

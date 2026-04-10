@@ -6,6 +6,7 @@ export interface ServerTask {
     id: string;
     projectId: string | null;
     machineId: string;
+    directory: string | null;
     priority: string;
     status: string;
     triggerType: string;

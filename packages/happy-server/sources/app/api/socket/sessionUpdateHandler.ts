@@ -328,6 +328,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                     userId,
                     payload: buildTaskStatusChangedEphemeral({
                         taskId: task.id,
+                        machineId: task.machineId,
                         status: "completed",
                         sessionId: updated.sessionId ?? undefined,
                         completedAt: completedAt.getTime(),

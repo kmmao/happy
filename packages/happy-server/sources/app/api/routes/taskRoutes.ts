@@ -65,7 +65,7 @@ function buildTaskStatusPayload(input: {
         return {
             status: input.status,
             outcome: undefined,
-            errorMessage: input.summary ?? input.errorMessage,
+            errorMessage: input.errorMessage,
         };
     }
 
@@ -76,7 +76,7 @@ function buildTaskStatusPayload(input: {
     return {
         status: normalized.status,
         outcome: normalized.outcome,
-        errorMessage: input.summary ?? input.errorMessage,
+        errorMessage: normalized.status === "completed" ? undefined : (input.errorMessage ?? input.summary),
     };
 }
 
@@ -182,6 +182,7 @@ export function taskRoutes(app: Fastify) {
                     projectId: resolvedProjectId,
                     machineId,
                     prompt,
+                    directory,
                     priority,
                     maxAttempts,
                     triggerType: "manual",
@@ -319,6 +320,7 @@ export function taskRoutes(app: Fastify) {
                 userId: request.userId,
                 payload: buildTaskStatusChangedEphemeral({
                     taskId: task.id,
+                    machineId: task.machineId,
                     status: "cancelled",
                     completedAt: updated.completedAt?.getTime(),
                 }),
@@ -349,7 +351,7 @@ export function taskRoutes(app: Fastify) {
                 return reply.code(400).send({ error: `Can only retry failed tasks, current: '${task.status}'` });
             }
 
-            let directory = "~";
+            let directory = task.directory ?? "~";
             if (task.projectId) {
                 const project = await db.project.findFirst({
                     where: { id: task.projectId, accountId: request.userId },
@@ -357,7 +359,9 @@ export function taskRoutes(app: Fastify) {
                 if (!project) {
                     return reply.code(404).send({ error: "Project not found" });
                 }
-                directory = project.path;
+                if (!task.directory) {
+                    directory = project.path;
+                }
             }
 
             let skillContents: Array<{ name: string; content: string }> | undefined;
@@ -500,6 +504,7 @@ export function taskRoutes(app: Fastify) {
                 userId: request.userId,
                 payload: buildTaskStatusChangedEphemeral({
                     taskId,
+                    machineId: task.machineId,
                     status: resolvedStatus,
                     sessionId: updated.sessionId ?? undefined,
                     errorMessage: updated.errorMessage ?? undefined,
@@ -573,6 +578,7 @@ export function taskRoutes(app: Fastify) {
                 userId: request.userId,
                 payload: buildTaskStatusChangedEphemeral({
                     taskId,
+                    machineId: task.machineId,
                     status: resolvedStatus,
                     sessionId: updated.sessionId ?? undefined,
                     errorMessage: updated.errorMessage ?? undefined,
@@ -601,6 +607,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         projectId: string | null;
         machineId: string;
         prompt: string;
+        directory: string | null;
         priority: string;
         status: string;
         triggerType: string;
@@ -620,6 +627,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         id: t.id,
         projectId: t.projectId,
         machineId: t.machineId,
+        directory: t.directory,
         priority: t.priority,
         status: t.status,
         triggerType: t.triggerType,

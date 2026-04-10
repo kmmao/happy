@@ -121,7 +121,7 @@ export function useTasksData(machineId: string | undefined) {
 
     React.useEffect(() => {
         return sync.onTaskStatusChanged((event) => {
-            if (event.machineId !== machineId) return;
+            if (event.machineId && event.machineId !== machineId) return;
             if (!hasLoadedOnceRef.current) return;
             taskEventRetrierRef.current?.trigger();
         });

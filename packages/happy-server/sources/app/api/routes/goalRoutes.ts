@@ -690,7 +690,7 @@ export function goalRoutes(app: Fastify) {
                     goalId: goal.id,
                     status: { in: ["queued", "dispatching"] },
                 },
-                select: { id: true },
+                select: { id: true, machineId: true },
             });
 
             await db.$transaction([
@@ -713,6 +713,7 @@ export function goalRoutes(app: Fastify) {
                     userId: request.userId,
                     payload: buildTaskStatusChangedEphemeral({
                         taskId: task.id,
+                        machineId: task.machineId,
                         status: "cancelled",
                         completedAt: now.getTime(),
                     }),

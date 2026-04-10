@@ -331,6 +331,7 @@ export const ApiEphemeralGoalProgressSchema = z.object({
 export const ApiEphemeralTaskStatusChangedSchema = z.object({
     type: z.literal("task-status-changed"),
     taskId: z.string(),
+    machineId: z.string().optional(),
     status: z.string(),
     sessionId: z.string().optional(),
     errorMessage: z.string().optional(),
