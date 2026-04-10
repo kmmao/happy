@@ -2198,6 +2198,11 @@ export const ru: TranslationStructure = {
     turnCount: ({ count }: { count: number }) =>
       count === 1 ? `${count} ход` : `${count} ходов`,
     thinkingMarker: "Мышление",
+    taskStarted: "Задача начата",
+    taskProgress: "Прогресс задачи",
+    taskCompleted: "Задача завершена",
+    taskFailed: "Задача не выполнена",
+    taskStopped: "Задача остановлена",
   },
 
   codex: {

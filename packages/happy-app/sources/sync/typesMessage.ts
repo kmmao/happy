@@ -53,6 +53,12 @@ export type ModeSwitchMessage = {
   };
 };
 
+export type TaskStatusMessage = {
+  status: "start" | "progress" | "completed" | "failed" | "stopped";
+  summary: string;
+  metrics: string | null;
+};
+
 export type AgentTextMessage = {
   kind: "agent-text";
   id: string;
@@ -60,6 +66,7 @@ export type AgentTextMessage = {
   createdAt: number;
   text: string;
   isThinking?: boolean;
+  taskStatus?: TaskStatusMessage;
   meta?: MessageMeta;
 };
 

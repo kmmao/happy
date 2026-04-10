@@ -2271,6 +2271,11 @@ export const ja: TranslationStructure = {
     sessionSummary: ({ tokens }: { tokens: string }) => `Σ${tokens} tokens`,
     turnCount: ({ count }: { count: number }) => `${count} ターン`,
     thinkingMarker: "思考中",
+    taskStarted: "タスク開始",
+    taskProgress: "タスク進捗",
+    taskCompleted: "タスク完了",
+    taskFailed: "タスク失敗",
+    taskStopped: "タスク停止",
   },
 
   codex: {

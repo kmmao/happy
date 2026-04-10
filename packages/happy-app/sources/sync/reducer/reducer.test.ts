@@ -3010,6 +3010,39 @@ describe('reducer', () => {
             ];
         }
 
+        it('should expose unified taskStatus for task-start progress and end messages', () => {
+            const state = createReducer();
+            const startMessages = reducer(state, [taskStart('bg-1', 'Running npm start')]).messages;
+            const progressMessages = reducer(state, [taskProgress('bg-1', 'Tests 50% complete')]).messages;
+            const endMessages = reducer(state, [taskEnd('bg-1', 'completed')]).messages;
+
+            const messages = [...startMessages, ...progressMessages, ...endMessages].filter((message) => message.kind === 'agent-text');
+            expect(messages).toHaveLength(3);
+            expect(messages[0]).toMatchObject({
+                kind: 'agent-text',
+                taskStatus: {
+                    status: 'start',
+                    summary: 'Running npm start',
+                    metrics: null,
+                },
+            });
+            expect(messages[1]).toMatchObject({
+                kind: 'agent-text',
+                taskStatus: {
+                    status: 'progress',
+                    summary: 'Tests 50% complete',
+                },
+            });
+            expect(messages[2]).toMatchObject({
+                kind: 'agent-text',
+                taskStatus: {
+                    status: 'completed',
+                    summary: 'Task completed',
+                    metrics: null,
+                },
+            });
+        });
+
         it('should create entry from task-start', () => {
             const state = createReducer();
             reducer(state, [taskStart('bg-1', 'Running npm start')]);
@@ -3030,6 +3063,18 @@ describe('reducer', () => {
 
             const entry = state.backgroundTasks.get('bg-1');
             expect(entry!.summary).toBe('Tests 50% complete');
+        });
+
+        it('should preserve summary when task-progress arrives before task-start', () => {
+            const state = createReducer();
+            reducer(state, [taskProgress('bg-1', 'Tests 50% complete', { description: 'Running tests', createdAt: 1000 })]);
+            reducer(state, [taskStart('bg-1', 'Running tests', { createdAt: 2000 })]);
+
+            const entry = state.backgroundTasks.get('bg-1');
+            expect(entry).toBeDefined();
+            expect(entry!.summary).toBe('Tests 50% complete');
+            expect(entry!.description).toBe('Running tests');
+            expect(entry!.status).toBe('running');
         });
 
         it('should mark completed from task-end', () => {
@@ -3124,18 +3169,15 @@ describe('reducer', () => {
             expect(state.backgroundTasks.get('bg-1')!.status).toBe('completed');
         });
 
-        it('should also update tool-call message state on task-end', () => {
+        it('should not downgrade completed tool-call message state on task-end', () => {
             const state = createReducer();
 
-            // Setup: tool-call + tool-result
             reducer(state, bgToolMessages('tool-1', 'bg-1'));
-            // tool.state is "completed" — Bash tool finishes normally
             const toolMsgId = state.toolIdToMessageId.get('tool-1')!;
             expect(state.messages.get(toolMsgId)!.tool!.state).toBe('completed');
 
-            // task-end should still update tool message state
             reducer(state, [taskEnd('bg-1', 'failed')]);
-            expect(state.messages.get(toolMsgId)!.tool!.state).toBe('error');
+            expect(state.messages.get(toolMsgId)!.tool!.state).toBe('completed');
         });
 
         it('should skip enrichment for already-enriched entries', () => {

@@ -2194,6 +2194,11 @@ export const en = {
     turnCount: ({ count }: { count: number }) =>
       `${plural({ count, singular: `${count} turn`, plural: `${count} turns` })}`,
     thinkingMarker: "Thinking",
+    taskStarted: "Task started",
+    taskProgress: "Task progress",
+    taskCompleted: "Task completed",
+    taskFailed: "Task failed",
+    taskStopped: "Task stopped",
   },
 
   codex: {

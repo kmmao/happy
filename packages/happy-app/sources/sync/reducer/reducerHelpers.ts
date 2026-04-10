@@ -15,6 +15,11 @@ export type ReducerMessage = {
     role: "user" | "agent";
     text: string | null;
     isThinking?: boolean;
+    taskStatus?: {
+        status: "start" | "progress" | "completed" | "failed" | "stopped";
+        summary: string;
+        metrics: string | null;
+    };
     event: AgentEvent | null;
     tool: ToolCall | null;
     meta?: MessageMeta;

@@ -1739,6 +1739,127 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
             }
         });
 
+        it('normalizes task-progress as labeled progress text with metrics line', () => {
+            const progress = normalizeRawMessage('db-task-progress-1', null, 1, {
+                ...base,
+                content: {
+                    type: 'session',
+                    data: {
+                        id: 'env-task-progress-1',
+                        time: 1,
+                        role: 'agent',
+                        ev: {
+                            t: 'task-progress',
+                            taskId: 'task-1',
+                            description: 'Run sidebar tests',
+                            summary: 'Reading getExpandedSidebarWidth tests',
+                            usage: {
+                                durationMs: 46000,
+                                totalTokens: 0,
+                                toolUses: 11,
+                            },
+                        }
+                    }
+                }
+            });
+
+            expect(progress).toBeTruthy();
+            expect(progress).toMatchObject({
+                id: 'env-task-progress-1',
+                role: 'agent',
+                taskProgressInfo: {
+                    taskId: 'task-1',
+                    description: 'Run sidebar tests',
+                    summary: 'Reading getExpandedSidebarWidth tests',
+                }
+            });
+            if (progress && progress.role === 'agent') {
+                expect(progress.content[0]).toMatchObject({
+                    type: 'text',
+                    text: '⏳ Task progress\nReading getExpandedSidebarWidth tests\n_46s · 0 tokens · 11 tools_',
+                    uuid: 'env-task-progress-1',
+                    parentUUID: null,
+                });
+            }
+        });
+
+        it('normalizes task-start and task-end as labeled task status text', () => {
+            const start = normalizeRawMessage('db-task-start-1', null, 1, {
+                ...base,
+                content: {
+                    type: 'session',
+                    data: {
+                        id: 'env-task-start-1',
+                        time: 1,
+                        role: 'agent',
+                        ev: {
+                            t: 'task-start',
+                            taskId: 'task-1',
+                            toolUseId: 'tool-1',
+                            description: 'Run sidebar tests',
+                            taskType: 'bash',
+                        }
+                    }
+                }
+            });
+
+            expect(start).toBeTruthy();
+            expect(start).toMatchObject({
+                id: 'env-task-start-1',
+                role: 'agent',
+                taskStartInfo: {
+                    taskId: 'task-1',
+                    toolUseId: 'tool-1',
+                    description: 'Run sidebar tests',
+                    taskType: 'bash',
+                }
+            });
+            if (start && start.role === 'agent') {
+                expect(start.content[0]).toMatchObject({
+                    type: 'text',
+                    text: '⏳ Task started\nRun sidebar tests',
+                    uuid: 'env-task-start-1',
+                    parentUUID: null,
+                });
+            }
+
+            const end = normalizeRawMessage('db-task-end-1', null, 1, {
+                ...base,
+                content: {
+                    type: 'session',
+                    data: {
+                        id: 'env-task-end-1',
+                        time: 1,
+                        role: 'agent',
+                        ev: {
+                            t: 'task-end',
+                            taskId: 'task-1',
+                            status: 'failed',
+                            summary: 'Sidebar tests failed',
+                        }
+                    }
+                }
+            });
+
+            expect(end).toBeTruthy();
+            expect(end).toMatchObject({
+                id: 'env-task-end-1',
+                role: 'agent',
+                taskEndInfo: {
+                    taskId: 'task-1',
+                    status: 'failed',
+                }
+            });
+            if (end && end.role === 'agent') {
+                expect(end.content[0]).toMatchObject({
+                    type: 'text',
+                    text: '✗ Task failed\nSidebar tests failed',
+                    uuid: 'env-task-end-1',
+                    parentUUID: null,
+                });
+            }
+        });
+
         it('maps turn-end to ready event and drops turn-start', () => {
             const turnStart = normalizeRawMessage('db-5', null, 1, {
                 ...base,

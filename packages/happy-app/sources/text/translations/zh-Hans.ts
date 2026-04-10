@@ -2144,6 +2144,11 @@ export const zhHans: TranslationStructure = {
     sessionSummary: ({ tokens }: { tokens: string }) => `Σ${tokens} tokens`,
     turnCount: ({ count }: { count: number }) => `${count} 轮`,
     thinkingMarker: "思考中",
+    taskStarted: "任务开始",
+    taskProgress: "任务进度",
+    taskCompleted: "任务完成",
+    taskFailed: "任务失败",
+    taskStopped: "任务停止",
   },
 
   codex: {
@@ -3766,14 +3771,14 @@ export const zhHans: TranslationStructure = {
     dismiss: "忽略",
     acceptConfirmTitle: "接受建议",
     acceptConfirmBody: ({ type, title }: { type: string; title: string }) =>
-      `这将创建一个新的 ${type}："${title}"。继续？`,
+      `这将创建一个新的${type}："${title}"。继续？`,
     accepted: "建议已接受",
     dismissed: "建议已忽略",
     evidence: "依据",
     recommendedRole: "推荐角色",
-    typeGoal: "Goal",
-    typeTask: "Task",
-    typeSkill: "Skill",
+    typeGoal: "目标",
+    typeTask: "任务",
+    typeSkill: "技能",
   },
   roles: {
     title: "角色",

@@ -2202,6 +2202,11 @@ export const es: TranslationStructure = {
     turnCount: ({ count }: { count: number }) =>
       count === 1 ? `${count} turno` : `${count} turnos`,
     thinkingMarker: "Pensando",
+    taskStarted: "Tarea iniciada",
+    taskProgress: "Progreso de tarea",
+    taskCompleted: "Tarea completada",
+    taskFailed: "Tarea fallida",
+    taskStopped: "Tarea detenida",
   },
 
   codex: {

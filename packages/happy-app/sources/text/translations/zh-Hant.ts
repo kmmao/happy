@@ -2145,6 +2145,11 @@ export const zhHant: TranslationStructure = {
     sessionSummary: ({ tokens }: { tokens: string }) => `Σ${tokens} tokens`,
     turnCount: ({ count }: { count: number }) => `${count} 輪`,
     thinkingMarker: "思考中",
+    taskStarted: "任務開始",
+    taskProgress: "任務進度",
+    taskCompleted: "任務完成",
+    taskFailed: "任務失敗",
+    taskStopped: "任務停止",
   },
 
   codex: {

@@ -2194,6 +2194,11 @@ export const en: TranslationStructure = {
     turnCount: ({ count }: { count: number }) =>
       count === 1 ? `${count} turn` : `${count} turns`,
     thinkingMarker: "Thinking",
+    taskStarted: "Task started",
+    taskProgress: "Task progress",
+    taskCompleted: "Task completed",
+    taskFailed: "Task failed",
+    taskStopped: "Task stopped",
   },
 
   codex: {
@@ -3857,7 +3862,7 @@ export const en: TranslationStructure = {
     dismiss: "Dismiss",
     acceptConfirmTitle: "Accept Suggestion",
     acceptConfirmBody: ({ type, title }: { type: string; title: string }) =>
-      `This will create a new ${type}: "${title}". Continue?`,
+      `This will create a new ${type}: \"${title}\". Continue?`,
     accepted: "Suggestion accepted",
     dismissed: "Suggestion dismissed",
     evidence: "Based on",

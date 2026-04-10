@@ -114,7 +114,6 @@ import { Message, ModeSwitchMessage, ToolCall } from "../typesMessage";
 import { AgentEvent, NormalizedMessage, UsageData } from "../typesRaw";
 import { createTracer, traceMessages, TracerState } from "./reducerTracer";
 import { AgentState } from "../storageTypes";
-import { MessageMeta } from "../typesMessageMeta";
 import { parseMessageAsEvent } from "./messageToEvent";
 import {
     ReducerMessage,
@@ -729,6 +728,27 @@ export function reducer(
         if (c.type === "text" || c.type === "thinking") {
           let mid = allocateId();
           const isThinking = c.type === "thinking";
+          const taskStatus = !isThinking
+            ? msg.taskStartInfo
+              ? {
+                  status: "start" as const,
+                  summary: msg.taskStartInfo.description,
+                  metrics: null,
+                }
+              : msg.taskProgressInfo
+                ? {
+                    status: "progress" as const,
+                    summary: msg.taskProgressInfo.summary,
+                    metrics: c.text.split("\n")[2]?.trim()?.replace(/^_/, "").replace(/_$/, "") ?? null,
+                  }
+                : msg.taskEndInfo
+                  ? {
+                      status: msg.taskEndInfo.status,
+                      summary: c.text.split("\n")[1]?.trim() || c.text,
+                      metrics: null,
+                    }
+                  : undefined
+            : undefined;
           state.messages.set(mid, {
             id: mid,
             realID: msg.id,
@@ -736,6 +756,7 @@ export function reducer(
             createdAt: msg.createdAt,
             text: isThinking ? `*${c.thinking}*` : c.text,
             isThinking,
+            ...(taskStatus && { taskStatus }),
             tool: null,
             event: null,
             meta: msg.meta,
@@ -1003,8 +1024,19 @@ export function reducer(
           description: msg.taskProgressInfo.description,
           summary: msg.taskProgressInfo.summary ?? entry.summary,
         });
-        bgTasksDirty = true;
+      } else {
+        state.backgroundTasks.set(msg.taskProgressInfo.taskId, {
+          taskId: msg.taskProgressInfo.taskId,
+          toolUseId: null,
+          command: "",
+          description: msg.taskProgressInfo.description,
+          outputFile: null,
+          startedAt: msg.createdAt,
+          status: "running",
+          summary: msg.taskProgressInfo.summary,
+        });
       }
+      bgTasksDirty = true;
     }
 
     // task-end → update status in backgroundTasks + update tool-call message state
@@ -1018,15 +1050,13 @@ export function reducer(
         });
         bgTasksDirty = true;
       }
-      // Also update the tool-call message for tool bubble UI
+      // Also update the tool-call message for tool bubble UI when the tool is still active.
       const bgMsgId = state.backgroundTaskIdToMessageId.get(taskId);
       if (bgMsgId) {
         const bgMessage = state.messages.get(bgMsgId);
-        if (bgMessage?.tool) {
+        if (bgMessage?.tool && bgMessage.tool.state === "running") {
           bgMessage.tool.state =
-            status === "failed" ? "error" :
-            status === "stopped" ? "error" :
-            "completed";
+            status === "failed" || status === "stopped" ? "error" : "completed";
           bgMessage.tool.completedAt = msg.createdAt;
           changed.add(bgMsgId);
         }
@@ -1435,6 +1465,7 @@ function convertReducerMessageToMessage(
       kind: "agent-text",
       text: reducerMsg.text,
       ...(reducerMsg.isThinking && { isThinking: true }),
+      ...(reducerMsg.taskStatus && { taskStatus: reducerMsg.taskStatus }),
       meta: reducerMsg.meta,
     };
   } else if (reducerMsg.role === "agent" && reducerMsg.tool !== null) {

@@ -25,6 +25,7 @@ import { MessageImage } from "./MessageImage";
 import { parseImageRefs } from "@/utils/parseImageRefs";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useAppendToInput } from "@/hooks/useInputContext";
+import { parseTaskStatusMessage } from "./messageProgress";
 
 export const MessageView = (props: {
   message: Message;
@@ -373,6 +374,28 @@ function AgentTextBlock(props: {
     );
   }
 
+  const taskStatus = props.message.taskStatus ?? parseTaskStatusMessage(props.message.text);
+  const taskStatusIcon =
+    taskStatus?.status === "completed"
+      ? "checkmark-circle-outline"
+      : taskStatus?.status === "failed"
+        ? "close-circle-outline"
+        : taskStatus?.status === "stopped"
+          ? "stop-circle-outline"
+          : "hourglass-outline";
+  const taskStatusLabel =
+    taskStatus?.status === "start"
+      ? t("message.taskStarted")
+      : taskStatus?.status === "progress"
+        ? t("message.taskProgress")
+        : taskStatus?.status === "completed"
+          ? t("message.taskCompleted")
+          : taskStatus?.status === "failed"
+            ? t("message.taskFailed")
+            : taskStatus?.status === "stopped"
+              ? t("message.taskStopped")
+              : null;
+
   return (
     <View style={styles.agentMessageRow}>
       <View style={styles.avatarSlot}>
@@ -385,10 +408,32 @@ function AgentTextBlock(props: {
         )}
       </View>
       <View style={styles.agentMessageContainer}>
-        <MarkdownView
-          markdown={props.message.text}
-          onOptionPress={handleOptionPress}
-        />
+        {taskStatus && taskStatusLabel ? (
+          <View style={[styles.taskProgressCard, { backgroundColor: theme.colors.surfaceHighest ?? theme.colors.surface }]}>
+            <View style={styles.taskProgressHeader}>
+              <Ionicons
+                name={taskStatusIcon}
+                size={13}
+                color={theme.colors.textSecondary}
+              />
+              <Text style={[styles.taskProgressLabel, { color: theme.colors.textSecondary }]}>{taskStatusLabel}</Text>
+            </View>
+            <MarkdownView
+              markdown={taskStatus.summary}
+              onOptionPress={handleOptionPress}
+            />
+            {taskStatus.metrics ? (
+              <Text style={[styles.taskProgressMetrics, { color: theme.colors.textSecondary }]}>
+                {taskStatus.metrics}
+              </Text>
+            ) : null}
+          </View>
+        ) : (
+          <MarkdownView
+            markdown={props.message.text}
+            onOptionPress={handleOptionPress}
+          />
+        )}
       </View>
     </View>
   );
@@ -742,6 +787,26 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: 12,
     borderRadius: 16,
     flex: 1,
+  },
+  taskProgressCard: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  taskProgressHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  taskProgressLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    ...Typography.default(),
+  },
+  taskProgressMetrics: {
+    fontSize: 12,
+    ...Typography.default(),
   },
   thinkingHeader: {
     flexDirection: "row",

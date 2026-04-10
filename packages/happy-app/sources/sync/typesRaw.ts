@@ -894,7 +894,7 @@ function normalizeSessionEnvelope(
       content: [
         {
           type: "text",
-          text: `**Task:** ${envelope.ev.description}${envelope.ev.taskType ? ` (${envelope.ev.taskType})` : ""}${envelope.ev.workflowName ? ` — ${envelope.ev.workflowName}` : ""}`,
+          text: `⏳ Task started\n${envelope.ev.description}`,
           uuid: contentUUID,
           parentUUID,
         },
@@ -938,7 +938,7 @@ function normalizeSessionEnvelope(
       content: [
         {
           type: "text",
-          text: `⏳ ${envelope.ev.summary}${metricsLine}`,
+          text: `⏳ Task progress\n${envelope.ev.summary}${metricsLine}`,
           uuid: contentUUID,
           parentUUID,
         },
@@ -953,12 +953,12 @@ function normalizeSessionEnvelope(
   }
 
   if (envelope.ev.t === "task-end") {
-    const statusIcon =
+    const statusHeader =
       envelope.ev.status === "completed"
-        ? "✓"
+        ? "✓ Task completed"
         : envelope.ev.status === "failed"
-          ? "✗"
-          : "■";
+          ? "✗ Task failed"
+          : "■ Task stopped";
     return {
       id: messageId,
       localId,
@@ -968,7 +968,7 @@ function normalizeSessionEnvelope(
       content: [
         {
           type: "text",
-          text: `${statusIcon} **Task ${envelope.ev.status}:** ${envelope.ev.summary}`,
+          text: `${statusHeader}\n${envelope.ev.summary}`,
           uuid: contentUUID,
           parentUUID,
         },
