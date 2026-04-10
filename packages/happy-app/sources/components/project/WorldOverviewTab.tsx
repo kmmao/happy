@@ -15,7 +15,18 @@ import { t } from "@/text";
 import { Project } from "@/sync/projectManager";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { layout } from "@/components/layout";
-import { fetchWorldDashboard, type WorldDashboard } from "@/sync/apiWorld";
+import { Modal } from "@/modal";
+import { sync } from "@/sync/sync";
+import {
+    fetchWorldDashboard,
+    fetchSuggestions,
+    refreshSuggestions,
+    acceptSuggestion,
+    dismissSuggestion,
+    type WorldDashboard,
+    type SuggestionSummary,
+} from "@/sync/apiWorld";
+import { SuggestionCard } from "./SuggestionCard";
 
 interface WorldOverviewTabProps {
     project: Project;
@@ -27,8 +38,10 @@ export const WorldOverviewTab = React.memo(
         const { theme } = useUnistyles();
         const router = useRouter();
         const [data, setData] = React.useState<WorldDashboard | null>(null);
+        const [suggestions, setSuggestions] = React.useState<SuggestionSummary[]>([]);
         const [loading, setLoading] = React.useState(false);
         const [refreshing, setRefreshing] = React.useState(false);
+        const [suggestionsRefreshing, setSuggestionsRefreshing] = React.useState(false);
 
         const loadData = React.useCallback(async (isRefresh = false) => {
             if (!project.serverId) return;
@@ -37,8 +50,12 @@ export const WorldOverviewTab = React.memo(
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const dashboard = await fetchWorldDashboard(credentials, project.serverId);
+                const [dashboard, suggestionsData] = await Promise.all([
+                    fetchWorldDashboard(credentials, project.serverId),
+                    fetchSuggestions(credentials, project.serverId),
+                ]);
                 setData(dashboard);
+                setSuggestions(suggestionsData);
             } catch {
                 // best effort
             } finally {
@@ -52,6 +69,87 @@ export const WorldOverviewTab = React.memo(
                 loadData();
             }
         }, [isActive, loadData]);
+
+        // Subscribe to ephemeral suggestion updates
+        React.useEffect(() => {
+            if (!isActive || !project.serverId) return;
+
+            return sync.onWorldSuggestionUpdated((event) => {
+                if (event.projectId !== project.serverId) return;
+                if (event.status === "accepted" || event.status === "dismissed") {
+                    setSuggestions((prev) =>
+                        prev.filter((s) => s.id !== event.suggestionId),
+                    );
+                }
+            });
+        }, [isActive, project.serverId]);
+
+        const handleRefreshSuggestions = React.useCallback(async () => {
+            if (!project.serverId) return;
+            setSuggestionsRefreshing(true);
+            try {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                await refreshSuggestions(credentials, project.serverId);
+                const updated = await fetchSuggestions(credentials, project.serverId);
+                setSuggestions(updated);
+            } catch {
+                // best effort
+            } finally {
+                setSuggestionsRefreshing(false);
+            }
+        }, [project.serverId]);
+
+        const handleAccept = React.useCallback(async (suggestion: SuggestionSummary) => {
+            if (!project.serverId) return;
+
+            const typeLabel = suggestion.type === "suggested_goal"
+                ? t("suggestions.typeGoal")
+                : suggestion.type === "suggested_skill"
+                    ? t("suggestions.typeSkill")
+                    : t("suggestions.typeTask");
+            const payloadTitle = suggestion.payload.goal?.title
+                ?? suggestion.payload.task?.title
+                ?? suggestion.payload.skill?.title
+                ?? suggestion.title;
+
+            const confirmed = await Modal.confirm(
+                t("suggestions.acceptConfirmTitle"),
+                t("suggestions.acceptConfirmBody", { type: typeLabel, title: payloadTitle }),
+            );
+            if (!confirmed) return;
+
+            // Optimistic remove
+            setSuggestions((prev) => prev.filter((s) => s.id !== suggestion.id));
+
+            try {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                await acceptSuggestion(credentials, project.serverId, suggestion.id);
+                Modal.toast(t("suggestions.accepted"));
+            } catch (e: any) {
+                // Rollback on failure
+                setSuggestions((prev) => [...prev, suggestion]);
+                Modal.toast(e.message ?? t("common.error"));
+            }
+        }, [project.serverId]);
+
+        const handleDismiss = React.useCallback(async (suggestion: SuggestionSummary) => {
+            if (!project.serverId) return;
+
+            // Optimistic remove
+            setSuggestions((prev) => prev.filter((s) => s.id !== suggestion.id));
+
+            try {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                await dismissSuggestion(credentials, project.serverId, suggestion.id);
+                Modal.toast(t("suggestions.dismissed"));
+            } catch {
+                // Rollback on failure
+                setSuggestions((prev) => [...prev, suggestion]);
+            }
+        }, [project.serverId]);
 
         if (loading && !data) {
             return (
@@ -170,6 +268,40 @@ export const WorldOverviewTab = React.memo(
                         <GoalStat label={t("world.goalsBlocked")} value={data.goals.blocked} color="#F59E0B" />
                     </View>
                 </View>
+
+                {/* Suggested Next Steps */}
+                <View style={styles.suggestionsSection}>
+                    <View style={styles.suggestionsSectionHeader}>
+                        <Ionicons name="bulb-outline" size={18} color="#F59E0B" />
+                        <Text style={styles.sectionTitle}>{t("suggestions.suggestedNextSteps")}</Text>
+                        <View style={{ flex: 1 }} />
+                        <Pressable
+                            style={styles.refreshButton}
+                            onPress={handleRefreshSuggestions}
+                            disabled={suggestionsRefreshing}
+                        >
+                            <Text style={styles.refreshButtonText}>
+                                {suggestionsRefreshing ? t("suggestions.refreshing") : t("suggestions.refresh")}
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
+
+                {suggestions.length === 0 ? (
+                    <View style={styles.emptySuggestions}>
+                        <Text style={styles.emptySuggestionsText}>{t("suggestions.noSuggestions")}</Text>
+                        <Text style={styles.emptySuggestionsHint}>{t("suggestions.noSuggestionsHint")}</Text>
+                    </View>
+                ) : (
+                    suggestions.map((s) => (
+                        <SuggestionCard
+                            key={s.id}
+                            suggestion={s}
+                            onAccept={handleAccept}
+                            onDismiss={handleDismiss}
+                        />
+                    ))
+                )}
 
                 {/* Agent Messages Summary */}
                 {(data.agentMessages.conflicts30d > 0 || data.agentMessages.lawSuggestions30d > 0) && (
@@ -422,6 +554,46 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 11,
         color: theme.colors.textSecondary,
         marginTop: 2,
+    },
+
+    // Suggestions
+    suggestionsSection: {
+        marginHorizontal: 16,
+        marginBottom: 8,
+    },
+    suggestionsSectionHeader: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 8,
+        paddingVertical: 8,
+    },
+    refreshButton: {
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+    },
+    refreshButtonText: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        color: theme.colors.textLink,
+    },
+    emptySuggestions: {
+        marginHorizontal: 16,
+        marginBottom: 8,
+        paddingVertical: 16,
+        alignItems: "center" as const,
+        gap: 4,
+    },
+    emptySuggestionsText: {
+        ...Typography.default(),
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+    },
+    emptySuggestionsHint: {
+        ...Typography.default(),
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        textAlign: "center" as const,
+        paddingHorizontal: 32,
     },
 
     // Messages

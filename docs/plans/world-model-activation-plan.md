@@ -19,7 +19,7 @@
 - [x] **阶段 A — 板子入口**：强化 World / Goal 为主入口 UI，聚合子 Task 状态与会话链接；设备任务队列为二级排障
 - [x] **阶段 A — 阻塞**：用 AgentMessage（或约定 `content` 结构）表达阻塞，与 Goal `blocked` 规则对齐
 - [x] **阶段 B — 语义完成**：CLI 任务结果上报闭环、Server 状态机统一与 task-scoped 窄权限 token 已落地；默认仍进程退出结算
-- [ ] **阶段 C — 主动性**：基于 narrative / decisions / failures 生成建议 Goal/Task（先确认后派发）+ 可选 Skill 提炼闭环
+- [x] **阶段 C — 主动性**：基于 narrative / decisions / failures 生成建议 Goal/Task（先确认后派发）+ 可选 Skill 提炼闭环
 
 ---
 
@@ -141,7 +141,7 @@ Goal 的“活起来”不能依赖手动刷新。现有服务端已具备 `goal
   - `AgentMessage PATCH` 已限制客户端仅可写 `unread/read`，`resolved` 保留给系统流程
   - 列表页与详情页的 session / decision 跳转入口已统一做白名单校验，避免异常 id 直接进入路由
 
-仍未完成：
+当时仍未完成（已在 2026-04-09 阶段 A 收尾中补齐）：
 
 - `AgentMessage` 驱动的 blocker 真相源
 - Goal 详情页更细的 blocker 处理动作
@@ -185,6 +185,220 @@ Goal 的“活起来”不能依赖手动刷新。现有服务端已具备 `goal
 - **技能复利**：任务完成后可选「提炼 Skill 草稿」→ Skill 表（人工确认后发布）。
 
 **验收**：World 页出现「建议的下一步」列表，且一键转为真实 Goal/Task。
+
+#### 阶段 C 实施计划（2026-04-10）
+
+##### C.0 阶段边界
+
+**这轮只做**：
+- 服务端生成建议真相源（`WorldSuggestion` 模型）
+- App 展示建议与确认动作
+- `accept` 后转成真实 Goal/Task/Skill
+- `dismiss` 后持久关闭，不重复出现
+
+**这轮不做**：
+- 自动派发、自动执行、自治等级、审批策略（阶段 D/E）
+- 多角色消息协议扩展（阶段 F）
+- 自动修改 laws / narrative
+- 建议评分排序引擎
+- 从 session 全量时间线挖智能结论
+- 跨项目建议聚合
+
+##### C.1 MVP 输入源
+
+首版只消费 4 类已有稳定结构，不做泛化：
+
+| 输入源 | 用途 | 触发建议类型 |
+|--------|------|-------------|
+| `Project.narrative` | 提供项目目标语境，不单独触发建议，只作为生成文案和 reason 的背景 | — |
+| `Decision`（`pending/open`） | 生成 `suggested_task`：补充信息后再裁决、拆出前置探索任务 | `suggested_task` |
+| `Goal blocked` / `Task failed` | 首要触发源：失败后建议下一步、blocked 后建议拆出补充任务 | `suggested_goal` / `suggested_task` |
+| 未解决 `AgentMessage`（`conflict` / `request`） | 只取已关联 goal/task 且 `resolutionState` 为 open-like 的消息 | `suggested_task`（`requiresHuman: true`） |
+
+首版暂不做：`law_suggestion`、全量 `report`、TriggerSchedule / Agent Loop 自动刷新、session transcript 自动提炼。
+
+##### C.2 建议真相源设计
+
+不复用 `Decision` 承载 suggestion。`Decision` 是裁决对象，`Suggestion` 是候选动作，语义不同。新增轻量持久模型 `WorldSuggestion`，Server 为唯一真相源。
+
+```typescript
+type WorldSuggestion = {
+  id: string
+  projectId: string
+  relatedGoalId?: string
+  relatedTaskId?: string
+  type: "suggested_goal" | "suggested_task" | "suggested_skill"
+  title: string
+  summary: string
+  reason: string
+  evidence: Array<{
+    kind: "goal" | "task" | "decision" | "message" | "narrative"
+    id?: string
+    label: string
+  }>
+  recommendedRole?: string
+  payload: {
+    goal?: { title: string; detail?: string; priority?: string }
+    task?: { title: string; prompt: string; roleType?: string; goalId?: string; priority?: string }
+    skill?: { title: string; content: string; sourceTaskId?: string }
+  }
+  requiresHuman: boolean       // 首版统一 true
+  status: "open" | "accepted" | "dismissed"
+  dedupeKey: string
+  createdAt: Date
+  actedAt?: Date
+}
+```
+
+关键约束：
+- `payload` 保存"接受后要创建什么"，避免 accept 时再二次推理
+- `evidence[]` 必须存在，防止 suggestion 变成无依据提示
+- `dedupeKey` 用于去重，同一个 failed task 不会每次 refresh 都新建一条
+- `requiresHuman` 首版统一 `true`，为后续阶段 D/E 预留位但不启用自治
+
+##### C.3 服务端实施方案
+
+###### C.3.1 模块结构
+
+新增模块落点：`packages/happy-server/sources/modules/worldSuggestion/`
+
+- `worldSuggestionTypes.ts` — 类型定义
+- `worldSuggestionGenerate.ts` — 按输入源生成候选建议
+- `worldSuggestionQuery.ts` — 查询当前项目建议列表
+- `worldSuggestionAccept.ts` — 接受建议并转成真实实体
+- `worldSuggestionDismiss.ts` — 关闭建议
+
+###### C.3.2 生成策略
+
+不做后台常驻生成器，先做"按需 refresh"：
+
+- **触发时机**：
+  - 用户进入 WorldOverviewTab 首屏时走 `GET`（返回已有 open suggestions）
+  - 用户点击"刷新建议"走 `POST refresh`（拉取事实源重新生成/去重）
+  - 可选：项目页重基线时顺带 refresh 一次，但要防抖
+- **生成过程**：
+  1. 拉取当前项目 narrative、open decisions、blocked goals、failed tasks、unresolved AgentMessage
+  2. 运行 deterministic generator rules
+  3. 生成候选 suggestion
+  4. 依据 `dedupeKey + status=open` 去重 upsert
+
+###### C.3.3 Generator 规则（首版 3 条）
+
+| 规则 | 输入 | 输出 | 逻辑 |
+|------|------|------|------|
+| `failed_task_followup` | 失败任务（有 `errorMessage/summary`） | `suggested_task` | 建议补一个探索/修复任务，payload 包含原任务上下文 |
+| `blocked_goal_decompose` | Goal 被 blocker 卡住 | `suggested_goal` 或 `suggested_task` | 建议拆一个"补前置依赖"的 task 或子 goal |
+| `pending_decision_investigate` | 待裁决但证据不足 | `suggested_task` | 建议先派一个调研 task 补充信息 |
+
+首版不上打分排序器，只做 3 条确定性规则。
+
+###### C.3.4 Accept / Dismiss 语义
+
+- **dismiss**：只更新 `suggestion.status = dismissed`，无副作用。已 dismiss 的建议在同一事实源未变化时不再重生。
+- **accept**：根据 `type` 调用已有创建链：
+  - `suggested_goal` → 复用 [`goalCreate.ts`](../../packages/happy-server/sources/modules/goalCreate.ts)
+  - `suggested_task` → 复用已有 task 创建/派发链
+  - `suggested_skill` → 复用 [`skillRoutes.ts`](../../packages/happy-server/sources/app/api/routes/skillRoutes.ts)
+- accept 后把 suggestion 标记为 `accepted`，记录目标实体 id 到 `actedAt`
+
+##### C.4 接口草案
+
+**REST**：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/v1/projects/:projectId/world/suggestions` | 返回当前项目 suggestions 列表，默认只给 `open` |
+| `POST` | `/v1/projects/:projectId/world/suggestions/refresh` | 按当前事实源重新生成/去重 |
+| `POST` | `/v1/projects/:projectId/world/suggestions/:suggestionId/accept` | 请求体可带 priority/role 覆写 |
+| `POST` | `/v1/projects/:projectId/world/suggestions/:suggestionId/dismiss` | 无请求体 |
+
+**Ephemeral**：
+
+- `world-suggestion-updated`：最小字段 `projectId`、`suggestionId`、`status`
+- 原则同阶段 A：REST 是完整真相，ephemeral 只让页面动起来，不承载完整 payload
+
+##### C.5 App 落点
+
+首版只放一个主入口，不在 UI 到处撒 suggestion。
+
+**主落点**：[`WorldOverviewTab.tsx`](../../packages/happy-app/sources/components/project/WorldOverviewTab.tsx)
+
+**新增区块**：`Suggested Next Steps`
+
+每张建议卡展示：
+- `title` + `summary`
+- `reason` + `evidence` 摘要
+- `recommendedRole`（可选）
+- `Accept` 按钮
+- `Dismiss` 按钮
+
+**交互约束**：
+- `Accept` 先弹确认层（展示"将创建什么"），不直接创建
+- 确认层允许少量覆写（priority / role）
+- `Dismiss` 立即本地 optimistic update，然后等 REST/ephemeral 对齐
+- 首版不在 GoalDetail 里做第二套 suggestion UI
+
+**客户端同步**：
+- 进入 World 页先 `GET`
+- 用户手动触发 refresh 时走 `POST refresh`
+- 收到 `world-suggestion-updated` 只 patch status
+- App 回前台 / socket 重连时重新 `GET`
+
+##### C.6 可选 Skill 闭环
+
+Skill 是阶段 C 的可选尾巴，不阻塞主线。放在 Phase 3 单独开关：
+
+- 只针对 `completed task + 明确 summary/session` 生成 `suggested_skill`
+- 不自动发布，只允许用户确认后创建 Skill 草稿
+- 不做复杂归纳，不碰知识库自动整理
+
+##### C.7 实施拆解
+
+| Phase | 内容 | 依赖 |
+|-------|------|------|
+| **Phase 1: Server 真相源** | 新增 `WorldSuggestion` schema + migration；实现 generate/query/accept/dismiss 模块；挂到 world routes；复用 goal/task/skill 创建链 | 无 |
+| **Phase 2: App 展示与操作** | 新增 suggestions API client；在 `WorldOverviewTab` 增加建议区块；做 Accept 确认弹窗和 Dismiss 动作；接入最小 ephemeral patch | Phase 1 |
+| **Phase 3: Skill 可选闭环** | 增加 `suggested_skill` generator；接入 skill draft 创建；UI 上透出为同一列表中的一种类型 | Phase 1 |
+
+##### C.8 主要风险
+
+| 风险 | 控制方式 |
+|------|----------|
+| 建议噪音过高 | 只上 3 条 generator 规则，不做泛化 |
+| 重复建议轰炸 | `dedupeKey` 去重 + `dismissed` 在同一事实源未变化时不再重生 |
+| evidence 不可信 | 所有 suggestion 必须带来源 id/label，不输出"系统猜测" |
+| accept 后创建参数不完整 | 确认层允许少量覆写（priority/role/goalId） |
+| UI 入口分散 | 首版只放 `WorldOverviewTab`，不同时在 GoalsTab、GoalDetail、Inbox 各做一套 |
+
+##### C.9 验收标准
+
+满足以下 5 条即可收阶段 C：
+
+1. World 页能看到稳定的 `Suggested Next Steps` 区块
+2. suggestion 都能说明"为什么建议"和"依据什么"
+3. `accept` 后能创建真实 Goal/Task，且 suggestion 状态变为 `accepted`
+4. `dismiss` 后刷新仍保持关闭，不会立即重生
+5. 不引入任何自动派发、自动执行、自治策略能力
+
+##### C.10 测试策略
+
+**服务端**：
+- generator 单测：覆盖 failed task、blocked goal、pending decision 三类规则
+- accept/dismiss route 集成测试：覆盖状态流转、去重、无效 suggestionId、跨项目访问
+- 创建链复用测试：验证 accept 后真实 Goal/Task/Skill 被创建，且 suggestion 状态同步
+
+**客户端**：
+- API contract 测试
+- `WorldOverviewTab` 视图测试：覆盖 loading/empty/list/error
+- 交互测试：覆盖 accept 确认、dismiss、ephemeral patch 后状态更新
+
+**手工验收链路**：
+1. 制造一个 failed task 或 blocked goal
+2. 打开 WorldOverview
+3. 看到 suggestion 与 evidence
+4. 点击 accept
+5. 真实 Goal/Task 出现
+6. suggestion 状态收口为 accepted
 
 ---
 
@@ -614,7 +828,9 @@ World 逐步从 Goal list 演进为：
 | 2026-04-08 | 阶段 A 继续打磨：ProjectDetailView tab 白名单回退已补齐，`knowledge` 不可用时自动回退 `world`，避免项目页空白态 |
 | 2026-04-09 | 阶段 A 最终扫尾：补齐列表页 session 跳转白名单校验，复跑 typecheck/tests，并通过收尾复审无新的 HIGH/CRITICAL |
 | 2026-04-10 | 阶段 B 加固：task result token 已补 `jti + RepeatKey` 一次性消费，`/v1/tasks/result` 的 task-token 主路径具备显式重放防护，阶段 B 的最小安全闭环已完整 |
-| 2026-04-10 | 阶段 B 同步：普通 task 已补结果上报闭环（`HAPPY_TASK_*` 注入、`/v1/tasks/result`、Goal blocker 读取任务语义摘要），但 task-scoped 窄权限 token 仍待收口 |
+| 2026-04-10 | 阶段 B 中期同步：当时普通 task 已补结果上报闭环（`HAPPY_TASK_*` 注入、`/v1/tasks/result`、Goal blocker 读取任务语义摘要），但 task-scoped 窄权限 token 尚未收口（后续已于同日完成） |
 | 2026-04-09 | 阶段 A 收尾：AgentMessage 驱动的 blocker 真相源已接入 Goal list/detail，详情页补最小处理动作，Goals 列表补聚合摘要与基础筛选 |
+| 2026-04-10 | 阶段 C 实施计划定稿：3 Phase 拆解（Server 真相源 → App 展示 → Skill 可选闭环），新增 `WorldSuggestion` 模型设计、4 类输入源、3 条 generator 规则、REST/ephemeral 接口草案 |
+| 2026-04-10 | 阶段 C 全部完成：Phase 1 Server 真相源（WorldSuggestion Prisma 模型 + generate/query/accept/dismiss 模块 + 4 REST 路由 + ephemeral + inTx 原子性 + task-trigger 派发）；Phase 2 App 展示（API client + SuggestionCard + WorldOverviewTab 集成 + ephemeral 订阅 + i18n 11 语言）；Phase 3 Skill 闭环（completedTaskSkill generator）；code review 修复 5 项（TOCTOU/N+1/dedup 语义/task 派发/evidence 关联） |
 
 （后续每一轮活化：在此表追加一行，并勾选上方清单。）

@@ -112,3 +112,102 @@ export async function fetchWorldDashboard(
         return (await response.json()) as WorldDashboard;
     });
 }
+
+// === World Suggestions ===
+
+export interface SuggestionEvidence {
+    kind: "goal" | "task" | "decision" | "message" | "narrative";
+    id?: string;
+    label: string;
+}
+
+export interface SuggestionPayload {
+    goal?: { title: string; detail?: string; priority?: string };
+    task?: { title: string; prompt: string; roleType?: string; goalId?: string; priority?: string };
+    skill?: { title: string; content: string; sourceTaskId?: string };
+}
+
+export interface SuggestionSummary {
+    id: string;
+    projectId: string;
+    relatedGoalId: string | null;
+    relatedTaskId: string | null;
+    type: string;
+    title: string;
+    summary: string;
+    reason: string;
+    evidence: SuggestionEvidence[];
+    recommendedRole: string | null;
+    payload: SuggestionPayload;
+    requiresHuman: boolean;
+    status: string;
+    dedupeKey: string;
+    createdAt: number;
+    actedAt: number | null;
+}
+
+export async function fetchSuggestions(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<SuggestionSummary[]> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/world/suggestions?status=open`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch suggestions: ${response.status}`);
+        }
+        const data = (await response.json()) as { suggestions: SuggestionSummary[] };
+        return data.suggestions;
+    });
+}
+
+export async function refreshSuggestions(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<{ created: number; unchanged: number; total: number }> {
+    const API_ENDPOINT = getServerUrl();
+    const response = await fetch(
+        `${API_ENDPOINT}/v1/projects/${projectId}/world/suggestions/refresh`,
+        { method: "POST", headers: authHeaders(credentials) },
+    );
+    if (!response.ok) {
+        throw new Error(`Failed to refresh suggestions: ${response.status}`);
+    }
+    return (await response.json()) as { created: number; unchanged: number; total: number };
+}
+
+export async function acceptSuggestion(
+    credentials: AuthCredentials,
+    projectId: string,
+    suggestionId: string,
+    body?: { machineId?: string; priorityOverride?: string; roleOverride?: string },
+): Promise<{ suggestionId: string; createdEntityType: string; createdEntityId: string }> {
+    const API_ENDPOINT = getServerUrl();
+    const response = await fetch(
+        `${API_ENDPOINT}/v1/projects/${projectId}/world/suggestions/${suggestionId}/accept`,
+        { method: "POST", headers: authHeaders(credentials), body: JSON.stringify(body ?? {}) },
+    );
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error((err as any).error ?? `Failed to accept suggestion: ${response.status}`);
+    }
+    return (await response.json()) as { suggestionId: string; createdEntityType: string; createdEntityId: string };
+}
+
+export async function dismissSuggestion(
+    credentials: AuthCredentials,
+    projectId: string,
+    suggestionId: string,
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+    const response = await fetch(
+        `${API_ENDPOINT}/v1/projects/${projectId}/world/suggestions/${suggestionId}/dismiss`,
+        { method: "POST", headers: authHeaders(credentials) },
+    );
+    if (!response.ok) {
+        throw new Error(`Failed to dismiss suggestion: ${response.status}`);
+    }
+}

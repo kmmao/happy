@@ -64,6 +64,7 @@ model Account {
     Decision            Decision[]
     Goal                Goal[]
     AgentMessage        AgentMessage[]
+    WorldSuggestion     WorldSuggestion[]
 }
 
 model TerminalAuthRequest {
@@ -464,6 +465,7 @@ model Project {
     decisions          Decision[]
     goals              Goal[]
     agentMessages      AgentMessage[]
+    worldSuggestions   WorldSuggestion[]
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
@@ -1155,4 +1157,36 @@ model AgentMessage {
     @@index([accountId, projectId, status])
     @@index([projectId, createdAt(sort: Desc)])
     @@index([projectId, msgType])
+}
+
+//
+// World Suggestion — server-generated next-step proposals (Phase C)
+//
+
+model WorldSuggestion {
+    id              String    @id @default(cuid())
+    accountId       String
+    projectId       String
+    relatedGoalId   String?
+    relatedTaskId   String?
+    type            String    // suggested_goal | suggested_task | suggested_skill
+    title           String
+    summary         String
+    reason          String
+    evidence        String    @default("[]")   // JSON: [{kind, id?, label}]
+    recommendedRole String?
+    payload         String    @default("{}")   // JSON: accept 时创建所需参数
+    requiresHuman   Boolean   @default(true)
+    status          String    @default("open") // open | accepted | dismissed
+    dedupeKey       String
+    actedAt         DateTime?
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    account         Account   @relation(fields: [accountId], references: [id])
+    project         Project   @relation(fields: [projectId], references: [id])
+
+    @@index([projectId, status])
+    @@index([projectId, dedupeKey])
+    @@index([accountId])
 }

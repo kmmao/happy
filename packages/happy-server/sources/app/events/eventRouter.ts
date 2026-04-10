@@ -438,6 +438,12 @@ export type EphemeralEvent =
       toRole: string | null;
       msgType: string;
     }
+  | {
+      type: "world-suggestion-updated";
+      projectId: string;
+      suggestionId: string;
+      status: string;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -1256,6 +1262,17 @@ export function buildAgentMessageEphemeral(opts: {
 }): EphemeralPayload {
   return {
     type: "agent-message",
+    ...opts,
+  };
+}
+
+export function buildWorldSuggestionUpdatedEphemeral(opts: {
+  projectId: string;
+  suggestionId: string;
+  status: string;
+}): EphemeralPayload {
+  return {
+    type: "world-suggestion-updated",
     ...opts,
   };
 }

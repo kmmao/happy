@@ -195,6 +195,11 @@ class Sync {
     status: string;
     progress: number;
   }) => void>();
+  private worldSuggestionUpdatedListeners = new Set<(event: {
+    projectId: string;
+    suggestionId: string;
+    status: string;
+  }) => void>();
   private taskStatusListeners = new Set<(event: {
     taskId: string;
     status: string;
@@ -2563,6 +2568,17 @@ class Sync {
       }
     }
 
+    // Handle world-suggestion-updated: notify listeners for real-time suggestion status changes
+    if (updateData.type === "world-suggestion-updated") {
+      for (const listener of this.worldSuggestionUpdatedListeners) {
+        listener({
+          projectId: updateData.projectId,
+          suggestionId: updateData.suggestionId,
+          status: updateData.status,
+        });
+      }
+    }
+
   };
 
   /**
@@ -2860,6 +2876,15 @@ class Sync {
   }) => void): () => void {
     this.sessionEventCreatedListeners.add(listener);
     return () => { this.sessionEventCreatedListeners.delete(listener); };
+  }
+
+  onWorldSuggestionUpdated(listener: (event: {
+    projectId: string;
+    suggestionId: string;
+    status: string;
+  }) => void): () => void {
+    this.worldSuggestionUpdatedListeners.add(listener);
+    return () => { this.worldSuggestionUpdatedListeners.delete(listener); };
   }
 
   destroy() {

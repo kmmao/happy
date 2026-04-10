@@ -50,6 +50,7 @@ import { agentRoleRoutes } from "./routes/agentRoleRoutes";
 import { decisionRoutes } from "./routes/decisionRoutes";
 import { goalRoutes } from "./routes/goalRoutes";
 import { worldDashboardRoutes } from "./routes/worldDashboardRoutes";
+import { worldSuggestionRoutes } from "./routes/worldSuggestionRoutes";
 import { agentMessageRoutes } from "./routes/agentMessageRoutes";
 import { sessionEventRoutes } from "./routes/sessionEventRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
@@ -175,6 +176,7 @@ export async function startApi() {
   decisionRoutes(typed);
   goalRoutes(typed);
   worldDashboardRoutes(typed);
+  worldSuggestionRoutes(typed);
   agentMessageRoutes(typed);
 
   // Start HTTP

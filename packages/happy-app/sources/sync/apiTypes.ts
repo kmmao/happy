@@ -372,6 +372,13 @@ export const ApiEphemeralSessionEventCreatedSchema = z.object({
     }),
 });
 
+export const ApiEphemeralWorldSuggestionUpdatedSchema = z.object({
+    type: z.literal("world-suggestion-updated"),
+    projectId: z.string(),
+    suggestionId: z.string(),
+    status: z.string(),
+});
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
@@ -389,6 +396,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralInboxNewItemSchema,
   ApiEphemeralInboxUnreadCountSchema,
   ApiEphemeralSessionEventCreatedSchema,
+  ApiEphemeralWorldSuggestionUpdatedSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<
