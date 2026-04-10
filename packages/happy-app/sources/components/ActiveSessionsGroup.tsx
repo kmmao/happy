@@ -263,6 +263,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   tagsRow: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 6,
     marginTop: 4,
   },
@@ -655,6 +656,29 @@ const CompactSessionRow = React.memo(
       return getSessionAvatarId(session);
     }, [session]);
     const hasUnreadMessages = useHasUnreadMessages(session.id);
+    const sessionProfileLabel = React.useMemo(() => {
+      const rawProfileLabel = session.profileName?.trim() || session.profileId?.trim();
+      if (!rawProfileLabel) return null;
+
+      const normalizedProfileLabel = rawProfileLabel.toLowerCase();
+      const normalizedProviderKey = getSessionProviderKey(session).toLowerCase();
+      const normalizedProviderLabel = getSessionProviderLabel(session).trim().toLowerCase();
+      const normalizedProfileProviderKey = getSessionProviderKey({
+        ...session,
+        profileId: rawProfileLabel,
+        profileName: rawProfileLabel,
+      }).toLowerCase();
+
+      if (
+        normalizedProfileLabel === normalizedProviderKey ||
+        normalizedProfileLabel === normalizedProviderLabel ||
+        normalizedProfileProviderKey === normalizedProviderKey
+      ) {
+        return null;
+      }
+
+      return rawProfileLabel;
+    }, [session]);
 
     const itemContent = (
       <View>
@@ -812,6 +836,11 @@ const CompactSessionRow = React.memo(
                 {getSessionProviderLabel(session)}
               </Text>
             </View>
+            {sessionProfileLabel && (
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>{sessionProfileLabel}</Text>
+              </View>
+            )}
             {(machine?.metadata?.displayName || session.metadata?.host) && (
               <View style={styles.tag}>
                 <Text style={styles.tagText}>
