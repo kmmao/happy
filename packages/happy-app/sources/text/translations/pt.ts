@@ -135,10 +135,17 @@ export const pt: TranslationStructure = {
     apiRetry: ({
       attempt,
       maxRetries,
+      retryDelaySeconds,
+      isRateLimit,
     }: {
       attempt: number;
       maxRetries: number;
-    }) => `tentando API novamente (${attempt}/${maxRetries})…`,
+      retryDelaySeconds: number;
+      isRateLimit: boolean;
+    }) =>
+      isRateLimit
+        ? `aguardando redefinição do limite (${retryDelaySeconds}s)…`
+        : `tentando API novamente (${attempt}/${maxRetries})…`,
     activeNow: "Ativo agora",
     unknown: "desconhecido",
   },

@@ -224,10 +224,17 @@ export const ja: TranslationStructure = {
     apiRetry: ({
       attempt,
       maxRetries,
+      retryDelaySeconds,
+      isRateLimit,
     }: {
       attempt: number;
       maxRetries: number;
-    }) => `API リトライ中 (${attempt}/${maxRetries})…`,
+      retryDelaySeconds: number;
+      isRateLimit: boolean;
+    }) =>
+      isRateLimit
+        ? `レート制限のリセット待ち（${retryDelaySeconds}秒）…`
+        : `API リトライ中 (${attempt}/${maxRetries})…`,
     activeNow: "アクティブ",
     unknown: "不明",
   },

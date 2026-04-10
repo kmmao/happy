@@ -738,10 +738,17 @@ export const ru: TranslationStructure = {
     apiRetry: ({
       attempt,
       maxRetries,
+      retryDelaySeconds,
+      isRateLimit,
     }: {
       attempt: number;
       maxRetries: number;
-    }) => `повтор API (${attempt}/${maxRetries})…`,
+      retryDelaySeconds: number;
+      isRateLimit: boolean;
+    }) =>
+      isRateLimit
+        ? `ожидание сброса лимита (${retryDelaySeconds}с)…`
+        : `повтор API (${attempt}/${maxRetries})…`,
     activeNow: "Активен сейчас",
     unknown: "неизвестно",
   },

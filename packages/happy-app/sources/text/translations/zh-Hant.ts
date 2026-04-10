@@ -137,10 +137,17 @@ export const zhHant: TranslationStructure = {
     apiRetry: ({
       attempt,
       maxRetries,
+      retryDelaySeconds,
+      isRateLimit,
     }: {
       attempt: number;
       maxRetries: number;
-    }) => `API 重試中 (${attempt}/${maxRetries})…`,
+      retryDelaySeconds: number;
+      isRateLimit: boolean;
+    }) =>
+      isRateLimit
+        ? `等待速率限制重置（${retryDelaySeconds} 秒）…`
+        : `API 重試中（${attempt}/${maxRetries}）…`,
     activeNow: "目前活躍",
     unknown: "未知",
   },
