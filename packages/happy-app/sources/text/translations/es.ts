@@ -613,6 +613,7 @@ export const es: TranslationStructure = {
     recommendationsTitle: "Sugerido para esta sesión",
     recommendationsTapHint: "Toca para añadir al input",
     autoOptionSendLabel: "Auto",
+    autoOptionSendActiveLabel: "Auto · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,
     autoOptionSendTitle: "Acciones recomendadas",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>

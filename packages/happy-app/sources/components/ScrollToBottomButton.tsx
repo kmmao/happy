@@ -171,7 +171,9 @@ export const ScrollToBottomButton = React.memo(
                           Math.ceil(autoOptionSend.remainingMs / 1000),
                         ),
                       })
-                    : t("session.autoOptionSendLabel")
+                    : autoOptionSend.enabled
+                      ? t("session.autoOptionSendActiveLabel")
+                      : t("session.autoOptionSendLabel")
                 }
                 onPress={() => autoOptionSend.onToggle(!autoOptionSend.enabled)}
                 size={18}

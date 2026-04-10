@@ -802,6 +802,7 @@ export const ru: TranslationStructure = {
     recommendationsTitle: "Рекомендовано для этой сессии",
     recommendationsTapHint: "Нажмите, чтобы добавить в поле ввода",
     autoOptionSendLabel: "Авто",
+    autoOptionSendActiveLabel: "Авто · ВКЛ",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Авто ${seconds}с`,
     autoOptionSendTitle: "Рекомендуемые действия",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>

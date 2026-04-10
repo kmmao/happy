@@ -621,6 +621,7 @@ export const pl: TranslationStructure = {
     recommendationsTitle: "Sugerowane dla tej sesji",
     recommendationsTapHint: "Dotknij, aby dodać do pola tekstowego",
     autoOptionSendLabel: "Auto",
+    autoOptionSendActiveLabel: "Auto · WŁ",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,
     autoOptionSendTitle: "Polecane działania",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>

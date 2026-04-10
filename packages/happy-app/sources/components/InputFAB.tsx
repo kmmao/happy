@@ -213,7 +213,9 @@ export const InputFAB = React.memo(function InputFAB({
                         Math.ceil(autoOptionSend.remainingMs / 1000),
                       ),
                     })
-                  : t("session.autoOptionSendLabel")
+                  : autoOptionSend.enabled
+                    ? t("session.autoOptionSendActiveLabel")
+                    : t("session.autoOptionSendLabel")
               }
               onPress={() => autoOptionSend.onToggle(!autoOptionSend.enabled)}
               badgeColor={autoOptionSend.enabled ? badgeColor : undefined}

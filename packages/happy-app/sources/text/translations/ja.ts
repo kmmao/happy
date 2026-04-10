@@ -685,6 +685,7 @@ export const ja: TranslationStructure = {
     recommendationsTitle: "このセッションで提案された課題",
     recommendationsTapHint: "タップして入力欄に追加",
     autoOptionSendLabel: "自動",
+    autoOptionSendActiveLabel: "自動 · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `自動 ${seconds}秒`,
     autoOptionSendTitle: "推奨アクション",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>

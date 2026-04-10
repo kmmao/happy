@@ -583,6 +583,7 @@ export const zhHans: TranslationStructure = {
     recommendationsTitle: "本次会话建议处理",
     recommendationsTapHint: "点击填入输入框",
     autoOptionSendLabel: "自动",
+    autoOptionSendActiveLabel: "自动 · 开",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `自动 ${seconds}秒`,
     autoOptionSendTitle: "推荐操作",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>

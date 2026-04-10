@@ -611,6 +611,7 @@ export const ca: TranslationStructure = {
     recommendationsTitle: "Suggerit per a aquesta sessió",
     recommendationsTapHint: "Toca per afegir a l'entrada",
     autoOptionSendLabel: "Auto",
+    autoOptionSendActiveLabel: "Auto · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,
     autoOptionSendTitle: "Accions recomanades",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
