@@ -23,11 +23,14 @@ export function formatApiRetryStatus(apiRetry: {
   attempt: number;
   maxRetries: number;
   retryDelayMs: number;
+  errorStatus?: number | null;
 }): string {
+  const retryDelaySeconds = Math.max(0, Math.ceil(apiRetry.retryDelayMs / 1000));
   return t("status.apiRetry", {
     attempt: apiRetry.attempt,
     maxRetries: apiRetry.maxRetries,
-    retryDelaySeconds: Math.max(1, Math.ceil(apiRetry.retryDelayMs / 1000)),
+    retryDelaySeconds,
+    isRateLimit: apiRetry.errorStatus === 429,
   });
 }
 

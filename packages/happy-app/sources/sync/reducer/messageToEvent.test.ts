@@ -41,6 +41,13 @@ describe('messageToEvent', () => {
             expect(event!.type).toBe('limit-reached');
         });
 
+        it('keeps backend limit messages that mention automatic retry as limit-reached events', () => {
+            const msg = createAgentTextMessage('Gemini API rate limit exceeded. Please wait a moment and try again. The API will retry automatically.');
+            const event = parseMessageAsEvent(msg);
+            expect(event).not.toBeNull();
+            expect(event!.type).toBe('limit-reached');
+        });
+
         it('does not convert transient retry messages into limit-reached events', () => {
             const msg = createAgentTextMessage('API rate limit exceeded. Retrying in 8 seconds…');
             const event = parseMessageAsEvent(msg);

@@ -9,7 +9,9 @@ vi.mock('@/text', () => ({
             'status.unknown': 'Unknown',
             'session.startedByDaemon': 'daemon',
             'session.startedByTerminal': 'Terminal',
-            'status.apiRetry': (values) => `Waiting for rate limit reset (${String(values?.retryDelaySeconds)}s)…`,
+            'status.apiRetry': (values) => values?.isRateLimit
+                ? `Waiting for rate limit reset (${String(values?.retryDelaySeconds)}s)…`
+                : `retrying API (${String(values?.attempt)}/${String(values?.maxRetries)})…`,
         };
         const translation = translations[key];
         if (typeof translation === 'function') {
@@ -44,14 +46,37 @@ function createSession(overrides: Partial<Session> = {}): Session {
 
 describe('sessionUtils', () => {
     describe('formatApiRetryStatus', () => {
-        it('shows a friendly retry message with remaining seconds', () => {
+        it('shows a friendly retry message with remaining seconds for rate limits', () => {
             const statusText = formatApiRetryStatus({
                 attempt: 2,
                 maxRetries: 5,
                 retryDelayMs: 8000,
+                errorStatus: 429,
             });
 
             expect(statusText).toBe('Waiting for rate limit reset (8s)…');
+        });
+
+        it('falls back to generic retry text for non-rate-limit retries', () => {
+            const statusText = formatApiRetryStatus({
+                attempt: 2,
+                maxRetries: 5,
+                retryDelayMs: 8000,
+                errorStatus: 500,
+            });
+
+            expect(statusText).toBe('retrying API (2/5)…');
+        });
+
+        it('does not force a minimum one second delay', () => {
+            const statusText = formatApiRetryStatus({
+                attempt: 1,
+                maxRetries: 5,
+                retryDelayMs: 0,
+                errorStatus: 429,
+            });
+
+            expect(statusText).toBe('Waiting for rate limit reset (0s)…');
         });
     });
 
