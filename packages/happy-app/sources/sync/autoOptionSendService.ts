@@ -123,12 +123,13 @@ class AutoOptionSendService {
             { type: "toggle", enabled },
             context,
         );
-        this.applyStateChange(sessionId, current, next);
-        // If enabled and options are stale (not fresh), fire immediately
-        if (next.status === "armed" && result && !result.isFresh) {
-            this.fireImmediately(sessionId);
-        }
-        this.persistEnabled(sessionId, next.enabled);
+        // Stale options (previous turn): skip countdown, stay idle
+        const final =
+            next.status === "armed" && result && !result.isFresh
+                ? { ...next, status: "idle" as const, candidate: null, remainingMs: null }
+                : next;
+        this.applyStateChange(sessionId, current, final);
+        this.persistEnabled(sessionId, final.enabled);
     }
 
     /**
@@ -179,12 +180,12 @@ class AutoOptionSendService {
             : ({ type: "context-invalidated", reason: "options-missing" } as const);
 
         const next = reduceAutoOptionSendEvent(state, event, context);
-        this.applyStateChange(sessionId, state, next);
-
-        // Stale options (from a previous turn): skip countdown, fire now
-        if (next.status === "armed" && result && !result.isFresh) {
-            this.fireImmediately(sessionId);
-        }
+        // Stale options (previous turn): skip countdown, stay idle
+        const final =
+            next.status === "armed" && result && !result.isFresh
+                ? { ...next, status: "idle" as const, candidate: null, remainingMs: null }
+                : next;
+        this.applyStateChange(sessionId, state, final);
     }
 
     private buildContext(
@@ -252,44 +253,6 @@ class AutoOptionSendService {
             }
         }, 250);
         this.timers.set(sessionId, interval);
-    }
-
-    /** Skip countdown and fire immediately (for stale/old-turn options). */
-    private fireImmediately(sessionId: string): void {
-        this.clearTimer(sessionId);
-        const state = this.states.get(sessionId);
-        if (!state || state.status !== "armed") return;
-
-        const messages =
-            storage.getState().sessionMessages[sessionId]?.messages ?? [];
-        const result = buildSnapshotFromMessages(messages);
-        const context = this.buildContext(
-            sessionId,
-            result?.snapshot ?? null,
-            messages,
-            Date.now(),
-        );
-
-        // armed → ready → fire in one shot
-        const readyState = reduceAutoOptionSendEvent(
-            state,
-            { type: "timer-finished" },
-            context,
-        );
-        if (readyState.status !== "ready") {
-            this.setState(sessionId, readyState);
-            return;
-        }
-        const firedState = reduceAutoOptionSendEvent(
-            readyState,
-            { type: "attempt-fire" },
-            context,
-        );
-        const textToSend = firedState.shouldSendText;
-        this.setState(sessionId, { ...firedState, shouldSendText: null });
-        if (textToSend) {
-            this.sendMessageFn?.(sessionId, textToSend).catch(() => {});
-        }
     }
 
     private clearTimer(sessionId: string): void {
