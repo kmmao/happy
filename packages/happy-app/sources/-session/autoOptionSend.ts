@@ -1,4 +1,4 @@
-export type AutoOptionSendStatus = "off" | "armed" | "ready" | "fired";
+export type AutoOptionSendStatus = "off" | "idle" | "armed" | "ready";
 
 export interface SessionFollowUpOptionsSnapshot {
   sourceType: "markdown-options";
@@ -22,6 +22,7 @@ export interface AutoOptionSendState {
   candidate: AutoOptionCandidate | null;
   remainingMs: number | null;
   lastAutoSentText: string | null;
+  lastAutoSentKey: string | null;
   lastCancelReason: string | null;
   shouldSendText: string | null;
 }
@@ -43,10 +44,15 @@ export type AutoOptionSendEvent =
   | { type: "toggle"; enabled: boolean }
   | { type: "timer-finished" }
   | { type: "attempt-fire" }
+  | { type: "options-updated" }
   | { type: "context-invalidated"; reason: string };
 
 export function buildOptionsHash(items: string[]): string {
   return JSON.stringify(items);
+}
+
+function buildAutoSentKey(candidate: AutoOptionCandidate): string {
+  return `${candidate.sourceMessageId ?? "none"}:${candidate.optionsHash}:${candidate.recommendedText}`;
 }
 
 export function createInitialAutoOptionSendState(): AutoOptionSendState {
@@ -56,6 +62,7 @@ export function createInitialAutoOptionSendState(): AutoOptionSendState {
     candidate: null,
     remainingMs: null,
     lastAutoSentText: null,
+    lastAutoSentKey: null,
     lastCancelReason: null,
     shouldSendText: null,
   };
@@ -69,6 +76,21 @@ function clearToOff(
     ...state,
     enabled: false,
     status: "off",
+    candidate: null,
+    remainingMs: null,
+    lastCancelReason: reason,
+    shouldSendText: null,
+  };
+}
+
+function clearToIdle(
+  state: AutoOptionSendState,
+  reason: string | null,
+): AutoOptionSendState {
+  return {
+    ...state,
+    enabled: true,
+    status: "idle",
     candidate: null,
     remainingMs: null,
     lastCancelReason: reason,
@@ -125,7 +147,7 @@ function canFire(
   if (currentText !== state.candidate.recommendedText) return false;
   if (context.snapshot.optionsHash !== state.candidate.optionsHash) return false;
   if (context.snapshot.sourceMessageId !== state.candidate.sourceMessageId) return false;
-  if (state.lastAutoSentText === currentText) return false;
+  if (state.lastAutoSentKey === buildAutoSentKey(state.candidate)) return false;
 
   return true;
 }
@@ -141,12 +163,12 @@ export function reduceAutoOptionSendEvent(
     }
 
     if (!canArm(context)) {
-      return clearToOff(state, null);
+      return clearToIdle(state, null);
     }
 
     const candidate = buildAutoOptionCandidate(context);
     if (!candidate) {
-      return clearToOff(state, null);
+      return clearToIdle(state, null);
     }
 
     return {
@@ -161,7 +183,46 @@ export function reduceAutoOptionSendEvent(
   }
 
   if (event.type === "context-invalidated") {
+    if (event.reason === "options-missing" && state.enabled) {
+      return clearToIdle(state, state.lastCancelReason);
+    }
     return clearToOff(state, event.reason);
+  }
+
+  if (event.type === "options-updated") {
+    if (!state.enabled) return state;
+    if (!canArm(context)) {
+      return clearToOff(state, "options-invalid");
+    }
+
+    const candidate = buildAutoOptionCandidate(context);
+    if (!candidate) {
+      return clearToOff(state, "options-invalid");
+    }
+
+    if (
+      (state.status === "armed" || state.status === "ready") &&
+      state.candidate &&
+      state.candidate.optionsHash === candidate.optionsHash &&
+      state.candidate.sourceMessageId === candidate.sourceMessageId &&
+      state.candidate.recommendedText === candidate.recommendedText
+    ) {
+      return state;
+    }
+
+    if (state.status === "idle" && state.lastAutoSentKey === buildAutoSentKey(candidate)) {
+      return clearToIdle(state, state.lastCancelReason);
+    }
+
+    return {
+      ...state,
+      enabled: true,
+      status: "armed",
+      candidate,
+      remainingMs: candidate.durationMs,
+      lastCancelReason: null,
+      shouldSendText: null,
+    };
   }
 
   if (event.type === "timer-finished") {
@@ -182,13 +243,17 @@ export function reduceAutoOptionSendEvent(
 
     return {
       ...state,
-      enabled: false,
-      status: "fired",
+      enabled: true,
+      status: "idle",
       candidate: null,
       remainingMs: null,
       lastCancelReason: null,
       shouldSendText: state.candidate?.recommendedText ?? null,
-      lastAutoSentText: state.candidate?.recommendedText ?? state.lastAutoSentText,
+      lastAutoSentText:
+        state.candidate?.recommendedText ?? state.lastAutoSentText,
+      lastAutoSentKey: state.candidate
+        ? buildAutoSentKey(state.candidate)
+        : state.lastAutoSentKey,
     };
   }
 

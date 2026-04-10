@@ -3,6 +3,7 @@ import * as React from "react";
 import { Animated, Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { layout } from "@/components/layout";
+import { t } from "@/text";
 import { StatusDot } from "@/components/StatusDot";
 import { Typography } from "@/constants/Typography";
 import { useElapsedTime } from "@/hooks/useElapsedTime";
@@ -203,11 +204,16 @@ export const InputFAB = React.memo(function InputFAB({
           {autoOptionSend?.visible && (
             <FABButton
               key="auto-option-send"
-              icon={autoOptionSend.enabled ? "pause" : "play"}
+              icon="sparkles"
               label={
                 autoOptionSend.enabled && autoOptionSend.remainingMs != null
-                  ? `${Math.max(1, Math.ceil(autoOptionSend.remainingMs / 1000))}s`
-                  : undefined
+                  ? t("session.autoOptionSendCountdown", {
+                      seconds: Math.max(
+                        1,
+                        Math.ceil(autoOptionSend.remainingMs / 1000),
+                      ),
+                    })
+                  : t("session.autoOptionSendLabel")
               }
               onPress={() => autoOptionSend.onToggle(!autoOptionSend.enabled)}
               badgeColor={autoOptionSend.enabled ? badgeColor : undefined}

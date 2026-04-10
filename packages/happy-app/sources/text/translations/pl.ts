@@ -620,6 +620,11 @@ export const pl: TranslationStructure = {
     knowledgeAccessGoToSource: "Przejdź do sesji źródłowej",
     recommendationsTitle: "Sugerowane dla tej sesji",
     recommendationsTapHint: "Dotknij, aby dodać do pola tekstowego",
+    autoOptionSendLabel: "Auto",
+    autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,
+    autoOptionSendTitle: "Polecane działania",
+    autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
+      `Polecane działania · automatyczne wysłanie pierwszej opcji za ${seconds}s`,
   },
 
   bookmark: {

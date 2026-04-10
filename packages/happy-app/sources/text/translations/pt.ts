@@ -608,6 +608,11 @@ export const pt: TranslationStructure = {
     knowledgeAccessGoToSource: "Ir para a sessão de origem",
     recommendationsTitle: "Sugerido para esta sessão",
     recommendationsTapHint: "Toque para adicionar ao campo de entrada",
+    autoOptionSendLabel: "Auto",
+    autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,
+    autoOptionSendTitle: "Ações recomendadas",
+    autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
+      `Ações recomendadas · envio automático da primeira opção em ${seconds}s`,
   },
 
   bookmark: {

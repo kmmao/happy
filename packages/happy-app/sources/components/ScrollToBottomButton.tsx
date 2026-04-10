@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as React from "react";
 import { Animated, Pressable, View, Text } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { t } from "@/text";
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -161,11 +162,16 @@ export const ScrollToBottomButton = React.memo(
             />
             {autoOptionSend?.visible && (
               <PulseButton
-                icon={autoOptionSend.enabled ? "pause" : "play"}
+                icon="sparkles"
                 label={
                   autoOptionSend.enabled && autoOptionSend.remainingMs != null
-                    ? `${Math.max(1, Math.ceil(autoOptionSend.remainingMs / 1000))}s`
-                    : undefined
+                    ? t("session.autoOptionSendCountdown", {
+                        seconds: Math.max(
+                          1,
+                          Math.ceil(autoOptionSend.remainingMs / 1000),
+                        ),
+                      })
+                    : t("session.autoOptionSendLabel")
                 }
                 onPress={() => autoOptionSend.onToggle(!autoOptionSend.enabled)}
                 size={18}

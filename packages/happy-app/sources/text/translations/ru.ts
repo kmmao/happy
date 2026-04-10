@@ -801,6 +801,11 @@ export const ru: TranslationStructure = {
     knowledgeAccessGoToSource: "Перейти к исходной сессии",
     recommendationsTitle: "Рекомендовано для этой сессии",
     recommendationsTapHint: "Нажмите, чтобы добавить в поле ввода",
+    autoOptionSendLabel: "Авто",
+    autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Авто ${seconds}с`,
+    autoOptionSendTitle: "Рекомендуемые действия",
+    autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
+      `Рекомендуемые действия · первая опция будет отправлена автоматически через ${seconds}с`,
   },
 
   bookmark: {

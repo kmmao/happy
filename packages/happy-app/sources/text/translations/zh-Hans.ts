@@ -582,6 +582,11 @@ export const zhHans: TranslationStructure = {
     knowledgeAccessGoToSource: "跳转到来源会话",
     recommendationsTitle: "本次会话建议处理",
     recommendationsTapHint: "点击填入输入框",
+    autoOptionSendLabel: "自动",
+    autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `自动 ${seconds}秒`,
+    autoOptionSendTitle: "推荐操作",
+    autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
+      `推荐操作 · ${seconds} 秒后自动发送第一项`,
   },
 
   bookmark: {

@@ -1,11 +1,12 @@
 import * as React from "react";
-import { Animated, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
 import { layout } from "./layout";
 import { t } from "@/text";
 import { useAppendToInput } from "@/hooks/useInputContext";
+import { BaseModal } from "@/modal/components/BaseModal";
 
 export interface OptionItem {
   text: string;
@@ -27,6 +28,10 @@ function normalizeOption(option: string | OptionItem): OptionItem {
   return typeof option === "string" ? { text: option } : option;
 }
 
+function buildOptionKey(option: OptionItem, occurrence: number): string {
+  return `${option.source ?? "plain"}:${option.text}:${occurrence}`;
+}
+
 export const OptionsPopover = React.memo(
   ({
     visible,
@@ -40,184 +45,139 @@ export const OptionsPopover = React.memo(
   }: OptionsPopoverProps) => {
     const { theme } = useUnistyles();
     const appendToInput = useAppendToInput();
-    const opacity = React.useRef(new Animated.Value(0)).current;
-    const [shouldRender, setShouldRender] = React.useState(false);
-
-    React.useEffect(() => {
-      if (visible) {
-        setShouldRender(true);
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-      } else {
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }).start(({ finished }) => {
-          if (finished) {
-            setShouldRender(false);
-          }
-        });
-      }
-    }, [visible, opacity]);
-
-    if (!shouldRender) return null;
+    const optionOccurrences = new Map<string, number>();
 
     return (
-      <Animated.View style={[styles.overlay, { opacity }]}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.centerAnchor} pointerEvents="box-none">
-          <View style={styles.bubble}>
-            {title && (
-              <View style={styles.titleContainer}>
-                <Text style={styles.titleText}>{title}</Text>
-              </View>
-            )}
-            {options.map((raw, index) => {
-              const option = normalizeOption(raw);
-              const isRecommended = recommendedIndex === index;
-              const countdownLabel =
-                isRecommended && recommendedRemainingMs != null
-                  ? `${Math.max(0, Math.ceil(recommendedRemainingMs / 1000))}s`
-                  : null;
+      <BaseModal visible={visible} onClose={onClose}>
+        <View style={styles.bubble}>
+          {title && (
+            <View style={styles.titleContainer}>
+              <Text style={styles.titleText}>{title}</Text>
+            </View>
+          )}
+          {options.map((raw, index) => {
+            const option = normalizeOption(raw);
+            const isRecommended = recommendedIndex === index;
+            const countdownLabel =
+              isRecommended && recommendedRemainingMs != null
+                ? `${Math.max(0, Math.ceil(recommendedRemainingMs / 1000))}s`
+                : null;
+            const occurrenceKey = `${option.source ?? "plain"}:${option.text}`;
+            const occurrence = optionOccurrences.get(occurrenceKey) ?? 0;
+            optionOccurrences.set(occurrenceKey, occurrence + 1);
 
-              return (
-                <View
-                  key={`${option.source ?? "plain"}:${option.text}:${index}`}
-                  style={[
-                    styles.optionRow,
-                    index < options.length - 1 && styles.optionItemBorder,
+            return (
+              <View
+                key={buildOptionKey(option, occurrence)}
+                style={[
+                  styles.optionRow,
+                  index < options.length - 1 && styles.optionItemBorder,
+                ]}
+              >
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.optionItem,
+                    onRemoveOption && styles.optionItemFlex,
+                    isRecommended && styles.optionItemRecommended,
+                    pressed && styles.optionItemPressed,
                   ]}
+                  onPress={() => onOptionPress(option.text)}
                 >
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.optionItem,
-                      onRemoveOption && styles.optionItemFlex,
-                      isRecommended && styles.optionItemRecommended,
-                      pressed && styles.optionItemPressed,
-                    ]}
-                    onPress={() => onOptionPress(option.text)}
-                  >
-                    <View style={styles.optionContent}>
-                      <Text style={styles.optionText} numberOfLines={2}>
-                        {option.text}
-                      </Text>
-                      {isRecommended && (
-                        <View style={styles.recommendedTag}>
-                          <Ionicons
-                            name="sparkles"
-                            size={11}
-                            color={theme.colors.radio.active}
-                          />
-                          <Text style={styles.recommendedTagText}>
-                            {t("tools.askUserQuestion.recommended")}
+                  <View style={styles.optionContent}>
+                    <Text style={styles.optionText} numberOfLines={2}>
+                      {option.text}
+                    </Text>
+                    {isRecommended && (
+                      <View style={styles.recommendedTag}>
+                        <Ionicons
+                          name="sparkles"
+                          size={11}
+                          color={theme.colors.radio.active}
+                        />
+                        <Text style={styles.recommendedTagText}>
+                          {t("tools.askUserQuestion.recommended")}
+                        </Text>
+                        {countdownLabel ? (
+                          <Text style={styles.recommendedCountdownText}>
+                            {countdownLabel}
                           </Text>
-                          {countdownLabel ? (
-                            <Text style={styles.recommendedCountdownText}>
-                              {countdownLabel}
-                            </Text>
-                          ) : null}
-                        </View>
-                      )}
-                      {option.source && (
-                        <View
+                        ) : null}
+                      </View>
+                    )}
+                    {option.source && (
+                      <View
+                        style={[
+                          styles.sourceTag,
+                          option.source === "ai"
+                            ? {
+                                backgroundColor:
+                                  theme.colors.radio.active + "20",
+                              }
+                            : {
+                                backgroundColor:
+                                  theme.colors.box.warning.background,
+                              },
+                        ]}
+                      >
+                        <Text
                           style={[
-                            styles.sourceTag,
+                            styles.sourceTagText,
                             option.source === "ai"
-                              ? {
-                                  backgroundColor:
-                                    theme.colors.radio.active + "20",
-                                }
-                              : {
-                                  backgroundColor:
-                                    theme.colors.box.warning.background,
-                                },
+                              ? { color: theme.colors.radio.active }
+                              : { color: theme.colors.box.warning.text },
                           ]}
                         >
-                          <Text
-                            style={[
-                              styles.sourceTagText,
-                              option.source === "ai"
-                                ? { color: theme.colors.radio.active }
-                                : { color: theme.colors.box.warning.text },
-                            ]}
-                          >
-                            {option.source === "ai"
-                              ? t("bookmark.sourceAI")
-                              : t("bookmark.sourceUser")}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </Pressable>
+                          {option.source === "ai"
+                            ? t("bookmark.sourceAI")
+                            : t("bookmark.sourceUser")}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.removeButton,
+                    pressed && styles.removeButtonPressed,
+                  ]}
+                  onPress={() => {
+                    onClose();
+                    appendToInput(option.text);
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                >
+                  <Ionicons
+                    name="copy-outline"
+                    size={16}
+                    color={theme.colors.textSecondary}
+                  />
+                </Pressable>
+                {onRemoveOption && (
                   <Pressable
                     style={({ pressed }) => [
                       styles.removeButton,
                       pressed && styles.removeButtonPressed,
                     ]}
-                    onPress={() => {
-                      onClose();
-                      appendToInput(option.text);
-                    }}
-                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    onPress={() => onRemoveOption(option.text)}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                   >
                     <Ionicons
-                      name="copy-outline"
+                      name="bookmark-outline"
                       size={16}
                       color={theme.colors.textSecondary}
                     />
                   </Pressable>
-                  {onRemoveOption && (
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.removeButton,
-                        pressed && styles.removeButtonPressed,
-                      ]}
-                      onPress={() => onRemoveOption(option.text)}
-                      hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                    >
-                      <Ionicons
-                        name="bookmark-outline"
-                        size={16}
-                        color={theme.colors.textSecondary}
-                      />
-                    </Pressable>
-                  )}
-                </View>
-              );
-            })}
-          </View>
+                )}
+              </View>
+            );
+          })}
         </View>
-      </Animated.View>
+      </BaseModal>
     );
   },
 );
 
 const styles = StyleSheet.create((theme) => ({
-  overlay: {
-    position: "absolute" as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 100,
-  },
-  backdrop: {
-    position: "absolute" as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-  },
-  centerAnchor: {
-    flex: 1,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-  },
   bubble: {
     maxWidth: layout.maxWidth - 32,
     width: "90%",

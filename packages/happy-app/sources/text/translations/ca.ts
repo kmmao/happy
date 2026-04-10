@@ -610,6 +610,11 @@ export const ca: TranslationStructure = {
     knowledgeAccessGoToSource: "Anar a la sessió d'origen",
     recommendationsTitle: "Suggerit per a aquesta sessió",
     recommendationsTapHint: "Toca per afegir a l'entrada",
+    autoOptionSendLabel: "Auto",
+    autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,
+    autoOptionSendTitle: "Accions recomanades",
+    autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
+      `Accions recomanades · enviament automàtic de la primera opció en ${seconds}s`,
   },
 
   bookmark: {
