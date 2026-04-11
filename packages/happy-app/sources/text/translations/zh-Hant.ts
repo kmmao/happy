@@ -285,6 +285,9 @@ export const zhHant: TranslationStructure = {
     realtimeSessionSort: "即時工作階段排序",
     realtimeSessionSortDescription:
       "依最近活動排序工作階段（關閉後依建立時間穩定排序）",
+    developerDescription: "面向開發者的外觀控制項",
+    expandThinkingByDefault: "預設展開思考內容",
+    expandThinkingByDefaultDescription: "思考內容首次出現時預設展開顯示",
   },
 
   settingsFeatures: {

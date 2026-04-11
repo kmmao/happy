@@ -379,6 +379,10 @@ export const ja: TranslationStructure = {
     realtimeSessionSort: "リアルタイムセッション並び替え",
     realtimeSessionSortDescription:
       "最近のアクティビティでセッションを並び替え（オフにすると作成日時順で安定表示）",
+    developerDescription: "開発者向けの外観設定",
+    expandThinkingByDefault: "思考内容をデフォルトで展開",
+    expandThinkingByDefaultDescription:
+      "思考内容が最初に表示されたときに自動で展開します",
   },
 
   settingsFeatures: {

@@ -297,6 +297,10 @@ export const pt: TranslationStructure = {
     realtimeSessionSort: "Ordenação de sessões em tempo real",
     realtimeSessionSortDescription:
       "Ordenar sessões por atividade recente (desative para ordem estável por data de criação)",
+    developerDescription: "Controles de aparência voltados para desenvolvedores",
+    expandThinkingByDefault: "Expandir pensamento por padrão",
+    expandThinkingByDefaultDescription:
+      "Mostrar o conteúdo de pensamento expandido quando aparecer pela primeira vez",
   },
 
   settingsFeatures: {

@@ -285,6 +285,9 @@ export const zhHans: TranslationStructure = {
     realtimeSessionSort: "实时会话排序",
     realtimeSessionSortDescription:
       "按最近活动排序会话（关闭后按创建时间稳定排序）",
+    developerDescription: "面向开发者的外观控制项",
+    expandThinkingByDefault: "默认展开思考内容",
+    expandThinkingByDefaultDescription: "思考内容首次出现时默认展开显示",
   },
 
   settingsFeatures: {

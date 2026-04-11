@@ -57,6 +57,12 @@ describe("getThinkingLabelTitle", () => {
         );
     });
 
+    it("strips trailing markdown emphasis markers from the title", () => {
+        expect(getThinkingLabelTitle("*Addressing content issues**\nMore details*")).toBe(
+            "Addressing content issues",
+        );
+    });
+
     it("returns null when there is no meaningful thinking content", () => {
         expect(getThinkingLabelTitle("***")).toBeNull();
     });

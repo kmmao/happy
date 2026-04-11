@@ -318,8 +318,14 @@ function AgentTextBlock(props: {
   isLatestAgent?: boolean;
 }) {
   const experiments = useSetting("experiments");
+  const expandThinkingByDefault = useSetting("expandThinkingByDefault");
   const { theme } = useUnistyles();
-  const [thinkingExpanded, setThinkingExpanded] = React.useState(false);
+  const [thinkingExpanded, setThinkingExpanded] = React.useState(
+    expandThinkingByDefault,
+  );
+  React.useEffect(() => {
+    setThinkingExpanded(expandThinkingByDefault);
+  }, [expandThinkingByDefault]);
   const handleOptionPress = React.useCallback(
     (option: Option) => {
       sync.sendMessage(props.sessionId, option.title);

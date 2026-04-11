@@ -42,6 +42,8 @@ function AppearanceSettingsScreen() {
     useSettingMutable("compactSessionView");
   const [collapsibleInput, setCollapsibleInput] =
     useSettingMutable("collapsibleInput");
+  const [expandThinkingByDefault, setExpandThinkingByDefault] =
+    useSettingMutable("expandThinkingByDefault");
   const [realtimeSessionSort, setRealtimeSessionSort] = useSettingMutable(
     "realtimeSessionSort",
   );
@@ -317,6 +319,23 @@ function AppearanceSettingsScreen() {
             <Switch
               value={showFlavorIcons}
               onValueChange={setShowFlavorIcons}
+            />
+          }
+        />
+      </ItemGroup>
+
+      <ItemGroup
+        title={t("settings.developer")}
+        footer={t("settingsAppearance.developerDescription")}
+      >
+        <Item
+          title={t("settingsAppearance.expandThinkingByDefault")}
+          subtitle={t("settingsAppearance.expandThinkingByDefaultDescription")}
+          icon={<Ionicons name="bulb-outline" size={29} color="#FF9500" />}
+          rightElement={
+            <Switch
+              value={expandThinkingByDefault}
+              onValueChange={setExpandThinkingByDefault}
             />
           }
         />

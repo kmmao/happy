@@ -308,6 +308,10 @@ export const pl: TranslationStructure = {
     realtimeSessionSort: "Sortowanie sesji w czasie rzeczywistym",
     realtimeSessionSortDescription:
       "Sortuj sesje według ostatniej aktywności (wyłącz, aby zachować stabilną kolejność wg daty utworzenia)",
+    developerDescription: "Ustawienia wyglądu dla deweloperów",
+    expandThinkingByDefault: "Domyślnie rozwijaj myślenie",
+    expandThinkingByDefaultDescription:
+      "Pokazuj treść myślenia rozwiniętą przy pierwszym wyświetleniu",
   },
 
   settingsFeatures: {

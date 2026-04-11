@@ -263,6 +263,10 @@ export const ru: TranslationStructure = {
     realtimeSessionSort: "Сортировка сессий в реальном времени",
     realtimeSessionSortDescription:
       "Сортировать сессии по недавней активности (отключите для стабильного порядка по времени создания)",
+    developerDescription: "Настройки внешнего вида для разработчиков",
+    expandThinkingByDefault: "Разворачивать размышления по умолчанию",
+    expandThinkingByDefaultDescription:
+      "Показывать содержимое размышлений развернутым при первом появлении",
   },
 
   settingsFeatures: {

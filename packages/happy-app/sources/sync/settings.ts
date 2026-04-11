@@ -398,6 +398,9 @@ export const SettingsSchema = z.object({
     .describe(
       "Whether to enable collapsible input box in sessions (auto-collapse when messages exist)",
     ),
+  expandThinkingByDefault: z
+    .boolean()
+    .describe("Whether thinking blocks should start expanded by default"),
   hideInactiveSessions: z
     .boolean()
     .describe("Hide inactive sessions in the main list"),
@@ -699,6 +702,7 @@ export const settingsDefaults: Settings = {
   showFlavorIcons: false,
   compactSessionView: false,
   collapsibleInput: false,
+  expandThinkingByDefault: false,
   hideInactiveSessions: false,
   realtimeSessionSort: true,
   reviewPromptAnswered: false,

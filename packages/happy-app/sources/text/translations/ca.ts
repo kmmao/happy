@@ -298,6 +298,10 @@ export const ca: TranslationStructure = {
     realtimeSessionSort: "Ordenació de sessions en temps real",
     realtimeSessionSortDescription:
       "Ordena les sessions per activitat recent (desactiveu per ordre estable per data de creació)",
+    developerDescription: "Controls d'aparença per a desenvolupadors",
+    expandThinkingByDefault: "Expandir el pensament per defecte",
+    expandThinkingByDefaultDescription:
+      "Mostra el contingut del pensament expandit quan aparegui per primera vegada",
   },
 
   settingsFeatures: {

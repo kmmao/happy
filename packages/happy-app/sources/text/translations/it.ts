@@ -385,6 +385,10 @@ export const it: TranslationStructure = {
     realtimeSessionSort: "Ordinamento sessioni in tempo reale",
     realtimeSessionSortDescription:
       "Ordina le sessioni per attività recente (disattiva per ordine stabile per data di creazione)",
+    developerDescription: "Controlli aspetto per sviluppatori",
+    expandThinkingByDefault: "Espandi il pensiero per impostazione predefinita",
+    expandThinkingByDefaultDescription:
+      "Mostra il contenuto del pensiero espanso quando appare per la prima volta",
   },
 
   settingsFeatures: {

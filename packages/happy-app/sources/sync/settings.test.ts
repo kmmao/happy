@@ -25,10 +25,12 @@ describe("settings", () => {
     it("should parse valid settings object", () => {
       const validSettings = {
         viewInline: true,
+        expandThinkingByDefault: true,
       };
       expect(settingsParse(validSettings)).toEqual({
         ...settingsDefaults,
         viewInline: true,
+        expandThinkingByDefault: true,
       });
     });
 
@@ -117,6 +119,7 @@ describe("settings", () => {
         showFlavorIcons: false,
         compactSessionView: false,
         collapsibleInput: false,
+        expandThinkingByDefault: false,
         hideInactiveSessions: false,
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
@@ -157,9 +160,10 @@ describe("settings", () => {
       };
       const delta: Partial<Settings> = {
         viewInline: true,
+        expandThinkingByDefault: true,
       };
       expect(applySettings(currentSettings, delta)).toEqual({
-        schemaVersion: 1, // Preserved from currentSettings
+        schemaVersion: 1,
         viewInline: true,
         expandTodos: true,
         expandTools: false,
@@ -172,10 +176,11 @@ describe("settings", () => {
         useEnhancedSessionWizard: false,
         alwaysShowContextSize: false,
         agentInputEnterToSend: true,
-        avatarStyle: "gradient", // This should be preserved from currentSettings
+        avatarStyle: "gradient",
         showFlavorIcons: false,
         compactSessionView: false,
         collapsibleInput: false,
+        expandThinkingByDefault: true,
         hideInactiveSessions: false,
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
@@ -235,6 +240,7 @@ describe("settings", () => {
         showFlavorIcons: false,
         compactSessionView: false,
         collapsibleInput: false,
+        expandThinkingByDefault: false,
         hideInactiveSessions: false,
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
@@ -296,6 +302,7 @@ describe("settings", () => {
         showFlavorIcons: false,
         compactSessionView: false,
         collapsibleInput: false,
+        expandThinkingByDefault: false,
         hideInactiveSessions: false,
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
@@ -362,6 +369,7 @@ describe("settings", () => {
         showFlavorIcons: false,
         compactSessionView: false,
         collapsibleInput: false,
+        expandThinkingByDefault: false,
         hideInactiveSessions: false,
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
@@ -437,6 +445,7 @@ describe("settings", () => {
         showFlavorIcons: false,
         compactSessionView: false,
         collapsibleInput: false,
+        expandThinkingByDefault: false,
         hideInactiveSessions: false,
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
@@ -522,6 +531,7 @@ describe("settings", () => {
         showFlavorIcons: false,
         compactSessionView: false,
         collapsibleInput: false,
+        expandThinkingByDefault: false,
         agentInputEnterToSend: true,
         hideInactiveSessions: false,
         realtimeSessionSort: true,

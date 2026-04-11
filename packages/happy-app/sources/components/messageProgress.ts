@@ -47,6 +47,7 @@ export function getThinkingLabelTitle(text: string): string | null {
 
     const normalizedTitle = firstMeaningfulLine
         .replace(/^#{1,6}\s+/, "")
+        .replace(/\*+$/g, "")
         .trim();
 
     return normalizedTitle.length > 0 ? normalizedTitle : null;
