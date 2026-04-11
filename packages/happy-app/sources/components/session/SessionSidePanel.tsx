@@ -12,6 +12,7 @@ import { SidePanelFilePreview } from "./SidePanelFilePreview";
 import { SidePanelTimelineTab } from "./SidePanelTimelineTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
 import { InputContext } from "@/hooks/useInputContext";
+import { buildFileReferenceText } from "./sessionSidePanelReference";
 
 export const SIDE_PANEL_WIDTH = 360;
 export const SIDE_PANEL_MIN_WINDOW_WIDTH = 1200;
@@ -43,7 +44,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
 
         const handleReference = React.useCallback(
             (path: string) => {
-                inputContext?.appendToInput(`@${path}`);
+                inputContext?.appendToInput(buildFileReferenceText(path));
             },
             [inputContext],
         );

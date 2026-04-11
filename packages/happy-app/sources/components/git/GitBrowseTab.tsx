@@ -24,6 +24,7 @@ import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { FileIcon } from "@/components/FileIcon";
 import { utf8ToBase64 } from "@/utils/stringUtils";
+import { getFavoriteItemActions } from "./gitBrowseTabFavorites";
 
 const BINARY_EXTENSIONS = new Set([
     "png", "jpg", "jpeg", "gif", "bmp", "svg", "ico",
@@ -429,6 +430,7 @@ export const GitBrowseTab = React.memo<{
                                 ? fav.path.slice(0, fav.path.lastIndexOf("/"))
                                 : null;
                             const isDir = fav.type === "directory";
+                            const actions = getFavoriteItemActions(!!onReference);
                             return (
                                 <View
                                     key={`fav-${fav.path}`}
@@ -501,13 +503,27 @@ export const GitBrowseTab = React.memo<{
                                             </Text>
                                         </Pressable>
                                     )}
-                                    <Pressable
-                                        onPress={() => toggleFavorite(fav.path, fav.type)}
-                                        hitSlop={6}
-                                        style={({ pressed }) => ({ padding: 2, opacity: pressed ? 0.5 : 1 })}
-                                    >
-                                        <Octicons name="x" size={12} color={theme.colors.textSecondary} />
-                                    </Pressable>
+                                    {actions.map((action: "reference" | "remove") => (
+                                        <Pressable
+                                            key={action}
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                if (action === "reference") {
+                                                    onReference?.(fav.path);
+                                                    return;
+                                                }
+                                                toggleFavorite(fav.path, fav.type);
+                                            }}
+                                            hitSlop={6}
+                                            style={({ pressed }) => ({ padding: 2, opacity: pressed ? 0.5 : 1 })}
+                                        >
+                                            <Octicons
+                                                name={action === "reference" ? "mention" : "x"}
+                                                size={action === "reference" ? 15 : 12}
+                                                color={action === "reference" ? theme.colors.textLink : theme.colors.textSecondary}
+                                            />
+                                        </Pressable>
+                                    ))}
                                 </View>
                             );
                         })}
