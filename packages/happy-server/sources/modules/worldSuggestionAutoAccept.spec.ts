@@ -1,14 +1,20 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { worldSuggestionAccept } = vi.hoisted(() => ({
+const { worldSuggestionAccept, dbMock } = vi.hoisted(() => ({
   worldSuggestionAccept: vi.fn(async () => ({
     suggestionId: "sug-1",
     createdEntityType: "task",
     createdEntityId: "task-1",
   })),
+  dbMock: {
+    worldSuggestion: {
+      count: vi.fn(async () => 0),
+    },
+  },
 }));
 
 vi.mock("./worldSuggestionAccept", () => ({ worldSuggestionAccept }));
+vi.mock("@/storage/db", () => ({ db: dbMock }));
 
 import {
   autoAcceptSuggestedTasksIfEnabled,
@@ -19,20 +25,38 @@ import {
 
 describe("parseWorldSuggestionAutoAcceptProjectConfig", () => {
   it("returns disabled by default", () => {
-    expect(parseWorldSuggestionAutoAcceptProjectConfig(null)).toEqual({ autoAcceptSafeSuggestedTasks: false });
+    expect(parseWorldSuggestionAutoAcceptProjectConfig(null)).toEqual({
+      autoAcceptSafeSuggestedTasks: false,
+      maxAutoAcceptsPerDay: null,
+    });
   });
 
   it("reads boolean flag from supervisorConfig JSON", () => {
     expect(parseWorldSuggestionAutoAcceptProjectConfig(JSON.stringify({
       worldAutonomy: { autoAcceptSafeSuggestedTasks: true },
-    }))).toEqual({ autoAcceptSafeSuggestedTasks: true });
+    }))).toEqual({
+      autoAcceptSafeSuggestedTasks: true,
+      maxAutoAcceptsPerDay: null,
+    });
+  });
+
+  it("reads numeric daily limit from supervisorConfig JSON", () => {
+    expect(parseWorldSuggestionAutoAcceptProjectConfig(JSON.stringify({
+      worldAutonomy: {
+        autoAcceptSafeSuggestedTasks: true,
+        maxAutoAcceptsPerDay: 2,
+      },
+    }))).toEqual({
+      autoAcceptSafeSuggestedTasks: true,
+      maxAutoAcceptsPerDay: 2,
+    });
   });
 });
 
 describe("shouldAutoAcceptSuggestedTask", () => {
   it("returns true for low-risk suggested_task in next_step bucket when project opt-in is enabled", () => {
     expect(shouldAutoAcceptSuggestedTask({
-      projectConfig: { autoAcceptSafeSuggestedTasks: true },
+      projectConfig: { autoAcceptSafeSuggestedTasks: true, maxAutoAcceptsPerDay: null },
       suggestion: {
         id: "sug-1",
         projectId: "project-1",
@@ -64,7 +88,7 @@ describe("shouldAutoAcceptSuggestedTask", () => {
 
   it("returns false when project opt-in is disabled", () => {
     expect(shouldAutoAcceptSuggestedTask({
-      projectConfig: { autoAcceptSafeSuggestedTasks: false },
+      projectConfig: { autoAcceptSafeSuggestedTasks: false, maxAutoAcceptsPerDay: null },
       suggestion: {
         id: "sug-1",
         projectId: "project-1",
@@ -90,7 +114,7 @@ describe("shouldAutoAcceptSuggestedTask", () => {
 
   it("returns false for non-task suggestions", () => {
     expect(shouldAutoAcceptSuggestedTask({
-      projectConfig: { autoAcceptSafeSuggestedTasks: true },
+      projectConfig: { autoAcceptSafeSuggestedTasks: true, maxAutoAcceptsPerDay: null },
       suggestion: {
         id: "sug-2",
         projectId: "project-1",
@@ -116,7 +140,7 @@ describe("shouldAutoAcceptSuggestedTask", () => {
 
   it("returns false for task suggestions outside next_step bucket", () => {
     expect(shouldAutoAcceptSuggestedTask({
-      projectConfig: { autoAcceptSafeSuggestedTasks: true },
+      projectConfig: { autoAcceptSafeSuggestedTasks: true, maxAutoAcceptsPerDay: null },
       suggestion: {
         id: "sug-3",
         projectId: "project-1",
@@ -142,7 +166,7 @@ describe("shouldAutoAcceptSuggestedTask", () => {
 
   it("returns false when evidence contains message or decision involvement", () => {
     expect(shouldAutoAcceptSuggestedTask({
-      projectConfig: { autoAcceptSafeSuggestedTasks: true },
+      projectConfig: { autoAcceptSafeSuggestedTasks: true, maxAutoAcceptsPerDay: null },
       suggestion: {
         id: "sug-4",
         projectId: "project-1",
@@ -206,6 +230,11 @@ describe("buildAutoAcceptAudit", () => {
 });
 
 describe("autoAcceptSuggestedTasksIfEnabled", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dbMock.worldSuggestion.count.mockResolvedValue(0);
+  });
+
   it("reuses worldSuggestionAccept for eligible tasks with system audit source and reason snapshot", async () => {
     await autoAcceptSuggestedTasksIfEnabled({
       accountId: "user-1",
@@ -251,5 +280,104 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
         ],
       },
     });
+  });
+
+  it("stops auto-accepting when project daily quota is already exhausted", async () => {
+    dbMock.worldSuggestion.count.mockResolvedValue(2);
+
+    await autoAcceptSuggestedTasksIfEnabled({
+      accountId: "user-1",
+      projectId: "project-1",
+      supervisorConfig: JSON.stringify({
+        worldAutonomy: {
+          autoAcceptSafeSuggestedTasks: true,
+          maxAutoAcceptsPerDay: 2,
+        },
+      }),
+      suggestions: [
+        {
+          id: "sug-1",
+          projectId: "project-1",
+          relatedGoalId: null,
+          relatedTaskId: null,
+          type: "suggested_task",
+          title: "Investigate API retry",
+          summary: "summary",
+          reason: "reason",
+          evidence: [],
+          recommendedRole: null,
+          payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic" } },
+          requiresHuman: false,
+          status: "open",
+          dedupeKey: "dedupe:1",
+          bucket: "next_step",
+          createdAt: 1,
+          actedAt: null,
+          acceptSource: null,
+        },
+      ],
+    });
+
+    expect(worldSuggestionAccept).not.toHaveBeenCalled();
+  });
+
+  it("only auto-accepts suggestions up to the remaining daily quota", async () => {
+    dbMock.worldSuggestion.count.mockResolvedValue(1);
+
+    await autoAcceptSuggestedTasksIfEnabled({
+      accountId: "user-1",
+      projectId: "project-1",
+      supervisorConfig: JSON.stringify({
+        worldAutonomy: {
+          autoAcceptSafeSuggestedTasks: true,
+          maxAutoAcceptsPerDay: 2,
+        },
+      }),
+      suggestions: [
+        {
+          id: "sug-1",
+          projectId: "project-1",
+          relatedGoalId: null,
+          relatedTaskId: null,
+          type: "suggested_task",
+          title: "Investigate API retry",
+          summary: "summary",
+          reason: "reason",
+          evidence: [],
+          recommendedRole: null,
+          payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic" } },
+          requiresHuman: false,
+          status: "open",
+          dedupeKey: "dedupe:1",
+          bucket: "next_step",
+          createdAt: 1,
+          actedAt: null,
+          acceptSource: null,
+        },
+        {
+          id: "sug-2",
+          projectId: "project-1",
+          relatedGoalId: null,
+          relatedTaskId: null,
+          type: "suggested_task",
+          title: "Investigate second retry",
+          summary: "summary",
+          reason: "reason",
+          evidence: [],
+          recommendedRole: null,
+          payload: { task: { title: "Investigate second retry", prompt: "Inspect second retry logic" } },
+          requiresHuman: false,
+          status: "open",
+          dedupeKey: "dedupe:2",
+          bucket: "next_step",
+          createdAt: 2,
+          actedAt: null,
+          acceptSource: null,
+        },
+      ],
+    });
+
+    expect(worldSuggestionAccept).toHaveBeenCalledTimes(1);
+    expect(worldSuggestionAccept).toHaveBeenCalledWith(expect.objectContaining({ suggestionId: "sug-1" }));
   });
 });

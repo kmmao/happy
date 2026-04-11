@@ -1,8 +1,10 @@
 import type { SuggestionAcceptAudit, SuggestionSummary } from "@kmmao/happy-wire";
+import { db } from "@/storage/db";
 import { worldSuggestionAccept } from "./worldSuggestionAccept";
 
 export interface WorldSuggestionAutoAcceptProjectConfig {
   autoAcceptSafeSuggestedTasks: boolean;
+  maxAutoAcceptsPerDay: number | null;
 }
 
 export function parseWorldSuggestionAutoAcceptProjectConfig(
@@ -12,15 +14,20 @@ export function parseWorldSuggestionAutoAcceptProjectConfig(
     if (supervisorConfig) {
       const cfg = JSON.parse(supervisorConfig);
       const enabled = cfg?.worldAutonomy?.autoAcceptSafeSuggestedTasks;
+      const rawLimit = cfg?.worldAutonomy?.maxAutoAcceptsPerDay;
+      const maxAutoAcceptsPerDay = Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : null;
       if (typeof enabled === "boolean") {
-        return { autoAcceptSafeSuggestedTasks: enabled };
+        return {
+          autoAcceptSafeSuggestedTasks: enabled,
+          maxAutoAcceptsPerDay,
+        };
       }
     }
   } catch {
     // Ignore invalid JSON and fall back to disabled.
   }
 
-  return { autoAcceptSafeSuggestedTasks: false };
+  return { autoAcceptSafeSuggestedTasks: false, maxAutoAcceptsPerDay: null };
 }
 
 export function shouldAutoAcceptSuggestedTask(input: {
@@ -76,10 +83,24 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
   suggestions: SuggestionSummary[];
 }): Promise<void> {
   const projectConfig = parseWorldSuggestionAutoAcceptProjectConfig(input.supervisorConfig);
+  const remainingQuota = await getRemainingDailyAutoAcceptQuota({
+    accountId: input.accountId,
+    projectId: input.projectId,
+    maxAutoAcceptsPerDay: projectConfig.maxAutoAcceptsPerDay,
+  });
+
+  if (remainingQuota === 0) {
+    return;
+  }
+
+  let acceptedCount = 0;
 
   for (const suggestion of input.suggestions) {
     if (!shouldAutoAcceptSuggestedTask({ projectConfig, suggestion })) {
       continue;
+    }
+    if (remainingQuota !== null && acceptedCount >= remainingQuota) {
+      break;
     }
 
     await worldSuggestionAccept({
@@ -89,5 +110,31 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
       acceptSource: "system_auto",
       acceptAudit: buildAutoAcceptAudit({ suggestion }),
     });
+    acceptedCount += 1;
   }
+}
+
+async function getRemainingDailyAutoAcceptQuota(input: {
+  accountId: string;
+  projectId: string;
+  maxAutoAcceptsPerDay: number | null;
+}): Promise<number | null> {
+  if (input.maxAutoAcceptsPerDay === null) {
+    return null;
+  }
+
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+
+  const currentCount = await db.worldSuggestion.count({
+    where: {
+      accountId: input.accountId,
+      projectId: input.projectId,
+      status: "accepted",
+      acceptSource: "system_auto",
+      actedAt: { gte: dayStart },
+    },
+  });
+
+  return Math.max(input.maxAutoAcceptsPerDay - currentCount, 0);
 }

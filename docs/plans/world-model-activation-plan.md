@@ -648,11 +648,14 @@ World 中增加：
 - `WorldSuggestion` 已进一步新增 `acceptAudit` 最小策略命中快照字段（`rule + checks`），专门用于记录 `system_auto` 为什么被判定为可自动接受；当前结构保持最小，不扩成完整策略引擎。
 - `worldSuggestionAutoAccept.ts` 已集中产出 `safe_suggested_task_auto_accept` 审计快照，当前 checks 至少覆盖：`type`、`bucket`、`requiresHuman`、payload 非空、evidence 干净。
 - `worldSuggestionAccept()` 已兼容可选 `acceptAudit` 入参，并把快照持久化到 `WorldSuggestion`；manual 路径默认仍为 `acceptAudit = null`。
-- query / serialize / wire contract 已可返回 `acceptAudit`，因此后端现在不仅能回答“这条 suggestion 是自动接受的”，也能回答“它当时为何命中自动接受规则”。
-- 已补齐这一轮 TDD 回归：`worldSuggestionAutoAccept.spec.ts`、`worldSuggestionAccept.spec.ts`、`worldSuggestionQuery.spec.ts`、`worldSuggestionTypes.spec.ts`；相关 31 个 server tests 通过，`happy-server tsc --noEmit` 通过。
+- `worldSuggestionAutoAccept.ts` 已进一步接入 project 级每日配额保护：当前支持 `maxAutoAcceptsPerDay`，并且只统计同一 project 下 `acceptSource = system_auto` 且当日已 accepted 的 suggestion。
+- 配额为 0 时，白名单 suggestion 会保持 `open` 而不是继续自动接受；有剩余额度时，也只会在当前 refresh 批次内接受到剩余额度为止。
+- 当前实现仍保持最小：只做每日数量硬上限，不引入并发保护、审批列表或自治面板，也不影响 human accept 路径。
+- 已补齐这一轮 TDD 回归：`worldSuggestionAutoAccept.spec.ts` 已覆盖默认无上限、读取 `maxAutoAcceptsPerDay`、配额耗尽时不 auto、剩余额度只接受前 N 条；相关 server 回归 34 个测试通过，`happy-server tsc --noEmit` 通过。
 
 当前仍未做（且仍不属于这轮范围）：
 
+- 并发保护（例如 maxConcurrentAutoAccepts / maxOpenAutoAcceptedTasks）
 - autonomy dashboard / approvals / pending approvals 可视化
 - auto-safe / auto-guarded 的完整策略模型落库
 - 非 `suggested_task` 的自动执行
@@ -924,8 +927,8 @@ World 逐步从 Goal list 演进为：
 | 2026-04-10 | 阶段 C 实施计划定稿：3 Phase 拆解（Server 真相源 → App 展示 → Skill 可选闭环），新增 `WorldSuggestion` 模型设计、4 类输入源、3 条 generator 规则、REST/ephemeral 接口草案 |
 | 2026-04-11 | 阶段 D 最后稳定化尾项完成：`SuggestionSummary / payload` 已收成严格判别联合，wire 中的 summary 类型与 `type` 绑定 `payload` 分支，server `serializeSuggestion()` 输出严格结构，app 关键消费点已利用 `type` 自动收窄，相关 wire build / server tests / app typecheck / app tests 全绿 |
 | 2026-04-11 | 阶段 D / Phase 3 完成：Suggestion 共享契约已迁入 `happy-wire`，app/server 主要消费链已切到 wire（含 `apiWorld.ts`、`apiTypes.ts`、server 生产代码与 event builder），本地过渡层已移除；accept 写链路保持 strict validate + fail-closed；已通过 wire build、app typecheck 与 server world suggestion 相关 tests |
+| 2026-04-12 | 阶段 E 配额保护已落地：auto-accept 现支持 project 级 `maxAutoAcceptsPerDay`，只统计当日 `system_auto` 已接受 suggestion；配额耗尽后 suggestion 保持 open，不影响 human accept |
 | 2026-04-12 | 阶段 E 策略深化第一步已落地：为 `system_auto` accept 增加 `acceptAudit` 最小命中快照（`rule + checks`），并打通 WorldSuggestion 持久化、wire 契约、query / serialize 返回；后端现在可回答自动接受“为什么发生” |
-| 2026-04-12 | 阶段 E / GoalDetail 复用结论已确认：Goal 详情页的 suggestion 区当前直接复用 `SuggestionCard`，因此已自动继承 accepted 来源 badge；本轮仅补充文档澄清，不新增第二套展示逻辑 |
 | 2026-04-12 | 阶段 E 起手入口已落地：`worldSuggestionRefresh()` 已接入白名单 `suggested_task` 自动 accept，默认关闭、project 级显式开启、强制复用 `worldSuggestionAccept()`；同时补齐 `WorldSuggestion.acceptSource`（`human | system_auto`）与 `triggerType: suggestion_auto` 审计链路，query / serialize 已可返回来源，相关 suggestion tests 41 项全绿，app typecheck 通过 |
 | 2026-04-11 | 阶段 E 入口定稿：下一步不从 autonomy dashboard 或完整策略系统起手，而是只对白名单内低风险 `suggested_task` 做自动 accept，并强制复用既有 `worldSuggestionAccept()` 链路；默认关闭、project 级显式开启、必须可追溯 |
 
