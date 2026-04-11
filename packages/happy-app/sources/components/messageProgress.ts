@@ -33,3 +33,21 @@ export function parseTaskStatusMessage(text: string): {
 
     return { status, summary, metrics };
 }
+
+export function getThinkingLabelTitle(text: string): string | null {
+    const normalizedText = text.trim().replace(/^\*+|\*+$/g, "");
+    const firstMeaningfulLine = normalizedText
+        .split("\n")
+        .map((line) => line.trim())
+        .find((line) => line.length > 0);
+
+    if (!firstMeaningfulLine) {
+        return null;
+    }
+
+    const normalizedTitle = firstMeaningfulLine
+        .replace(/^#{1,6}\s+/, "")
+        .trim();
+
+    return normalizedTitle.length > 0 ? normalizedTitle : null;
+}

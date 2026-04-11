@@ -25,7 +25,7 @@ import { MessageImage } from "./MessageImage";
 import { parseImageRefs } from "@/utils/parseImageRefs";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useAppendToInput } from "@/hooks/useInputContext";
-import { parseTaskStatusMessage } from "./messageProgress";
+import { parseTaskStatusMessage, getThinkingLabelTitle } from "./messageProgress";
 
 export const MessageView = (props: {
   message: Message;
@@ -334,6 +334,11 @@ function AgentTextBlock(props: {
 
   // Collapsed thinking block
   if (props.message.isThinking) {
+    const thinkingTitle = getThinkingLabelTitle(props.message.text);
+    const thinkingLabel = thinkingTitle
+      ? `${t("sessionInfo.thinking")} ${thinkingTitle}`
+      : t("sessionInfo.thinking");
+
     return (
       <View style={styles.agentMessageRow}>
         <View style={[styles.avatarSlot, { paddingTop: 7 }]}>
@@ -358,8 +363,8 @@ function AgentTextBlock(props: {
               size={14}
               color={theme.colors.textSecondary}
             />
-            <Text style={styles.thinkingLabel}>
-              {t("sessionInfo.thinking")}
+            <Text style={styles.thinkingLabel} numberOfLines={1} ellipsizeMode="tail">
+              {thinkingLabel}
             </Text>
           </Pressable>
           {thinkingExpanded && (

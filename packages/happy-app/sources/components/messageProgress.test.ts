@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTaskStatusMessage } from "./messageProgress";
+import { getThinkingLabelTitle, parseTaskStatusMessage } from "./messageProgress";
 
 describe("parseTaskStatusMessage", () => {
     it("parses labeled task-progress text into summary and metrics", () => {
@@ -41,5 +41,23 @@ describe("parseTaskStatusMessage", () => {
     it("returns null when the task-progress label exists without a summary", () => {
         expect(parseTaskStatusMessage("⏳ Task progress\n\n_46s · 0 tokens_"))
             .toBeNull();
+    });
+});
+
+describe("getThinkingLabelTitle", () => {
+    it("extracts the first non-empty thinking line as the collapsed title", () => {
+        expect(
+            getThinkingLabelTitle("*Considering monitor and account recoveries\n\nMore details here*")
+        ).toBe("Considering monitor and account recoveries");
+    });
+
+    it("strips markdown heading markers before returning the title", () => {
+        expect(getThinkingLabelTitle("*## Investigate session state sync\nMore details*")).toBe(
+            "Investigate session state sync",
+        );
+    });
+
+    it("returns null when there is no meaningful thinking content", () => {
+        expect(getThinkingLabelTitle("***")).toBeNull();
     });
 });
