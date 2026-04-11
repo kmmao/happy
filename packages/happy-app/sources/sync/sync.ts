@@ -664,7 +664,11 @@ class Sync {
     sessionId: string,
     text: string,
     displayText?: string,
-    options?: { continue?: boolean; localId?: string },
+    options?: {
+      continue?: boolean;
+      localId?: string;
+      source?: "auto-option-send";
+    },
   ) {
     // Clear any existing prompt suggestion and needsContinue when user sends a message
     storage.getState().setPromptSuggestion(sessionId, null);
@@ -727,6 +731,7 @@ class Sync {
       },
       meta: {
         sentFrom,
+        ...(options?.source && { source: options.source }),
         permissionMode,
         model,
         fallbackModel,

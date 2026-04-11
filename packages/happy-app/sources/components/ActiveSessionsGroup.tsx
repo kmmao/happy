@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { Session, Machine } from "@/sync/storageTypes";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  getLatestUserRequestPreview,
   getSessionName,
   useSessionStatus,
   getSessionAvatarId,
@@ -34,6 +35,7 @@ import {
   useMachine,
   useSetting,
   useProjectAliasMap,
+  useSessionMessages,
 } from "@/sync/storage";
 import { StyleSheet } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
@@ -250,6 +252,19 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   newSessionButtonTextDisabled: {
     color: theme.colors.textSecondary,
+  },
+  requestPreviewText: {
+    fontSize: 11,
+    lineHeight: 14,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+    ...Typography.default(),
+  },
+  requestPreviewTextAuto: {
+    color: theme.colors.accentPurple,
+    textShadowColor: `${theme.colors.accentPurple}66`,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   taskStatusContainer: {
     flexDirection: "row",
@@ -723,6 +738,11 @@ const CompactSessionRow = React.memo(
       return rawProfileLabel;
     }, [session]);
 
+    const { messages } = useSessionMessages(session.id);
+    const latestRequestPreview = React.useMemo(() => {
+      return getLatestUserRequestPreview(messages);
+    }, [messages]);
+
     const itemContent = (
       <View>
         <Pressable
@@ -871,6 +891,18 @@ const CompactSessionRow = React.memo(
               </Text>
             ) : null}
           </View>
+          {latestRequestPreview ? (
+            <Text
+              style={[
+                styles.requestPreviewText,
+                latestRequestPreview.isAutoOptionSend &&
+                  styles.requestPreviewTextAuto,
+              ]}
+              numberOfLines={1}
+            >
+              {latestRequestPreview.text}
+            </Text>
+          ) : null}
 
           {/* Bottom row - tags + indicators */}
           <View style={styles.tagsRow}>

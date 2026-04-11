@@ -77,11 +77,23 @@ class AutoOptionSendService {
     private timers = new Map<string, ReturnType<typeof setInterval>>();
     private listeners = new Map<string, Set<() => void>>();
     private sendMessageFn:
-        | ((sessionId: string, text: string) => Promise<void>)
+        | ((
+            sessionId: string,
+            text: string,
+            displayText?: string,
+            options?: { source?: "auto-option-send" },
+        ) => Promise<void>)
         | null = null;
 
     /** Called once by sync.ts during init. */
-    init(sendMessage: (sessionId: string, text: string) => Promise<void>): void {
+    init(
+        sendMessage: (
+            sessionId: string,
+            text: string,
+            displayText?: string,
+            options?: { source?: "auto-option-send" },
+        ) => Promise<void>,
+    ): void {
         this.sendMessageFn = sendMessage;
         const sessions =
             storage.getState().localSettings.autoOptionSendSessions ?? {};
@@ -295,7 +307,9 @@ class AutoOptionSendService {
         this.setState(sessionId, { ...firedState, shouldSendText: null });
 
         if (textToSend) {
-            this.sendMessageFn?.(sessionId, textToSend).catch(() => {});
+            this.sendMessageFn?.(sessionId, textToSend, undefined, {
+                source: "auto-option-send",
+            }).catch(() => {});
         }
     }
 

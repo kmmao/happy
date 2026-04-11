@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
     formatApiRetryStatus,
+    getLatestUserRequestPreview,
     getSessionStatusState,
     getSessionSubtitle,
     formatPathRelativeToHome,
@@ -8,6 +9,7 @@ import {
     shouldClearQueuedMessagesOnTransition,
 } from './sessionUtils';
 import { Session } from '@/sync/storageTypes';
+import { Message } from '@/sync/typesMessage';
 
 // Mock @/text to return deterministic translations for tests
 vi.mock('@/text', () => ({
@@ -49,6 +51,18 @@ function createSession(overrides: Partial<Session> = {}): Session {
         permissionMode: 'default',
         ...overrides,
     } as Session;
+}
+
+function createUserTextMessage(overrides: Partial<Message> & { text: string }): Message {
+    return {
+        kind: 'user-text',
+        id: 'msg-1',
+        realId: null,
+        localId: null,
+        createdAt: Date.now(),
+        ...overrides,
+        text: overrides.text,
+    } as Message;
 }
 
 describe('sessionUtils', () => {
@@ -194,6 +208,108 @@ describe('sessionUtils', () => {
                 nextIsRunning: false,
                 nextSdkSessionState: null,
             })).toBe(true);
+        });
+    });
+
+    describe('getLatestUserRequestPreview', () => {
+        it('uses the newest user-text from storage order where messages are sorted descending by createdAt', () => {
+            const preview = getLatestUserRequestPreview([
+                createUserTextMessage({ id: 'msg-newest', createdAt: 3000, text: '最新请求' }),
+                {
+                    kind: 'agent-text',
+                    id: 'agent-1',
+                    localId: null,
+                    createdAt: 2500,
+                    text: '处理中',
+                } as Message,
+                createUserTextMessage({ id: 'msg-oldest', createdAt: 1000, text: '最早请求' }),
+            ]);
+
+            expect(preview).toEqual({
+                text: '最新请求',
+                isAutoOptionSend: false,
+            });
+        });
+
+        it('marks preview as auto option send when newest user-text has auto source', () => {
+            const preview = getLatestUserRequestPreview([
+                createUserTextMessage({
+                    id: 'msg-2',
+                    createdAt: 2000,
+                    text: '自动确认继续',
+                    meta: {
+                        source: 'auto-option-send',
+                    },
+                }),
+                createUserTextMessage({ id: 'msg-1', createdAt: 1000, text: '手动请求' }),
+            ]);
+
+            expect(preview).toEqual({
+                text: '自动确认继续',
+                isAutoOptionSend: true,
+            });
+        });
+
+        it('uses displayText while preserving auto option source detection', () => {
+            const preview = getLatestUserRequestPreview([
+                createUserTextMessage({
+                    id: 'msg-2',
+                    createdAt: 2000,
+                    text: '真实长文本',
+                    displayText: '展示文本',
+                    meta: {
+                        source: 'auto-option-send',
+                    },
+                }),
+            ]);
+
+            expect(preview).toEqual({
+                text: '展示文本',
+                isAutoOptionSend: true,
+            });
+        });
+
+        it('skips empty user-text messages and falls back to the latest non-empty one', () => {
+            const preview = getLatestUserRequestPreview([
+                createUserTextMessage({ id: 'msg-2', createdAt: 2000, text: '   \n  ' }),
+                createUserTextMessage({ id: 'msg-1', createdAt: 1000, text: '有效请求' }),
+            ]);
+
+            expect(preview).toEqual({
+                text: '有效请求',
+                isAutoOptionSend: false,
+            });
+        });
+
+        it('returns null when there is no non-empty user-text message', () => {
+            const preview = getLatestUserRequestPreview([
+                {
+                    kind: 'agent-text',
+                    id: 'agent-1',
+                    localId: null,
+                    createdAt: 1000,
+                    text: '处理中',
+                } as Message,
+                createUserTextMessage({ id: 'msg-1', createdAt: 500, text: '   ' }),
+            ]);
+
+            expect(preview).toBeNull();
+        });
+
+        it('provides preview data for active session cards to render directly', () => {
+            const preview = getLatestUserRequestPreview([
+                createUserTextMessage({
+                    id: 'msg-2',
+                    createdAt: 2000,
+                    text: '自动处理 issue #123',
+                    meta: {
+                        source: 'auto-option-send',
+                    },
+                }),
+            ]);
+
+            expect(preview?.text).toBe('自动处理 issue #123');
+            expect(preview?.isAutoOptionSend).toBe(true);
         });
     });
 

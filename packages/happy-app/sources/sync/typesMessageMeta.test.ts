@@ -11,4 +11,12 @@ describe('MessageMetaSchema', () => {
         expect(parsed.permissionMode).toBe('team-custom-mode');
         expect(parsed.model).toBe('custom-model');
     });
+
+    it('accepts auto option send source marker', () => {
+        const parsed = MessageMetaSchema.parse({
+            source: 'auto-option-send',
+        });
+
+        expect(parsed.source).toBe('auto-option-send');
+    });
 });

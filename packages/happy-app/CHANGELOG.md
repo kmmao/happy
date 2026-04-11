@@ -31,6 +31,9 @@ Dev environment management with live log streaming, project-level Knowledge Base
 - Added inline metrics for subtasks (progress indicators)
 - Added collapsible result sections for subtask output summaries
 - Added collapsible result display for sub-agent summaries
+- Improved session list cards to show the latest sent request preview under status so auto-running sessions are easier to identify
+- Improved auto option send request previews with purple glow so list items distinguish automatic sends from manual requests
+- Fixed active session cards and compact active session rows to also show the latest request preview under status
 
 ### Background Task Stability
 - Refactored background task kill to use SDK native stopTask RPC

@@ -14,9 +14,11 @@ import {
   useHasUnreadMessages,
   useSetting,
   useMachine,
+  useSessionMessages,
 } from "@/sync/storage";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  getLatestUserRequestPreview,
   getSessionName,
   useSessionStatus,
   getSessionSubtitle,
@@ -168,6 +170,18 @@ const stylesheet = StyleSheet.create((theme) => ({
     color: theme.colors.textSecondary,
     marginBottom: 4,
     ...Typography.default(),
+  },
+  requestPreview: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+    ...Typography.default(),
+  },
+  requestPreviewAuto: {
+    color: theme.colors.accentPurple,
+    textShadowColor: `${theme.colors.accentPurple}66`,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   tagsRow: {
     flexDirection: "row",
@@ -644,6 +658,10 @@ const SessionItem = React.memo(
       return getSessionAvatarId(session);
     }, [session]);
     const hasUnreadMessages = useHasUnreadMessages(session.id);
+    const { messages } = useSessionMessages(session.id);
+    const latestRequestPreview = React.useMemo(() => {
+      return getLatestUserRequestPreview(messages);
+    }, [messages]);
 
     const itemContent = (
       <View>
@@ -800,6 +818,18 @@ const SessionItem = React.memo(
                   </Text>
                 ) : null}
               </View>
+              {latestRequestPreview ? (
+                <Text
+                  style={[
+                    styles.requestPreview,
+                    latestRequestPreview.isAutoOptionSend &&
+                      styles.requestPreviewAuto,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {latestRequestPreview.text}
+                </Text>
+              ) : null}
             </View>
           </View>
 

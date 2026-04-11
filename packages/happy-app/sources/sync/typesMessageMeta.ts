@@ -3,6 +3,7 @@ import { z } from "zod";
 // Shared message metadata schema
 export const MessageMetaSchema = z.object({
   sentFrom: z.string().optional(), // Source identifier
+  source: z.enum(["auto-option-send"]).optional(), // Logical message origin for UI affordances
   permissionMode: z.string().optional(), // Permission mode key for this message
   model: z.string().nullable().optional(), // Model name for this message (null = reset)
   fallbackModel: z.string().nullable().optional(), // Fallback model for this message (null = reset)

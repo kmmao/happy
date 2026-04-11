@@ -12,6 +12,7 @@ import { router, useRouter } from "expo-router";
 import { Session, Machine } from "@/sync/storageTypes";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  getLatestUserRequestPreview,
   getSessionName,
   useSessionStatus,
   getSessionAvatarId,
@@ -35,6 +36,7 @@ import {
   useSession,
   useSetting,
   useProjectAliasMap,
+  useSessionMessages,
 } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
@@ -251,6 +253,19 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     color: "#FFFFFF",
     textAlign: "center",
     ...Typography.default("semiBold"),
+  },
+  requestPreviewText: {
+    fontSize: 11,
+    lineHeight: 14,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+    ...Typography.default(),
+  },
+  requestPreviewTextAuto: {
+    color: theme.colors.accentPurple,
+    textShadowColor: `${theme.colors.accentPurple}66`,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   tagsRow: {
     flexDirection: "row",
@@ -692,6 +707,11 @@ const CompactSessionRow = React.memo(
       onUpgrade();
     }, [onUpgrade]);
 
+    const { messages } = useSessionMessages(session.id);
+    const latestRequestPreview = React.useMemo(() => {
+      return getLatestUserRequestPreview(messages);
+    }, [messages]);
+
     const itemContent = (
       <View>
         <Pressable
@@ -814,6 +834,20 @@ const CompactSessionRow = React.memo(
                 </Text>
               </View>
             </View>
+
+            {/* Request preview */}
+            {latestRequestPreview ? (
+              <Text
+                style={[
+                  styles.requestPreviewText,
+                  latestRequestPreview.isAutoOptionSend &&
+                    styles.requestPreviewTextAuto,
+                ]}
+                numberOfLines={1}
+              >
+                {latestRequestPreview.text}
+              </Text>
+            ) : null}
 
             {/* Tags line */}
             <View style={styles.tagsRow}>

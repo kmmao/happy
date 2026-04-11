@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Session } from "@/sync/storageTypes";
+import { Message } from "@/sync/typesMessage";
 import { t } from "@/text";
 
 export type SessionState =
@@ -80,6 +81,37 @@ export function formatApiRetryStatus(apiRetry: {
     retryDelaySeconds,
     isRateLimit: apiRetry.errorStatus === 429,
   });
+}
+
+export type LatestUserRequestPreview = {
+  text: string;
+  isAutoOptionSend: boolean;
+};
+
+export function getLatestUserRequestPreview(
+  messages: readonly Message[] | null | undefined,
+): LatestUserRequestPreview | null {
+  if (!messages || messages.length === 0) {
+    return null;
+  }
+
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index];
+    if (message.kind !== "user-text") {
+      continue;
+    }
+
+    const text = message.displayText ?? message.text;
+    const normalizedText = text.replace(/\s+/g, " ").trim();
+    if (normalizedText.length > 0) {
+      return {
+        text: normalizedText,
+        isAutoOptionSend: message.meta?.source === "auto-option-send",
+      };
+    }
+  }
+
+  return null;
 }
 
 /**
