@@ -1,4 +1,4 @@
-import type { SuggestionSummary } from "@kmmao/happy-wire";
+import type { SuggestionAcceptAudit, SuggestionSummary } from "@kmmao/happy-wire";
 import { worldSuggestionAccept } from "./worldSuggestionAccept";
 
 export interface WorldSuggestionAutoAcceptProjectConfig {
@@ -54,6 +54,21 @@ export function shouldAutoAcceptSuggestedTask(input: {
   return true;
 }
 
+export function buildAutoAcceptAudit(input: {
+  suggestion: SuggestionSummary;
+}): SuggestionAcceptAudit {
+  return {
+    rule: "safe_suggested_task_auto_accept",
+    checks: [
+      `type:${input.suggestion.type}`,
+      `bucket:${input.suggestion.bucket}`,
+      `requiresHuman:${String(input.suggestion.requiresHuman)}`,
+      "payload:task_title_prompt_present",
+      "evidence:no_message_decision",
+    ],
+  };
+}
+
 export async function autoAcceptSuggestedTasksIfEnabled(input: {
   accountId: string;
   projectId: string;
@@ -72,6 +87,7 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
       projectId: input.projectId,
       suggestionId: suggestion.id,
       acceptSource: "system_auto",
+      acceptAudit: buildAutoAcceptAudit({ suggestion }),
     });
   }
 }

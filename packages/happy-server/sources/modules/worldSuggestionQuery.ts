@@ -46,6 +46,7 @@ export async function worldSuggestionQuery(
             status: SuggestionStatus;
             bucket?: SuggestionBucket | null;
             acceptSource?: string | null;
+            acceptAudit?: string | null;
         };
 
         return serializeSuggestion({
@@ -53,6 +54,7 @@ export async function worldSuggestionQuery(
             type: typedRow.type,
             status: typedRow.status,
             acceptSource: normalizeAcceptSource(typedRow.acceptSource),
+            acceptAudit: normalizeAcceptAudit(typedRow.acceptAudit),
         });
     });
 }
@@ -106,6 +108,10 @@ function normalizeAcceptSource(raw: string | null | undefined): SuggestionAccept
         return raw;
     }
     return null;
+}
+
+function normalizeAcceptAudit(raw: string | null | undefined): string | null {
+    return raw ?? null;
 }
 
 function safeParseJson(raw: string, fallback: any) {

@@ -49,6 +49,7 @@ const {
                 relatedGoalId: null,
                 status: "open",
                 acceptSource: null,
+                acceptAudit: null,
             })),
             update: vi.fn(async () => ({})),
         },
@@ -100,6 +101,7 @@ describe("worldSuggestionAccept", () => {
             relatedGoalId: null,
             status: "open",
             acceptSource: null,
+            acceptAudit: null,
         });
         goalCreate.mockRejectedValueOnce(new Error("planner unavailable"));
 
@@ -111,7 +113,7 @@ describe("worldSuggestionAccept", () => {
 
         expect(tx.worldSuggestion.update).toHaveBeenCalledWith({
             where: { id: "suggestion-goal-1" },
-            data: { status: "processing", actedAt: expect.any(Date), acceptSource: "human" },
+            data: { status: "processing", actedAt: expect.any(Date), acceptSource: "human", acceptAudit: null },
         });
         expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
             where: { id: "suggestion-goal-1" },
@@ -153,16 +155,23 @@ describe("worldSuggestionAccept", () => {
         });
         expect(tx.worldSuggestion.update).toHaveBeenCalledWith({
             where: { id: "suggestion-1" },
-            data: { status: "accepted", actedAt: expect.any(Date), acceptSource: "human" },
+            data: { status: "accepted", actedAt: expect.any(Date), acceptSource: "human", acceptAudit: null },
         });
     });
 
-    it("marks auto-accepts with system audit source and suggestion_auto trigger type", async () => {
+    it("stores auto-accept audit snapshot with system audit source and suggestion_auto trigger type", async () => {
         await worldSuggestionAccept({
             accountId: "user-1",
             projectId: "project-1",
             suggestionId: "suggestion-1",
             acceptSource: "system_auto",
+            acceptAudit: {
+                rule: "safe_suggested_task_auto_accept",
+                checks: [
+                    "type:suggested_task",
+                    "bucket:next_step",
+                ],
+            },
         });
 
         expect(tx.task.create).toHaveBeenCalledWith({
@@ -172,7 +181,18 @@ describe("worldSuggestionAccept", () => {
         });
         expect(tx.worldSuggestion.update).toHaveBeenCalledWith({
             where: { id: "suggestion-1" },
-            data: { status: "accepted", actedAt: expect.any(Date), acceptSource: "system_auto" },
+            data: {
+                status: "accepted",
+                actedAt: expect.any(Date),
+                acceptSource: "system_auto",
+                acceptAudit: JSON.stringify({
+                    rule: "safe_suggested_task_auto_accept",
+                    checks: [
+                        "type:suggested_task",
+                        "bucket:next_step",
+                    ],
+                }),
+            },
         });
     });
 
@@ -190,6 +210,7 @@ describe("worldSuggestionAccept", () => {
             relatedGoalId: null,
             status: "open",
             acceptSource: null,
+            acceptAudit: null,
         });
 
         await expect(worldSuggestionAccept({
@@ -213,6 +234,7 @@ describe("worldSuggestionAccept", () => {
             relatedGoalId: null,
             status: "open",
             acceptSource: null,
+            acceptAudit: null,
         });
 
         await expect(worldSuggestionAccept({
@@ -240,6 +262,7 @@ describe("worldSuggestionAccept", () => {
             relatedGoalId: null,
             status: "open",
             acceptSource: null,
+            acceptAudit: null,
         });
         tx.decision.findFirst.mockResolvedValueOnce({ id: "decision-2", status: "pending" });
 
@@ -274,6 +297,7 @@ describe("worldSuggestionAccept", () => {
             relatedGoalId: null,
             status: "open",
             acceptSource: null,
+            acceptAudit: null,
         });
         tx.decision.findFirst.mockResolvedValueOnce(null);
 

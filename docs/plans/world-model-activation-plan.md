@@ -645,18 +645,18 @@ World 中增加：
 - `WorldSuggestion` 已新增 `acceptSource` 持久化字段，并通过 wire / query / serialize 打通，当前可区分：`human | system_auto`。
 - `worldSuggestionAccept()` 已兼容可选 `acceptSource` 入参：手动 accept 默认记为 `human`；auto-accept 显式写入 `system_auto`。
 - task 创建链已同步审计来源：手动 accept 保持 `triggerType: manual`，系统自动 accept 改为 `triggerType: suggestion_auto`，避免后续统计/审计把自动任务误算成人工任务。
-- App 侧已在现有 `SuggestionCard` 头部补最小来源 badge，accepted suggestion 现在可区分：`手动接受 / 自动接受 / 已接受（老数据兜底）`；非 accepted suggestion 不显示该 badge。
-- 可见性逻辑已收口到 `worldSuggestionViewModel.ts`，通过 `acceptSource + status` 统一派生展示文案，避免在多个组件里散落条件判断。
-- i18n 已补齐最小新增文案（accepted generic/manual/auto）并同步到各语言文件，未新开自治页面。
-- GoalDetail 当前无需额外实现第二套来源展示：其 suggestion 区已直接复用 `SuggestionCard`，因此会自动继承 accepted 来源 badge；本轮核对后没有继续扩散新的 helper / 组件分支。
-- 已补齐相关 TDD 回归：`worldSuggestionAutoAccept.spec.ts`、`worldSuggestionGenerate.spec.ts`、`worldSuggestionAccept.spec.ts`、`worldSuggestionQuery.spec.ts`、`worldSuggestionTypes.spec.ts`、`worldSuggestionViewModel.test.ts`；suggestion 相关 server tests 全绿，`happy-app typecheck` 通过。
+- `WorldSuggestion` 已进一步新增 `acceptAudit` 最小策略命中快照字段（`rule + checks`），专门用于记录 `system_auto` 为什么被判定为可自动接受；当前结构保持最小，不扩成完整策略引擎。
+- `worldSuggestionAutoAccept.ts` 已集中产出 `safe_suggested_task_auto_accept` 审计快照，当前 checks 至少覆盖：`type`、`bucket`、`requiresHuman`、payload 非空、evidence 干净。
+- `worldSuggestionAccept()` 已兼容可选 `acceptAudit` 入参，并把快照持久化到 `WorldSuggestion`；manual 路径默认仍为 `acceptAudit = null`。
+- query / serialize / wire contract 已可返回 `acceptAudit`，因此后端现在不仅能回答“这条 suggestion 是自动接受的”，也能回答“它当时为何命中自动接受规则”。
+- 已补齐这一轮 TDD 回归：`worldSuggestionAutoAccept.spec.ts`、`worldSuggestionAccept.spec.ts`、`worldSuggestionQuery.spec.ts`、`worldSuggestionTypes.spec.ts`；相关 31 个 server tests 通过，`happy-server tsc --noEmit` 通过。
 
 当前仍未做（且仍不属于这轮范围）：
 
 - autonomy dashboard / approvals / pending approvals 可视化
 - auto-safe / auto-guarded 的完整策略模型落库
 - 非 `suggested_task` 的自动执行
-- 更细的策略快照（例如为何命中白名单、命中哪条规则版本）
+- 更细的策略快照（例如策略版本、调用来源链、人工 override 原因）
 - GoalDetail 之外更多二级入口的来源展示扩散
 
 
@@ -924,8 +924,8 @@ World 逐步从 Goal list 演进为：
 | 2026-04-10 | 阶段 C 实施计划定稿：3 Phase 拆解（Server 真相源 → App 展示 → Skill 可选闭环），新增 `WorldSuggestion` 模型设计、4 类输入源、3 条 generator 规则、REST/ephemeral 接口草案 |
 | 2026-04-11 | 阶段 D 最后稳定化尾项完成：`SuggestionSummary / payload` 已收成严格判别联合，wire 中的 summary 类型与 `type` 绑定 `payload` 分支，server `serializeSuggestion()` 输出严格结构，app 关键消费点已利用 `type` 自动收窄，相关 wire build / server tests / app typecheck / app tests 全绿 |
 | 2026-04-11 | 阶段 D / Phase 3 完成：Suggestion 共享契约已迁入 `happy-wire`，app/server 主要消费链已切到 wire（含 `apiWorld.ts`、`apiTypes.ts`、server 生产代码与 event builder），本地过渡层已移除；accept 写链路保持 strict validate + fail-closed；已通过 wire build、app typecheck 与 server world suggestion 相关 tests |
+| 2026-04-12 | 阶段 E 策略深化第一步已落地：为 `system_auto` accept 增加 `acceptAudit` 最小命中快照（`rule + checks`），并打通 WorldSuggestion 持久化、wire 契约、query / serialize 返回；后端现在可回答自动接受“为什么发生” |
 | 2026-04-12 | 阶段 E / GoalDetail 复用结论已确认：Goal 详情页的 suggestion 区当前直接复用 `SuggestionCard`，因此已自动继承 accepted 来源 badge；本轮仅补充文档澄清，不新增第二套展示逻辑 |
-| 2026-04-12 | 阶段 E UI 可见性最小补强已落地：在现有 `SuggestionCard` 中增加 accepted 来源 badge，区分 `human / system_auto / legacy-null`，展示逻辑收口到 `worldSuggestionViewModel.ts`，未新增 autonomy 页面；相关 app tests 与 typecheck 通过 |
 | 2026-04-12 | 阶段 E 起手入口已落地：`worldSuggestionRefresh()` 已接入白名单 `suggested_task` 自动 accept，默认关闭、project 级显式开启、强制复用 `worldSuggestionAccept()`；同时补齐 `WorldSuggestion.acceptSource`（`human | system_auto`）与 `triggerType: suggestion_auto` 审计链路，query / serialize 已可返回来源，相关 suggestion tests 41 项全绿，app typecheck 通过 |
 | 2026-04-11 | 阶段 E 入口定稿：下一步不从 autonomy dashboard 或完整策略系统起手，而是只对白名单内低风险 `suggested_task` 做自动 accept，并强制复用既有 `worldSuggestionAccept()` 链路；默认关闭、project 级显式开启、必须可追溯 |
 

@@ -1,5 +1,7 @@
 import {
+  SuggestionAcceptAuditSchema,
   getSuggestionPayloadSchema,
+  type SuggestionAcceptAudit,
   type SuggestionAcceptSource,
   type SuggestionBucket,
   type SuggestionEvidence,
@@ -26,6 +28,7 @@ export function serializeSuggestion(row: {
   dedupeKey: string;
   bucket?: SuggestionBucket | null;
   acceptSource?: SuggestionAcceptSource | null;
+  acceptAudit?: string | null;
   createdAt: Date;
   actedAt: Date | null;
 }): SuggestionSerialized {
@@ -52,6 +55,7 @@ export function serializeSuggestion(row: {
       requiresHuman: row.requiresHuman,
     }),
     acceptSource: row.acceptSource ?? null,
+    acceptAudit: parseAcceptAudit(row.acceptAudit),
     createdAt: row.createdAt.getTime(),
     actedAt: row.actedAt?.getTime() ?? null,
   };
@@ -140,6 +144,19 @@ export function deriveSuggestionBucket(input: {
     return "needs_human_input";
   }
   return "next_step";
+}
+
+function parseAcceptAudit(raw: string | null | undefined): SuggestionAcceptAudit | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    const result = SuggestionAcceptAuditSchema.safeParse(parsed);
+    return result.success ? result.data : null;
+  } catch {
+    return null;
+  }
 }
 
 function safeParseJson<T>(raw: string, fallback: T): T {

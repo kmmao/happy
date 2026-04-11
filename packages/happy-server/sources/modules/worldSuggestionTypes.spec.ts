@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   AcceptBodySchema,
+  SuggestionAcceptAuditSchema,
   getSuggestionPayloadSchema,
   SuggestionPayloadSchema,
+  SUGGESTION_ACCEPT_SOURCES,
   SUGGESTION_BUCKETS,
   SUGGESTION_STATUSES,
   SUGGESTION_TYPES,
@@ -18,6 +20,7 @@ describe("worldSuggestionContract", () => {
     expect(SUGGESTION_TYPES).toEqual(["suggested_goal", "suggested_task", "suggested_skill", "suggested_decision"]);
     expect(SUGGESTION_STATUSES).toEqual(["open", "processing", "accepted", "suspended", "dismissed", "expired"]);
     expect(SUGGESTION_BUCKETS).toEqual(["next_step", "needs_decision", "needs_human_input"]);
+    expect(SUGGESTION_ACCEPT_SOURCES).toEqual(["human", "system_auto"]);
   });
 
   it("exports payload schemas from the contract layer", () => {
@@ -41,6 +44,13 @@ describe("worldSuggestionContract", () => {
     expect(AcceptBodySchema.safeParse({
       machineId: "machine-1",
       priorityOverride: "user",
+    }).success).toBe(true);
+  });
+
+  it("exports accept audit schema", () => {
+    expect(SuggestionAcceptAuditSchema.safeParse({
+      rule: "safe_suggested_task_auto_accept",
+      checks: ["type:suggested_task"],
     }).success).toBe(true);
   });
 
@@ -113,6 +123,7 @@ describe("serializeSuggestion", () => {
       createdAt: new Date("2026-04-10T10:00:00Z"),
       actedAt: null,
       acceptSource: null,
+      acceptAudit: null,
     };
 
     const result = serializeSuggestion(row);
@@ -136,6 +147,41 @@ describe("serializeSuggestion", () => {
       createdAt: new Date("2026-04-10T10:00:00Z").getTime(),
       actedAt: null,
       acceptSource: null,
+      acceptAudit: null,
+    });
+  });
+
+  it("parses auto-accept audit snapshot when present", () => {
+    const row = {
+      id: "sug-auto-audit",
+      projectId: "proj-1",
+      relatedGoalId: null,
+      relatedTaskId: "task-1",
+      type: "suggested_task" as const,
+      title: "Retry failed API",
+      summary: "summary",
+      reason: "reason",
+      evidence: "[]",
+      recommendedRole: "builder",
+      payload: JSON.stringify({ task: { title: "Retry failed API", prompt: "Inspect retry logic", priority: "user" } }),
+      requiresHuman: false,
+      status: "accepted" as const,
+      dedupeKey: "dedupe:auto-1",
+      bucket: "next_step" as const,
+      createdAt: new Date("2026-04-10T10:00:00Z"),
+      actedAt: new Date("2026-04-10T10:05:00Z"),
+      acceptSource: "system_auto" as const,
+      acceptAudit: JSON.stringify({
+        rule: "safe_suggested_task_auto_accept",
+        checks: ["type:suggested_task"],
+      }),
+    };
+
+    const result = serializeSuggestion(row as any);
+
+    expect(result.acceptAudit).toEqual({
+      rule: "safe_suggested_task_auto_accept",
+      checks: ["type:suggested_task"],
     });
   });
 
@@ -159,6 +205,7 @@ describe("serializeSuggestion", () => {
       createdAt: new Date("2026-04-10T10:00:00Z"),
       actedAt: null,
       acceptSource: null,
+      acceptAudit: null,
     };
 
     const result = serializeSuggestion(row as any);
@@ -190,6 +237,7 @@ describe("serializeSuggestion", () => {
       createdAt: new Date("2026-04-10T10:00:00Z"),
       actedAt: null,
       acceptSource: null,
+      acceptAudit: null,
     };
 
     const result = serializeSuggestion(row as any);
@@ -220,6 +268,7 @@ describe("serializeSuggestion", () => {
       createdAt: new Date("2026-04-10T10:00:00Z"),
       actedAt: new Date("2026-04-10T12:00:00Z"),
       acceptSource: "human" as const,
+      acceptAudit: "{broken",
     };
 
     const result = serializeSuggestion(row as any);
@@ -229,5 +278,6 @@ describe("serializeSuggestion", () => {
     expect(result.actedAt).toBe(new Date("2026-04-10T12:00:00Z").getTime());
     expect(result.bucket).toBe("needs_human_input");
     expect(result.acceptSource).toBe("human");
+    expect(result.acceptAudit).toBeNull();
   });
 });

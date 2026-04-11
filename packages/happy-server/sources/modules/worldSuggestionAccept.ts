@@ -2,6 +2,7 @@
  * Accept a WorldSuggestion — create the real entity and mark as accepted.
  */
 
+import type { SuggestionAcceptAudit } from "@kmmao/happy-wire";
 import { auth } from "@/app/auth/auth";
 import {
     eventRouter,
@@ -23,6 +24,7 @@ interface AcceptInput {
     priorityOverride?: string;
     roleOverride?: string;
     acceptSource?: AcceptSource;
+    acceptAudit?: SuggestionAcceptAudit;
 }
 
 interface AcceptResult {
@@ -41,7 +43,9 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
         priorityOverride,
         roleOverride,
         acceptSource = "human",
+        acceptAudit,
     } = input;
+    const serializedAcceptAudit = acceptAudit ? JSON.stringify(acceptAudit) : null;
 
     const project = await db.project.findFirst({
         where: { id: projectId, accountId },
@@ -81,7 +85,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "processing", actedAt: new Date(), acceptSource },
+                data: { status: "processing", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit },
             });
         });
 
@@ -104,7 +108,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await db.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", acceptSource },
+                data: { status: "accepted", acceptSource, acceptAudit: serializedAcceptAudit },
             });
 
             eventRouter.emitEphemeral({
@@ -174,7 +178,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", actedAt: new Date(), acceptSource },
+                data: { status: "accepted", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit },
             });
 
             afterTx(tx, () => {
@@ -268,7 +272,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", actedAt: new Date(), acceptSource },
+                data: { status: "accepted", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit },
             });
 
             afterTx(tx, () => {
@@ -326,7 +330,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", actedAt: new Date(), acceptSource },
+                data: { status: "accepted", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit },
             });
 
             afterTx(tx, () => {

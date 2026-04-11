@@ -84,6 +84,7 @@ describe("worldSuggestionQuery", () => {
                 createdAt: new Date("2026-04-10T10:00:00Z"),
                 actedAt: null,
                 acceptSource: null,
+                acceptAudit: null,
             },
         ];
 
@@ -124,6 +125,7 @@ describe("worldSuggestionQuery", () => {
                 createdAt: new Date("2026-04-10T11:00:00Z"),
                 actedAt: null,
                 acceptSource: null,
+                acceptAudit: null,
             },
         ];
 
@@ -142,7 +144,7 @@ describe("worldSuggestionQuery", () => {
         expect(result[0]?.payload).toEqual({ goal: { title: "Recovered goal" } });
     });
 
-    it("returns accept source in serialized suggestions", async () => {
+    it("returns accept source and audit snapshot in serialized suggestions", async () => {
         state.suggestions = [
             {
                 id: "sug-auto-1",
@@ -166,6 +168,10 @@ describe("worldSuggestionQuery", () => {
                 createdAt: new Date("2026-04-10T12:00:00Z"),
                 actedAt: new Date("2026-04-10T12:05:00Z"),
                 acceptSource: "system_auto",
+                acceptAudit: JSON.stringify({
+                    rule: "safe_suggested_task_auto_accept",
+                    checks: ["type:suggested_task"],
+                }),
             },
         ];
 
@@ -177,8 +183,11 @@ describe("worldSuggestionQuery", () => {
             expect.objectContaining({
                 id: "sug-auto-1",
                 acceptSource: "system_auto",
+                acceptAudit: {
+                    rule: "safe_suggested_task_auto_accept",
+                    checks: ["type:suggested_task"],
+                },
             }),
         ]);
     });
 });
-

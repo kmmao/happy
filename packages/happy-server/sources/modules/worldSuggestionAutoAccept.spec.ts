@@ -12,6 +12,7 @@ vi.mock("./worldSuggestionAccept", () => ({ worldSuggestionAccept }));
 
 import {
   autoAcceptSuggestedTasksIfEnabled,
+  buildAutoAcceptAudit,
   parseWorldSuggestionAutoAcceptProjectConfig,
   shouldAutoAcceptSuggestedTask,
 } from "./worldSuggestionAutoAccept";
@@ -166,8 +167,46 @@ describe("shouldAutoAcceptSuggestedTask", () => {
   });
 });
 
+describe("buildAutoAcceptAudit", () => {
+  it("builds a stable reason snapshot for eligible task suggestions", () => {
+    const audit = buildAutoAcceptAudit({
+      suggestion: {
+        id: "sug-1",
+        projectId: "project-1",
+        relatedGoalId: "goal-1",
+        relatedTaskId: null,
+        type: "suggested_task",
+        title: "Investigate API retry",
+        summary: "summary",
+        reason: "reason",
+        evidence: [{ kind: "task", id: "task-1", label: "Retry failed" }],
+        recommendedRole: "builder",
+        payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic", priority: "user" } },
+        requiresHuman: false,
+        status: "open",
+        dedupeKey: "dedupe:1",
+        bucket: "next_step",
+        createdAt: 1,
+        actedAt: null,
+        acceptSource: null,
+      },
+    });
+
+    expect(audit).toEqual({
+      rule: "safe_suggested_task_auto_accept",
+      checks: [
+        "type:suggested_task",
+        "bucket:next_step",
+        "requiresHuman:false",
+        "payload:task_title_prompt_present",
+        "evidence:no_message_decision",
+      ],
+    });
+  });
+});
+
 describe("autoAcceptSuggestedTasksIfEnabled", () => {
-  it("reuses worldSuggestionAccept for eligible tasks with system audit source", async () => {
+  it("reuses worldSuggestionAccept for eligible tasks with system audit source and reason snapshot", async () => {
     await autoAcceptSuggestedTasksIfEnabled({
       accountId: "user-1",
       projectId: "project-1",
@@ -201,6 +240,16 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
       projectId: "project-1",
       suggestionId: "sug-1",
       acceptSource: "system_auto",
+      acceptAudit: {
+        rule: "safe_suggested_task_auto_accept",
+        checks: [
+          "type:suggested_task",
+          "bucket:next_step",
+          "requiresHuman:false",
+          "payload:task_title_prompt_present",
+          "evidence:no_message_decision",
+        ],
+      },
     });
   });
 });

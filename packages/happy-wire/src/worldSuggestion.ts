@@ -12,6 +12,12 @@ export type SuggestionBucket = typeof SUGGESTION_BUCKETS[number];
 export const SUGGESTION_ACCEPT_SOURCES = ["human", "system_auto"] as const;
 export type SuggestionAcceptSource = typeof SUGGESTION_ACCEPT_SOURCES[number];
 
+export const SuggestionAcceptAuditSchema = z.object({
+  rule: z.literal("safe_suggested_task_auto_accept"),
+  checks: z.array(z.string()).min(1),
+});
+export type SuggestionAcceptAudit = z.infer<typeof SuggestionAcceptAuditSchema>;
+
 export const EVIDENCE_KINDS = ["goal", "task", "decision", "message", "narrative"] as const;
 
 export const SuggestionEvidenceSchema = z.object({
@@ -120,6 +126,7 @@ export type SuggestionSerialized =
       createdAt: number;
       actedAt: number | null;
       acceptSource?: SuggestionAcceptSource | null;
+      acceptAudit?: SuggestionAcceptAudit | null;
     }
   | {
       id: string;
@@ -140,6 +147,7 @@ export type SuggestionSerialized =
       createdAt: number;
       actedAt: number | null;
       acceptSource?: SuggestionAcceptSource | null;
+      acceptAudit?: SuggestionAcceptAudit | null;
     }
   | {
       id: string;
@@ -160,6 +168,7 @@ export type SuggestionSerialized =
       createdAt: number;
       actedAt: number | null;
       acceptSource?: SuggestionAcceptSource | null;
+      acceptAudit?: SuggestionAcceptAudit | null;
     }
   | {
       id: string;
@@ -180,6 +189,7 @@ export type SuggestionSerialized =
       createdAt: number;
       actedAt: number | null;
       acceptSource?: SuggestionAcceptSource | null;
+      acceptAudit?: SuggestionAcceptAudit | null;
     };
 
 export type SuggestionSummary = SuggestionSerialized;
