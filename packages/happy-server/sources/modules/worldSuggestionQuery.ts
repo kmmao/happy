@@ -23,13 +23,14 @@ export async function worldSuggestionQuery(
 ): Promise<SuggestionSerialized[]> {
     const status = opts?.status ?? "open";
     const limit = opts?.limit ?? 50;
+    const includeSuspended = status === "open" && !opts?.bucket;
 
     const rows = await db.worldSuggestion.findMany({
         where: {
             accountId,
             projectId,
             ...(opts?.goalId ? { relatedGoalId: opts.goalId } : {}),
-            status: status === "open" ? { in: ["open", "suspended"] } : status,
+            status: includeSuspended ? { in: ["open", "suspended"] } : status,
         },
         orderBy: { createdAt: "desc" },
         take: limit,
