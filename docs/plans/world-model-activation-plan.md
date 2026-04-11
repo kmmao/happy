@@ -927,6 +927,7 @@ World 逐步从 Goal list 演进为：
 | 2026-04-10 | 阶段 C 实施计划定稿：3 Phase 拆解（Server 真相源 → App 展示 → Skill 可选闭环），新增 `WorldSuggestion` 模型设计、4 类输入源、3 条 generator 规则、REST/ephemeral 接口草案 |
 | 2026-04-11 | 阶段 D 最后稳定化尾项完成：`SuggestionSummary / payload` 已收成严格判别联合，wire 中的 summary 类型与 `type` 绑定 `payload` 分支，server `serializeSuggestion()` 输出严格结构，app 关键消费点已利用 `type` 自动收窄，相关 wire build / server tests / app typecheck / app tests 全绿 |
 | 2026-04-11 | 阶段 D / Phase 3 完成：Suggestion 共享契约已迁入 `happy-wire`，app/server 主要消费链已切到 wire（含 `apiWorld.ts`、`apiTypes.ts`、server 生产代码与 event builder），本地过渡层已移除；accept 写链路保持 strict validate + fail-closed；已通过 wire build、app typecheck 与 server world suggestion 相关 tests |
+| 2026-04-12 | 阶段 E accept 侧 logical dedupe 已落地：`worldSuggestionAccept()` 在 task / skill / decision 分支基于 `projectId + dedupeKey` 使用 `RepeatKey` 做逻辑 claim，并在 winner 成功后将 open/suspended siblings 收口为 `expired`，避免同一逻辑 suggestion 被重复 accept 或重复创建实体 |
 | 2026-04-12 | 阶段 E 最小原因展示已闭环：app 侧已基于 `acceptAudit` 展示 `accepted + system_auto` 的轻量原因文本，并补齐 `typeDecision` / `autoAcceptReasonSafeTask` i18n 键，相关 app tests 与 typecheck 通过 |
 | 2026-04-12 | 阶段 E 已接受 suggestion 可见性已修正：`fetchSuggestions()` 支持显式 `status` 查询，WorldOverview 与 GoalDetail 现同时拉取 `open` + `accepted` suggestion，并在现有 `SuggestionCard` 流程中真实展示来源/原因，不引入第二套 UI |
 | 2026-04-12 | 阶段 E 配额保护已落地：auto-accept 现支持 project 级 `maxAutoAcceptsPerDay`，只统计当日 `system_auto` 已接受 suggestion；配额耗尽后 suggestion 保持 open，不影响 human accept |
@@ -1029,10 +1030,11 @@ World 逐步从 Goal list 演进为：
 - query / serialize / wire contract 已可返回 `acceptSource` 与 `acceptAudit`
 - App 侧通过 `worldSuggestionViewModel.ts` 统一派生 accepted 来源文案与最小原因文案，`SuggestionCard` 展示来源 badge + 轻量原因文本
 - `fetchSuggestions()` 已支持显式 `status` 查询；`WorldOverviewTab` 与 GoalDetail 现在都会同时拉取 `open` 与 `accepted` suggestion，并在现有 suggestion 流程中真实展示 accepted + system_auto 的来源/原因
+- `worldSuggestionAccept()` 已进一步接入 accept 侧 logical dedupe：task / skill / decision 分支现在基于 `projectId + dedupeKey` 使用 `RepeatKey` 做逻辑 claim，并在 winner 成功后将同 dedupeKey 的 open/suspended sibling rows 收口为 `expired`，避免重复创建实体
 - GoalDetail 的 suggestion 区继续直接复用 `SuggestionCard`，因此自动继承来源/原因展示，无需第二套展示逻辑
 
 ### 最终判定
 
 当前 World Model Activation 应表述为：
 
-> **阶段 A/B/C 已完成；阶段 D 已完成契约与稳定化收口；阶段 E 已落地最小自动 accept 入口、基础审计链路、最小原因展示与已接受 suggestion 可见性修复，但完整自治策略、审批面板与可视化仍未开始；阶段 F-H 仍属规划。**
+> **阶段 A/B/C 已完成；阶段 D 已完成契约与稳定化收口；阶段 E 已落地最小自动 accept 入口、基础审计链路、最小原因展示、已接受 suggestion 可见性修复，以及 accept 侧 logical dedupe（当前覆盖 task / skill / decision，goal 分支仍未纳入同层保护）；完整自治策略、审批面板与可视化仍未开始；阶段 F-H 仍属规划。**

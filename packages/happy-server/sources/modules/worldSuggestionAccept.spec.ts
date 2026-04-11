@@ -5,6 +5,7 @@ const {
     buildTaskTriggerEphemeral,
     buildWorldSuggestionUpdatedEphemeral,
     createTaskResultToken,
+    claimRepeatKey,
     tx,
     dbMock,
 } = vi.hoisted(() => ({
@@ -12,10 +13,12 @@ const {
     buildTaskTriggerEphemeral: vi.fn((payload: unknown) => payload),
     buildWorldSuggestionUpdatedEphemeral: vi.fn((payload: unknown) => payload),
     createTaskResultToken: vi.fn(async ({ taskId }: { taskId: string }) => `task-token-for-${taskId}`),
+    claimRepeatKey: vi.fn(async () => true),
     tx: {
         worldSuggestion: {
-            findFirst: vi.fn(async () => ({ id: "suggestion-1" })),
+            findFirst: vi.fn(async () => ({ id: "suggestion-1", status: "open", dedupeKey: "dedupe:1" })),
             update: vi.fn(async () => ({})),
+            updateMany: vi.fn(async () => ({ count: 1 })),
         },
         task: {
             create: vi.fn(async ({ data }: any) => ({ id: "task-1", priority: data.priority, triggerType: data.triggerType })),
@@ -47,6 +50,7 @@ const {
                     },
                 }),
                 relatedGoalId: null,
+                dedupeKey: "dedupe:1",
                 status: "open",
                 acceptSource: null,
                 acceptAudit: null,
@@ -65,6 +69,7 @@ vi.mock("@/storage/inTx", () => ({
     inTx: vi.fn(async (fn: any) => fn(tx)),
     afterTx: vi.fn((_tx: any, callback: () => void) => callback()),
 }));
+vi.mock("@/storage/repeatKey", () => ({ claimRepeatKey }));
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: { emitEphemeral },
     buildTaskTriggerEphemeral,
@@ -84,6 +89,8 @@ import { worldSuggestionAccept } from "./worldSuggestionAccept";
 describe("worldSuggestionAccept", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        claimRepeatKey.mockResolvedValue(true);
+        tx.worldSuggestion.findFirst.mockResolvedValue({ id: "suggestion-1", status: "open", dedupeKey: "dedupe:1" });
     });
 
     it("suspends suggested_goal when goal creation fails after processing claim", async () => {
@@ -99,10 +106,12 @@ describe("worldSuggestionAccept", () => {
                 },
             }),
             relatedGoalId: null,
+            dedupeKey: "dedupe:goal-1",
             status: "open",
             acceptSource: null,
             acceptAudit: null,
         });
+        tx.worldSuggestion.findFirst.mockResolvedValueOnce({ id: "suggestion-goal-1", status: "open", dedupeKey: "dedupe:goal-1" });
         goalCreate.mockRejectedValueOnce(new Error("planner unavailable"));
 
         await expect(worldSuggestionAccept({
@@ -196,6 +205,82 @@ describe("worldSuggestionAccept", () => {
         });
     });
 
+    it("accepts only one row for the same logical dedupe key and expires siblings", async () => {
+        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
+            id: "suggestion-dup-1",
+            type: "suggested_task",
+            title: "Fix build",
+            payload: JSON.stringify({
+                task: {
+                    title: "Fix build",
+                    prompt: "Investigate failing build",
+                    priority: "user",
+                },
+            }),
+            relatedGoalId: null,
+            dedupeKey: "dedupe:shared",
+            status: "open",
+            acceptSource: null,
+            acceptAudit: null,
+        });
+        tx.worldSuggestion.findFirst.mockResolvedValueOnce({ id: "suggestion-dup-1", status: "open", dedupeKey: "dedupe:shared" });
+
+        await worldSuggestionAccept({
+            accountId: "user-1",
+            projectId: "project-1",
+            suggestionId: "suggestion-dup-1",
+        });
+
+        expect(claimRepeatKey).toHaveBeenCalledWith(
+            tx,
+            "world-suggestion-accept:project-1:dedupe:shared",
+            "suggestion-dup-1",
+            expect.any(Number),
+        );
+        expect(tx.task.create).toHaveBeenCalledTimes(1);
+        expect(tx.worldSuggestion.updateMany).toHaveBeenCalledWith({
+            where: {
+                accountId: "user-1",
+                projectId: "project-1",
+                dedupeKey: "dedupe:shared",
+                id: { not: "suggestion-dup-1" },
+                status: { in: ["open", "suspended"] },
+            },
+            data: { status: "expired", actedAt: expect.any(Date) },
+        });
+    });
+
+    it("rejects when another sibling with the same logical dedupe key already won", async () => {
+        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
+            id: "suggestion-dup-2",
+            type: "suggested_task",
+            title: "Fix build duplicate",
+            payload: JSON.stringify({
+                task: {
+                    title: "Fix build duplicate",
+                    prompt: "Should not dispatch twice",
+                    priority: "user",
+                },
+            }),
+            relatedGoalId: null,
+            dedupeKey: "dedupe:shared",
+            status: "open",
+            acceptSource: null,
+            acceptAudit: null,
+        });
+        tx.worldSuggestion.findFirst.mockResolvedValueOnce({ id: "suggestion-dup-2", status: "open", dedupeKey: "dedupe:shared" });
+        claimRepeatKey.mockResolvedValueOnce(false);
+
+        await expect(worldSuggestionAccept({
+            accountId: "user-1",
+            projectId: "project-1",
+            suggestionId: "suggestion-dup-2",
+        })).rejects.toThrow("Suggestion not found or already acted upon");
+
+        expect(tx.task.create).not.toHaveBeenCalled();
+        expect(tx.worldSuggestion.updateMany).not.toHaveBeenCalled();
+    });
+
     it("rejects suggested_goal when stored payload does not match goal branch", async () => {
         dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
             id: "suggestion-goal-fallback",
@@ -208,6 +293,7 @@ describe("worldSuggestionAccept", () => {
                 },
             }),
             relatedGoalId: null,
+            dedupeKey: "dedupe:goal-fallback",
             status: "open",
             acceptSource: null,
             acceptAudit: null,
@@ -220,7 +306,6 @@ describe("worldSuggestionAccept", () => {
         })).rejects.toThrow("Suggestion payload does not match suggestion type");
     });
 
-
     it("rejects suggested_task when stored payload does not match task branch", async () => {
         dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
             id: "suggestion-task-invalid",
@@ -232,6 +317,7 @@ describe("worldSuggestionAccept", () => {
                 },
             }),
             relatedGoalId: null,
+            dedupeKey: "dedupe:task-invalid",
             status: "open",
             acceptSource: null,
             acceptAudit: null,
@@ -260,10 +346,12 @@ describe("worldSuggestionAccept", () => {
                 },
             }),
             relatedGoalId: null,
+            dedupeKey: "dedupe:decision-2",
             status: "open",
             acceptSource: null,
             acceptAudit: null,
         });
+        tx.worldSuggestion.findFirst.mockResolvedValueOnce({ id: "suggestion-2", status: "open", dedupeKey: "dedupe:decision-2" });
         tx.decision.findFirst.mockResolvedValueOnce({ id: "decision-2", status: "pending" });
 
         const result = await worldSuggestionAccept({
@@ -295,10 +383,12 @@ describe("worldSuggestionAccept", () => {
                 },
             }),
             relatedGoalId: null,
+            dedupeKey: "dedupe:decision-2",
             status: "open",
             acceptSource: null,
             acceptAudit: null,
         });
+        tx.worldSuggestion.findFirst.mockResolvedValueOnce({ id: "suggestion-2", status: "open", dedupeKey: "dedupe:decision-2" });
         tx.decision.findFirst.mockResolvedValueOnce(null);
 
         await expect(worldSuggestionAccept({

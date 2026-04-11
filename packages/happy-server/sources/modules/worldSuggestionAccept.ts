@@ -11,6 +11,7 @@ import {
 } from "@/app/events/eventRouter";
 import { db } from "@/storage/db";
 import { afterTx, inTx } from "@/storage/inTx";
+import { claimRepeatKey } from "@/storage/repeatKey";
 import { goalCreate } from "./goalCreate";
 import { validateSuggestionPayload } from "./worldSuggestionTypes";
 
@@ -55,7 +56,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
     const suggestion = await db.worldSuggestion.findFirst({
         where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
     });
-    if (!suggestion) {
+    if (!suggestion || !isActableSuggestionStatus(suggestion.status)) {
         throw new Error("Suggestion not found or already acted upon");
     }
 
@@ -76,10 +77,16 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
         await inTx(async (tx) => {
             const fresh = await tx.worldSuggestion.findFirst({
-                where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
-                select: { id: true },
+                where: {
+                    accountId,
+                    projectId,
+                    dedupeKey: suggestion.dedupeKey,
+                    id: suggestionId,
+                    status: { in: ["open", "suspended"] },
+                },
+                select: { id: true, status: true, dedupeKey: true },
             });
-            if (!fresh) {
+            if (!fresh || !isActableSuggestionStatus(fresh.status)) {
                 throw new Error("Suggestion not found or already acted upon");
             }
 
@@ -153,10 +160,26 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
         return inTx(async (tx) => {
             const fresh = await tx.worldSuggestion.findFirst({
-                where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
-                select: { id: true },
+                where: {
+                    accountId,
+                    projectId,
+                    dedupeKey: suggestion.dedupeKey,
+                    id: suggestionId,
+                    status: { in: ["open", "suspended"] },
+                },
+                select: { id: true, status: true, dedupeKey: true },
             });
-            if (!fresh) {
+            if (!fresh || !isActableSuggestionStatus(fresh.status)) {
+                throw new Error("Suggestion not found or already acted upon");
+            }
+
+            const claimed = await claimRepeatKey(
+                tx as any,
+                buildSuggestionAcceptRepeatKey(projectId, fresh.dedupeKey),
+                suggestionId,
+                Date.now() + 24 * 60 * 60 * 1000,
+            );
+            if (!claimed) {
                 throw new Error("Suggestion not found or already acted upon");
             }
 
@@ -178,7 +201,18 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit },
+                data: { status: "accepted", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit } as any,
+
+            });
+            await tx.worldSuggestion.updateMany({
+                where: {
+                    accountId,
+                    projectId,
+                    dedupeKey: suggestion.dedupeKey,
+                    id: { not: suggestionId },
+                    status: { in: ["open", "suspended"] },
+                },
+                data: { status: "expired", actedAt: new Date() },
             });
 
             afterTx(tx, () => {
@@ -235,10 +269,26 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
         }
         return inTx(async (tx) => {
             const fresh = await tx.worldSuggestion.findFirst({
-                where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
-                select: { id: true },
+                where: {
+                    accountId,
+                    projectId,
+                    dedupeKey: suggestion.dedupeKey,
+                    id: suggestionId,
+                    status: { in: ["open", "suspended"] },
+                },
+                select: { id: true, status: true, dedupeKey: true },
             });
-            if (!fresh) {
+            if (!fresh || !isActableSuggestionStatus(fresh.status)) {
+                throw new Error("Suggestion not found or already acted upon");
+            }
+
+            const claimed = await claimRepeatKey(
+                tx as any,
+                buildSuggestionAcceptRepeatKey(projectId, fresh.dedupeKey),
+                suggestionId,
+                Date.now() + 24 * 60 * 60 * 1000,
+            );
+            if (!claimed) {
                 throw new Error("Suggestion not found or already acted upon");
             }
 
@@ -272,7 +322,18 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit },
+                data: { status: "accepted", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit } as any,
+
+            });
+            await tx.worldSuggestion.updateMany({
+                where: {
+                    accountId,
+                    projectId,
+                    dedupeKey: suggestion.dedupeKey,
+                    id: { not: suggestionId },
+                    status: { in: ["open", "suspended"] },
+                },
+                data: { status: "expired", actedAt: new Date() },
             });
 
             afterTx(tx, () => {
@@ -302,10 +363,26 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
         const decisionPayload = payload.decision;
         return inTx(async (tx) => {
             const fresh = await tx.worldSuggestion.findFirst({
-                where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
-                select: { id: true },
+                where: {
+                    accountId,
+                    projectId,
+                    dedupeKey: suggestion.dedupeKey,
+                    id: suggestionId,
+                    status: { in: ["open", "suspended"] },
+                },
+                select: { id: true, status: true, dedupeKey: true },
             });
-            if (!fresh) {
+            if (!fresh || !isActableSuggestionStatus(fresh.status)) {
+                throw new Error("Suggestion not found or already acted upon");
+            }
+
+            const claimed = await claimRepeatKey(
+                tx as any,
+                buildSuggestionAcceptRepeatKey(projectId, fresh.dedupeKey),
+                suggestionId,
+                Date.now() + 24 * 60 * 60 * 1000,
+            );
+            if (!claimed) {
                 throw new Error("Suggestion not found or already acted upon");
             }
 
@@ -330,7 +407,18 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit },
+                data: { status: "accepted", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit } as any,
+
+            });
+            await tx.worldSuggestion.updateMany({
+                where: {
+                    accountId,
+                    projectId,
+                    dedupeKey: suggestion.dedupeKey,
+                    id: { not: suggestionId },
+                    status: { in: ["open", "suspended"] },
+                },
+                data: { status: "expired", actedAt: new Date() },
             });
 
             afterTx(tx, () => {
@@ -354,6 +442,14 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
 function isUniqueConstraintError(error: unknown): boolean {
     return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
+function isActableSuggestionStatus(status: string | null | undefined): boolean {
+    return status === "open" || status === "suspended";
+}
+
+function buildSuggestionAcceptRepeatKey(projectId: string, dedupeKey: string): string {
+    return `world-suggestion-accept:${projectId}:${dedupeKey}`;
 }
 
 async function reopenExistingDecision(tx: { decision: { findFirst: typeof db.decision.findFirst; update: typeof db.decision.update } }, input: {

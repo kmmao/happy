@@ -86,9 +86,9 @@ describe("shouldAutoAcceptSuggestedTask", () => {
     })).toBe(true);
   });
 
-  it("returns false when project opt-in is disabled", () => {
+  it("returns false for non-open suggestions", () => {
     expect(shouldAutoAcceptSuggestedTask({
-      projectConfig: { autoAcceptSafeSuggestedTasks: false, maxAutoAcceptsPerDay: null },
+      projectConfig: { autoAcceptSafeSuggestedTasks: true, maxAutoAcceptsPerDay: null },
       suggestion: {
         id: "sug-1",
         projectId: "project-1",
@@ -102,12 +102,12 @@ describe("shouldAutoAcceptSuggestedTask", () => {
         recommendedRole: null,
         payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic" } },
         requiresHuman: false,
-        status: "open",
+        status: "accepted",
         dedupeKey: "dedupe:1",
         bucket: "next_step",
         createdAt: 1,
-        actedAt: null,
-        acceptSource: null,
+        actedAt: 1,
+        acceptSource: "system_auto",
       },
     })).toBe(false);
   });
@@ -280,6 +280,98 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
         ],
       },
     });
+  });
+
+  it("skips stale non-open suggestions instead of re-accepting them", async () => {
+    await autoAcceptSuggestedTasksIfEnabled({
+      accountId: "user-1",
+      projectId: "project-1",
+      supervisorConfig: JSON.stringify({ worldAutonomy: { autoAcceptSafeSuggestedTasks: true } }),
+      suggestions: [
+        {
+          id: "sug-1",
+          projectId: "project-1",
+          relatedGoalId: null,
+          relatedTaskId: null,
+          type: "suggested_task",
+          title: "Investigate API retry",
+          summary: "summary",
+          reason: "reason",
+          evidence: [],
+          recommendedRole: null,
+          payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic" } },
+          requiresHuman: false,
+          status: "accepted",
+          dedupeKey: "dedupe:1",
+          bucket: "next_step",
+          createdAt: 1,
+          actedAt: 1,
+          acceptSource: "system_auto",
+        },
+      ],
+    });
+
+    expect(worldSuggestionAccept).not.toHaveBeenCalled();
+  });
+
+  it("ignores already-acted accept races instead of failing the whole batch", async () => {
+    worldSuggestionAccept
+      .mockRejectedValueOnce(new Error("Suggestion not found or already acted upon"))
+      .mockResolvedValueOnce({
+        suggestionId: "sug-2",
+        createdEntityType: "task",
+        createdEntityId: "task-2",
+      });
+
+    await expect(autoAcceptSuggestedTasksIfEnabled({
+      accountId: "user-1",
+      projectId: "project-1",
+      supervisorConfig: JSON.stringify({ worldAutonomy: { autoAcceptSafeSuggestedTasks: true } }),
+      suggestions: [
+        {
+          id: "sug-1",
+          projectId: "project-1",
+          relatedGoalId: null,
+          relatedTaskId: null,
+          type: "suggested_task",
+          title: "Investigate API retry",
+          summary: "summary",
+          reason: "reason",
+          evidence: [],
+          recommendedRole: null,
+          payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic" } },
+          requiresHuman: false,
+          status: "open",
+          dedupeKey: "dedupe:1",
+          bucket: "next_step",
+          createdAt: 1,
+          actedAt: null,
+          acceptSource: null,
+        },
+        {
+          id: "sug-2",
+          projectId: "project-1",
+          relatedGoalId: null,
+          relatedTaskId: null,
+          type: "suggested_task",
+          title: "Inspect flaky queue",
+          summary: "summary",
+          reason: "reason",
+          evidence: [],
+          recommendedRole: null,
+          payload: { task: { title: "Inspect flaky queue", prompt: "Inspect queue state" } },
+          requiresHuman: false,
+          status: "open",
+          dedupeKey: "dedupe:2",
+          bucket: "next_step",
+          createdAt: 2,
+          actedAt: null,
+          acceptSource: null,
+        },
+      ],
+    })).resolves.toBeUndefined();
+
+    expect(worldSuggestionAccept).toHaveBeenCalledTimes(2);
   });
 
   it("stops auto-accepting when project daily quota is already exhausted", async () => {

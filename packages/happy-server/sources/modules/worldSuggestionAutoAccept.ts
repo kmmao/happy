@@ -38,6 +38,10 @@ export function shouldAutoAcceptSuggestedTask(input: {
     return false;
   }
 
+  if (input.suggestion.status !== "open") {
+    return false;
+  }
+
   if (input.suggestion.type !== "suggested_task") {
     return false;
   }
@@ -103,14 +107,21 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
       break;
     }
 
-    await worldSuggestionAccept({
-      accountId: input.accountId,
-      projectId: input.projectId,
-      suggestionId: suggestion.id,
-      acceptSource: "system_auto",
-      acceptAudit: buildAutoAcceptAudit({ suggestion }),
-    });
-    acceptedCount += 1;
+    try {
+      await worldSuggestionAccept({
+        accountId: input.accountId,
+        projectId: input.projectId,
+        suggestionId: suggestion.id,
+        acceptSource: "system_auto",
+        acceptAudit: buildAutoAcceptAudit({ suggestion }),
+      });
+      acceptedCount += 1;
+    } catch (error) {
+      if (isAlreadyActedSuggestionError(error)) {
+        continue;
+      }
+      throw error;
+    }
   }
 }
 
@@ -131,10 +142,13 @@ async function getRemainingDailyAutoAcceptQuota(input: {
       accountId: input.accountId,
       projectId: input.projectId,
       status: "accepted",
-      acceptSource: "system_auto",
       actedAt: { gte: dayStart },
     },
   });
 
   return Math.max(input.maxAutoAcceptsPerDay - currentCount, 0);
+}
+
+function isAlreadyActedSuggestionError(error: unknown): boolean {
+  return error instanceof Error && error.message === "Suggestion not found or already acted upon";
 }
