@@ -104,6 +104,7 @@ import {
   getRecommendedOptionIndex,
   type SessionFollowUpOptionsSnapshot,
 } from "./autoOptionSend";
+import { getSessionContentMaxWidth } from "./sessionContentWidth";
 import { autoOptionSendService } from "@/sync/autoOptionSendService";
 import { log } from '@/log';
 
@@ -176,6 +177,11 @@ export const SessionView = React.memo((props: { id: string }) => {
   // Use containerWidth when available, fall back to windowWidth
   const effectiveWidth = containerWidth > 0 ? containerWidth : windowWidth;
 
+  const contentMaxWidth = getSessionContentMaxWidth({
+    platform: Platform.OS,
+    defaultMaxWidth: layout.maxWidth,
+  });
+
   // Resizable panel: compute column widths
   const MIN_PANEL_WIDTH = 250;
   const MIN_LEFT_WIDTH = 500;
@@ -185,12 +191,13 @@ export const SessionView = React.memo((props: { id: string }) => {
   const hasAutoExpanded = React.useRef(false);
   React.useEffect(() => {
     if (hasAutoExpanded.current || !showSidePanelOuter || sidePanelCollapsed || effectiveWidth <= 0) return;
-    const idealPanel = effectiveWidth - layout.maxWidth - DIVIDER_WIDTH;
+    const idealContentWidth = Number.isFinite(contentMaxWidth) ? contentMaxWidth : effectiveWidth;
+    const idealPanel = effectiveWidth - idealContentWidth - DIVIDER_WIDTH;
     if (idealPanel >= MIN_PANEL_WIDTH) {
       storage.getState().applyLocalSettings({ sidePanelWidth: idealPanel });
     }
     hasAutoExpanded.current = true;
-  }, [showSidePanelOuter, sidePanelCollapsed, effectiveWidth]);
+  }, [showSidePanelOuter, sidePanelCollapsed, effectiveWidth, contentMaxWidth]);
 
   const activePanelWidth = dragPanelWidth ?? storedPanelWidth;
 
@@ -376,8 +383,8 @@ export const SessionView = React.memo((props: { id: string }) => {
                 : 0,
             }}
           >
-            {/* Centered max-width container — keeps chat content readable on very wide displays */}
-            <View style={{ flex: 1, maxWidth: layout.maxWidth, alignSelf: "center", width: "100%" }}>
+            {/* Session view uses full available width on web, while native keeps readable max width */}
+            <View style={{ flex: 1, maxWidth: contentMaxWidth, alignSelf: "center", width: "100%" }}>
               {!isDataReady ? (
                 // Loading state
                 <View
@@ -500,6 +507,10 @@ function SessionViewInner({
     [sessionId],
   );
   const realtimeStatus = useRealtimeStatus();
+  const contentMaxWidth = getSessionContentMaxWidth({
+    platform: Platform.OS,
+    defaultMaxWidth: layout.maxWidth,
+  });
   // Track session column height + AgentInput height to compute exact overlay max height
   const [sessionColumnHeight, setSessionColumnHeight] = React.useState(0);
   const [agentInputHeight, setAgentInputHeight] = React.useState(0);
@@ -1043,6 +1054,7 @@ function SessionViewInner({
             session={session}
             onScrollAwayFromBottom={setShowScrollToBottom}
             onVisibleUserMessageChange={handleVisibleUserMessage}
+            contentMaxWidth={contentMaxWidth}
           />
         )}
       </Deferred>
@@ -1108,6 +1120,7 @@ function SessionViewInner({
         permissionMode={permissionMode}
         onPermissionModeChange={updatePermissionMode}
         availableModes={availableModes}
+        contentMaxWidth={contentMaxWidth}
         modelMode={modelMode}
         effectiveModelLabel={
           modelMode?.key && modelMode.key !== "default"

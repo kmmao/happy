@@ -17,6 +17,7 @@ This folder documents how Happy works internally, with a focus on protocol, back
 - adding-ai-models.md: Guide for adding or updating AI model definitions and pricing across the codebase.
 - happy-wire.md: Shared wire schemas/types package and migration notes.
 - sdk-features.md: SDK feature capability matrix across agent backends and the Happy system.
+- sdk-upgrade-checklist.md: Claude Agent SDK 升级集成入口，包含集成面、重点核对项与最小回归矩阵。
 - mcp-plugins.md: MCP servers and Claude Code plugins used in the development environment.
 - release-guide.md: Release workflow, ordering dependencies, and commands for each package after upstream merges.
 - claude-mem.md: Cross-session memory system plugin for Claude Code.

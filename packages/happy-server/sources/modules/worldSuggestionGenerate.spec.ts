@@ -197,6 +197,8 @@ const {
             findMany: vi.fn(async (args: any) =>
                 state.sessionEvents
                     .filter((event) => args.where.sessionId.in.includes(event.sessionId))
+                    .filter((event) => !args.where.eventType || event.eventType === args.where.eventType)
+                    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
                     .map((event) => ({
                         sessionId: event.sessionId,
                         eventType: event.eventType,
@@ -771,6 +773,74 @@ describe("worldSuggestionRefresh", () => {
 
         expect(dbMock.worldSuggestion.create).not.toHaveBeenCalledWith(expect.objectContaining({
             data: expect.objectContaining({ type: "suggested_skill" }),
+        }));
+    });
+
+    it("ignores non-session_end events for suggested_skill generation", async () => {
+        setCompletedTasks([
+            {
+                id: "task-skill-4",
+                accountId: "user-1",
+                projectId: "project-1",
+                title: "Refactor auth flow",
+                goalId: null,
+                sessionId: "session-skill-4",
+                updatedAt: new Date("2026-04-10T09:57:00Z"),
+            },
+        ]);
+        setSessionEvents([
+            {
+                sessionId: "session-skill-4",
+                eventType: "file_edit",
+                summary: "Edited packages/happy-server/sources/app/api/routes/auth.ts",
+                createdAt: new Date("2026-04-10T09:56:30Z"),
+            },
+            {
+                sessionId: "session-skill-4",
+                eventType: "session_end",
+                summary: "Completed OAuth callback flow hardening and verified the auth regression tests pass.",
+                createdAt: new Date("2026-04-10T09:56:00Z"),
+            },
+        ]);
+
+        await worldSuggestionRefresh("user-1", "project-1");
+
+        expect(dbMock.worldSuggestion.create).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({
+                type: "suggested_skill",
+                relatedTaskId: "task-skill-4",
+            }),
+        }));
+    });
+
+    it("does not create suggested_skill from file_edit events alone", async () => {
+        setCompletedTasks([
+            {
+                id: "task-skill-5",
+                accountId: "user-1",
+                projectId: "project-1",
+                title: "Refactor auth flow",
+                goalId: null,
+                sessionId: "session-skill-5",
+                updatedAt: new Date("2026-04-10T09:57:00Z"),
+            },
+        ]);
+        setSessionEvents([
+            {
+                sessionId: "session-skill-5",
+                eventType: "file_edit",
+                summary: "Completed auth.ts edit and saved the file.",
+                createdAt: new Date("2026-04-10T09:56:30Z"),
+            },
+        ]);
+
+        await worldSuggestionRefresh("user-1", "project-1");
+
+        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({
+                type: "suggested_skill",
+                relatedTaskId: "task-skill-5",
+            }),
         }));
     });
 

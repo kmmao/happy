@@ -510,7 +510,7 @@ export const AgentInput = React.memo(
           ref={dropZoneRef}
           style={[
             styles.innerContainer,
-            { maxWidth: layout.maxWidth },
+            { maxWidth: props.contentMaxWidth ?? layout.maxWidth },
           ]}
         >
           {/* Drop zone overlay (web only) */}

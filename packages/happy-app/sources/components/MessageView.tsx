@@ -36,10 +36,11 @@ export const MessageView = (props: {
   isLatestAgent?: boolean;
   hasTurnsWithThinking?: boolean;
   permissionModeKey?: string | null;
+  contentMaxWidth?: number;
 }) => {
   return (
     <View style={styles.messageContainer} renderToHardwareTextureAndroid={true}>
-      <View style={styles.messageContent}>
+      <View style={[styles.messageContent, { maxWidth: props.contentMaxWidth ?? layout.maxWidth }]}>
         <RenderBlock
           message={props.message}
           metadata={props.metadata}
@@ -797,7 +798,6 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "column",
     flexGrow: 1,
     flexBasis: 0,
-    maxWidth: layout.maxWidth,
   },
   userMessageContainer: {
     maxWidth: "100%",

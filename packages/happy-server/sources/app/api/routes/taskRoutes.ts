@@ -10,7 +10,7 @@ import { log } from "@/utils/log";
 import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
 import { auth } from "@/app/auth/auth";
 import { inTx } from "@/storage/inTx";
-import { fetchRepeatKey, saveRepeatKey } from "@/storage/repeatKey";
+import { claimRepeatKey } from "@/storage/repeatKey";
 import {
     normalizeTaskStatusReport,
     shouldApplyTaskStatus,
@@ -452,13 +452,6 @@ export function taskRoutes(app: Fastify) {
             const resolvedStatus = payload.status;
             const replayKey = (request as any).taskResultJti ? `task-result-jti:${(request as any).taskResultJti}` : null;
 
-            if (replayKey) {
-                const existing = await fetchRepeatKey(db as any, replayKey).catch(() => null);
-                if (existing) {
-                    return reply.code(409).send({ error: "Task result token already consumed" });
-                }
-            }
-
             const task = await db.task.findFirst({
                 where: { id: taskId, accountId: request.userId },
             });
@@ -466,32 +459,27 @@ export function taskRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Task not found" });
             }
 
-            if (task.status === resolvedStatus && ["completed", "failed", "cancelled"].includes(task.status)) {
-                return reply.send({ task: serializeTask(task), ignored: true });
-            }
+            const persistCompletedResult = async (tx: typeof db) => {
+                if (replayKey) {
+                    const claimed = await claimRepeatKey(tx as any, replayKey, taskId, Date.now() + 6 * 60 * 60 * 1000);
+                    if (!claimed) {
+                        return null;
+                    }
+                }
 
-            if (!shouldApplyTaskStatus(task.status, resolvedStatus)) {
-                log(
-                    { module: "task", level: "warn" },
-                    `Ignored stale task result transition ${taskId}: ${task.status} -> ${resolvedStatus}`,
-                );
-                return reply.send({ task: serializeTask(task), ignored: true });
-            }
+                if (task.status === resolvedStatus && ["completed", "failed", "cancelled"].includes(task.status)) {
+                    return { task, ignored: true } as const;
+                }
 
-            const updated = replayKey
-                ? await inTx(async (tx) => {
-                    await saveRepeatKey(tx, replayKey, taskId, Date.now() + 6 * 60 * 60 * 1000);
-                    return await tx.task.update({
-                        where: { id: taskId },
-                        data: {
-                            status: resolvedStatus,
-                            sessionId: sessionId ?? task.sessionId,
-                            errorMessage: payload.errorMessage ?? task.errorMessage,
-                            completedAt: new Date(),
-                        },
-                    });
-                })
-                : await db.task.update({
+                if (!shouldApplyTaskStatus(task.status, resolvedStatus)) {
+                    log(
+                        { module: "task", level: "warn" },
+                        `Ignored stale task result transition ${taskId}: ${task.status} -> ${resolvedStatus}`,
+                    );
+                    return { task, ignored: true } as const;
+                }
+
+                const updated = await tx.task.update({
                     where: { id: taskId },
                     data: {
                         status: resolvedStatus,
@@ -500,6 +488,30 @@ export function taskRoutes(app: Fastify) {
                         completedAt: new Date(),
                     },
                 });
+
+                const persistedSessionId = updated.sessionId ?? task.sessionId;
+                if (resolvedStatus === "completed" && persistedSessionId && summary?.trim()) {
+                    await tx.sessionEvent.create({
+                        data: {
+                            sessionId: persistedSessionId,
+                            eventType: "session_end",
+                            summary: summary.trim(),
+                        },
+                    });
+                }
+
+                return { task: updated, ignored: false } as const;
+            };
+
+            const persisted = await inTx(async (tx) => await persistCompletedResult(tx as typeof db));
+            if (!persisted) {
+                return reply.code(409).send({ error: "Task result token already consumed" });
+            }
+            if (persisted.ignored) {
+                return reply.send({ task: serializeTask(persisted.task), ignored: true });
+            }
+
+            const updated = persisted.task;
 
             eventRouter.emitEphemeral({
                 userId: request.userId,

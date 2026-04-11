@@ -130,4 +130,5 @@ export interface AgentInputProps {
     turnStartedAt?: number;
     /** Max height (px) for popover overlays. Caller passes the available vertical space above the input. */
     overlayMaxHeight?: number;
+    contentMaxWidth?: number;
 }

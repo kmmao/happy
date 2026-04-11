@@ -25,13 +25,15 @@ type TaskRecord = {
     updatedAt: Date;
 };
 
-const { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock } = vi.hoisted(() => {
+const { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock, worldSuggestionRefreshMock } = vi.hoisted(() => {
     const state = {
         tasks: [] as TaskRecord[],
+        repeatKeys: new Map<string, { key: string; value: string; expiresAt: Date; createdAt: Date }>(),
     };
 
     const resetState = () => {
         state.tasks = [];
+        state.repeatKeys = new Map();
     };
 
     const seedTask = (input: Partial<TaskRecord> & Pick<TaskRecord, "id" | "accountId" | "machineId">) => {
@@ -100,9 +102,46 @@ const { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock } 
         taskSkillBinding: {
             findMany: vi.fn(async () => []),
         },
+        sessionEvent: {
+            create: vi.fn(async ({ data }: any) => ({ id: "session-event-1", createdAt: new Date(), ...data })),
+        },
         repeatKey: {
-            findUnique: vi.fn(async () => null),
-            upsert: vi.fn(async () => ({})),
+            findUnique: vi.fn(async ({ where }: any) => {
+                const record = state.repeatKeys.get(where.key) ?? null;
+                if (!record) return null;
+                if (where.expiresAt?.gte && record.expiresAt < where.expiresAt.gte) return null;
+                if (where.expiresAt?.lte && record.expiresAt > where.expiresAt.lte) return null;
+                return record;
+            }),
+            upsert: vi.fn(async ({ where, create, update }: any) => {
+                const existing = state.repeatKeys.get(where.key);
+                const next = {
+                    key: where.key,
+                    value: existing ? update.value : create.value,
+                    expiresAt: existing ? update.expiresAt : create.expiresAt,
+                    createdAt: existing?.createdAt ?? new Date(),
+                };
+                state.repeatKeys.set(where.key, next);
+                return next;
+            }),
+            create: vi.fn(async ({ data }: any) => {
+                if (state.repeatKeys.has(data.key)) {
+                    const error = new Error("Unique constraint failed");
+                    (error as any).code = "P2002";
+                    throw error;
+                }
+                const record = { ...data, createdAt: new Date() };
+                state.repeatKeys.set(data.key, record);
+                return record;
+            }),
+            delete: vi.fn(async ({ where }: any) => {
+                if (!state.repeatKeys.has(where.key)) {
+                    const error = new Error("Record to delete does not exist");
+                    (error as any).code = "P2025";
+                    throw error;
+                }
+                state.repeatKeys.delete(where.key);
+            }),
         },
         $transaction: vi.fn(async (fn: any) => fn(dbMock as any)),
     };
@@ -113,8 +152,9 @@ const { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock } 
     };
 
     const goalProgressUpdateMock = vi.fn();
+    const worldSuggestionRefreshMock = vi.fn(async () => ({ created: 0, unchanged: 0, total: 0 }));
 
-    return { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock };
+    return { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock, worldSuggestionRefreshMock };
 });
 
 vi.mock("@/storage/db", () => ({ db: dbMock }));
@@ -127,6 +167,9 @@ vi.mock("@/app/events/eventRouter", () => ({
 vi.mock("@/modules/goalProgressUpdate", () => ({
     goalProgressUpdate: goalProgressUpdateMock,
 }));
+vi.mock("@/modules/worldSuggestionGenerate", () => ({
+    worldSuggestionRefresh: worldSuggestionRefreshMock,
+}));
 vi.mock("@/app/auth/auth", () => ({
     auth: authMock,
 }));
@@ -136,6 +179,31 @@ vi.mock("@/storage/inTx", () => ({
 vi.mock("@/storage/repeatKey", () => ({
     fetchRepeatKey: vi.fn(async (dbArg: any, key: string) => dbArg.repeatKey.findUnique({ where: { key } })),
     saveRepeatKey: vi.fn(async (dbArg: any, key: string, value: string, expiresAt: number) => dbArg.repeatKey.upsert({ where: { key }, update: { value, expiresAt: new Date(expiresAt) }, create: { key, value, expiresAt: new Date(expiresAt) } })),
+    claimRepeatKey: vi.fn(async (dbArg: any, key: string, value: string, expiresAt: number) => {
+        const existing = await dbArg.repeatKey.findUnique({ where: { key } });
+        if (existing && existing.expiresAt >= new Date()) {
+            return false;
+        }
+        if (existing) {
+            try {
+                await dbArg.repeatKey.delete({ where: { key } });
+            } catch (error) {
+                if ((error as { code?: string }).code === "P2025") {
+                    return false;
+                }
+                throw error;
+            }
+        }
+        try {
+            await dbArg.repeatKey.create({ data: { key, value, expiresAt: new Date(expiresAt) } });
+            return true;
+        } catch (error) {
+            if ((error as { code?: string }).code === "P2002") {
+                return false;
+            }
+            throw error;
+        }
+    }),
 }));
 vi.mock("@/modules/taskStatusLogic", () => ({
     normalizeTaskStatusReport: vi.fn(({ status, outcome, errorMessage }: any) => {
@@ -422,7 +490,11 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             scope: "task-result",
             jti: "jti-replayed",
         } as any));
-        dbMock.repeatKey.findUnique.mockResolvedValueOnce({ key: "task-result-jti:jti-replayed", value: "used", expiresAt: new Date(Date.now() + 60_000) } as any);
+        dbMock.repeatKey.create.mockImplementationOnce(async () => {
+            const error = new Error("Unique constraint failed");
+            (error as any).code = "P2002";
+            throw error;
+        });
         app = await createApp();
 
         const res = await app.inject({
@@ -437,6 +509,88 @@ describe("taskRoutes POST /v1/tasks/result", () => {
         });
 
         expect(res.statusCode).toBe(409);
+    });
+
+    it("returns 409 and does not persist task completion when repeat key claim loses the race", async () => {
+        seedTask({
+            id: "task-1",
+            accountId: "user-1",
+            machineId: "machine-1",
+            status: "running",
+            goalId: "goal-1",
+            sessionId: "session-1",
+        });
+        authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
+            userId: "user-1",
+            taskId: "task-1",
+            scope: "task-result",
+            jti: "jti-race",
+        } as any));
+        dbMock.repeatKey.create.mockImplementationOnce(async () => {
+            const error = new Error("Unique constraint failed");
+            (error as any).code = "P2002";
+            throw error;
+        });
+        app = await createApp();
+
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/tasks/result",
+            headers: { authorization: "Bearer task-token-1" },
+            payload: {
+                taskId: "task-1",
+                outcome: "completed",
+                summary: "Completed OAuth callback hardening and verified the auth regression tests pass.",
+            },
+        });
+
+        expect(res.statusCode).toBe(409);
+        expect(dbMock.task.update).not.toHaveBeenCalled();
+        expect(dbMock.sessionEvent.create).not.toHaveBeenCalled();
+    });
+
+    it("returns 409 when the same task result token is replayed after a successful completion", async () => {
+        seedTask({
+            id: "task-1",
+            accountId: "user-1",
+            machineId: "machine-1",
+            status: "running",
+            goalId: "goal-1",
+            sessionId: "session-1",
+        });
+        authMock.verifyTaskResultToken.mockImplementation(async () => ({
+            userId: "user-1",
+            taskId: "task-1",
+            scope: "task-result",
+            jti: "jti-repeat-after-success",
+        } as any));
+        app = await createApp();
+
+        const first = await app.inject({
+            method: "POST",
+            url: "/v1/tasks/result",
+            headers: { authorization: "Bearer task-token-1" },
+            payload: {
+                taskId: "task-1",
+                outcome: "completed",
+                summary: "Completed OAuth callback hardening and verified the auth regression tests pass.",
+            },
+        });
+        const second = await app.inject({
+            method: "POST",
+            url: "/v1/tasks/result",
+            headers: { authorization: "Bearer task-token-1" },
+            payload: {
+                taskId: "task-1",
+                outcome: "completed",
+                summary: "Completed OAuth callback hardening and verified the auth regression tests pass.",
+            },
+        });
+
+        expect(first.statusCode).toBe(200);
+        expect(second.statusCode).toBe(409);
+        expect(dbMock.task.update).toHaveBeenCalledTimes(1);
+        expect(dbMock.sessionEvent.create).toHaveBeenCalledTimes(1);
     });
 
     it("does not copy success summary into errorMessage for completed outcome", async () => {
@@ -472,6 +626,115 @@ describe("taskRoutes POST /v1/tasks/result", () => {
         expect(res.json().task.status).toBe("completed");
         expect(res.json().task.errorMessage).toBeNull();
         expect(state.tasks[0]?.errorMessage).toBeNull();
+    });
+
+    it("persists a session_end timeline event for completed task results with summary and sessionId", async () => {
+        seedTask({
+            id: "task-1",
+            accountId: "user-1",
+            machineId: "machine-1",
+            status: "running",
+            goalId: "goal-1",
+            errorMessage: null,
+        });
+        authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
+            userId: "user-1",
+            taskId: "task-1",
+            scope: "task-result",
+            jti: "jti-success-summary",
+        } as any));
+        app = await createApp();
+
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/tasks/result",
+            headers: { authorization: "Bearer task-token-1" },
+            payload: {
+                taskId: "task-1",
+                outcome: "completed",
+                summary: "Completed OAuth callback hardening and verified the auth regression tests pass.",
+                sessionId: "session-1",
+            },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(dbMock.sessionEvent.create).toHaveBeenCalledWith({
+            data: {
+                sessionId: "session-1",
+                eventType: "session_end",
+                summary: "Completed OAuth callback hardening and verified the auth regression tests pass.",
+            },
+        });
+    });
+
+    it("persists session_end timeline event using task sessionId when result omits sessionId", async () => {
+        seedTask({
+            id: "task-1",
+            accountId: "user-1",
+            machineId: "machine-1",
+            status: "running",
+            goalId: "goal-1",
+            sessionId: "session-existing",
+        });
+        authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
+            userId: "user-1",
+            taskId: "task-1",
+            scope: "task-result",
+            jti: "jti-success-existing-session",
+        } as any));
+        app = await createApp();
+
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/tasks/result",
+            headers: { authorization: "Bearer task-token-1" },
+            payload: {
+                taskId: "task-1",
+                outcome: "completed",
+                summary: "Completed OAuth callback hardening and verified the auth regression tests pass.",
+            },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(dbMock.sessionEvent.create).toHaveBeenCalledWith({
+            data: {
+                sessionId: "session-existing",
+                eventType: "session_end",
+                summary: "Completed OAuth callback hardening and verified the auth regression tests pass.",
+            },
+        });
+    });
+
+    it("does not persist session_end timeline event for non-completed task results", async () => {
+        seedTask({
+            id: "task-1",
+            accountId: "user-1",
+            machineId: "machine-1",
+            status: "running",
+            goalId: "goal-1",
+        });
+        authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
+            userId: "user-1",
+            taskId: "task-1",
+            scope: "task-result",
+            jti: "jti-blocked",
+        } as any));
+        app = await createApp();
+
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/tasks/result",
+            headers: { authorization: "Bearer task-token-1" },
+            payload: {
+                taskId: "task-1",
+                outcome: "blocked",
+                summary: "Blocked: waiting for user decision on API direction",
+                sessionId: "session-1",
+            },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(dbMock.sessionEvent.create).not.toHaveBeenCalled();
     });
 });
 

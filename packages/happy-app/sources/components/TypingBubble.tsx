@@ -12,7 +12,7 @@ const BREATH_DURATION = 1800;
 const BREATH_DOT_SIZE = 10;
 const FADE_IN_DURATION = 200;
 
-export const TypingBubble = React.memo(() => {
+export const TypingBubble = React.memo((props: { contentMaxWidth?: number }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const breathAnim = useRef(new Animated.Value(0)).current;
     const dotAnims = useRef<Animated.Value[]>(
@@ -96,7 +96,7 @@ export const TypingBubble = React.memo(() => {
 
     return (
         <View style={styles.container}>
-            <Animated.View style={[styles.row, { opacity: fadeAnim }]}>
+            <Animated.View style={[styles.row, { opacity: fadeAnim, maxWidth: props.contentMaxWidth ?? layout.maxWidth }]}>
                 <View style={styles.avatarSlot}>
                     <Animated.View
                         style={[
@@ -151,7 +151,6 @@ const styles = StyleSheet.create((theme) => ({
         paddingLeft: 8,
         flexGrow: 1,
         flexBasis: 0,
-        maxWidth: layout.maxWidth,
     },
     avatarSlot: {
         width: 32,

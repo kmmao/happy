@@ -647,7 +647,7 @@ async function buildCompletedTaskSkillFacts(tasks: Array<{
     if (sessionIds.length === 0) return [];
 
     const sessionEvents = await db.sessionEvent.findMany({
-        where: { sessionId: { in: sessionIds } },
+        where: { sessionId: { in: sessionIds }, eventType: "session_end" },
         select: { sessionId: true, eventType: true, summary: true, createdAt: true },
         orderBy: [{ createdAt: "desc" }],
     });
@@ -681,15 +681,22 @@ function normalizeStableSkillSummary(input: string): string | null {
     if (summary.length < 24) return null;
 
     const lower = summary.toLowerCase();
+    const exactUnstableSummaries = new Set([
+        "done",
+        "completed successfully",
+        "task completed successfully",
+    ]);
+    if (exactUnstableSummaries.has(lower)) {
+        return null;
+    }
+
     const unstablePhrases = [
         "need user decision",
         "waiting for user",
         "blocked",
         "todo",
-        "done",
-        "completed",
     ];
-    if (unstablePhrases.some((phrase) => lower === phrase || lower.includes(phrase))) {
+    if (unstablePhrases.some((phrase) => lower.includes(phrase))) {
         return null;
     }
 

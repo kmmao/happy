@@ -34,6 +34,7 @@ export const ChatList = React.memo(
       onScrollAwayFromBottom?: (isAway: boolean) => void;
       onScrollActivity?: () => void;
       onVisibleUserMessageChange?: (msgIndex: number) => void;
+      contentMaxWidth?: number;
     }
   >((props, ref) => {
     const { messages } = useSessionMessages(props.session.id);
@@ -47,6 +48,7 @@ export const ChatList = React.memo(
         onScrollAwayFromBottom={props.onScrollAwayFromBottom}
         onScrollActivity={props.onScrollActivity}
         onVisibleUserMessageChange={props.onVisibleUserMessageChange}
+        contentMaxWidth={props.contentMaxWidth}
       />
     );
   }),
@@ -66,7 +68,7 @@ const ListHeader = React.memo(() => {
   );
 });
 
-const ListFooter = React.memo((props: { sessionId: string }) => {
+const ListFooter = React.memo((props: { sessionId: string; contentMaxWidth?: number }) => {
   const session = useSession(props.sessionId)!;
   const { messages } = useSessionMessages(props.sessionId);
   const isThinking =
@@ -81,7 +83,7 @@ const ListFooter = React.memo((props: { sessionId: string }) => {
   return (
     <>
       {showTyping && (
-        <TypingBubble />
+        <TypingBubble contentMaxWidth={props.contentMaxWidth} />
       )}
       <ChatFooter
         controlledByUser={session.agentState?.controlledByUser || false}
@@ -103,6 +105,7 @@ const ChatListInternal = React.memo(
       onScrollAwayFromBottom?: (isAway: boolean) => void;
       onScrollActivity?: () => void;
       onVisibleUserMessageChange?: (msgIndex: number) => void;
+      contentMaxWidth?: number;
     }
   >((props, ref) => {
     const flatListRef = React.useRef<FlatList>(null);
@@ -346,6 +349,7 @@ const ChatListInternal = React.memo(
             isLatestAgent={item.id === latestAgentId}
             hasTurnsWithThinking={hasThinking}
             permissionModeKey={props.permissionModeKey}
+            contentMaxWidth={props.contentMaxWidth}
           />
         );
       },
@@ -356,6 +360,7 @@ const ChatListInternal = React.memo(
         latestAgentId,
         thinkingTurnIds,
         props.permissionModeKey,
+        props.contentMaxWidth,
       ],
     );
     return (
@@ -376,7 +381,7 @@ const ChatListInternal = React.memo(
         scrollEventThrottle={400}
         showsVerticalScrollIndicator={false}
         viewabilityConfigCallbackPairs={viewabilityPairs.current}
-        ListHeaderComponent={<ListFooter sessionId={props.sessionId} />}
+        ListHeaderComponent={<ListFooter sessionId={props.sessionId} contentMaxWidth={props.contentMaxWidth} />}
         ListFooterComponent={<ListHeader />}
       />
     );
