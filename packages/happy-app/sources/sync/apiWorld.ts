@@ -115,6 +115,10 @@ export async function fetchWorldDashboard(
 
 // === World Suggestions ===
 
+export type SuggestionType = "suggested_goal" | "suggested_task" | "suggested_skill" | "suggested_decision";
+export type SuggestionStatus = "open" | "processing" | "accepted" | "suspended" | "dismissed" | "expired";
+export type SuggestionBucket = "next_step" | "needs_decision" | "needs_human_input";
+
 export interface SuggestionEvidence {
     kind: "goal" | "task" | "decision" | "message" | "narrative";
     id?: string;
@@ -140,7 +144,7 @@ export interface SuggestionSummary {
     projectId: string;
     relatedGoalId: string | null;
     relatedTaskId: string | null;
-    type: string;
+    type: SuggestionType;
     title: string;
     summary: string;
     reason: string;
@@ -148,19 +152,20 @@ export interface SuggestionSummary {
     recommendedRole: string | null;
     payload: SuggestionPayload;
     requiresHuman: boolean;
-    status: string;
+    status: SuggestionStatus;
     dedupeKey: string;
-    bucket: "next_step" | "needs_decision" | "needs_human_input";
+    bucket: SuggestionBucket;
     createdAt: number;
     actedAt: number | null;
 }
+
 
 export async function fetchSuggestions(
     credentials: AuthCredentials,
     projectId: string,
     opts?: {
         goalId?: string;
-        bucket?: "next_step" | "needs_decision" | "needs_human_input";
+        bucket?: SuggestionBucket;
     },
 ): Promise<SuggestionSummary[]> {
     const API_ENDPOINT = getServerUrl();

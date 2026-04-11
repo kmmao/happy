@@ -8,6 +8,7 @@ import {
     type SuggestionBucket,
     type SuggestionSerialized,
     type SuggestionStatus,
+    type SuggestionType,
 } from "./worldSuggestionTypes";
 
 export async function worldSuggestionQuery(
@@ -34,7 +35,11 @@ export async function worldSuggestionQuery(
         take: limit,
     });
 
-    const suggestions = rows.map(serializeSuggestion);
+    const suggestions = rows.map((row) => serializeSuggestion({
+        ...row,
+        type: row.type as SuggestionType,
+        status: row.status as SuggestionStatus,
+    }));
     if (!opts?.bucket) {
         return suggestions;
     }

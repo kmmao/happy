@@ -78,7 +78,7 @@ export interface SuggestionSerialized {
     projectId: string;
     relatedGoalId: string | null;
     relatedTaskId: string | null;
-    type: string;
+    type: SuggestionType;
     title: string;
     summary: string;
     reason: string;
@@ -86,7 +86,7 @@ export interface SuggestionSerialized {
     recommendedRole: string | null;
     payload: SuggestionPayload;
     requiresHuman: boolean;
-    status: string;
+    status: SuggestionStatus;
     dedupeKey: string;
     bucket: SuggestionBucket;
     createdAt: number;
@@ -98,7 +98,7 @@ export function serializeSuggestion(row: {
     projectId: string;
     relatedGoalId: string | null;
     relatedTaskId: string | null;
-    type: string;
+    type: SuggestionType;
     title: string;
     summary: string;
     reason: string;
@@ -106,7 +106,7 @@ export function serializeSuggestion(row: {
     recommendedRole: string | null;
     payload: string;
     requiresHuman: boolean;
-    status: string;
+    status: SuggestionStatus;
     dedupeKey: string;
     createdAt: Date;
     actedAt: Date | null;
@@ -140,7 +140,7 @@ export function serializeSuggestion(row: {
 }
 
 export function deriveSuggestionBucket(input: {
-    type: string;
+    type: SuggestionType;
     payload: SuggestionPayload;
     evidence: SuggestionEvidence[];
     requiresHuman: boolean;

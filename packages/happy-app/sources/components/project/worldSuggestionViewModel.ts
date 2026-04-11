@@ -1,4 +1,5 @@
 import type { TranslationKey } from "@/text";
+import type { SuggestionBucket, SuggestionStatus, SuggestionType } from "@/sync/apiWorld";
 
 export interface SuggestionLike {
     id: string;
@@ -6,11 +7,11 @@ export interface SuggestionLike {
 
 export interface SuggestionStatusUpdate {
     suggestionId: string;
-    status: string;
+    status: SuggestionStatus;
 }
 
 export interface SuggestionBucketLike extends SuggestionLike {
-    bucket?: string;
+    bucket?: SuggestionBucket;
     relatedGoalId?: string | null;
 }
 
@@ -25,18 +26,18 @@ export function mergeFetchedSuggestions<T extends SuggestionLike>(
     return fetched.filter((suggestion) => !pendingRemovedIds.has(suggestion.id));
 }
 
-const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
+const TYPE_CONFIG: Record<SuggestionType, { icon: string; color: string }> = {
     suggested_goal: { icon: "flag-outline", color: "#8B5CF6" },
     suggested_task: { icon: "hammer-outline", color: "#3B82F6" },
     suggested_skill: { icon: "school-outline", color: "#10B981" },
     suggested_decision: { icon: "help-circle-outline", color: "#F59E0B" },
 };
 
-export function getSuggestionTypeConfig(type: string): { icon: string; color: string } {
+export function getSuggestionTypeConfig(type: SuggestionType): { icon: string; color: string } {
     return TYPE_CONFIG[type] ?? TYPE_CONFIG.suggested_task;
 }
 
-export function getSuggestionTypeLabelKey(type: string): TranslationKey {
+export function getSuggestionTypeLabelKey(type: SuggestionType): TranslationKey {
     if (type === "suggested_goal") return "suggestions.typeGoal";
     if (type === "suggested_skill") return "suggestions.typeSkill";
     if (type === "suggested_decision") return "suggestions.typeDecision";

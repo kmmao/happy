@@ -10,14 +10,15 @@ import {
     groupSuggestionsByBucket,
     type SuggestionLike,
 } from "./worldSuggestionViewModel";
+import type { SuggestionBucket, SuggestionStatus, SuggestionType } from "@/sync/apiWorld";
 
 describe("getSuggestionTypeLabelKey", () => {
     it("returns decision label key for suggested_decision", () => {
         expect(getSuggestionTypeLabelKey("suggested_decision")).toBe("suggestions.typeDecision");
     });
 
-    it("falls back to task label key for unknown types", () => {
-        expect(getSuggestionTypeLabelKey("unknown_type")).toBe("suggestions.typeTask");
+    it("keeps runtime fallback for unexpected type input", () => {
+        expect(getSuggestionTypeLabelKey("unknown_type" as unknown as SuggestionType)).toBe("suggestions.typeTask");
     });
 });
 
@@ -114,21 +115,21 @@ describe("mergeFetchedSuggestions", () => {
     });
 });
 
-
 describe("groupSuggestionsByBucket", () => {
     it("groups suggestions into three lanes", () => {
         const result = groupSuggestionsByBucket([
-            { id: "s1", bucket: "next_step" },
-            { id: "s2", bucket: "needs_decision" },
-            { id: "s3", bucket: "needs_human_input" },
-            { id: "s4", bucket: "unknown" },
-        ] as Array<SuggestionLike & { bucket?: string }>);
+            { id: "s1", bucket: "next_step" as SuggestionBucket },
+            { id: "s2", bucket: "needs_decision" as SuggestionBucket },
+            { id: "s3", bucket: "needs_human_input" as SuggestionBucket },
+            { id: "s4", bucket: "unknown" as unknown as SuggestionBucket },
+        ]);
 
         expect(result.nextStep.map((item) => item.id)).toEqual(["s1", "s4"]);
         expect(result.needsDecision.map((item) => item.id)).toEqual(["s2"]);
         expect(result.needsHumanInput.map((item) => item.id)).toEqual(["s3"]);
     });
 });
+
 describe("restoreSuggestionAtIndex", () => {
     const suggestions: SuggestionLike[] = [
         { id: "sug-1" },
@@ -163,3 +164,4 @@ describe("restoreSuggestionAtIndex", () => {
         ]);
     });
 });
+

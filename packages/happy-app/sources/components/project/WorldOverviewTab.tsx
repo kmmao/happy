@@ -23,6 +23,7 @@ import {
     refreshSuggestions,
     acceptSuggestion,
     dismissSuggestion,
+    type SuggestionStatus,
     type WorldDashboard,
     type SuggestionSummary,
 } from "@/sync/apiWorld";
@@ -41,6 +42,15 @@ import {
 interface WorldOverviewTabProps {
     project: Project;
     isActive: boolean;
+}
+
+function isSuggestionStatus(value: string): value is SuggestionStatus {
+    return value === "open"
+        || value === "processing"
+        || value === "accepted"
+        || value === "suspended"
+        || value === "dismissed"
+        || value === "expired";
 }
 
 export const WorldOverviewTab = React.memo(
@@ -89,8 +99,14 @@ export const WorldOverviewTab = React.memo(
             let isDisposed = false;
             const unsubscribe = sync.onWorldSuggestionUpdated((event) => {
                 if (event.projectId !== projectServerId) return;
+                if (!isSuggestionStatus(event.status)) return;
 
-                if (shouldRefetchSuggestions(event)) {
+                const narrowedEvent = {
+                    suggestionId: event.suggestionId,
+                    status: event.status,
+                } as const;
+
+                if (shouldRefetchSuggestions(narrowedEvent)) {
                     const reloadSeq = ++suggestionReloadSeqRef.current;
                     void (async () => {
                         const credentials = await TokenStorage.getCredentials();
@@ -103,7 +119,7 @@ export const WorldOverviewTab = React.memo(
                 }
 
                 hiddenSuggestionIdsRef.current.add(event.suggestionId);
-                setSuggestions((prev) => applySuggestionStatusUpdate(prev, event));
+                setSuggestions((prev) => applySuggestionStatusUpdate(prev, narrowedEvent));
             });
 
             return () => {
