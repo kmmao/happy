@@ -13,6 +13,10 @@ import {
     buildWorldSuggestionUpdatedEphemeral,
 } from "@/app/events/eventRouter";
 import { buildGoalBlockerSummary, type GoalBlockerSummary } from "./goalSummary";
+import {
+    normalizeConcreteImplementationSummary,
+    normalizeSuggestionFactText,
+} from "./summaryDetailFilter";
 import type { SuggestionEvidence, SuggestionPayload, SuggestionType } from "./worldSuggestionTypes";
 
 interface FailedTaskFact {
@@ -419,7 +423,7 @@ export function reconcileSuggestionCandidates(input: {
 
 export function failedTaskFollowup(task: FailedTaskFact): SuggestionCandidate {
     const taskLabel = task.title ?? task.id;
-    const errorSummary = normalizeFactText(task.errorMessage, "Unknown error");
+    const errorSummary = normalizeSuggestionFactText(task.errorMessage, "Unknown error");
     const factKey = [task.id, task.attempt, task.maxAttempts, errorSummary].join("|");
 
     return {
@@ -453,7 +457,7 @@ export function failedTaskFollowup(task: FailedTaskFact): SuggestionCandidate {
 
 export function retryExhaustedDecision(task: FailedTaskFact): SuggestionCandidate {
     const taskLabel = task.title ?? task.id;
-    const errorSummary = normalizeFactText(task.errorMessage, "Unknown error");
+    const errorSummary = normalizeSuggestionFactText(task.errorMessage, "Unknown error");
     const factKey = [task.id, task.attempt, task.maxAttempts, errorSummary].join("|");
 
     return {
@@ -490,7 +494,9 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
         summary: "Goal is blocked",
         requiresHuman: true,
     };
-    const factKey = [goal.id, blocker.kind, blocker.summary].join("|");
+    const summary = normalizeSuggestionFactText(goal.description, "Goal is blocked");
+    const blockerSummary = normalizeSuggestionFactText(blocker.summary, summary);
+    const factKey = [goal.id, blocker.kind, blockerSummary].join("|");
 
     if (blocker.kind === "planner_timeout") {
         return {
@@ -499,13 +505,13 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
             type: "suggested_decision",
             title: `Resolve planning timeout: ${truncate(goal.title, 50)}`,
             summary: `Goal "${goal.title}" is blocked because planning timed out and needs a human decision.`,
-            reason: blocker.summary,
+            reason: blockerSummary,
             evidence: [{ kind: "goal", id: goal.id, label: `Blocked: ${goal.title}` }],
             recommendedRole: null,
             payload: {
                 decision: {
                     question: `Goal "${goal.title}" is blocked after planner timeout. How should planning continue?`,
-                    context: goal.description ?? blocker.summary,
+                    context: summary,
                     goalId: goal.id,
                     precedentKey: "goal.planner_timeout",
                     options: [
@@ -516,7 +522,7 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
                 },
             },
             requiresHuman: true,
-            dedupeKey: `blocked_goal_attention:${goal.id}:planner_timeout:${blocker.summary}`,
+            dedupeKey: `blocked_goal_attention:${goal.id}:planner_timeout:${blockerSummary}`,
             factKey,
         };
     }
@@ -527,7 +533,7 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
         type: "suggested_task",
         title: `Unblock: ${truncate(goal.title, 60)}`,
         summary: `Goal "${goal.title}" is blocked. Create a focused task to remove the blocker.`,
-        reason: blocker.summary,
+        reason: blockerSummary,
         evidence: [
             { kind: "goal", id: goal.id, label: `Blocked: ${goal.title}` },
             ...(blocker.sourceTaskId ? [{ kind: "task" as const, id: blocker.sourceTaskId, label: `Source task: ${blocker.sourceTaskId}` }] : []),
@@ -540,7 +546,7 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
                 prompt: [
                     `Goal "${goal.title}" is blocked.`,
                     goal.description ? `Goal description: ${goal.description}` : "",
-                    `Blocker: ${blocker.summary}`,
+                    `Blocker: ${blockerSummary}`,
                     "",
                     "Investigate the blocker and propose or implement the smallest change that unblocks progress.",
                 ].filter(Boolean).join("\n"),
@@ -549,7 +555,7 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
             },
         },
         requiresHuman: true,
-        dedupeKey: `blocked_goal_attention:${goal.id}:${blocker.kind}:${blocker.summary}`,
+        dedupeKey: `blocked_goal_attention:${goal.id}:${blocker.kind}:${blockerSummary}`,
         factKey,
     };
 }
@@ -654,7 +660,7 @@ async function buildCompletedTaskSkillFacts(tasks: Array<{
     const latestStableSummaryBySession = new Map<string, string>();
     for (const event of sessionEvents) {
         if (latestStableSummaryBySession.has(event.sessionId)) continue;
-        const stableSummary = normalizeStableSkillSummary(event.summary);
+        const stableSummary = normalizeConcreteImplementationSummary(event.summary);
         if (!stableSummary) continue;
         latestStableSummaryBySession.set(event.sessionId, stableSummary);
     }
@@ -676,33 +682,6 @@ async function buildCompletedTaskSkillFacts(tasks: Array<{
         .filter((task): task is CompletedTaskSkillFact => task !== null);
 }
 
-function normalizeStableSkillSummary(input: string): string | null {
-    const summary = input.trim();
-    if (summary.length < 24) return null;
-
-    const lower = summary.toLowerCase();
-    const exactUnstableSummaries = new Set([
-        "done",
-        "completed successfully",
-        "task completed successfully",
-    ]);
-    if (exactUnstableSummaries.has(lower)) {
-        return null;
-    }
-
-    const unstablePhrases = [
-        "need user decision",
-        "waiting for user",
-        "blocked",
-        "todo",
-    ];
-    if (unstablePhrases.some((phrase) => lower.includes(phrase))) {
-        return null;
-    }
-
-    return summary;
-}
-
 function extractFamilyKey(dedupeKey: string): string {
     const parts = dedupeKey.split(":");
     if (parts.length <= 2) return dedupeKey;
@@ -713,11 +692,6 @@ function extractFactKey(dedupeKey: string): string {
     const parts = dedupeKey.split(":");
     if (parts.length <= 2) return dedupeKey;
     return parts.slice(1).join("|");
-}
-
-function normalizeFactText(input: string | null, fallback: string): string {
-    const normalized = input?.trim();
-    return normalized && normalized.length > 0 ? normalized : fallback;
 }
 
 function truncate(str: string, max: number): string {

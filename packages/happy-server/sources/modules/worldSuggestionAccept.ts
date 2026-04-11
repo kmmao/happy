@@ -212,15 +212,33 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 throw new Error("Suggestion not found or already acted upon");
             }
 
-            const skill = await tx.skill.create({
-                data: {
-                    accountId,
-                    projectId,
-                    name: payload.skill!.title,
-                    content: payload.skill!.content,
-                    archived: false,
-                },
-            });
+            const baseName = payload.skill!.title;
+            const fallbackName = suggestion.relatedTaskId ? `${baseName} (${suggestion.relatedTaskId})` : null;
+            let skill;
+            try {
+                skill = await tx.skill.create({
+                    data: {
+                        accountId,
+                        projectId,
+                        name: baseName,
+                        content: payload.skill!.content,
+                        archived: false,
+                    },
+                });
+            } catch (error) {
+                if (!isUniqueConstraintError(error) || !fallbackName) {
+                    throw error;
+                }
+                skill = await tx.skill.create({
+                    data: {
+                        accountId,
+                        projectId,
+                        name: fallbackName,
+                        content: payload.skill!.content,
+                        archived: false,
+                    },
+                });
+            }
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
@@ -299,6 +317,10 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
     }
 
     throw new Error(`Invalid suggestion type or missing payload for type: ${suggestion.type}`);
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+    return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
 async function reopenExistingDecision(tx: { decision: { findFirst: typeof db.decision.findFirst; update: typeof db.decision.update } }, input: {

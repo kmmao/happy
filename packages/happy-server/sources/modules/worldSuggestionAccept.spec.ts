@@ -24,7 +24,7 @@ const {
             update: vi.fn(async () => ({})),
         },
         skill: {
-            create: vi.fn(),
+            create: vi.fn(async () => ({ id: "skill-1" })),
         },
         decision: {
             create: vi.fn(async ({ data }: any) => ({ id: data.question === "What next?" ? "decision-2" : "decision-1" })),
@@ -37,7 +37,7 @@ const {
             findFirst: vi.fn(async () => ({ path: "/repo" })),
         },
         worldSuggestion: {
-            findFirst: vi.fn(async () => ({
+            findFirst: vi.fn(async (): Promise<any> => ({
                 id: "suggestion-1",
                 type: "suggested_task",
                 payload: JSON.stringify({
@@ -259,6 +259,94 @@ describe("worldSuggestionAccept", () => {
         expect(tx.worldSuggestion.update).toHaveBeenCalledWith({
             where: { id: "suggestion-3" },
             data: { status: "accepted", actedAt: expect.any(Date) },
+        });
+    });
+
+    it("accepts suggested_skill without creating task skill usage bindings", async () => {
+        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
+            id: "suggestion-skill-1",
+            type: "suggested_skill",
+            payload: JSON.stringify({
+                skill: {
+                    title: "From task: Implement auth refresh",
+                    content: "Successful outcome: refreshed auth flow",
+                    sourceTaskId: "task-source-1",
+                },
+            }),
+            relatedGoalId: null,
+            relatedTaskId: "task-source-1",
+            status: "open",
+        });
+
+        const result = await worldSuggestionAccept({
+            accountId: "user-1",
+            projectId: "project-1",
+            suggestionId: "suggestion-skill-1",
+        });
+
+        expect(tx.skill.create).toHaveBeenCalledWith({
+            data: {
+                accountId: "user-1",
+                projectId: "project-1",
+                name: "From task: Implement auth refresh",
+                content: "Successful outcome: refreshed auth flow",
+                archived: false,
+            },
+        });
+        expect(result).toEqual({
+            suggestionId: "suggestion-skill-1",
+            createdEntityType: "skill",
+            createdEntityId: "skill-1",
+        });
+    });
+
+    it("falls back to a task-scoped name when suggested_skill name already exists", async () => {
+        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
+            id: "suggestion-skill-duplicate",
+            type: "suggested_skill",
+            payload: JSON.stringify({
+                skill: {
+                    title: "From task: Implement auth refresh",
+                    content: "Successful outcome: refreshed auth flow",
+                    sourceTaskId: "task-source-2",
+                },
+            }),
+            relatedGoalId: null,
+            relatedTaskId: "task-source-2",
+            status: "open",
+        });
+        tx.skill.create
+            .mockRejectedValueOnce({ code: "P2002" })
+            .mockResolvedValueOnce({ id: "skill-2" });
+
+        const result = await worldSuggestionAccept({
+            accountId: "user-1",
+            projectId: "project-1",
+            suggestionId: "suggestion-skill-duplicate",
+        });
+
+        expect(tx.skill.create).toHaveBeenNthCalledWith(1, {
+            data: {
+                accountId: "user-1",
+                projectId: "project-1",
+                name: "From task: Implement auth refresh",
+                content: "Successful outcome: refreshed auth flow",
+                archived: false,
+            },
+        });
+        expect(tx.skill.create).toHaveBeenNthCalledWith(2, {
+            data: {
+                accountId: "user-1",
+                projectId: "project-1",
+                name: "From task: Implement auth refresh (task-source-2)",
+                content: "Successful outcome: refreshed auth flow",
+                archived: false,
+            },
+        });
+        expect(result).toEqual({
+            suggestionId: "suggestion-skill-duplicate",
+            createdEntityType: "skill",
+            createdEntityId: "skill-2",
         });
     });
 
