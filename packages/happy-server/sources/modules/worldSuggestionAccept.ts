@@ -11,7 +11,9 @@ import {
 import { db } from "@/storage/db";
 import { afterTx, inTx } from "@/storage/inTx";
 import { goalCreate } from "./goalCreate";
-import { normalizeSuggestionPayload } from "./worldSuggestionTypes";
+import { validateSuggestionPayload } from "./worldSuggestionTypes";
+
+type AcceptSource = "human" | "system_auto";
 
 interface AcceptInput {
     accountId: string;
@@ -20,6 +22,7 @@ interface AcceptInput {
     machineId?: string;
     priorityOverride?: string;
     roleOverride?: string;
+    acceptSource?: AcceptSource;
 }
 
 interface AcceptResult {
@@ -30,7 +33,15 @@ interface AcceptResult {
 }
 
 export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptResult> {
-    const { accountId, projectId, suggestionId, machineId, priorityOverride, roleOverride } = input;
+    const {
+        accountId,
+        projectId,
+        suggestionId,
+        machineId,
+        priorityOverride,
+        roleOverride,
+        acceptSource = "human",
+    } = input;
 
     const project = await db.project.findFirst({
         where: { id: projectId, accountId },
@@ -47,11 +58,13 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
     const rawPayload = safeParseJson(suggestion.payload);
 
     if (suggestion.type === "suggested_goal") {
-        const payload = normalizeSuggestionPayload({
+        const payload = validateSuggestionPayload({
             type: suggestion.type,
-            title: suggestion.title,
             rawPayload,
-        });
+        }) as { goal: { title: string; detail?: string; priority?: string } } | null;
+        if (!payload) {
+            throw new Error("Suggestion payload does not match suggestion type");
+        }
         const resolvedMachineId = machineId ?? await findActiveMachine(accountId, projectId);
         if (!resolvedMachineId) {
             throw new Error("No active machine found for this project. Please specify a machineId.");
@@ -68,7 +81,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "processing", actedAt: new Date() },
+                data: { status: "processing", actedAt: new Date(), acceptSource },
             });
         });
 
@@ -91,7 +104,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await db.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted" },
+                data: { status: "accepted", acceptSource },
             });
 
             eventRouter.emitEphemeral({
@@ -122,11 +135,13 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
     }
 
     if (suggestion.type === "suggested_task") {
-        const payload = normalizeSuggestionPayload({
+        const payload = validateSuggestionPayload({
             type: suggestion.type,
-            title: suggestion.title,
             rawPayload,
-        });
+        }) as { task: { title: string; prompt: string; roleType?: string; goalId?: string; priority?: string } } | null;
+        if (!payload) {
+            throw new Error("Suggestion payload does not match suggestion type");
+        }
         const resolvedMachineId = machineId ?? await findActiveMachine(accountId, projectId);
         if (!resolvedMachineId) {
             throw new Error("No active machine found for this project. Please specify a machineId.");
@@ -151,7 +166,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                     priority: priorityOverride ?? payload.task.priority ?? "user",
                     roleType: roleOverride ?? payload.task.roleType ?? null,
                     goalId: payload.task.goalId ?? suggestion.relatedGoalId ?? null,
-                    triggerType: "manual",
+                    triggerType: acceptSource === "system_auto" ? "suggestion_auto" : "manual",
                     status: "dispatching",
                     maxAttempts: 3,
                 },
@@ -159,7 +174,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", actedAt: new Date() },
+                data: { status: "accepted", actedAt: new Date(), acceptSource },
             });
 
             afterTx(tx, () => {
@@ -207,11 +222,13 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
     }
 
     if (suggestion.type === "suggested_skill") {
-        const payload = normalizeSuggestionPayload({
+        const payload = validateSuggestionPayload({
             type: suggestion.type,
-            title: suggestion.title,
             rawPayload,
-        });
+        }) as { skill: { title: string; content: string; sourceTaskId?: string } } | null;
+        if (!payload) {
+            throw new Error("Suggestion payload does not match suggestion type");
+        }
         return inTx(async (tx) => {
             const fresh = await tx.worldSuggestion.findFirst({
                 where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
@@ -251,7 +268,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", actedAt: new Date() },
+                data: { status: "accepted", actedAt: new Date(), acceptSource },
             });
 
             afterTx(tx, () => {
@@ -271,11 +288,13 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
     }
 
     if (suggestion.type === "suggested_decision") {
-        const payload = normalizeSuggestionPayload({
+        const payload = validateSuggestionPayload({
             type: suggestion.type,
-            title: suggestion.title,
             rawPayload,
-        });
+        }) as { decision: { question: string; context?: string; goalId?: string; existingDecisionId?: string; precedentKey?: string; options: Array<{ id: string; description: string; pros?: string; cons?: string }> } } | null;
+        if (!payload) {
+            throw new Error("Suggestion payload does not match suggestion type");
+        }
         const decisionPayload = payload.decision;
         return inTx(async (tx) => {
             const fresh = await tx.worldSuggestion.findFirst({
@@ -307,7 +326,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", actedAt: new Date() },
+                data: { status: "accepted", actedAt: new Date(), acceptSource },
             });
 
             afterTx(tx, () => {

@@ -1,7 +1,24 @@
+import {
+    type SuggestionBucket,
+    type SuggestionEvidence,
+    type SuggestionPayload,
+    type SuggestionSummary,
+    type SuggestionStatus,
+    type SuggestionType,
+} from "@kmmao/happy-wire";
+export type {
+    SuggestionBucket,
+    SuggestionEvidence,
+    SuggestionPayload,
+    SuggestionSummary,
+    SuggestionStatus,
+    SuggestionType,
+};
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { getCurrentLanguage, type SupportedLanguage } from "@/text";
 import { backoff } from "@/utils/time";
 import { getServerUrl } from "./serverConfig";
+
 
 /** Maps app appearance language to world generation copy (en | zh). */
 export function worldContentLanguageForGenerate(): "en" | "zh" {
@@ -112,52 +129,6 @@ export async function fetchWorldDashboard(
         return (await response.json()) as WorldDashboard;
     });
 }
-
-// === World Suggestions ===
-
-export type SuggestionType = "suggested_goal" | "suggested_task" | "suggested_skill" | "suggested_decision";
-export type SuggestionStatus = "open" | "processing" | "accepted" | "suspended" | "dismissed" | "expired";
-export type SuggestionBucket = "next_step" | "needs_decision" | "needs_human_input";
-
-export interface SuggestionEvidence {
-    kind: "goal" | "task" | "decision" | "message" | "narrative";
-    id?: string;
-    label: string;
-}
-
-export type SuggestionPayload =
-    | { goal: { title: string; detail?: string; priority?: string } }
-    | { task: { title: string; prompt: string; roleType?: string; goalId?: string; priority?: string } }
-    | { skill: { title: string; content: string; sourceTaskId?: string } }
-    | { decision: {
-        question: string;
-        context?: string;
-        goalId?: string;
-        existingDecisionId?: string;
-        precedentKey?: string;
-        options: Array<{ id: string; description: string; pros?: string; cons?: string }>;
-    } };
-
-export interface SuggestionSummary {
-    id: string;
-    projectId: string;
-    relatedGoalId: string | null;
-    relatedTaskId: string | null;
-    type: SuggestionType;
-    title: string;
-    summary: string;
-    reason: string;
-    evidence: SuggestionEvidence[];
-    recommendedRole: string | null;
-    payload: SuggestionPayload;
-    requiresHuman: boolean;
-    status: SuggestionStatus;
-    dedupeKey: string;
-    bucket: SuggestionBucket;
-    createdAt: number;
-    actedAt: number | null;
-}
-
 
 export async function fetchSuggestions(
     credentials: AuthCredentials,

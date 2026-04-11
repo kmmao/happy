@@ -1,15 +1,15 @@
-/**
- * Query open WorldSuggestions for a project.
- */
-
 import { db } from "@/storage/db";
 import {
-    deriveSuggestionBucket,
-    serializeSuggestion,
+    type SuggestionAcceptSource,
     type SuggestionBucket,
     type SuggestionSerialized,
     type SuggestionStatus,
     type SuggestionType,
+} from "@kmmao/happy-wire";
+import {
+    deriveSuggestionBucket,
+    normalizeSuggestionPayload,
+    serializeSuggestion,
 } from "./worldSuggestionTypes";
 
 export async function worldSuggestionQuery(
@@ -40,15 +40,21 @@ export async function worldSuggestionQuery(
         take: limit,
     });
 
-    return rows.map((row) => serializeSuggestion({
-        ...(row as typeof row & {
+    return rows.map((row) => {
+        const typedRow = row as typeof row & {
             type: SuggestionType;
             status: SuggestionStatus;
             bucket?: SuggestionBucket | null;
-        }),
-        type: row.type as SuggestionType,
-        status: row.status as SuggestionStatus,
-    }));
+            acceptSource?: string | null;
+        };
+
+        return serializeSuggestion({
+            ...typedRow,
+            type: typedRow.type,
+            status: typedRow.status,
+            acceptSource: normalizeAcceptSource(typedRow.acceptSource),
+        });
+    });
 }
 
 async function backfillSuggestionBuckets(accountId: string, projectId: string): Promise<void> {
@@ -61,19 +67,26 @@ async function backfillSuggestionBuckets(accountId: string, projectId: string): 
         select: {
             id: true,
             type: true,
+            title: true,
             payload: true,
             evidence: true,
             requiresHuman: true,
             bucket: true,
         },
+        orderBy: { createdAt: "desc" },
         take: 200,
     });
 
     const updates = rows.flatMap((row) => {
         const typedRow = row as typeof row & { bucket?: SuggestionBucket | null; type: SuggestionType };
+        const normalizedPayload = normalizeSuggestionPayload({
+            type: typedRow.type,
+            title: row.title,
+            rawPayload: safeParseJson(row.payload, {}),
+        });
         const derivedBucket = deriveSuggestionBucket({
             type: typedRow.type,
-            payload: safeParseJson(row.payload, {}),
+            payload: normalizedPayload,
             evidence: safeParseJson(row.evidence, []),
             requiresHuman: row.requiresHuman,
         });
@@ -86,6 +99,13 @@ async function backfillSuggestionBuckets(accountId: string, projectId: string): 
     if (updates.length > 0) {
         await Promise.all(updates);
     }
+}
+
+function normalizeAcceptSource(raw: string | null | undefined): SuggestionAcceptSource | null {
+    if (raw === "human" || raw === "system_auto") {
+        return raw;
+    }
+    return null;
 }
 
 function safeParseJson(raw: string, fallback: any) {

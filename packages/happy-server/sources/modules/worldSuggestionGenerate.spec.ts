@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 const {
     buildWorldSuggestionUpdatedEphemeral,
     dbMock,
     emitEphemeral,
+    autoAcceptSuggestedTasksIfEnabled,
     resetState,
     setCountResult,
     seedExistingSuggestion,
@@ -14,6 +15,7 @@ const {
     setPlanningTimeoutGoalIds,
     setSessionEvents,
     setTaskSkillBindings,
+    setProjectSupervisorConfig,
 } = vi.hoisted(() => {
     type SuggestionRow = {
         id: string;
@@ -25,6 +27,7 @@ const {
     };
 
     const state = {
+        projectSupervisorConfig: null as string | null,
         blockedGoals: [] as Array<{
             id: string;
             accountId: string;
@@ -83,6 +86,7 @@ const {
     };
 
     const resetState = () => {
+        state.projectSupervisorConfig = null;
         state.blockedGoals = [];
         state.failedTasks = [];
         state.completedTasks = [];
@@ -92,6 +96,10 @@ const {
         state.planningTimeoutGoalIds = [];
         state.existingSuggestions = [];
         state.countResult = 0;
+    };
+
+    const setProjectSupervisorConfig = (supervisorConfig: string | null) => {
+        state.projectSupervisorConfig = supervisorConfig;
     };
 
     const seedExistingSuggestion = (input: Partial<SuggestionRow> & Pick<SuggestionRow, "id" | "accountId" | "projectId" | "dedupeKey" | "status">) => {
@@ -138,6 +146,9 @@ const {
     };
 
     const dbMock = {
+        project: {
+            findUnique: vi.fn(async () => ({ supervisorConfig: state.projectSupervisorConfig })),
+        },
         worldSuggestion: {
             findMany: vi.fn(async (args: any) => {
                 if (args?.where?.status === "processing") {
@@ -175,7 +186,7 @@ const {
                 }
                 return { count: 1 };
             }),
-            create: vi.fn(async ({ data }: any) => ({ id: "created-1", ...data })),
+            create: vi.fn(async ({ data }: any) => ({ id: `created-${state.countResult + 1}`, ...data })),
             count: vi.fn(async () => state.countResult),
         },
         task: {
@@ -188,7 +199,9 @@ const {
                     .filter((task: any) => !args.where.sessionId?.not || task.sessionId !== args.where.sessionId.not)
                     .map((task: any) => {
                         const result = { ...task };
-                        if ("status" in result && !args.select?.status) delete result.status;
+                        if ("status" in result && !args.select?.status) {
+                            delete result.status;
+                        }
                         return result;
                     });
             }),
@@ -225,6 +238,7 @@ const {
                         .filter((goal) => goal.updatedAt <= args.where.updatedAt.lte)
                         .map((goal) => ({ id: goal.id }));
                 }
+
                 return state.blockedGoals
                     .filter((goal) => goal.accountId === args.where.accountId)
                     .filter((goal) => goal.projectId === args.where.projectId);
@@ -251,6 +265,7 @@ const {
         buildWorldSuggestionUpdatedEphemeral: vi.fn((payload: unknown) => payload),
         dbMock,
         emitEphemeral: vi.fn(),
+        autoAcceptSuggestedTasksIfEnabled: vi.fn(async () => {}),
         resetState,
         setCountResult,
         seedExistingSuggestion,
@@ -259,6 +274,7 @@ const {
         setCompletedTasks,
         setAttentionDecisions,
         setPlanningTimeoutGoalIds,
+        setProjectSupervisorConfig,
         setSessionEvents,
         setTaskSkillBindings,
     };
@@ -268,6 +284,9 @@ vi.mock("@/storage/db", () => ({ db: dbMock }));
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: { emitEphemeral },
     buildWorldSuggestionUpdatedEphemeral,
+}));
+vi.mock("./worldSuggestionAutoAccept", () => ({
+    autoAcceptSuggestedTasksIfEnabled,
 }));
 
 import {
@@ -589,5 +608,69 @@ describe("worldSuggestionGenerate", () => {
         });
         expect(result.created).toBe(1);
         expect(result.total).toBe(1);
+    });
+
+    it("passes newly created suggestions into auto-accept with project config", async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-04-10T10:00:00Z"));
+        setProjectSupervisorConfig(JSON.stringify({
+            worldAutonomy: { autoAcceptSafeSuggestedTasks: true },
+        }));
+        setBlockedGoals([
+            {
+                id: "goal-1",
+                accountId: "user-1",
+                projectId: "project-1",
+                title: "Ship v2.0",
+                description: "Release version 2.0",
+                plannerTaskId: null,
+                updatedAt: new Date("2026-04-10T09:50:00Z"),
+                tasks: [{
+                    id: "task-9",
+                    title: "Planner task",
+                    status: "failed",
+                    errorMessage: "syntax error",
+                }],
+            },
+        ]);
+        setCountResult(1);
+
+        await worldSuggestionRefresh("user-1", "project-1");
+
+        expect(autoAcceptSuggestedTasksIfEnabled).toHaveBeenCalledWith({
+            accountId: "user-1",
+            projectId: "project-1",
+            supervisorConfig: JSON.stringify({
+                worldAutonomy: { autoAcceptSafeSuggestedTasks: true },
+            }),
+            suggestions: [
+                expect.objectContaining({
+                    type: "suggested_task",
+                    projectId: "project-1",
+                    status: "open",
+                    relatedGoalId: "goal-1",
+                }),
+            ],
+        });
+    });
+
+    it("calls auto-accept with empty created list when no new suggestions are created", async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-04-10T10:00:00Z"));
+        setProjectSupervisorConfig(JSON.stringify({
+            worldAutonomy: { autoAcceptSafeSuggestedTasks: true },
+        }));
+        setCountResult(0);
+
+        await worldSuggestionRefresh("user-1", "project-1");
+
+        expect(autoAcceptSuggestedTasksIfEnabled).toHaveBeenCalledWith({
+            accountId: "user-1",
+            projectId: "project-1",
+            supervisorConfig: JSON.stringify({
+                worldAutonomy: { autoAcceptSafeSuggestedTasks: true },
+            }),
+            suggestions: [],
+        });
     });
 });

@@ -20,7 +20,7 @@
 - [x] **阶段 A — 阻塞**：用 AgentMessage（或约定 `content` 结构）表达阻塞，与 Goal `blocked` 规则对齐
 - [x] **阶段 B — 语义完成**：CLI 任务结果上报闭环、Server 状态机统一与 task-scoped 窄权限 token 已落地；默认仍进程退出结算
 - [x] **阶段 C — 主动性**：基于 narrative / decisions / failures 生成建议 Goal/Task（先确认后派发）+ 可选 Skill 提炼闭环
-- [ ] **阶段 D — 建议系统稳定化收尾**：三分桶建议流与 GoalDetail suggestion 已落地；仍待 bucket 持久化、payload 判别联合与 shared schema 收口
+- [ ] **阶段 D — 建议系统稳定化收尾**：三分桶建议流与 GoalDetail suggestion 已落地；bucket 已持久化并带回填修正，仍待 payload 按 `type` 的判别联合进一步收口，以及 shared schema 统一进入单一来源（例如 `happy-wire`）
 
 ---
 
@@ -493,19 +493,38 @@ Skill 是阶段 C 的可选尾巴，不阻塞主线。放在 Phase 3 单独开�
 - Goal 详情页已接入 goal-scoped suggestion 区，不再只有 WorldOverview 能消费建议。
 - Server 查询已支持 `goalId / bucket` 过滤；`status=open` 且带 `bucket` 时不再混入 `suspended` suggestion，避免 lane 语义漂移。
 - server/app 两端 `Suggestion` 的 `type / status / bucket` 已完成一轮联合类型收紧，减少字符串漂移风险。
+- `WorldSuggestion.bucket` 已入库为稳定字段，并在查询路径补了回填修正逻辑，用于兼容历史数据与派生规则变更。
 - app 侧 `requires_action` 相关运行态语义已补洞：避免会话从 `running -> requires_action` 时提前清空 queued marker。
+- Phase 1 已完成 server 内 `payload + type` 第一轮收口：新增按 `type` 获取 payload schema 的 helper，accept 路径改为 strict validate + fail-closed，payload/type 不匹配时直接拒绝；query 的 bucket 回填改为基于 normalize 后 payload 推导。
+- Phase 2 已完成 server 内共享契约边界整理：纯 Suggestion schema/类型与 server-only helper 已分层，server 侧消费点完成了第一轮 contract 边界收口。
+- Phase 3 已完成：`happy-wire` 中已新增 `worldSuggestion.ts`，app 的 `apiWorld.ts` 与 `apiTypes.ts` 已接入 wire 中的 Suggestion 类型与 `WorldSuggestionUpdatedSchema`，server 生产代码已直接消费 wire contract；本地过渡层已移除，`happy-wire build`、`happy-app typecheck` 与 server 的 world suggestion 相关 tests 已通过。
+- **阶段 D 最后一项稳定化尾项也已完成**：`SuggestionSummary / payload` 已收成真正的严格判别联合，wire 中的 summary 类型已与 `type` 绑定 `payload` 分支；server 的 `serializeSuggestion()` 已输出该严格结构；app 侧关键消费点（如 `worldSuggestionViewModel.ts`）已改为依赖 `suggestion.type` 自动收窄，不再依赖 payload 的 `in` 判断；相关 wire build、server tests、app typecheck 与 app 相关 tests 已通过。
 
-当前仍待收尾：
+结论：阶段 D 已完成核心产品落地与稳定化收尾。`bucket` 持久化、Phase 1 的 server 侧 payload/type 收口、Phase 2 的 server 内 contract 边界整理、Phase 3 的 wire 迁移，以及最后的严格判别联合闭合都已补齐；当前不再存在阶段 D 的必做稳定化尾项。
 
-- `bucket` 仍是派生值，尚未持久化为稳定字段。
-- `payload` 仍不是按 `type` 绑定的判别联合。
-- server/app 仍未共享单一 Suggestion schema（例如进入 `happy-wire`）。
+#### D.8 剩余尾项的推荐收口顺序（2026-04-11）
 
-结论：阶段 D 已完成核心产品落地，但尚未完成“稳定化终局”，应继续按收尾项推进，而不是误判为纯规划或已完全收口。
+**该收口顺序已全部完成，可作为阶段 D 的实施回顾保留。**
+
+1. **先在 server 内完成 `payload + type` 的强绑定收口**
+   - 状态：**已完成第一轮最小闭环**。
+   - 已落地：`worldSuggestionTypes.ts` 新增按 `type` 获取 payload schema 的 helper；accept 路径已改为严格校验，payload/type 不匹配时直接拒绝；query 路径的 bucket 回填改为基于 normalize 后 payload，而不是直接读取 raw payload 残枝；相关 types/accept/query/generate 测试已补齐并通过。
+
+2. **再在 server 内整理“可导出”的共享契约边界**
+   - 状态：**已完成 server 内第一轮边界整理**。
+   - 已落地：纯 Suggestion schema/类型与 server-only helper 已分层；server 内生产代码不再依赖本地 contract 作为真相源，`worldSuggestionTypes.ts` 保留 `normalizeSuggestionPayload()`、`serializeSuggestion()`、`deriveSuggestionBucket()` 等 server-only helper；server 内 routes/modules/tests 已改为依赖 wire 或其薄过渡层消费纯定义。
+
+3. **然后把稳定后的共享契约迁入 `happy-wire`**
+   - 状态：**已完成**。
+   - 已落地：`happy-wire/src/worldSuggestion.ts` 已新增 Suggestion 共享契约；`happy-wire` 已导出相关 schema/类型；app 的 `apiWorld.ts` 与 `apiTypes.ts` 已消费 wire 中的 Suggestion contract 与 `WorldSuggestionUpdatedSchema`；server 生产代码已切到直接消费 wire contract；本地过渡层已移除；`happy-wire build`、`happy-app typecheck`、server world suggestion 相关 tests 已通过。
+
+4. **最后让 app 改为消费共享 schema，并删除本地重复定义**
+   - 状态：**已完成**。
+   - 已落地：app 的基础 Suggestion contract 定义已切到 wire 消费，`apiTypes.ts` 已接入 wire 中的 suggestion update event schema；关键消费点已利用严格判别联合按 `type` 自动收窄，去除了关键路径中对 payload 的 `in` 判断。
+
+**为什么这个顺序最稳**：server 是真相源，应该先定稳语义；wire 只承接稳定契约；app 最后切换消费。若先动 `happy-wire`，等于把未完全定型的 Suggestion 协议同时广播给 server/app，两端会一起爆，返工面最大。
 
 ### 阶段 E — 受限自治执行
-
-**目标**：在明确授权边界内，让世界自动把低风险建议转成真实任务并推进。
 
 #### E.1 自治等级模型
 
@@ -574,19 +593,72 @@ World 中增加：
 - `Pending Approvals`
 - `Recent Autonomous Actions`
 
-#### E.7 验收标准
 
-- 低风险任务能在白名单范围内自动创建并执行
-- 所有自动行为对用户可见、可追溯
-- 系统不越权、不隐式扩大自治边界
+#### E.8 下一步实施入口（2026-04-11）
 
-### 阶段 F — 多角色协作世界
+**阶段 E 的最小可落地入口，不是先做自治面板，也不是先做完整自治策略系统，而是：只对白名单内的一小类 `suggested_task` 做自动 accept，并且强制复用现有 `worldSuggestionAccept()` 链路。**
 
-**目标**：让 Agent 从“执行器”升级为“世界中的角色节点”，形成角色间协作协议。
+建议的第一批自动动作限定为：
 
-#### F.1 核心转变
+- `type === suggested_task`
+- `bucket === next_step`
+- 来源属于低风险 follow-up / blocker 补充任务，而不是 goal / decision / law 级动作
+- payload 已有明确 `task.title` 与 `task.prompt`
+- 默认关闭，仅在显式开启的 project 级策略下生效
 
-阶段 F 的重点不是消息列表，而是**角色协作协议**：Planner、Builder、Guardian、Chronicler、Messenger 不再只是标签，而是具备协作关系和通信行为的节点。
+为什么这是当前最合理的入口：
+
+- **复用现有闭环**：suggestion → accept → dispatch → outcome 回写 已经存在，不必再造第二条自动创建任务的旁路。
+- **风险最低**：自动接受一条 task suggestion 的风险，显著低于自动创建 goal、自动改 decision、自动调整 laws / narrative。
+- **可解释性最好**：用户能明确看到“系统根据现有 suggestion 自动接受了一条低风险任务”，而不是看到来路不明的幽灵任务。
+- **失败可控**：最坏情况是多生成一个 task，而不是直接改坏目标树或治理层。
+
+最小实施范围建议：
+
+- server 新增一个很小的自动 accept 判断/调度入口（例如 `worldSuggestionAutoAccept.ts`）
+- 复用 `worldSuggestionAccept()`，禁止另造自动创建 task 的旁路
+- 第一版只需要最小可见性提示，不要求先做完整 autonomy dashboard
+
+硬边界：
+
+- 第一版**只允许 `suggested_task`**，不自动处理 `suggested_goal` / `suggested_decision` / `suggested_skill`
+- 不自动修改 laws / narrative
+- 默认关闭，必须显式开启
+- 必须可追溯，至少能回答“哪条 suggestion 因什么策略被自动 accept，并创建了哪个 task”
+
+验证链路建议：
+
+1. 制造一个满足白名单条件的 `suggested_task`
+2. 开启 project 级最小自治开关
+3. refresh / generate suggestion
+4. 验证该 suggestion 被自动 accept
+5. 验证 task 被创建并派发
+6. 验证用户可见该自动行为来源
+
+##### E.8 当前进展（2026-04-12）
+
+已落地的最小入口：
+
+- `worldSuggestionRefresh()` 已接入自动 accept 入口，只处理**本轮新创建**的 suggestion，避免对历史 open/suspended suggestion 做隐式批量补执行。
+- server 已新增 `worldSuggestionAutoAccept.ts`，对白名单低风险 `suggested_task` 做集中判定；当前硬条件包括：project 级显式开启、`type === suggested_task`、`bucket === next_step`、`requiresHuman === false`、`task.title/prompt` 非空、evidence 不含 `message/decision`。
+- 自动执行仍**强制复用** `worldSuggestionAccept()`，没有另造 task 创建旁路。
+- `WorldSuggestion` 已新增 `acceptSource` 持久化字段，并通过 wire / query / serialize 打通，当前可区分：`human | system_auto`。
+- `worldSuggestionAccept()` 已兼容可选 `acceptSource` 入参：手动 accept 默认记为 `human`；auto-accept 显式写入 `system_auto`。
+- task 创建链已同步审计来源：手动 accept 保持 `triggerType: manual`，系统自动 accept 改为 `triggerType: suggestion_auto`，避免后续统计/审计把自动任务误算成人工任务。
+- App 侧已在现有 `SuggestionCard` 头部补最小来源 badge，accepted suggestion 现在可区分：`手动接受 / 自动接受 / 已接受（老数据兜底）`；非 accepted suggestion 不显示该 badge。
+- 可见性逻辑已收口到 `worldSuggestionViewModel.ts`，通过 `acceptSource + status` 统一派生展示文案，避免在多个组件里散落条件判断。
+- i18n 已补齐最小新增文案（accepted generic/manual/auto）并同步到各语言文件，未新开自治页面。
+- GoalDetail 当前无需额外实现第二套来源展示：其 suggestion 区已直接复用 `SuggestionCard`，因此会自动继承 accepted 来源 badge；本轮核对后没有继续扩散新的 helper / 组件分支。
+- 已补齐相关 TDD 回归：`worldSuggestionAutoAccept.spec.ts`、`worldSuggestionGenerate.spec.ts`、`worldSuggestionAccept.spec.ts`、`worldSuggestionQuery.spec.ts`、`worldSuggestionTypes.spec.ts`、`worldSuggestionViewModel.test.ts`；suggestion 相关 server tests 全绿，`happy-app typecheck` 通过。
+
+当前仍未做（且仍不属于这轮范围）：
+
+- autonomy dashboard / approvals / pending approvals 可视化
+- auto-safe / auto-guarded 的完整策略模型落库
+- 非 `suggested_task` 的自动执行
+- 更细的策略快照（例如为何命中白名单、命中哪条规则版本）
+- GoalDetail 之外更多二级入口的来源展示扩散
+
 
 #### F.2 最小消息协议
 
@@ -850,6 +922,15 @@ World 逐步从 Goal list 演进为：
 | 2026-04-10 | 阶段 B 中期同步：当时普通 task 已补结果上报闭环（`HAPPY_TASK_*` 注入、`/v1/tasks/result`、Goal blocker 读取任务语义摘要），但 task-scoped 窄权限 token 尚未收口（后续已于同日完成） |
 | 2026-04-09 | 阶段 A 收尾：AgentMessage 驱动的 blocker 真相源已接入 Goal list/detail，详情页补最小处理动作，Goals 列表补聚合摘要与基础筛选 |
 | 2026-04-10 | 阶段 C 实施计划定稿：3 Phase 拆解（Server 真相源 → App 展示 → Skill 可选闭环），新增 `WorldSuggestion` 模型设计、4 类输入源、3 条 generator 规则、REST/ephemeral 接口草案 |
+| 2026-04-11 | 阶段 D 最后稳定化尾项完成：`SuggestionSummary / payload` 已收成严格判别联合，wire 中的 summary 类型与 `type` 绑定 `payload` 分支，server `serializeSuggestion()` 输出严格结构，app 关键消费点已利用 `type` 自动收窄，相关 wire build / server tests / app typecheck / app tests 全绿 |
+| 2026-04-11 | 阶段 D / Phase 3 完成：Suggestion 共享契约已迁入 `happy-wire`，app/server 主要消费链已切到 wire（含 `apiWorld.ts`、`apiTypes.ts`、server 生产代码与 event builder），本地过渡层已移除；accept 写链路保持 strict validate + fail-closed；已通过 wire build、app typecheck 与 server world suggestion 相关 tests |
+| 2026-04-12 | 阶段 E / GoalDetail 复用结论已确认：Goal 详情页的 suggestion 区当前直接复用 `SuggestionCard`，因此已自动继承 accepted 来源 badge；本轮仅补充文档澄清，不新增第二套展示逻辑 |
+| 2026-04-12 | 阶段 E UI 可见性最小补强已落地：在现有 `SuggestionCard` 中增加 accepted 来源 badge，区分 `human / system_auto / legacy-null`，展示逻辑收口到 `worldSuggestionViewModel.ts`，未新增 autonomy 页面；相关 app tests 与 typecheck 通过 |
+| 2026-04-12 | 阶段 E 起手入口已落地：`worldSuggestionRefresh()` 已接入白名单 `suggested_task` 自动 accept，默认关闭、project 级显式开启、强制复用 `worldSuggestionAccept()`；同时补齐 `WorldSuggestion.acceptSource`（`human | system_auto`）与 `triggerType: suggestion_auto` 审计链路，query / serialize 已可返回来源，相关 suggestion tests 41 项全绿，app typecheck 通过 |
+| 2026-04-11 | 阶段 E 入口定稿：下一步不从 autonomy dashboard 或完整策略系统起手，而是只对白名单内低风险 `suggested_task` 做自动 accept，并强制复用既有 `worldSuggestionAccept()` 链路；默认关闭、project 级显式开启、必须可追溯 |
+
+| 2026-04-11 | 阶段 D / Phase 2 完成：server 内已完成 Suggestion 可导出共享契约边界整理——新增 `worldSuggestionContract.ts` 纯 contract 层，纯 schema/类型与 server-only helper 分层，happy-server build 通过，相关 routes/modules/tests 已切到 contract 层消费纯定义 |
+| 2026-04-11 | 阶段 D 进度核对修正：`WorldSuggestion.bucket` 已作为稳定字段入库并在 query 路径补回填修正；文档不再将其表述为“尚未持久化”。当前剩余收尾聚焦 `payload` 判别联合进一步收口与 shared schema 单一来源化 |
 | 2026-04-11 | 阶段 D 进入收尾：WorldOverview 三分桶建议流、GoalDetail suggestion、`goalId / bucket` 查询、bucket 查询语义修复、Suggestion 类型联合收紧与 requires_action queued marker 补洞已落地；当前剩余 bucket 持久化、payload 判别联合、shared schema 收口 |
 
 （后续每一轮活化：在此表追加一行，并勾选上方清单。）
@@ -920,9 +1001,32 @@ World 逐步从 Goal list 演进为：
 - WorldOverview 中的 `Suggested Next Steps`
 - suggestion 的 evidence / reason 展示与实时收口
 
+### 阶段 E：受限自治执行（已落地最小入口）
+
+关键落点：
+
+- `packages/happy-server/sources/modules/worldSuggestionGenerate.ts:92`
+- `packages/happy-server/sources/modules/worldSuggestionAutoAccept.ts:25`
+- `packages/happy-server/sources/modules/worldSuggestionAccept.ts:137`
+- `packages/happy-server/sources/modules/worldSuggestionQuery.ts:14`
+- `packages/happy-server/sources/modules/worldSuggestionTypes.ts:11`
+- `packages/happy-wire/src/worldSuggestion.ts:11`
+- `packages/happy-app/sources/components/project/worldSuggestionViewModel.ts:59`
+- `packages/happy-app/sources/components/project/SuggestionCard.tsx:19`
+- `packages/happy-app/sources/app/(app)/project/[id]/goal/[goalId].tsx:231`
+
+已实现：
+
+- `worldSuggestionRefresh()` 在生成后只对**本轮新建** suggestion 触发 auto-accept 评估
+- `worldSuggestionAutoAccept.ts` 负责 project 级显式开关与白名单低风险 `suggested_task` 判定
+- auto-accept 强制复用 `worldSuggestionAccept()`，并显式写入 `acceptSource: system_auto`
+- `worldSuggestionAccept()` 按来源区分 `triggerType: manual | suggestion_auto`，同时把 `acceptSource` 持久化到 `WorldSuggestion`
+- query / serialize / wire contract 已可返回 `acceptSource`
+- App 侧通过 `worldSuggestionViewModel.ts` 统一派生 accepted 来源文案，`SuggestionCard` 展示来源 badge
+- GoalDetail 的 suggestion 区直接复用 `SuggestionCard`，因此自动继承来源 badge，无需第二套展示逻辑
+
 ### 最终判定
 
 当前 World Model Activation 应表述为：
 
-> **阶段 A/B/C 已完成，实现了 Goal 驱动、Task 结果回写、Suggestion 提议闭环；阶段 D-H 仍为自治演进规划。**
-
+> **阶段 A/B/C 已完成；阶段 D 已完成契约与稳定化收口；阶段 E 已落地最小自动 accept 入口、基础审计链路与最小 UI 可见性，但完整自治策略、审批面板与可视化仍未开始；阶段 F-H 仍属规划。**

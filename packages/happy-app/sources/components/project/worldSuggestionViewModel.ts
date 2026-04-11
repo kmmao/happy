@@ -39,15 +39,15 @@ export function getSuggestionTypeConfig(type: SuggestionType): { icon: string; c
 
 export function getSuggestionPayloadTitle(suggestion: SuggestionSummary): string {
     if (suggestion.type === "suggested_goal") {
-        return "goal" in suggestion.payload ? suggestion.payload.goal.title : suggestion.title;
+        return suggestion.payload.goal.title;
     }
     if (suggestion.type === "suggested_task") {
-        return "task" in suggestion.payload ? suggestion.payload.task.title : suggestion.title;
+        return suggestion.payload.task.title;
     }
     if (suggestion.type === "suggested_skill") {
-        return "skill" in suggestion.payload ? suggestion.payload.skill.title : suggestion.title;
+        return suggestion.payload.skill.title;
     }
-    return "decision" in suggestion.payload ? suggestion.payload.decision.question : suggestion.title;
+    return suggestion.payload.decision.question;
 }
 
 export function getSuggestionTypeLabelKey(type: SuggestionType): TranslationKey {
@@ -55,6 +55,19 @@ export function getSuggestionTypeLabelKey(type: SuggestionType): TranslationKey 
     if (type === "suggested_skill") return "suggestions.typeSkill";
     if (type === "suggested_decision") return "suggestions.typeDecision";
     return "suggestions.typeTask";
+}
+
+export function getSuggestionAcceptanceLabelKey(suggestion: SuggestionSummary): TranslationKey | null {
+    if (suggestion.status !== "accepted") {
+        return null;
+    }
+    if (suggestion.acceptSource === "system_auto") {
+        return "suggestions.acceptedAuto";
+    }
+    if (suggestion.acceptSource === "human") {
+        return "suggestions.acceptedManual";
+    }
+    return "suggestions.acceptedGeneric";
 }
 
 export function applySuggestionStatusUpdate<T extends SuggestionLike>(

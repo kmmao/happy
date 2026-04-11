@@ -3935,6 +3935,9 @@ export const en = {
     acceptConfirmBody: ({ type, title }: { type: string; title: string }) =>
       `This will create a new ${type}: "${title}". Continue?`,
     accepted: "Suggestion accepted",
+    acceptedGeneric: "Accepted",
+    acceptedManual: "Manually accepted",
+    acceptedAuto: "Auto-accepted",
     dismissed: "Suggestion dismissed",
     evidence: "Based on",
     recommendedRole: "Recommended role",

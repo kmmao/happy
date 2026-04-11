@@ -18,7 +18,7 @@ const {
             update: vi.fn(async () => ({})),
         },
         task: {
-            create: vi.fn(async ({ data }: any) => ({ id: "task-1", priority: data.priority })),
+            create: vi.fn(async ({ data }: any) => ({ id: "task-1", priority: data.priority, triggerType: data.triggerType })),
             update: vi.fn(async () => ({})),
         },
         skill: {
@@ -48,6 +48,7 @@ const {
                 }),
                 relatedGoalId: null,
                 status: "open",
+                acceptSource: null,
             })),
             update: vi.fn(async () => ({})),
         },
@@ -98,6 +99,7 @@ describe("worldSuggestionAccept", () => {
             }),
             relatedGoalId: null,
             status: "open",
+            acceptSource: null,
         });
         goalCreate.mockRejectedValueOnce(new Error("planner unavailable"));
 
@@ -109,7 +111,7 @@ describe("worldSuggestionAccept", () => {
 
         expect(tx.worldSuggestion.update).toHaveBeenCalledWith({
             where: { id: "suggestion-goal-1" },
-            data: { status: "processing", actedAt: expect.any(Date) },
+            data: { status: "processing", actedAt: expect.any(Date), acceptSource: "human" },
         });
         expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
             where: { id: "suggestion-goal-1" },
@@ -137,7 +139,44 @@ describe("worldSuggestionAccept", () => {
         }));
     });
 
-    it("falls back to type-safe goal payload when stored goal payload mismatches", async () => {
+    it("marks manual accepts with human audit source and manual trigger type", async () => {
+        await worldSuggestionAccept({
+            accountId: "user-1",
+            projectId: "project-1",
+            suggestionId: "suggestion-1",
+        });
+
+        expect(tx.task.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                triggerType: "manual",
+            }),
+        });
+        expect(tx.worldSuggestion.update).toHaveBeenCalledWith({
+            where: { id: "suggestion-1" },
+            data: { status: "accepted", actedAt: expect.any(Date), acceptSource: "human" },
+        });
+    });
+
+    it("marks auto-accepts with system audit source and suggestion_auto trigger type", async () => {
+        await worldSuggestionAccept({
+            accountId: "user-1",
+            projectId: "project-1",
+            suggestionId: "suggestion-1",
+            acceptSource: "system_auto",
+        });
+
+        expect(tx.task.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                triggerType: "suggestion_auto",
+            }),
+        });
+        expect(tx.worldSuggestion.update).toHaveBeenCalledWith({
+            where: { id: "suggestion-1" },
+            data: { status: "accepted", actedAt: expect.any(Date), acceptSource: "system_auto" },
+        });
+    });
+
+    it("rejects suggested_goal when stored payload does not match goal branch", async () => {
         dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
             id: "suggestion-goal-fallback",
             type: "suggested_goal",
@@ -150,18 +189,37 @@ describe("worldSuggestionAccept", () => {
             }),
             relatedGoalId: null,
             status: "open",
+            acceptSource: null,
         });
 
-        const result = await worldSuggestionAccept({
+        await expect(worldSuggestionAccept({
             accountId: "user-1",
             projectId: "project-1",
             suggestionId: "suggestion-goal-fallback",
+        })).rejects.toThrow("Suggestion payload does not match suggestion type");
+    });
+
+
+    it("rejects suggested_task when stored payload does not match task branch", async () => {
+        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
+            id: "suggestion-task-invalid",
+            type: "suggested_task",
+            title: "Recovered task title",
+            payload: JSON.stringify({
+                goal: {
+                    title: "Wrong goal payload",
+                },
+            }),
+            relatedGoalId: null,
+            status: "open",
+            acceptSource: null,
         });
 
-        expect(goalCreate).toHaveBeenCalledWith(expect.objectContaining({
-            title: "Recovered goal title",
-        }));
-        expect(result.createdEntityType).toBe("goal");
+        await expect(worldSuggestionAccept({
+            accountId: "user-1",
+            projectId: "project-1",
+            suggestionId: "suggestion-task-invalid",
+        })).rejects.toThrow("Suggestion payload does not match suggestion type");
     });
 
     it("accepts suggested_decision when existing decision is still pending", async () => {
@@ -181,6 +239,7 @@ describe("worldSuggestionAccept", () => {
             }),
             relatedGoalId: null,
             status: "open",
+            acceptSource: null,
         });
         tx.decision.findFirst.mockResolvedValueOnce({ id: "decision-2", status: "pending" });
 
@@ -214,6 +273,7 @@ describe("worldSuggestionAccept", () => {
             }),
             relatedGoalId: null,
             status: "open",
+            acceptSource: null,
         });
         tx.decision.findFirst.mockResolvedValueOnce(null);
 

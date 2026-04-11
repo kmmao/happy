@@ -17,7 +17,8 @@ import {
     normalizeConcreteImplementationSummary,
     normalizeSuggestionFactText,
 } from "./summaryDetailFilter";
-import type { SuggestionEvidence, SuggestionPayload, SuggestionType } from "./worldSuggestionTypes";
+import { autoAcceptSuggestedTasksIfEnabled } from "./worldSuggestionAutoAccept";
+import type { SuggestionBucket, SuggestionEvidence, SuggestionPayload, SuggestionSummary, SuggestionType } from "@kmmao/happy-wire";
 
 interface FailedTaskFact {
     id: string;
@@ -62,7 +63,7 @@ export interface SuggestionCandidate {
     recommendedRole: string | null;
     payload: SuggestionPayload;
     requiresHuman: boolean;
-    bucket: "next_step" | "needs_decision" | "needs_human_input";
+    bucket: SuggestionBucket;
     dedupeKey: string;
     factKey: string;
 }
@@ -92,6 +93,11 @@ export async function worldSuggestionRefresh(
     accountId: string,
     projectId: string,
 ): Promise<RefreshResult> {
+    const project = await db.project.findUnique({
+        where: { id: projectId },
+        select: { supervisorConfig: true },
+    });
+
     const staleProcessingRows = await db.worldSuggestion.findMany({
         where: {
             accountId,
@@ -178,6 +184,8 @@ export async function worldSuggestionRefresh(
         }
     }
 
+    const createdSuggestions: SuggestionSummary[] = [];
+
     for (const candidate of reconcile.toCreate) {
         const created = await db.worldSuggestion.create({
             data: {
@@ -198,6 +206,26 @@ export async function worldSuggestionRefresh(
             },
         });
 
+        createdSuggestions.push({
+            id: created.id,
+            projectId,
+            relatedGoalId: candidate.relatedGoalId,
+            relatedTaskId: candidate.relatedTaskId,
+            type: candidate.type,
+            title: candidate.title,
+            summary: candidate.summary,
+            reason: candidate.reason,
+            evidence: candidate.evidence,
+            recommendedRole: candidate.recommendedRole,
+            payload: candidate.payload,
+            requiresHuman: candidate.requiresHuman,
+            status: "open",
+            dedupeKey: candidate.dedupeKey,
+            bucket: candidate.bucket,
+            createdAt: Date.now(),
+            actedAt: null,
+        } as SuggestionSummary);
+
         eventRouter.emitEphemeral({
             userId: accountId,
             payload: buildWorldSuggestionUpdatedEphemeral({
@@ -208,6 +236,13 @@ export async function worldSuggestionRefresh(
             recipientFilter: { type: "user-scoped-only" },
         });
     }
+
+    await autoAcceptSuggestedTasksIfEnabled({
+        accountId,
+        projectId,
+        supervisorConfig: project?.supervisorConfig ?? null,
+        suggestions: createdSuggestions,
+    });
 
     const total = await db.worldSuggestion.count({
         where: { projectId, accountId, status: "open" },

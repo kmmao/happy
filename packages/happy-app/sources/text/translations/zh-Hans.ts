@@ -3781,6 +3781,9 @@ export const zhHans: TranslationStructure = {
     acceptConfirmBody: ({ type, title }: { type: string; title: string }) =>
       `这将创建一个新的${type}："${title}"。继续？`,
     accepted: "建议已接受",
+    acceptedGeneric: "已接受",
+    acceptedManual: "手动接受",
+    acceptedAuto: "自动接受",
     dismissed: "建议已忽略",
     evidence: "依据",
     recommendedRole: "推荐角色",

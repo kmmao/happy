@@ -17,10 +17,12 @@ const { dbMock, state, resetState } = vi.hoisted(() => {
                         .filter((row) => row.accountId === args.where.accountId)
                         .filter((row) => row.projectId === args.where.projectId)
                         .filter((row) => !args.where.status?.in || args.where.status.in.includes(row.status))
+                        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
                         .slice(0, args.take ?? state.suggestions.length)
                         .map((row) => ({
                             id: row.id,
                             type: row.type,
+                            title: row.title,
                             payload: row.payload,
                             evidence: row.evidence,
                             requiresHuman: row.requiresHuman,
@@ -81,6 +83,7 @@ describe("worldSuggestionQuery", () => {
                 bucket: "next_step",
                 createdAt: new Date("2026-04-10T10:00:00Z"),
                 actedAt: null,
+                acceptSource: null,
             },
         ];
 
@@ -96,4 +99,86 @@ describe("worldSuggestionQuery", () => {
         expect(result.map((item) => item.id)).toEqual(["sug-1"]);
         expect(result[0]?.bucket).toBe("needs_decision");
     });
+
+    it("derives bucket from normalized payload instead of stale raw branch", async () => {
+        state.suggestions = [
+            {
+                id: "sug-raw-mismatch",
+                accountId: "user-1",
+                projectId: "project-1",
+                relatedGoalId: null,
+                relatedTaskId: null,
+                type: "suggested_goal",
+                title: "Recovered goal",
+                summary: "Recovered goal",
+                reason: "Recovered goal",
+                evidence: "[]",
+                recommendedRole: null,
+                payload: JSON.stringify({
+                    decision: { question: "Wrong branch", options: [{ id: "a", description: "A" }, { id: "b", description: "B" }] },
+                }),
+                requiresHuman: true,
+                status: "open",
+                dedupeKey: "dedupe:2",
+                bucket: "needs_decision",
+                createdAt: new Date("2026-04-10T11:00:00Z"),
+                actedAt: null,
+                acceptSource: null,
+            },
+        ];
+
+        const result = await worldSuggestionQuery("user-1", "project-1", {
+            status: "open",
+            bucket: "needs_human_input",
+        });
+
+        expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
+            where: { id: "sug-raw-mismatch" },
+            data: { bucket: "needs_human_input" },
+        });
+        expect(result.map((item) => item.id)).toEqual(["sug-raw-mismatch"]);
+        expect(result[0]?.type).toBe("suggested_goal");
+        expect(result[0]?.bucket).toBe("needs_human_input");
+        expect(result[0]?.payload).toEqual({ goal: { title: "Recovered goal" } });
+    });
+
+    it("returns accept source in serialized suggestions", async () => {
+        state.suggestions = [
+            {
+                id: "sug-auto-1",
+                accountId: "user-1",
+                projectId: "project-1",
+                relatedGoalId: null,
+                relatedTaskId: "task-1",
+                type: "suggested_task",
+                title: "Retry failed API",
+                summary: "summary",
+                reason: "reason",
+                evidence: "[]",
+                recommendedRole: "builder",
+                payload: JSON.stringify({
+                    task: { title: "Retry failed API", prompt: "Inspect retry logic", priority: "user" },
+                }),
+                requiresHuman: false,
+                status: "accepted",
+                dedupeKey: "dedupe:auto-1",
+                bucket: "next_step",
+                createdAt: new Date("2026-04-10T12:00:00Z"),
+                actedAt: new Date("2026-04-10T12:05:00Z"),
+                acceptSource: "system_auto",
+            },
+        ];
+
+        const result = await worldSuggestionQuery("user-1", "project-1", {
+            status: "accepted",
+        });
+
+        expect(result).toEqual([
+            expect.objectContaining({
+                id: "sug-auto-1",
+                acceptSource: "system_auto",
+            }),
+        ]);
+    });
 });
+

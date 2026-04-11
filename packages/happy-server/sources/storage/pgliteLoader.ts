@@ -2,7 +2,8 @@ import { PGlite } from "@electric-sql/pglite";
 import * as fs from "fs";
 import * as path from "path";
 
-type WebAssemblyModuleCtor = new (bytes: Buffer) => WebAssembly.Module;
+type WasmModule = object;
+type WebAssemblyModuleCtor = new (bytes: Buffer) => WasmModule;
 
 function getWebAssemblyModuleCtor(): WebAssemblyModuleCtor | null {
     const moduleCtor = (globalThis as { WebAssembly?: { Module?: unknown } }).WebAssembly?.Module;
@@ -11,7 +12,7 @@ function getWebAssemblyModuleCtor(): WebAssemblyModuleCtor | null {
         : null;
 }
 
-function findWasmFiles(): { wasmModule: WebAssembly.Module; fsBundle: Blob } | null {
+function findWasmFiles(): { wasmModule: WasmModule; fsBundle: Blob } | null {
     const wasmModuleCtor = getWebAssemblyModuleCtor();
     if (!wasmModuleCtor) {
         return null;
@@ -36,7 +37,7 @@ function findWasmFiles(): { wasmModule: WebAssembly.Module; fsBundle: Blob } | n
 export function createPGlite(dataDir: string): PGlite {
     const wasmOpts = findWasmFiles();
     if (wasmOpts) {
-        return new PGlite({ dataDir, ...wasmOpts });
+        return new PGlite({ dataDir, ...(wasmOpts as any) });
     }
     return new PGlite(dataDir);
 }

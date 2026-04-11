@@ -3892,6 +3892,9 @@ export const ru: TranslationStructure = {
     acceptConfirmBody: ({ type, title }: { type: string; title: string }) =>
       `Будет создан новый ${type}: "${title}". Продолжить?`,
     accepted: "Предложение принято",
+    acceptedGeneric: "Принято",
+    acceptedManual: "Принято вручную",
+    acceptedAuto: "Принято автоматически",
     dismissed: "Предложение отклонено",
     evidence: "На основе",
     recommendedRole: "Рекомендуемая роль",

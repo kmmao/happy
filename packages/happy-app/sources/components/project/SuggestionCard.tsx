@@ -5,7 +5,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { type SuggestionSummary } from "@/sync/apiWorld";
-import { getSuggestionTypeConfig, getSuggestionTypeLabelKey } from "./worldSuggestionViewModel";
+import {
+    getSuggestionAcceptanceLabelKey,
+    getSuggestionTypeConfig,
+    getSuggestionTypeLabelKey,
+} from "./worldSuggestionViewModel";
 
 interface SuggestionCardProps {
     suggestion: SuggestionSummary;
@@ -20,6 +24,7 @@ export const SuggestionCard = React.memo(function SuggestionCard({
 }: SuggestionCardProps) {
     const config = getSuggestionTypeConfig(suggestion.type);
     const typeLabel = t(getSuggestionTypeLabelKey(suggestion.type));
+    const acceptanceLabelKey = getSuggestionAcceptanceLabelKey(suggestion);
 
     return (
         <View style={styles.card}>
@@ -29,10 +34,19 @@ export const SuggestionCard = React.memo(function SuggestionCard({
                 <View style={styles.headerText}>
                     <Text style={styles.title} numberOfLines={2}>{suggestion.title}</Text>
                 </View>
-                <View style={[styles.typeBadge, { backgroundColor: config.color + "20" }]}>
-                    <Text style={[styles.typeBadgeText, { color: config.color }]}>
-                        {typeLabel}
-                    </Text>
+                <View style={styles.badgesColumn}>
+                    <View style={[styles.typeBadge, { backgroundColor: config.color + "20" }]}>
+                        <Text style={[styles.typeBadgeText, { color: config.color }]}>
+                            {typeLabel}
+                        </Text>
+                    </View>
+                    {acceptanceLabelKey ? (
+                        <View style={styles.acceptanceBadge}>
+                            <Text style={styles.acceptanceBadgeText}>
+                                {t(acceptanceLabelKey)}
+                            </Text>
+                        </View>
+                    ) : null}
                 </View>
             </View>
 
@@ -100,6 +114,10 @@ const styles = StyleSheet.create((theme) => ({
     headerText: {
         flex: 1,
     },
+    badgesColumn: {
+        alignItems: "flex-end" as const,
+        gap: 6,
+    },
     title: {
         ...Typography.default("semiBold"),
         fontSize: 14,
@@ -114,6 +132,17 @@ const styles = StyleSheet.create((theme) => ({
     typeBadgeText: {
         ...Typography.default("semiBold"),
         fontSize: 11,
+    },
+    acceptanceBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+        backgroundColor: "rgba(107, 114, 128, 0.12)",
+    },
+    acceptanceBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 11,
+        color: theme.colors.textSecondary,
     },
     summary: {
         ...Typography.default(),

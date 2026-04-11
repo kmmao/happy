@@ -9,11 +9,9 @@ import { worldSuggestionQuery } from "@/modules/worldSuggestionQuery";
 import { worldSuggestionRefresh } from "@/modules/worldSuggestionGenerate";
 import { worldSuggestionAccept } from "@/modules/worldSuggestionAccept";
 import { worldSuggestionDismiss } from "@/modules/worldSuggestionDismiss";
-import { AcceptBodySchema, SUGGESTION_BUCKETS } from "@/modules/worldSuggestionTypes";
+import { AcceptBodySchema, SUGGESTION_BUCKETS, SUGGESTION_STATUSES, type AcceptBody } from "@kmmao/happy-wire";
 
 export function worldSuggestionRoutes(app: Fastify) {
-
-    // GET /v1/projects/:id/world/suggestions — list open suggestions
     app.get(
         "/v1/projects/:id/world/suggestions",
         {
@@ -21,7 +19,7 @@ export function worldSuggestionRoutes(app: Fastify) {
             schema: {
                 params: z.object({ id: z.string() }),
                 querystring: z.object({
-                    status: z.enum(["open", "processing", "accepted", "suspended", "dismissed", "expired"]).default("open"),
+                    status: z.enum(SUGGESTION_STATUSES).default("open"),
                     limit: z.coerce.number().int().min(1).max(100).default(50),
                     goalId: z.string().optional(),
                     bucket: z.enum(SUGGESTION_BUCKETS).optional(),
@@ -51,7 +49,6 @@ export function worldSuggestionRoutes(app: Fastify) {
         },
     );
 
-    // POST /v1/projects/:id/world/suggestions/refresh — regenerate from fact sources
     app.post(
         "/v1/projects/:id/world/suggestions/refresh",
         {
@@ -77,7 +74,6 @@ export function worldSuggestionRoutes(app: Fastify) {
         },
     );
 
-    // POST /v1/projects/:id/world/suggestions/:suggestionId/accept
     app.post(
         "/v1/projects/:id/world/suggestions/:suggestionId/accept",
         {
@@ -94,6 +90,7 @@ export function worldSuggestionRoutes(app: Fastify) {
             const userId = request.userId;
             const projectId = request.params.id;
             const { suggestionId } = request.params;
+            const body = request.body as AcceptBody;
 
             const project = await db.project.findFirst({
                 where: { id: projectId, accountId: userId },
@@ -108,9 +105,9 @@ export function worldSuggestionRoutes(app: Fastify) {
                     accountId: userId,
                     projectId,
                     suggestionId,
-                    machineId: request.body.machineId,
-                    priorityOverride: request.body.priorityOverride,
-                    roleOverride: request.body.roleOverride,
+                    machineId: body.machineId,
+                    priorityOverride: body.priorityOverride,
+                    roleOverride: body.roleOverride,
                 });
                 return reply.send(result);
             } catch (e: any) {
@@ -119,7 +116,6 @@ export function worldSuggestionRoutes(app: Fastify) {
         },
     );
 
-    // POST /v1/projects/:id/world/suggestions/:suggestionId/dismiss
     app.post(
         "/v1/projects/:id/world/suggestions/:suggestionId/dismiss",
         {

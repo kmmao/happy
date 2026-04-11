@@ -3872,6 +3872,9 @@ export const it: TranslationStructure = {
     acceptConfirmBody: ({ type, title }: { type: string; title: string }) =>
       `Questo creerà un nuovo ${type}: "${title}". Continuare?`,
     accepted: "Suggerimento accettato",
+    acceptedGeneric: "Accettato",
+    acceptedManual: "Accettato manualmente",
+    acceptedAuto: "Accettato automaticamente",
     dismissed: "Suggerimento ignorato",
     evidence: "Basato su",
     recommendedRole: "Ruolo consigliato",

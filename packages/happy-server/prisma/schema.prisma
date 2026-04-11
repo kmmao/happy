@@ -1181,6 +1181,7 @@ model WorldSuggestion {
     status          String    @default("open") // open | processing | accepted | suspended | dismissed | expired
     dedupeKey       String
     bucket          String    @default("next_step") // next_step | needs_decision | needs_human_input
+    acceptSource    String?   // human | system_auto
     actedAt         DateTime?
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt

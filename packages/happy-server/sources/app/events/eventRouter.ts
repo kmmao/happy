@@ -3,7 +3,8 @@ import { log } from "@/utils/log";
 import { GitHubProfile } from "@/app/api/types";
 import { AccountProfile } from "@/types";
 import { getPublicUrl } from "@/storage/files";
-import type { SessionMessageContent } from "@kmmao/happy-wire";
+import type { SessionMessageContent, WorldSuggestionUpdated } from "@kmmao/happy-wire";
+
 import * as privacyKit from "privacy-kit";
 
 // === CONNECTION TYPES ===
@@ -1268,11 +1269,7 @@ export function buildAgentMessageEphemeral(opts: {
   };
 }
 
-export function buildWorldSuggestionUpdatedEphemeral(opts: {
-  projectId: string;
-  suggestionId: string;
-  status: string;
-}): EphemeralPayload {
+export function buildWorldSuggestionUpdatedEphemeral(opts: Omit<WorldSuggestionUpdated, "type">): WorldSuggestionUpdated {
   return {
     type: "world-suggestion-updated",
     ...opts,

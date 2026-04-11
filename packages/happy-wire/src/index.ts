@@ -9,3 +9,4 @@ export * from './skills';
 export * from './inbox';
 export * from './sessionEvents';
 export * from './terminal';
+export * from './worldSuggestion';

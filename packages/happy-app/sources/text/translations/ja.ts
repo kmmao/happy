@@ -3850,6 +3850,9 @@ export const ja: TranslationStructure = {
     acceptConfirmBody: ({ type, title }: { type: string; title: string }) =>
       `新しい${type}「${title}」を作成します。続行しますか？`,
     accepted: "提案を承認しました",
+    acceptedGeneric: "承認済み",
+    acceptedManual: "手動承認",
+    acceptedAuto: "自動承認",
     dismissed: "提案を却下しました",
     evidence: "根拠",
     recommendedRole: "推奨ロール",

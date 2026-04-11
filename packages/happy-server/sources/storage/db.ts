@@ -6,7 +6,8 @@ import * as path from "path";
 
 let pgliteInstance: PGlite | null = null;
 
-type WebAssemblyModuleCtor = new (bytes: Buffer) => WebAssembly.Module;
+type WasmModule = object;
+type WebAssemblyModuleCtor = new (bytes: Buffer) => WasmModule;
 
 function getWebAssemblyModuleCtor(): WebAssemblyModuleCtor | null {
     const moduleCtor = (globalThis as { WebAssembly?: { Module?: unknown } }).WebAssembly?.Module;
@@ -15,7 +16,7 @@ function getWebAssemblyModuleCtor(): WebAssemblyModuleCtor | null {
         : null;
 }
 
-function findPGliteWasm(): { wasmModule: WebAssembly.Module; fsBundle: Blob } | null {
+function findPGliteWasm(): { wasmModule: WasmModule; fsBundle: Blob } | null {
     const wasmModuleCtor = getWebAssemblyModuleCtor();
     if (!wasmModuleCtor) {
         return null;
@@ -41,7 +42,7 @@ function createClient(): PrismaClient {
     if (pgliteDir) {
         const wasmOpts = findPGliteWasm();
         if (wasmOpts) {
-            pgliteInstance = new PGlite({ dataDir: pgliteDir, ...wasmOpts });
+            pgliteInstance = new PGlite({ dataDir: pgliteDir, ...(wasmOpts as any) });
         } else {
             pgliteInstance = new PGlite(pgliteDir);
         }
