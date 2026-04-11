@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { formatApiRetryStatus, getSessionSubtitle, formatPathRelativeToHome } from './sessionUtils';
+import { formatApiRetryStatus, getSessionStatusState, getSessionSubtitle, formatPathRelativeToHome, isSessionRunning } from './sessionUtils';
 import { Session } from '@/sync/storageTypes';
 
 // Mock @/text to return deterministic translations for tests
@@ -132,6 +132,72 @@ describe('sessionUtils', () => {
 
         it('returns ~ for exact home dir match', () => {
             expect(formatPathRelativeToHome('/home/user', '/home/user')).toBe('~');
+        });
+    });
+
+    describe('isSessionRunning', () => {
+        it('uses sdkSessionState as the authoritative running signal', () => {
+            const session = createSession({
+                thinking: true,
+                sdkSessionState: 'requires_action',
+            });
+
+            expect(isSessionRunning(session)).toBe(false);
+        });
+
+        it('returns true when sdkSessionState is running even if legacy thinking is false', () => {
+            const session = createSession({
+                thinking: false,
+                sdkSessionState: 'running',
+            });
+
+            expect(isSessionRunning(session)).toBe(true);
+        });
+
+        it('falls back to legacy thinking when sdkSessionState is unavailable', () => {
+            const session = createSession({
+                thinking: true,
+                sdkSessionState: null,
+            });
+
+            expect(isSessionRunning(session)).toBe(true);
+        });
+    });
+
+    describe('getSessionStatusState', () => {
+        it('returns thinking for sdk running even when legacy thinking is false', () => {
+            const session = createSession({
+                thinking: false,
+                sdkSessionState: 'running',
+            });
+
+            expect(getSessionStatusState(session)).toBe('thinking');
+        });
+
+        it('returns needs_attention for requires_action even when legacy thinking is true', () => {
+            const session = createSession({
+                thinking: true,
+                sdkSessionState: 'requires_action',
+            });
+
+            expect(getSessionStatusState(session)).toBe('needs_attention');
+        });
+
+        it('keeps permission_required ahead of requires_action', () => {
+            const session = createSession({
+                sdkSessionState: 'requires_action',
+                agentState: {
+                    requests: {
+                        request1: {
+                            tool: 'Bash',
+                            arguments: {},
+                            createdAt: Date.now(),
+                        },
+                    },
+                },
+            } as Partial<Session>);
+
+            expect(getSessionStatusState(session)).toBe('permission_required');
         });
     });
 });

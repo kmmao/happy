@@ -77,6 +77,7 @@ import {
   getSessionAvatarId,
   getSessionName,
   getSessionProviderKey,
+  isSessionRunning,
   useSessionStatus,
 } from "@/utils/sessionUtils";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
@@ -285,7 +286,7 @@ export const SessionView = React.memo((props: { id: string }) => {
         )
       : undefined;
     const subtitle =
-      showAgentActivity && session.thinking
+      showAgentActivity && isSessionRunning(session)
         ? t("tools.taskView.agentThinking")
         : pathSubtitle;
 
@@ -668,15 +669,50 @@ function SessionViewInner({
   const sessionStatus = useSessionStatus(session);
   const sessionUsage = useSessionUsage(sessionId);
   const contextUsage = useSessionContextUsage(sessionId);
+  const isRunning = isSessionRunning(session);
+  const requiresAction = session.sdkSessionState === "requires_action";
 
-  // Clear queued message markers when AI finishes thinking
-  const prevThinkingRef = React.useRef(session.thinking);
+  const sessionStateLogKey = React.useMemo(() => JSON.stringify({
+    sdkSessionState: session.sdkSessionState ?? null,
+    thinking: session.thinking === true,
+    needsAttention: session.needsAttention === true,
+    hasPermissionRequests: Boolean(
+      session.agentState?.requests && Object.keys(session.agentState.requests).length > 0,
+    ),
+    hasElicitation: session.agentState?.elicitation != null,
+    statusState: sessionStatus.state,
+    isRunning,
+    requiresAction,
+  }), [
+    isRunning,
+    requiresAction,
+    session.agentState?.elicitation,
+    session.agentState?.requests,
+    session.needsAttention,
+    session.sdkSessionState,
+    session.thinking,
+    sessionStatus.state,
+  ]);
+
+  const prevSessionStateLogKeyRef = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (prevThinkingRef.current && !session.thinking) {
+    if (prevSessionStateLogKeyRef.current === sessionStateLogKey) {
+      return;
+    }
+    prevSessionStateLogKeyRef.current = sessionStateLogKey;
+    if (__DEV__) {
+      log.log("[session-state]", sessionId, sessionStateLogKey);
+    }
+  }, [sessionId, sessionStateLogKey]);
+
+  // Clear queued message markers when AI finishes running.
+  const prevRunningRef = React.useRef(isRunning);
+  React.useEffect(() => {
+    if (prevRunningRef.current && !isRunning) {
       storage.getState().clearQueuedMessageIds(sessionId);
     }
-    prevThinkingRef.current = session.thinking;
-  }, [session.thinking, sessionId]);
+    prevRunningRef.current = isRunning;
+  }, [isRunning, sessionId]);
   const promptSuggestion = usePromptSuggestion(sessionId);
   const needsContinue = useNeedsContinue(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
@@ -822,7 +858,7 @@ function SessionViewInner({
     hasMessages: messages.length > 0,
     promptSuggestion,
     needsContinue,
-    requiresAction: session.sdkSessionState === "requires_action",
+    requiresAction,
     isSttListening: false,
     hasPendingImages: pendingImagePaths.length > 0,
   });
@@ -981,9 +1017,9 @@ function SessionViewInner({
   // the "Turn started" message arrives through the message stream).
   const reducerTurnStart = usageSource?.currentTurnStartedAt;
   const fallbackTurnStartRef = React.useRef<number | undefined>(undefined);
-  if (session.thinking && !reducerTurnStart && !fallbackTurnStartRef.current) {
+  if (isRunning && !reducerTurnStart && !fallbackTurnStartRef.current) {
     fallbackTurnStartRef.current = Date.now();
-  } else if (!session.thinking || reducerTurnStart) {
+  } else if (!isRunning || reducerTurnStart) {
     fallbackTurnStartRef.current = undefined;
   }
   const turnStartedAt = reducerTurnStart ?? fallbackTurnStartRef.current;
@@ -1026,7 +1062,7 @@ function SessionViewInner({
       modelCode: effectiveModelCode,
       totalDurationMs: usageSource?.totalDurationMs,
       completedTurnsDurationMs: usageSource?.completedTurnsDurationMs,
-      isThinking: session.thinking === true,
+      isThinking: isRunning,
       turnStartedAt,
     }),
     [
@@ -1040,7 +1076,7 @@ function SessionViewInner({
       modelMode?.name,
       usageSource,
       alwaysShowContextSize,
-      session.thinking,
+      isRunning,
       turnStartedAt,
     ],
   );
@@ -1267,11 +1303,11 @@ function SessionViewInner({
         onContinuePress={() => {
           sync.sendMessage(sessionId, "", undefined, { continue: true });
         }}
-        requiresAction={session.sdkSessionState === "requires_action"}
+        requiresAction={requiresAction}
         onRequiresActionPress={handleRequiresActionPress}
         totalDurationMs={usageSource?.totalDurationMs}
         completedTurnsDurationMs={usageSource?.completedTurnsDurationMs}
-        isThinking={session.thinking === true}
+        isThinking={isRunning}
         turnStartedAt={turnStartedAt}
       />
       </View>

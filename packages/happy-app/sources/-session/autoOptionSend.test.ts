@@ -4,7 +4,6 @@ import {
   buildOptionsHash,
   createInitialAutoOptionSendState,
   getRecommendedOptionIndex,
-  PURE_VIEW_ONLY_OPTION_PATTERNS,
   reduceAutoOptionSendEvent,
   type AutoOptionSendContext,
 } from "./autoOptionSend";
@@ -73,20 +72,52 @@ describe("autoOptionSend", () => {
     expect(next.candidate?.recommendedText).toBe("继续修 token");
   });
 
-  it("纯查看型词表可配置且驱动推荐判定", () => {
-    expect(PURE_VIEW_ONLY_OPTION_PATTERNS).toEqual([
-      "查看 diff",
-      "看日志",
-      "浏览输出",
-    ]);
-    expect(getRecommendedOptionIndex([PURE_VIEW_ONLY_OPTION_PATTERNS[0], "继续修 token"])).toBeNull();
-    expect(getRecommendedOptionIndex([PURE_VIEW_ONLY_OPTION_PATTERNS[1], "继续排查"])).toBeNull();
-    expect(getRecommendedOptionIndex([PURE_VIEW_ONLY_OPTION_PATTERNS[2], "整理结论"])).toBeNull();
+  it("纯查看型选项不会被推荐（精确匹配）", () => {
+    expect(getRecommendedOptionIndex(["查看 diff", "继续修 token"])).toBeNull();
+    expect(getRecommendedOptionIndex(["看日志", "继续排查"])).toBeNull();
+    expect(getRecommendedOptionIndex(["浏览输出", "整理结论"])).toBeNull();
+  });
+
+  it("纯查看型选项不会被推荐（关键词模式匹配）", () => {
+    // 列出/列举/给我列 类
+    expect(getRecommendedOptionIndex(["给我列当前这次修复涉及的文件", "继续修 token"])).toBeNull();
+    expect(getRecommendedOptionIndex(["列出改动文件", "整理结论"])).toBeNull();
+    expect(getRecommendedOptionIndex(["列举这次涉及的模块", "继续排查"])).toBeNull();
+    // 查看/看一下 类
+    expect(getRecommendedOptionIndex(["查看这次提交的关键改动摘要", "继续"])).toBeNull();
+    expect(getRecommendedOptionIndex(["看一下当前的测试覆盖率", "修复测试"])).toBeNull();
+    // 检查/审查 类（纯查看，无后续动作动词）
+    expect(getRecommendedOptionIndex(["检查当前工作区状态", "提交代码"])).toBeNull();
+    // 显示/展示 类
+    expect(getRecommendedOptionIndex(["显示所有改动的文件", "开始重构"])).toBeNull();
+  });
+
+  it("纯查看型选项不会被推荐（英文关键词）", () => {
+    // view/review/check 类
+    expect(getRecommendedOptionIndex(["View the diff", "Run tests"])).toBeNull();
+    expect(getRecommendedOptionIndex(["Review the changes", "Deploy"])).toBeNull();
+    expect(getRecommendedOptionIndex(["Check current workspace status", "Commit"])).toBeNull();
+    // show/display/list/browse/inspect 类
+    expect(getRecommendedOptionIndex(["Show all modified files", "Start refactoring"])).toBeNull();
+    expect(getRecommendedOptionIndex(["Display the error output", "Fix tests"])).toBeNull();
+    expect(getRecommendedOptionIndex(["List the affected modules", "Continue"])).toBeNull();
+    expect(getRecommendedOptionIndex(["Browse the logs", "Retry deploy"])).toBeNull();
+    expect(getRecommendedOptionIndex(["Inspect the build output", "Fix errors"])).toBeNull();
+    // 大小写混合
+    expect(getRecommendedOptionIndex(["view diff", "run tests"])).toBeNull();
+    expect(getRecommendedOptionIndex(["LIST changed files", "commit"])).toBeNull();
   });
 
   it("复合动作首项不会被误伤", () => {
     expect(getRecommendedOptionIndex(["查看 diff 并修复回归", "整理检查清单"])).toBe(0);
     expect(getRecommendedOptionIndex(["看日志后继续定位", "总结原因"])).toBe(0);
+    expect(getRecommendedOptionIndex(["检查并修复类型错误", "跳过"])).toBe(0);
+    expect(getRecommendedOptionIndex(["列出问题并逐个修复", "跳过"])).toBe(0);
+    // 英文复合动作
+    expect(getRecommendedOptionIndex(["View diff and fix regressions", "Skip"])).toBe(0);
+    expect(getRecommendedOptionIndex(["Check logs then continue debugging", "Summarize"])).toBe(0);
+    expect(getRecommendedOptionIndex(["Review and fix type errors", "Skip"])).toBe(0);
+    expect(getRecommendedOptionIndex(["List issues and fix them one by one", "Skip"])).toBe(0);
   });
 
   it("没有 options 时打开开关会进入待命状态", () => {

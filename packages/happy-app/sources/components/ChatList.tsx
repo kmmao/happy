@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MessageView } from "./MessageView";
 import { Metadata, Session } from "@/sync/storageTypes";
 import { ChatFooter } from "./ChatFooter";
+import { isSessionRunning } from "@/utils/sessionUtils";
 import { Message } from "@/sync/typesMessage";
 import { knownTools } from "./tools/knownTools";
 import { TypingBubble } from "./TypingBubble";
@@ -71,10 +72,7 @@ const ListHeader = React.memo(() => {
 const ListFooter = React.memo((props: { sessionId: string; contentMaxWidth?: number }) => {
   const session = useSession(props.sessionId)!;
   const { messages } = useSessionMessages(props.sessionId);
-  const isThinking =
-    session.sdkSessionState != null
-      ? session.sdkSessionState === "running"
-      : session.thinking === true;
+  const isThinking = isSessionRunning(session);
   const lastMsg = messages.length > 0 ? messages[0] : undefined;
   const showTyping =
     isThinking &&

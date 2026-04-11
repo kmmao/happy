@@ -19,6 +19,43 @@ export interface SessionStatus {
   isPulsing?: boolean;
 }
 
+export function isSessionRunning(session: Session): boolean {
+  return session.sdkSessionState != null
+    ? session.sdkSessionState === "running"
+    : session.thinking === true;
+}
+
+export function getSessionStatusState(session: Session): SessionState {
+  const isOnline = session.presence === "online";
+  const hasPermissions =
+    session.agentState?.requests &&
+    Object.keys(session.agentState.requests).length > 0
+      ? true
+      : false;
+
+  if (!isOnline) {
+    return "disconnected";
+  }
+
+  if (hasPermissions) {
+    return "permission_required";
+  }
+
+  if (session.sdkSessionState === "requires_action" && !hasPermissions) {
+    return "needs_attention";
+  }
+
+  if (isSessionRunning(session)) {
+    return "thinking";
+  }
+
+  if (session.needsAttention) {
+    return "needs_attention";
+  }
+
+  return "waiting";
+}
+
 export function formatApiRetryStatus(apiRetry: {
   attempt: number;
   maxRetries: number;
@@ -39,20 +76,16 @@ export function formatApiRetryStatus(apiRetry: {
  * Uses centralized session state from storage.ts
  */
 export function useSessionStatus(session: Session): SessionStatus {
-  const isOnline = session.presence === "online";
-  const hasPermissions =
-    session.agentState?.requests &&
-    Object.keys(session.agentState.requests).length > 0
-      ? true
-      : false;
+  const currentState = getSessionStatusState(session);
+  const isRunning = isSessionRunning(session);
 
   // Derive a stable index from session ID + a counter that increments
-  // each time thinking changes, so the word updates per thinking cycle
+  // each time the unified running state changes, so the word updates per cycle
   // but stays consistent across all component instances showing this session.
   const thinkingGeneration = React.useRef(0);
-  const prevThinking = React.useRef(session.thinking);
-  if (session.thinking !== prevThinking.current) {
-    prevThinking.current = session.thinking;
+  const prevRunning = React.useRef(isRunning);
+  if (isRunning !== prevRunning.current) {
+    prevRunning.current = isRunning;
     thinkingGeneration.current += 1;
   }
   const generation = thinkingGeneration.current;
@@ -67,7 +100,7 @@ export function useSessionStatus(session: Session): SessionStatus {
     return vibingMessages[index].toLowerCase() + "…";
   }, [session.id, generation]);
 
-  if (!isOnline) {
+  if (currentState === "disconnected") {
     return {
       state: "disconnected",
       isConnected: false,
@@ -80,8 +113,7 @@ export function useSessionStatus(session: Session): SessionStatus {
     };
   }
 
-  // Check if permission is required
-  if (hasPermissions) {
+  if (currentState === "permission_required") {
     return {
       state: "permission_required",
       isConnected: true,
@@ -93,12 +125,7 @@ export function useSessionStatus(session: Session): SessionStatus {
     };
   }
 
-  // SDK signals requires_action when the session needs user input (e.g. MCP elicitation,
-  // tool approval not yet surfaced via agentState). Show as needs_attention with pulsing orange.
-  if (
-    session.sdkSessionState === "requires_action" &&
-    !hasPermissions
-  ) {
+  if (currentState === "needs_attention") {
     return {
       state: "needs_attention",
       isConnected: true,
@@ -110,15 +137,7 @@ export function useSessionStatus(session: Session): SessionStatus {
     };
   }
 
-  // Use authoritative SDK session state when available (idle/running/requires_action),
-  // falling back to the legacy `thinking` boolean for older CLI versions.
-  const isRunning =
-    session.sdkSessionState != null
-      ? session.sdkSessionState === "running"
-      : session.thinking === true;
-
-  if (isRunning) {
-    // Show retry status when API is being retried
+  if (currentState === "thinking") {
     if (session.apiRetry) {
       return {
         state: "thinking",
@@ -137,18 +156,6 @@ export function useSessionStatus(session: Session): SessionStatus {
       shouldShowStatus: true,
       statusColor: "#007AFF",
       statusDotColor: "#007AFF",
-      isPulsing: true,
-    };
-  }
-
-  if (session.needsAttention) {
-    return {
-      state: "needs_attention",
-      isConnected: true,
-      statusText: t("status.needsAttention"),
-      shouldShowStatus: true,
-      statusColor: "#FF9500",
-      statusDotColor: "#FF9500",
       isPulsing: true,
     };
   }

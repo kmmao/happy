@@ -61,12 +61,41 @@ export const PURE_VIEW_ONLY_OPTION_PATTERNS = [
   "浏览输出",
 ] as const;
 
+/**
+ * View-only verb prefixes (Chinese + English).
+ * An option starting with any of these is considered "view-only"
+ * UNLESS it also contains a follow-up action connector.
+ */
+const VIEW_ONLY_VERB_PREFIXES = [
+  // Chinese
+  "查看", "看一下", "看下", "浏览",
+  "列出", "列举", "给我列",
+  "检查", "审查",
+  "显示", "展示",
+  "看日志", "看 diff", "查看 diff",
+  // English
+  "view ", "review ", "check ",
+  "show ", "display ", "list ",
+  "browse ", "inspect ",
+] as const;
+
+const FOLLOW_UP_ACTION_CONNECTORS = /(?:并|后|再|然后|并且|逐个| and | then | to fix)/i;
+
 const PURE_VIEW_ONLY_OPTION_SET = new Set(
   PURE_VIEW_ONLY_OPTION_PATTERNS.map(normalizeOptionText),
 );
 
 function isPureViewOnlyOption(text: string): boolean {
-  return PURE_VIEW_ONLY_OPTION_SET.has(normalizeOptionText(text));
+  const normalized = normalizeOptionText(text);
+  // Exact match (legacy)
+  if (PURE_VIEW_ONLY_OPTION_SET.has(normalized)) return true;
+  // Keyword prefix match: starts with a view-only verb AND has no follow-up action
+  for (const prefix of VIEW_ONLY_VERB_PREFIXES) {
+    if (normalized.startsWith(prefix.toLowerCase())) {
+      return !FOLLOW_UP_ACTION_CONNECTORS.test(normalized);
+    }
+  }
+  return false;
 }
 
 export function getRecommendedOptionIndex(items: string[]): number | null {
