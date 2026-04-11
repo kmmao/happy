@@ -78,6 +78,7 @@ import {
   getSessionName,
   getSessionProviderKey,
   isSessionRunning,
+  shouldClearQueuedMessagesOnTransition,
   useSessionStatus,
 } from "@/utils/sessionUtils";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
@@ -705,14 +706,19 @@ function SessionViewInner({
     }
   }, [sessionId, sessionStateLogKey]);
 
-  // Clear queued message markers when AI finishes running.
+  // Clear queued message markers when AI fully leaves the running state,
+  // but keep them during requires_action because the turn is waiting on user input.
   const prevRunningRef = React.useRef(isRunning);
   React.useEffect(() => {
-    if (prevRunningRef.current && !isRunning) {
+    if (shouldClearQueuedMessagesOnTransition({
+      prevIsRunning: prevRunningRef.current,
+      nextIsRunning: isRunning,
+      nextSdkSessionState: session.sdkSessionState ?? null,
+    })) {
       storage.getState().clearQueuedMessageIds(sessionId);
     }
     prevRunningRef.current = isRunning;
-  }, [isRunning, sessionId]);
+  }, [isRunning, session.sdkSessionState, sessionId]);
   const promptSuggestion = usePromptSuggestion(sessionId);
   const needsContinue = useNeedsContinue(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");

@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { formatApiRetryStatus, getSessionStatusState, getSessionSubtitle, formatPathRelativeToHome, isSessionRunning } from './sessionUtils';
+import {
+    formatApiRetryStatus,
+    getSessionStatusState,
+    getSessionSubtitle,
+    formatPathRelativeToHome,
+    isSessionRunning,
+    shouldClearQueuedMessagesOnTransition,
+} from './sessionUtils';
 import { Session } from '@/sync/storageTypes';
 
 // Mock @/text to return deterministic translations for tests
@@ -161,6 +168,32 @@ describe('sessionUtils', () => {
             });
 
             expect(isSessionRunning(session)).toBe(true);
+        });
+    });
+
+    describe('shouldClearQueuedMessagesOnTransition', () => {
+        it('does not clear when running transitions to requires_action', () => {
+            expect(shouldClearQueuedMessagesOnTransition({
+                prevIsRunning: true,
+                nextIsRunning: false,
+                nextSdkSessionState: 'requires_action',
+            })).toBe(false);
+        });
+
+        it('clears when running transitions to idle', () => {
+            expect(shouldClearQueuedMessagesOnTransition({
+                prevIsRunning: true,
+                nextIsRunning: false,
+                nextSdkSessionState: 'idle',
+            })).toBe(true);
+        });
+
+        it('clears when running transitions to unknown legacy idle state', () => {
+            expect(shouldClearQueuedMessagesOnTransition({
+                prevIsRunning: true,
+                nextIsRunning: false,
+                nextSdkSessionState: null,
+            })).toBe(true);
         });
     });
 

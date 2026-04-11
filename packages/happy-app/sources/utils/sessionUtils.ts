@@ -25,6 +25,17 @@ export function isSessionRunning(session: Session): boolean {
     : session.thinking === true;
 }
 
+export function shouldClearQueuedMessagesOnTransition(input: {
+  prevIsRunning: boolean;
+  nextIsRunning: boolean;
+  nextSdkSessionState?: Session["sdkSessionState"];
+}): boolean {
+  if (!input.prevIsRunning || input.nextIsRunning) {
+    return false;
+  }
+  return input.nextSdkSessionState !== "requires_action";
+}
+
 export function getSessionStatusState(session: Session): SessionState {
   const isOnline = session.presence === "online";
   const hasPermissions =
