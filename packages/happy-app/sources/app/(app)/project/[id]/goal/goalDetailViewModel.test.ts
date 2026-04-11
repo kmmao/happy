@@ -1,6 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { buildGoalDetailSections, deriveGoalDetailScreenState } from "./goalDetailViewModel";
+import {
+    buildGoalDetailSections,
+    deriveGoalDetailScreenState,
+    filterGoalDetailSuggestions,
+} from "./goalDetailViewModel";
 import type { GoalDetail } from "@/sync/apiProjects";
+import type { SuggestionSummary } from "@/sync/apiWorld";
+
+function createSuggestion(overrides: Partial<SuggestionSummary> = {}): SuggestionSummary {
+    return {
+        id: "suggestion-1",
+        projectId: "project-1",
+        relatedGoalId: "goal-1",
+        relatedTaskId: null,
+        type: "suggested_decision",
+        title: "Need a decision",
+        summary: "Choose an option",
+        reason: "Decision pending",
+        evidence: [],
+        recommendedRole: null,
+        payload: {
+            decision: {
+                question: "Use modal or sheet?",
+                options: [
+                    { id: "a", description: "Modal" },
+                    { id: "b", description: "Sheet" },
+                ],
+            },
+        },
+        requiresHuman: true,
+        status: "open",
+        dedupeKey: "dedupe:suggestion-1",
+        bucket: "needs_decision",
+        createdAt: 1,
+        actedAt: null,
+        ...overrides,
+    };
+}
 
 function createGoalDetail(overrides: Partial<GoalDetail> = {}): GoalDetail {
     return {
@@ -161,6 +197,18 @@ describe("buildGoalDetailSections", () => {
     });
 });
 
+describe("filterGoalDetailSuggestions", () => {
+    it("keeps only suggestions related to the current goal", () => {
+        const result = filterGoalDetailSuggestions([
+            createSuggestion({ id: "s1", relatedGoalId: "goal-1" }),
+            createSuggestion({ id: "s2", relatedGoalId: "goal-2" }),
+            createSuggestion({ id: "s3", relatedGoalId: null }),
+        ], "goal-1");
+
+        expect(result.map((item: SuggestionSummary) => item.id)).toEqual(["s1"]);
+    });
+});
+
 describe("deriveGoalDetailScreenState", () => {
     it("returns loading when initial fetch is in flight", () => {
         expect(deriveGoalDetailScreenState({ loading: true, goal: null, error: null })).toEqual({
@@ -189,3 +237,4 @@ describe("deriveGoalDetailScreenState", () => {
         })).toEqual({ kind: "ready" });
     });
 });
+

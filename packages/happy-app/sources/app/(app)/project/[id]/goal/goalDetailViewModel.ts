@@ -1,4 +1,5 @@
 import type { GoalDetail } from "@/sync/apiProjects";
+import type { SuggestionSummary } from "@/sync/apiWorld";
 
 export interface GoalDetailSectionStat {
     label: "tasks" | "subGoals" | "decisions";
@@ -58,7 +59,7 @@ export function buildGoalDetailSections(goal: GoalDetail): GoalDetailViewModel {
         if (blocker.sessionId) {
             blockerActions.push({ kind: "open_session", blockerIndex: index, targetId: blocker.sessionId });
         }
-        if (blocker.sourceMessageId && blocker.messageStatus !== "resolved") {
+        if (blocker.sourceMessageId && blocker.messageStatus === "unread") {
             blockerActions.push({ kind: "mark_read", blockerIndex: index, targetId: blocker.sourceMessageId });
         }
     }
@@ -76,6 +77,13 @@ export function buildGoalDetailSections(goal: GoalDetail): GoalDetailViewModel {
         sections,
         blockerActions,
     };
+}
+
+export function filterGoalDetailSuggestions(
+    suggestions: SuggestionSummary[],
+    goalId: string,
+): SuggestionSummary[] {
+    return suggestions.filter((suggestion) => suggestion.relatedGoalId === goalId);
 }
 
 export function deriveGoalDetailScreenState(input: {

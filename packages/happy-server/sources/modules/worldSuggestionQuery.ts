@@ -3,12 +3,22 @@
  */
 
 import { db } from "@/storage/db";
-import { serializeSuggestion, type SuggestionSerialized, type SuggestionStatus } from "./worldSuggestionTypes";
+import {
+    serializeSuggestion,
+    type SuggestionBucket,
+    type SuggestionSerialized,
+    type SuggestionStatus,
+} from "./worldSuggestionTypes";
 
 export async function worldSuggestionQuery(
     accountId: string,
     projectId: string,
-    opts?: { status?: SuggestionStatus; limit?: number },
+    opts?: {
+        status?: SuggestionStatus;
+        limit?: number;
+        goalId?: string;
+        bucket?: SuggestionBucket;
+    },
 ): Promise<SuggestionSerialized[]> {
     const status = opts?.status ?? "open";
     const limit = opts?.limit ?? 50;
@@ -17,11 +27,16 @@ export async function worldSuggestionQuery(
         where: {
             accountId,
             projectId,
+            ...(opts?.goalId ? { relatedGoalId: opts.goalId } : {}),
             status: status === "open" ? { in: ["open", "suspended"] } : status,
         },
         orderBy: { createdAt: "desc" },
         take: limit,
     });
 
-    return rows.map(serializeSuggestion);
+    const suggestions = rows.map(serializeSuggestion);
+    if (!opts?.bucket) {
+        return suggestions;
+    }
+    return suggestions.filter((item) => item.bucket === opts.bucket);
 }

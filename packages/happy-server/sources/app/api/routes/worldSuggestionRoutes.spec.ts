@@ -30,6 +30,7 @@ const {
         dedupeKey: string;
         createdAt: Date;
         actedAt: Date | null;
+        bucket: string;
     };
 
     const state = {
@@ -60,6 +61,7 @@ const {
             dedupeKey: input.dedupeKey ?? `dedupe:${input.id}`,
             createdAt: input.createdAt ?? now,
             actedAt: input.actedAt ?? null,
+            bucket: input.bucket ?? "next_step",
         });
     };
 
@@ -83,11 +85,13 @@ const {
             machineId: "machine-1",
         })),
         worldSuggestionDismiss: vi.fn(async () => undefined),
-        worldSuggestionQuery: vi.fn(async (accountId: string, projectId: string, opts?: { status?: string; limit?: number }) => {
+        worldSuggestionQuery: vi.fn(async (accountId: string, projectId: string, opts?: { status?: string; limit?: number; goalId?: string; bucket?: string }) => {
             const statuses = opts?.status === "open" ? ["open", "suspended"] : [opts?.status ?? "open"];
             return state.suggestions
                 .filter((item) => item.accountId === accountId && item.projectId === projectId)
                 .filter((item) => statuses.includes(item.status))
+                .filter((item) => !opts?.goalId || item.relatedGoalId === opts.goalId)
+                .filter((item) => !opts?.bucket || item.bucket === opts.bucket)
                 .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
                 .slice(0, opts?.limit ?? state.suggestions.length)
                 .map((item) => ({

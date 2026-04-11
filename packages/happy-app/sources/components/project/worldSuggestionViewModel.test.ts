@@ -7,6 +7,7 @@ import {
     restoreSuggestionAtIndex,
     shouldRefetchSuggestions,
     mergeFetchedSuggestions,
+    groupSuggestionsByBucket,
     type SuggestionLike,
 } from "./worldSuggestionViewModel";
 
@@ -113,6 +114,21 @@ describe("mergeFetchedSuggestions", () => {
     });
 });
 
+
+describe("groupSuggestionsByBucket", () => {
+    it("groups suggestions into three lanes", () => {
+        const result = groupSuggestionsByBucket([
+            { id: "s1", bucket: "next_step" },
+            { id: "s2", bucket: "needs_decision" },
+            { id: "s3", bucket: "needs_human_input" },
+            { id: "s4", bucket: "unknown" },
+        ] as Array<SuggestionLike & { bucket?: string }>);
+
+        expect(result.nextStep.map((item) => item.id)).toEqual(["s1", "s4"]);
+        expect(result.needsDecision.map((item) => item.id)).toEqual(["s2"]);
+        expect(result.needsHumanInput.map((item) => item.id)).toEqual(["s3"]);
+    });
+});
 describe("restoreSuggestionAtIndex", () => {
     const suggestions: SuggestionLike[] = [
         { id: "sug-1" },

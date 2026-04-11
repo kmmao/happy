@@ -150,6 +150,7 @@ export interface SuggestionSummary {
     requiresHuman: boolean;
     status: string;
     dedupeKey: string;
+    bucket: "next_step" | "needs_decision" | "needs_human_input";
     createdAt: number;
     actedAt: number | null;
 }
@@ -157,11 +158,19 @@ export interface SuggestionSummary {
 export async function fetchSuggestions(
     credentials: AuthCredentials,
     projectId: string,
+    opts?: {
+        goalId?: string;
+        bucket?: "next_step" | "needs_decision" | "needs_human_input";
+    },
 ): Promise<SuggestionSummary[]> {
     const API_ENDPOINT = getServerUrl();
     return await backoff(async () => {
+        const params = new URLSearchParams();
+        params.set("status", "open");
+        if (opts?.goalId) params.set("goalId", opts.goalId);
+        if (opts?.bucket) params.set("bucket", opts.bucket);
         const response = await fetch(
-            `${API_ENDPOINT}/v1/projects/${projectId}/world/suggestions?status=open`,
+            `${API_ENDPOINT}/v1/projects/${projectId}/world/suggestions?${params.toString()}`,
             { headers: authHeaders(credentials) },
         );
         if (!response.ok) {

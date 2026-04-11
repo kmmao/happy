@@ -13,11 +13,24 @@ import { Typography } from "@/constants/Typography";
 import { layout } from "@/components/layout";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchGoalDetail, type GoalDetail } from "@/sync/apiProjects";
+import {
+    acceptSuggestion,
+    dismissSuggestion,
+    fetchSuggestions,
+    type SuggestionSummary,
+} from "@/sync/apiWorld";
 import { useGoalProgressSubscription } from "@/hooks/useGoalProgressSubscription";
 import { useProject } from "@/hooks/useProjects";
 import { t } from "@/text";
-import { buildGoalDetailSections, deriveGoalDetailScreenState } from "./goalDetailViewModel";
+import { Modal } from "@/modal";
+import {
+    buildGoalDetailSections,
+    deriveGoalDetailScreenState,
+    filterGoalDetailSuggestions,
+} from "./goalDetailViewModel";
 import { buildGoalDetailRouteState } from "./goalDetailRouteSafety";
+import { SuggestionCard } from "@/components/project/SuggestionCard";
+import { getSuggestionTypeLabelKey } from "@/components/project/worldSuggestionViewModel";
 
 function isSafeId(value: string | undefined): value is string {
     return Boolean(value && /^[A-Za-z0-9_-]+$/.test(value));
@@ -30,6 +43,7 @@ function GoalDetailScreen() {
     const navigation = useNavigation();
     const router = useRouter();
     const [goal, setGoal] = React.useState<GoalDetail | null>(null);
+    const [goalSuggestions, setGoalSuggestions] = React.useState<SuggestionSummary[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
 
@@ -40,6 +54,7 @@ function GoalDetailScreen() {
 
     const loadGoal = React.useCallback(async () => {
         if (waitingForProject) {
+            setLoading(true);
             return;
         }
         if (!readyProjectId || !readyGoalId) {
@@ -55,8 +70,12 @@ function GoalDetailScreen() {
                 setError(t("common.error"));
                 return;
             }
-            const data = await fetchGoalDetail(credentials, readyProjectId, readyGoalId);
-            setGoal(data);
+            const [goalData, suggestionData] = await Promise.all([
+                fetchGoalDetail(credentials, readyProjectId, readyGoalId),
+                fetchSuggestions(credentials, readyProjectId, { goalId: readyGoalId }),
+            ]);
+            setGoal(goalData);
+            setGoalSuggestions(filterGoalDetailSuggestions(suggestionData, readyGoalId));
         } catch {
             setError(t("common.error"));
         } finally {
@@ -99,7 +118,65 @@ function GoalDetailScreen() {
         onRefresh: handleRefresh,
     });
 
+    const handleAcceptSuggestion = React.useCallback(async (suggestion: SuggestionSummary) => {
+        if (!projectServerId) return;
+        const typeLabel = t(getSuggestionTypeLabelKey(suggestion.type));
+        const payloadTitle = suggestion.payload.goal?.title
+            ?? suggestion.payload.task?.title
+            ?? suggestion.payload.skill?.title
+            ?? suggestion.payload.decision?.question
+            ?? suggestion.title;
+        const confirmed = await Modal.confirm(
+            t("suggestions.acceptConfirmTitle"),
+            t("suggestions.acceptConfirmBody", { type: typeLabel, title: payloadTitle }),
+        );
+        if (!confirmed) return;
+        try {
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return;
+            const result = await acceptSuggestion(credentials, projectServerId, suggestion.id);
+            setGoalSuggestions((prev) => prev.filter((item) => item.id !== suggestion.id));
+            Modal.toast(t("suggestions.accepted"));
+            if (result.createdEntityType === "decision") {
+                router.push(`/decision/${result.createdEntityId}` as any);
+                return;
+            }
+            if (result.createdEntityType === "goal") {
+                router.push(`/project/${project?.id}/goal/${result.createdEntityId}` as any);
+                return;
+            }
+            if (result.createdEntityType === "skill") {
+                router.push(`/skills/${result.createdEntityId}/edit` as any);
+                return;
+            }
+            router.push(`/machine/${result.machineId ?? project?.key.machineId}/task/${result.createdEntityId}` as any);
+        } catch (e: any) {
+            Modal.toast(e.message ?? t("common.error"));
+        }
+    }, [project?.id, project?.key.machineId, projectServerId, router]);
+
+    const handleDismissSuggestion = React.useCallback(async (suggestion: SuggestionSummary) => {
+        if (!projectServerId) return;
+        try {
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return;
+            await dismissSuggestion(credentials, projectServerId, suggestion.id);
+            setGoalSuggestions((prev) => prev.filter((item) => item.id !== suggestion.id));
+            Modal.toast(t("suggestions.dismissed"));
+        } catch {
+            Modal.toast(t("common.error"));
+        }
+    }, [projectServerId]);
+
     const screenState = deriveGoalDetailScreenState({ loading, goal, error });
+
+    if (waitingForProject) {
+        return (
+            <View style={styles.centered}>
+                <ActivityIndicator />
+            </View>
+        );
+    }
 
     if (screenState.kind === "loading") {
         return (
@@ -136,9 +213,7 @@ function GoalDetailScreen() {
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
             <View style={styles.heroCard}>
                 <Text style={styles.title}>{readyGoal.title}</Text>
-                {readyGoal.description ? (
-                    <Text style={styles.description}>{readyGoal.description}</Text>
-                ) : null}
+                {readyGoal.description ? <Text style={styles.description}>{readyGoal.description}</Text> : null}
                 <View style={styles.badgeRow}>
                     {viewModel.hero.badges.map((badge) => (
                         <View key={badge} style={styles.badge}>
@@ -157,13 +232,24 @@ function GoalDetailScreen() {
                 </View>
             </View>
 
+            {goalSuggestions.length > 0 ? (
+                <View style={styles.card}>
+                    <Text style={styles.sectionTitle}>{t("suggestions.suggestedNextSteps")}</Text>
+                    {goalSuggestions.map((suggestion) => (
+                        <SuggestionCard
+                            key={suggestion.id}
+                            suggestion={suggestion}
+                            onAccept={handleAcceptSuggestion}
+                            onDismiss={handleDismissSuggestion}
+                        />
+                    ))}
+                </View>
+            ) : null}
+
             {viewModel.sections.some((section) => section.key === "latest-session") && readyGoal.latestSession && isSafeId(readyGoal.latestSession.sessionId) ? (
                 <View style={styles.card}>
                     <Text style={styles.sectionTitle}>{t("goals.viewSession")}</Text>
-                    <Pressable
-                        style={styles.linkRow}
-                        onPress={() => router.push(`/session/${readyGoal.latestSession!.sessionId}` as any)}
-                    >
+                    <Pressable style={styles.linkRow} onPress={() => router.push(`/session/${readyGoal.latestSession!.sessionId}` as any)}>
                         <Ionicons name="open-outline" size={14} color="#3B82F6" />
                         <Text style={styles.linkText}>{readyGoal.latestSession.taskTitle ?? t("goals.viewSession")}</Text>
                     </Pressable>
@@ -184,9 +270,7 @@ function GoalDetailScreen() {
                                 <Text style={styles.rowTitle}>{task.title ?? t("goals.taskIndex", { index: index + 1 })}</Text>
                                 <Text style={styles.rowMeta}>{task.status}</Text>
                             </View>
-                            {task.roleType ? (
-                                <Text style={styles.rowMeta}>{task.roleType}</Text>
-                            ) : null}
+                            {task.roleType ? <Text style={styles.rowMeta}>{task.roleType}</Text> : null}
                         </Pressable>
                     ))}
                 </View>
@@ -221,29 +305,19 @@ function GoalDetailScreen() {
                                     <Text style={styles.rowMeta}>{blocker.kind}</Text>
                                 </View>
                                 <View style={styles.metaRow}>
-                                    {blocker.requiresHuman ? (
-                                        <Text style={styles.metaText}>{t("status.needsAttention")}</Text>
-                                    ) : null}
-                                    {showMarkRead ? (
-                                        <Text style={styles.metaText}>{t("inbox.markRead")}</Text>
-                                    ) : null}
+                                    {blocker.requiresHuman ? <Text style={styles.metaText}>{t("status.needsAttention")}</Text> : null}
+                                    {showMarkRead ? <Text style={styles.metaText}>{t("inbox.markRead")}</Text> : null}
                                 </View>
                                 {(canOpenDecision || canOpenSession) ? (
                                     <View style={styles.actionRowInline}>
                                         {canOpenDecision ? (
-                                            <Pressable
-                                                style={styles.inlineActionButton}
-                                                onPress={() => router.push(`/decision/${blocker.decisionId}` as any)}
-                                            >
+                                            <Pressable style={styles.inlineActionButton} onPress={() => router.push(`/decision/${blocker.decisionId}` as any)}>
                                                 <Ionicons name="git-branch-outline" size={14} color="#3B82F6" />
                                                 <Text style={styles.inlineActionText}>{t("decision.title")}</Text>
                                             </Pressable>
                                         ) : null}
                                         {canOpenSession ? (
-                                            <Pressable
-                                                style={styles.inlineActionButton}
-                                                onPress={() => router.push(`/session/${blocker.sessionId}` as any)}
-                                            >
+                                            <Pressable style={styles.inlineActionButton} onPress={() => router.push(`/session/${blocker.sessionId}` as any)}>
                                                 <Ionicons name="open-outline" size={14} color="#3B82F6" />
                                                 <Text style={styles.inlineActionText}>{t("goals.viewSession")}</Text>
                                             </Pressable>

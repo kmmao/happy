@@ -9,7 +9,7 @@ import { worldSuggestionQuery } from "@/modules/worldSuggestionQuery";
 import { worldSuggestionRefresh } from "@/modules/worldSuggestionGenerate";
 import { worldSuggestionAccept } from "@/modules/worldSuggestionAccept";
 import { worldSuggestionDismiss } from "@/modules/worldSuggestionDismiss";
-import { AcceptBodySchema } from "@/modules/worldSuggestionTypes";
+import { AcceptBodySchema, SUGGESTION_BUCKETS } from "@/modules/worldSuggestionTypes";
 
 export function worldSuggestionRoutes(app: Fastify) {
 
@@ -23,6 +23,8 @@ export function worldSuggestionRoutes(app: Fastify) {
                 querystring: z.object({
                     status: z.enum(["open", "processing", "accepted", "suspended", "dismissed", "expired"]).default("open"),
                     limit: z.coerce.number().int().min(1).max(100).default(50),
+                    goalId: z.string().optional(),
+                    bucket: z.enum(SUGGESTION_BUCKETS).optional(),
                 }),
             },
         },
@@ -38,14 +40,12 @@ export function worldSuggestionRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Project not found" });
             }
 
-            const suggestions = await worldSuggestionQuery(
-                userId,
-                projectId,
-                {
-                    status: request.query.status,
-                    limit: request.query.limit,
-                },
-            );
+            const suggestions = await worldSuggestionQuery(userId, projectId, {
+                status: request.query.status,
+                limit: request.query.limit,
+                goalId: request.query.goalId,
+                bucket: request.query.bucket,
+            });
 
             return reply.send({ suggestions });
         },

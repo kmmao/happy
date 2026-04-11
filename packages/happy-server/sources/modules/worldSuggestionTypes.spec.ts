@@ -39,6 +39,7 @@ describe("serializeSuggestion", () => {
             requiresHuman: true,
             status: "expired",
             dedupeKey: "failed_task_followup:task-1:1:3:boom",
+            bucket: "needs_decision",
             createdAt: new Date("2026-04-10T10:00:00Z").getTime(),
             actedAt: null,
         });

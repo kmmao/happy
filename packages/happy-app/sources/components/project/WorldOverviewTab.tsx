@@ -31,6 +31,7 @@ import { SuggestionCard } from "./SuggestionCard";
 import {
     applySuggestionStatusUpdate,
     getSuggestionTypeLabelKey,
+    groupSuggestionsByBucket,
     mergeFetchedSuggestions,
     removeSuggestionOptimistically,
     restoreSuggestionAtIndex,
@@ -77,11 +78,10 @@ export const WorldOverviewTab = React.memo(
 
         React.useEffect(() => {
             if (isActive) {
-                loadData();
+                void loadData();
             }
         }, [isActive, loadData]);
 
-        // Subscribe to ephemeral suggestion updates
         React.useEffect(() => {
             const projectServerId = project.serverId;
             if (!isActive || !projectServerId) return;
@@ -142,9 +142,7 @@ export const WorldOverviewTab = React.memo(
                 t("suggestions.acceptConfirmTitle"),
                 t("suggestions.acceptConfirmBody", { type: typeLabel, title: payloadTitle }),
             );
-            if (!confirmed) {
-                return;
-            }
+            if (!confirmed) return;
 
             hiddenSuggestionIdsRef.current.add(suggestion.id);
             const { removedIndex } = removeSuggestionOptimistically(suggestions, suggestion.id);
@@ -220,13 +218,13 @@ export const WorldOverviewTab = React.memo(
                     ? "#F59E0B"
                     : "#DC2626";
 
+        const groupedSuggestions = groupSuggestionsByBucket(suggestions);
+
         return (
             <ScrollView
                 style={styles.container}
                 contentContainerStyle={styles.scrollContent}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />
-                }
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadData(true)} />}
             >
                 <View style={[styles.sectionCard, { marginTop: 12 }]}>
                     <Pressable
@@ -238,15 +236,10 @@ export const WorldOverviewTab = React.memo(
                             <Text style={styles.sectionTitle}>{t("world.title")}</Text>
                             <Text style={styles.constitutionHint}>{t("world.narrativeDesc")}</Text>
                         </View>
-                        <Ionicons
-                            name="chevron-forward"
-                            size={18}
-                            color={theme.colors.textSecondary}
-                        />
+                        <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
                     </Pressable>
                 </View>
 
-                {/* Autonomy Score Card */}
                 <View style={styles.autonomyCard}>
                     <Text style={styles.sectionTitle}>{t("world.dashboardTitle")}</Text>
                     <View style={styles.autonomyRow}>
@@ -264,45 +257,22 @@ export const WorldOverviewTab = React.memo(
                                         ? t("world.needsAttention")
                                         : t("world.autonomyScoreDesc")}
                             </Text>
-                            {data.autonomy.total30d > 0 && (
+                            {data.autonomy.total30d > 0 ? (
                                 <Text style={styles.autonomyStatsText}>
                                     {data.autonomy.decided30d} {t("world.autonomyDecided")}, {data.autonomy.autoResolved30d} {t("world.autonomyAuto")}, {data.autonomy.pending30d} {t("world.autonomyPending")}
                                 </Text>
-                            )}
+                            ) : null}
                         </View>
                     </View>
                 </View>
 
-                {/* Metrics Grid */}
                 <View style={styles.metricsGrid}>
-                    <MetricCard
-                        icon="people"
-                        label={t("world.activeRoles")}
-                        value={String(data.roles.total)}
-                        color="#8B5CF6"
-                    />
-                    <MetricCard
-                        icon="alert-circle"
-                        label={t("world.pendingDecisions")}
-                        value={String(data.decisions.pending)}
-                        color={data.decisions.pending > 0 ? "#F59E0B" : "#10B981"}
-                    />
-                    <MetricCard
-                        icon="document-text"
-                        label={t("world.lawCount")}
-                        value={String(data.lawCount)}
-                        color="#3B82F6"
-                        onPress={project.serverId ? () => router.push(`/project/${project.id}/world-laws` as any) : undefined}
-                    />
-                    <MetricCard
-                        icon="chatbubbles"
-                        label={t("world.agentMessages")}
-                        value={String(data.agentMessages.total30d)}
-                        color="#6B7280"
-                    />
+                    <MetricCard icon="people" label={t("world.activeRoles")} value={String(data.roles.total)} color="#8B5CF6" />
+                    <MetricCard icon="alert-circle" label={t("world.pendingDecisions")} value={String(data.decisions.pending)} color={data.decisions.pending > 0 ? "#F59E0B" : "#10B981"} />
+                    <MetricCard icon="document-text" label={t("world.lawCount")} value={String(data.lawCount)} color="#3B82F6" onPress={project.serverId ? () => router.push(`/project/${project.id}/world-laws` as any) : undefined} />
+                    <MetricCard icon="chatbubbles" label={t("world.agentMessages")} value={String(data.agentMessages.total30d)} color="#6B7280" />
                 </View>
 
-                {/* Goals Overview */}
                 <View style={styles.sectionCard}>
                     <Text style={styles.sectionTitle}>{t("world.goalsOverview")}</Text>
                     <View style={styles.goalsRow}>
@@ -312,88 +282,119 @@ export const WorldOverviewTab = React.memo(
                     </View>
                 </View>
 
-                {/* Suggested Next Steps */}
-                <View style={styles.suggestionsSection}>
-                    <View style={styles.suggestionsSectionHeader}>
-                        <Ionicons name="bulb-outline" size={18} color="#F59E0B" />
-                        <Text style={styles.sectionTitle}>{t("suggestions.suggestedNextSteps")}</Text>
-                        <View style={{ flex: 1 }} />
-                        <Pressable
-                            style={styles.refreshButton}
-                            onPress={handleRefreshSuggestions}
-                            disabled={suggestionsRefreshing}
-                        >
-                            <Text style={styles.refreshButtonText}>
-                                {suggestionsRefreshing ? t("suggestions.refreshing") : t("suggestions.refresh")}
-                            </Text>
-                        </Pressable>
-                    </View>
+                <View style={styles.suggestionsToolbar}>
+                    <Text style={styles.sectionTitle}>{t("suggestions.suggestedNextSteps")}</Text>
+                    <Pressable style={styles.refreshButton} onPress={handleRefreshSuggestions} disabled={suggestionsRefreshing}>
+                        <Text style={styles.refreshButtonText}>
+                            {suggestionsRefreshing ? t("suggestions.refreshing") : t("suggestions.refresh")}
+                        </Text>
+                    </Pressable>
                 </View>
+
+                <SuggestionLane
+                    title={t("suggestions.suggestedNextSteps")}
+                    icon="bulb-outline"
+                    color="#F59E0B"
+                    suggestions={groupedSuggestions.nextStep}
+                    onAccept={handleAccept}
+                    onDismiss={handleDismiss}
+                />
+                <SuggestionLane
+                    title={t("decision.title")}
+                    icon="help-circle-outline"
+                    color="#F59E0B"
+                    suggestions={groupedSuggestions.needsDecision}
+                    onAccept={handleAccept}
+                    onDismiss={handleDismiss}
+                />
+                <SuggestionLane
+                    title={t("status.needsAttention")}
+                    icon="hand-left-outline"
+                    color="#DC2626"
+                    suggestions={groupedSuggestions.needsHumanInput}
+                    onAccept={handleAccept}
+                    onDismiss={handleDismiss}
+                />
 
                 {suggestions.length === 0 ? (
                     <View style={styles.emptySuggestions}>
                         <Text style={styles.emptySuggestionsText}>{t("suggestions.noSuggestions")}</Text>
                         <Text style={styles.emptySuggestionsHint}>{t("suggestions.noSuggestionsHint")}</Text>
                     </View>
-                ) : (
-                    suggestions.map((s) => (
-                        <SuggestionCard
-                            key={s.id}
-                            suggestion={s}
-                            onAccept={handleAccept}
-                            onDismiss={handleDismiss}
-                        />
-                    ))
-                )}
+                ) : null}
 
-                {/* Agent Messages Summary */}
-                {(data.agentMessages.conflicts30d > 0 || data.agentMessages.lawSuggestions30d > 0) && (
+                {(data.agentMessages.conflicts30d > 0 || data.agentMessages.lawSuggestions30d > 0) ? (
                     <View style={styles.sectionCard}>
                         <Text style={styles.sectionTitle}>{t("world.agentMessages")}</Text>
-                        {data.agentMessages.conflicts30d > 0 && (
+                        {data.agentMessages.conflicts30d > 0 ? (
                             <View style={styles.messageRow}>
                                 <Ionicons name="warning-outline" size={16} color="#F59E0B" />
-                                <Text style={styles.messageText}>
-                                    {t("world.conflicts")}: {data.agentMessages.conflicts30d}
-                                </Text>
+                                <Text style={styles.messageText}>{t("world.conflicts")}: {data.agentMessages.conflicts30d}</Text>
                             </View>
-                        )}
-                        {data.agentMessages.lawSuggestions30d > 0 && (
+                        ) : null}
+                        {data.agentMessages.lawSuggestions30d > 0 ? (
                             <View style={styles.messageRow}>
                                 <Ionicons name="bulb-outline" size={16} color="#8B5CF6" />
-                                <Text style={styles.messageText}>
-                                    {t("world.lawSuggestions")}: {data.agentMessages.lawSuggestions30d}
-                                </Text>
+                                <Text style={styles.messageText}>{t("world.lawSuggestions")}: {data.agentMessages.lawSuggestions30d}</Text>
                             </View>
-                        )}
+                        ) : null}
                     </View>
-                )}
+                ) : null}
 
-                {/* Recent Decisions */}
-                {data.decisions.recentDecided.length > 0 && (
+                {data.decisions.recentDecided.length > 0 ? (
                     <View style={styles.sectionCard}>
                         <Text style={styles.sectionTitle}>{t("world.recentDecisions")}</Text>
-                        {data.decisions.recentDecided.map((d) => (
+                        {data.decisions.recentDecided.map((decision) => (
                             <Pressable
-                                key={d.id}
+                                key={decision.id}
                                 style={styles.decisionRow}
-                                onPress={() => router.push(`/decision/${d.id}` as any)}
+                                onPress={() => router.push(`/decision/${decision.id}` as any)}
                             >
                                 <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                                <Text style={styles.decisionText} numberOfLines={2}>
-                                    {d.question}
-                                </Text>
+                                <Text style={styles.decisionText} numberOfLines={2}>{decision.question}</Text>
                                 <Ionicons name="chevron-forward" size={14} color="#9CA3AF" />
                             </Pressable>
                         ))}
                     </View>
-                )}
+                ) : null}
             </ScrollView>
         );
     },
 );
 
-// === Metric Card ===
+const SuggestionLane = React.memo(function SuggestionLane({
+    title,
+    icon,
+    color,
+    suggestions,
+    onAccept,
+    onDismiss,
+}: {
+    title: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    color: string;
+    suggestions: SuggestionSummary[];
+    onAccept: (suggestion: SuggestionSummary) => void;
+    onDismiss: (suggestion: SuggestionSummary) => void;
+}) {
+    if (suggestions.length === 0) return null;
+    return (
+        <View style={styles.laneSection}>
+            <View style={styles.laneHeader}>
+                <Ionicons name={icon} size={18} color={color} />
+                <Text style={styles.sectionTitle}>{title}</Text>
+            </View>
+            {suggestions.map((suggestion) => (
+                <SuggestionCard
+                    key={suggestion.id}
+                    suggestion={suggestion}
+                    onAccept={onAccept}
+                    onDismiss={onDismiss}
+                />
+            ))}
+        </View>
+    );
+});
 
 const MetricCard = React.memo(function MetricCard({
     icon,
@@ -416,16 +417,10 @@ const MetricCard = React.memo(function MetricCard({
         </>
     );
     if (onPress) {
-        return (
-            <Pressable style={styles.metricCard} onPress={onPress}>
-                {content}
-            </Pressable>
-        );
+        return <Pressable style={styles.metricCard} onPress={onPress}>{content}</Pressable>;
     }
     return <View style={styles.metricCard}>{content}</View>;
 });
-
-// === Goal Stat ===
 
 const GoalStat = React.memo(function GoalStat({
     label,
@@ -444,226 +439,202 @@ const GoalStat = React.memo(function GoalStat({
     );
 });
 
-// === Styles ===
-
 const styles = StyleSheet.create((theme) => ({
     container: {
         flex: 1,
-        backgroundColor: theme.colors.groupped.background,
     },
     scrollContent: {
-        paddingBottom: 32,
+        paddingBottom: 24,
         maxWidth: layout.maxWidth,
-        alignSelf: "center" as const,
-        width: "100%" as const,
+        alignSelf: "center",
+        width: "100%",
     },
     centerContainer: {
         flex: 1,
-        alignItems: "center" as const,
-        justifyContent: "center" as const,
-        paddingVertical: 60,
-        gap: 12,
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 24,
     },
     emptyText: {
         ...Typography.default("semiBold"),
-        fontSize: 15,
-        color: theme.colors.textSecondary,
-        textAlign: "center" as const,
+        color: theme.colors.text,
+        marginTop: 12,
     },
     emptyHint: {
         ...Typography.default(),
-        fontSize: 13,
-        color: theme.colors.textSecondary,
-        textAlign: "center" as const,
-        paddingHorizontal: 40,
-    },
-
-    // Autonomy Card
-    autonomyCard: {
-        marginHorizontal: 16,
-        marginTop: 12,
-        marginBottom: 8,
-        backgroundColor: theme.colors.surface,
-        borderRadius: 12,
-        padding: 16,
-    },
-    autonomyRow: {
-        flexDirection: "row" as const,
-        alignItems: "center" as const,
-        marginTop: 12,
-        gap: 16,
-    },
-    autonomyScoreContainer: {
-        alignItems: "center" as const,
-        minWidth: 80,
-    },
-    autonomyScoreText: {
-        ...Typography.default("semiBold"),
-        fontSize: 36,
-    },
-    autonomyLabel: {
-        ...Typography.default("semiBold"),
-        fontSize: 12,
-        color: theme.colors.textSecondary,
-        marginTop: 2,
-    },
-    autonomyDetails: {
-        flex: 1,
-    },
-    autonomyDetailText: {
-        ...Typography.default("semiBold"),
-        fontSize: 14,
-        color: theme.colors.text,
-    },
-    autonomyStatsText: {
-        ...Typography.default(),
-        fontSize: 12,
         color: theme.colors.textSecondary,
         marginTop: 4,
+        textAlign: "center",
     },
-
-    // Metrics Grid
-    metricsGrid: {
-        flexDirection: "row" as const,
-        flexWrap: "wrap" as const,
-        paddingHorizontal: 12,
-        gap: 8,
-        marginBottom: 8,
-    },
-    metricCard: {
-        flex: 1,
-        minWidth: "45%" as any,
-        backgroundColor: theme.colors.surface,
-        borderRadius: 12,
-        padding: 14,
-        alignItems: "center" as const,
-        gap: 4,
-    },
-    metricValue: {
-        ...Typography.default("semiBold"),
-        fontSize: 24,
-    },
-    metricLabel: {
-        ...Typography.default(),
-        fontSize: 11,
-        color: theme.colors.textSecondary,
-        textAlign: "center" as const,
-    },
-
-    // Section Card
     sectionCard: {
         marginHorizontal: 16,
-        marginBottom: 8,
+        marginBottom: 12,
         backgroundColor: theme.colors.surface,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
     },
-    sectionTitle: {
-        ...Typography.default("semiBold"),
-        fontSize: 15,
-        color: theme.colors.text,
-    },
     constitutionRow: {
-        flexDirection: "row" as const,
-        alignItems: "center" as const,
-        justifyContent: "space-between" as const,
+        flexDirection: "row",
+        alignItems: "center",
         gap: 12,
     },
     constitutionContent: {
         flex: 1,
+        gap: 4,
     },
     constitutionHint: {
         ...Typography.default(),
-        fontSize: 12,
+        color: theme.colors.textSecondary,
+    },
+    sectionTitle: {
+        ...Typography.default("semiBold"),
+        fontSize: 16,
+        color: theme.colors.text,
+    },
+    autonomyCard: {
+        marginHorizontal: 16,
+        marginBottom: 12,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 16,
+        padding: 16,
+    },
+    autonomyRow: {
+        flexDirection: "row",
+        gap: 16,
+        marginTop: 12,
+    },
+    autonomyScoreContainer: {
+        minWidth: 96,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    autonomyScoreText: {
+        ...Typography.default("semiBold"),
+        fontSize: 28,
+    },
+    autonomyLabel: {
+        ...Typography.default(),
         color: theme.colors.textSecondary,
         marginTop: 4,
     },
-
-    // Goals Row
-    goalsRow: {
-        flexDirection: "row" as const,
-        justifyContent: "space-around" as const,
-        marginTop: 12,
+    autonomyDetails: {
+        flex: 1,
+        gap: 6,
     },
-    goalStat: {
-        alignItems: "center" as const,
+    autonomyDetailText: {
+        ...Typography.default(),
+        color: theme.colors.text,
     },
-    goalStatValue: {
+    autonomyStatsText: {
+        ...Typography.default(),
+        color: theme.colors.textSecondary,
+    },
+    metricsGrid: {
+        marginHorizontal: 16,
+        marginBottom: 12,
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 12,
+    },
+    metricCard: {
+        width: "47%",
+        backgroundColor: theme.colors.surface,
+        borderRadius: 16,
+        padding: 16,
+        gap: 8,
+    },
+    metricValue: {
         ...Typography.default("semiBold"),
         fontSize: 22,
     },
+    metricLabel: {
+        ...Typography.default(),
+        color: theme.colors.textSecondary,
+    },
+    goalsRow: {
+        flexDirection: "row",
+        gap: 12,
+        marginTop: 12,
+    },
+    goalStat: {
+        flex: 1,
+        backgroundColor: theme.colors.groupped.background,
+        borderRadius: 12,
+        padding: 12,
+    },
+    goalStatValue: {
+        ...Typography.default("semiBold"),
+        fontSize: 20,
+    },
     goalStatLabel: {
         ...Typography.default(),
-        fontSize: 11,
         color: theme.colors.textSecondary,
-        marginTop: 2,
+        marginTop: 4,
     },
-
-    // Suggestions
-    suggestionsSection: {
+    suggestionsToolbar: {
         marginHorizontal: 16,
         marginBottom: 8,
-    },
-    suggestionsSectionHeader: {
-        flexDirection: "row" as const,
-        alignItems: "center" as const,
-        gap: 8,
-        paddingVertical: 8,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
     },
     refreshButton: {
-        paddingVertical: 4,
-        paddingHorizontal: 10,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
     },
     refreshButtonText: {
         ...Typography.default("semiBold"),
-        fontSize: 12,
-        color: theme.colors.textLink,
+        color: theme.colors.text,
+    },
+    laneSection: {
+        marginBottom: 12,
+    },
+    laneHeader: {
+        marginHorizontal: 16,
+        marginBottom: 8,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
     },
     emptySuggestions: {
         marginHorizontal: 16,
-        marginBottom: 8,
-        paddingVertical: 16,
-        alignItems: "center" as const,
-        gap: 4,
+        marginBottom: 12,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 16,
+        padding: 16,
     },
     emptySuggestionsText: {
-        ...Typography.default(),
-        fontSize: 13,
-        color: theme.colors.textSecondary,
+        ...Typography.default("semiBold"),
+        color: theme.colors.text,
     },
     emptySuggestionsHint: {
         ...Typography.default(),
-        fontSize: 11,
         color: theme.colors.textSecondary,
-        textAlign: "center" as const,
-        paddingHorizontal: 32,
+        marginTop: 4,
     },
-
-    // Messages
     messageRow: {
-        flexDirection: "row" as const,
-        alignItems: "center" as const,
+        flexDirection: "row",
+        alignItems: "center",
         gap: 8,
         marginTop: 8,
     },
     messageText: {
         ...Typography.default(),
-        fontSize: 14,
         color: theme.colors.text,
     },
-
-    // Decisions
     decisionRow: {
-        flexDirection: "row" as const,
-        alignItems: "flex-start" as const,
+        flexDirection: "row",
+        alignItems: "center",
         gap: 8,
-        marginTop: 8,
+        paddingVertical: 10,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: theme.colors.divider,
     },
     decisionText: {
         ...Typography.default(),
-        fontSize: 13,
         color: theme.colors.text,
         flex: 1,
-        lineHeight: 18,
     },
 }));

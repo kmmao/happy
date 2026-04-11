@@ -9,6 +9,11 @@ export interface SuggestionStatusUpdate {
     status: string;
 }
 
+export interface SuggestionBucketLike extends SuggestionLike {
+    bucket?: string;
+    relatedGoalId?: string | null;
+}
+
 export function shouldRefetchSuggestions(event: SuggestionStatusUpdate): boolean {
     return event.status === "open" || event.status === "suspended";
 }
@@ -51,6 +56,39 @@ export function applySuggestionStatusUpdate<T extends SuggestionLike>(
         return suggestions;
     }
     return suggestions.filter((suggestion) => suggestion.id !== event.suggestionId);
+}
+
+export function groupSuggestionsByBucket<T extends SuggestionBucketLike>(suggestions: T[]): {
+    nextStep: T[];
+    needsDecision: T[];
+    needsHumanInput: T[];
+} {
+    return suggestions.reduce(
+        (result, suggestion) => {
+            if (suggestion.bucket === "needs_decision") {
+                result.needsDecision.push(suggestion);
+                return result;
+            }
+            if (suggestion.bucket === "needs_human_input") {
+                result.needsHumanInput.push(suggestion);
+                return result;
+            }
+            result.nextStep.push(suggestion);
+            return result;
+        },
+        {
+            nextStep: [] as T[],
+            needsDecision: [] as T[],
+            needsHumanInput: [] as T[],
+        },
+    );
+}
+
+export function filterGoalSuggestions<T extends SuggestionBucketLike>(
+    suggestions: T[],
+    goalId: string,
+): T[] {
+    return suggestions.filter((suggestion) => suggestion.relatedGoalId === goalId);
 }
 
 export function removeSuggestionOptimistically<T extends SuggestionLike>(

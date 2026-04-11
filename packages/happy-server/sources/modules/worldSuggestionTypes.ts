@@ -8,6 +8,9 @@ export type SuggestionType = typeof SUGGESTION_TYPES[number];
 export const SUGGESTION_STATUSES = ["open", "processing", "accepted", "suspended", "dismissed", "expired"] as const;
 export type SuggestionStatus = typeof SUGGESTION_STATUSES[number];
 
+export const SUGGESTION_BUCKETS = ["next_step", "needs_decision", "needs_human_input"] as const;
+export type SuggestionBucket = typeof SUGGESTION_BUCKETS[number];
+
 export const EVIDENCE_KINDS = ["goal", "task", "decision", "message", "narrative"] as const;
 
 // --- Zod Schemas ---
@@ -85,6 +88,7 @@ export interface SuggestionSerialized {
     requiresHuman: boolean;
     status: string;
     dedupeKey: string;
+    bucket: SuggestionBucket;
     createdAt: number;
     actedAt: number | null;
 }
@@ -107,6 +111,8 @@ export function serializeSuggestion(row: {
     createdAt: Date;
     actedAt: Date | null;
 }): SuggestionSerialized {
+    const evidence = safeParseJson(row.evidence, [] as SuggestionEvidence[]);
+    const payload = safeParseJson(row.payload, {} as SuggestionPayload);
     return {
         id: row.id,
         projectId: row.projectId,
@@ -116,15 +122,39 @@ export function serializeSuggestion(row: {
         title: row.title,
         summary: row.summary,
         reason: row.reason,
-        evidence: safeParseJson(row.evidence, []),
+        evidence,
         recommendedRole: row.recommendedRole,
-        payload: safeParseJson(row.payload, {}),
+        payload,
         requiresHuman: row.requiresHuman,
         status: row.status,
         dedupeKey: row.dedupeKey,
+        bucket: deriveSuggestionBucket({
+            type: row.type,
+            payload,
+            evidence,
+            requiresHuman: row.requiresHuman,
+        }),
         createdAt: row.createdAt.getTime(),
         actedAt: row.actedAt?.getTime() ?? null,
     };
+}
+
+export function deriveSuggestionBucket(input: {
+    type: string;
+    payload: SuggestionPayload;
+    evidence: SuggestionEvidence[];
+    requiresHuman: boolean;
+}): SuggestionBucket {
+    if (input.type === "suggested_decision" || input.payload.decision) {
+        return "needs_decision";
+    }
+    if (input.evidence.some((item) => item.kind === "message")) {
+        return "needs_human_input";
+    }
+    if (input.requiresHuman && input.type === "suggested_goal") {
+        return "needs_human_input";
+    }
+    return "next_step";
 }
 
 function safeParseJson<T>(raw: string, fallback: T): T {
