@@ -3945,6 +3945,7 @@ export const en = {
     typeTask: "Task",
     typeSkill: "Skill",
     typeDecision: "Decision",
+    autoAcceptReasonSafeTask: "Auto-accepted because it matched the safe next-step task rule",
   },
   roles: {
     title: "Roles",

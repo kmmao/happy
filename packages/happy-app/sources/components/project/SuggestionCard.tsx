@@ -7,8 +7,10 @@ import { t } from "@/text";
 import { type SuggestionSummary } from "@/sync/apiWorld";
 import {
     getSuggestionAcceptanceLabelKey,
+    getSuggestionAutoAcceptReasonKey,
     getSuggestionTypeConfig,
     getSuggestionTypeLabelKey,
+    shouldShowSuggestionActions,
 } from "./worldSuggestionViewModel";
 
 interface SuggestionCardProps {
@@ -25,6 +27,8 @@ export const SuggestionCard = React.memo(function SuggestionCard({
     const config = getSuggestionTypeConfig(suggestion.type);
     const typeLabel = t(getSuggestionTypeLabelKey(suggestion.type));
     const acceptanceLabelKey = getSuggestionAcceptanceLabelKey(suggestion);
+    const autoAcceptReasonKey = getSuggestionAutoAcceptReasonKey(suggestion);
+    const showActions = shouldShowSuggestionActions(suggestion);
 
     return (
         <View style={styles.card}>
@@ -56,6 +60,12 @@ export const SuggestionCard = React.memo(function SuggestionCard({
             {/* Reason */}
             <Text style={styles.reason} numberOfLines={2}>{suggestion.reason}</Text>
 
+            {autoAcceptReasonKey ? (
+                <Text style={styles.autoAcceptReason} numberOfLines={2}>
+                    {t(autoAcceptReasonKey)}
+                </Text>
+            ) : null}
+
             {/* Evidence */}
             {suggestion.evidence.length > 0 && (
                 <View style={styles.evidenceRow}>
@@ -74,23 +84,24 @@ export const SuggestionCard = React.memo(function SuggestionCard({
                 </View>
             )}
 
-            {/* Actions */}
-            <View style={styles.actionRow}>
-                <Pressable
-                    style={styles.dismissButton}
-                    onPress={() => onDismiss(suggestion)}
-                >
-                    <Ionicons name="close" size={16} color="#6B7280" />
-                    <Text style={styles.dismissText}>{t("suggestions.dismiss")}</Text>
-                </Pressable>
-                <Pressable
-                    style={[styles.acceptButton, { backgroundColor: config.color }]}
-                    onPress={() => onAccept(suggestion)}
-                >
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                    <Text style={styles.acceptText}>{t("suggestions.accept")}</Text>
-                </Pressable>
-            </View>
+            {showActions ? (
+                <View style={styles.actionRow}>
+                    <Pressable
+                        style={styles.dismissButton}
+                        onPress={() => onDismiss(suggestion)}
+                    >
+                        <Ionicons name="close" size={16} color="#6B7280" />
+                        <Text style={styles.dismissText}>{t("suggestions.dismiss")}</Text>
+                    </Pressable>
+                    <Pressable
+                        style={[styles.acceptButton, { backgroundColor: config.color }]}
+                        onPress={() => onAccept(suggestion)}
+                    >
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        <Text style={styles.acceptText}>{t("suggestions.accept")}</Text>
+                    </Pressable>
+                </View>
+            ) : null}
         </View>
     );
 });
@@ -157,6 +168,12 @@ const styles = StyleSheet.create((theme) => ({
         lineHeight: 16,
         fontStyle: "italic" as const,
     },
+    autoAcceptReason: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        lineHeight: 16,
+    },
     evidenceRow: {
         flexDirection: "row" as const,
         alignItems: "center" as const,
@@ -206,3 +223,4 @@ const styles = StyleSheet.create((theme) => ({
         color: "#FFFFFF",
     },
 }));
+

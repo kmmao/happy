@@ -26,6 +26,21 @@ export function mergeFetchedSuggestions<T extends SuggestionLike>(
     return fetched.filter((suggestion) => !pendingRemovedIds.has(suggestion.id));
 }
 
+export function mergeVisibleSuggestions<T extends SuggestionSummary>(
+    active: T[],
+    accepted: T[],
+): T[] {
+    const byId = new Map<string, T>();
+
+    for (const suggestion of [...active, ...accepted]) {
+        if (!byId.has(suggestion.id)) {
+            byId.set(suggestion.id, suggestion);
+        }
+    }
+
+    return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
+
 const TYPE_CONFIG: Record<SuggestionType, { icon: string; color: string }> = {
     suggested_goal: { icon: "flag-outline", color: "#8B5CF6" },
     suggested_task: { icon: "hammer-outline", color: "#3B82F6" },
@@ -68,6 +83,26 @@ export function getSuggestionAcceptanceLabelKey(suggestion: SuggestionSummary): 
         return "suggestions.acceptedManual";
     }
     return "suggestions.acceptedGeneric";
+}
+
+export function getSuggestionAutoAcceptReasonKey(suggestion: SuggestionSummary): TranslationKey | null {
+    if (suggestion.status !== "accepted") {
+        return null;
+    }
+    if (suggestion.acceptSource !== "system_auto") {
+        return null;
+    }
+    if (!suggestion.acceptAudit) {
+        return null;
+    }
+    if (suggestion.acceptAudit.rule === "safe_suggested_task_auto_accept") {
+        return "suggestions.autoAcceptReasonSafeTask";
+    }
+    return null;
+}
+
+export function shouldShowSuggestionActions(suggestion: SuggestionSummary): boolean {
+    return suggestion.status === "open" || suggestion.status === "suspended";
 }
 
 export function applySuggestionStatusUpdate<T extends SuggestionLike>(

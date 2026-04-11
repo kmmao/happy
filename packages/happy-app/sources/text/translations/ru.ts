@@ -3902,6 +3902,7 @@ export const ru: TranslationStructure = {
     typeTask: "Task",
     typeSkill: "Skill",
     typeDecision: "Decision",
+    autoAcceptReasonSafeTask: "Принято автоматически, потому что совпало с безопасным правилом следующего task",
   },
   roles: {
     title: "Roles",

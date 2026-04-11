@@ -3860,6 +3860,7 @@ export const ja: TranslationStructure = {
     typeTask: "Task",
     typeSkill: "Skill",
     typeDecision: "Decision",
+    autoAcceptReasonSafeTask: "安全な次ステップ task ルールに一致したため自動承認されました",
   },
   roles: {
     title: "ロール",

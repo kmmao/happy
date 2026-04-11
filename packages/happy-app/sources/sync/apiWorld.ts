@@ -136,12 +136,13 @@ export async function fetchSuggestions(
     opts?: {
         goalId?: string;
         bucket?: SuggestionBucket;
+        status?: SuggestionStatus;
     },
 ): Promise<SuggestionSummary[]> {
     const API_ENDPOINT = getServerUrl();
     return await backoff(async () => {
         const params = new URLSearchParams();
-        params.set("status", "open");
+        params.set("status", opts?.status ?? "open");
         if (opts?.goalId) params.set("goalId", opts.goalId);
         if (opts?.bucket) params.set("bucket", opts.bucket);
         const response = await fetch(

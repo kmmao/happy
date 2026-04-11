@@ -3883,6 +3883,7 @@ export const es: TranslationStructure = {
     typeTask: "Task",
     typeSkill: "Skill",
     typeDecision: "Decision",
+    autoAcceptReasonSafeTask: "Aceptada automáticamente porque coincidió con la regla segura de task siguiente",
   },
   roles: {
     title: "Roles",

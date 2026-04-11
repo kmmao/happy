@@ -35,6 +35,7 @@ import {
     getSuggestionPayloadTitle,
     groupSuggestionsByBucket,
     mergeFetchedSuggestions,
+    mergeVisibleSuggestions,
     removeSuggestionOptimistically,
     restoreSuggestionAtIndex,
     shouldRefetchSuggestions,
@@ -66,6 +67,21 @@ export const WorldOverviewTab = React.memo(
         const hiddenSuggestionIdsRef = React.useRef<Set<string>>(new Set());
         const suggestionReloadSeqRef = React.useRef(0);
 
+        const loadSuggestions = React.useCallback(async (projectServerId: string) => {
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) {
+                return [] as SuggestionSummary[];
+            }
+            const [activeSuggestions, acceptedSuggestions] = await Promise.all([
+                fetchSuggestions(credentials, projectServerId),
+                fetchSuggestions(credentials, projectServerId, { status: "accepted" }),
+            ]);
+            return mergeVisibleSuggestions(
+                mergeFetchedSuggestions(activeSuggestions, hiddenSuggestionIdsRef.current),
+                mergeFetchedSuggestions(acceptedSuggestions, hiddenSuggestionIdsRef.current),
+            );
+        }, []);
+
         const loadData = React.useCallback(async (isRefresh = false) => {
             if (!project.serverId) return;
             if (isRefresh) setRefreshing(true);
@@ -73,19 +89,23 @@ export const WorldOverviewTab = React.memo(
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const [dashboard, suggestionsData] = await Promise.all([
+                const [dashboard, activeSuggestions, acceptedSuggestions] = await Promise.all([
                     fetchWorldDashboard(credentials, project.serverId),
                     fetchSuggestions(credentials, project.serverId),
+                    fetchSuggestions(credentials, project.serverId, { status: "accepted" }),
                 ]);
                 setData(dashboard);
-                setSuggestions(mergeFetchedSuggestions(suggestionsData, hiddenSuggestionIdsRef.current));
+                setSuggestions(mergeVisibleSuggestions(
+                    mergeFetchedSuggestions(activeSuggestions, hiddenSuggestionIdsRef.current),
+                    mergeFetchedSuggestions(acceptedSuggestions, hiddenSuggestionIdsRef.current),
+                ));
             } catch {
                 // best effort
             } finally {
                 setLoading(false);
                 setRefreshing(false);
             }
-        }, [project.serverId]);
+        }, [loadSuggestions, project.serverId]);
 
         React.useEffect(() => {
             if (isActive) {
@@ -110,11 +130,9 @@ export const WorldOverviewTab = React.memo(
                 if (shouldRefetchSuggestions(narrowedEvent)) {
                     const reloadSeq = ++suggestionReloadSeqRef.current;
                     void (async () => {
-                        const credentials = await TokenStorage.getCredentials();
-                        if (!credentials || isDisposed) return;
-                        const updated = await fetchSuggestions(credentials, projectServerId);
+                        const updated = await loadSuggestions(projectServerId);
                         if (isDisposed || reloadSeq !== suggestionReloadSeqRef.current) return;
-                        setSuggestions(mergeFetchedSuggestions(updated, hiddenSuggestionIdsRef.current));
+                        setSuggestions(updated);
                     })();
                     return;
                 }
@@ -127,7 +145,7 @@ export const WorldOverviewTab = React.memo(
                 isDisposed = true;
                 unsubscribe();
             };
-        }, [isActive, project.serverId]);
+        }, [isActive, loadSuggestions, project.serverId]);
 
         const handleRefreshSuggestions = React.useCallback(async () => {
             if (!project.serverId) return;
@@ -136,14 +154,14 @@ export const WorldOverviewTab = React.memo(
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
                 await refreshSuggestions(credentials, project.serverId);
-                const updated = await fetchSuggestions(credentials, project.serverId);
-                setSuggestions(mergeFetchedSuggestions(updated, hiddenSuggestionIdsRef.current));
+                const updated = await loadSuggestions(project.serverId);
+                setSuggestions(updated);
             } catch {
                 // best effort
             } finally {
                 setSuggestionsRefreshing(false);
             }
-        }, [project.serverId]);
+        }, [loadSuggestions, project.serverId]);
 
         const handleAccept = React.useCallback(async (suggestion: SuggestionSummary) => {
             if (!project.serverId) return;

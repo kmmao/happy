@@ -30,7 +30,11 @@ import {
 } from "./goalDetailViewModel";
 import { buildGoalDetailRouteState } from "./goalDetailRouteSafety";
 import { SuggestionCard } from "@/components/project/SuggestionCard";
-import { getSuggestionPayloadTitle, getSuggestionTypeLabelKey } from "@/components/project/worldSuggestionViewModel";
+import {
+    getSuggestionPayloadTitle,
+    getSuggestionTypeLabelKey,
+    mergeVisibleSuggestions,
+} from "@/components/project/worldSuggestionViewModel";
 
 function isSafeId(value: string | undefined): value is string {
     return Boolean(value && /^[A-Za-z0-9_-]+$/.test(value));
@@ -70,12 +74,16 @@ function GoalDetailScreen() {
                 setError(t("common.error"));
                 return;
             }
-            const [goalData, suggestionData] = await Promise.all([
+            const [goalData, activeSuggestions, acceptedSuggestions] = await Promise.all([
                 fetchGoalDetail(credentials, readyProjectId, readyGoalId),
                 fetchSuggestions(credentials, readyProjectId, { goalId: readyGoalId }),
+                fetchSuggestions(credentials, readyProjectId, { goalId: readyGoalId, status: "accepted" }),
             ]);
             setGoal(goalData);
-            setGoalSuggestions(filterGoalDetailSuggestions(suggestionData, readyGoalId));
+            setGoalSuggestions(filterGoalDetailSuggestions(
+                mergeVisibleSuggestions(activeSuggestions, acceptedSuggestions),
+                readyGoalId,
+            ));
         } catch {
             setError(t("common.error"));
         } finally {

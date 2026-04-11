@@ -3795,6 +3795,7 @@ export const zhHant: TranslationStructure = {
     typeTask: "Task",
     typeSkill: "Skill",
     typeDecision: "Decision",
+    autoAcceptReasonSafeTask: "因命中安全的下一步任務規則而自動接受",
   },
   roles: {
     title: "角色",

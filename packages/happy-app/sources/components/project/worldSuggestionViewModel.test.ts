@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getSuggestionAcceptanceLabelKey,
+  getSuggestionAutoAcceptReasonKey,
   getSuggestionTypeLabelKey,
   getSuggestionTypeConfig,
   applySuggestionStatusUpdate,
@@ -8,6 +9,8 @@ import {
   restoreSuggestionAtIndex,
   shouldRefetchSuggestions,
   mergeFetchedSuggestions,
+  mergeVisibleSuggestions,
+  shouldShowSuggestionActions,
   groupSuggestionsByBucket,
   getSuggestionPayloadTitle,
   type SuggestionLike,
@@ -40,6 +43,7 @@ function createSuggestion(overrides: Partial<SuggestionSummary>): SuggestionSumm
     createdAt: 1,
     actedAt: null,
     acceptSource: null,
+    acceptAudit: null,
     ...overrides,
   } as SuggestionSummary;
 }
@@ -108,6 +112,80 @@ describe("getSuggestionAcceptanceLabelKey", () => {
       status: "open",
       acceptSource: "system_auto",
     }))).toBe(null);
+  });
+});
+
+describe("getSuggestionAutoAcceptReasonKey", () => {
+  it("returns safe-task reason key for accepted system suggestions with known audit rule", () => {
+    expect(getSuggestionAutoAcceptReasonKey(createSuggestion({
+      status: "accepted",
+      acceptSource: "system_auto",
+      acceptAudit: {
+        rule: "safe_suggested_task_auto_accept",
+        checks: ["type:suggested_task"],
+      },
+    }))).toBe("suggestions.autoAcceptReasonSafeTask");
+  });
+
+  it("returns null for human accepted suggestions", () => {
+    expect(getSuggestionAutoAcceptReasonKey(createSuggestion({
+      status: "accepted",
+      acceptSource: "human",
+      acceptAudit: {
+        rule: "safe_suggested_task_auto_accept",
+        checks: ["type:suggested_task"],
+      },
+    }))).toBe(null);
+  });
+
+  it("returns null when auto-accept audit is missing", () => {
+    expect(getSuggestionAutoAcceptReasonKey(createSuggestion({
+      status: "accepted",
+      acceptSource: "system_auto",
+      acceptAudit: null,
+    }))).toBe(null);
+  });
+
+  it("returns null for non-accepted suggestions", () => {
+    expect(getSuggestionAutoAcceptReasonKey(createSuggestion({
+      status: "open",
+      acceptSource: "system_auto",
+      acceptAudit: {
+        rule: "safe_suggested_task_auto_accept",
+        checks: ["type:suggested_task"],
+      },
+    }))).toBe(null);
+  });
+});
+
+describe("shouldShowSuggestionActions", () => {
+  it("shows actions for open suggestions", () => {
+    expect(shouldShowSuggestionActions(createSuggestion({ status: "open" }))).toBe(true);
+  });
+
+  it("hides actions for accepted suggestions", () => {
+    expect(shouldShowSuggestionActions(createSuggestion({ status: "accepted" }))).toBe(false);
+  });
+});
+
+describe("mergeVisibleSuggestions", () => {
+  it("combines open and accepted suggestions in descending createdAt order", () => {
+    const result = mergeVisibleSuggestions(
+      [createSuggestion({ id: "open-1", status: "open", createdAt: 2 })],
+      [createSuggestion({ id: "accepted-1", status: "accepted", createdAt: 3 })],
+    );
+
+    expect(result.map((item) => item.id)).toEqual(["accepted-1", "open-1"]);
+  });
+
+  it("keeps only one copy when the same suggestion appears twice", () => {
+    const result = mergeVisibleSuggestions(
+      [createSuggestion({ id: "sug-1", status: "open", createdAt: 2 })],
+      [createSuggestion({ id: "sug-1", status: "accepted", createdAt: 1, acceptSource: "system_auto" })],
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "sug-1", status: "open" });
   });
 });
 
