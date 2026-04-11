@@ -20,6 +20,7 @@
 - [x] **阶段 A — 阻塞**：用 AgentMessage（或约定 `content` 结构）表达阻塞，与 Goal `blocked` 规则对齐
 - [x] **阶段 B — 语义完成**：CLI 任务结果上报闭环、Server 状态机统一与 task-scoped 窄权限 token 已落地；默认仍进程退出结算
 - [x] **阶段 C — 主动性**：基于 narrative / decisions / failures 生成建议 Goal/Task（先确认后派发）+ 可选 Skill 提炼闭环
+- [ ] **阶段 D — 建议系统稳定化收尾**：三分桶建议流与 GoalDetail suggestion 已落地；仍待 bucket 持久化、payload 判别联合与 shared schema 收口
 
 ---
 
@@ -484,6 +485,24 @@ Skill 是阶段 C 的可选尾巴，不阻塞主线。放在 Phase 3 单独开�
 - 建议展示明确来源与原因
 - 建议噪音可控，以采纳率而非数量为优先指标
 
+#### D.7 当前进展（2026-04-11）
+
+已落地的核心闭环：
+
+- `WorldOverviewTab` 已从单列表升级为三分桶建议流：`Suggested Next Steps`、`Needs Decision`、`Needs Human Input`。
+- Goal 详情页已接入 goal-scoped suggestion 区，不再只有 WorldOverview 能消费建议。
+- Server 查询已支持 `goalId / bucket` 过滤；`status=open` 且带 `bucket` 时不再混入 `suspended` suggestion，避免 lane 语义漂移。
+- server/app 两端 `Suggestion` 的 `type / status / bucket` 已完成一轮联合类型收紧，减少字符串漂移风险。
+- app 侧 `requires_action` 相关运行态语义已补洞：避免会话从 `running -> requires_action` 时提前清空 queued marker。
+
+当前仍待收尾：
+
+- `bucket` 仍是派生值，尚未持久化为稳定字段。
+- `payload` 仍不是按 `type` 绑定的判别联合。
+- server/app 仍未共享单一 Suggestion schema（例如进入 `happy-wire`）。
+
+结论：阶段 D 已完成核心产品落地，但尚未完成“稳定化终局”，应继续按收尾项推进，而不是误判为纯规划或已完全收口。
+
 ### 阶段 E — 受限自治执行
 
 **目标**：在明确授权边界内，让世界自动把低风险建议转成真实任务并推进。
@@ -831,9 +850,7 @@ World 逐步从 Goal list 演进为：
 | 2026-04-10 | 阶段 B 中期同步：当时普通 task 已补结果上报闭环（`HAPPY_TASK_*` 注入、`/v1/tasks/result`、Goal blocker 读取任务语义摘要），但 task-scoped 窄权限 token 尚未收口（后续已于同日完成） |
 | 2026-04-09 | 阶段 A 收尾：AgentMessage 驱动的 blocker 真相源已接入 Goal list/detail，详情页补最小处理动作，Goals 列表补聚合摘要与基础筛选 |
 | 2026-04-10 | 阶段 C 实施计划定稿：3 Phase 拆解（Server 真相源 → App 展示 → Skill 可选闭环），新增 `WorldSuggestion` 模型设计、4 类输入源、3 条 generator 规则、REST/ephemeral 接口草案 |
-| 2026-04-10 | 阶段 C 全部完成：Phase 1 Server 真相源（WorldSuggestion Prisma 模型 + generate/query/accept/dismiss 模块 + 4 REST 路由 + ephemeral + inTx 原子性 + task-trigger 派发）；Phase 2 App 展示（API client + SuggestionCard + WorldOverviewTab 集成 + ephemeral 订阅 + i18n 11 语言）；Phase 3 Skill 闭环（completedTaskSkill generator）；code review 修复 5 项（TOCTOU/N+1/dedup 语义/task 派发/evidence 关联） |
-
-| 2026-04-10 | 补充阶段 A/B/C 最小实现核对附录：为已完成声明补上关键代码落点，明确当前状态为“激活主线已完成、D-H 仍属规划” |
+| 2026-04-11 | 阶段 D 进入收尾：WorldOverview 三分桶建议流、GoalDetail suggestion、`goalId / bucket` 查询、bucket 查询语义修复、Suggestion 类型联合收紧与 requires_action queued marker 补洞已落地；当前剩余 bucket 持久化、payload 判别联合、shared schema 收口 |
 
 （后续每一轮活化：在此表追加一行，并勾选上方清单。）
 
@@ -841,7 +858,7 @@ World 逐步从 Goal list 演进为：
 
 ## 附录：阶段 A/B/C 实现状态核对（最小版）
 
-> **结论**：阶段 A/B/C 已在代码中找到明确实现落点；当前应视为**激活主线已完成**，阶段 D-H 仍属规划。
+> **结论**：阶段 A/B/C 已在代码中找到明确实现落点；当前应视为**激活主线已完成，阶段 D 已完成核心产品落地并进入收尾，阶段 E-H 仍属规划**。
 
 ### 阶段 A：Goal 主入口 / blocker / 实时同步
 
