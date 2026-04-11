@@ -125,19 +125,18 @@ export interface SuggestionEvidence {
     label: string;
 }
 
-export interface SuggestionPayload {
-    goal?: { title: string; detail?: string; priority?: string };
-    task?: { title: string; prompt: string; roleType?: string; goalId?: string; priority?: string };
-    skill?: { title: string; content: string; sourceTaskId?: string };
-    decision?: {
+export type SuggestionPayload =
+    | { goal: { title: string; detail?: string; priority?: string } }
+    | { task: { title: string; prompt: string; roleType?: string; goalId?: string; priority?: string } }
+    | { skill: { title: string; content: string; sourceTaskId?: string } }
+    | { decision: {
         question: string;
         context?: string;
         goalId?: string;
         existingDecisionId?: string;
         precedentKey?: string;
         options: Array<{ id: string; description: string; pros?: string; cons?: string }>;
-    };
-}
+    } };
 
 export interface SuggestionSummary {
     id: string;

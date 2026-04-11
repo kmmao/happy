@@ -8,9 +8,76 @@ import {
     shouldRefetchSuggestions,
     mergeFetchedSuggestions,
     groupSuggestionsByBucket,
+    getSuggestionPayloadTitle,
     type SuggestionLike,
 } from "./worldSuggestionViewModel";
-import type { SuggestionBucket, SuggestionStatus, SuggestionType } from "@/sync/apiWorld";
+import type { SuggestionBucket, SuggestionSummary, SuggestionType } from "@/sync/apiWorld";
+
+function createSuggestion(overrides: Partial<SuggestionSummary>): SuggestionSummary {
+    return {
+        id: "sug-1",
+        projectId: "proj-1",
+        relatedGoalId: null,
+        relatedTaskId: null,
+        type: "suggested_task",
+        title: "Fallback title",
+        summary: "summary",
+        reason: "reason",
+        evidence: [],
+        recommendedRole: null,
+        payload: {
+            task: {
+                title: "Task title",
+                prompt: "Task prompt",
+                priority: "user",
+            },
+        },
+        requiresHuman: true,
+        status: "open",
+        dedupeKey: "dedupe:1",
+        bucket: "next_step",
+        createdAt: 1,
+        actedAt: null,
+        ...overrides,
+    };
+}
+
+describe("getSuggestionPayloadTitle", () => {
+    it("returns task title from task suggestion payload", () => {
+        expect(getSuggestionPayloadTitle(createSuggestion({
+            type: "suggested_task",
+            payload: {
+                task: { title: "Fix build", prompt: "Investigate", priority: "user" },
+            },
+        }))).toBe("Fix build");
+    });
+
+    it("returns decision question from decision suggestion payload", () => {
+        expect(getSuggestionPayloadTitle(createSuggestion({
+            type: "suggested_decision",
+            title: "Fallback title",
+            payload: {
+                decision: {
+                    question: "What next?",
+                    options: [
+                        { id: "a", description: "A" },
+                        { id: "b", description: "B" },
+                    ],
+                },
+            },
+        }))).toBe("What next?");
+    });
+
+    it("falls back to suggestion title for mismatched payload branch", () => {
+        expect(getSuggestionPayloadTitle(createSuggestion({
+            type: "suggested_goal",
+            title: "Recovered goal",
+            payload: {
+                task: { title: "Wrong task", prompt: "Wrong task", priority: "user" },
+            } as SuggestionSummary["payload"],
+        }))).toBe("Recovered goal");
+    });
+});
 
 describe("getSuggestionTypeLabelKey", () => {
     it("returns decision label key for suggested_decision", () => {
@@ -164,4 +231,3 @@ describe("restoreSuggestionAtIndex", () => {
         ]);
     });
 });
-

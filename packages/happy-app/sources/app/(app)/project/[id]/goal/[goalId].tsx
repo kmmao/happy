@@ -30,7 +30,7 @@ import {
 } from "./goalDetailViewModel";
 import { buildGoalDetailRouteState } from "./goalDetailRouteSafety";
 import { SuggestionCard } from "@/components/project/SuggestionCard";
-import { getSuggestionTypeLabelKey } from "@/components/project/worldSuggestionViewModel";
+import { getSuggestionPayloadTitle, getSuggestionTypeLabelKey } from "@/components/project/worldSuggestionViewModel";
 
 function isSafeId(value: string | undefined): value is string {
     return Boolean(value && /^[A-Za-z0-9_-]+$/.test(value));
@@ -121,11 +121,7 @@ function GoalDetailScreen() {
     const handleAcceptSuggestion = React.useCallback(async (suggestion: SuggestionSummary) => {
         if (!projectServerId) return;
         const typeLabel = t(getSuggestionTypeLabelKey(suggestion.type));
-        const payloadTitle = suggestion.payload.goal?.title
-            ?? suggestion.payload.task?.title
-            ?? suggestion.payload.skill?.title
-            ?? suggestion.payload.decision?.question
-            ?? suggestion.title;
+        const payloadTitle = getSuggestionPayloadTitle(suggestion);
         const confirmed = await Modal.confirm(
             t("suggestions.acceptConfirmTitle"),
             t("suggestions.acceptConfirmBody", { type: typeLabel, title: payloadTitle }),

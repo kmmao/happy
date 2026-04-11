@@ -32,6 +32,7 @@ import { SuggestionCard } from "./SuggestionCard";
 import {
     applySuggestionStatusUpdate,
     getSuggestionTypeLabelKey,
+    getSuggestionPayloadTitle,
     groupSuggestionsByBucket,
     mergeFetchedSuggestions,
     removeSuggestionOptimistically,
@@ -148,11 +149,7 @@ export const WorldOverviewTab = React.memo(
             if (!project.serverId) return;
 
             const typeLabel = t(getSuggestionTypeLabelKey(suggestion.type));
-            const payloadTitle = suggestion.payload.goal?.title
-                ?? suggestion.payload.task?.title
-                ?? suggestion.payload.skill?.title
-                ?? suggestion.payload.decision?.question
-                ?? suggestion.title;
+            const payloadTitle = getSuggestionPayloadTitle(suggestion);
 
             const confirmed = await Modal.confirm(
                 t("suggestions.acceptConfirmTitle"),

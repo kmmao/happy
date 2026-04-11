@@ -1,5 +1,5 @@
 import type { TranslationKey } from "@/text";
-import type { SuggestionBucket, SuggestionStatus, SuggestionType } from "@/sync/apiWorld";
+import type { SuggestionBucket, SuggestionStatus, SuggestionSummary, SuggestionType } from "@/sync/apiWorld";
 
 export interface SuggestionLike {
     id: string;
@@ -35,6 +35,19 @@ const TYPE_CONFIG: Record<SuggestionType, { icon: string; color: string }> = {
 
 export function getSuggestionTypeConfig(type: SuggestionType): { icon: string; color: string } {
     return TYPE_CONFIG[type] ?? TYPE_CONFIG.suggested_task;
+}
+
+export function getSuggestionPayloadTitle(suggestion: SuggestionSummary): string {
+    if (suggestion.type === "suggested_goal") {
+        return "goal" in suggestion.payload ? suggestion.payload.goal.title : suggestion.title;
+    }
+    if (suggestion.type === "suggested_task") {
+        return "task" in suggestion.payload ? suggestion.payload.task.title : suggestion.title;
+    }
+    if (suggestion.type === "suggested_skill") {
+        return "skill" in suggestion.payload ? suggestion.payload.skill.title : suggestion.title;
+    }
+    return "decision" in suggestion.payload ? suggestion.payload.decision.question : suggestion.title;
 }
 
 export function getSuggestionTypeLabelKey(type: SuggestionType): TranslationKey {
