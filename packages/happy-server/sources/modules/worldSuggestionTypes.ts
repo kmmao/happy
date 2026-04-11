@@ -13,8 +13,6 @@ export type SuggestionBucket = typeof SUGGESTION_BUCKETS[number];
 
 export const EVIDENCE_KINDS = ["goal", "task", "decision", "message", "narrative"] as const;
 
-// --- Zod Schemas ---
-
 export const SuggestionEvidenceSchema = z.object({
     kind: z.enum(EVIDENCE_KINDS),
     id: z.string().optional(),
@@ -27,6 +25,7 @@ export const SuggestionGoalPayloadSchema = z.object({
     detail: z.string().optional(),
     priority: z.string().optional(),
 });
+export type SuggestionGoalPayload = z.infer<typeof SuggestionGoalPayloadSchema>;
 
 export const SuggestionTaskPayloadSchema = z.object({
     title: z.string(),
@@ -35,12 +34,14 @@ export const SuggestionTaskPayloadSchema = z.object({
     goalId: z.string().optional(),
     priority: z.string().optional(),
 });
+export type SuggestionTaskPayload = z.infer<typeof SuggestionTaskPayloadSchema>;
 
 export const SuggestionSkillPayloadSchema = z.object({
     title: z.string(),
     content: z.string(),
     sourceTaskId: z.string().optional(),
 });
+export type SuggestionSkillPayload = z.infer<typeof SuggestionSkillPayloadSchema>;
 
 export const SuggestionDecisionPayloadSchema = z.object({
     question: z.string(),
@@ -55,14 +56,20 @@ export const SuggestionDecisionPayloadSchema = z.object({
     })).min(2).max(10),
     precedentKey: z.string().optional(),
 });
+export type SuggestionDecisionPayload = z.infer<typeof SuggestionDecisionPayloadSchema>;
 
-export const SuggestionPayloadSchema = z.object({
-    goal: SuggestionGoalPayloadSchema.optional(),
-    task: SuggestionTaskPayloadSchema.optional(),
-    skill: SuggestionSkillPayloadSchema.optional(),
-    decision: SuggestionDecisionPayloadSchema.optional(),
-});
-export type SuggestionPayload = z.infer<typeof SuggestionPayloadSchema>;
+export type SuggestionPayload =
+    | { goal: SuggestionGoalPayload }
+    | { task: SuggestionTaskPayload }
+    | { skill: SuggestionSkillPayload }
+    | { decision: SuggestionDecisionPayload };
+
+export const SuggestionPayloadSchema = z.union([
+    z.object({ goal: SuggestionGoalPayloadSchema }),
+    z.object({ task: SuggestionTaskPayloadSchema }),
+    z.object({ skill: SuggestionSkillPayloadSchema }),
+    z.object({ decision: SuggestionDecisionPayloadSchema }),
+]);
 
 export const AcceptBodySchema = z.object({
     machineId: z.string().optional(),
@@ -70,8 +77,6 @@ export const AcceptBodySchema = z.object({
     roleOverride: z.string().optional(),
 });
 export type AcceptBody = z.infer<typeof AcceptBodySchema>;
-
-// --- Serialized output ---
 
 export interface SuggestionSerialized {
     id: string;
@@ -108,11 +113,19 @@ export function serializeSuggestion(row: {
     requiresHuman: boolean;
     status: SuggestionStatus;
     dedupeKey: string;
+    bucket?: SuggestionBucket | null;
     createdAt: Date;
     actedAt: Date | null;
 }): SuggestionSerialized {
     const evidence = safeParseJson(row.evidence, [] as SuggestionEvidence[]);
-    const payload = safeParseJson(row.payload, {} as SuggestionPayload);
+    const rawPayload = safeParseJson(row.payload, {} as Record<string, unknown>);
+    const payload = row.type === "suggested_goal"
+        ? normalizeSuggestionPayload({ type: row.type, title: row.title, rawPayload })
+        : row.type === "suggested_task"
+            ? normalizeSuggestionPayload({ type: row.type, title: row.title, rawPayload })
+            : row.type === "suggested_skill"
+                ? normalizeSuggestionPayload({ type: row.type, title: row.title, rawPayload })
+                : normalizeSuggestionPayload({ type: row.type, title: row.title, rawPayload });
     return {
         id: row.id,
         projectId: row.projectId,
@@ -128,7 +141,7 @@ export function serializeSuggestion(row: {
         requiresHuman: row.requiresHuman,
         status: row.status,
         dedupeKey: row.dedupeKey,
-        bucket: deriveSuggestionBucket({
+        bucket: row.bucket ?? deriveSuggestionBucket({
             type: row.type,
             payload,
             evidence,
@@ -139,13 +152,66 @@ export function serializeSuggestion(row: {
     };
 }
 
+export function normalizeSuggestionPayload(input: {
+    type: "suggested_goal";
+    title: string;
+    rawPayload: Record<string, unknown>;
+}): { goal: SuggestionGoalPayload };
+export function normalizeSuggestionPayload(input: {
+    type: "suggested_task";
+    title: string;
+    rawPayload: Record<string, unknown>;
+}): { task: SuggestionTaskPayload };
+export function normalizeSuggestionPayload(input: {
+    type: "suggested_skill";
+    title: string;
+    rawPayload: Record<string, unknown>;
+}): { skill: SuggestionSkillPayload };
+export function normalizeSuggestionPayload(input: {
+    type: "suggested_decision";
+    title: string;
+    rawPayload: Record<string, unknown>;
+}): { decision: SuggestionDecisionPayload };
+export function normalizeSuggestionPayload(input: {
+    type: SuggestionType;
+    title: string;
+    rawPayload: Record<string, unknown>;
+}): SuggestionPayload {
+    if (input.type === "suggested_goal") {
+        const parsed = z.object({ goal: SuggestionGoalPayloadSchema }).safeParse(input.rawPayload);
+        if (parsed.success) return parsed.data;
+        return { goal: { title: input.title } };
+    }
+    if (input.type === "suggested_task") {
+        const parsed = z.object({ task: SuggestionTaskPayloadSchema }).safeParse(input.rawPayload);
+        if (parsed.success) return parsed.data;
+        return { task: { title: input.title, prompt: input.title, priority: "user" } };
+    }
+    if (input.type === "suggested_skill") {
+        const parsed = z.object({ skill: SuggestionSkillPayloadSchema }).safeParse(input.rawPayload);
+        if (parsed.success) return parsed.data;
+        return { skill: { title: input.title, content: input.title } };
+    }
+    const parsed = z.object({ decision: SuggestionDecisionPayloadSchema }).safeParse(input.rawPayload);
+    if (parsed.success) return parsed.data;
+    return {
+        decision: {
+            question: input.title,
+            options: [
+                { id: "option_a", description: "Option A" },
+                { id: "option_b", description: "Option B" },
+            ],
+        },
+    };
+}
+
 export function deriveSuggestionBucket(input: {
     type: SuggestionType;
     payload: SuggestionPayload;
     evidence: SuggestionEvidence[];
     requiresHuman: boolean;
 }): SuggestionBucket {
-    if (input.type === "suggested_decision" || input.payload.decision) {
+    if (input.type === "suggested_decision" || "decision" in input.payload) {
         return "needs_decision";
     }
     if (input.evidence.some((item) => item.kind === "message")) {

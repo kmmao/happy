@@ -86,7 +86,7 @@ const {
         })),
         worldSuggestionDismiss: vi.fn(async () => undefined),
         worldSuggestionQuery: vi.fn(async (accountId: string, projectId: string, opts?: { status?: string; limit?: number; goalId?: string; bucket?: string }) => {
-            const includeSuspended = opts?.status === "open" && !opts?.bucket;
+            const includeSuspended = opts?.status === "open";
             const statuses = includeSuspended ? ["open", "suspended"] : [opts?.status ?? "open"];
             return state.suggestions
                 .filter((item) => item.accountId === accountId && item.projectId === projectId)
@@ -155,7 +155,7 @@ describe("worldSuggestionRoutes suspended lifecycle", () => {
         if (app) await app.close();
     });
 
-    it("excludes suspended suggestions from bucket-filtered open queries", async () => {
+    it("includes suspended suggestions again when bucket is persisted and matches", async () => {
         seedSuggestion({
             id: "suggestion-open-next-step",
             accountId: "user-1",
@@ -165,12 +165,12 @@ describe("worldSuggestionRoutes suspended lifecycle", () => {
             title: "Open next step",
         });
         seedSuggestion({
-            id: "suggestion-suspended-decision",
+            id: "suggestion-suspended-next-step",
             accountId: "user-1",
             projectId: "project-1",
             status: "suspended",
-            bucket: "needs_decision",
-            title: "Suspended decision",
+            bucket: "next_step",
+            title: "Suspended next step",
         });
 
         app = await createApp();
@@ -182,29 +182,11 @@ describe("worldSuggestionRoutes suspended lifecycle", () => {
         });
 
         expect(bucketRes.statusCode).toBe(200);
-        expect(bucketRes.json()).toEqual({
-            suggestions: [
-                expect.objectContaining({
-                    id: "suggestion-open-next-step",
-                    status: "open",
-                    bucket: "next_step",
-                }),
-            ],
-        });
-        expect(worldSuggestionQuery).toHaveBeenCalledWith("user-1", "project-1", {
-            status: "open",
-            limit: 50,
-            bucket: "next_step",
-            goalId: undefined,
-        });
-
-        const openRes = await app.inject({
-            method: "GET",
-            url: "/v1/projects/project-1/world/suggestions?status=open",
-            headers: { "x-user-id": "user-1" },
-        });
-
-        expect(openRes.statusCode).toBe(200);
+        expect(bucketRes.json().suggestions.map((item: any) => item.id)).toEqual([
+            "suggestion-suspended-1",
+            "suggestion-open-next-step",
+            "suggestion-suspended-next-step",
+        ]);
     });
 
     it("lists suspended suggestions in open query and allows dismiss and accept actions", async () => {

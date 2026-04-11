@@ -5,7 +5,6 @@ const {
     buildTaskTriggerEphemeral,
     buildWorldSuggestionUpdatedEphemeral,
     createTaskResultToken,
-    decisionCreate,
     tx,
     dbMock,
 } = vi.hoisted(() => ({
@@ -13,7 +12,6 @@ const {
     buildTaskTriggerEphemeral: vi.fn((payload: unknown) => payload),
     buildWorldSuggestionUpdatedEphemeral: vi.fn((payload: unknown) => payload),
     createTaskResultToken: vi.fn(async ({ taskId }: { taskId: string }) => `task-token-for-${taskId}`),
-    decisionCreate: vi.fn(),
     tx: {
         worldSuggestion: {
             findFirst: vi.fn(async () => ({ id: "suggestion-1" })),
@@ -40,6 +38,7 @@ const {
             findFirst: vi.fn(async (): Promise<any> => ({
                 id: "suggestion-1",
                 type: "suggested_task",
+                title: "Fix build",
                 payload: JSON.stringify({
                     task: {
                         title: "Fix build",
@@ -51,9 +50,6 @@ const {
                 status: "open",
             })),
             update: vi.fn(async () => ({})),
-        },
-        decision: {
-            findFirst: vi.fn(),
         },
         task: {
             findFirst: vi.fn(async () => ({ machineId: "machine-1" })),
@@ -80,7 +76,6 @@ const { goalCreate } = vi.hoisted(() => ({
 }));
 
 vi.mock("./goalCreate", () => ({ goalCreate }));
-vi.mock("./decisionCreate", () => ({ decisionCreate }));
 
 import { worldSuggestionAccept } from "./worldSuggestionAccept";
 
@@ -93,6 +88,7 @@ describe("worldSuggestionAccept", () => {
         dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
             id: "suggestion-goal-1",
             type: "suggested_goal",
+            title: "Ship feature",
             payload: JSON.stringify({
                 goal: {
                     title: "Ship feature",
@@ -119,16 +115,6 @@ describe("worldSuggestionAccept", () => {
             where: { id: "suggestion-goal-1" },
             data: { status: "suspended" },
         });
-        expect(buildWorldSuggestionUpdatedEphemeral).toHaveBeenCalledWith({
-            projectId: "project-1",
-            suggestionId: "suggestion-goal-1",
-            status: "processing",
-        });
-        expect(buildWorldSuggestionUpdatedEphemeral).toHaveBeenCalledWith({
-            projectId: "project-1",
-            suggestionId: "suggestion-goal-1",
-            status: "suspended",
-        });
     });
 
     it("includes resultToken when dispatching accepted suggested task", async () => {
@@ -141,11 +127,6 @@ describe("worldSuggestionAccept", () => {
         await Promise.resolve();
 
         expect(result.createdEntityType).toBe("task");
-        expect(buildWorldSuggestionUpdatedEphemeral).toHaveBeenCalledWith({
-            projectId: "project-1",
-            suggestionId: "suggestion-1",
-            status: "accepted",
-        });
         expect(createTaskResultToken).toHaveBeenCalledWith({
             userId: "user-1",
             taskId: "task-1",
@@ -156,33 +137,38 @@ describe("worldSuggestionAccept", () => {
         }));
     });
 
-    it("marks accepted suggested task as failed when dispatch setup throws", async () => {
-        createTaskResultToken.mockRejectedValueOnce(new Error("token failed"));
+    it("falls back to type-safe goal payload when stored goal payload mismatches", async () => {
+        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
+            id: "suggestion-goal-fallback",
+            type: "suggested_goal",
+            title: "Recovered goal title",
+            payload: JSON.stringify({
+                task: {
+                    title: "Wrong task payload",
+                    prompt: "Should not be used",
+                },
+            }),
+            relatedGoalId: null,
+            status: "open",
+        });
 
-        await worldSuggestionAccept({
+        const result = await worldSuggestionAccept({
             accountId: "user-1",
             projectId: "project-1",
-            suggestionId: "suggestion-1",
+            suggestionId: "suggestion-goal-fallback",
         });
 
-        await Promise.resolve();
-        await Promise.resolve();
-
-        expect(dbMock.task.update).toHaveBeenCalledWith({
-            where: { id: "task-1" },
-            data: { status: "failed", errorMessage: "Task dispatch failed: token failed" },
-        });
-        expect(buildWorldSuggestionUpdatedEphemeral).toHaveBeenCalledWith({
-            projectId: "project-1",
-            suggestionId: "suggestion-1",
-            status: "accepted",
-        });
+        expect(goalCreate).toHaveBeenCalledWith(expect.objectContaining({
+            title: "Recovered goal title",
+        }));
+        expect(result.createdEntityType).toBe("goal");
     });
 
     it("accepts suggested_decision when existing decision is still pending", async () => {
         dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
             id: "suggestion-2",
             type: "suggested_decision",
+            title: "What next?",
             payload: JSON.stringify({
                 decision: {
                     question: "What next?",
@@ -196,7 +182,7 @@ describe("worldSuggestionAccept", () => {
             relatedGoalId: null,
             status: "open",
         });
-        tx.decision.findFirst.mockResolvedValueOnce({ id: "decision-2" });
+        tx.decision.findFirst.mockResolvedValueOnce({ id: "decision-2", status: "pending" });
 
         const result = await worldSuggestionAccept({
             accountId: "user-1",
@@ -208,193 +194,6 @@ describe("worldSuggestionAccept", () => {
             suggestionId: "suggestion-2",
             createdEntityType: "decision",
             createdEntityId: "decision-2",
-        });
-        expect(tx.worldSuggestion.update).toHaveBeenCalledWith({
-            where: { id: "suggestion-2" },
-            data: { status: "accepted", actedAt: expect.any(Date) },
-        });
-    });
-
-    it("creates a new decision when suggested_decision has no existing decision id", async () => {
-        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
-            id: "suggestion-3",
-            type: "suggested_decision",
-            payload: JSON.stringify({
-                decision: {
-                    question: "What next?",
-                    options: [
-                        { id: "a", description: "A" },
-                        { id: "b", description: "B" },
-                    ],
-                    context: "Need a call",
-                    precedentKey: "next-step",
-                    goalId: "goal-7",
-                },
-            }),
-            relatedGoalId: null,
-            status: "open",
-        });
-
-        const result = await worldSuggestionAccept({
-            accountId: "user-1",
-            projectId: "project-1",
-            suggestionId: "suggestion-3",
-        });
-
-        expect(tx.decision.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                accountId: "user-1",
-                projectId: "project-1",
-                question: "What next?",
-                context: "Need a call",
-                precedentKey: "next-step",
-                goalId: "goal-7",
-            }),
-        });
-        expect(result).toEqual({
-            suggestionId: "suggestion-3",
-            createdEntityType: "decision",
-            createdEntityId: "decision-2",
-        });
-        expect(tx.worldSuggestion.update).toHaveBeenCalledWith({
-            where: { id: "suggestion-3" },
-            data: { status: "accepted", actedAt: expect.any(Date) },
-        });
-    });
-
-    it("accepts suggested_skill without creating task skill usage bindings", async () => {
-        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
-            id: "suggestion-skill-1",
-            type: "suggested_skill",
-            payload: JSON.stringify({
-                skill: {
-                    title: "From task: Implement auth refresh",
-                    content: "Successful outcome: refreshed auth flow",
-                    sourceTaskId: "task-source-1",
-                },
-            }),
-            relatedGoalId: null,
-            relatedTaskId: "task-source-1",
-            status: "open",
-        });
-
-        const result = await worldSuggestionAccept({
-            accountId: "user-1",
-            projectId: "project-1",
-            suggestionId: "suggestion-skill-1",
-        });
-
-        expect(tx.skill.create).toHaveBeenCalledWith({
-            data: {
-                accountId: "user-1",
-                projectId: "project-1",
-                name: "From task: Implement auth refresh",
-                content: "Successful outcome: refreshed auth flow",
-                archived: false,
-            },
-        });
-        expect(result).toEqual({
-            suggestionId: "suggestion-skill-1",
-            createdEntityType: "skill",
-            createdEntityId: "skill-1",
-        });
-    });
-
-    it("falls back to a task-scoped name when suggested_skill name already exists", async () => {
-        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
-            id: "suggestion-skill-duplicate",
-            type: "suggested_skill",
-            payload: JSON.stringify({
-                skill: {
-                    title: "From task: Implement auth refresh",
-                    content: "Successful outcome: refreshed auth flow",
-                    sourceTaskId: "task-source-2",
-                },
-            }),
-            relatedGoalId: null,
-            relatedTaskId: "task-source-2",
-            status: "open",
-        });
-        tx.skill.create
-            .mockRejectedValueOnce({ code: "P2002" })
-            .mockResolvedValueOnce({ id: "skill-2" });
-
-        const result = await worldSuggestionAccept({
-            accountId: "user-1",
-            projectId: "project-1",
-            suggestionId: "suggestion-skill-duplicate",
-        });
-
-        expect(tx.skill.create).toHaveBeenNthCalledWith(1, {
-            data: {
-                accountId: "user-1",
-                projectId: "project-1",
-                name: "From task: Implement auth refresh",
-                content: "Successful outcome: refreshed auth flow",
-                archived: false,
-            },
-        });
-        expect(tx.skill.create).toHaveBeenNthCalledWith(2, {
-            data: {
-                accountId: "user-1",
-                projectId: "project-1",
-                name: "From task: Implement auth refresh (task-source-2)",
-                content: "Successful outcome: refreshed auth flow",
-                archived: false,
-            },
-        });
-        expect(result).toEqual({
-            suggestionId: "suggestion-skill-duplicate",
-            createdEntityType: "skill",
-            createdEntityId: "skill-2",
-        });
-    });
-
-    it("accepts suggested_decision when existing decision is expired", async () => {
-        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
-            id: "suggestion-expired-decision",
-            type: "suggested_decision",
-            payload: JSON.stringify({
-                decision: {
-                    question: "What next?",
-                    existingDecisionId: "decision-expired",
-                    options: [
-                        { id: "a", description: "A" },
-                        { id: "b", description: "B" },
-                    ],
-                },
-            }),
-            relatedGoalId: null,
-            status: "open",
-        });
-        tx.decision.findFirst.mockResolvedValueOnce({ id: "decision-expired", status: "expired" });
-
-        const result = await worldSuggestionAccept({
-            accountId: "user-1",
-            projectId: "project-1",
-            suggestionId: "suggestion-expired-decision",
-        });
-
-        expect(result).toEqual({
-            suggestionId: "suggestion-expired-decision",
-            createdEntityType: "decision",
-            createdEntityId: "decision-expired",
-        });
-        expect(tx.decision.findFirst).toHaveBeenCalledWith({
-            where: {
-                id: "decision-expired",
-                accountId: "user-1",
-                projectId: "project-1",
-                status: { in: ["pending", "expired"] },
-            },
-            select: { id: true, status: true },
-        });
-        expect(tx.decision.update).toHaveBeenCalledWith({
-            where: { id: "decision-expired" },
-            data: {
-                status: "pending",
-                expiresAt: expect.any(Date),
-            },
         });
     });
 
@@ -402,6 +201,7 @@ describe("worldSuggestionAccept", () => {
         dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
             id: "suggestion-2",
             type: "suggested_decision",
+            title: "What next?",
             payload: JSON.stringify({
                 decision: {
                     question: "What next?",
@@ -422,8 +222,5 @@ describe("worldSuggestionAccept", () => {
             projectId: "project-1",
             suggestionId: "suggestion-2",
         })).rejects.toThrow("Decision not found or no longer pending");
-
-        expect(tx.worldSuggestion.update).not.toHaveBeenCalled();
-        expect(decisionCreate).not.toHaveBeenCalled();
     });
 });

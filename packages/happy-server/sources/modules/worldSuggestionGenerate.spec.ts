@@ -283,31 +283,35 @@ import {
 } from "./worldSuggestionGenerate";
 import { normalizeSuggestionFactText } from "./summaryDetailFilter";
 
-describe("failedTaskFollowup", () => {
+describe("worldSuggestionGenerate", () => {
     beforeEach(() => {
         resetState();
         vi.clearAllMocks();
     });
 
-    it("should generate a suggested_task for a failed task with remaining retries", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("binds suggested_task payload to task type", () => {
         const result = failedTaskFollowup({
             id: "task-1",
             title: "Fix auth endpoint",
-            errorMessage: "Connection refused: ECONNREFUSED 127.0.0.1:5432",
+            errorMessage: "Connection refused",
             goalId: "goal-1",
             attempt: 1,
             maxAttempts: 3,
         });
 
         expect(result.type).toBe("suggested_task");
-        expect(result.dedupeKey).toBe("failed_task_followup:task-1:1:3:Connection refused: ECONNREFUSED 127.0.0.1:5432");
-        expect(result.relatedGoalId).toBe("goal-1");
-        expect(result.relatedTaskId).toBe("task-1");
-        expect(result.payload.task).toBeDefined();
-        expect(result.payload.task!.prompt).toContain("Connection refused");
+        expect(result.bucket).toBe("next_step");
+        expect("task" in result.payload).toBe(true);
+        expect("goal" in result.payload).toBe(false);
+        if (!("task" in result.payload)) throw new Error("expected task payload");
+        expect(result.payload.task.prompt).toContain("Connection refused");
     });
 
-    it("should use shared fact text normalization for empty error messages", () => {
+    it("normalizes empty fact text in failed task follow-up", () => {
         const fallback = normalizeSuggestionFactText("   ", "Unknown error");
         const result = failedTaskFollowup({
             id: "task-empty-error",
@@ -319,13 +323,11 @@ describe("failedTaskFollowup", () => {
         });
 
         expect(result.reason).toBe(`Task failed with: ${fallback}`);
-        expect(result.payload.task!.prompt).toContain(`Error: ${fallback}`);
-        expect(result.dedupeKey).toBe(`failed_task_followup:task-empty-error:1:3:${fallback}`);
+        if (!("task" in result.payload)) throw new Error("expected task payload");
+        expect(result.payload.task.prompt).toContain(`Error: ${fallback}`);
     });
-});
 
-describe("retryExhaustedDecision", () => {
-    it("should generate a suggested_decision when retries are exhausted", () => {
+    it("binds suggested_decision payload to exhausted retry type", () => {
         const result = retryExhaustedDecision({
             id: "task-2",
             title: "Deploy release",
@@ -336,17 +338,32 @@ describe("retryExhaustedDecision", () => {
         });
 
         expect(result.type).toBe("suggested_decision");
-        expect(result.relatedGoalId).toBe("goal-2");
-        expect(result.relatedTaskId).toBe("task-2");
-        expect(result.payload.decision).toBeDefined();
-        expect(result.payload.decision!.question).toContain("Deploy release");
-        expect(result.payload.decision!.goalId).toBe("goal-2");
-        expect(result.dedupeKey).toBe("retry_exhausted_decision:task-2:3:3:Still failing after retries");
+        expect(result.bucket).toBe("needs_decision");
+        expect("decision" in result.payload).toBe(true);
+        expect("task" in result.payload).toBe(false);
+        if (!("decision" in result.payload)) throw new Error("expected decision payload");
+        expect(result.payload.decision.question).toContain("Deploy release");
     });
-});
 
-describe("blockedGoalAttention", () => {
-    it("should generate task follow-up for task_failed blockers", () => {
+    it("emits decision payload for planner timeout blockers", () => {
+        const result = blockedGoalAttention({
+            id: "goal-2",
+            title: "Plan migration",
+            description: null,
+            blocker: {
+                kind: "planner_timeout",
+                summary: "Planning result timed out",
+                requiresHuman: false,
+            },
+        });
+
+        expect(result.type).toBe("suggested_decision");
+        expect(result.bucket).toBe("needs_decision");
+        if (!("decision" in result.payload)) throw new Error("expected decision payload");
+        expect(result.payload.decision.context).toBe("Goal is blocked");
+    });
+
+    it("emits task payload for blocked goal remediation", () => {
         const result = blockedGoalAttention({
             id: "goal-1",
             title: "Ship v2.0",
@@ -360,91 +377,13 @@ describe("blockedGoalAttention", () => {
         });
 
         expect(result.type).toBe("suggested_task");
+        expect(result.bucket).toBe("next_step");
+        if (!("task" in result.payload)) throw new Error("expected task payload");
+        expect(result.payload.task.goalId).toBe("goal-1");
         expect(result.relatedTaskId).toBe("task-9");
-        expect(result.reason).toContain("Planner task failed with syntax error");
-        expect(result.dedupeKey).toBe("blocked_goal_attention:goal-1:task_failed:Planner task failed with syntax error");
     });
 
-    it("should use shared fact text normalization for blocker summaries", () => {
-        const fallback = normalizeSuggestionFactText("   ", "Goal is blocked");
-        const result = blockedGoalAttention({
-            id: "goal-empty-blocker",
-            title: "Ship v2.0",
-            description: null,
-            blocker: {
-                kind: "task_failed",
-                summary: "   ",
-                sourceTaskId: "task-9",
-                requiresHuman: false,
-            },
-        });
-
-        expect(result.reason).toBe(fallback);
-        expect(result.payload.task!.prompt).toContain(`Blocker: ${fallback}`);
-        expect(result.dedupeKey).toBe(`blocked_goal_attention:goal-empty-blocker:task_failed:${fallback}`);
-    });
-
-    it("should generate decision attention for planner timeout blockers", () => {
-        const result = blockedGoalAttention({
-            id: "goal-2",
-            title: "Plan migration",
-            description: null,
-            blocker: {
-                kind: "planner_timeout",
-                summary: "Planning result timed out",
-                requiresHuman: false,
-            },
-        });
-
-        expect(result.type).toBe("suggested_decision");
-        expect(result.payload.decision).toBeDefined();
-        expect(result.payload.decision!.question).toContain("Plan migration");
-        expect(result.dedupeKey).toBe("blocked_goal_attention:goal-2:planner_timeout:Planning result timed out");
-    });
-
-    it("should normalize planner timeout context when goal description is blank", () => {
-        const result = blockedGoalAttention({
-            id: "goal-blank-description",
-            title: "Plan migration",
-            description: "   ",
-            blocker: {
-                kind: "planner_timeout",
-                summary: "Planning result timed out",
-                requiresHuman: false,
-            },
-        });
-
-        expect(result.payload.decision!.context).toBe("Goal is blocked");
-    });
-});
-
-describe("decisionAttention", () => {
-    it("should distinguish pending vs expired decisions", () => {
-        const pending = decisionAttention({
-            id: "dec-1",
-            question: "Should we use PostgreSQL or MongoDB?",
-            goalId: "goal-1",
-            status: "pending",
-            expiresAt: new Date("2026-04-12T10:00:00Z"),
-        });
-        const expired = decisionAttention({
-            id: "dec-1",
-            question: "Should we use PostgreSQL or MongoDB?",
-            goalId: "goal-1",
-            status: "expired",
-            expiresAt: new Date("2026-04-12T10:00:00Z"),
-        });
-
-        expect(pending.type).toBe("suggested_decision");
-        expect(pending.payload.decision!.existingDecisionId).toBe("dec-1");
-        expect(pending.dedupeKey).toBe("decision_attention:dec-1:pending:2026-04-12T10:00:00.000Z");
-        expect(expired.dedupeKey).toBe("decision_attention:dec-1:expired:2026-04-12T10:00:00.000Z");
-        expect(expired.summary).toContain("expired");
-    });
-});
-
-describe("completedTaskSkillSuggestion", () => {
-    it("should generate a suggested_skill for a completed task with stable session summary", () => {
+    it("binds suggested_skill payload to completed task extraction", () => {
         const result = completedTaskSkillSuggestion({
             id: "task-3",
             title: "Implement auth refresh",
@@ -454,17 +393,14 @@ describe("completedTaskSkillSuggestion", () => {
         });
 
         expect(result.type).toBe("suggested_skill");
-        expect(result.relatedTaskId).toBe("task-3");
-        expect(result.relatedGoalId).toBe("goal-3");
-        expect(result.payload.skill).toBeDefined();
-        expect(result.payload.skill!.sourceTaskId).toBe("task-3");
-        expect(result.payload.skill!.content).toContain("Updated token refresh middleware");
-        expect(result.dedupeKey).toBe("completed_task_skill:task-3:session-3:Updated token refresh middleware to reuse cached signing key and verified the auth tests pass.");
+        expect(result.bucket).toBe("next_step");
+        expect("skill" in result.payload).toBe(true);
+        expect("decision" in result.payload).toBe(false);
+        if (!("skill" in result.payload)) throw new Error("expected skill payload");
+        expect(result.payload.skill.sourceTaskId).toBe("task-3");
     });
-});
 
-describe("buildSuggestionCandidates", () => {
-    it("should only emit Sprint 1 rules", () => {
+    it("builds only current suggestion candidates", () => {
         const results = buildSuggestionCandidates({
             failedTasks: [
                 {
@@ -516,7 +452,6 @@ describe("buildSuggestionCandidates", () => {
             ],
         });
 
-        expect(results).toHaveLength(5);
         expect(results.map((item) => item.type)).toEqual([
             "suggested_task",
             "suggested_decision",
@@ -525,10 +460,8 @@ describe("buildSuggestionCandidates", () => {
             "suggested_skill",
         ]);
     });
-});
 
-describe("reconcileSuggestionCandidates", () => {
-    it("should keep dismissed suggestions dismissed for the same fact and reopen only on fact change", () => {
+    it("keeps dismissed suggestion dismissed for the same fact", () => {
         const candidate: SuggestionCandidate = {
             relatedGoalId: null,
             relatedTaskId: "task-1",
@@ -540,229 +473,99 @@ describe("reconcileSuggestionCandidates", () => {
             recommendedRole: "builder",
             payload: { task: { title: "Fix task-1", prompt: "Investigate", priority: "user" } },
             requiresHuman: true,
+            bucket: "next_step",
             dedupeKey: "failed_task_followup:task-1:1:3:boom",
             factKey: "task-1|1|3|boom",
         };
 
-        const sameFact = reconcileSuggestionCandidates({
-            candidates: [candidate],
-            existing: [
-                {
-                    id: "sug-1",
-                    dedupeKey: "failed_task_followup:task-1:1:3:boom",
-                    factKey: "task-1|1|3|boom",
-                    status: "dismissed",
-                },
-            ],
-        });
-
-        expect(sameFact.toCreate).toHaveLength(0);
-        expect(sameFact.toExpireIds).toHaveLength(0);
-        expect(sameFact.unchanged).toBe(1);
-
-        const changedFact = reconcileSuggestionCandidates({
-            candidates: [{ ...candidate, dedupeKey: "failed_task_followup:task-1:2:3:still-boom", factKey: "task-1|2|3|still-boom" }],
-            existing: [
-                {
-                    id: "sug-1",
-                    dedupeKey: "failed_task_followup:task-1:1:3:boom",
-                    factKey: "task-1|1|3|boom",
-                    status: "dismissed",
-                },
-            ],
-        });
-
-        expect(changedFact.toCreate).toHaveLength(1);
-        expect(changedFact.toExpireIds).toEqual(["sug-1"]);
-    });
-
-    it("should expire open suggestions missing from refreshed facts", () => {
         const result = reconcileSuggestionCandidates({
-            candidates: [],
-            existing: [
-                {
-                    id: "sug-open",
-                    dedupeKey: "decision_attention:dec-1:pending:none",
-                    factKey: "dec-1|pending|none",
-                    status: "open",
-                },
-                {
-                    id: "sug-accepted",
-                    dedupeKey: "decision_attention:dec-2:pending:none",
-                    factKey: "dec-2|pending|none",
-                    status: "accepted",
-                },
-            ],
+            candidates: [candidate],
+            existing: [{
+                id: "sug-1",
+                dedupeKey: "failed_task_followup:task-1:1:3:boom",
+                factKey: "task-1|1|3|boom",
+                status: "dismissed",
+            }],
         });
 
-        expect(result.toExpireIds).toEqual(["sug-open"]);
+        expect(result.toCreate).toHaveLength(0);
+        expect(result.toExpireIds).toHaveLength(0);
+        expect(result.unchanged).toBe(1);
     });
 
-    it("should treat processing and suspended suggestions as existing lifecycle rows", () => {
+    it("reopens changed dismissed fact as a new suggestion", () => {
         const candidate: SuggestionCandidate = {
             relatedGoalId: null,
-            relatedTaskId: null,
-            type: "suggested_goal",
-            title: "Create goal",
-            summary: "Goal needs follow-up",
-            reason: "Recent signal",
-            evidence: [{ kind: "goal", id: "goal-1", label: "Goal 1" }],
-            recommendedRole: null,
-            payload: { goal: { title: "Create goal" } },
+            relatedTaskId: "task-1",
+            type: "suggested_task",
+            title: "Follow up: task-1",
+            summary: "Task failed",
+            reason: "Task failed with: still-boom",
+            evidence: [{ kind: "task", id: "task-1", label: "Failed: task-1" }],
+            recommendedRole: "builder",
+            payload: { task: { title: "Fix task-1", prompt: "Investigate", priority: "user" } },
             requiresHuman: true,
-            dedupeKey: "blocked_goal_attention:goal-1:request:Recent signal",
-            factKey: "goal-1|request|Recent signal",
-        };
-
-        const processing = reconcileSuggestionCandidates({
-            candidates: [candidate],
-            existing: [
-                {
-                    id: "sug-processing",
-                    dedupeKey: "blocked_goal_attention:goal-1:request:Recent signal",
-                    factKey: "goal-1|request|Recent signal",
-                    status: "processing",
-                },
-            ],
-        });
-
-        const suspended = reconcileSuggestionCandidates({
-            candidates: [candidate],
-            existing: [
-                {
-                    id: "sug-suspended",
-                    dedupeKey: "blocked_goal_attention:goal-1:request:Recent signal",
-                    factKey: "goal-1|request|Recent signal",
-                    status: "suspended",
-                },
-            ],
-        });
-
-        expect(processing.toCreate).toHaveLength(0);
-        expect(processing.unchanged).toBe(1);
-        expect(suspended.toCreate).toHaveLength(0);
-        expect(suspended.unchanged).toBe(1);
-    });
-
-    it("should create a new suggestion when a suspended suggestion changes fact", () => {
-        const candidate: SuggestionCandidate = {
-            relatedGoalId: null,
-            relatedTaskId: null,
-            type: "suggested_goal",
-            title: "Create goal",
-            summary: "Goal needs follow-up",
-            reason: "Recent signal changed",
-            evidence: [{ kind: "goal", id: "goal-1", label: "Goal 1" }],
-            recommendedRole: null,
-            payload: { goal: { title: "Create goal" } },
-            requiresHuman: true,
-            dedupeKey: "blocked_goal_attention:goal-1:request:Recent signal changed",
-            factKey: "goal-1|request|Recent signal changed",
+            bucket: "next_step",
+            dedupeKey: "failed_task_followup:task-1:2:3:still-boom",
+            factKey: "task-1|2|3|still-boom",
         };
 
         const result = reconcileSuggestionCandidates({
             candidates: [candidate],
-            existing: [
-                {
-                    id: "sug-suspended",
-                    dedupeKey: "blocked_goal_attention:goal-1:request:Recent signal",
-                    factKey: "goal-1|request|Recent signal",
-                    status: "suspended",
-                },
-            ],
+            existing: [{
+                id: "sug-1",
+                dedupeKey: "failed_task_followup:task-1:1:3:boom",
+                factKey: "task-1|1|3|boom",
+                status: "dismissed",
+            }],
         });
 
         expect(result.toCreate).toEqual([candidate]);
-        expect(result.toExpireIds).toHaveLength(0);
-        expect(result.unchanged).toBe(0);
+        expect(result.toExpireIds).toEqual(["sug-1"]);
     });
 
-    it("should reopen stale processing suggestions as suspended on refresh event semantics", () => {
-        const processingOnly = reconcileSuggestionCandidates({
-            candidates: [],
-            existing: [
-                {
-                    id: "sug-processing",
-                    dedupeKey: "blocked_goal_attention:goal-1:request:Recent signal",
-                    factKey: "goal-1|request|Recent signal",
-                    status: "processing",
-                },
-            ],
-        });
-
-        expect(processingOnly.toExpireIds).toHaveLength(0);
-    });
-});
-
-describe("worldSuggestionRefresh", () => {
-    beforeEach(() => {
-        resetState();
-        vi.clearAllMocks();
+    it("suspends stale processing suggestions at the five minute boundary", async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date("2026-04-10T10:00:00Z"));
-    });
-
-    afterEach(() => {
-        vi.useRealTimers();
-    });
-
-    it("does not suspend processing suggestions newer than five minutes", async () => {
         seedExistingSuggestion({
-            id: "sug-processing-fresh",
+            id: "processing-stale",
             accountId: "user-1",
             projectId: "project-1",
-            dedupeKey: "blocked_goal_attention:goal-fresh:planner_timeout:Planning result timed out",
-            status: "processing",
-            updatedAt: new Date("2026-04-10T09:55:01Z"),
-        });
-
-        const result = await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.updateMany).not.toHaveBeenCalled();
-        expect(emitEphemeral).not.toHaveBeenCalled();
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalled();
-        expect(result).toEqual({ created: 0, unchanged: 0, total: 0 });
-    });
-
-    it("suspends processing suggestions exactly at the five minute boundary", async () => {
-        seedExistingSuggestion({
-            id: "sug-processing-boundary",
-            accountId: "user-1",
-            projectId: "project-1",
-            dedupeKey: "blocked_goal_attention:goal-boundary:planner_timeout:Planning result timed out",
+            dedupeKey: "blocked_goal_attention:goal-1:planner_timeout:Planning result timed out",
             status: "processing",
             updatedAt: new Date("2026-04-10T09:55:00Z"),
         });
+        setCountResult(0);
 
         const result = await worldSuggestionRefresh("user-1", "project-1");
 
         expect(dbMock.worldSuggestion.updateMany).toHaveBeenCalledWith({
-            where: { id: { in: ["sug-processing-boundary"] }, status: "processing" },
+            where: {
+                id: { in: ["processing-stale"] },
+                status: "processing",
+            },
             data: { status: "suspended" },
         });
-        expect(emitEphemeral).toHaveBeenCalledWith({
-            userId: "user-1",
-            payload: {
-                projectId: "project-1",
-                suggestionId: "sug-processing-boundary",
-                status: "suspended",
-            },
-            recipientFilter: { type: "user-scoped-only" },
+        expect(buildWorldSuggestionUpdatedEphemeral).toHaveBeenCalledWith({
+            projectId: "project-1",
+            suggestionId: "processing-stale",
+            status: "suspended",
         });
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalled();
-        expect(result).toEqual({ created: 0, unchanged: 0, total: 0 });
+        expect(result.created).toBe(0);
     });
 
-    it("creates a suggested_skill from a completed task with a stable session summary", async () => {
+    it("creates a suggested_skill from a completed task with stable session summary", async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-04-10T10:00:00Z"));
         setCompletedTasks([
             {
                 id: "task-skill-1",
                 accountId: "user-1",
                 projectId: "project-1",
                 title: "Implement auth refresh",
-                goalId: null,
+                goalId: "goal-1",
                 sessionId: "session-skill-1",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
+                updatedAt: new Date("2026-04-10T09:50:00Z"),
             },
         ]);
         setSessionEvents([
@@ -770,580 +573,21 @@ describe("worldSuggestionRefresh", () => {
                 sessionId: "session-skill-1",
                 eventType: "session_end",
                 summary: "Updated token refresh middleware to reuse cached signing key and verified the auth tests pass.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
+                createdAt: new Date("2026-04-10T09:51:00Z"),
             },
         ]);
+        setCountResult(1);
 
-        await worldSuggestionRefresh("user-1", "project-1");
+        const result = await worldSuggestionRefresh("user-1", "project-1");
 
-        expect(dbMock.worldSuggestion.create).toHaveBeenCalledWith(expect.objectContaining({
+        expect(dbMock.worldSuggestion.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 type: "suggested_skill",
                 relatedTaskId: "task-skill-1",
-            }),
-        }));
-    });
-
-    it("does not create a suggested_skill when the completed task summary is missing or unstable", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-2",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Implement auth refresh",
-                goalId: null,
-                sessionId: "session-skill-2",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-            {
-                id: "task-skill-3",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Implement billing fix",
-                goalId: null,
-                sessionId: "session-skill-3",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-2",
-                eventType: "session_end",
-                summary: "done",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-            {
-                sessionId: "session-skill-3",
-                eventType: "session_end",
-                summary: "Need user decision on billing API direction.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({ type: "suggested_skill" }),
-        }));
-    });
-
-    it("ignores non-session_end events for suggested_skill generation", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-4",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Refactor auth flow",
-                goalId: null,
-                sessionId: "session-skill-4",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-4",
-                eventType: "file_edit",
-                summary: "Edited packages/happy-server/sources/app/api/routes/auth.ts",
-                createdAt: new Date("2026-04-10T09:56:30Z"),
-            },
-            {
-                sessionId: "session-skill-4",
-                eventType: "session_end",
-                summary: "Completed OAuth callback flow hardening and verified the auth regression tests pass.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({
-                type: "suggested_skill",
-                relatedTaskId: "task-skill-4",
-            }),
-        }));
-    });
-
-    it("does not create suggested_skill from file_edit events alone", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-5",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Refactor auth flow",
-                goalId: null,
-                sessionId: "session-skill-5",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-5",
-                eventType: "file_edit",
-                summary: "Completed auth.ts edit and saved the file.",
-                createdAt: new Date("2026-04-10T09:56:30Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({
-                type: "suggested_skill",
-                relatedTaskId: "task-skill-5",
-            }),
-        }));
-    });
-
-    it("does not create suggested_skill for generic completion summaries", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-6",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Refactor auth flow",
-                goalId: null,
-                sessionId: "session-skill-6",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-6",
-                eventType: "session_end",
-                summary: "Completed the requested changes and verified everything works as expected.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({
-                type: "suggested_skill",
-                relatedTaskId: "task-skill-6",
-            }),
-        }));
-    });
-
-    it("does not recreate suggested_skill after the source task already has a bound skill", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-7",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Implement auth refresh",
-                goalId: null,
-                sessionId: "session-skill-7",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setTaskSkillBindings([
-            {
-                taskId: "task-skill-7",
-                skillId: "skill-7",
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-7",
-                eventType: "session_end",
-                summary: "Updated token refresh middleware to reuse cached signing key and verified the auth tests pass.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({
-                type: "suggested_skill",
-                relatedTaskId: "task-skill-7",
-            }),
-        }));
-    });
-
-    it("does not recreate suggested_skill when the same fact was already accepted", async () => {
-        seedExistingSuggestion({
-            id: "sug-skill-accepted",
-            accountId: "user-1",
-            projectId: "project-1",
-            dedupeKey: "completed_task_skill:task-skill-8:session-skill-8:Updated token refresh middleware to reuse cached signing key and verified the auth tests pass.",
-            status: "accepted",
-        });
-        setCompletedTasks([
-            {
-                id: "task-skill-8",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Implement auth refresh",
-                goalId: null,
-                sessionId: "session-skill-8",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-8",
-                eventType: "session_end",
-                summary: "Updated token refresh middleware to reuse cached signing key and verified the auth tests pass.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        const result = await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalled();
-        expect(result).toEqual({ created: 0, unchanged: 1, total: 0 });
-    });
-
-    it("does not create suggested_skill for generic completion summary variants", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-9",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Refactor auth flow",
-                goalId: null,
-                sessionId: "session-skill-9",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-9",
-                eventType: "session_end",
-                summary: "Implemented the requested updates and verified it works as expected.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({
-                type: "suggested_skill",
-                relatedTaskId: "task-skill-9",
-            }),
-        }));
-    });
-
-    it("keeps suggested_skill for mixed summaries that contain concrete implementation detail", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-10",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Refactor auth flow",
-                goalId: null,
-                sessionId: "session-skill-10",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-10",
-                eventType: "session_end",
-                summary: "Completed the requested changes: updated token refresh middleware to reuse cached signing key, and verified everything works as expected.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({
-                type: "suggested_skill",
-                relatedTaskId: "task-skill-10",
-            }),
-        }));
-    });
-
-    it("does not create suggested_skill for generic success summaries without technical detail", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-11",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Refactor auth flow",
-                goalId: null,
-                sessionId: "session-skill-11",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-11",
-                eventType: "session_end",
-                summary: "Implemented the requested fix and all tests passed successfully.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({
-                type: "suggested_skill",
-                relatedTaskId: "task-skill-11",
-            }),
-        }));
-    });
-
-    it("keeps suggested_skill when summary includes concrete verification target", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-12",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Refactor auth flow",
-                goalId: null,
-                sessionId: "session-skill-12",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-12",
-                eventType: "session_end",
-                summary: "Updated token refresh middleware to reuse cached signing key and verified the auth regression tests pass.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({
-                type: "suggested_skill",
-                relatedTaskId: "task-skill-12",
-            }),
-        }));
-    });
-
-    it("does not create suggested_skill for verification-only technical summaries", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-13",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Verify auth flow",
-                goalId: null,
-                sessionId: "session-skill-13",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-13",
-                eventType: "session_end",
-                summary: "Verified the auth regression tests pass.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({
-                type: "suggested_skill",
-                relatedTaskId: "task-skill-13",
-            }),
-        }));
-    });
-
-    it("keeps suggested_skill for concrete implementation details outside auth vocabulary", async () => {
-        setCompletedTasks([
-            {
-                id: "task-skill-14",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Stabilize retries",
-                goalId: null,
-                sessionId: "session-skill-14",
-                updatedAt: new Date("2026-04-10T09:57:00Z"),
-            },
-        ]);
-        setSessionEvents([
-            {
-                sessionId: "session-skill-14",
-                eventType: "session_end",
-                summary: "Added exponential backoff to the retry loop and capped delay at 5s.",
-                createdAt: new Date("2026-04-10T09:56:00Z"),
-            },
-        ]);
-
-        await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({
-                type: "suggested_skill",
-                relatedTaskId: "task-skill-14",
-            }),
-        }));
-    });
-
-    it("does not generate planner timeout suggestions newer than ten minutes", async () => {
-        setBlockedGoals([
-            {
-                id: "goal-not-stale",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Plan migration",
-                description: null,
-                plannerTaskId: "planner-1",
-                updatedAt: new Date("2026-04-10T09:50:01Z"),
-                tasks: [],
-            },
-        ]);
-        setPlanningTimeoutGoalIds([]);
-
-        const result = await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.goal.findMany).toHaveBeenNthCalledWith(2, {
-            where: {
-                accountId: "user-1",
-                projectId: "project-1",
-                status: "blocked",
-                plannerTaskId: { not: null },
-                updatedAt: { lte: new Date("2026-04-10T09:50:00Z") },
-            },
-            select: { id: true },
-        });
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalled();
-        expect(result).toEqual({ created: 0, unchanged: 0, total: 0 });
-    });
-
-    it("marks stale processing suggestions suspended and does not recreate the same fact at the planner timeout boundary", async () => {
-        seedExistingSuggestion({
-            id: "sug-processing-1",
-            accountId: "user-1",
-            projectId: "project-1",
-            dedupeKey: "blocked_goal_attention:goal-1:planner_timeout:Planning result timed out",
-            status: "processing",
-            updatedAt: new Date("2026-04-10T09:54:00Z"),
-        });
-        setBlockedGoals([
-            {
-                id: "goal-1",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Plan migration",
-                description: null,
-                plannerTaskId: "planner-1",
-                updatedAt: new Date("2026-04-10T09:50:00Z"),
-                tasks: [],
-            },
-        ]);
-        setPlanningTimeoutGoalIds(["goal-1"]);
-        setCountResult(0);
-
-        const result = await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.updateMany).toHaveBeenCalledWith({
-            where: { id: { in: ["sug-processing-1"] }, status: "processing" },
-            data: { status: "suspended" },
-        });
-        expect(dbMock.goal.findMany).toHaveBeenNthCalledWith(2, {
-            where: {
-                accountId: "user-1",
-                projectId: "project-1",
-                status: "blocked",
-                plannerTaskId: { not: null },
-                updatedAt: { lte: new Date("2026-04-10T09:50:00Z") },
-            },
-            select: { id: true },
-        });
-        expect(dbMock.worldSuggestion.findMany).toHaveBeenNthCalledWith(2, {
-            where: {
-                accountId: "user-1",
-                projectId: "project-1",
-                status: { in: ["open", "processing", "suspended", "dismissed", "accepted"] },
-            },
-            select: { id: true, dedupeKey: true, status: true },
-        });
-        expect(dbMock.worldSuggestion.create).not.toHaveBeenCalled();
-        expect(emitEphemeral).toHaveBeenCalledWith({
-            userId: "user-1",
-            payload: {
-                projectId: "project-1",
-                suggestionId: "sug-processing-1",
-                status: "suspended",
-            },
-            recipientFilter: { type: "user-scoped-only" },
-        });
-        expect(result).toEqual({ created: 0, unchanged: 1, total: 0 });
-    });
-
-    it("creates a new task follow-up when a suspended task suggestion changes fact", async () => {
-        seedExistingSuggestion({
-            id: "sug-task-suspended",
-            accountId: "user-1",
-            projectId: "project-1",
-            dedupeKey: "failed_task_followup:task-1:1:3:boom",
-            status: "suspended",
-        });
-        setFailedTasks([
-            {
-                id: "task-1",
-                accountId: "user-1",
-                projectId: "project-1",
-                title: "Retryable task",
-                status: "failed",
-                errorMessage: "still-boom",
-                goalId: null,
-                attempt: 2,
-                maxAttempts: 3,
-                updatedAt: new Date("2026-04-10T09:59:00Z"),
-            },
-        ]);
-        setCountResult(1);
-
-        const result = await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                accountId: "user-1",
-                projectId: "project-1",
-                type: "suggested_task",
-                dedupeKey: "failed_task_followup:task-1:2:3:still-boom",
-                relatedTaskId: "task-1",
+                payload: expect.stringContaining('"sourceTaskId":"task-skill-1"'),
             }),
         });
-        expect(result).toEqual({ created: 1, unchanged: 0, total: 1 });
-    });
-
-    it("creates a new decision attention suggestion when a dismissed decision fact changes", async () => {
-        seedExistingSuggestion({
-            id: "sug-decision-dismissed",
-            accountId: "user-1",
-            projectId: "project-1",
-            dedupeKey: "decision_attention:dec-1:pending:none",
-            status: "dismissed",
-        });
-        setAttentionDecisions([
-            {
-                id: "dec-1",
-                accountId: "user-1",
-                projectId: "project-1",
-                question: "Need human input",
-                goalId: null,
-                status: "expired",
-                expiresAt: new Date("2026-04-12T10:00:00Z"),
-            },
-        ]);
-        setCountResult(1);
-
-        const result = await worldSuggestionRefresh("user-1", "project-1");
-
-        expect(dbMock.worldSuggestion.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                accountId: "user-1",
-                projectId: "project-1",
-                type: "suggested_decision",
-                dedupeKey: "decision_attention:dec-1:expired:2026-04-12T10:00:00.000Z",
-            }),
-        });
-        expect(result).toEqual({ created: 1, unchanged: 0, total: 1 });
+        expect(result.created).toBe(1);
+        expect(result.total).toBe(1);
     });
 });

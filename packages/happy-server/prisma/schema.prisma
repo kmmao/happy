@@ -1170,7 +1170,7 @@ model WorldSuggestion {
     projectId       String
     relatedGoalId   String?
     relatedTaskId   String?
-    type            String    // suggested_goal | suggested_task | suggested_skill
+    type            String    // suggested_goal | suggested_task | suggested_skill | suggested_decision
     title           String
     summary         String
     reason          String
@@ -1180,6 +1180,7 @@ model WorldSuggestion {
     requiresHuman   Boolean   @default(true)
     status          String    @default("open") // open | processing | accepted | suspended | dismissed | expired
     dedupeKey       String
+    bucket          String    @default("next_step") // next_step | needs_decision | needs_human_input
     actedAt         DateTime?
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
@@ -1189,5 +1190,6 @@ model WorldSuggestion {
 
     @@index([projectId, status])
     @@index([projectId, dedupeKey])
+    @@index([projectId, bucket])
     @@index([accountId])
 }

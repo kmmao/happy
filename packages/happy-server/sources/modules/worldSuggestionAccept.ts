@@ -2,16 +2,16 @@
  * Accept a WorldSuggestion — create the real entity and mark as accepted.
  */
 
-import { db } from "@/storage/db";
-import { inTx, afterTx } from "@/storage/inTx";
-import { goalCreate } from "./goalCreate";
+import { auth } from "@/app/auth/auth";
 import {
     eventRouter,
-    buildWorldSuggestionUpdatedEphemeral,
     buildTaskTriggerEphemeral,
+    buildWorldSuggestionUpdatedEphemeral,
 } from "@/app/events/eventRouter";
-import { SuggestionPayloadSchema } from "./worldSuggestionTypes";
-import { auth } from "@/app/auth/auth";
+import { db } from "@/storage/db";
+import { afterTx, inTx } from "@/storage/inTx";
+import { goalCreate } from "./goalCreate";
+import { normalizeSuggestionPayload } from "./worldSuggestionTypes";
 
 interface AcceptInput {
     accountId: string;
@@ -32,7 +32,6 @@ interface AcceptResult {
 export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptResult> {
     const { accountId, projectId, suggestionId, machineId, priorityOverride, roleOverride } = input;
 
-    // Load project path for task dispatch
     const project = await db.project.findFirst({
         where: { id: projectId, accountId },
         select: { path: true },
@@ -45,9 +44,14 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
         throw new Error("Suggestion not found or already acted upon");
     }
 
-    const payload = SuggestionPayloadSchema.parse(JSON.parse(suggestion.payload));
+    const rawPayload = safeParseJson(suggestion.payload);
 
-    if (suggestion.type === "suggested_goal" && payload.goal) {
+    if (suggestion.type === "suggested_goal") {
+        const payload = normalizeSuggestionPayload({
+            type: suggestion.type,
+            title: suggestion.title,
+            rawPayload,
+        });
         const resolvedMachineId = machineId ?? await findActiveMachine(accountId, projectId);
         if (!resolvedMachineId) {
             throw new Error("No active machine found for this project. Please specify a machineId.");
@@ -98,7 +102,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             return {
                 suggestionId,
-                createdEntityType: "goal" as const,
+                createdEntityType: "goal",
                 createdEntityId: result.id,
                 machineId: resolvedMachineId,
             };
@@ -117,15 +121,18 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
         }
     }
 
-    if (suggestion.type === "suggested_task" && payload.task) {
+    if (suggestion.type === "suggested_task") {
+        const payload = normalizeSuggestionPayload({
+            type: suggestion.type,
+            title: suggestion.title,
+            rawPayload,
+        });
         const resolvedMachineId = machineId ?? await findActiveMachine(accountId, projectId);
         if (!resolvedMachineId) {
             throw new Error("No active machine found for this project. Please specify a machineId.");
         }
 
-        // Use inTx for task creation + suggestion status update atomicity
-        const result = await inTx(async (tx) => {
-            // Re-check status inside transaction to prevent TOCTOU
+        return inTx(async (tx) => {
             const fresh = await tx.worldSuggestion.findFirst({
                 where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
                 select: { id: true },
@@ -139,11 +146,11 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                     accountId,
                     projectId,
                     machineId: resolvedMachineId,
-                    prompt: payload.task!.prompt,
-                    title: payload.task!.title,
-                    priority: priorityOverride ?? payload.task!.priority ?? "user",
-                    roleType: roleOverride ?? payload.task!.roleType ?? null,
-                    goalId: payload.task!.goalId ?? suggestion.relatedGoalId ?? null,
+                    prompt: payload.task.prompt,
+                    title: payload.task.title,
+                    priority: priorityOverride ?? payload.task.priority ?? "user",
+                    roleType: roleOverride ?? payload.task.roleType ?? null,
+                    goalId: payload.task.goalId ?? suggestion.relatedGoalId ?? null,
                     triggerType: "manual",
                     status: "dispatching",
                     maxAttempts: 3,
@@ -155,7 +162,6 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 data: { status: "accepted", actedAt: new Date() },
             });
 
-            // Dispatch task to CLI after transaction commits.
             afterTx(tx, () => {
                 void (async () => {
                     try {
@@ -167,7 +173,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                             userId: accountId,
                             payload: buildTaskTriggerEphemeral({
                                 taskId: task.id,
-                                prompt: payload.task!.prompt,
+                                prompt: payload.task.prompt,
                                 directory: project?.path ?? "",
                                 priority: task.priority,
                                 projectId,
@@ -193,17 +199,20 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             return {
                 suggestionId,
-                createdEntityType: "task" as const,
+                createdEntityType: "task",
                 createdEntityId: task.id,
                 machineId: resolvedMachineId,
             };
         });
-
-        return result;
     }
 
-    if (suggestion.type === "suggested_skill" && payload.skill) {
-        const result = await inTx(async (tx) => {
+    if (suggestion.type === "suggested_skill") {
+        const payload = normalizeSuggestionPayload({
+            type: suggestion.type,
+            title: suggestion.title,
+            rawPayload,
+        });
+        return inTx(async (tx) => {
             const fresh = await tx.worldSuggestion.findFirst({
                 where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
                 select: { id: true },
@@ -212,7 +221,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 throw new Error("Suggestion not found or already acted upon");
             }
 
-            const baseName = payload.skill!.title;
+            const baseName = payload.skill.title;
             const fallbackName = suggestion.relatedTaskId ? `${baseName} (${suggestion.relatedTaskId})` : null;
             let skill;
             try {
@@ -221,7 +230,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                         accountId,
                         projectId,
                         name: baseName,
-                        content: payload.skill!.content,
+                        content: payload.skill.content,
                         archived: false,
                     },
                 });
@@ -234,7 +243,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                         accountId,
                         projectId,
                         name: fallbackName,
-                        content: payload.skill!.content,
+                        content: payload.skill.content,
                         archived: false,
                     },
                 });
@@ -255,17 +264,20 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             return {
                 suggestionId,
-                createdEntityType: "skill" as const,
+                createdEntityType: "skill",
                 createdEntityId: skill.id,
             };
         });
-
-        return result;
     }
 
-    if (suggestion.type === "suggested_decision" && payload.decision) {
+    if (suggestion.type === "suggested_decision") {
+        const payload = normalizeSuggestionPayload({
+            type: suggestion.type,
+            title: suggestion.title,
+            rawPayload,
+        });
         const decisionPayload = payload.decision;
-        const result = await inTx(async (tx) => {
+        return inTx(async (tx) => {
             const fresh = await tx.worldSuggestion.findFirst({
                 where: { id: suggestionId, accountId, projectId, status: { in: ["open", "suspended"] } },
                 select: { id: true },
@@ -308,12 +320,10 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             return {
                 suggestionId,
-                createdEntityType: "decision" as const,
+                createdEntityType: "decision",
                 createdEntityId: decisionId,
             };
         });
-
-        return result;
     }
 
     throw new Error(`Invalid suggestion type or missing payload for type: ${suggestion.type}`);
@@ -353,7 +363,6 @@ async function reopenExistingDecision(tx: { decision: { findFirst: typeof db.dec
 }
 
 async function findActiveMachine(accountId: string, projectId: string): Promise<string | null> {
-    // Find the machine that most recently had a task in this project
     const recentTask = await db.task.findFirst({
         where: { accountId, projectId },
         orderBy: { updatedAt: "desc" },
@@ -361,10 +370,17 @@ async function findActiveMachine(accountId: string, projectId: string): Promise<
     });
     if (recentTask) return recentTask.machineId;
 
-    // Fallback: find the machine associated with this project
     const project = await db.project.findFirst({
         where: { id: projectId, accountId },
         select: { machineId: true },
     });
     return project?.machineId ?? null;
+}
+
+function safeParseJson(raw: string): Record<string, unknown> {
+    try {
+        return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+        return {};
+    }
 }

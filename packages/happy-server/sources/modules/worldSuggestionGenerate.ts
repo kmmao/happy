@@ -62,6 +62,7 @@ export interface SuggestionCandidate {
     recommendedRole: string | null;
     payload: SuggestionPayload;
     requiresHuman: boolean;
+    bucket: "next_step" | "needs_decision" | "needs_human_input";
     dedupeKey: string;
     factKey: string;
 }
@@ -192,6 +193,7 @@ export async function worldSuggestionRefresh(
                 recommendedRole: candidate.recommendedRole,
                 payload: JSON.stringify(candidate.payload),
                 requiresHuman: candidate.requiresHuman,
+                bucket: candidate.bucket,
                 dedupeKey: candidate.dedupeKey,
             },
         });
@@ -450,6 +452,7 @@ export function failedTaskFollowup(task: FailedTaskFact): SuggestionCandidate {
             },
         },
         requiresHuman: true,
+        bucket: "next_step",
         dedupeKey: `failed_task_followup:${task.id}:${task.attempt}:${task.maxAttempts}:${errorSummary}`,
         factKey,
     };
@@ -483,6 +486,7 @@ export function retryExhaustedDecision(task: FailedTaskFact): SuggestionCandidat
             },
         },
         requiresHuman: true,
+        bucket: "needs_decision",
         dedupeKey: `retry_exhausted_decision:${task.id}:${task.attempt}:${task.maxAttempts}:${errorSummary}`,
         factKey,
     };
@@ -522,6 +526,7 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
                 },
             },
             requiresHuman: true,
+            bucket: "needs_decision",
             dedupeKey: `blocked_goal_attention:${goal.id}:planner_timeout:${blockerSummary}`,
             factKey,
         };
@@ -555,6 +560,7 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
             },
         },
         requiresHuman: true,
+        bucket: blocker.requiresHuman ? "needs_human_input" : "next_step",
         dedupeKey: `blocked_goal_attention:${goal.id}:${blocker.kind}:${blockerSummary}`,
         factKey,
     };
@@ -595,6 +601,7 @@ export function decisionAttention(decision: DecisionAttentionFact): SuggestionCa
             },
         },
         requiresHuman: true,
+        bucket: "needs_decision",
         dedupeKey: `decision_attention:${decision.id}:${decision.status}:${expiresAt}`,
         factKey,
     };
@@ -627,6 +634,7 @@ export function completedTaskSkillSuggestion(task: CompletedTaskSkillFact): Sugg
             },
         },
         requiresHuman: true,
+        bucket: "next_step",
         dedupeKey: `completed_task_skill:${task.id}:${task.sessionId}:${task.summary}`,
         factKey,
     };

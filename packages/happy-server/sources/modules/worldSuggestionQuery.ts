@@ -4,6 +4,7 @@
 
 import { db } from "@/storage/db";
 import {
+    deriveSuggestionBucket,
     serializeSuggestion,
     type SuggestionBucket,
     type SuggestionSerialized,
@@ -21,28 +22,76 @@ export async function worldSuggestionQuery(
         bucket?: SuggestionBucket;
     },
 ): Promise<SuggestionSerialized[]> {
+    await backfillSuggestionBuckets(accountId, projectId);
+
     const status = opts?.status ?? "open";
     const limit = opts?.limit ?? 50;
-    const includeSuspended = status === "open" && !opts?.bucket;
+    const includeSuspended = status === "open";
 
     const rows = await db.worldSuggestion.findMany({
         where: {
             accountId,
             projectId,
             ...(opts?.goalId ? { relatedGoalId: opts.goalId } : {}),
+            ...(opts?.bucket ? { bucket: opts.bucket } : {}),
             status: includeSuspended ? { in: ["open", "suspended"] } : status,
         },
         orderBy: { createdAt: "desc" },
         take: limit,
     });
 
-    const suggestions = rows.map((row) => serializeSuggestion({
-        ...row,
+    return rows.map((row) => serializeSuggestion({
+        ...(row as typeof row & {
+            type: SuggestionType;
+            status: SuggestionStatus;
+            bucket?: SuggestionBucket | null;
+        }),
         type: row.type as SuggestionType,
         status: row.status as SuggestionStatus,
     }));
-    if (!opts?.bucket) {
-        return suggestions;
+}
+
+async function backfillSuggestionBuckets(accountId: string, projectId: string): Promise<void> {
+    const rows = await db.worldSuggestion.findMany({
+        where: {
+            accountId,
+            projectId,
+            status: { in: ["open", "suspended", "processing", "dismissed", "accepted"] },
+        },
+        select: {
+            id: true,
+            type: true,
+            payload: true,
+            evidence: true,
+            requiresHuman: true,
+            bucket: true,
+        },
+        take: 200,
+    });
+
+    const updates = rows.flatMap((row) => {
+        const typedRow = row as typeof row & { bucket?: SuggestionBucket | null; type: SuggestionType };
+        const derivedBucket = deriveSuggestionBucket({
+            type: typedRow.type,
+            payload: safeParseJson(row.payload, {}),
+            evidence: safeParseJson(row.evidence, []),
+            requiresHuman: row.requiresHuman,
+        });
+        if (typedRow.bucket === derivedBucket) {
+            return [];
+        }
+        return [db.worldSuggestion.update({ where: { id: row.id }, data: { bucket: derivedBucket } })];
+    });
+
+    if (updates.length > 0) {
+        await Promise.all(updates);
     }
-    return suggestions.filter((item) => item.bucket === opts.bucket);
+}
+
+function safeParseJson(raw: string, fallback: any) {
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return fallback;
+    }
 }
