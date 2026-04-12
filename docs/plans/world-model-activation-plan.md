@@ -24,6 +24,7 @@
 - [x] **阶段 E — 受限自治执行**：策略模型正式化（supervisorMode → WorldAutonomyPolicy）、并发保护、Autonomy Dashboard、扩展自动动作范围（retryable task / blocked goal supplement）、策略分层（semi-auto / auto）均已完成
 - [x] **阶段 F — 多角色协作协议**：AgentMessage 扩展为 8 种 msgType（含 dependency_blocked / decision_request / handoff / review_request）、协作图谱查询接口（GET /world/collaboration）、任务终态自动解除 dependency_blocked、App RoleCollaborationSection 可视化角色协作状态与等待链；均已完成（2026-04-12）
 - [x] **阶段 G — 世界目标引擎**：纯函数 goalHealthEngine（stale/blocked aging/repeated failure/all-terminal 检测 + narrative deviation V1）、Goal +blockedSince/healthScore/layer 三字段、classifyGoalLayer 自动分层（strategic/operational/execution）、健康仪表盘（dashboard goalHealth + GoalCard 健康圆点 + layer badge + Replan 按钮 + "unhealthy" 筛选）、POST replan 端点、i18n 10 语言 15 键；均已完成（2026-04-12）
+- [x] **阶段 H — God Mode（用户立法 + 世界执行 + 用户裁决）**：Decision 判例自动裁决（decisionAutoResolve + precedent matching）、Goal 按 layer 分级自动建议（suggested_goal for strategic/operational）、风险分级引擎（worldEscalationPolicy: low/medium/high + shouldEscalate）、1 小时 veto 撤销机制（worldSuggestionVeto）、审计日志路由（GET audit-log）、策略 PATCH 端点、Governance Dashboard UI（4 级模式选择器 + 审计日志 + veto 按钮）、i18n 10 语言 22 键；均已完成（2026-04-12）
 
 ---
 
@@ -763,6 +764,10 @@ World 中增加：
 - 冲突可以显式升级为 Decision
 - 用户能看懂“谁在等谁、谁卡住了什么、谁需要裁决”
 
+### 阶段 F — 多角色协作协议 ✅（2026-04-12）
+
+阶段 F 已完成，详见上方阶段 F 进展标记。
+
 ### 阶段 G — 世界目标引擎 ✅（2026-04-12）
 
 **目标**：让世界具备长期连续性，能够围绕 narrative 自动维护目标树。
@@ -819,9 +824,9 @@ World 逐步从 Goal list 演进为：
 - [x] 失败和阻塞会驱动重规划，而不是只停留在”失败了”（all_tasks_terminal_with_failures → goal_replan_needed suggestion + POST replan endpoint）
 - [x] 世界具备跨会话连续性，而不是一次运行一次遗忘（healthScore/blockedSince/layer 持久化、suggestion pipeline 自动刷新健康信号）
 
-### 阶段 H — 用户立法，世界执行，用户裁决
+### 阶段 H — 用户立法，世界执行，用户裁决 ✅（2026-04-12）
 
-**目标**：达到最终的“上帝模式”——用户负责立法与裁决，世界负责日常推进与汇报。
+**目标**：达到最终的”上帝模式”——用户负责立法与裁决，世界负责日常推进与汇报。
 
 #### H.1 用户职责
 
@@ -880,6 +885,51 @@ World 逐步从 Goal list 演进为：
 
 1. **所有自动行为可解释**
 2. **所有高风险行为可拦截**
+
+#### H.6 当前进展（2026-04-12）
+
+4 个 Sprint 均已完成：
+
+**Sprint 1 — Decision 判例自动裁决**：
+- `decisionAutoResolve.ts`：纯函数 `canAutoResolveDecision`（policy ≥ semi-auto + precedent match + option in list）+ async `autoResolveDecision`（status → auto_resolved + Knowledge 沉淀 + 审计 InboxItem）
+- `decisionCreate.ts` 集成：创建 Decision 时自动检查 precedentKey → matchPrecedent → canAutoResolve → autoResolve，命中时跳过 InboxItem 创建
+- Wire：新增 `"precedent_auto_resolve"` 审计规则
+
+**Sprint 2 — 自主目标建议**：
+- `goalHealthEngine`：`all_tasks_terminal_with_failures` 按 layer 分级发射 — strategic → `suggested_goal`（requiresHuman:true, needs_decision）、operational → `suggested_goal`（requiresHuman:false, next_step）、execution → `suggested_task`
+- `worldSuggestionAutoAccept`：新增 `shouldAutoAcceptSuggestedGoal()`（仅 auto 模式）
+- Wire：新增 `"goal_replan_auto_accept"` 审计规则，`autoTaskTypes` 重命名为 `autoAcceptTypes`
+
+**Sprint 3 — 风险分级 + 审计 + Veto**：
+- `worldEscalationPolicy.ts`：`classifyActionRisk`（requiresHuman → high / strategic goal → high / operational goal → medium / decision with precedent → medium / task → low）+ `shouldEscalate`（high always / medium for non-auto / low never）
+- `worldSuggestionVeto.ts`：1 小时 veto 窗口，取消关联 Task/Goal 或恢复 Decision 状态
+- 路由：`GET /world/audit-log`、`POST /world/veto/:suggestionId`、`PATCH /world/policy`
+
+**Sprint 4 — Governance Dashboard UI**：
+- `GovernanceDashboard.tsx`：4 级模式选择器（disabled/suggest/semi-auto/auto），颜色编码边框
+- `AuditLogSection.tsx`：自动接受条目列表，1 小时内显示 Veto 按钮
+- `WorldOverviewTab.tsx`：集成 GovernanceDashboard + AuditLogSection，并行加载 audit log
+- `apiWorld.ts`：`fetchAuditLog()` / `vetoSuggestion()` / `updateWorldPolicy()`
+- i18n：`governance.*` 22 键，覆盖 10 语言
+
+**验证**：647 个 server 测试全绿，app typecheck 通过。
+
+**铁律验证**：
+- ✅ 所有自动行为可解释：每条自动操作有审计日志（acceptAudit + auditLog route），包含命中规则、检查项和判例来源
+- ✅ 所有高风险行为可拦截：high risk 永远 escalate，1 小时 veto 窗口可撤销任何自动操作
+
+#### H.7 阶段 H 结论
+
+阶段 A–H 全部完成。World Model 激活路线图从"看板入口"到"God Mode"的完整闭环已落地：
+
+- **A**：Goal 协作板入口
+- **B**：语义完成（Task 结果上报）
+- **C**：主动性（建议生成）
+- **D**：建议系统稳定化
+- **E**：受限自治执行
+- **F**：多角色协作协议
+- **G**：世界目标引擎
+- **H**：God Mode（判例自动裁决 + 目标自主建议 + 风险分级 + 治理面板）
 
 ---
 
