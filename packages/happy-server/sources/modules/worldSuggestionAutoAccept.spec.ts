@@ -374,6 +374,32 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
     expect(worldSuggestionAccept).toHaveBeenCalledTimes(2);
   });
 
+  it("counts only system_auto accepts toward the daily quota", async () => {
+    dbMock.worldSuggestion.count.mockResolvedValue(1);
+
+    await autoAcceptSuggestedTasksIfEnabled({
+      accountId: "user-1",
+      projectId: "project-1",
+      supervisorConfig: JSON.stringify({
+        worldAutonomy: {
+          autoAcceptSafeSuggestedTasks: true,
+          maxAutoAcceptsPerDay: 2,
+        },
+      }),
+      suggestions: [],
+    });
+
+    expect(dbMock.worldSuggestion.count).toHaveBeenCalledWith({
+      where: {
+        accountId: "user-1",
+        projectId: "project-1",
+        status: "accepted",
+        acceptSource: "system_auto",
+        actedAt: { gte: expect.any(Date) },
+      },
+    });
+  });
+
   it("stops auto-accepting when project daily quota is already exhausted", async () => {
     dbMock.worldSuggestion.count.mockResolvedValue(2);
 

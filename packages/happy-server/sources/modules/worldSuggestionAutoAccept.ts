@@ -142,6 +142,7 @@ async function getRemainingDailyAutoAcceptQuota(input: {
       accountId: input.accountId,
       projectId: input.projectId,
       status: "accepted",
+      acceptSource: "system_auto",
       actedAt: { gte: dayStart },
     },
   });

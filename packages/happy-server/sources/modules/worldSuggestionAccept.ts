@@ -90,9 +90,19 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 throw new Error("Suggestion not found or already acted upon");
             }
 
+            const claimed = await claimRepeatKey(
+                tx as any,
+                buildSuggestionAcceptRepeatKey(projectId, fresh.dedupeKey),
+                suggestionId,
+                Date.now() + 24 * 60 * 60 * 1000,
+            );
+            if (!claimed) {
+                throw new Error("Suggestion not found or already acted upon");
+            }
+
             await tx.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "processing", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit },
+                data: { status: "processing", actedAt: new Date(), acceptSource, acceptAudit: serializedAcceptAudit } as any,
             });
         });
 
@@ -115,7 +125,17 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
 
             await db.worldSuggestion.update({
                 where: { id: suggestionId },
-                data: { status: "accepted", acceptSource, acceptAudit: serializedAcceptAudit },
+                data: { status: "accepted", acceptSource, acceptAudit: serializedAcceptAudit } as any,
+            });
+            await db.worldSuggestion.updateMany({
+                where: {
+                    accountId,
+                    projectId,
+                    dedupeKey: suggestion.dedupeKey,
+                    id: { not: suggestionId },
+                    status: { in: ["open", "suspended"] },
+                },
+                data: { status: "expired", actedAt: new Date() },
             });
 
             eventRouter.emitEphemeral({

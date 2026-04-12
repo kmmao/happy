@@ -56,6 +56,7 @@ const {
                 acceptAudit: null,
             })),
             update: vi.fn(async () => ({})),
+            updateMany: vi.fn(async () => ({ count: 1 })),
         },
         task: {
             findFirst: vi.fn(async () => ({ machineId: "machine-1" })),
@@ -91,6 +92,119 @@ describe("worldSuggestionAccept", () => {
         vi.clearAllMocks();
         claimRepeatKey.mockResolvedValue(true);
         tx.worldSuggestion.findFirst.mockResolvedValue({ id: "suggestion-1", status: "open", dedupeKey: "dedupe:1" });
+    });
+
+    it("claims logical dedupe before processing suggested_goal and expires siblings only after success", async () => {
+        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
+            id: "suggestion-goal-dedupe-1",
+            type: "suggested_goal",
+            title: "Ship feature",
+            payload: JSON.stringify({
+                goal: {
+                    title: "Ship feature",
+                    detail: "Finish the remaining work",
+                    priority: "urgent",
+                },
+            }),
+            relatedGoalId: null,
+            dedupeKey: "dedupe:goal-shared",
+            status: "open",
+            acceptSource: null,
+            acceptAudit: null,
+        });
+        tx.worldSuggestion.findFirst.mockResolvedValueOnce({ id: "suggestion-goal-dedupe-1", status: "open", dedupeKey: "dedupe:goal-shared" });
+
+        await worldSuggestionAccept({
+            accountId: "user-1",
+            projectId: "project-1",
+            suggestionId: "suggestion-goal-dedupe-1",
+        });
+
+        expect(claimRepeatKey).toHaveBeenCalledWith(
+            tx,
+            "world-suggestion-accept:project-1:dedupe:goal-shared",
+            "suggestion-goal-dedupe-1",
+            expect.any(Number),
+        );
+        expect(tx.worldSuggestion.update).toHaveBeenCalledWith({
+            where: { id: "suggestion-goal-dedupe-1" },
+            data: { status: "processing", actedAt: expect.any(Date), acceptSource: "human", acceptAudit: null },
+        });
+        expect(dbMock.worldSuggestion.updateMany).toHaveBeenCalledWith({
+            where: {
+                accountId: "user-1",
+                projectId: "project-1",
+                dedupeKey: "dedupe:goal-shared",
+                id: { not: "suggestion-goal-dedupe-1" },
+                status: { in: ["open", "suspended"] },
+            },
+            data: { status: "expired", actedAt: expect.any(Date) },
+        });
+    });
+
+    it("rejects suggested_goal when another sibling already claimed the same logical dedupe key", async () => {
+        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
+            id: "suggestion-goal-dedupe-2",
+            type: "suggested_goal",
+            title: "Ship feature duplicate",
+            payload: JSON.stringify({
+                goal: {
+                    title: "Ship feature duplicate",
+                    detail: "Should not create twice",
+                    priority: "urgent",
+                },
+            }),
+            relatedGoalId: null,
+            dedupeKey: "dedupe:goal-shared",
+            status: "open",
+            acceptSource: null,
+            acceptAudit: null,
+        });
+        tx.worldSuggestion.findFirst.mockResolvedValueOnce({ id: "suggestion-goal-dedupe-2", status: "open", dedupeKey: "dedupe:goal-shared" });
+        claimRepeatKey.mockResolvedValueOnce(false);
+
+        await expect(worldSuggestionAccept({
+            accountId: "user-1",
+            projectId: "project-1",
+            suggestionId: "suggestion-goal-dedupe-2",
+        })).rejects.toThrow("Suggestion not found or already acted upon");
+
+        expect(goalCreate).not.toHaveBeenCalled();
+        expect(dbMock.worldSuggestion.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("keeps goal siblings untouched when winner goalCreate fails", async () => {
+        dbMock.worldSuggestion.findFirst.mockResolvedValueOnce({
+            id: "suggestion-goal-fail-1",
+            type: "suggested_goal",
+            title: "Ship feature",
+            payload: JSON.stringify({
+                goal: {
+                    title: "Ship feature",
+                    detail: "Finish the remaining work",
+                    priority: "urgent",
+                },
+            }),
+            relatedGoalId: null,
+            dedupeKey: "dedupe:goal-fail",
+            status: "open",
+            acceptSource: null,
+            acceptAudit: null,
+        });
+        tx.worldSuggestion.findFirst.mockResolvedValueOnce({ id: "suggestion-goal-fail-1", status: "open", dedupeKey: "dedupe:goal-fail" });
+        goalCreate.mockRejectedValueOnce(new Error("planner unavailable"));
+
+        await expect(worldSuggestionAccept({
+            accountId: "user-1",
+            projectId: "project-1",
+            suggestionId: "suggestion-goal-fail-1",
+        })).rejects.toThrow("planner unavailable");
+
+        expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
+            where: { id: "suggestion-goal-fail-1" },
+            data: { status: "suspended" },
+        });
+        expect(dbMock.worldSuggestion.updateMany).not.toHaveBeenCalled();
     });
 
     it("suspends suggested_goal when goal creation fails after processing claim", async () => {
