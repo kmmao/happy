@@ -1,6 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SandboxConfig } from '@/persistence';
-import { CodexMcpClient } from '../codexMcpClient';
+import {
+    CodexMcpClient,
+    getInstalledCodexVersion,
+    supportsCodexAppServer,
+} from '../codexMcpClient';
 
 const {
     mockExecSync,
@@ -151,5 +155,15 @@ describe('CodexMcpClient sandbox integration', () => {
                 }),
             }),
         );
+    });
+
+    it('parses the installed codex version', () => {
+        mockExecSync.mockReturnValue('codex-cli 0.120.0');
+        expect(getInstalledCodexVersion()).toBe('0.120.0');
+    });
+
+    it('detects app-server support from the codex CLI', () => {
+        mockExecSync.mockReturnValue('help text');
+        expect(supportsCodexAppServer()).toBe(true);
     });
 });

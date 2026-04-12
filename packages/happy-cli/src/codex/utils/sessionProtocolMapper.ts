@@ -317,6 +317,37 @@ export function mapCodexMcpMessageToSessionEnvelopes(
     };
   }
 
+  if (type === "service_message") {
+    if (typeof message.text !== "string" || message.text.length === 0) {
+      return {
+        currentTurnId: state.currentTurnId,
+        startedSubagents,
+        activeSubagents,
+        providerSubagentToSessionSubagent,
+        envelopes: [],
+      };
+    }
+
+    const envelopes: SessionEnvelope[] = [];
+    maybeEmitSubagentStart(
+      subagent,
+      opts,
+      startedSubagents,
+      activeSubagents,
+      envelopes,
+    );
+    envelopes.push(
+      createEnvelope("agent", { t: "service", text: message.text }, opts),
+    );
+    return {
+      currentTurnId: state.currentTurnId,
+      startedSubagents,
+      activeSubagents,
+      providerSubagentToSessionSubagent,
+      envelopes,
+    };
+  }
+
   if (type === "agent_reasoning" || type === "agent_reasoning_delta") {
     const text =
       typeof message.text === "string"

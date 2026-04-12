@@ -329,10 +329,13 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
 
       // Parse startedBy argument
       let startedBy: "daemon" | "terminal" | undefined = undefined;
+      let happySessionId: string | undefined = undefined;
       const codexArgs = extractNoSandboxFlag(args.slice(1));
       for (let i = 0; i < codexArgs.args.length; i++) {
         if (codexArgs.args[i] === "--started-by") {
           startedBy = codexArgs.args[++i] as "daemon" | "terminal";
+        } else if (codexArgs.args[i] === "--happy-session-id") {
+          happySessionId = codexArgs.args[++i];
         }
       }
 
@@ -341,6 +344,7 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
         credentials,
         startedBy,
         noSandbox: codexArgs.noSandbox,
+        happySessionId,
       });
       // Do not force exit here; allow instrumentation to show lingering handles
     } catch (error) {

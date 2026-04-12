@@ -92,6 +92,15 @@ export function createSessionMetadata(
     lifecycleState: "running",
     lifecycleStateSince: Date.now(),
     flavor: opts.flavor,
+    ...(opts.flavor === "codex"
+      ? {
+          codex: {
+            requestedBackend: "codex-mcp-legacy" as const,
+            resolvedBackend: "codex-mcp-legacy" as const,
+            configMode: "inherit" as const,
+          },
+        }
+      : {}),
     sandbox: opts.sandbox?.enabled ? opts.sandbox : null,
     dangerouslySkipPermissions: opts.dangerouslySkipPermissions ?? null,
   };

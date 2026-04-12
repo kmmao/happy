@@ -62,6 +62,19 @@ describe('createSessionMetadata', () => {
         expect(metadata.dangerouslySkipPermissions).toBeNull();
     });
 
+    it('marks current codex sessions as legacy backend metadata', () => {
+        const { metadata } = createSessionMetadata({
+            flavor: 'codex',
+            machineId: 'machine-legacy',
+        });
+
+        expect(metadata.codex).toEqual({
+            requestedBackend: 'codex-mcp-legacy',
+            resolvedBackend: 'codex-mcp-legacy',
+            configMode: 'inherit',
+        });
+    });
+
     it('sets metadata.dangerouslySkipPermissions when provided', () => {
         const { metadata } = createSessionMetadata({
             flavor: 'claude',

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { SandboxConfigSchema } from './persistence';
+import {
+    AIBackendProfileSchema,
+    SandboxConfigSchema,
+    getProfileEnvironmentVariables,
+} from './persistence';
 
 describe('SandboxConfigSchema', () => {
     it('applies defaults when values are omitted', () => {
@@ -68,5 +72,53 @@ describe('SandboxConfigSchema', () => {
                 denyReadPaths: [123],
             }),
         ).toThrow();
+    });
+});
+
+describe('AIBackendProfileSchema codexConfig', () => {
+    it('accepts codexConfig fields and maps them to internal env vars', () => {
+        const profile = AIBackendProfileSchema.parse({
+            id: crypto.randomUUID(),
+            name: 'Codex Profile',
+            codexConfig: {
+                backendMode: 'codex-app-server',
+                configMode: 'managed-profile',
+                codexProfileName: 'happy_max',
+            },
+            environmentVariables: [],
+            compatibility: { claude: true, codex: true, gemini: true },
+        });
+
+        expect(getProfileEnvironmentVariables(profile)).toMatchObject({
+            HAPPY_CODEX_BACKEND: 'codex-app-server',
+            HAPPY_CODEX_CONFIG_MODE: 'managed-profile',
+            HAPPY_CODEX_PROFILE: 'happy_max',
+        });
+    });
+
+    it('maps managed override codexConfig values to internal env vars', () => {
+        const profile = AIBackendProfileSchema.parse({
+            id: crypto.randomUUID(),
+            name: 'Codex Override Profile',
+            codexConfig: {
+                backendMode: 'auto',
+                configMode: 'managed-overrides',
+                model: 'gpt-5.4',
+                reasoningEffort: 'high',
+                serviceTier: 'default',
+                webSearchEnabled: true,
+            },
+            environmentVariables: [],
+            compatibility: { claude: true, codex: true, gemini: true },
+        });
+
+        expect(getProfileEnvironmentVariables(profile)).toMatchObject({
+            HAPPY_CODEX_BACKEND: 'auto',
+            HAPPY_CODEX_CONFIG_MODE: 'managed-overrides',
+            HAPPY_CODEX_MODEL: 'gpt-5.4',
+            HAPPY_CODEX_REASONING_EFFORT: 'high',
+            HAPPY_CODEX_SERVICE_TIER: 'default',
+            HAPPY_CODEX_WEB_SEARCH: 'live',
+        });
     });
 });

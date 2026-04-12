@@ -38,6 +38,10 @@ export interface SetupOfflineReconnectionOptions {
     machineId?: string;
     /** Project path for server-side project auto-resolve */
     path?: string;
+    /** Existing Happy session id when reconnecting */
+    happySessionId?: string;
+    /** Persisted encryption key for reconnecting existing Happy session */
+    existingEncryptionKey?: Uint8Array;
 }
 
 /**
@@ -80,7 +84,18 @@ export interface SetupOfflineReconnectionResult {
  * ```
  */
 export function setupOfflineReconnection(opts: SetupOfflineReconnectionOptions): SetupOfflineReconnectionResult {
-    const { api, sessionTag, metadata, state, response, onSessionSwap, machineId, path } = opts;
+    const {
+        api,
+        sessionTag,
+        metadata,
+        state,
+        response,
+        onSessionSwap,
+        machineId,
+        path,
+        happySessionId,
+        existingEncryptionKey,
+    } = opts;
 
     let session: ApiSessionClient;
     let reconnectionHandle: ReturnType<typeof startOfflineReconnection<ApiSessionClient>> | null = null;
@@ -94,7 +109,16 @@ export function setupOfflineReconnection(opts: SetupOfflineReconnectionOptions):
         reconnectionHandle = startOfflineReconnection<ApiSessionClient>({
             serverUrl: configuration.serverUrl,
             onReconnected: async () => {
-                const resp = await api.getOrCreateSession({ tag: sessionTag, metadata, state, machineId, path });
+                const resp = happySessionId
+                    ? await api.reconnectSession({
+                        sessionId: happySessionId,
+                        metadata,
+                        state,
+                        machineId,
+                        path,
+                        existingEncryptionKey,
+                    })
+                    : await api.getOrCreateSession({ tag: sessionTag, metadata, state, machineId, path });
                 if (!resp) throw new Error('Server unavailable');
                 const realSession = api.sessionSyncClient(resp);
                 // Notify caller to swap the session reference

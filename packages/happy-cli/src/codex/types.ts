@@ -11,6 +11,12 @@ export interface CodexSessionConfig {
     'include-plan-tool'?: boolean;
     model?: string;
     profile?: string;
+    serviceTier?: string;
+    reasoningEffort?: string;
+    reasoningSummary?: string;
+    verbosity?: string;
+    personality?: string;
+    webSearch?: 'disabled' | 'cached' | 'live';
     sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access';
 }
 

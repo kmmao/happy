@@ -530,6 +530,77 @@ export class ApiClient {
     }
   }
 
+  async getSessionById(opts: {
+    sessionId: string;
+    existingEncryptionKey?: Uint8Array;
+  }): Promise<Session | null> {
+    try {
+      const response = await axios.get<{
+        sessions: Array<{
+          id: string;
+          seq: number;
+          metadata: string;
+          metadataVersion: number;
+          agentState: string | null;
+          agentStateVersion: number;
+        }>;
+      }>(`${configuration.serverUrl}/v1/sessions`, {
+        headers: {
+          Authorization: `Bearer ${this.credential.token}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 60000,
+      });
+
+      const raw = response.data.sessions.find(
+        (session) => session.id === opts.sessionId,
+      );
+      if (!raw) {
+        return null;
+      }
+
+      let encryptionKey: Uint8Array;
+      let encryptionVariant: "legacy" | "dataKey";
+      if (this.credential.encryption.type === "dataKey") {
+        if (!opts.existingEncryptionKey) {
+          logger.debug(
+            `[API] getSessionById: missing persisted encryption key for ${opts.sessionId}`,
+          );
+          return null;
+        }
+        encryptionKey = opts.existingEncryptionKey;
+        encryptionVariant = "dataKey";
+      } else {
+        encryptionKey = this.credential.encryption.secret;
+        encryptionVariant = "legacy";
+      }
+
+      return {
+        id: raw.id,
+        seq: raw.seq,
+        metadata: decrypt(
+          encryptionKey,
+          encryptionVariant,
+          decodeBase64(raw.metadata),
+        ),
+        metadataVersion: raw.metadataVersion,
+        agentState: raw.agentState
+          ? decrypt(
+              encryptionKey,
+              encryptionVariant,
+              decodeBase64(raw.agentState),
+            )
+          : null,
+        agentStateVersion: raw.agentStateVersion,
+        encryptionKey,
+        encryptionVariant,
+      };
+    } catch (error) {
+      logger.debug("[API] Failed to fetch session by id:", error);
+      return null;
+    }
+  }
+
   sessionSyncClient(session: Session): ApiSessionClient {
     return new ApiSessionClient(this.credential.token, session);
   }

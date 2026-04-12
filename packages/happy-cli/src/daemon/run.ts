@@ -1,6 +1,5 @@
 import fs from "fs/promises";
 import os from "os";
-import * as tmp from "tmp";
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -68,6 +67,7 @@ import type { AutomationAuditEvent, AutomationJob } from "@/automation/types";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
 import { detectTailscale, detectTailscaleServe } from "@/utils/tailscale";
 import { TunnelManager, TailscaleProvider, UpnpProvider, CaddyProvider } from "@/tunnel";
+import { createCodexHomeOverlay } from "@/codex-shared/codexHomeOverlay";
 
 
 const execFileAsync = promisify(execFileCb);
@@ -706,6 +706,7 @@ export async function startDaemon(): Promise<void> {
         }
       }
 
+      let cleanupSessionResources: (() => Promise<void>) | undefined;
       try {
         // Build environment variables with explicit precedence layers:
         // Layer 1 (base): Authentication tokens - protected, cannot be overridden
@@ -716,14 +717,12 @@ export async function startDaemon(): Promise<void> {
         const authEnv: Record<string, string> = {};
         if (options.token) {
           if (options.agent === "codex") {
-            // Create a temporary directory for Codex
-            const codexHomeDir = tmp.dirSync();
-
-            // Write the token to the temporary directory
-            fs.writeFile(join(codexHomeDir.name, "auth.json"), options.token);
-
-            // Set the environment variable for Codex
-            authEnv.CODEX_HOME = codexHomeDir.name;
+            const codexHomeOverlay = await createCodexHomeOverlay({
+              authJson: options.token,
+              sourceHome: process.env.CODEX_HOME || join(os.homedir(), ".codex"),
+            });
+            authEnv.CODEX_HOME = codexHomeOverlay.path;
+            cleanupSessionResources = codexHomeOverlay.cleanup;
           } else {
             // Assuming claude
             authEnv.CLAUDE_CODE_OAUTH_TOKEN = options.token;
@@ -1027,6 +1026,7 @@ export async function startDaemon(): Promise<void> {
               lastActivityAt: Date.now(),
               automationContext,
               directoryCreated,
+              cleanup: cleanupSessionResources,
               message: directoryCreated
                 ? `The path '${directory}' did not exist. We created a new folder and spawned a new session in tmux session '${tmuxSessionName}'. Use 'tmux attach -t ${tmuxSessionName}' to view the session.`
                 : `Spawned new session in tmux session '${tmuxSessionName}'. Use 'tmux attach -t ${tmuxSessionName}' to view the session.`,
@@ -1178,6 +1178,7 @@ export async function startDaemon(): Promise<void> {
           });
 
           if (!happyProcess.pid) {
+            await cleanupSessionResources?.();
             logger.debug(
               "[DAEMON RUN] Failed to spawn process - no PID returned",
             );
@@ -1199,6 +1200,7 @@ export async function startDaemon(): Promise<void> {
             lastActivityAt: Date.now(),
             automationContext,
             directoryCreated,
+            cleanup: cleanupSessionResources,
             message: directoryCreated
               ? `The path '${directory}' did not exist. We created a new folder and spawned a new session there.`
               : undefined,
@@ -1262,6 +1264,7 @@ export async function startDaemon(): Promise<void> {
           errorMessage: "Unexpected error in session spawning",
         };
       } catch (error) {
+        await cleanupSessionResources?.();
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         logger.debug("[DAEMON RUN] Failed to spawn session:", error);
@@ -1309,6 +1312,15 @@ export async function startDaemon(): Promise<void> {
 
       if (!session) {
         return;
+      }
+
+      if (session.cleanup) {
+        void session.cleanup().catch((error) => {
+          logger.debug(
+            `[DAEMON RUN] Failed to cleanup daemon session resources for PID ${pid}:`,
+            error,
+          );
+        });
       }
 
       const terminationWasRequested = session.terminationRequestedAt != null;

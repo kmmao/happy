@@ -1,0 +1,1277 @@
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { createInterface, type Interface as ReadLineInterface } from "node:readline";
+import { logger } from "@/ui/logger";
+import type { CodexSessionConfig, CodexToolResponse } from "@/codex/types";
+import type { CodexPermissionHandler } from "@/codex/utils/permissionHandler";
+import type { SandboxConfig } from "@/persistence";
+import { initializeSandbox, wrapForMcpTransport } from "@/sandbox/manager";
+
+type JsonRpcRequest = {
+  id?: string | number;
+  method: string;
+  params?: unknown;
+  result?: unknown;
+  error?: { message?: string } | unknown;
+};
+
+type AppServerQuestion = {
+  id: string;
+  header: string;
+  question: string;
+  isOther: boolean;
+  isSecret: boolean;
+  options: Array<{ label: string; description: string }> | null;
+};
+
+type AppServerElicitationRequest = {
+  serverName: string;
+  message: string;
+  mode: "form" | "url";
+  url?: string | null;
+  requestedSchema?: Record<string, unknown> | null;
+};
+
+type AppServerElicitationResult = {
+  action: "accept" | "decline" | "cancel";
+  content?: Record<string, unknown>;
+};
+
+type PendingCall = {
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+};
+
+type TurnWaiter = {
+  turnId: string;
+  resolve: () => void;
+  reject: (error: Error) => void;
+};
+
+type AppServerModel = {
+  model: string;
+  displayName: string;
+  description: string;
+  supportedReasoningEfforts: Array<{ value: string; label: string }>;
+  isDefault: boolean;
+  supportsPersonality: boolean;
+};
+
+type AppServerCapabilities = {
+  models: AppServerModel[];
+  config: {
+    model: string | null;
+    profile: string | null;
+    approvalPolicy: string | null;
+    sandboxMode: string | null;
+    serviceTier: string | null;
+    reasoningEffort: string | null;
+    reasoningSummary: string | null;
+    verbosity: string | null;
+    webSearch: string | null;
+  } | null;
+  account: {
+    type: "apiKey" | "chatgpt" | null;
+    email: string | null;
+    planType: string | null;
+    requiresOpenaiAuth: boolean;
+  } | null;
+  rateLimits: {
+    limitId: string | null;
+    limitName: string | null;
+    planType: string | null;
+    hasCredits: boolean;
+  } | null;
+  experimentalFeatures: Array<{
+    name: string;
+    stage: string;
+    enabled: boolean;
+    defaultEnabled: boolean;
+  }>;
+  skills: Array<{
+    name: string;
+    description: string;
+    path: string;
+    enabled: boolean;
+  }>;
+  mcpServers: Array<{
+    name: string;
+    authStatus: string;
+    toolCount: number;
+  }>;
+};
+
+function createAbortError(): Error {
+  const error = new Error("Aborted");
+  error.name = "AbortError";
+  return error;
+}
+
+function parseError(payload: unknown, fallbackMessage: string): Error {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "message" in payload &&
+    typeof (payload as { message?: unknown }).message === "string"
+  ) {
+    return new Error((payload as { message: string }).message);
+  }
+  return new Error(fallbackMessage);
+}
+
+function buildSandboxPolicy(
+  sandbox: CodexSessionConfig["sandbox"] | undefined,
+  cwd: string,
+): Record<string, unknown> | undefined {
+  switch (sandbox) {
+    case "danger-full-access":
+      return { type: "dangerFullAccess" };
+    case "read-only":
+      return {
+        type: "readOnly",
+        access: { type: "fullAccess" },
+        networkAccess: true,
+      };
+    case "workspace-write":
+      return {
+        type: "workspaceWrite",
+        writableRoots: [cwd],
+        readOnlyAccess: { type: "fullAccess" },
+        networkAccess: true,
+        excludeTmpdirEnvVar: false,
+        excludeSlashTmp: false,
+      };
+    default:
+      return undefined;
+  }
+}
+
+function buildElicitationSchema(
+  questions: AppServerQuestion[],
+): Record<string, unknown> {
+  const properties = Object.fromEntries(
+    questions.map((question) => [
+      question.id,
+      {
+        type: "string",
+        description: `${question.header}: ${question.question}`,
+        ...(question.options
+          ? { enum: question.options.map((option) => option.label) }
+          : {}),
+      },
+    ]),
+  );
+
+  return {
+    type: "object",
+    properties,
+  };
+}
+
+function mapPermissionDecision(
+  decision: "approved" | "approved_for_session" | "denied" | "abort",
+): "accept" | "acceptForSession" | "decline" | "cancel" {
+  switch (decision) {
+    case "approved":
+      return "accept";
+    case "approved_for_session":
+      return "acceptForSession";
+    case "denied":
+      return "decline";
+    case "abort":
+    default:
+      return "cancel";
+  }
+}
+
+export class CodexAppServerClient {
+  private process: ChildProcessWithoutNullStreams | null = null;
+  private stdoutReader: ReadLineInterface | null = null;
+  private connected = false;
+  private nextRequestId = 1;
+  private pendingCalls = new Map<string, PendingCall>();
+  private handler: ((event: any) => void) | null = null;
+  private permissionHandler: CodexPermissionHandler | null = null;
+  private elicitationHandler:
+    | ((
+        request: AppServerElicitationRequest,
+        options: { signal: AbortSignal },
+      ) => Promise<AppServerElicitationResult>)
+    | null = null;
+  private chatGptAuthTokensProvider:
+    | (() => Promise<{
+        accessToken: string;
+        chatgptAccountId: string;
+        chatgptPlanType?: string | null;
+      } | null>)
+    | null = null;
+  private sandboxConfig?: SandboxConfig;
+  private sandboxCleanup: (() => Promise<void>) | null = null;
+  private turnWaiters = new Map<string, TurnWaiter>();
+  private threadId: string | null = null;
+  private activeTurnId: string | null = null;
+  private currentModel: string | null = null;
+  private capabilities: AppServerCapabilities | null = null;
+  private capabilitiesRefresh: Promise<void> | null = null;
+  public sandboxEnabled = false;
+  public readonly supportsModeHotSwap = true;
+  public readonly backendKind = "codex-app-server" as const;
+
+  constructor(sandboxConfig?: SandboxConfig) {
+    this.sandboxConfig = sandboxConfig;
+  }
+
+  setHandler(handler: ((event: any) => void) | null): void {
+    this.handler = handler;
+  }
+
+  setPermissionHandler(handler: CodexPermissionHandler): void {
+    this.permissionHandler = handler;
+  }
+
+  setElicitationHandler(
+    handler:
+      | ((
+          request: AppServerElicitationRequest,
+          options: { signal: AbortSignal },
+        ) => Promise<AppServerElicitationResult>)
+      | null,
+  ): void {
+    this.elicitationHandler = handler;
+  }
+
+  setChatGptAuthTokensProvider(
+    provider:
+      | (() => Promise<{
+          accessToken: string;
+          chatgptAccountId: string;
+          chatgptPlanType?: string | null;
+        } | null>)
+      | null,
+  ): void {
+    this.chatGptAuthTokensProvider = provider;
+  }
+
+  async connect(): Promise<void> {
+    if (this.connected) {
+      return;
+    }
+
+    let command = "codex";
+    let args = ["app-server"];
+    this.sandboxEnabled = false;
+
+    if (this.sandboxConfig?.enabled) {
+      if (process.platform === "win32") {
+        logger.warn(
+          "[CodexAppServer] Sandbox is not supported on Windows; continuing without sandbox.",
+        );
+      } else {
+        try {
+          this.sandboxCleanup = await initializeSandbox(
+            this.sandboxConfig,
+            process.cwd(),
+          );
+          const wrappedTransport = await wrapForMcpTransport("codex", [
+            "app-server",
+          ]);
+          command = wrappedTransport.command;
+          args = wrappedTransport.args;
+          this.sandboxEnabled = true;
+        } catch (error) {
+          logger.warn(
+            "[CodexAppServer] Failed to initialize sandbox; continuing without sandbox.",
+            error,
+          );
+          this.sandboxCleanup = null;
+        }
+      }
+    }
+
+    const env = Object.keys(process.env).reduce(
+      (acc, key) => {
+        const value = process.env[key];
+        if (typeof value === "string") {
+          acc[key] = value;
+        }
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+    const rolloutListFilter = "codex_core::rollout::list=off";
+    const existingRustLog = env.RUST_LOG?.trim();
+    if (!existingRustLog) {
+      env.RUST_LOG = rolloutListFilter;
+    } else if (!existingRustLog.includes("codex_core::rollout::list=")) {
+      env.RUST_LOG = `${existingRustLog},${rolloutListFilter}`;
+    }
+    if (this.sandboxEnabled) {
+      env.CODEX_SANDBOX = "seatbelt";
+    }
+
+    this.process = spawn(command, args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      env,
+      cwd: process.cwd(),
+    });
+
+    this.stdoutReader = createInterface({ input: this.process.stdout });
+    this.stdoutReader.on("line", (line) => {
+      void this.handleStdoutLine(line);
+    });
+
+    this.process.stderr.on("data", (data) => {
+      logger.debug(`[CodexAppServer][stderr] ${data.toString()}`);
+    });
+
+    this.process.on("exit", (code, signal) => {
+      const error = new Error(
+        `Codex app-server exited with code ${code ?? "unknown"}${
+          signal ? ` (signal ${signal})` : ""
+        }`,
+      );
+      for (const pending of this.pendingCalls.values()) {
+        pending.reject(error);
+      }
+      this.pendingCalls.clear();
+      for (const waiter of this.turnWaiters.values()) {
+        waiter.reject(error);
+      }
+      this.turnWaiters.clear();
+      this.connected = false;
+      this.activeTurnId = null;
+    });
+
+    await this.sendRequest("initialize", {
+      clientInfo: {
+        name: "happy_codex_app_server",
+        title: "Happy Codex App Server",
+        version: "1.0.0",
+      },
+      capabilities: {
+        experimentalApi: true,
+      },
+    });
+    this.sendNotification("initialized");
+
+    this.capabilities = await this.loadCapabilities();
+    this.connected = true;
+  }
+
+  async loadCapabilities(): Promise<AppServerCapabilities> {
+    const safeRequest = async <T>(method: string, params: unknown): Promise<T | null> => {
+      try {
+        return (await this.sendRequest(method, params)) as T;
+      } catch (error) {
+        logger.debug(`[CodexAppServer] Optional capability request failed: ${method}`, error);
+        return null;
+      }
+    };
+
+    const modelsResult = (await this.sendRequest("model/list", {
+      includeHidden: false,
+    })) as {
+      data?: Array<{
+        model: string;
+        displayName: string;
+        description: string;
+        supportedReasoningEfforts?: Array<{ value: string; label: string }>;
+        isDefault?: boolean;
+        supportsPersonality?: boolean;
+      }>;
+    };
+    const configResult = (await this.sendRequest("config/read", {
+      includeLayers: false,
+      cwd: process.cwd(),
+    })) as {
+      config?: {
+        model?: string | null;
+        profile?: string | null;
+        approval_policy?: string | null;
+        sandbox_mode?: string | null;
+        service_tier?: string | null;
+        model_reasoning_effort?: string | null;
+        model_reasoning_summary?: string | null;
+        model_verbosity?: string | null;
+        web_search?: string | null;
+      };
+    };
+    const [accountResult, rateLimitsResult, experimentalFeaturesResult, skillsResult, mcpServersResult] =
+      (await Promise.all([
+        safeRequest<{
+          account?: { type: "apiKey" } | { type: "chatgpt"; email?: string; planType?: string };
+          requiresOpenaiAuth?: boolean;
+        }>("account/read", {
+          refreshToken: false,
+        }),
+        safeRequest<{
+          rateLimits?: {
+            limitId?: string | null;
+            limitName?: string | null;
+            planType?: string | null;
+            credits?: unknown;
+          };
+        }>("account/rateLimits/read", undefined),
+        safeRequest<{
+          data?: Array<{
+            name: string;
+            stage: string;
+            enabled: boolean;
+            defaultEnabled: boolean;
+          }>;
+        }>("experimentalFeature/list", {}),
+        safeRequest<{
+          data?: Array<{
+            skills?: Array<{
+              name: string;
+              description: string;
+              path: string;
+              enabled: boolean;
+            }>;
+          }>;
+        }>("skills/list", {}),
+        safeRequest<{
+          data?: Array<{
+            name: string;
+            authStatus: string;
+            tools?: Record<string, unknown>;
+          }>;
+        }>("mcpServerStatus/list", {}),
+      ])) as [
+        {
+          account?: { type: "apiKey" } | { type: "chatgpt"; email?: string; planType?: string };
+          requiresOpenaiAuth?: boolean;
+        },
+        {
+          rateLimits?: {
+            limitId?: string | null;
+            limitName?: string | null;
+            planType?: string | null;
+            credits?: unknown;
+          };
+        },
+        {
+          data?: Array<{
+            name: string;
+            stage: string;
+            enabled: boolean;
+            defaultEnabled: boolean;
+          }>;
+        },
+        {
+          data?: Array<{
+            skills?: Array<{
+              name: string;
+              description: string;
+              path: string;
+              enabled: boolean;
+            }>;
+          }>;
+        },
+        {
+          data?: Array<{
+            name: string;
+            authStatus: string;
+            tools?: Record<string, unknown>;
+          }>;
+        },
+      ];
+
+    return {
+      models: (modelsResult.data || []).map((model) => ({
+        model: model.model,
+        displayName: model.displayName,
+        description: model.description,
+        supportedReasoningEfforts: model.supportedReasoningEfforts || [],
+        isDefault: model.isDefault === true,
+        supportsPersonality: model.supportsPersonality === true,
+      })),
+      config: configResult.config
+        ? {
+            model: configResult.config.model ?? null,
+            profile: configResult.config.profile ?? null,
+            approvalPolicy: configResult.config.approval_policy ?? null,
+            sandboxMode: configResult.config.sandbox_mode ?? null,
+            serviceTier: configResult.config.service_tier ?? null,
+            reasoningEffort:
+              configResult.config.model_reasoning_effort ?? null,
+            reasoningSummary:
+              configResult.config.model_reasoning_summary ?? null,
+            verbosity: configResult.config.model_verbosity ?? null,
+            webSearch: configResult.config.web_search ?? null,
+          }
+        : null,
+      account: accountResult?.account
+        ? {
+            type: accountResult.account.type,
+            email:
+              accountResult.account.type === "chatgpt"
+                ? accountResult.account.email ?? null
+                : null,
+            planType:
+              accountResult.account.type === "chatgpt"
+                ? accountResult.account.planType ?? null
+                : null,
+            requiresOpenaiAuth: accountResult?.requiresOpenaiAuth === true,
+          }
+        : {
+            type: null,
+            email: null,
+            planType: null,
+            requiresOpenaiAuth: accountResult?.requiresOpenaiAuth === true,
+          },
+      rateLimits: rateLimitsResult?.rateLimits
+        ? {
+            limitId: rateLimitsResult.rateLimits.limitId ?? null,
+            limitName: rateLimitsResult.rateLimits.limitName ?? null,
+            planType: rateLimitsResult.rateLimits.planType ?? null,
+            hasCredits: rateLimitsResult.rateLimits.credits != null,
+          }
+        : null,
+      experimentalFeatures: (experimentalFeaturesResult?.data || []).map(
+        (feature) => ({
+          name: feature.name,
+          stage: feature.stage,
+          enabled: feature.enabled,
+          defaultEnabled: feature.defaultEnabled,
+        }),
+      ),
+      skills: (skillsResult?.data || []).flatMap((entry) =>
+        (entry.skills || []).map((skill) => ({
+          name: skill.name,
+          description: skill.description,
+          path: skill.path,
+          enabled: skill.enabled,
+        })),
+      ),
+      mcpServers: (mcpServersResult?.data || []).map((server) => ({
+        name: server.name,
+        authStatus: server.authStatus,
+        toolCount: Object.keys(server.tools || {}).length,
+      })),
+    };
+  }
+
+  getCapabilities(): AppServerCapabilities | null {
+    return this.capabilities;
+  }
+
+  private async refreshCapabilitiesAndNotify(): Promise<void> {
+    if (this.capabilitiesRefresh) {
+      await this.capabilitiesRefresh;
+      return;
+    }
+
+    this.capabilitiesRefresh = (async () => {
+      this.capabilities = await this.loadCapabilities();
+      this.handler?.({
+        type: "metadata_refresh",
+        capabilities: this.capabilities,
+      });
+    })();
+
+    try {
+      await this.capabilitiesRefresh;
+    } finally {
+      this.capabilitiesRefresh = null;
+    }
+  }
+
+  async loginWithApiKey(apiKey: string): Promise<void> {
+    if (!this.connected) {
+      await this.connect();
+    }
+    await this.sendRequest("account/login/start", {
+      type: "apiKey",
+      apiKey,
+    });
+    this.capabilities = await this.loadCapabilities();
+  }
+
+  async loginWithChatGptAuthTokens(params: {
+    accessToken: string;
+    chatgptAccountId: string;
+    chatgptPlanType?: string | null;
+  }): Promise<void> {
+    if (!this.connected) {
+      await this.connect();
+    }
+    await this.sendRequest("account/login/start", {
+      type: "chatgptAuthTokens",
+      accessToken: params.accessToken,
+      chatgptAccountId: params.chatgptAccountId,
+      chatgptPlanType: params.chatgptPlanType ?? null,
+    });
+    this.capabilities = await this.loadCapabilities();
+  }
+
+  getCurrentModel(): string | null {
+    return this.currentModel;
+  }
+
+  async startSession(
+    config: CodexSessionConfig,
+    options?: { signal?: AbortSignal },
+  ): Promise<CodexToolResponse> {
+    if (!this.connected) {
+      await this.connect();
+    }
+
+    const threadResponse = (await this.sendRequest("thread/start", {
+      model: config.model ?? null,
+      cwd: config.cwd ?? process.cwd(),
+      approvalPolicy: config["approval-policy"] ?? null,
+      sandbox: config.sandbox ?? null,
+      config: {
+        ...(config.config ?? {}),
+        ...(config.profile ? { profile: config.profile } : {}),
+        ...(config.verbosity ? { model_verbosity: config.verbosity } : {}),
+        ...(config.webSearch ? { web_search: config.webSearch } : {}),
+      },
+      serviceName: "happy",
+      serviceTier: config.serviceTier ?? null,
+      personality: config.personality ?? null,
+      sessionStartSource: "startup",
+      experimentalRawEvents: false,
+      persistExtendedHistory: true,
+    })) as {
+      thread: { id: string };
+      model?: string;
+    };
+
+    this.threadId = threadResponse.thread.id;
+    this.currentModel = threadResponse.model ?? config.model ?? null;
+
+    await this.startTurn(config.prompt, {
+      signal: options?.signal,
+      model: config.model ?? undefined,
+      approvalPolicy: config["approval-policy"] ?? undefined,
+      sandbox: config.sandbox ?? undefined,
+    });
+
+    return { content: [] };
+  }
+
+  async continueSession(
+    prompt: string,
+    options?: {
+      signal?: AbortSignal;
+      model?: string;
+      approvalPolicy?: CodexSessionConfig["approval-policy"];
+      sandbox?: CodexSessionConfig["sandbox"];
+      serviceTier?: string;
+      reasoningEffort?: string;
+      reasoningSummary?: string;
+      verbosity?: string;
+      personality?: string;
+      webSearch?: "disabled" | "cached" | "live";
+    },
+  ): Promise<CodexToolResponse> {
+    if (!this.threadId) {
+      throw new Error("No active Codex app-server thread");
+    }
+
+    if (this.activeTurnId) {
+      this.handler?.({
+        type: "service_message",
+        text: "Steering active Codex turn...",
+      });
+      await this.sendRequest("turn/steer", {
+        threadId: this.threadId,
+        input: [{ type: "text", text: prompt }],
+        expectedTurnId: this.activeTurnId,
+      });
+      await this.waitForTurnCompletion(this.activeTurnId, options?.signal);
+      return { content: [] };
+    }
+
+    await this.startTurn(prompt, options);
+    return { content: [] };
+  }
+
+  async resumeThread(params: {
+    threadId: string;
+    model?: string;
+    approvalPolicy?: CodexSessionConfig["approval-policy"];
+    sandbox?: CodexSessionConfig["sandbox"];
+    profile?: string;
+    serviceTier?: string;
+    personality?: string;
+    verbosity?: string;
+    webSearch?: "disabled" | "cached" | "live";
+  }): Promise<void> {
+    if (!this.connected) {
+      await this.connect();
+    }
+
+    const response = (await this.sendRequest("thread/resume", {
+      threadId: params.threadId,
+      model: params.model ?? null,
+      cwd: process.cwd(),
+      approvalPolicy: params.approvalPolicy ?? null,
+      sandbox: params.sandbox ?? null,
+      serviceTier: params.serviceTier ?? null,
+      personality: params.personality ?? null,
+      config: {
+        ...(params.profile ? { profile: params.profile } : {}),
+        ...(params.verbosity ? { model_verbosity: params.verbosity } : {}),
+        ...(params.webSearch ? { web_search: params.webSearch } : {}),
+      },
+      persistExtendedHistory: true,
+    })) as {
+      thread: { id: string };
+      model?: string;
+    };
+
+    this.threadId = response.thread.id;
+    this.currentModel = response.model ?? params.model ?? this.currentModel;
+  }
+
+  private async startTurn(
+    prompt: string,
+    options?: {
+      signal?: AbortSignal;
+      model?: string;
+      approvalPolicy?: CodexSessionConfig["approval-policy"];
+      sandbox?: CodexSessionConfig["sandbox"];
+      serviceTier?: string;
+      reasoningEffort?: string;
+      reasoningSummary?: string;
+      verbosity?: string;
+      personality?: string;
+      webSearch?: "disabled" | "cached" | "live";
+    },
+  ): Promise<void> {
+    if (!this.threadId) {
+      throw new Error("No active Codex app-server thread");
+    }
+
+    const result = (await this.sendRequest("turn/start", {
+      threadId: this.threadId,
+      input: [{ type: "text", text: prompt }],
+      cwd: process.cwd(),
+      approvalPolicy: options?.approvalPolicy ?? null,
+      sandboxPolicy: buildSandboxPolicy(options?.sandbox, process.cwd()) ?? null,
+      model: options?.model ?? null,
+      serviceTier: options?.serviceTier ?? null,
+      effort: options?.reasoningEffort ?? null,
+      summary: options?.reasoningSummary ?? null,
+      personality: options?.personality ?? null,
+    })) as {
+      turn: { id: string };
+    };
+
+    this.activeTurnId = result.turn.id;
+    await this.waitForTurnCompletion(result.turn.id, options?.signal);
+  }
+
+  private async waitForTurnCompletion(
+    turnId: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      const waiter: TurnWaiter = { turnId, resolve, reject };
+      this.turnWaiters.set(turnId, waiter);
+
+      if (!signal) {
+        return;
+      }
+
+      const abortHandler = () => {
+        void this.interruptActiveTurn().catch((error) => {
+          logger.debug("[CodexAppServer] Failed to interrupt active turn", error);
+        });
+        this.turnWaiters.delete(turnId);
+        reject(createAbortError());
+      };
+
+      signal.addEventListener("abort", abortHandler, { once: true });
+      const originalResolve = waiter.resolve;
+      const originalReject = waiter.reject;
+      waiter.resolve = () => {
+        signal.removeEventListener("abort", abortHandler);
+        originalResolve();
+      };
+      waiter.reject = (error) => {
+        signal.removeEventListener("abort", abortHandler);
+        originalReject(error);
+      };
+    });
+  }
+
+  private async interruptActiveTurn(): Promise<void> {
+    if (!this.threadId || !this.activeTurnId) {
+      return;
+    }
+
+    await this.sendRequest("turn/interrupt", {
+      threadId: this.threadId,
+      turnId: this.activeTurnId,
+    });
+  }
+
+  getSessionId(): string | null {
+    return this.threadId;
+  }
+
+  hasActiveSession(): boolean {
+    return this.threadId !== null;
+  }
+
+  clearSession(): void {
+    this.threadId = null;
+    this.activeTurnId = null;
+    this.currentModel = null;
+  }
+
+  storeSessionForResume(): string | null {
+    return this.threadId;
+  }
+
+  async forceCloseSession(): Promise<void> {
+    await this.disconnect();
+    this.clearSession();
+  }
+
+  async disconnect(): Promise<void> {
+    this.stdoutReader?.close();
+    this.stdoutReader = null;
+
+    if (this.process && !this.process.killed) {
+      this.process.kill("SIGKILL");
+    }
+    this.process = null;
+    this.connected = false;
+
+    if (this.sandboxCleanup) {
+      try {
+        await this.sandboxCleanup();
+      } finally {
+        this.sandboxCleanup = null;
+      }
+    }
+    this.sandboxEnabled = false;
+  }
+
+  private async handleStdoutLine(line: string): Promise<void> {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    let payload: JsonRpcRequest;
+    try {
+      payload = JSON.parse(trimmed) as JsonRpcRequest;
+    } catch (error) {
+      logger.debug("[CodexAppServer] Failed to parse stdout line", error, line);
+      return;
+    }
+
+    if (
+      payload.id !== undefined &&
+      (Object.prototype.hasOwnProperty.call(payload, "result") ||
+        Object.prototype.hasOwnProperty.call(payload, "error")) &&
+      !payload.method
+    ) {
+      this.resolvePendingCall(payload);
+      return;
+    }
+
+    if (payload.method && payload.id !== undefined) {
+      await this.handleServerRequest(payload);
+      return;
+    }
+
+    if (payload.method) {
+      this.handleNotification(payload.method, payload.params);
+    }
+  }
+
+  private resolvePendingCall(payload: JsonRpcRequest): void {
+    const key = String(payload.id);
+    const pending = this.pendingCalls.get(key);
+    if (!pending) {
+      return;
+    }
+    this.pendingCalls.delete(key);
+    if (payload.error !== undefined) {
+      pending.reject(parseError(payload.error, "Codex app-server request failed"));
+      return;
+    }
+    pending.resolve(payload.result);
+  }
+
+  private async handleServerRequest(payload: JsonRpcRequest): Promise<void> {
+    const requestId = payload.id!;
+    const requestKey = String(requestId);
+    const method = payload.method;
+    const params = (payload.params || {}) as Record<string, unknown>;
+
+    try {
+      if (method === "item/commandExecution/requestApproval") {
+        const decision = this.permissionHandler
+          ? mapPermissionDecision(
+              (
+                await this.permissionHandler.handleToolCall(requestKey, "CodexBash", {
+                  command: params.command,
+                  cwd: params.cwd,
+                  reason: params.reason,
+                  availableDecisions: params.availableDecisions,
+                })
+              ).decision,
+            )
+          : "cancel";
+        this.sendResponse(requestId, { decision });
+        return;
+      }
+
+      if (method === "item/fileChange/requestApproval") {
+        const decision = this.permissionHandler
+          ? mapPermissionDecision(
+              (
+                await this.permissionHandler.handleToolCall(requestKey, "CodexPatch", {
+                  reason: params.reason,
+                  grantRoot: params.grantRoot,
+                })
+              ).decision,
+            )
+          : "cancel";
+        this.sendResponse(requestId, { decision });
+        return;
+      }
+
+      if (method === "item/tool/requestUserInput") {
+        const questions = Array.isArray(params.questions)
+          ? (params.questions as AppServerQuestion[])
+          : [];
+        const result = this.elicitationHandler
+          ? await this.elicitationHandler(
+              {
+                serverName: "Codex",
+                message:
+                  questions.length > 0
+                    ? questions.map((question) => question.question).join("\n")
+                    : "Codex requires additional user input.",
+                mode: "form",
+                requestedSchema: buildElicitationSchema(questions),
+              },
+              { signal: AbortSignal.timeout(10 * 60 * 1000) },
+            )
+          : { action: "cancel" as const };
+
+        if (result.action !== "accept") {
+          this.sendResponse(requestId, { answers: {} });
+          return;
+        }
+
+        const answers = Object.fromEntries(
+          questions.map((question) => {
+            const value = result.content?.[question.id];
+            if (Array.isArray(value)) {
+              return [
+                question.id,
+                { answers: value.map((item) => String(item)) },
+              ];
+            }
+            if (value == null) {
+              return [question.id, { answers: [] }];
+            }
+            return [question.id, { answers: [String(value)] }];
+          }),
+        );
+        this.sendResponse(requestId, { answers });
+        return;
+      }
+
+      if (method === "account/chatgptAuthTokens/refresh") {
+        if (!this.chatGptAuthTokensProvider) {
+          this.sendError(requestId, "No ChatGPT auth token provider configured");
+          return;
+        }
+        const refreshed = await this.chatGptAuthTokensProvider();
+        if (!refreshed) {
+          this.sendError(requestId, "No ChatGPT auth tokens available");
+          return;
+        }
+        this.sendResponse(requestId, {
+          accessToken: refreshed.accessToken,
+          chatgptAccountId: refreshed.chatgptAccountId,
+          chatgptPlanType: refreshed.chatgptPlanType ?? null,
+        });
+        return;
+      }
+
+      this.sendResponse(requestId, {});
+    } catch (error) {
+      logger.debug("[CodexAppServer] Server request handler failed", error);
+      this.sendError(
+        requestId,
+        error instanceof Error ? error.message : "Server request handler failed",
+      );
+    }
+  }
+
+  private handleNotification(method: string, params: unknown): void {
+    switch (method) {
+      case "turn/started": {
+        const turnId =
+          params &&
+          typeof params === "object" &&
+          typeof (params as { turn?: { id?: unknown } }).turn?.id === "string"
+            ? (params as { turn: { id: string } }).turn.id
+            : null;
+        if (turnId) {
+          this.activeTurnId = turnId;
+        }
+        this.handler?.({ type: "task_started" });
+        return;
+      }
+      case "turn/completed": {
+        const turn =
+          params && typeof params === "object" ? (params as { turn?: any }).turn : null;
+        const turnId = typeof turn?.id === "string" ? turn.id : null;
+        const status = typeof turn?.status === "string" ? turn.status : "completed";
+        if (turnId) {
+          const waiter = this.turnWaiters.get(turnId);
+          this.turnWaiters.delete(turnId);
+          if (waiter) {
+            if (status === "failed") {
+              waiter.reject(
+                parseError(turn?.error, "Codex app-server turn failed"),
+              );
+            } else {
+              waiter.resolve();
+            }
+          }
+        }
+        this.activeTurnId = null;
+        if (status === "completed") {
+          this.handler?.({ type: "task_complete", status });
+        } else {
+          this.handler?.({
+            type: "turn_aborted",
+            status,
+            reason:
+              typeof turn?.error?.message === "string"
+                ? turn.error.message
+                : status,
+          });
+        }
+        return;
+      }
+      case "item/agentMessage/delta": {
+        const delta =
+          params && typeof params === "object" && typeof (params as { delta?: unknown }).delta === "string"
+            ? (params as { delta: string }).delta
+            : "";
+        if (delta) {
+          this.handler?.({ type: "agent_message", message: delta });
+        }
+        return;
+      }
+      case "item/reasoning/textDelta":
+      case "item/reasoning/summaryTextDelta": {
+        const delta =
+          params && typeof params === "object" && typeof (params as { delta?: unknown }).delta === "string"
+            ? (params as { delta: string }).delta
+            : "";
+        if (delta) {
+          this.handler?.({ type: "agent_reasoning_delta", delta });
+        }
+        return;
+      }
+      case "item/reasoning/summaryPartAdded": {
+        this.handler?.({ type: "agent_reasoning_section_break" });
+        return;
+      }
+      case "account/updated":
+      case "account/rateLimits/updated":
+      case "skills/changed":
+      case "mcpServer/startupStatus/updated":
+        void this.refreshCapabilitiesAndNotify().catch((error) => {
+          logger.debug("[CodexAppServer] Failed to refresh capabilities", error);
+        });
+        return;
+      case "model/rerouted": {
+        const notification = params as {
+          fromModel?: string;
+          toModel?: string;
+          reason?: string;
+        };
+        if (typeof notification.toModel === "string") {
+          this.currentModel = notification.toModel;
+          this.handler?.({
+            type: "metadata_patch",
+            patch: {
+              currentModelCode: notification.toModel,
+            },
+          });
+        }
+        this.handler?.({
+          type: "service_message",
+          text:
+            notification.toModel && notification.fromModel
+              ? `Codex rerouted model from ${notification.fromModel} to ${notification.toModel}`
+              : "Codex rerouted the active model",
+        });
+        return;
+      }
+      case "configWarning": {
+        const warning = params as { summary?: string; details?: string | null };
+        this.handler?.({
+          type: "service_message",
+          text:
+            warning.details && warning.summary
+              ? `${warning.summary}\n${warning.details}`
+              : warning.summary || "Codex reported a configuration warning",
+        });
+        return;
+      }
+      case "item/started": {
+        this.handleItemEvent((params as { item?: any })?.item, "started");
+        return;
+      }
+      case "item/completed": {
+        this.handleItemEvent((params as { item?: any })?.item, "completed");
+        return;
+      }
+      case "turn/plan/updated": {
+        const notification = params as {
+          explanation?: string | null;
+          plan?: Array<{ title?: string; status?: string }>;
+        };
+        const lines = [
+          notification.explanation || "Plan updated",
+          ...(notification.plan || []).map((step) => {
+            const status =
+              typeof step.status === "string" && step.status.length > 0
+                ? `[${step.status}] `
+                : "";
+            return `${status}${step.title || "Untitled step"}`;
+          }),
+        ].filter(Boolean);
+        this.handler?.({
+          type: "service_message",
+          text: lines.join("\n"),
+        });
+        return;
+      }
+      case "turn/diff/updated": {
+        const notification = params as { diff?: string };
+        if (typeof notification.diff === "string" && notification.diff.length > 0) {
+          this.handler?.({
+            type: "service_message",
+            text: `Latest diff preview:\n\n\`\`\`diff\n${notification.diff}\n\`\`\``,
+          });
+        }
+        return;
+      }
+      case "serverRequest/resolved":
+      default:
+        return;
+    }
+  }
+
+  private handleItemEvent(item: Record<string, unknown> | undefined, phase: "started" | "completed"): void {
+    if (!item || typeof item.type !== "string") {
+      return;
+    }
+
+    switch (item.type) {
+      case "commandExecution":
+        if (phase === "started") {
+          this.handler?.({
+            type: "exec_command_begin",
+            call_id: item.id,
+            command: item.command,
+            cwd: item.cwd,
+          });
+        } else {
+          this.handler?.({
+            type: "exec_command_end",
+            call_id: item.id,
+            output: item.aggregatedOutput,
+            success: item.status === "completed",
+            error: item.status === "failed" ? item.aggregatedOutput : undefined,
+          });
+        }
+        return;
+      case "fileChange":
+        if (phase === "started") {
+          const changes = Array.isArray(item.changes)
+            ? Object.fromEntries(
+                item.changes.map((change) => [
+                  String((change as { path?: unknown }).path || "unknown"),
+                  change,
+                ]),
+              )
+            : {};
+          this.handler?.({
+            type: "patch_apply_begin",
+            call_id: item.id,
+            changes,
+          });
+        } else {
+          this.handler?.({
+            type: "patch_apply_end",
+            call_id: item.id,
+            success: item.status === "completed",
+            stderr:
+              item.status === "failed"
+                ? "File change failed"
+                : item.status === "declined"
+                  ? "File change declined"
+                  : undefined,
+          });
+        }
+        return;
+      case "enteredReviewMode":
+      case "exitedReviewMode":
+        this.handler?.({
+          type: "service_message",
+          text:
+            typeof item.review === "string" && item.review.length > 0
+              ? item.review
+              : item.type === "enteredReviewMode"
+                ? "Codex review started"
+                : "Codex review completed",
+        });
+        return;
+      default:
+        return;
+    }
+  }
+
+  private sendNotification(method: string): void {
+    this.process?.stdin.write(`${JSON.stringify({ method })}\n`);
+  }
+
+  private sendResponse(id: string | number, result: unknown): void {
+    this.process?.stdin.write(`${JSON.stringify({ id, result })}\n`);
+  }
+
+  private sendError(id: string | number, message: string): void {
+    this.process?.stdin.write(
+      `${JSON.stringify({ id, error: { message } })}\n`,
+    );
+  }
+
+  private sendRequest(method: string, params: unknown): Promise<unknown> {
+    if (!this.process) {
+      return Promise.reject(new Error("Codex app-server process not started"));
+    }
+
+    const id = this.nextRequestId++;
+    const key = String(id);
+    const payload = JSON.stringify({ method, id, params });
+
+    return new Promise((resolve, reject) => {
+      this.pendingCalls.set(key, { resolve, reject });
+      this.process?.stdin.write(`${payload}\n`, (error) => {
+        if (error) {
+          this.pendingCalls.delete(key);
+          reject(error);
+        }
+      });
+    });
+  }
+}

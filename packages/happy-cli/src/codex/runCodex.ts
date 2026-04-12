@@ -1,12 +1,22 @@
 import { render } from "ink";
 import React from "react";
 import { ApiClient } from "@/api/api";
-import { CodexMcpClient } from "./codexMcpClient";
+import {
+  CodexMcpClient,
+  getInstalledCodexVersion,
+  supportsCodexAppServer,
+} from "./codexMcpClient";
+import { CodexAppServerClient } from "@/codex-app/CodexAppServerClient";
 import { CodexPermissionHandler } from "./utils/permissionHandler";
 import { ReasoningProcessor } from "./utils/reasoningProcessor";
 import { DiffProcessor } from "./utils/diffProcessor";
 import { logger } from "@/ui/logger";
-import { Credentials, readSettings, writeSessionKey } from "@/persistence";
+import {
+  Credentials,
+  readSessionKey,
+  readSettings,
+  writeSessionKey,
+} from "@/persistence";
 import { initialMachineMetadata } from "@/daemon/run";
 import { configuration } from "@/configuration";
 import packageJson from "../../package.json";
@@ -39,6 +49,13 @@ import { connectionState } from "@/utils/serverConnectionErrors";
 import { setupOfflineReconnection } from "@/utils/setupOfflineReconnection";
 import type { ApiSessionClient } from "@/api/apiSession";
 import { resolveCodexExecutionPolicy } from "./executionPolicy";
+import {
+  resolveRequestedCodexBackend,
+  shouldFallbackToLegacyCodex,
+  type RequestedCodexBackend,
+  type ResolvedCodexBackend,
+} from "@/codex-shared/backendSelection";
+import { resolveCodexRuntimeConfigFromEnv } from "@/codex-shared/configResolution";
 import {
   mapCodexMcpMessageToSessionEnvelopes,
   mapCodexProcessorMessageToSessionEnvelopes,
@@ -110,6 +127,7 @@ export async function runCodex(opts: {
   credentials: Credentials;
   startedBy?: "daemon" | "terminal";
   noSandbox?: boolean;
+  happySessionId?: string;
 }): Promise<void> {
   // Use shared PermissionMode type for cross-agent compatibility
   type PermissionMode = import("@/api/types").PermissionMode;
@@ -126,6 +144,24 @@ export async function runCodex(opts: {
   connectionState.setBackend("Codex");
 
   const api = await ApiClient.create(opts.credentials);
+  const loadOpenAiAuthTokens = async (): Promise<{
+    accessToken: string;
+    chatgptAccountId: string;
+    chatgptPlanType?: string | null;
+  } | null> => {
+    const vendorToken = await api.getVendorToken("openai");
+    if (
+      vendorToken?.oauth?.access_token &&
+      vendorToken?.oauth?.account_id
+    ) {
+      return {
+        accessToken: vendorToken.oauth.access_token,
+        chatgptAccountId: vendorToken.oauth.account_id,
+        chatgptPlanType: null,
+      };
+    }
+    return null;
+  };
 
   // Log startup options
   logger.debug(
@@ -139,6 +175,24 @@ export async function runCodex(opts: {
   const settings = await readSettings();
   let machineId = settings?.machineId;
   const sandboxConfig = opts.noSandbox ? undefined : settings?.sandboxConfig;
+  const existingSessionKey = opts.happySessionId
+    ? await readSessionKey(opts.happySessionId)
+    : null;
+  const existingHappySession = opts.happySessionId
+    ? await api.getSessionById({
+        sessionId: opts.happySessionId,
+        existingEncryptionKey: existingSessionKey ?? undefined,
+      })
+    : null;
+  const runtimeConfig = resolveCodexRuntimeConfigFromEnv();
+  const requestedBackendBase: RequestedCodexBackend =
+    resolveRequestedCodexBackend();
+  const requestedBackend: RequestedCodexBackend =
+    requestedBackendBase === "auto"
+      ? (existingHappySession?.metadata.codex?.resolvedBackend ??
+          existingHappySession?.metadata.codex?.requestedBackend ??
+          requestedBackendBase)
+      : requestedBackendBase;
   if (!machineId) {
     logger.warn(
       `[START] No machine ID found in settings, which is unexpected since authAndSetupMachineIfNeeded should have created it. Please report this issue on https://github.com/slopus/happy-cli/issues`,
@@ -164,17 +218,51 @@ export async function runCodex(opts: {
     startedBy: opts.startedBy,
     sandbox: sandboxConfig,
   });
-  const metadata = await enrichMetadataWithWorktree(rawMetadata);
-  const projectPath_ = metadata.worktree?.parentRepoPath || metadata.path;
-  const response = await api.getOrCreateSession({
-    tag: sessionTag,
-    metadata,
-    state,
-    machineId,
-    path: projectPath_,
+  rawMetadata.codex = {
+    ...rawMetadata.codex,
+    requestedBackend,
+    ...(requestedBackend === "codex-mcp-legacy"
+      ? { resolvedBackend: "codex-mcp-legacy" as const }
+      : {}),
+    configMode: runtimeConfig.configMode,
+    ...(runtimeConfig.profileName
+      ? {
+          config: {
+            ...(rawMetadata.codex?.config ?? {}),
+            profile: runtimeConfig.profileName,
+          },
+        }
+      : {}),
+  };
+  const installedCodexVersion = getInstalledCodexVersion();
+  const metadata = await enrichMetadataWithWorktree({
+    ...rawMetadata,
+    codex: {
+      ...rawMetadata.codex,
+      ...(installedCodexVersion
+        ? { backendVersion: installedCodexVersion }
+        : {}),
+    },
   });
+  const projectPath_ = metadata.worktree?.parentRepoPath || metadata.path;
+  const response = opts.happySessionId
+    ? await api.reconnectSession({
+        sessionId: opts.happySessionId,
+        metadata,
+        state,
+        machineId,
+        path: projectPath_,
+        existingEncryptionKey: existingSessionKey ?? undefined,
+      })
+    : await api.getOrCreateSession({
+        tag: sessionTag,
+        metadata,
+        state,
+        machineId,
+        path: projectPath_,
+      });
   // Persist encryption key for future reconnects
-  if (response) {
+  if (response && (!opts.happySessionId || !existingSessionKey)) {
     await writeSessionKey(response.id, response.encryptionKey);
   }
 
@@ -192,6 +280,8 @@ export async function runCodex(opts: {
       response,
       machineId,
       path: projectPath_,
+      happySessionId: opts.happySessionId,
+      existingEncryptionKey: existingSessionKey ?? undefined,
       onSessionSwap: (newSession) => {
         session = newSession;
         // Update permission handler with new session to avoid stale reference
@@ -235,7 +325,6 @@ export async function runCodex(opts: {
   let currentPermissionMode: import("@/api/types").PermissionMode | undefined =
     undefined;
   let currentModel: string | undefined = undefined;
-
   session.onUserMessage((message) => {
     // Resolve permission mode (accept all modes, will be mapped in switch statement)
     let messagePermissionMode = currentPermissionMode;
@@ -344,7 +433,7 @@ export async function runCodex(opts: {
     logger.debug("[Codex] Abort requested - stopping current task");
     try {
       // Store the current session ID before aborting for potential resume
-      if (client.hasActiveSession()) {
+      if (client?.hasActiveSession()) {
         storedSessionIdForResume = client.storeSessionForResume();
         logger.debug(
           "[Codex] Stored session for resume:",
@@ -406,7 +495,7 @@ export async function runCodex(opts: {
 
       // Force close Codex transport (best-effort) so we don't leave stray processes
       try {
-        await client.forceCloseSession();
+        await client?.forceCloseSession();
       } catch (e) {
         logger.debug(
           "[Codex] Error while force closing Codex session during termination",
@@ -473,7 +562,8 @@ export async function runCodex(opts: {
   // Start Context
   //
 
-  const client = new CodexMcpClient(sandboxConfig);
+  type CodexRuntimeClient = CodexMcpClient | CodexAppServerClient;
+  let client: CodexRuntimeClient | null = null;
 
   // Helper: find Codex session transcript for a given sessionId
   function findCodexResumeFile(sessionId: string | null): string | null {
@@ -524,6 +614,86 @@ export async function runCodex(opts: {
     }
   }
   permissionHandler = new CodexPermissionHandler(session);
+  const pendingElicitations = new Map<
+    string,
+    {
+      resolve: (result: { action: "accept" | "decline" | "cancel"; content?: Record<string, unknown> }) => void;
+      reject: (error: Error) => void;
+    }
+  >();
+  let elicitationCounter = 0;
+  session.rpcHandlerManager.registerHandler(
+    "elicitationResponse",
+    async (response: { id: string; action: string; content?: Record<string, unknown> }) => {
+      const pendingItem = pendingElicitations.get(response.id);
+      if (!pendingItem) {
+        logger.debug(`[Codex] Elicitation response for unknown id ${response.id}`);
+        return;
+      }
+      const validActions = ["accept", "decline", "cancel"] as const;
+      if (!validActions.includes(response.action as (typeof validActions)[number])) {
+        logger.debug(`[Codex] Invalid elicitation action: ${response.action}`);
+        return;
+      }
+      pendingElicitations.delete(response.id);
+      session.updateAgentState((currentState) => ({ ...currentState, elicitation: null }));
+      pendingItem.resolve({
+        action: response.action as "accept" | "decline" | "cancel",
+        content: response.content,
+      });
+    },
+  );
+  const handleElicitation = async (
+    request: {
+      serverName: string;
+      message: string;
+      mode: "form" | "url";
+      url?: string | null;
+      requestedSchema?: Record<string, unknown> | null;
+    },
+    options: { signal: AbortSignal },
+  ): Promise<{ action: "accept" | "decline" | "cancel"; content?: Record<string, unknown> }> => {
+    const id = `elicit-${++elicitationCounter}`;
+
+    return new Promise((resolve, reject) => {
+      const abortHandler = () => {
+        pendingElicitations.delete(id);
+        session.updateAgentState((currentState) => ({ ...currentState, elicitation: null }));
+        reject(new Error("Elicitation aborted"));
+      };
+      options.signal.addEventListener("abort", abortHandler, { once: true });
+
+      pendingElicitations.set(id, {
+        resolve: (result) => {
+          options.signal.removeEventListener("abort", abortHandler);
+          resolve(result);
+        },
+        reject: (error) => {
+          options.signal.removeEventListener("abort", abortHandler);
+          reject(error);
+        },
+      });
+
+      session.updateAgentState((currentState) => ({
+        ...currentState,
+        elicitation: {
+          id,
+          serverName: request.serverName,
+          message: request.message,
+          mode: request.mode,
+          url: request.url,
+          requestedSchema: request.requestedSchema,
+        },
+      }));
+
+      void api
+        .push()
+        .sendToAllDevices("Codex Input Required", request.message, {
+          sessionId: session.sessionId,
+          type: "elicitation_request",
+        });
+    });
+  };
   const reasoningProcessor = new ReasoningProcessor((message) => {
     const envelopes = mapCodexProcessorMessageToSessionEnvelopes(message, {
       currentTurnId,
@@ -540,13 +710,80 @@ export async function runCodex(opts: {
       session.sendSessionProtocolMessage(envelope);
     }
   });
-  client.setPermissionHandler(permissionHandler);
-  client.setHandler((msg) => {
+  const onClientMessage = (msg: any) => {
     logger.debug(`[Codex] MCP message: ${JSON.stringify(msg)}`);
+
+    const applyCapabilitiesToMetadata = (
+      capabilities: {
+        models?: Array<{
+          model: string;
+          displayName: string;
+          description: string;
+          supportedReasoningEfforts: Array<{ value: string; label: string }>;
+        }>;
+        config?: Record<string, unknown> | null;
+        account?: Record<string, unknown> | null;
+        rateLimits?: Record<string, unknown> | null;
+        experimentalFeatures?: Array<Record<string, unknown>>;
+        skills?: Array<Record<string, unknown>>;
+        mcpServers?: Array<Record<string, unknown>>;
+      } | null,
+    ) => {
+      if (!capabilities) {
+        return;
+      }
+      session.updateMetadata((currentMetadata) => ({
+        ...currentMetadata,
+        codex: {
+          ...currentMetadata.codex,
+          ...(capabilities.config ? { config: capabilities.config as any } : {}),
+          ...(capabilities.account ? { account: capabilities.account as any } : {}),
+          ...(capabilities.rateLimits ? { rateLimits: capabilities.rateLimits as any } : {}),
+          ...(capabilities.experimentalFeatures &&
+          capabilities.experimentalFeatures.length > 0
+            ? { experimentalFeatures: capabilities.experimentalFeatures as any }
+            : {}),
+          ...(capabilities.skills && capabilities.skills.length > 0
+            ? { skills: capabilities.skills as any }
+            : {}),
+          ...(capabilities.mcpServers && capabilities.mcpServers.length > 0
+            ? { mcpServers: capabilities.mcpServers as any }
+            : {}),
+        },
+        ...(capabilities.models && capabilities.models.length > 0
+          ? {
+              models: capabilities.models.map((model) => ({
+                code: model.model,
+                value: model.displayName,
+                description: model.description,
+                supportsEffort: model.supportedReasoningEfforts.length > 0,
+                supportedEffortLevels: model.supportedReasoningEfforts.map(
+                  (effort) => effort.value,
+                ),
+              })),
+            }
+          : {}),
+      }));
+    };
+
+    if (msg.type === "metadata_refresh") {
+      applyCapabilitiesToMetadata(msg.capabilities ?? null);
+      return;
+    }
+
+    if (msg.type === "metadata_patch") {
+      session.updateMetadata((currentMetadata) => ({
+        ...currentMetadata,
+        ...(msg.patch ?? {}),
+      }));
+      return;
+    }
 
     // Add messages to the ink UI buffer based on message type
     if (msg.type === "agent_message") {
       messageBuffer.addMessage(msg.message, "assistant");
+    } else if (msg.type === "service_message") {
+      messageBuffer.addMessage(msg.text, "system");
     } else if (msg.type === "agent_reasoning_delta") {
       // Skip reasoning deltas in the UI to reduce noise
     } else if (msg.type === "agent_reasoning") {
@@ -657,7 +894,7 @@ export async function runCodex(opts: {
         session.sendSessionProtocolMessage(envelope);
       }
     }
-  });
+  };
 
   // Start Happy MCP server (HTTP) and prepare STDIO bridge config for Codex
   const happyServer = await startHappyServer(session);
@@ -671,9 +908,194 @@ export async function runCodex(opts: {
   let first = true;
 
   try {
-    logger.debug("[codex]: client.connect begin");
-    await client.connect();
-    logger.debug("[codex]: client.connect done");
+    const instantiateLegacyClient = () => {
+      const legacyClient = new CodexMcpClient(sandboxConfig);
+      legacyClient.setPermissionHandler(permissionHandler);
+      legacyClient.setHandler(onClientMessage);
+      return legacyClient;
+    };
+    const instantiateAppServerClient = () => {
+      const appServerClient = new CodexAppServerClient(sandboxConfig);
+      appServerClient.setPermissionHandler(permissionHandler);
+      appServerClient.setElicitationHandler(handleElicitation);
+      appServerClient.setChatGptAuthTokensProvider(loadOpenAiAuthTokens);
+      appServerClient.setHandler(onClientMessage);
+      return appServerClient;
+    };
+
+    let resolvedBackend: ResolvedCodexBackend;
+    let fallbackReason: string | undefined;
+    const resumeThreadId =
+      existingHappySession?.metadata.codex?.resolvedBackend === "codex-app-server"
+        ? existingHappySession.metadata.codex.threadId ?? null
+        : null;
+    if (requestedBackend === "codex-mcp-legacy") {
+      client = instantiateLegacyClient();
+      resolvedBackend = "codex-mcp-legacy";
+    } else {
+      try {
+        if (!supportsCodexAppServer()) {
+          throw new Error("Codex CLI does not support app-server");
+        }
+        client = instantiateAppServerClient();
+        logger.debug("[codex]: app-server client.connect begin");
+        await client.connect();
+        logger.debug("[codex]: app-server client.connect done");
+        resolvedBackend = "codex-app-server";
+      } catch (error) {
+        if (requestedBackend === "codex-app-server") {
+          throw error;
+        }
+        if (!shouldFallbackToLegacyCodex(error)) {
+          throw error;
+        }
+        fallbackReason =
+          error instanceof Error ? error.message : "Codex app-server unavailable";
+        logger.warn("[Codex] Falling back to legacy MCP backend", error);
+        client = instantiateLegacyClient();
+        resolvedBackend = "codex-mcp-legacy";
+        messageBuffer.addMessage(
+          "Codex App Server unavailable, falling back to Legacy MCP",
+          "status",
+        );
+        session.sendSessionEvent({
+          type: "message",
+          message: "Codex App Server unavailable, fell back to Legacy MCP",
+        });
+        const mapped = mapCodexMcpMessageToSessionEnvelopes(
+          {
+            type: "service_message",
+            text: "Codex App Server unavailable, fell back to Legacy MCP",
+          },
+          {
+            currentTurnId,
+            startedSubagents: codexStartedSubagents,
+            activeSubagents: codexActiveSubagents,
+            providerSubagentToSessionSubagent:
+              codexProviderSubagentToSessionSubagent,
+          },
+        );
+        currentTurnId = mapped.currentTurnId;
+        codexStartedSubagents = mapped.startedSubagents;
+        codexActiveSubagents = mapped.activeSubagents;
+        codexProviderSubagentToSessionSubagent =
+          mapped.providerSubagentToSessionSubagent;
+        for (const envelope of mapped.envelopes) {
+          session.sendSessionProtocolMessage(envelope);
+        }
+        await client.connect();
+      }
+    }
+
+    if (resolvedBackend === "codex-app-server") {
+      const appServerClient = client as CodexAppServerClient;
+      try {
+        const authTokens = await loadOpenAiAuthTokens();
+        if (authTokens) {
+          await appServerClient.loginWithChatGptAuthTokens({
+            accessToken: authTokens.accessToken,
+            chatgptAccountId: authTokens.chatgptAccountId,
+            chatgptPlanType: authTokens.chatgptPlanType ?? null,
+          });
+        } else if (process.env.OPENAI_API_KEY) {
+          await appServerClient.loginWithApiKey(process.env.OPENAI_API_KEY);
+        }
+      } catch (error) {
+        logger.warn("[Codex] Failed to bootstrap app-server auth", error);
+      }
+      if (resumeThreadId) {
+        try {
+          await appServerClient.resumeThread({
+            threadId: resumeThreadId,
+            profile: runtimeConfig.profileName,
+            model: runtimeConfig.overrides.model,
+            approvalPolicy:
+              (runtimeConfig.overrides.approvalPolicy as
+                | "untrusted"
+                | "on-failure"
+                | "on-request"
+                | "never"
+                | undefined) ?? undefined,
+            sandbox:
+              (runtimeConfig.overrides.sandboxMode as
+                | "read-only"
+                | "workspace-write"
+                | "danger-full-access"
+                | undefined) ?? undefined,
+            serviceTier: runtimeConfig.overrides.serviceTier,
+            personality: runtimeConfig.overrides.personality,
+            verbosity: runtimeConfig.overrides.verbosity,
+            webSearch: runtimeConfig.overrides.webSearch,
+          });
+          session.sendSessionEvent({
+            type: "message",
+            message: `Resumed Codex thread ${resumeThreadId}`,
+          });
+        } catch (error) {
+          logger.warn("[Codex] Failed to resume existing app-server thread", error);
+          session.sendSessionEvent({
+            type: "message",
+            message: "Failed to resume previous Codex thread; a new thread will be created on the next prompt",
+          });
+        }
+      }
+      const capabilities = appServerClient.getCapabilities() ?? {
+        models: [],
+        config: null,
+        account: null,
+        rateLimits: null,
+        experimentalFeatures: [],
+        skills: [],
+        mcpServers: [],
+      };
+      session.updateMetadata((currentMetadata) => ({
+        ...currentMetadata,
+        codex: {
+          ...currentMetadata.codex,
+          requestedBackend,
+          resolvedBackend,
+          ...(fallbackReason ? { fallbackReason } : {}),
+          ...(installedCodexVersion ? { backendVersion: installedCodexVersion } : {}),
+          ...(appServerClient.getSessionId()
+            ? { threadId: appServerClient.getSessionId() ?? undefined }
+            : {}),
+          ...(capabilities.config ? { config: capabilities.config } : {}),
+          ...(capabilities.account ? { account: capabilities.account } : {}),
+          ...(capabilities.rateLimits ? { rateLimits: capabilities.rateLimits } : {}),
+          ...(capabilities.experimentalFeatures.length > 0
+            ? { experimentalFeatures: capabilities.experimentalFeatures }
+            : {}),
+          ...(capabilities.skills.length > 0 ? { skills: capabilities.skills } : {}),
+          ...(capabilities.mcpServers.length > 0
+            ? { mcpServers: capabilities.mcpServers }
+            : {}),
+        },
+        ...(capabilities.models.length > 0
+          ? {
+              models: capabilities.models.map((model) => ({
+                code: model.model,
+                value: model.displayName,
+                description: model.description,
+                supportsEffort: model.supportedReasoningEfforts.length > 0,
+                supportedEffortLevels: model.supportedReasoningEfforts.map(
+                  (effort) => effort.value,
+                ),
+              })),
+            }
+          : {}),
+      }));
+    } else {
+      session.updateMetadata((currentMetadata) => ({
+        ...currentMetadata,
+        codex: {
+          ...currentMetadata.codex,
+          requestedBackend,
+          resolvedBackend,
+          ...(fallbackReason ? { fallbackReason } : {}),
+          ...(installedCodexVersion ? { backendVersion: installedCodexVersion } : {}),
+        },
+      }));
+    }
     let wasCreated = false;
     let currentModeHash: string | null = null;
     let pending: {
@@ -720,7 +1142,14 @@ export async function runCodex(opts: {
       }
 
       // If a session exists and mode changed, restart on next iteration
-      if (wasCreated && currentModeHash && message.hash !== currentModeHash) {
+      const currentClient = client;
+      if (
+        wasCreated &&
+        currentModeHash &&
+        message.hash !== currentModeHash &&
+        currentClient &&
+        !currentClient.supportsModeHotSwap
+      ) {
         logger.debug("[Codex] Mode changed – restarting Codex session");
         messageBuffer.addMessage("═".repeat(40), "status");
         messageBuffer.addMessage(
@@ -729,7 +1158,7 @@ export async function runCodex(opts: {
         );
         // Capture previous sessionId and try to find its transcript to resume
         try {
-          const prevSessionId = client.getSessionId();
+          const prevSessionId = currentClient.getSessionId();
           nextExperimentalResume = findCodexResumeFile(prevSessionId);
           if (nextExperimentalResume) {
             logger.debug(
@@ -742,7 +1171,7 @@ export async function runCodex(opts: {
         } catch (e) {
           logger.debug("[Codex] Error while searching resume file", e);
         }
-        client.clearSession();
+        currentClient.clearSession();
         wasCreated = false;
         currentModeHash = null;
         pending = message;
@@ -772,12 +1201,61 @@ export async function runCodex(opts: {
             prompt: first
               ? message.message + "\n\n" + CHANGE_TITLE_INSTRUCTION
               : message.message,
-            sandbox: executionPolicy.sandbox,
-            "approval-policy": executionPolicy.approvalPolicy,
-            config: { mcp_servers: mcpServers },
+            config: {
+              mcp_servers: mcpServers,
+              ...(runtimeConfig.overrides.reasoningEffort
+                ? {
+                    model_reasoning_effort:
+                      runtimeConfig.overrides.reasoningEffort,
+                  }
+                : {}),
+              ...(runtimeConfig.overrides.reasoningSummary
+                ? {
+                    model_reasoning_summary:
+                      runtimeConfig.overrides.reasoningSummary,
+                  }
+                : {}),
+              ...(runtimeConfig.overrides.verbosity
+                ? { model_verbosity: runtimeConfig.overrides.verbosity }
+                : {}),
+              ...(runtimeConfig.overrides.webSearch
+                ? { web_search: runtimeConfig.overrides.webSearch }
+                : {}),
+            },
           };
+          if (executionPolicy.sandbox) {
+            startConfig.sandbox = executionPolicy.sandbox;
+          }
+          if (executionPolicy.approvalPolicy) {
+            startConfig["approval-policy"] = executionPolicy.approvalPolicy;
+          }
           if (message.mode.model) {
             startConfig.model = message.mode.model;
+          } else if (runtimeConfig.overrides.model) {
+            startConfig.model = runtimeConfig.overrides.model;
+          }
+          if (runtimeConfig.profileName) {
+            startConfig.profile = runtimeConfig.profileName;
+          }
+          if (runtimeConfig.overrides.serviceTier) {
+            startConfig.serviceTier = runtimeConfig.overrides.serviceTier;
+          }
+          if (runtimeConfig.overrides.reasoningEffort) {
+            startConfig.reasoningEffort =
+              runtimeConfig.overrides.reasoningEffort;
+          }
+          if (runtimeConfig.overrides.reasoningSummary) {
+            startConfig.reasoningSummary =
+              runtimeConfig.overrides.reasoningSummary;
+          }
+          if (runtimeConfig.overrides.verbosity) {
+            startConfig.verbosity = runtimeConfig.overrides.verbosity;
+          }
+          if (runtimeConfig.overrides.personality) {
+            startConfig.personality = runtimeConfig.overrides.personality;
+          }
+          if (runtimeConfig.overrides.webSearch) {
+            startConfig.webSearch = runtimeConfig.overrides.webSearch;
           }
 
           // Check for resume file from multiple sources
@@ -823,16 +1301,59 @@ export async function runCodex(opts: {
             "start",
           );
           logger.debug("[Codex] startSession response:", startResponse);
+          if (client.backendKind === "codex-app-server") {
+            const activeThreadId = client.getSessionId();
+            const currentModelCode =
+              (client as CodexAppServerClient).getCurrentModel() ??
+              message.mode.model ??
+              currentModel;
+            if (currentModelCode) {
+              session.updateMetadata((currentMetadata) => ({
+                ...currentMetadata,
+                codex: {
+                  ...currentMetadata.codex,
+                  ...(activeThreadId ? { threadId: activeThreadId } : {}),
+                },
+                currentModelCode,
+              }));
+            }
+          }
           wasCreated = true;
           first = false;
         } else {
           const response = requireSuccessfulCodexResponse(
             await client.continueSession(message.message, {
               signal: abortController.signal,
+              model: message.mode.model ?? runtimeConfig.overrides.model,
+              approvalPolicy: executionPolicy.approvalPolicy,
+              sandbox: executionPolicy.sandbox,
+              serviceTier: runtimeConfig.overrides.serviceTier,
+              reasoningEffort: runtimeConfig.overrides.reasoningEffort,
+              reasoningSummary: runtimeConfig.overrides.reasoningSummary,
+              verbosity: runtimeConfig.overrides.verbosity,
+              personality: runtimeConfig.overrides.personality,
+              webSearch: runtimeConfig.overrides.webSearch,
             }),
             "continue",
           );
           logger.debug("[Codex] continueSession response:", response);
+          if (client.backendKind === "codex-app-server") {
+            const activeThreadId = client.getSessionId();
+            const currentModelCode =
+              (client as CodexAppServerClient).getCurrentModel() ??
+              message.mode.model ??
+              currentModel;
+            if (currentModelCode) {
+              session.updateMetadata((currentMetadata) => ({
+                ...currentMetadata,
+                codex: {
+                  ...currentMetadata.codex,
+                  ...(activeThreadId ? { threadId: activeThreadId } : {}),
+                },
+                currentModelCode,
+              }));
+            }
+          }
         }
       } catch (error) {
         logger.warn("Error in codex session:", error);
@@ -861,7 +1382,7 @@ export async function runCodex(opts: {
           // Reset the active session after a startup/transport error so the next
           // user message creates a fresh Codex session instead of replying into a
           // broken one.
-          if (client.hasActiveSession()) {
+          if (client?.hasActiveSession()) {
             client.clearSession();
           }
           wasCreated = false;
@@ -916,9 +1437,11 @@ export async function runCodex(opts: {
     } catch (e) {
       logger.debug("[codex]: Error while closing session", e);
     }
-    logger.debug("[codex]: client.forceCloseSession begin");
-    await client.forceCloseSession();
-    logger.debug("[codex]: client.forceCloseSession done");
+    if (client) {
+      logger.debug("[codex]: client.forceCloseSession begin");
+      await client.forceCloseSession();
+      logger.debug("[codex]: client.forceCloseSession done");
+    }
     // Stop Happy MCP server
     logger.debug("[codex]: happyServer.stop");
     happyServer.stop();

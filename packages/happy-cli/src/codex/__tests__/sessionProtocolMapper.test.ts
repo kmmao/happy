@@ -49,6 +49,20 @@ describe('mapCodexMcpMessageToSessionEnvelopes', () => {
         expect(result.envelopes[0].ev).toEqual({ t: 'text', text: 'hello' });
     });
 
+    it('maps service messages to service envelopes', () => {
+        const result = mapCodexMcpMessageToSessionEnvelopes(
+            { type: 'service_message', text: 'Codex App Server unavailable, fell back to Legacy MCP' },
+            { currentTurnId: 'turn-1' }
+        );
+
+        expect(result.envelopes).toHaveLength(1);
+        expect(result.envelopes[0].turn).toBe('turn-1');
+        expect(result.envelopes[0].ev).toEqual({
+            t: 'service',
+            text: 'Codex App Server unavailable, fell back to Legacy MCP',
+        });
+    });
+
     it('maps parent call linkage to subagent field', () => {
         const result = mapCodexMcpMessageToSessionEnvelopes(
             { type: 'agent_message', message: 'subagent hello', parent_call_id: 'parent-call-1' },

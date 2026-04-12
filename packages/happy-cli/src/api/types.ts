@@ -435,6 +435,54 @@ export type Metadata = {
   archivedBy?: string;
   archiveReason?: string;
   flavor?: string;
+  codex?: {
+    requestedBackend?: "auto" | "codex-app-server" | "codex-mcp-legacy";
+    resolvedBackend?: "codex-app-server" | "codex-mcp-legacy";
+    configMode?: "inherit" | "managed-profile" | "managed-overrides";
+    fallbackReason?: string;
+    backendVersion?: string;
+    threadId?: string;
+    config?: {
+      model?: string | null;
+      profile?: string | null;
+      approvalPolicy?: string | null;
+      sandboxMode?: string | null;
+      serviceTier?: string | null;
+      reasoningEffort?: string | null;
+      reasoningSummary?: string | null;
+      verbosity?: string | null;
+      webSearch?: string | null;
+    };
+    account?: {
+      type?: "apiKey" | "chatgpt" | null;
+      email?: string | null;
+      planType?: string | null;
+      requiresOpenaiAuth?: boolean;
+    };
+    rateLimits?: {
+      limitId?: string | null;
+      limitName?: string | null;
+      planType?: string | null;
+      hasCredits?: boolean;
+    };
+    experimentalFeatures?: Array<{
+      name: string;
+      stage: string;
+      enabled: boolean;
+      defaultEnabled: boolean;
+    }>;
+    skills?: Array<{
+      name: string;
+      description: string;
+      path: string;
+      enabled: boolean;
+    }>;
+    mcpServers?: Array<{
+      name: string;
+      authStatus: string;
+      toolCount: number;
+    }>;
+  };
   sandbox?: SandboxConfig | null;
   dangerouslySkipPermissions?: boolean | null;
   packageScripts?: Record<string, string>;

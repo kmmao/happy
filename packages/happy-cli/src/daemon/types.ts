@@ -36,4 +36,6 @@ export interface TrackedSession {
   recoveredFromIndex?: boolean;
   /** Recovery timestamp for sessions reattached after daemon restart. */
   recoveredAt?: number;
+  /** Best-effort cleanup for daemon-local ephemeral resources. */
+  cleanup?: () => Promise<void>;
 }

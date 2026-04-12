@@ -16,11 +16,9 @@ import { initializeSandbox, wrapForMcpTransport } from "@/sandbox/manager";
 const DEFAULT_TIMEOUT = 14 * 24 * 60 * 60 * 1000; // 14 days, which is the half of the maximum possible timeout (~28 days for int32 value in NodeJS)
 
 /**
- * Get the correct MCP subcommand based on installed codex version
- * Versions >= 0.43.0-alpha.5 use 'mcp-server', older versions use 'mcp'
- * Returns null if codex is not installed or version cannot be determined
+ * Returns the installed Codex CLI version, or null when it cannot be read.
  */
-function getCodexMcpCommand(): string | null {
+export function getInstalledCodexVersion(): string | null {
   try {
     const version = execSync("codex --version", { encoding: "utf8" }).trim();
     const match = version.match(/codex-cli\s+(\d+\.\d+\.\d+(?:-alpha\.\d+)?)/);
@@ -29,24 +27,47 @@ function getCodexMcpCommand(): string | null {
       return null;
     }
 
-    const versionStr = match[1];
-    const [major, minor, patch] = versionStr.split(/[-.]/).map(Number);
-
-    // Version >= 0.43.0-alpha.5 has mcp-server
-    if (major > 0 || minor > 43) return "mcp-server";
-    if (minor === 43 && patch === 0) {
-      // Check for alpha version
-      if (versionStr.includes("-alpha.")) {
-        const alphaNum = parseInt(versionStr.split("-alpha.")[1]);
-        return alphaNum >= 5 ? "mcp-server" : "mcp";
-      }
-      return "mcp-server"; // 0.43.0 stable has mcp-server
-    }
-    return "mcp"; // Older versions use mcp
+    return match[1];
   } catch (error) {
     logger.debug("[CodexMCP] Codex CLI not found or not executable:", error);
     return null;
   }
+}
+
+export function supportsCodexAppServer(): boolean {
+  try {
+    execSync("codex app-server --help", { encoding: "utf8", stdio: "pipe" });
+    return true;
+  } catch (error) {
+    logger.debug("[CodexMCP] Codex app-server not available:", error);
+    return false;
+  }
+}
+
+/**
+ * Get the correct MCP subcommand based on installed codex version
+ * Versions >= 0.43.0-alpha.5 use 'mcp-server', older versions use 'mcp'
+ * Returns null if codex is not installed or version cannot be determined
+ */
+function getCodexMcpCommand(): string | null {
+  const versionStr = getInstalledCodexVersion();
+  if (!versionStr) {
+    return null;
+  }
+
+  const [major, minor, patch] = versionStr.split(/[-.]/).map(Number);
+
+  // Version >= 0.43.0-alpha.5 has mcp-server
+  if (major > 0 || minor > 43) return "mcp-server";
+  if (minor === 43 && patch === 0) {
+    // Check for alpha version
+    if (versionStr.includes("-alpha.")) {
+      const alphaNum = parseInt(versionStr.split("-alpha.")[1]);
+      return alphaNum >= 5 ? "mcp-server" : "mcp";
+    }
+    return "mcp-server"; // 0.43.0 stable has mcp-server
+  }
+  return "mcp"; // Older versions use mcp
 }
 
 export class CodexMcpClient {
@@ -60,6 +81,8 @@ export class CodexMcpClient {
   private sandboxConfig?: SandboxConfig;
   private sandboxCleanup: (() => Promise<void>) | null = null;
   public sandboxEnabled: boolean = false;
+  public readonly supportsModeHotSwap = false;
+  public readonly backendKind = "codex-mcp-legacy" as const;
 
   constructor(sandboxConfig?: SandboxConfig) {
     this.sandboxConfig = sandboxConfig;
@@ -296,7 +319,12 @@ export class CodexMcpClient {
 
   async continueSession(
     prompt: string,
-    options?: { signal?: AbortSignal },
+    options?: {
+      signal?: AbortSignal;
+      model?: string;
+      approvalPolicy?: CodexSessionConfig["approval-policy"];
+      sandbox?: CodexSessionConfig["sandbox"];
+    },
   ): Promise<CodexToolResponse> {
     if (!this.connected) await this.connect();
 
