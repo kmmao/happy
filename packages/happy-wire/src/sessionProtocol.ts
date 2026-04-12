@@ -10,6 +10,13 @@ export const sessionTextEventSchema = z.object({
   thinking: z.boolean().optional(),
 });
 
+export const sessionTextDeltaEventSchema = z.object({
+  t: z.literal("text-delta"),
+  stream: z.string(),
+  delta: z.string(),
+  thinking: z.boolean().optional(),
+});
+
 export const sessionServiceMessageEventSchema = z.object({
   t: z.literal("service"),
   text: z.string(),
@@ -208,6 +215,7 @@ export type SessionContextUsageEvent = z.infer<typeof sessionContextUsageEventSc
 
 export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
+  sessionTextDeltaEventSchema,
   sessionServiceMessageEventSchema,
   sessionToolCallStartEventSchema,
   sessionToolCallEndEventSchema,

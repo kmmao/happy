@@ -12,6 +12,7 @@ describe("session protocol schemas", () => {
     const events: SessionEvent[] = [
       { t: "text", text: "hello" },
       { t: "text", text: "thinking", thinking: true },
+      { t: "text-delta", stream: "stream-1", delta: "hel" },
       { t: "service", text: "**Service:** restarting MCP bridge" },
       {
         t: "tool-call-start",
@@ -112,6 +113,9 @@ describe("session protocol schemas", () => {
       false,
     );
     expect(sessionEventSchema.safeParse({ t: "service" }).success).toBe(false);
+    expect(
+      sessionEventSchema.safeParse({ t: "text-delta", delta: "x" }).success,
+    ).toBe(false);
     expect(sessionEventSchema.safeParse({ t: "not-real" }).success).toBe(false);
     expect(
       sessionEventSchema.safeParse({ t: "session-state-changed", state: "invalid" })
