@@ -26,6 +26,7 @@ import { parseImageRefs } from "@/utils/parseImageRefs";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useAppendToInput } from "@/hooks/useInputContext";
 import { parseTaskStatusMessage, getThinkingLabelTitle } from "./messageProgress";
+import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
 
 export const MessageView = (props: {
   message: Message;
@@ -387,6 +388,10 @@ function AgentTextBlock(props: {
   }
 
   const taskStatus = props.message.taskStatus ?? parseTaskStatusMessage(props.message.text);
+  const legacyDiffPreview = React.useMemo(
+    () => parseLegacyCodexDiffPreview(props.message.text),
+    [props.message.text],
+  );
   const taskStatusIcon =
     taskStatus?.status === "completed"
       ? "checkmark-circle-outline"
@@ -495,6 +500,35 @@ function AgentTextBlock(props: {
               ) : null}
             </View>
           </View>
+        ) : legacyDiffPreview ? (
+          <>
+            {legacyDiffPreview.prefixMarkdown ? (
+              <MarkdownView
+                markdown={legacyDiffPreview.prefixMarkdown}
+                onOptionPress={handleOptionPress}
+              />
+            ) : null}
+            <View style={styles.toolContainer}>
+              <ToolView
+                tool={{
+                  name: "CodexDiff",
+                  state: "completed",
+                  input: {
+                    unified_diff: legacyDiffPreview.unifiedDiff,
+                  },
+                  createdAt: props.message.createdAt,
+                  startedAt: props.message.createdAt,
+                  completedAt: props.message.createdAt,
+                  description: null,
+                  result: { status: "completed" },
+                }}
+                metadata={null}
+                messages={[]}
+                sessionId={props.sessionId}
+                permissionModeKey={null}
+              />
+            </View>
+          </>
         ) : (
           <MarkdownView
             markdown={props.message.text}
