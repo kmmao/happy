@@ -26,6 +26,8 @@ import { AutomationScheduler } from "./scheduler";
 import { AgentLoopCoordinator } from "./loopCoordinator";
 import { GuardianSessionRegistry } from "./guardianRegistry";
 import { AutomationAuditStore } from "./auditStore";
+import { WebhookServer } from "./webhookServer";
+import { enablePersistence, getTrackedSession } from "./trackedSessions";
 import { logger } from "../logger";
 
 // ---------------------------------------------------------------------------
@@ -131,6 +133,32 @@ export async function startDaemon(options: {
   const guardian = new GuardianSessionRegistry();
   const loopCoordinator = new AgentLoopCoordinator(scheduler, config.serverUrl, creds.token, guardian);
 
+  // 3c. Enable tracked session persistence
+  enablePersistence(join(config.homeDir, "agent-tracked-sessions.json"));
+
+  // 3d. Start webhook server for session-started callbacks
+  const webhookServer = new WebhookServer();
+  const webhookPort = await webhookServer.start();
+  webhookServer.setSessionStartedHandler((sessionId, _metadata, hostPid) => {
+    if (hostPid) {
+      const tracked = getTrackedSession(hostPid);
+      if (tracked) {
+        tracked.happySessionId = sessionId;
+        logger.debug(`[DAEMON] Session ${sessionId} linked to PID ${hostPid}`);
+        // Remember in guardian for future reuse
+        if (tracked.automationContext?.kind === "agent_loop") {
+          guardian.remember(sessionId, {
+            loopId: tracked.automationContext.trigger?.split(":")[1],
+            projectId: tracked.automationContext.projectId,
+          });
+        }
+      }
+    }
+  });
+  // Set globally so spawnSession's buildSpawnEnv passes it to children
+  process.env.HAPPY_DAEMON_HTTP_PORT = String(webhookPort);
+  console.log(`Webhook server: 127.0.0.1:${webhookPort}`);
+
   client.setTailscaleInfo(fullTailscale);
   client.enableAutomation(config.serverUrl, creds.token, scheduler, loopCoordinator, auditStore);
   loopCoordinator.start();
@@ -149,6 +177,7 @@ export async function startDaemon(options: {
     shuttingDown = true;
     logger.debug(`[DAEMON] Received ${signal}, shutting down...`);
     console.log(`\nReceived ${signal}, shutting down...`);
+    webhookServer.shutdown();
     loopCoordinator.shutdown();
     scheduler.shutdown();
     client.shutdown();
