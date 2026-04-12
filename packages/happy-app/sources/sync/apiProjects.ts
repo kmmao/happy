@@ -454,6 +454,8 @@ export interface GoalSummary {
     machineId: string;
     createdBy: string;
     plannerTaskId: string | null;
+    healthScore: number | null;
+    layer: string | null;
     createdAt: number;
     updatedAt: number;
     subGoalCount: number;
@@ -742,5 +744,26 @@ export async function deleteGoal(
         if (!response.ok) {
             throw new Error(`Failed to delete goal: ${response.status}`);
         }
+    });
+}
+
+export async function replanGoal(
+    credentials: AuthCredentials,
+    projectId: string,
+    goalId: string,
+): Promise<{ replanned: boolean; plannerTaskId: string | null }> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/goals/${goalId}/replan`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+            },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to replan goal: ${response.status}`);
+        }
+        return (await response.json()) as { replanned: boolean; plannerTaskId: string | null };
     });
 }

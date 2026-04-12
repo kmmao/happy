@@ -701,6 +701,73 @@ export function goalRoutes(app: Fastify) {
         },
     );
 
+    // POST /v1/projects/:id/goals/:goalId/replan — cancel active tasks and re-decompose
+    app.post(
+        "/v1/projects/:id/goals/:goalId/replan",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string(), goalId: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const goalId = request.params.goalId;
+            const projectId = request.params.id;
+
+            const goal = await db.goal.findFirst({
+                where: { id: goalId, projectId, accountId: userId },
+                select: { id: true, status: true, plannerTaskId: true, machineId: true },
+            });
+            if (!goal) {
+                return reply.code(404).send({ error: "Goal not found" });
+            }
+            if (goal.status === "completed" || goal.status === "cancelled") {
+                return reply.code(400).send({ error: `Cannot replan a ${goal.status} goal` });
+            }
+
+            // Cancel all active tasks for this goal
+            await db.task.updateMany({
+                where: {
+                    goalId: goal.id,
+                    accountId: userId,
+                    status: { in: ["dispatching", "queued", "running"] },
+                },
+                data: { status: "cancelled" },
+            });
+
+            // Reset goal to planning state
+            await db.goal.update({
+                where: { id: goal.id },
+                data: { status: "planning", progress: 0, plannerTaskId: null, blockedSince: null },
+            });
+
+            // Trigger new decomposition
+            const result = await goalDecompose({
+                accountId: userId,
+                projectId,
+                goalId: goal.id,
+            });
+
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildGoalProgressEphemeral({
+                    goalId: goal.id,
+                    projectId,
+                    status: "planning",
+                    progress: 0,
+                }),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+
+            return reply.send({
+                replanned: true,
+                goalId: goal.id,
+                plannerTaskId: result.plannerTaskId,
+            });
+        },
+    );
+
     // POST /v1/projects/:id/goals/:goalId/plan-result — Planner Agent reports decomposition
     app.post(
         "/v1/projects/:id/goals/:goalId/plan-result",

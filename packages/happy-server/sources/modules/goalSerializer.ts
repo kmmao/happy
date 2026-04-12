@@ -36,6 +36,8 @@ export function serializeGoal(goal: Record<string, unknown>, agentMessages: Goal
         machineId: string;
         createdBy: string;
         plannerTaskId: string | null;
+        healthScore: number | null;
+        layer: string | null;
         createdAt: Date;
         updatedAt: Date;
         tasks?: Array<{
@@ -85,6 +87,8 @@ export function serializeGoal(goal: Record<string, unknown>, agentMessages: Goal
         machineId: g.machineId,
         createdBy: g.createdBy,
         plannerTaskId: g.plannerTaskId,
+        healthScore: g.healthScore ?? null,
+        layer: g.layer ?? null,
         createdAt: g.createdAt.getTime(),
         updatedAt: g.updatedAt.getTime(),
         subGoalCount: g._count?.subGoals ?? 0,

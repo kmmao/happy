@@ -16,6 +16,8 @@ import {
     priorityLabel,
     isSafeId,
     isPlannerTimeoutBlocked,
+    healthColor,
+    layerShortLabel,
 } from "./worldGoalConstants";
 
 interface GoalCardProps {
@@ -26,6 +28,7 @@ interface GoalCardProps {
     onDelete: (goal: GoalSummary) => void;
     onOpenGoal: (goalId: string) => void;
     onViewSession: (sessionId: string) => void;
+    onReplan?: (goal: GoalSummary) => void;
 }
 
 export const GoalCard = React.memo(function GoalCard({
@@ -36,6 +39,7 @@ export const GoalCard = React.memo(function GoalCard({
     onDelete,
     onOpenGoal,
     onViewSession,
+    onReplan,
 }: GoalCardProps) {
     const { theme } = useUnistyles();
     const statusColor = STATUS_COLORS[goal.status] ?? "#6B7280";
@@ -66,7 +70,15 @@ export const GoalCard = React.memo(function GoalCard({
             <View style={[styles.goalCard, isTerminal && { opacity: 0.6 }]}>
                 <View style={styles.goalCardHeader}>
                     <Ionicons name={statusIcon as any} size={20} color={statusColor} />
+                    {goal.healthScore !== null ? (
+                        <View style={[styles.healthDot, { backgroundColor: healthColor(goal.healthScore) }]} />
+                    ) : null}
                     <Text style={styles.goalTitle} numberOfLines={2}>{goal.title}</Text>
+                    {goal.layer ? (
+                        <View style={styles.layerBadge}>
+                            <Text style={styles.layerBadgeText}>{layerShortLabel(goal.layer)}</Text>
+                        </View>
+                    ) : null}
                     <View style={[styles.priorityBadge, { backgroundColor: priorityColor }]}>
                         <Text style={styles.priorityBadgeText}>{priorityLabel(goal.priority)}</Text>
                     </View>
@@ -183,6 +195,17 @@ export const GoalCard = React.memo(function GoalCard({
                             </Text>
                         </Pressable>
                     ) : null}
+                    {onReplan && !isTerminal && !isPlanning && goal.status === "blocked" ? (
+                        <Pressable
+                            style={styles.actionButton}
+                            onPress={() => onReplan(goal)}
+                        >
+                            <Ionicons name="refresh-outline" size={16} color="#F59E0B" />
+                            <Text style={[styles.actionText, { color: "#F59E0B" }]}>
+                                {t("goals.replan")}
+                            </Text>
+                        </Pressable>
+                    ) : null}
                     {!isTerminal ? (
                         <Pressable
                             style={styles.actionButton}
@@ -229,6 +252,22 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 15,
         color: theme.colors.text,
         flex: 1,
+    },
+    healthDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    layerBadge: {
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 6,
+        backgroundColor: theme.colors.textSecondary + "22",
+    },
+    layerBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 9,
+        color: theme.colors.textSecondary,
     },
     priorityBadge: {
         paddingHorizontal: 8,

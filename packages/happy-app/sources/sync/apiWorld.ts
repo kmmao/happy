@@ -64,6 +64,17 @@ export interface WorldDashboard {
             decidedAt: number | null;
         }>;
     };
+    goalHealth: {
+        averageScore: number | null;
+        criticalCount: number;
+        warningCount: number;
+        healthyCount: number;
+        byLayer: {
+            strategic: { count: number; avgScore: number | null };
+            operational: { count: number; avgScore: number | null };
+            execution: { count: number; avgScore: number | null };
+        };
+    };
     lawCount: number;
     hasNarrative: boolean;
     agentMessages: {

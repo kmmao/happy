@@ -3926,6 +3926,8 @@ export const en = {
     goalModeAutoDecomposeHint: "Planner is triggered immediately after creation to split goals into executable tasks.",
     generateAutoAction: "Initialize World",
     generateCustomAction: "Generate from Description",
+    goalHealth: "Goal Health",
+    avgHealthScore: "Avg Score",
   },
   suggestions: {
     suggestedNextSteps: "Suggested Next Steps",
@@ -4057,6 +4059,19 @@ export const en = {
     deleteGoal: "Delete Goal",
     deleteGoalConfirm: "Delete this goal permanently?",
     deleted: "Goal deleted",
+    // Health (Stage G)
+    healthScore: "Health",
+    healthCritical: "Critical",
+    healthWarning: "Unhealthy",
+    healthHealthy: "Healthy",
+    layerStrategic: "Strategic",
+    layerOperational: "Operational",
+    layerExecution: "Execution",
+    replan: "Replan",
+    replanConfirm: "Cancel active tasks and re-decompose this goal?",
+    replanTriggered: "Replanning triggered",
+    replanError: "Failed to trigger replan",
+    avgHealthScore: "Avg Health",
   },
   decision: {
     pending: "Pending",

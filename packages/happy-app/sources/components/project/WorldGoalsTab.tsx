@@ -14,6 +14,7 @@ import {
     cancelGoal,
     decomposeGoal,
     deleteGoal,
+    replanGoal,
     type GoalSummary,
 } from "@/sync/apiProjects";
 import { sync } from "@/sync/sync";
@@ -141,6 +142,25 @@ export const WorldGoalsTab = React.memo(
             }
         }, [project.serverId]);
 
+        const handleReplan = React.useCallback(async (goal: GoalSummary) => {
+            const confirmed = await Modal.confirm(
+                t("goals.replan"),
+                t("goals.replanConfirm"),
+            );
+            if (!confirmed) return;
+            try {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials || !project.serverId) return;
+                await replanGoal(credentials, project.serverId, goal.id);
+                setGoals((prev) => prev.map((g) =>
+                    g.id === goal.id ? { ...g, status: "planning", progress: 0 } : g,
+                ));
+                Modal.toast(t("goals.replanTriggered"));
+            } catch {
+                Modal.toast(t("goals.replanError"));
+            }
+        }, [project.serverId]);
+
         const router = useRouter();
 
         const handleOpenGoal = React.useCallback((goalId: string) => {
@@ -163,6 +183,7 @@ export const WorldGoalsTab = React.memo(
             blocked: goals.filter((goal) => goal.status === "blocked").length,
             active: goals.filter((goal) => ["planning", "in_progress", "blocked"].includes(goal.status)).length,
             done: goals.filter((goal) => ["completed", "cancelled"].includes(goal.status)).length,
+            unhealthy: goals.filter((goal) => goal.healthScore !== null && goal.healthScore < 50).length,
         }), [goals]);
 
         const filteredGoals = React.useMemo(() => {
@@ -174,6 +195,9 @@ export const WorldGoalsTab = React.memo(
             }
             if (filter === "done") {
                 return goals.filter((goal) => ["completed", "cancelled"].includes(goal.status));
+            }
+            if (filter === "unhealthy") {
+                return goals.filter((goal) => goal.healthScore !== null && goal.healthScore < 50);
             }
             return goals;
         }, [filter, goals]);
@@ -213,7 +237,7 @@ export const WorldGoalsTab = React.memo(
                                 </View>
                             </View>
                             <View style={styles.filterRow}>
-                                {(["all", "blocked", "active", "done"] as GoalFilterKey[]).map((item) => (
+                                {(["all", "blocked", "active", "done", "unhealthy"] as GoalFilterKey[]).map((item) => (
                                     <Pressable
                                         key={item}
                                         style={[
@@ -253,6 +277,7 @@ export const WorldGoalsTab = React.memo(
                                 onDelete={handleDelete}
                                 onOpenGoal={handleOpenGoal}
                                 onViewSession={handleViewSession}
+                                onReplan={handleReplan}
                             />
                         ))
                     )}

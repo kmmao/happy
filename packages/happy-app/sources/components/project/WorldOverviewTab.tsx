@@ -331,6 +331,18 @@ export const WorldOverviewTab = React.memo(
                         <GoalStat label={t("world.goalsCompleted")} value={data.goals.completed} color="#10B981" />
                         <GoalStat label={t("world.goalsBlocked")} value={data.goals.blocked} color="#F59E0B" />
                     </View>
+                    {data.goalHealth.averageScore !== null ? (
+                        <View style={styles.healthRow}>
+                            <Text style={[styles.healthAvg, { color: data.goalHealth.averageScore < 30 ? "#EF4444" : data.goalHealth.averageScore <= 60 ? "#F59E0B" : "#10B981" }]}>
+                                {t("world.avgHealthScore")}: {data.goalHealth.averageScore}
+                            </Text>
+                            <View style={styles.goalsRow}>
+                                <GoalStat label={t("goals.healthCritical")} value={data.goalHealth.criticalCount} color="#EF4444" />
+                                <GoalStat label={t("goals.healthWarning")} value={data.goalHealth.warningCount} color="#F59E0B" />
+                                <GoalStat label={t("goals.healthHealthy")} value={data.goalHealth.healthyCount} color="#10B981" />
+                            </View>
+                        </View>
+                    ) : null}
                 </View>
 
                 <View style={styles.suggestionsToolbar}>
@@ -606,6 +618,16 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         gap: 12,
         marginTop: 12,
+    },
+    healthRow: {
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: theme.colors.textSecondary + "33",
+    },
+    healthAvg: {
+        ...Typography.default("semiBold"),
+        marginBottom: 8,
     },
     goalStat: {
         flex: 1,

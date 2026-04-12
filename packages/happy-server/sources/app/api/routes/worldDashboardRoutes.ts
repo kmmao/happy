@@ -39,6 +39,7 @@ export function worldDashboardRoutes(app: Fastify) {
                 pendingDecisions,
                 recentDecisions,
                 messagesData,
+                goalHealthRows,
             ] = await Promise.all([
                 autonomyScore(projectId, userId),
 
@@ -79,6 +80,11 @@ export function worldDashboardRoutes(app: Fastify) {
                     },
                     _count: true,
                 }),
+
+                db.goal.findMany({
+                    where: { accountId: userId, projectId, healthScore: { not: null } },
+                    select: { healthScore: true, layer: true },
+                }),
             ]);
 
             // Parse roles
@@ -105,6 +111,31 @@ export function worldDashboardRoutes(app: Fastify) {
                     lawCount = laws.filter((l) => l.enabled).length;
                 } catch {
                     // ignore
+                }
+            }
+
+            // Parse goal health
+            let healthTotal = 0;
+            let healthSum = 0;
+            let criticalCount = 0;
+            let warningCount = 0;
+            let healthyCount = 0;
+            const byLayer: Record<string, { count: number; sum: number }> = {
+                strategic: { count: 0, sum: 0 },
+                operational: { count: 0, sum: 0 },
+                execution: { count: 0, sum: 0 },
+            };
+            for (const row of goalHealthRows) {
+                const score = row.healthScore ?? 100;
+                healthTotal++;
+                healthSum += score;
+                if (score < 30) criticalCount++;
+                else if (score <= 60) warningCount++;
+                else healthyCount++;
+                const layer = row.layer ?? "operational";
+                if (byLayer[layer]) {
+                    byLayer[layer].count++;
+                    byLayer[layer].sum += score;
                 }
             }
 
@@ -154,6 +185,17 @@ export function worldDashboardRoutes(app: Fastify) {
                     })),
                 },
                 lawCount,
+                goalHealth: {
+                    averageScore: healthTotal > 0 ? Math.round(healthSum / healthTotal) : null,
+                    criticalCount,
+                    warningCount,
+                    healthyCount,
+                    byLayer: {
+                        strategic: { count: byLayer.strategic.count, avgScore: byLayer.strategic.count > 0 ? Math.round(byLayer.strategic.sum / byLayer.strategic.count) : null },
+                        operational: { count: byLayer.operational.count, avgScore: byLayer.operational.count > 0 ? Math.round(byLayer.operational.sum / byLayer.operational.count) : null },
+                        execution: { count: byLayer.execution.count, avgScore: byLayer.execution.count > 0 ? Math.round(byLayer.execution.sum / byLayer.execution.count) : null },
+                    },
+                },
                 hasNarrative: Boolean(project.narrative && project.narrative.trim().length > 0),
                 agentMessages: {
                     total30d: totalMessages30d,

@@ -53,6 +53,8 @@ function createGoalDetail(overrides: Partial<GoalDetail> = {}): GoalDetail {
     machineId: "machine-1",
     createdBy: "user-1",
     plannerTaskId: null,
+    healthScore: null,
+    layer: null,
     createdAt: 1,
     updatedAt: 2,
     subGoalCount: 1,
