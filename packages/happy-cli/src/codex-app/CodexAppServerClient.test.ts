@@ -188,7 +188,7 @@ class FakeProcess extends EventEmitter {
                 authStatus: "unsupported",
                 tools: {
                   happy__change_title: {},
-                  happy__search: {},
+                  happy__query_project_knowledge: {},
                 },
                 resources: [],
                 resourceTemplates: [],
@@ -517,6 +517,88 @@ describe("CodexAppServerClient", () => {
     expect(fakeProcesses[0].responses).toContainEqual({
       id: "approval-1",
       result: { decision: "acceptForSession" },
+    });
+  });
+
+  it("responds to legacy execCommandApproval requests through the permission handler", async () => {
+    const client = new CodexAppServerClient();
+    const handleToolCall = vi.fn(async () => ({
+      decision: "approved_for_session" as const,
+    }));
+    client.setPermissionHandler({ handleToolCall } as any);
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        id: "legacy-exec-1",
+        method: "execCommandApproval",
+        params: {
+          conversationId: "thread-1",
+          callId: "call-legacy-exec",
+          approvalId: "approval-legacy-exec",
+          command: ["rm", "-rf", "build"],
+          cwd: "/tmp/project",
+          reason: "Needs dangerous command approval",
+          parsedCmd: [],
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(handleToolCall).toHaveBeenCalledWith("call-legacy-exec", "CodexBash", {
+      command: ["rm", "-rf", "build"],
+      cwd: "/tmp/project",
+      reason: "Needs dangerous command approval",
+      parsedCmd: [],
+      approvalId: "approval-legacy-exec",
+    });
+    expect(fakeProcesses[0].responses).toContainEqual({
+      id: "legacy-exec-1",
+      result: { decision: "approved_for_session" },
+    });
+  });
+
+  it("responds to legacy applyPatchApproval requests through the permission handler", async () => {
+    const client = new CodexAppServerClient();
+    const handleToolCall = vi.fn(async () => ({
+      decision: "approved" as const,
+    }));
+    client.setPermissionHandler({ handleToolCall } as any);
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        id: "legacy-patch-1",
+        method: "applyPatchApproval",
+        params: {
+          conversationId: "thread-1",
+          callId: "call-legacy-patch",
+          fileChanges: {
+            "/tmp/file.ts": {
+              changeType: "modify",
+            },
+          },
+          reason: "Needs broader write access",
+          grantRoot: "/tmp",
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(handleToolCall).toHaveBeenCalledWith("call-legacy-patch", "CodexPatch", {
+      reason: "Needs broader write access",
+      grantRoot: "/tmp",
+      fileChanges: {
+        "/tmp/file.ts": {
+          changeType: "modify",
+        },
+      },
+    });
+    expect(fakeProcesses[0].responses).toContainEqual({
+      id: "legacy-patch-1",
+      result: { decision: "approved" },
     });
   });
 
@@ -981,6 +1063,52 @@ describe("CodexAppServerClient", () => {
     });
   });
 
+  it("emits readable progress updates for running mcp tool calls", async () => {
+    const events: any[] = [];
+    const client = new CodexAppServerClient();
+    client.setHandler((event) => events.push(event));
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "item/started",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          item: {
+            type: "mcpToolCall",
+            id: "mcp-progress-1",
+            server: "happy",
+            tool: "change_title",
+            arguments: { title: "标题" },
+            status: "inProgress",
+            result: null,
+            error: null,
+            durationMs: null,
+          },
+        },
+      })}\n`,
+    );
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "item/mcpToolCall/progress",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          itemId: "mcp-progress-1",
+          message: "waiting for permission review",
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(events).toContainEqual({
+      type: "service_message",
+      text: "mcp__happy__change_title: waiting for permission review",
+    });
+  });
+
   it("resumes an existing thread id", async () => {
     const client = new CodexAppServerClient();
 
@@ -1093,7 +1221,7 @@ describe("CodexAppServerClient", () => {
     ).toBe(true);
   });
 
-  it("emits a diff preview service message", async () => {
+  it("emits a diff preview as a CodexDiff tool call", async () => {
     const events: any[] = [];
     const client = new CodexAppServerClient();
     client.setHandler((event) => events.push(event));
@@ -1113,9 +1241,17 @@ describe("CodexAppServerClient", () => {
     expect(
       events.some(
         (event) =>
-          event.type === "service_message" &&
-          typeof event.text === "string" &&
-          event.text.includes("Latest diff preview:"),
+          event.type === "tool-call" &&
+          event.toolName === "CodexDiff" &&
+          event.args?.unified_diff === "--- a/file.ts\n+++ b/file.ts\n@@\n-old\n+new",
+      ),
+    ).toBe(true);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "tool-call-result" &&
+          event.name === "CodexDiff" &&
+          event.output?.status === "completed",
       ),
     ).toBe(true);
   });

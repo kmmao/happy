@@ -370,6 +370,12 @@ function mapPermissionDecision(
   }
 }
 
+function mapLegacyReviewDecision(
+  decision: "approved" | "approved_for_session" | "denied" | "abort",
+): "approved" | "approved_for_session" | "denied" | "abort" {
+  return decision;
+}
+
 function buildGrantedPermissions(
   permissions: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
@@ -434,6 +440,8 @@ export class CodexAppServerClient {
   private currentModel: string | null = null;
   private capabilities: AppServerCapabilities | null = null;
   private capabilitiesRefresh: Promise<void> | null = null;
+  private mcpToolNames = new Map<string, string>();
+  private lastDiffPreview: string | null = null;
   public sandboxEnabled = false;
   public readonly supportsModeHotSwap = true;
   public readonly backendKind = "codex-app-server" as const;
@@ -1156,6 +1164,28 @@ export class CodexAppServerClient {
         return;
       }
 
+      if (method === "execCommandApproval") {
+        const permissionId =
+          typeof params.callId === "string" && params.callId.length > 0
+            ? params.callId
+            : requestKey;
+        const decision = this.permissionHandler
+          ? mapLegacyReviewDecision(
+              (
+                await this.permissionHandler.handleToolCall(permissionId, "CodexBash", {
+                  command: params.command,
+                  cwd: params.cwd,
+                  reason: params.reason,
+                  parsedCmd: params.parsedCmd,
+                  approvalId: params.approvalId,
+                })
+              ).decision,
+            )
+          : "abort";
+        this.sendResponse(requestId, { decision });
+        return;
+      }
+
       if (method === "item/fileChange/requestApproval") {
         const decision = this.permissionHandler
           ? mapPermissionDecision(
@@ -1167,6 +1197,26 @@ export class CodexAppServerClient {
               ).decision,
             )
           : "cancel";
+        this.sendResponse(requestId, { decision });
+        return;
+      }
+
+      if (method === "applyPatchApproval") {
+        const permissionId =
+          typeof params.callId === "string" && params.callId.length > 0
+            ? params.callId
+            : requestKey;
+        const decision = this.permissionHandler
+          ? mapLegacyReviewDecision(
+              (
+                await this.permissionHandler.handleToolCall(permissionId, "CodexPatch", {
+                  reason: params.reason,
+                  grantRoot: params.grantRoot,
+                  fileChanges: params.fileChanges,
+                })
+              ).decision,
+            )
+          : "abort";
         this.sendResponse(requestId, { decision });
         return;
       }
@@ -1372,6 +1422,7 @@ export class CodexAppServerClient {
           }
         }
         this.activeTurnId = null;
+        this.lastDiffPreview = null;
         if (status === "completed") {
           this.handler?.({ type: "task_complete", status });
         } else {
@@ -1501,11 +1552,50 @@ export class CodexAppServerClient {
       case "turn/diff/updated": {
         const notification = params as { diff?: string };
         if (typeof notification.diff === "string" && notification.diff.length > 0) {
+          if (notification.diff === this.lastDiffPreview) {
+            return;
+          }
+          this.lastDiffPreview = notification.diff;
+          const callId = `codex-diff-${this.nextRequestId++}`;
           this.handler?.({
-            type: "service_message",
-            text: `Latest diff preview:\n\n\`\`\`diff\n${notification.diff}\n\`\`\``,
+            type: "tool-call",
+            callId,
+            toolName: "CodexDiff",
+            args: {
+              unified_diff: notification.diff,
+            },
+          });
+          this.handler?.({
+            type: "tool-call-result",
+            callId,
+            name: "CodexDiff",
+            output: {
+              status: "completed",
+            },
           });
         }
+        return;
+      }
+      case "item/mcpToolCall/progress": {
+        const notification =
+          params && typeof params === "object"
+            ? (params as { itemId?: unknown; message?: unknown })
+            : {};
+        const itemId =
+          typeof notification.itemId === "string" ? notification.itemId : null;
+        const progressMessage =
+          typeof notification.message === "string"
+            ? notification.message.trim()
+            : "";
+        if (!progressMessage) {
+          return;
+        }
+
+        const toolName = itemId ? this.mcpToolNames.get(itemId) : null;
+        this.handler?.({
+          type: "service_message",
+          text: toolName ? `${toolName}: ${progressMessage}` : progressMessage,
+        });
         return;
       }
       case "serverRequest/resolved":
@@ -1629,6 +1719,7 @@ export class CodexAppServerClient {
         const callId =
           typeof item.id === "string" && item.id.length > 0 ? item.id : toolName;
         if (phase === "started") {
+          this.mcpToolNames.set(callId, toolName);
           this.handler?.({
             type: "tool-call",
             callId,
@@ -1661,6 +1752,7 @@ export class CodexAppServerClient {
             status: item.status === "completed" ? "completed" : "canceled",
           },
         });
+        this.mcpToolNames.delete(callId);
         if (item.status !== "completed") {
           this.handler?.({
             type: "service_message",
