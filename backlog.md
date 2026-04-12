@@ -97,10 +97,11 @@ Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。Phase 6.1 已完成（�
 - [ ] Cron expression（后续按需）
 - [ ] Webhook/CI 事件桥接（后续按需）
 
-### 6.3 GuardianSessionRegistry（session 复用）
-- [ ] 复用已有 session 而非每次新建
-- [ ] Session 健康检查 + 自动回收
-- [ ] 按 project/directory 匹配复用
+### ~~6.3 GuardianSessionRegistry（session 复用）~~ ✅ 已完成 (3aba05ea)
+- [x] 复用已有 session（loop/project key hierarchy）
+- [x] resolve/remember/forget API + 8 个测试
+- [x] LoopCoordinator 自动传 --happy-session-id
+- [ ] Session 健康检查 + 自动回收（后续按需）
 
 ### 6.4 AutomationAuditStore（审计日志）
 - [ ] 本地 JSON 持久化审计事件
