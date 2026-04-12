@@ -77,6 +77,45 @@ CLI 侧已完成 SDK 选项映射（commit aff7302c），以下三个功能需�
 - [ ] embedding backfill 脚本在真实数据上运行
 - [ ] 语义检索效果评估（积累真实数据后对比关键词匹配）
 
+## Happy-Agent Phase 6: 高级自动化（2026-04-12 记录）
+
+Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。以下为后续可增强项，按优先级排列。
+
+### 6.1 AutomationScheduler（任务队列调度）
+- [ ] Job 队列 + 去重（dedupeKey）
+- [ ] 优先级排序（urgent > user > background）
+- [ ] 并发限制（maxConcurrentJobs）
+- [ ] 失败重试策略
+
+### 6.2 AgentLoopCoordinator（定时/cron 循环执行）
+- [ ] Loop 定义（interval / cron expression）
+- [ ] Loop 启动/暂停/停止
+- [ ] Webhook/CI 事件桥接到 loop
+
+### 6.3 GuardianSessionRegistry（session 复用）
+- [ ] 复用已有 session 而非每次新建
+- [ ] Session 健康检查 + 自动回收
+- [ ] 按 project/directory 匹配复用
+
+### 6.4 AutomationAuditStore（审计日志）
+- [ ] 本地 JSON 持久化审计事件
+- [ ] job_enqueued / job_started / job_completed / job_failed 事件
+- [ ] 通过 RPC 查询审计历史
+
+### 6.5 Webhook 回调系统
+- [ ] Agent 启动微型 HTTP server 接收 spawned session 回调
+- [ ] 通过 HAPPY_DAEMON_WEBHOOK_PORT env 传递给子进程
+- [ ] 实现 awaiter 系统：spawn → wait for callback → return sessionId
+
+### 6.6 TrackedSession 持久化
+- [ ] tracked-sessions.json 写盘（daemon 重启恢复）
+- [ ] PID 有效性校验（revalidate on restart）
+
+### 6.7 Tmux 集成
+- [ ] 检测 tmux 可用性
+- [ ] 在 tmux session 中 spawn（便于手动 attach 调试）
+- [ ] tmux window PID 提取
+
 ## Auto-Option-Send 跨设备同步（2026-04-11 记录）
 
 当前 auto-send 开关存储在 `localSettings`（device-local MMKV），不跨设备同步。
