@@ -50,7 +50,8 @@ export type {
 export { SessionClient } from "./session";
 export type { SessionClientOptions } from "./session";
 export { MachineClient } from "./api/machineClient";
-export type { MachineClientOptions } from "./api/machineClient";
+export type { MachineClientOptions, EphemeralEvent } from "./api/machineClient";
+export { startDaemon, stopDaemon, daemonStatus } from "./daemon/run";
 export { RpcHandlerManager, createRpcHandlerManager } from "./api/rpc/RpcHandlerManager";
 export type { RpcHandler, RpcHandlerConfig } from "./api/rpc/types";
 import {
@@ -59,6 +60,7 @@ import {
   formatMessageHistory,
   formatJson,
 } from "./output";
+import { startDaemon, stopDaemon, daemonStatus } from "./daemon/run";
 
 // --- Helpers ---
 
@@ -465,6 +467,33 @@ program
             }
           }
         }
+      }),
+  );
+
+program
+  .command("daemon")
+  .description("Run as a persistent background daemon")
+  .addCommand(
+    new Command("start")
+      .description("Start the agent daemon (connects to server, handles triggers)")
+      .option("--directory <dir>", "Working directory for spawned sessions")
+      .option("--foreground", "Run in foreground (do not detach)")
+      .action(async (opts: { directory?: string; foreground?: boolean }) => {
+        await startDaemon(opts);
+      }),
+  )
+  .addCommand(
+    new Command("stop")
+      .description("Stop the running daemon")
+      .action(() => {
+        stopDaemon();
+      }),
+  )
+  .addCommand(
+    new Command("status")
+      .description("Check daemon status")
+      .action(() => {
+        daemonStatus();
       }),
   );
 
