@@ -1,6 +1,6 @@
 {
   "name": "@kmmao/happy-coder",
-  "version": "0.69.7",
+  "version": "0.69.8",
   "description": "Mobile and Web client for Claude Code and Codex",
   "author": "kmmao",
   "license": "MIT",
@@ -100,7 +100,6 @@
     "chalk": "^5.6.2",
     "cron-parser": "^5.5.0",
     "cross-spawn": "^7.0.6",
-    "expo-server-sdk": "^3.15.0",
     "fastify": "^5.7.3",
     "fastify-type-provider-zod": "4.0.2",
     "http-proxy": "^1.18.1",
@@ -119,7 +118,7 @@
   },
   "devDependencies": {
     "@eslint/compat": "^1",
-    "@kmmao/happy-wire": "^0.10.4",
+    "@kmmao/happy-wire": "^0.10.5",
     "@types/cross-spawn": "^6.0.6",
     "@types/http-proxy": "^1.17.17",
     "@types/inquirer": "^9.0.9",
