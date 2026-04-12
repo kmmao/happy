@@ -36,6 +36,21 @@ type AppServerElicitationResult = {
   content?: Record<string, unknown>;
 };
 
+type AppServerDynamicToolCallRequest = {
+  threadId: string;
+  turnId: string;
+  callId: string;
+  tool: string;
+  arguments: unknown;
+};
+
+type AppServerDynamicToolCallResult = {
+  contentItems: Array<
+    { type: "inputText"; text: string } | { type: "inputImage"; imageUrl: string }
+  >;
+  success: boolean;
+};
+
 type PendingCall = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
@@ -158,6 +173,138 @@ function parseError(payload: unknown, fallbackMessage: string): Error {
   return new Error(fallbackMessage);
 }
 
+function formatPlanLine(step: {
+  title?: string | null;
+  step?: string | null;
+  status?: string | null;
+}): string {
+  const text =
+    (typeof step.title === "string" && step.title.trim().length > 0
+      ? step.title.trim()
+      : null) ??
+    (typeof step.step === "string" && step.step.trim().length > 0
+      ? step.step.trim()
+      : null) ??
+    "Untitled step";
+
+  const status =
+    typeof step.status === "string" && step.status.length > 0
+      ? `[${step.status}] `
+      : "";
+
+  return `${status}${text}`;
+}
+
+function stringifyUnknownValue(value: unknown): string | null {
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value.trim();
+  }
+
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  try {
+    const json = JSON.stringify(value);
+    return typeof json === "string" && json.length > 0 ? json : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractDynamicToolCallText(
+  contentItems: unknown,
+  fallback?: string,
+): string | null {
+  if (!Array.isArray(contentItems)) {
+    return fallback ?? null;
+  }
+
+  const parts = contentItems
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      if (
+        (item as { type?: unknown }).type === "inputText" &&
+        typeof (item as { text?: unknown }).text === "string"
+      ) {
+        const text = (item as { text: string }).text.trim();
+        return text.length > 0 ? text : null;
+      }
+      if (
+        (item as { type?: unknown }).type === "inputImage" &&
+        typeof (item as { imageUrl?: unknown }).imageUrl === "string"
+      ) {
+        const imageUrl = (item as { imageUrl: string }).imageUrl.trim();
+        return imageUrl.length > 0 ? `[image] ${imageUrl}` : null;
+      }
+      return stringifyUnknownValue(item);
+    })
+    .filter((part): part is string => typeof part === "string" && part.length > 0);
+
+  if (parts.length > 0) {
+    return parts.join("\n");
+  }
+
+  return fallback ?? null;
+}
+
+function extractMcpToolCallText(
+  result: unknown,
+  error: unknown,
+  fallback?: string,
+): string | null {
+  if (
+    error &&
+    typeof error === "object" &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    const message = (error as { message: string }).message.trim();
+    if (message.length > 0) {
+      return message;
+    }
+  }
+
+  if (
+    result &&
+    typeof result === "object" &&
+    Array.isArray((result as { content?: unknown }).content)
+  ) {
+    const parts = (result as { content: unknown[] }).content
+      .map((item) => {
+        if (
+          item &&
+          typeof item === "object" &&
+          typeof (item as { type?: unknown }).type === "string" &&
+          (item as { type: string }).type === "text" &&
+          typeof (item as { text?: unknown }).text === "string"
+        ) {
+          const text = (item as { text: string }).text.trim();
+          return text.length > 0 ? text : null;
+        }
+        return stringifyUnknownValue(item);
+      })
+      .filter((part): part is string => typeof part === "string" && part.length > 0);
+
+    if (parts.length > 0) {
+      return parts.join("\n");
+    }
+  }
+
+  return fallback ?? null;
+}
+
+function formatMcpToolName(server: unknown, tool: unknown): string {
+  const serverName =
+    typeof server === "string" && server.trim().length > 0
+      ? server.trim()
+      : "unknown";
+  const toolName =
+    typeof tool === "string" && tool.trim().length > 0 ? tool.trim() : "unknown";
+  return `mcp__${serverName}__${toolName}`;
+}
+
 function buildSandboxPolicy(
   sandbox: CodexSessionConfig["sandbox"] | undefined,
   cwd: string,
@@ -237,6 +384,9 @@ export class CodexAppServerClient {
         options: { signal: AbortSignal },
       ) => Promise<AppServerElicitationResult>)
     | null = null;
+  private dynamicToolHandler:
+    | ((request: AppServerDynamicToolCallRequest) => Promise<AppServerDynamicToolCallResult>)
+    | null = null;
   private chatGptAuthTokensProvider:
     | (() => Promise<{
         accessToken: string;
@@ -277,6 +427,14 @@ export class CodexAppServerClient {
       | null,
   ): void {
     this.elicitationHandler = handler;
+  }
+
+  setDynamicToolHandler(
+    handler:
+      | ((request: AppServerDynamicToolCallRequest) => Promise<AppServerDynamicToolCallResult>)
+      | null,
+  ): void {
+    this.dynamicToolHandler = handler;
   }
 
   setChatGptAuthTokensProvider(
@@ -981,6 +1139,28 @@ export class CodexAppServerClient {
         return;
       }
 
+      if (method === "item/tool/call") {
+        const result = this.dynamicToolHandler
+          ? await this.dynamicToolHandler({
+              threadId: String(params.threadId ?? ""),
+              turnId: String(params.turnId ?? ""),
+              callId: String(params.callId ?? requestKey),
+              tool: String(params.tool ?? ""),
+              arguments: params.arguments,
+            })
+          : {
+              contentItems: [
+                {
+                  type: "inputText" as const,
+                  text: `Unsupported dynamic tool: ${String(params.tool ?? "unknown")}`,
+                },
+              ],
+              success: false,
+            };
+        this.sendResponse(requestId, result);
+        return;
+      }
+
       if (method === "item/tool/requestUserInput") {
         const questions = Array.isArray(params.questions)
           ? (params.questions as AppServerQuestion[])
@@ -1196,17 +1376,15 @@ export class CodexAppServerClient {
       case "turn/plan/updated": {
         const notification = params as {
           explanation?: string | null;
-          plan?: Array<{ title?: string; status?: string }>;
+          plan?: Array<{
+            title?: string | null;
+            step?: string | null;
+            status?: string | null;
+          }>;
         };
         const lines = [
           notification.explanation || "Plan updated",
-          ...(notification.plan || []).map((step) => {
-            const status =
-              typeof step.status === "string" && step.status.length > 0
-                ? `[${step.status}] `
-                : "";
-            return `${status}${step.title || "Untitled step"}`;
-          }),
+          ...(notification.plan || []).map((step) => formatPlanLine(step)),
         ].filter(Boolean);
         this.handler?.({
           type: "service_message",
@@ -1295,6 +1473,96 @@ export class CodexAppServerClient {
                 : "Codex review completed",
         });
         return;
+      case "dynamicToolCall": {
+        const callId = typeof item.id === "string" ? item.id : "dynamic-tool-call";
+        const toolName =
+          typeof item.tool === "string" && item.tool.length > 0
+            ? item.tool
+            : "unknown";
+        if (phase === "started") {
+          this.handler?.({
+            type: "tool-call",
+            callId,
+            toolName,
+            args:
+              item.arguments && typeof item.arguments === "object"
+                ? (item.arguments as Record<string, unknown>)
+                : {},
+          });
+          return;
+        }
+
+        const success = item.success === true && item.status === "completed";
+        const content = extractDynamicToolCallText(
+          item.contentItems,
+          success ? "Tool call completed" : `Tool call failed: ${toolName}`,
+        );
+        this.handler?.({
+          type: "tool-call-result",
+          callId,
+          name: toolName,
+          output: {
+            content:
+              content ??
+              (success
+                ? `Tool call completed: ${toolName}`
+                : `Tool call failed: ${toolName}`),
+            status: success ? "completed" : "canceled",
+          },
+        });
+        if (!success) {
+          this.handler?.({
+            type: "service_message",
+            text: content ?? `Tool call failed: ${toolName}`,
+          });
+        }
+        return;
+      }
+      case "mcpToolCall": {
+        const toolName = formatMcpToolName(item.server, item.tool);
+        const callId =
+          typeof item.id === "string" && item.id.length > 0 ? item.id : toolName;
+        if (phase === "started") {
+          this.handler?.({
+            type: "tool-call",
+            callId,
+            toolName,
+            args:
+              item.arguments && typeof item.arguments === "object"
+                ? (item.arguments as Record<string, unknown>)
+                : {},
+          });
+          return;
+        }
+
+        const content = extractMcpToolCallText(
+          item.result,
+          item.error,
+          item.status === "completed"
+            ? `MCP tool call completed: ${toolName}`
+            : `MCP tool call failed: ${toolName}`,
+        );
+        this.handler?.({
+          type: "tool-call-result",
+          callId,
+          name: toolName,
+          output: {
+            content:
+              content ??
+              (item.status === "completed"
+                ? `MCP tool call completed: ${toolName}`
+                : `MCP tool call failed: ${toolName}`),
+            status: item.status === "completed" ? "completed" : "canceled",
+          },
+        });
+        if (item.status !== "completed") {
+          this.handler?.({
+            type: "service_message",
+            text: content ?? `MCP tool call failed: ${toolName}`,
+          });
+        }
+        return;
+      }
       default:
         return;
     }

@@ -561,6 +561,223 @@ describe("CodexAppServerClient", () => {
     });
   });
 
+  it("renders plan updates from step text when title is missing", async () => {
+    const events: any[] = [];
+    const client = new CodexAppServerClient();
+    client.setHandler((event) => events.push(event));
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "turn/plan/updated",
+        params: {
+          explanation: "Plan updated",
+          plan: [
+            { step: "Inspect logs", status: "completed" },
+            { step: "Patch parser", status: "in_progress" },
+            { step: "Verify UI", status: "pending" },
+          ],
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(events).toContainEqual({
+      type: "service_message",
+      text: [
+        "Plan updated",
+        "[completed] Inspect logs",
+        "[in_progress] Patch parser",
+        "[pending] Verify UI",
+      ].join("\n"),
+    });
+  });
+
+  it("responds to dynamic tool calls through the dynamic tool handler", async () => {
+    const client = new CodexAppServerClient();
+    const dynamicToolHandler = vi.fn(async () => ({
+      contentItems: [{ type: "inputText" as const, text: 'Successfully changed chat title to: "MCP调用排查"' }],
+      success: true,
+    }));
+    client.setDynamicToolHandler(dynamicToolHandler);
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        id: "tool-1",
+        method: "item/tool/call",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          callId: "call-1",
+          tool: "mcp__happy__change_title",
+          arguments: { title: "MCP调用排查" },
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(dynamicToolHandler).toHaveBeenCalledWith({
+      threadId: "thread-1",
+      turnId: "turn-1",
+      callId: "call-1",
+      tool: "mcp__happy__change_title",
+      arguments: { title: "MCP调用排查" },
+    });
+    expect(fakeProcesses[0].responses).toContainEqual({
+      id: "tool-1",
+      result: {
+        contentItems: [{ type: "inputText", text: 'Successfully changed chat title to: "MCP调用排查"' }],
+        success: true,
+      },
+    });
+  });
+
+  it("emits visible failure events for completed dynamic tool calls", async () => {
+    const events: any[] = [];
+    const client = new CodexAppServerClient();
+    client.setHandler((event) => events.push(event));
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "item/started",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          item: {
+            type: "dynamicToolCall",
+            id: "dynamic-1",
+            tool: "mcp__happy__save_memory",
+            arguments: { key: "knowledge" },
+            status: "inProgress",
+            contentItems: null,
+            success: null,
+            durationMs: null,
+          },
+        },
+      })}\n`,
+    );
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "item/completed",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          item: {
+            type: "dynamicToolCall",
+            id: "dynamic-1",
+            tool: "mcp__happy__save_memory",
+            arguments: { key: "knowledge" },
+            status: "failed",
+            contentItems: [
+              {
+                type: "inputText",
+                text: "save_memory failed: storage unavailable",
+              },
+            ],
+            success: false,
+            durationMs: 12,
+          },
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(events).toContainEqual({
+      type: "tool-call",
+      callId: "dynamic-1",
+      toolName: "mcp__happy__save_memory",
+      args: { key: "knowledge" },
+    });
+    expect(events).toContainEqual({
+      type: "tool-call-result",
+      callId: "dynamic-1",
+      name: "mcp__happy__save_memory",
+      output: {
+        content: "save_memory failed: storage unavailable",
+        status: "canceled",
+      },
+    });
+    expect(events).toContainEqual({
+      type: "service_message",
+      text: "save_memory failed: storage unavailable",
+    });
+  });
+
+  it("emits visible failure events for completed mcp tool calls", async () => {
+    const events: any[] = [];
+    const client = new CodexAppServerClient();
+    client.setHandler((event) => events.push(event));
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "item/started",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          item: {
+            type: "mcpToolCall",
+            id: "mcp-1",
+            server: "happy",
+            tool: "change_title",
+            arguments: { title: "标题" },
+            status: "inProgress",
+            result: null,
+            error: null,
+            durationMs: null,
+          },
+        },
+      })}\n`,
+    );
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "item/completed",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          item: {
+            type: "mcpToolCall",
+            id: "mcp-1",
+            server: "happy",
+            tool: "change_title",
+            arguments: { title: "标题" },
+            status: "failed",
+            result: null,
+            error: { message: "user rejected MCP tool call" },
+            durationMs: 8,
+          },
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(events).toContainEqual({
+      type: "tool-call",
+      callId: "mcp-1",
+      toolName: "mcp__happy__change_title",
+      args: { title: "标题" },
+    });
+    expect(events).toContainEqual({
+      type: "tool-call-result",
+      callId: "mcp-1",
+      name: "mcp__happy__change_title",
+      output: {
+        content: "user rejected MCP tool call",
+        status: "canceled",
+      },
+    });
+    expect(events).toContainEqual({
+      type: "service_message",
+      text: "user rejected MCP tool call",
+    });
+  });
+
   it("resumes an existing thread id", async () => {
     const client = new CodexAppServerClient();
 
