@@ -536,6 +536,9 @@ export function taskRoutes(app: Fastify) {
                 void worldSuggestionRefresh(request.userId, updated.projectId);
             }
 
+            // Auto-resolve dependency_blocked messages waiting on this task
+            void resolveBlockedMessagesByTask({ taskId, accountId: request.userId });
+
             log({ module: "task" }, `Task ${taskId} outcome → ${outcome} (status=${resolvedStatus})`);
             return reply.send({ task: serializeTask(updated) });
         },
@@ -613,10 +616,34 @@ export function taskRoutes(app: Fastify) {
                 void worldSuggestionRefresh(request.userId, updated.projectId);
             }
 
+            // Auto-resolve dependency_blocked messages waiting on this task
+            if (isTerminal) {
+                void resolveBlockedMessagesByTask({ taskId, accountId: request.userId });
+            }
+
             log({ module: "task" }, `Task ${taskId} status → ${resolvedStatus}`);
             return reply.send({ task: serializeTask(updated) });
         },
     );
+}
+
+/**
+ * Batch-resolve dependency_blocked messages whose relatedTaskId matches the
+ * just-completed/failed task. This self-heals the collaboration graph.
+ */
+async function resolveBlockedMessagesByTask(input: {
+    taskId: string;
+    accountId: string;
+}): Promise<void> {
+    await db.agentMessage.updateMany({
+        where: {
+            accountId: input.accountId,
+            msgType: "dependency_blocked",
+            relatedTaskId: input.taskId,
+            status: { not: "resolved" },
+        },
+        data: { status: "resolved" },
+    });
 }
 
 function serializeTask(task: Record<string, unknown>): Record<string, unknown> {

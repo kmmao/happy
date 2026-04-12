@@ -105,6 +105,9 @@ const { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock, w
         sessionEvent: {
             create: vi.fn(async ({ data }: any) => ({ id: "session-event-1", createdAt: new Date(), ...data })),
         },
+        agentMessage: {
+            updateMany: vi.fn(async () => ({ count: 0 })),
+        },
         repeatKey: {
             findUnique: vi.fn(async ({ where }: any) => {
                 const record = state.repeatKeys.get(where.key) ?? null;
@@ -735,6 +738,70 @@ describe("taskRoutes POST /v1/tasks/result", () => {
 
         expect(res.statusCode).toBe(200);
         expect(dbMock.sessionEvent.create).not.toHaveBeenCalled();
+    });
+});
+
+describe("taskRoutes auto-resolve dependency_blocked on task completion", () => {
+    let app: Fastify;
+
+    beforeEach(() => {
+        resetState();
+        vi.clearAllMocks();
+    });
+
+    afterEach(async () => {
+        if (app) await app.close();
+    });
+
+    it("calls agentMessage.updateMany to resolve dependency_blocked when task reaches terminal status", async () => {
+        seedTask({
+            id: "task-1",
+            accountId: "user-1",
+            machineId: "machine-1",
+            status: "running",
+            projectId: "project-1",
+        });
+        app = await createApp();
+
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/tasks/status",
+            headers: { "x-user-id": "user-1" },
+            payload: { taskId: "task-1", status: "completed" },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(dbMock.agentMessage.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    relatedTaskId: "task-1",
+                    msgType: "dependency_blocked",
+                    status: { not: "resolved" },
+                }),
+                data: { status: "resolved" },
+            }),
+        );
+    });
+
+    it("does NOT call agentMessage.updateMany when task is not in terminal state", async () => {
+        seedTask({
+            id: "task-2",
+            accountId: "user-1",
+            machineId: "machine-1",
+            status: "queued",
+            projectId: "project-1",
+        });
+        app = await createApp();
+
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/tasks/status",
+            headers: { "x-user-id": "user-1" },
+            payload: { taskId: "task-2", status: "running" },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(dbMock.agentMessage.updateMany).not.toHaveBeenCalled();
     });
 });
 

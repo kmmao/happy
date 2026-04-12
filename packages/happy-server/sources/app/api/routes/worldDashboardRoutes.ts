@@ -3,6 +3,7 @@ import { db } from "@/storage/db";
 import { z } from "zod";
 import { autonomyScore } from "@/modules/autonomyScore";
 import { generateWorldConstitution } from "@/modules/worldConstitutionGenerator";
+import { buildCollaborationSummary } from "@/modules/roleCollaboration";
 
 /**
  * World Dashboard — aggregated project world state.
@@ -163,6 +164,65 @@ export function worldDashboardRoutes(app: Fastify) {
                     reviewRequests30d,
                 },
             });
+        },
+    );
+
+    // GET /v1/projects/:id/world/collaboration — role collaboration graph
+    app.get(
+        "/v1/projects/:id/world/collaboration",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const projectId = request.params.id;
+
+            const project = await db.project.findFirst({
+                where: { id: projectId, accountId: userId },
+                select: { id: true },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+            const [roles, tasks, messages, decisions] = await Promise.all([
+                db.agentRole.findMany({
+                    where: { accountId: userId, projectId, enabled: true },
+                    select: { name: true, type: true },
+                }),
+                db.task.findMany({
+                    where: { accountId: userId, projectId, createdAt: { gte: since30d } },
+                    select: { roleType: true, status: true },
+                }),
+                db.agentMessage.findMany({
+                    where: {
+                        accountId: userId,
+                        projectId,
+                        status: { not: "resolved" },
+                    },
+                    select: {
+                        id: true,
+                        fromRole: true,
+                        toRole: true,
+                        msgType: true,
+                        status: true,
+                        relatedGoalId: true,
+                        createdAt: true,
+                    },
+                }),
+                db.decision.findMany({
+                    where: { accountId: userId, projectId },
+                    select: { status: true },
+                }),
+            ]);
+
+            const summary = buildCollaborationSummary({ roles, tasks, messages, decisions });
+            return reply.send(summary);
         },
     );
 
