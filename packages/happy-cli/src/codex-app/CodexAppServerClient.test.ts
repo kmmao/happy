@@ -18,6 +18,7 @@ class FakeProcess extends EventEmitter {
   killed = false;
   responses: FakeRpcMessage[] = [];
   requests: FakeRpcMessage[] = [];
+  modelListOverride: unknown = null;
 
   constructor() {
     super();
@@ -63,7 +64,7 @@ class FakeProcess extends EventEmitter {
         this.writeServerMessage({
           id: payload.id,
           result: {
-            data: [
+            data: (this.modelListOverride as unknown[]) ?? [
               {
                 id: "model-1",
                 model: "gpt-5.4",
@@ -458,6 +459,39 @@ describe("CodexAppServerClient", () => {
 
     await client.disconnect();
     expect(fakeProcesses[0].killed).toBe(true);
+  });
+
+  it("normalizes reasoning effort shapes returned by newer app-server builds", async () => {
+    const fakeProcess = new FakeProcess();
+    fakeProcess.modelListOverride = [
+      {
+        id: "model-1",
+        model: "gpt-5.4",
+        displayName: "GPT-5.4",
+        description: "Most capable",
+        supportedReasoningEfforts: [
+          { reasoningEffort: "low", description: "Fast" },
+          { reasoningEffort: "high", description: "Deep" },
+        ],
+        supportsPersonality: true,
+        isDefault: true,
+      },
+    ];
+    mockSpawn.mockImplementation(() => {
+      fakeProcesses.push(fakeProcess);
+      return fakeProcess as any;
+    });
+
+    const client = new CodexAppServerClient();
+
+    await client.connect();
+
+    expect(client.getCapabilities()?.models[0]?.supportedReasoningEfforts).toEqual([
+      { value: "low", label: "Fast" },
+      { value: "high", label: "Deep" },
+    ]);
+
+    await client.disconnect();
   });
 
   it("responds to command approval requests through the permission handler", async () => {

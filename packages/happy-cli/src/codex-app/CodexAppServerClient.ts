@@ -100,6 +100,46 @@ type AppServerCapabilities = {
   }>;
 };
 
+type RawSupportedReasoningEffort =
+  | { value?: string; label?: string }
+  | { reasoningEffort?: string; description?: string };
+
+function normalizeSupportedReasoningEfforts(
+  efforts: RawSupportedReasoningEffort[] | null | undefined,
+): Array<{ value: string; label: string }> {
+  if (!Array.isArray(efforts) || efforts.length === 0) {
+    return [];
+  }
+
+  return efforts
+    .map((effort) => {
+      const value =
+        ("value" in effort && typeof effort.value === "string"
+          ? effort.value
+          : null) ??
+        ("reasoningEffort" in effort &&
+        typeof effort.reasoningEffort === "string"
+          ? effort.reasoningEffort
+          : null);
+
+      if (!value) {
+        return null;
+      }
+
+      const label =
+        ("label" in effort && typeof effort.label === "string"
+          ? effort.label
+          : null) ??
+        ("description" in effort && typeof effort.description === "string"
+          ? effort.description
+          : null) ??
+        value;
+
+      return { value, label };
+    })
+    .filter((effort): effort is { value: string; label: string } => effort !== null);
+}
+
 function createAbortError(): Error {
   const error = new Error("Aborted");
   error.name = "AbortError";
@@ -374,7 +414,7 @@ export class CodexAppServerClient {
         model: string;
         displayName: string;
         description: string;
-        supportedReasoningEfforts?: Array<{ value: string; label: string }>;
+        supportedReasoningEfforts?: RawSupportedReasoningEffort[];
         isDefault?: boolean;
         supportsPersonality?: boolean;
       }>;
@@ -481,7 +521,9 @@ export class CodexAppServerClient {
         model: model.model,
         displayName: model.displayName,
         description: model.description,
-        supportedReasoningEfforts: model.supportedReasoningEfforts || [],
+        supportedReasoningEfforts: normalizeSupportedReasoningEfforts(
+          model.supportedReasoningEfforts,
+        ),
         isDefault: model.isDefault === true,
         supportsPersonality: model.supportsPersonality === true,
       })),

@@ -1802,6 +1802,38 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
             }
         });
 
+        it('normalizes text-delta events to streaming agent content', () => {
+            const normalized = normalizeRawMessage('db-2-delta', null, 1, {
+                ...base,
+                content: {
+                    type: 'session',
+                    data: {
+                        id: 'env-2-delta',
+                        time: 1,
+                        role: 'agent',
+                        turn: 'turn-1',
+                        ev: {
+                            t: 'text-delta',
+                            stream: 'stream-1',
+                            delta: '你好',
+                        }
+                    }
+                }
+            } as any);
+
+            expect(normalized).toBeTruthy();
+            expect(normalized?.role).toBe('agent');
+            if (normalized && normalized.role === 'agent') {
+                expect(normalized.content[0]).toMatchObject({
+                    type: 'text-delta',
+                    delta: '你好',
+                    streamId: 'stream-1',
+                    uuid: 'stream-1',
+                    parentUUID: null,
+                });
+            }
+        });
+
         it('drops modern user session envelopes when send flag is disabled', () => {
             const normalized = normalizeRawMessage('db-modern-user-flag-off-1', null, 1, {
                 role: 'session',

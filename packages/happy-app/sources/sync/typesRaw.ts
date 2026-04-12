@@ -111,6 +111,13 @@ const sessionTextEventSchema = z.object({
   thinking: z.boolean().optional(),
 });
 
+const sessionTextDeltaEventSchema = z.object({
+  t: z.literal("text-delta"),
+  stream: z.string(),
+  delta: z.string(),
+  thinking: z.boolean().optional(),
+});
+
 const sessionServiceMessageEventSchema = z.object({
   t: z.literal("service"),
   text: z.string(),
@@ -285,6 +292,7 @@ const sessionContextUsageEventSchema = z.object({
 
 const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTextEventSchema,
+  sessionTextDeltaEventSchema,
   sessionServiceMessageEventSchema,
   sessionToolCallStartEventSchema,
   sessionToolCallEndEventSchema,
@@ -328,6 +336,7 @@ const sessionEnvelopeSchema = z
     }
     if (
       (envelope.ev.t === "start" ||
+        envelope.ev.t === "text-delta" ||
         envelope.ev.t === "stop" ||
         envelope.ev.t === "usage-update" ||
         envelope.ev.t === "task-start" ||
@@ -763,6 +772,14 @@ type NormalizedAgentContent =
       parentUUID: string | null;
     }
   | {
+      type: "text-delta";
+      delta: string;
+      streamId: string;
+      uuid: string;
+      parentUUID: string | null;
+      thinking?: boolean;
+    }
+  | {
       type: "thinking";
       thinking: string;
       uuid: string;
@@ -1123,6 +1140,31 @@ function normalizeSessionEnvelope(
               uuid: contentUUID,
               parentUUID,
             },
+      ],
+      meta,
+    } satisfies NormalizedMessage;
+  }
+
+  if (envelope.ev.t === "text-delta") {
+    if (envelope.role !== "agent") {
+      return null;
+    }
+
+    return {
+      id: messageId,
+      localId,
+      createdAt: messageCreatedAt,
+      role: "agent",
+      isSidechain,
+      content: [
+        {
+          type: "text-delta",
+          delta: envelope.ev.delta,
+          streamId: envelope.ev.stream,
+          uuid: envelope.ev.stream,
+          parentUUID,
+          ...(envelope.ev.thinking ? { thinking: true } : {}),
+        },
       ],
       meta,
     } satisfies NormalizedMessage;

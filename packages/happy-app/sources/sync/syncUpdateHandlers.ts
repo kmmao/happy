@@ -33,6 +33,7 @@ import {
 } from "./syncIssueHandlers";
 import { deleteMessageCache } from "./messageCache";
 import { detectNeedsAttention } from "./syncHelpers";
+import { mergeUpdatedSession } from "./updateSessionMerge";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import { t } from "@/text";
 import { getSessionName } from "@/utils/sessionUtils";
@@ -375,13 +376,20 @@ export async function handleUpdateSessionUpdate(
     ctx: UpdateHandlerContext,
 ): Promise<void> {
     const session = storage.getState().sessions[body.id];
-    if (!session) return;
+    if (!session) {
+        log.warn(
+            `Session ${body.id} not found for update-session; refetching sessions`,
+        );
+        ctx.fetchSessions();
+        return;
+    }
 
     const sessionEncryption = ctx.encryption.getSessionEncryption(body.id);
     if (!sessionEncryption) {
         log.error(
             `Session encryption not found for ${body.id} - this should never happen`,
         );
+        ctx.fetchSessions();
         return;
     }
 
@@ -406,37 +414,32 @@ export async function handleUpdateSessionUpdate(
         ? await sessionEncryption.decryptPreferences(preferencesData.value)
         : null;
 
+    const {
+        updatedSession,
+        metadataDecryptFailed,
+    } = mergeUpdatedSession({
+        session,
+        seq: updateData.seq,
+        updatedAt: updateData.createdAt,
+        agentState,
+        agentStateVersion: body.agentState
+            ? body.agentState.version
+            : session.agentStateVersion,
+        metadata,
+        metadataUpdate: body.metadata,
+        preferences,
+        preferencesUpdate: preferencesData,
+    });
+
+    if (body.metadata && metadataDecryptFailed) {
+        log.warn(
+            `Failed to decrypt session metadata for ${body.id} version ${body.metadata.version}; preserving existing metadata and refetching sessions`,
+        );
+        ctx.fetchSessions();
+    }
+
     ctx.applySessions([
-        {
-            ...session,
-            agentState,
-            agentStateVersion: body.agentState
-                ? body.agentState.version
-                : session.agentStateVersion,
-            metadata,
-            metadataVersion: body.metadata
-                ? body.metadata.version
-                : session.metadataVersion,
-            preferencesVersion: preferencesData
-                ? preferencesData.version
-                : session.preferencesVersion,
-            ...(preferences
-                ? {
-                    permissionMode: preferences.permissionMode,
-                    modelMode: preferences.modelMode,
-                    customModels: preferences.customModels,
-                    modelMappings: preferences.modelMappings,
-                    profileId: preferences.profileId,
-                    profileName: preferences.profileName,
-                    thinkingMode: preferences.thinkingMode,
-                    thinkingBudget: preferences.thinkingBudget,
-                    effortLevel: preferences.effortLevel,
-                    maxBudgetUsd: preferences.maxBudgetUsd,
-                }
-                : {}),
-            updatedAt: updateData.createdAt,
-            seq: updateData.seq,
-        },
+        updatedSession,
     ]);
 
     // Invalidate git status when agent state changes
