@@ -166,6 +166,7 @@ export const zhHans: TranslationStructure = {
     invalidSecretKey: "无效的密钥，请检查后重试。",
     enterUrlManually: "手动输入 URL",
     restoreInstructions: "输入您的密钥以恢复对账户的访问。",
+    rememberMe: "记住我",
   },
 
   settings: {

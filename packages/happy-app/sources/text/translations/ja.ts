@@ -274,6 +274,7 @@ export const ja: TranslationStructure = {
       "シークレットキーが無効です。確認して再試行してください。",
     enterUrlManually: "URLを手動で入力",
     restoreInstructions: "シークレットキーを入力してアカウントへのアクセスを復元してください。",
+    rememberMe: "ログイン状態を保持",
   },
 
   settings: {

@@ -166,6 +166,7 @@ export const es: TranslationStructure = {
     invalidSecretKey: "Clave secreta inválida. Verifica e intenta de nuevo.",
     enterUrlManually: "Ingresar URL manualmente",
     restoreInstructions: "Ingresa tu clave secreta para restaurar el acceso a tu cuenta.",
+    rememberMe: "Recordarme",
   },
 
   settings: {

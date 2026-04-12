@@ -21,7 +21,9 @@ export interface AuthCredentials {
 export const TokenStorage = {
     async getCredentials(): Promise<AuthCredentials | null> {
         if (Platform.OS === 'web') {
-            return sessionStorage.getItem(AUTH_KEY) ? JSON.parse(sessionStorage.getItem(AUTH_KEY)!) as AuthCredentials : null;
+            // Check localStorage first (persistent "remember me"), then sessionStorage
+            const stored = localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY);
+            return stored ? JSON.parse(stored) as AuthCredentials : null;
         }
         try {
             const stored = await SecureStore.getItemAsync(AUTH_KEY);
@@ -34,9 +36,14 @@ export const TokenStorage = {
         }
     },
 
-    async setCredentials(credentials: AuthCredentials): Promise<boolean> {
+    async setCredentials(credentials: AuthCredentials, options?: { remember?: boolean }): Promise<boolean> {
         if (Platform.OS === 'web') {
-            sessionStorage.setItem(AUTH_KEY, JSON.stringify(credentials));
+            const json = JSON.stringify(credentials);
+            if (options?.remember) {
+                localStorage.setItem(AUTH_KEY, json);
+            } else {
+                sessionStorage.setItem(AUTH_KEY, json);
+            }
             return true;
         }
         try {
@@ -51,7 +58,8 @@ export const TokenStorage = {
     },
 
     async removeCredentials(): Promise<boolean> {
-        if (Platform.OS === 'web') {    
+        if (Platform.OS === 'web') {
+            localStorage.removeItem(AUTH_KEY);
             sessionStorage.removeItem(AUTH_KEY);
             return true;
         }

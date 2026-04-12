@@ -274,6 +274,7 @@ export const it: TranslationStructure = {
     invalidSecretKey: "Chiave segreta non valida. Controlla e riprova.",
     enterUrlManually: "Inserisci URL manualmente",
     restoreInstructions: "Inserisci la tua chiave segreta per ripristinare l'accesso al tuo account.",
+    rememberMe: "Ricordami",
   },
 
   settings: {

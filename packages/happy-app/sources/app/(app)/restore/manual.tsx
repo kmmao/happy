@@ -1,20 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/auth/AuthContext';
 import { RoundButton } from '@/components/RoundButton';
 import { Typography } from '@/constants/Typography';
 import { normalizeSecretKey } from '@/auth/secretKeyBackup';
 import { authGetToken } from '@/auth/authGetToken';
-import { decodeBase64, encodeBase64 } from '@/encryption/base64';
-import { generateAuthKeyPair, authQRStart, QRAuthKeyPair } from '@/auth/authQRStart';
-import { authQRWait } from '@/auth/authQRWait';
+import { decodeBase64 } from '@/encryption/base64';
 import { layout } from '@/components/layout';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { QRCode } from '@/components/qr/QRCode';
 import { log } from '@/log';
+import { Switch } from '@/components/Switch';
 
 const stylesheet = StyleSheet.create((theme) => ({
     scrollView: {
@@ -63,6 +61,17 @@ const stylesheet = StyleSheet.create((theme) => ({
         textAlignVertical: 'top',
         color: theme.colors.input.text,
     },
+    rememberMeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 24,
+    },
+    rememberMeLabel: {
+        fontSize: 15,
+        color: theme.colors.text,
+        ...Typography.default(),
+    },
 }));
 
 function Restore() {
@@ -71,6 +80,7 @@ function Restore() {
     const auth = useAuth();
     const router = useRouter();
     const [restoreKey, setRestoreKey] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
 
     const handleRestore = async () => {
         const trimmedKey = restoreKey.trim();
@@ -97,7 +107,7 @@ function Restore() {
             }
 
             // Login with new credentials
-            await auth.login(token, normalizedKey);
+            await auth.login(token, normalizedKey, { remember: rememberMe });
 
             // Dismiss
             router.back();
@@ -127,6 +137,16 @@ function Restore() {
                         multiline={true}
                         numberOfLines={4}
                     />
+
+                    {Platform.OS === 'web' && (
+                        <View style={styles.rememberMeRow}>
+                            <Text style={styles.rememberMeLabel}>{t('connect.rememberMe')}</Text>
+                            <Switch
+                                value={rememberMe}
+                                onValueChange={setRememberMe}
+                            />
+                        </View>
+                    )}
 
                     <RoundButton
                         title={t('connect.restoreAccount')}

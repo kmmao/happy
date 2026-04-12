@@ -133,6 +133,7 @@ export const ru: TranslationStructure = {
     invalidSecretKey: "Неверный секретный ключ. Проверьте и попробуйте снова.",
     enterUrlManually: "Ввести URL вручную",
     restoreInstructions: "Введите секретный ключ для восстановления доступа к аккаунту.",
+    rememberMe: "Запомнить меня",
   },
 
   settings: {

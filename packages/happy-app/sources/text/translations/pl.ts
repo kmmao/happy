@@ -179,6 +179,7 @@ export const pl: TranslationStructure = {
     invalidSecretKey: "Nieprawidłowy klucz tajny. Sprawdź i spróbuj ponownie.",
     enterUrlManually: "Wprowadź URL ręcznie",
     restoreInstructions: "Wprowadź swój tajny klucz, aby przywrócić dostęp do konta.",
+    rememberMe: "Zapamiętaj mnie",
   },
 
   settings: {

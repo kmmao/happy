@@ -167,6 +167,7 @@ export const ca: TranslationStructure = {
       "Clau secreta no vàlida. Comprova-ho i torna-ho a provar.",
     enterUrlManually: "Introdueix l'URL manualment",
     restoreInstructions: "Introduïu la vostra clau secreta per restaurar l'accés al vostre compte.",
+    rememberMe: "Recorda'm",
   },
 
   settings: {

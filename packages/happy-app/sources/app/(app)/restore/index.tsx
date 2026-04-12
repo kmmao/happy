@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/auth/AuthContext';
 import { RoundButton } from '@/components/RoundButton';
@@ -13,6 +13,7 @@ import { t } from '@/text';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { QRCode } from '@/components/qr/QRCode';
 import { log } from '@/log';
+import { Switch } from '@/components/Switch';
 
 const stylesheet = StyleSheet.create((theme) => ({
     scrollView: {
@@ -64,6 +65,19 @@ const stylesheet = StyleSheet.create((theme) => ({
         textAlignVertical: 'top',
         color: theme.colors.input.text,
     },
+    rememberMeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        maxWidth: layout.maxWidth,
+        marginBottom: 16,
+    },
+    rememberMeLabel: {
+        fontSize: 15,
+        color: theme.colors.text,
+        ...Typography.default(),
+    },
 }));
 
 function Restore() {
@@ -76,6 +90,7 @@ function Restore() {
     const [authReady, setAuthReady] = useState(false);
     const [waitingDots, setWaitingDots] = useState(0);
     const isCancelledRef = useRef(false);
+    const [rememberMe, setRememberMe] = useState(false);
 
     // Memoize keypair generation to prevent re-creating on re-renders
     const keypair = React.useMemo(() => generateAuthKeyPair(), []);
@@ -106,7 +121,7 @@ function Restore() {
                 if (credentials && !isCancelledRef.current) {
                     // Convert secret bytes to base64url string for login
                     const secretString = encodeBase64(credentials.secret, 'base64url');
-                    await auth.login(credentials.token, secretString);
+                    await auth.login(credentials.token, secretString, { remember: rememberMe });
                     if (!isCancelledRef.current) {
                         router.back();
                     }
@@ -157,7 +172,16 @@ function Restore() {
                         backgroundColor={'white'}
                     />
                 )}
-                <View style={{ flexGrow: 4, paddingTop: 30 }}>
+                <View style={{ flexGrow: 4, paddingTop: 30, alignItems: 'center', width: '100%' }}>
+                    {Platform.OS === 'web' && (
+                        <View style={styles.rememberMeRow}>
+                            <Text style={styles.rememberMeLabel}>{t('connect.rememberMe')}</Text>
+                            <Switch
+                                value={rememberMe}
+                                onValueChange={setRememberMe}
+                            />
+                        </View>
+                    )}
                     <RoundButton title={t('connect.restoreWithSecretKey')} display='inverted' onPress={() => {
                         router.push('/restore/manual');
                     }} />

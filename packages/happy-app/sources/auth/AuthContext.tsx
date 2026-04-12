@@ -13,7 +13,7 @@ import { trackLogout } from "@/track";
 interface AuthContextType {
   isAuthenticated: boolean;
   credentials: AuthCredentials | null;
-  login: (token: string, secret: string) => Promise<void>;
+  login: (token: string, secret: string, options?: { remember?: boolean }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -38,9 +38,9 @@ export function AuthProvider({
     );
   }, [isAuthenticated, credentials]);
 
-  const login = async (token: string, secret: string) => {
+  const login = async (token: string, secret: string, options?: { remember?: boolean }) => {
     const newCredentials: AuthCredentials = { token, secret };
-    const success = await TokenStorage.setCredentials(newCredentials);
+    const success = await TokenStorage.setCredentials(newCredentials, options);
     if (success) {
       await syncCreate(newCredentials);
       setCredentials(newCredentials);

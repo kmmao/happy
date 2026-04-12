@@ -166,6 +166,7 @@ export const zhHant: TranslationStructure = {
     invalidSecretKey: "無效的金鑰，請檢查後重試。",
     enterUrlManually: "手動輸入 URL",
     restoreInstructions: "輸入您的密鑰以恢復對帳戶的存取。",
+    rememberMe: "記住我",
   },
 
   settings: {

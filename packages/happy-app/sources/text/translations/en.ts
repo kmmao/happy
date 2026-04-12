@@ -181,6 +181,7 @@ export const en: TranslationStructure = {
     invalidSecretKey: "Invalid secret key. Please check and try again.",
     enterUrlManually: "Enter URL manually",
     restoreInstructions: "Enter your secret key to restore access to your account.",
+    rememberMe: "Remember me",
   },
 
   settings: {
