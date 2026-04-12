@@ -25,6 +25,7 @@ import { detectTailscale, detectTailscaleServe } from "../utils/tailscale";
 import { AutomationScheduler } from "./scheduler";
 import { AgentLoopCoordinator } from "./loopCoordinator";
 import { GuardianSessionRegistry } from "./guardianRegistry";
+import { AutomationAuditStore } from "./auditStore";
 import { logger } from "../logger";
 
 // ---------------------------------------------------------------------------
@@ -121,13 +122,17 @@ export async function startDaemon(options: {
     workingDirectory: workDir,
   });
 
-  // 3b. Create scheduler + guardian + loop coordinator
-  const scheduler = new AutomationScheduler({ maxConcurrentJobs: 2 });
+  // 3b. Create automation stack
+  const auditStore = new AutomationAuditStore();
+  const scheduler = new AutomationScheduler({
+    maxConcurrentJobs: 2,
+    onAudit: (event) => auditStore.record(event),
+  });
   const guardian = new GuardianSessionRegistry();
   const loopCoordinator = new AgentLoopCoordinator(scheduler, config.serverUrl, creds.token, guardian);
 
   client.setTailscaleInfo(fullTailscale);
-  client.enableAutomation(config.serverUrl, creds.token, scheduler, loopCoordinator);
+  client.enableAutomation(config.serverUrl, creds.token, scheduler, loopCoordinator, auditStore);
   loopCoordinator.start();
 
   // 4. Connect

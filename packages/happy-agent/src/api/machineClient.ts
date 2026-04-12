@@ -34,6 +34,7 @@ import {
 } from "../daemon/triggerHandlers";
 import type { AutomationScheduler } from "../daemon/scheduler";
 import type { AgentLoopCoordinator, CreateLoopInput } from "../daemon/loopCoordinator";
+import type { AutomationAuditStore, AuditQuery } from "../daemon/auditStore";
 
 const TAILSCALE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -121,6 +122,7 @@ export class MachineClient {
   private automationAuthToken = "";
   private scheduler: AutomationScheduler | null = null;
   private loopCoordinator: AgentLoopCoordinator | null = null;
+  private auditStore: AutomationAuditStore | null = null;
 
   constructor(opts: MachineClientOptions) {
     this.token = opts.token;
@@ -220,6 +222,24 @@ export class MachineClient {
       { success: boolean }
     >("delete-loop", async (data) => {
       return { success: coord.deleteLoop(data.loopId) };
+    });
+  }
+
+  private registerAuditHandlers(): void {
+    const audit = this.auditStore!;
+
+    this.rpcHandlerManager.registerHandler<
+      AuditQuery,
+      { events: Array<{ id: number; kind: string; timestamp: number; message?: string; jobId?: string; loopId?: string; errorMessage?: string }> }
+    >("query-audit-log", async (data) => {
+      return { events: audit.query(data) };
+    });
+
+    this.rpcHandlerManager.registerHandler<
+      Record<string, never>,
+      { summary: Record<string, number> }
+    >("audit-summary", async () => {
+      return { summary: audit.summarize() };
     });
   }
 
@@ -496,14 +516,19 @@ export class MachineClient {
     authToken: string,
     scheduler: AutomationScheduler,
     loopCoordinator?: AgentLoopCoordinator,
+    auditStore?: AutomationAuditStore,
   ): void {
     this.automationEnabled = true;
     this.automationServerUrl = serverUrl;
     this.automationAuthToken = authToken;
     this.scheduler = scheduler;
     this.loopCoordinator = loopCoordinator ?? null;
+    this.auditStore = auditStore ?? null;
     if (this.loopCoordinator) {
       this.registerLoopHandlers();
+    }
+    if (this.auditStore) {
+      this.registerAuditHandlers();
     }
     logger.debug("[MACHINE] Automation enabled");
   }

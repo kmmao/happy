@@ -61,11 +61,20 @@ export interface SchedulerStatus {
   }>;
 }
 
+export type AuditCallback = (event: {
+  kind: "job_enqueued" | "job_dispatched" | "job_completed" | "job_failed" | "job_retried";
+  jobId: string;
+  dedupeKey: string;
+  message?: string;
+  errorMessage?: string;
+}) => void;
+
 export interface SchedulerOptions {
   maxConcurrentJobs?: number;
   retryDelayMs?: number;
   maxAttempts?: number;
   maxRecentCompletions?: number;
+  onAudit?: AuditCallback;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +98,7 @@ export class AutomationScheduler {
   private readonly retryDelayMs: number;
   private readonly defaultMaxAttempts: number;
   private readonly maxRecentCompletions: number;
+  private readonly onAudit: AuditCallback | null;
 
   /** Active jobs indexed by id. */
   private readonly jobs = new Map<string, SchedulerJob>();
@@ -105,6 +115,7 @@ export class AutomationScheduler {
     this.retryDelayMs = options?.retryDelayMs ?? 5000;
     this.defaultMaxAttempts = options?.maxAttempts ?? 3;
     this.maxRecentCompletions = options?.maxRecentCompletions ?? 50;
+    this.onAudit = options?.onAudit ?? null;
 
     this.pumpTimer = setInterval(() => this.pump(), 1000);
   }
@@ -142,6 +153,7 @@ export class AutomationScheduler {
     this.dedupeIndex.set(job.dedupeKey, job.id);
 
     logger.debug(`[SCHEDULER] Enqueued: ${job.kind} ${job.dedupeKey} (${job.priority}) id=${job.id}`);
+    this.onAudit?.({ kind: "job_enqueued", jobId: job.id, dedupeKey: job.dedupeKey, message: `${job.kind}:${job.priority}` });
 
     // Immediate pump attempt
     this.pump();
@@ -156,6 +168,7 @@ export class AutomationScheduler {
     job.status = "completed";
     job.updatedAt = Date.now();
     logger.debug(`[SCHEDULER] Completed: ${job.kind} ${job.dedupeKey} id=${jobId}`);
+    this.onAudit?.({ kind: "job_completed", jobId, dedupeKey: job.dedupeKey });
     this.finalize(job);
   }
 
@@ -171,12 +184,14 @@ export class AutomationScheduler {
       job.status = "queued";
       job.nextRunAt = Date.now() + job.attempt * this.retryDelayMs;
       logger.debug(`[SCHEDULER] Retry queued: ${job.dedupeKey} attempt=${job.attempt}/${job.maxAttempts} nextRunAt=+${job.attempt * this.retryDelayMs}ms`);
+      this.onAudit?.({ kind: "job_retried", jobId, dedupeKey: job.dedupeKey, errorMessage: error, message: `attempt ${job.attempt}/${job.maxAttempts}` });
       this.pump();
       return;
     }
 
     job.status = "failed";
     logger.debug(`[SCHEDULER] Failed (exhausted): ${job.kind} ${job.dedupeKey} id=${jobId}: ${error}`);
+    this.onAudit?.({ kind: "job_failed", jobId, dedupeKey: job.dedupeKey, errorMessage: error });
     this.finalize(job);
   }
 
@@ -251,6 +266,7 @@ export class AutomationScheduler {
     job.updatedAt = Date.now();
 
     logger.debug(`[SCHEDULER] Dispatching: ${job.kind} ${job.dedupeKey} attempt=${job.attempt}`);
+    this.onAudit?.({ kind: "job_dispatched", jobId: job.id, dedupeKey: job.dedupeKey, message: `attempt ${job.attempt}` });
 
     job.run(job.id)
       .then(({ pid }) => {
