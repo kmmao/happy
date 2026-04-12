@@ -56,6 +56,11 @@ type PendingCall = {
   reject: (error: Error) => void;
 };
 
+type DynamicToolMetadata = {
+  toolName: string;
+  arguments: Record<string, unknown>;
+};
+
 type TurnWaiter = {
   turnId: string;
   resolve: () => void;
@@ -441,6 +446,7 @@ export class CodexAppServerClient {
   private capabilities: AppServerCapabilities | null = null;
   private capabilitiesRefresh: Promise<void> | null = null;
   private mcpToolNames = new Map<string, string>();
+  private dynamicToolMetadata = new Map<string, DynamicToolMetadata>();
   private lastDiffPreview: string | null = null;
   public sandboxEnabled = false;
   public readonly supportsModeHotSwap = true;
@@ -1226,15 +1232,22 @@ export class CodexAppServerClient {
           typeof params.itemId === "string" && params.itemId.length > 0
             ? params.itemId
             : requestKey;
+        const requestedToolName =
+          typeof params.itemId === "string" && params.itemId.length > 0
+            ? this.mcpToolNames.get(params.itemId) ?? null
+            : null;
         const decision = this.permissionHandler
           ? (
               await this.permissionHandler.handleToolCall(
                 permissionId,
-                "CodexPermissions",
+                requestedToolName ?? "CodexPermissions",
                 {
                   itemId: params.itemId,
                   reason: params.reason,
                   permissions: params.permissions,
+                  ...(requestedToolName
+                    ? { requestedToolName }
+                    : {}),
                 },
               )
             ).decision
@@ -1258,12 +1271,24 @@ export class CodexAppServerClient {
       }
 
       if (method === "item/tool/call") {
+        const dynamicCallId = String(params.callId ?? requestKey);
+        const dynamicToolName = String(params.tool ?? "").trim();
+        const dynamicToolArguments =
+          params.arguments && typeof params.arguments === "object"
+            ? (params.arguments as Record<string, unknown>)
+            : {};
+        if (dynamicToolName.length > 0) {
+          this.dynamicToolMetadata.set(dynamicCallId, {
+            toolName: dynamicToolName,
+            arguments: dynamicToolArguments,
+          });
+        }
         const result = this.dynamicToolHandler
           ? await this.dynamicToolHandler({
               threadId: String(params.threadId ?? ""),
               turnId: String(params.turnId ?? ""),
-              callId: String(params.callId ?? requestKey),
-              tool: String(params.tool ?? ""),
+              callId: dynamicCallId,
+              tool: dynamicToolName,
               arguments: params.arguments,
             })
           : {
@@ -1676,19 +1701,25 @@ export class CodexAppServerClient {
         return;
       case "dynamicToolCall": {
         const callId = typeof item.id === "string" ? item.id : "dynamic-tool-call";
+        const cachedMetadata = this.dynamicToolMetadata.get(callId);
         const toolName =
           typeof item.tool === "string" && item.tool.length > 0
             ? item.tool
-            : "unknown";
+            : cachedMetadata?.toolName ?? "CodexDynamicTool";
+        const toolArguments =
+          item.arguments && typeof item.arguments === "object"
+            ? (item.arguments as Record<string, unknown>)
+            : cachedMetadata?.arguments ?? {};
         if (phase === "started") {
           this.handler?.({
             type: "tool-call",
             callId,
             toolName,
-            args:
-              item.arguments && typeof item.arguments === "object"
-                ? (item.arguments as Record<string, unknown>)
-                : {},
+            args: {
+              ...toolArguments,
+              requestedToolName: toolName,
+              toolName,
+            },
           });
           return;
         }
@@ -1711,6 +1742,7 @@ export class CodexAppServerClient {
             status: success ? "completed" : "canceled",
           },
         });
+        this.dynamicToolMetadata.delete(callId);
         return;
       }
       case "mcpToolCall": {

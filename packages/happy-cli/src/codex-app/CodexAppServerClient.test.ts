@@ -660,6 +660,77 @@ describe("CodexAppServerClient", () => {
     });
   });
 
+  it("passes through the real Happy MCP tool name for title permission approvals", async () => {
+    const client = new CodexAppServerClient();
+    const handleToolCall = vi.fn(async () => ({
+      decision: "approved" as const,
+    }));
+    client.setPermissionHandler({
+      handleToolCall,
+    } as any);
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "item/started",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          item: {
+            type: "mcpToolCall",
+            id: "mcp-title-1",
+            server: "happy",
+            tool: "change_title",
+            arguments: { title: "标题" },
+            status: "inProgress",
+            result: null,
+            error: null,
+            durationMs: null,
+          },
+        },
+      })}\n`,
+    );
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        id: "perm-title-1",
+        method: "item/permissions/requestApproval",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          itemId: "mcp-title-1",
+          reason: "Allow Happy MCP title updates",
+          permissions: {
+            network: { enabled: true },
+          },
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(handleToolCall).toHaveBeenCalledWith(
+      "mcp-title-1",
+      "mcp__happy__change_title",
+      {
+        itemId: "mcp-title-1",
+        reason: "Allow Happy MCP title updates",
+        permissions: {
+          network: { enabled: true },
+        },
+        requestedToolName: "mcp__happy__change_title",
+      },
+    );
+    expect(fakeProcesses[0].responses).toContainEqual({
+      id: "perm-title-1",
+      result: {
+        permissions: {
+          network: { enabled: true },
+        },
+        scope: "turn",
+      },
+    });
+  });
+
   it("returns an empty permission grant when generic permission approval is denied", async () => {
     const client = new CodexAppServerClient();
     client.setPermissionHandler({
@@ -976,7 +1047,11 @@ describe("CodexAppServerClient", () => {
       type: "tool-call",
       callId: "dynamic-1",
       toolName: "mcp__happy__save_memory",
-      args: { key: "knowledge" },
+      args: {
+        key: "knowledge",
+        requestedToolName: "mcp__happy__save_memory",
+        toolName: "mcp__happy__save_memory",
+      },
     });
     expect(events).toContainEqual({
       type: "tool-call-result",
@@ -994,6 +1069,86 @@ describe("CodexAppServerClient", () => {
           event.text === "save_memory failed: storage unavailable",
       ),
     ).toBe(false);
+  });
+
+  it("reuses dynamic tool metadata when item events omit tool details", async () => {
+    const events: any[] = [];
+    const client = new CodexAppServerClient();
+    const dynamicToolHandler = vi.fn(async () => ({
+      contentItems: [{ type: "inputText" as const, text: "title updated" }],
+      success: true,
+    }));
+    client.setHandler((event) => events.push(event));
+    client.setDynamicToolHandler(dynamicToolHandler);
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        id: "tool-2",
+        method: "item/tool/call",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          callId: "dynamic-2",
+          tool: "mcp__happy__change_title",
+          arguments: { title: "新标题" },
+        },
+      })}\n`,
+    );
+
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "item/started",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          item: {
+            type: "dynamicToolCall",
+            id: "dynamic-2",
+            status: "inProgress",
+          },
+        },
+      })}\n`,
+    );
+
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "item/completed",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          item: {
+            type: "dynamicToolCall",
+            id: "dynamic-2",
+            status: "completed",
+            success: true,
+            contentItems: [{ type: "inputText", text: "title updated" }],
+          },
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(events).toContainEqual({
+      type: "tool-call",
+      callId: "dynamic-2",
+      toolName: "mcp__happy__change_title",
+      args: {
+        title: "新标题",
+        requestedToolName: "mcp__happy__change_title",
+        toolName: "mcp__happy__change_title",
+      },
+    });
+    expect(events).toContainEqual({
+      type: "tool-call-result",
+      callId: "dynamic-2",
+      name: "mcp__happy__change_title",
+      output: {
+        content: "title updated",
+        status: "completed",
+      },
+    });
   });
 
   it("emits visible failure events for completed mcp tool calls", async () => {

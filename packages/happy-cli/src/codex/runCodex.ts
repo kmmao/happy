@@ -336,10 +336,16 @@ export async function runCodex(opts: {
       messagePermissionMode = message.meta
         .permissionMode as import("@/api/types").PermissionMode;
       currentPermissionMode = messagePermissionMode;
+      if (permissionHandler) {
+        permissionHandler.setPermissionMode(currentPermissionMode);
+      }
       logger.debug(
         `[Codex] Permission mode updated from user message to: ${currentPermissionMode}`,
       );
     } else {
+      if (permissionHandler) {
+        permissionHandler.setPermissionMode(messagePermissionMode || "default");
+      }
       logger.debug(
         `[Codex] User message received with no permission mode override, using current: ${currentPermissionMode ?? "default (effective)"}`,
       );
@@ -618,6 +624,7 @@ export async function runCodex(opts: {
     }
   }
   permissionHandler = new CodexPermissionHandler(session);
+  permissionHandler.setPermissionMode(currentPermissionMode ?? "default");
   const pendingElicitations = new Map<
     string,
     {
