@@ -871,6 +871,60 @@ describe("CodexAppServerClient", () => {
     });
   });
 
+  it("auto-approves Happy MCP tool approval elicitation through the permission handler", async () => {
+    const client = new CodexAppServerClient();
+    const handleToolCall = vi.fn(async () => ({
+      decision: "approved" as const,
+    }));
+    const elicitationHandler = vi.fn(async () => ({
+      action: "decline" as const,
+    }));
+    client.setPermissionHandler({ handleToolCall } as any);
+    client.setElicitationHandler(elicitationHandler);
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        id: "mcp-elicit-approve-1",
+        method: "mcpServer/elicitation/request",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          serverName: "happy",
+          mode: "form",
+          message: 'Allow the happy MCP server to run tool "change_title"?',
+          requestedSchema: {
+            type: "object",
+            properties: {},
+          },
+          _meta: {
+            codex_approval_kind: "mcp_tool_call",
+            tool_title: "Change Chat Title",
+          },
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(handleToolCall).toHaveBeenCalledWith(
+      "mcp-elicit-approve-1",
+      "mcp__happy__change_title",
+      expect.objectContaining({
+        requestedToolName: "mcp__happy__change_title",
+      }),
+    );
+    expect(elicitationHandler).not.toHaveBeenCalled();
+    expect(fakeProcesses[0].responses).toContainEqual({
+      id: "mcp-elicit-approve-1",
+      result: {
+        action: "accept",
+        content: {},
+        _meta: null,
+      },
+    });
+  });
+
   it("responds to MCP URL elicitation through the shared elicitation handler", async () => {
     const client = new CodexAppServerClient();
     const elicitationHandler = vi.fn(async () => ({

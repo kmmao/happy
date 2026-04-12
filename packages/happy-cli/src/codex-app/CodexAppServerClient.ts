@@ -310,6 +310,62 @@ function formatMcpToolName(server: unknown, tool: unknown): string {
   return `mcp__${serverName}__${toolName}`;
 }
 
+function extractMcpToolNameFromApprovalRequest(
+  params: Record<string, unknown>,
+): string | null {
+  const meta =
+    params._meta && typeof params._meta === "object"
+      ? (params._meta as Record<string, unknown>)
+      : null;
+  const approvalKind =
+    typeof meta?.codex_approval_kind === "string"
+      ? meta.codex_approval_kind
+      : null;
+  if (approvalKind !== "mcp_tool_call") {
+    return null;
+  }
+
+  const serverName =
+    typeof params.serverName === "string" && params.serverName.trim().length > 0
+      ? params.serverName.trim()
+      : null;
+  if (!serverName) {
+    return null;
+  }
+
+  const toolNameFromMeta =
+    typeof meta?.tool_name === "string" && meta.tool_name.trim().length > 0
+      ? meta.tool_name.trim()
+      : null;
+  if (toolNameFromMeta) {
+    return formatMcpToolName(serverName, toolNameFromMeta);
+  }
+
+  const message =
+    typeof params.message === "string" ? params.message.trim() : "";
+  const match = message.match(/run tool "([^"]+)"/i);
+  if (match?.[1]) {
+    return formatMcpToolName(serverName, match[1]);
+  }
+
+  return null;
+}
+
+function mapElicitationDecision(
+  decision: "approved" | "approved_for_session" | "denied" | "abort",
+): "accept" | "decline" | "cancel" {
+  switch (decision) {
+    case "approved":
+    case "approved_for_session":
+      return "accept";
+    case "denied":
+      return "decline";
+    case "abort":
+    default:
+      return "cancel";
+  }
+}
+
 function buildSandboxPolicy(
   sandbox: CodexSessionConfig["sandbox"] | undefined,
   cwd: string,
@@ -1348,6 +1404,28 @@ export class CodexAppServerClient {
       }
 
       if (method === "mcpServer/elicitation/request") {
+        const requestedToolName = extractMcpToolNameFromApprovalRequest(params);
+        if (requestedToolName && this.permissionHandler) {
+          const permissionId =
+            typeof params.elicitationId === "string" && params.elicitationId.length > 0
+              ? params.elicitationId
+              : requestKey;
+          const decision = (
+            await this.permissionHandler.handleToolCall(permissionId, requestedToolName, {
+              reason: params.message,
+              requestedToolName,
+              serverName: params.serverName,
+              meta: params._meta,
+            })
+          ).decision;
+          this.sendResponse(requestId, {
+            action: mapElicitationDecision(decision),
+            content: decision === "approved" || decision === "approved_for_session" ? {} : null,
+            _meta: null,
+          });
+          return;
+        }
+
         const mode = params.mode === "url" ? "url" : "form";
         const result = this.elicitationHandler
           ? await this.elicitationHandler(
