@@ -22,6 +22,7 @@
 - [x] **阶段 C — 主动性**：基于 narrative / decisions / failures 生成建议 Goal/Task（先确认后派发）+ 可选 Skill 提炼闭环
 - [x] **阶段 D — 建议系统稳定化收尾**：三分桶建议流与 GoalDetail suggestion 已落地；bucket 持久化、payload 判别联合、shared schema 迁入 `happy-wire` 均已完成
 - [x] **阶段 E — 受限自治执行**：策略模型正式化（supervisorMode → WorldAutonomyPolicy）、并发保护、Autonomy Dashboard、扩展自动动作范围（retryable task / blocked goal supplement）、策略分层（semi-auto / auto）均已完成
+- [x] **阶段 F — 多角色协作协议**：AgentMessage 扩展为 8 种 msgType（含 dependency_blocked / decision_request / handoff / review_request）、协作图谱查询接口（GET /world/collaboration）、任务终态自动解除 dependency_blocked、App RoleCollaborationSection 可视化角色协作状态与等待链；均已完成（2026-04-12）
 
 ---
 
@@ -932,16 +933,16 @@ World 逐步从 Goal list 演进为：
 
 ## 推荐执行顺序
 
-### 激活主线（当前迭代）
+### 激活主线（已完成）
 
-1. **Sprint 1**：阶段 A —— Goal 主入口、Goal 详情、blocked 统一规则。
-2. **Sprint 2**：阶段 B —— 任务 outcome 上报、语义完成、blocked 语义回写。
-3. **Sprint 3**：阶段 C —— 建议下一步（默认人工确认）、World 概览聚合。
+1. [x] **Sprint 1**：阶段 A —— Goal 主入口、Goal 详情、blocked 统一规则。✅ 已完成（2026-04-09）
+2. [x] **Sprint 2**：阶段 B —— 任务 outcome 上报、语义完成、blocked 语义回写。✅ 已完成（2026-04-10）
+3. [x] **Sprint 3**：阶段 C —— 建议下一步（默认人工确认）、World 概览聚合。✅ 已完成（2026-04-10）
 
-### 自治演进线（后续迭代）
+### 自治演进线（已完成至 F）
 
-4. **Sprint 4+**：阶段 D —— 建议系统稳定化。
-5. **Sprint 5+**：阶段 E —— 受限自治执行。
+4. [x] **Sprint 4+**：阶段 D —— 建议系统稳定化。✅ 已完成（2026-04-11）
+5. [x] **Sprint 5+**：阶段 E —— 受限自治执行。✅ 已完成（2026-04-12）
 6. [x] **Sprint 6+**：阶段 F —— 多角色协作世界。✅ 已完成（2026-04-12）
 7. **Sprint 7+**：阶段 G —— 世界目标引擎。
 8. **长期目标**：阶段 H —— 用户立法 / 世界执行 / 用户裁决。
