@@ -88,10 +88,14 @@ Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。Phase 6.1 已完成（�
 - [x] 失败重试策略（maxAttempts=3, 递增退避）
 - [x] 12 个单元测试覆盖
 
-### 6.2 AgentLoopCoordinator（定时/cron 循环执行）
-- [ ] Loop 定义（interval / cron expression）
-- [ ] Loop 启动/暂停/停止
-- [ ] Webhook/CI 事件桥接到 loop
+### ~~6.2 AgentLoopCoordinator（定时循环执行）~~ ✅ 已完成 (637b67ec)
+- [x] Loop 定义（interval-based, min 10s）
+- [x] Loop 启动/暂停/恢复/删除
+- [x] tick() 每秒轮询 + 自动 enqueue scheduler
+- [x] 连续失败阻断 + 最大迭代限制
+- [x] 5 个 RPC handler + 11 个单元测试
+- [ ] Cron expression（后续按需）
+- [ ] Webhook/CI 事件桥接（后续按需）
 
 ### 6.3 GuardianSessionRegistry（session 复用）
 - [ ] 复用已有 session 而非每次新建
