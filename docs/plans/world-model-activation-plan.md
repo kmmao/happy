@@ -658,13 +658,7 @@ World 中增加：
 - 当前实现仍保持最小：只做每日数量硬上限，不引入并发保护、审批列表或自治面板，也不影响 human accept 路径。
 - 已补齐这一轮 TDD 回归：`worldSuggestionAutoAccept.spec.ts` 已覆盖默认无上限、读取 `maxAutoAcceptsPerDay`、配额耗尽时不 auto、剩余额度只接受前 N 条；相关 server 回归 34 个测试通过，`happy-server tsc --noEmit` 通过。
 
-**已确认的下一步（未实现）**：
-
-- 下一步优先不是再加新的 outcome 状态，也不是加可视化面板，而是只为 `accept_failed` 补一条**最小失败摘要**。
-- 目标边界保持克制：仅覆盖 `autoAcceptStatus = failed`；继续复用 `WorldSuggestion` / query / view model / `SuggestionCard` 链路；不改 manual accept，不做 explain panel，不直接向 UI 暴露原始异常 message。
-- 建议实现方式是：服务端把失败原因归一化为有限、安全、稳定的 detail 值（例如 `dispatch_failed` / `payload_invalid` / `auto_accept_failed`），query / wire 最小透传，app 侧只追加一行只读说明。
-
-当前仍未做（且仍不属于这轮范围）：
+- **已完成**：`accept_failed` 的最小失败摘要已补齐。服务端现在把 auto-accept 失败原因归一化为有限 detail：`dispatch_failed` / `payload_invalid` / `auto_accept_failed`；`WorldSuggestion`、wire contract、query / serialize 已可最小透传 `autoAcceptFailureDetail`；app 侧继续复用 `worldSuggestionViewModel.ts` + `SuggestionCard`，仅追加一行只读说明，不暴露原始异常 message，也不引入 explain panel 或审批流。
 
 - 并发保护（例如 maxConcurrentAutoAccepts / maxOpenAutoAcceptedTasks）
 - autonomy dashboard / approvals / pending approvals 可视化
@@ -943,7 +937,7 @@ World 逐步从 Goal list 演进为：
 | 2026-04-12 | 阶段 E accept 侧 logical dedupe 已覆盖 goal 分支：`worldSuggestionAccept()` 现对 suggested_goal 也基于 `projectId + dedupeKey` 使用 `RepeatKey` 做逻辑 claim；winner 先进入 `processing`，`goalCreate()` 成功后再将 open/suspended siblings 收口为 `expired`，失败时仅回退 winner 为 `suspended` |
 | 2026-04-12 | 阶段 E 配额统计口径已修正：`maxAutoAcceptsPerDay` 现在只统计当日 `acceptSource = system_auto` 的 accepted suggestion，已补对应回归测试 |
 | 2026-04-12 | 阶段 E accept 侧 logical dedupe 已落地：`worldSuggestionAccept()` 在 task / skill / decision 分支基于 `projectId + dedupeKey` 使用 `RepeatKey` 做逻辑 claim，并在 winner 成功后将 open/suspended siblings 收口为 `expired`，避免同一逻辑 suggestion 被重复 accept 或重复创建实体 |
-| 2026-04-12 | 阶段 E 最小原因展示已闭环：app 侧已基于 `acceptAudit` 展示 `accepted + system_auto` 的轻量原因文本，并补齐 `typeDecision` / `autoAcceptReasonSafeTask` i18n 键，相关 app tests 与 typecheck 通过 |
+| 2026-04-12 | 阶段 E `accept_failed` 最小失败摘要已落地：服务端将 auto-accept 失败原因归一化为 `dispatch_failed / payload_invalid / auto_accept_failed` 三类 detail，并通过 `WorldSuggestion.autoAcceptFailureDetail`、wire contract、query / serialize 打通；app 侧继续复用 `worldSuggestionViewModel.ts` + `SuggestionCard` 追加只读说明，不暴露原始异常 message，不新增 explain panel；相关 server spec、app view-model test、happy-wire build、happy-server build 与 happy-app typecheck 全绿 |
 | 2026-04-12 | 阶段 E 已接受 suggestion 可见性已修正：`fetchSuggestions()` 支持显式 `status` 查询，WorldOverview 与 GoalDetail 现同时拉取 `open` + `accepted` suggestion，并在现有 `SuggestionCard` 流程中真实展示来源/原因，不引入第二套 UI |
 | 2026-04-12 | 阶段 E 配额保护已落地：auto-accept 现支持 project 级 `maxAutoAcceptsPerDay`，只统计当日 `system_auto` 已接受 suggestion；配额耗尽后 suggestion 保持 open，不影响 human accept |
 | 2026-04-12 | 阶段 E 策略深化第一步已落地：为 `system_auto` accept 增加 `acceptAudit` 最小命中快照（`rule + checks`），并打通 WorldSuggestion 持久化、wire 契约、query / serialize 返回；后端现在可回答自动接受“为什么发生” |

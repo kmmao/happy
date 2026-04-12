@@ -1,10 +1,12 @@
 import {
   SuggestionAcceptAuditSchema,
+  SUGGESTION_AUTO_ACCEPT_FAILURE_DETAILS,
   SUGGESTION_AUTO_ACCEPT_REASON_CODES,
   SUGGESTION_AUTO_ACCEPT_STATUSES,
   getSuggestionPayloadSchema,
   type SuggestionAcceptAudit,
   type SuggestionAcceptSource,
+  type SuggestionAutoAcceptFailureDetail,
   type SuggestionAutoAcceptReasonCode,
   type SuggestionAutoAcceptStatus,
   type SuggestionBucket,
@@ -35,6 +37,7 @@ export function serializeSuggestion(row: {
   acceptAudit?: string | null;
   autoAcceptStatus?: string | null;
   autoAcceptReasonCode?: string | null;
+  autoAcceptFailureDetail?: string | null;
   createdAt: Date;
   actedAt: Date | null;
 }): SuggestionSerialized {
@@ -64,6 +67,7 @@ export function serializeSuggestion(row: {
     acceptAudit: parseAcceptAudit(row.acceptAudit),
     autoAcceptStatus: parseAutoAcceptStatus(row.autoAcceptStatus),
     autoAcceptReasonCode: parseAutoAcceptReasonCode(row.autoAcceptReasonCode),
+    autoAcceptFailureDetail: parseAutoAcceptFailureDetail(row.autoAcceptFailureDetail),
     createdAt: row.createdAt.getTime(),
     actedAt: row.actedAt?.getTime() ?? null,
   };
@@ -176,6 +180,12 @@ function parseAutoAcceptStatus(raw: string | null | undefined): SuggestionAutoAc
 function parseAutoAcceptReasonCode(raw: string | null | undefined): SuggestionAutoAcceptReasonCode | null {
   return raw && SUGGESTION_AUTO_ACCEPT_REASON_CODES.includes(raw as SuggestionAutoAcceptReasonCode)
     ? raw as SuggestionAutoAcceptReasonCode
+    : null;
+}
+
+function parseAutoAcceptFailureDetail(raw: string | null | undefined): SuggestionAutoAcceptFailureDetail | null {
+  return raw && SUGGESTION_AUTO_ACCEPT_FAILURE_DETAILS.includes(raw as SuggestionAutoAcceptFailureDetail)
+    ? raw as SuggestionAutoAcceptFailureDetail
     : null;
 }
 

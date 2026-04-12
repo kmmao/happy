@@ -3896,6 +3896,9 @@ export const ca: TranslationStructure = {
     autoAcceptSkippedQuota: "No s'ha acceptat automàticament perquè s'ha esgotat la quota diària d'acceptacions automàtiques",
     autoAcceptSkippedAlreadyActed: "No s'ha acceptat automàticament perquè aquest suggeriment ja s'ha processat",
     autoAcceptFailed: "S'ha intentat l'acceptació automàtica, però ha fallat",
+    autoAcceptFailureDetailDispatchFailed: "L'acceptació automàtica ha fallat en enviar la task creada",
+    autoAcceptFailureDetailPayloadInvalid: "L'acceptació automàtica ha fallat perquè el payload del suggeriment era invàlid",
+    autoAcceptFailureDetailGeneric: "L'acceptació automàtica ha fallat abans de poder aplicar el suggeriment",
   },
   roles: {
     title: "Roles",

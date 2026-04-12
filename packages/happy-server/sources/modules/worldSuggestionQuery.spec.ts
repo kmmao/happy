@@ -11,34 +11,16 @@ const { dbMock, state, resetState } = vi.hoisted(() => {
 
     const dbMock = {
         worldSuggestion: {
-            findMany: vi.fn(async (args: any) => {
-                if (args?.select?.id && args?.select?.bucket) {
-                    return state.suggestions
-                        .filter((row) => row.accountId === args.where.accountId)
-                        .filter((row) => row.projectId === args.where.projectId)
-                        .filter((row) => !args.where.status?.in || args.where.status.in.includes(row.status))
-                        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-                        .slice(0, args.take ?? state.suggestions.length)
-                        .map((row) => ({
-                            id: row.id,
-                            type: row.type,
-                            title: row.title,
-                            payload: row.payload,
-                            evidence: row.evidence,
-                            requiresHuman: row.requiresHuman,
-                            bucket: row.bucket,
-                        }));
-                }
-
-                return state.suggestions
+            findMany: vi.fn(async (args: any) =>
+                state.suggestions
                     .filter((row) => row.accountId === args.where.accountId)
                     .filter((row) => row.projectId === args.where.projectId)
                     .filter((row) => !args.where.relatedGoalId || row.relatedGoalId === args.where.relatedGoalId)
                     .filter((row) => !args.where.bucket || row.bucket === args.where.bucket)
                     .filter((row) => Array.isArray(args.where.status?.in) ? args.where.status.in.includes(row.status) : row.status === args.where.status)
                     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-                    .slice(0, args.take ?? state.suggestions.length);
-            }),
+                    .slice(0, args.take ?? state.suggestions.length),
+            ),
             update: vi.fn(async ({ where, data }: any) => {
                 const row = state.suggestions.find((item) => item.id === where.id);
                 if (row) {
@@ -62,7 +44,7 @@ describe("worldSuggestionQuery", () => {
         vi.clearAllMocks();
     });
 
-    it("backfills derived bucket before filtering", async () => {
+    it("does not write derived bucket fixes during query reads", async () => {
         state.suggestions = [
             {
                 id: "sug-1",
@@ -87,23 +69,20 @@ describe("worldSuggestionQuery", () => {
                 acceptAudit: null,
                 autoAcceptStatus: null,
                 autoAcceptReasonCode: null,
+                autoAcceptFailureDetail: null,
             },
         ];
 
         const result = await worldSuggestionQuery("user-1", "project-1", {
             status: "open",
-            bucket: "needs_decision",
         });
 
-        expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
-            where: { id: "sug-1" },
-            data: { bucket: "needs_decision" },
-        });
+        expect(dbMock.worldSuggestion.update).not.toHaveBeenCalled();
         expect(result.map((item) => item.id)).toEqual(["sug-1"]);
-        expect(result[0]?.bucket).toBe("needs_decision");
+        expect(result[0]?.bucket).toBe("next_step");
     });
 
-    it("derives bucket from normalized payload instead of stale raw branch", async () => {
+    it("filters by persisted bucket without trying to repair stale rows during query", async () => {
         state.suggestions = [
             {
                 id: "sug-raw-mismatch",
@@ -130,6 +109,7 @@ describe("worldSuggestionQuery", () => {
                 acceptAudit: null,
                 autoAcceptStatus: null,
                 autoAcceptReasonCode: null,
+                autoAcceptFailureDetail: null,
             },
         ];
 
@@ -138,14 +118,8 @@ describe("worldSuggestionQuery", () => {
             bucket: "needs_human_input",
         });
 
-        expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
-            where: { id: "sug-raw-mismatch" },
-            data: { bucket: "needs_human_input" },
-        });
-        expect(result.map((item) => item.id)).toEqual(["sug-raw-mismatch"]);
-        expect(result[0]?.type).toBe("suggested_goal");
-        expect(result[0]?.bucket).toBe("needs_human_input");
-        expect(result[0]?.payload).toEqual({ goal: { title: "Recovered goal" } });
+        expect(dbMock.worldSuggestion.update).not.toHaveBeenCalled();
+        expect(result).toEqual([]);
     });
 
     it("returns accept source and audit snapshot in serialized suggestions", async () => {
@@ -178,6 +152,7 @@ describe("worldSuggestionQuery", () => {
                 }),
                 autoAcceptStatus: null,
                 autoAcceptReasonCode: null,
+                autoAcceptFailureDetail: null,
             },
         ];
 
@@ -224,6 +199,7 @@ describe("worldSuggestionQuery", () => {
                 acceptAudit: null,
                 autoAcceptStatus: "skipped",
                 autoAcceptReasonCode: "already_acted",
+                autoAcceptFailureDetail: null,
             },
             {
                 id: "sug-open-1",
@@ -250,6 +226,7 @@ describe("worldSuggestionQuery", () => {
                 acceptAudit: null,
                 autoAcceptStatus: null,
                 autoAcceptReasonCode: null,
+                autoAcceptFailureDetail: null,
             },
         ];
 
@@ -287,6 +264,7 @@ describe("worldSuggestionQuery", () => {
                 acceptAudit: null,
                 autoAcceptStatus: "skipped",
                 autoAcceptReasonCode: "quota_exhausted",
+                autoAcceptFailureDetail: null,
             },
             {
                 id: "sug-fail-1",
@@ -313,6 +291,7 @@ describe("worldSuggestionQuery", () => {
                 acceptAudit: null,
                 autoAcceptStatus: "failed",
                 autoAcceptReasonCode: "accept_failed",
+                autoAcceptFailureDetail: "dispatch_failed",
             },
         ];
 
@@ -325,6 +304,7 @@ describe("worldSuggestionQuery", () => {
                 id: "sug-fail-1",
                 autoAcceptStatus: "failed",
                 autoAcceptReasonCode: "accept_failed",
+                autoAcceptFailureDetail: "dispatch_failed",
             }),
             expect.objectContaining({
                 id: "sug-skip-1",
@@ -334,4 +314,3 @@ describe("worldSuggestionQuery", () => {
         ]);
     });
 });
-

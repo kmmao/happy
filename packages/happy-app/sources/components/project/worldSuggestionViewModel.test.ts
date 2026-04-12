@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getSuggestionAcceptanceLabelKey,
+  getSuggestionAutoAcceptFailureDetailKey,
   getSuggestionAutoAcceptOutcomeKey,
   getSuggestionAutoAcceptReasonKey,
   getSuggestionTypeLabelKey,
@@ -193,6 +194,50 @@ describe("getSuggestionAutoAcceptOutcomeKey", () => {
       autoAcceptStatus: null,
       autoAcceptReasonCode: null,
     }))).toBe(null);
+  });
+});
+
+describe("getSuggestionAutoAcceptFailureDetailKey", () => {
+  it("returns dispatch failure detail key for failed suggestions with dispatch_failed detail", () => {
+    expect(getSuggestionAutoAcceptFailureDetailKey(createSuggestion({
+      status: "open",
+      autoAcceptStatus: "failed",
+      autoAcceptReasonCode: "accept_failed",
+      autoAcceptFailureDetail: "dispatch_failed",
+    } as Partial<SuggestionSummary>))).toBe("suggestions.autoAcceptFailureDetailDispatchFailed");
+  });
+
+  it("returns payload invalid detail key for failed suggestions with payload_invalid detail", () => {
+    expect(getSuggestionAutoAcceptFailureDetailKey(createSuggestion({
+      status: "open",
+      autoAcceptStatus: "failed",
+      autoAcceptReasonCode: "accept_failed",
+      autoAcceptFailureDetail: "payload_invalid",
+    } as Partial<SuggestionSummary>))).toBe("suggestions.autoAcceptFailureDetailPayloadInvalid");
+  });
+
+  it("returns generic failure detail key for failed suggestions with generic detail", () => {
+    expect(getSuggestionAutoAcceptFailureDetailKey(createSuggestion({
+      status: "open",
+      autoAcceptStatus: "failed",
+      autoAcceptReasonCode: "accept_failed",
+      autoAcceptFailureDetail: "auto_accept_failed",
+    } as Partial<SuggestionSummary>))).toBe("suggestions.autoAcceptFailureDetailGeneric");
+  });
+
+  it("returns null for non-failed or missing detail cases", () => {
+    expect(getSuggestionAutoAcceptFailureDetailKey(createSuggestion({
+      status: "open",
+      autoAcceptStatus: "failed",
+      autoAcceptReasonCode: "accept_failed",
+      autoAcceptFailureDetail: null,
+    } as Partial<SuggestionSummary>))).toBe(null);
+    expect(getSuggestionAutoAcceptFailureDetailKey(createSuggestion({
+      status: "open",
+      autoAcceptStatus: "skipped",
+      autoAcceptReasonCode: "quota_exhausted",
+      autoAcceptFailureDetail: "dispatch_failed",
+    } as Partial<SuggestionSummary>))).toBe(null);
   });
 });
 

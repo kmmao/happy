@@ -3891,6 +3891,9 @@ export const es: TranslationStructure = {
     autoAcceptSkippedQuota: "No se aceptó automáticamente porque se agotó la cuota diaria de aceptaciones automáticas",
     autoAcceptSkippedAlreadyActed: "No se aceptó automáticamente porque esta sugerencia ya fue atendida",
     autoAcceptFailed: "Se intentó la aceptación automática, pero falló",
+    autoAcceptFailureDetailDispatchFailed: "La aceptación automática falló al despachar la task creada",
+    autoAcceptFailureDetailPayloadInvalid: "La aceptación automática falló porque el payload de la sugerencia era inválido",
+    autoAcceptFailureDetailGeneric: "La aceptación automática falló antes de poder aplicar la sugerencia",
   },
   roles: {
     title: "Roles",

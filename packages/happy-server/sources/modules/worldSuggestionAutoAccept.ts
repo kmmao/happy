@@ -133,8 +133,9 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
         suggestionId: suggestion.id,
         status: "failed",
         reasonCode: "accept_failed",
+        failureDetail: normalizeAutoAcceptFailureDetail(error),
       });
-      throw error;
+      throw new Error(`Auto-accept failed for suggestion ${suggestion.id}`);
     }
   }
 }
@@ -168,6 +169,7 @@ async function markAutoAcceptOutcome(input: {
   suggestionId: string;
   status: "skipped" | "failed";
   reasonCode: "quota_exhausted" | "already_acted" | "accept_failed";
+  failureDetail?: "dispatch_failed" | "payload_invalid" | "auto_accept_failed";
   suggestionStatus?: "expired";
 }): Promise<void> {
   await db.worldSuggestion.update({
@@ -181,10 +183,27 @@ async function markAutoAcceptOutcome(input: {
         : {}),
       autoAcceptStatus: input.status,
       autoAcceptReasonCode: input.reasonCode,
+      ...(input.failureDetail ? { autoAcceptFailureDetail: input.failureDetail } : {}),
     } as any,
   });
 }
 
 function isAlreadyActedSuggestionError(error: unknown): boolean {
   return error instanceof Error && error.message === "Suggestion not found or already acted upon";
+}
+
+function normalizeAutoAcceptFailureDetail(error: unknown): "dispatch_failed" | "payload_invalid" | "auto_accept_failed" {
+  if (!(error instanceof Error)) {
+    return "auto_accept_failed";
+  }
+
+  if (error.message.startsWith("Task dispatch failed:")) {
+    return "dispatch_failed";
+  }
+
+  if (error.message === "Suggestion payload does not match suggestion type") {
+    return "payload_invalid";
+  }
+
+  return "auto_accept_failed";
 }

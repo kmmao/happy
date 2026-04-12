@@ -1185,6 +1185,7 @@ model WorldSuggestion {
     acceptAudit     String?   // JSON: { rule, checks }
     autoAcceptStatus String?  // skipped | failed
     autoAcceptReasonCode String? // quota_exhausted | already_acted | accept_failed
+    autoAcceptFailureDetail String? // dispatch_failed | payload_invalid | auto_accept_failed
     actedAt         DateTime?
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt

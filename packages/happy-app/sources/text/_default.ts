@@ -3953,6 +3953,9 @@ export const en = {
     autoAcceptSkippedQuota: "Not auto-accepted because the daily auto-accept quota was exhausted",
     autoAcceptSkippedAlreadyActed: "Not auto-accepted because this suggestion was already acted on",
     autoAcceptFailed: "Auto-accept was attempted but failed",
+    autoAcceptFailureDetailDispatchFailed: "Automatic acceptance failed while dispatching the created task",
+    autoAcceptFailureDetailPayloadInvalid: "Automatic acceptance failed because the suggestion payload was invalid",
+    autoAcceptFailureDetailGeneric: "Automatic acceptance failed before the suggestion could be applied",
   },
   roles: {
     title: "Roles",

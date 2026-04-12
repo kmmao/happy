@@ -28,6 +28,13 @@ export const SUGGESTION_AUTO_ACCEPT_REASON_CODES = [
 ] as const;
 export type SuggestionAutoAcceptReasonCode = typeof SUGGESTION_AUTO_ACCEPT_REASON_CODES[number];
 
+export const SUGGESTION_AUTO_ACCEPT_FAILURE_DETAILS = [
+  "dispatch_failed",
+  "payload_invalid",
+  "auto_accept_failed",
+] as const;
+export type SuggestionAutoAcceptFailureDetail = typeof SUGGESTION_AUTO_ACCEPT_FAILURE_DETAILS[number];
+
 export const EVIDENCE_KINDS = ["goal", "task", "decision", "message", "narrative"] as const;
 
 export const SuggestionEvidenceSchema = z.object({
@@ -139,6 +146,7 @@ export type SuggestionSerialized =
       acceptAudit?: SuggestionAcceptAudit | null;
       autoAcceptStatus?: SuggestionAutoAcceptStatus | null;
       autoAcceptReasonCode?: SuggestionAutoAcceptReasonCode | null;
+      autoAcceptFailureDetail?: SuggestionAutoAcceptFailureDetail | null;
     }
   | {
       id: string;
@@ -162,6 +170,7 @@ export type SuggestionSerialized =
       acceptAudit?: SuggestionAcceptAudit | null;
       autoAcceptStatus?: SuggestionAutoAcceptStatus | null;
       autoAcceptReasonCode?: SuggestionAutoAcceptReasonCode | null;
+      autoAcceptFailureDetail?: SuggestionAutoAcceptFailureDetail | null;
     }
   | {
       id: string;
@@ -185,6 +194,7 @@ export type SuggestionSerialized =
       acceptAudit?: SuggestionAcceptAudit | null;
       autoAcceptStatus?: SuggestionAutoAcceptStatus | null;
       autoAcceptReasonCode?: SuggestionAutoAcceptReasonCode | null;
+      autoAcceptFailureDetail?: SuggestionAutoAcceptFailureDetail | null;
     }
   | {
       id: string;
@@ -208,6 +218,7 @@ export type SuggestionSerialized =
       acceptAudit?: SuggestionAcceptAudit | null;
       autoAcceptStatus?: SuggestionAutoAcceptStatus | null;
       autoAcceptReasonCode?: SuggestionAutoAcceptReasonCode | null;
+      autoAcceptFailureDetail?: SuggestionAutoAcceptFailureDetail | null;
     };
 
 export type SuggestionSummary = SuggestionSerialized;

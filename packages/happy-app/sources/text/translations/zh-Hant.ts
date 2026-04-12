@@ -3802,6 +3802,9 @@ export const zhHant: TranslationStructure = {
     autoAcceptSkippedQuota: "因當日自動接受配額已用盡，未自動接受",
     autoAcceptSkippedAlreadyActed: "因該建議已被處理，未自動接受",
     autoAcceptFailed: "已嘗試自動接受，但失敗了",
+    autoAcceptFailureDetailDispatchFailed: "自動接受在派發已建立任務時失敗",
+    autoAcceptFailureDetailPayloadInvalid: "自動接受失敗，因為建議 payload 無效",
+    autoAcceptFailureDetailGeneric: "自動接受在套用建議前失敗",
   },
   roles: {
     title: "角色",

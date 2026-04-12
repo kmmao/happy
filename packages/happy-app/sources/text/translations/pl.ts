@@ -3912,6 +3912,9 @@ export const pl: TranslationStructure = {
     autoAcceptSkippedQuota: "Nie zaakceptowano automatycznie, ponieważ dzienny limit automatycznych akceptacji został wyczerpany",
     autoAcceptSkippedAlreadyActed: "Nie zaakceptowano automatycznie, ponieważ ta sugestia została już obsłużona",
     autoAcceptFailed: "Próba automatycznej akceptacji nie powiodła się",
+    autoAcceptFailureDetailDispatchFailed: "Automatyczna akceptacja nie powiodła się podczas wysyłania utworzonego taska",
+    autoAcceptFailureDetailPayloadInvalid: "Automatyczna akceptacja nie powiodła się, ponieważ payload sugestii był nieprawidłowy",
+    autoAcceptFailureDetailGeneric: "Automatyczna akceptacja nie powiodła się przed zastosowaniem sugestii",
   },
   roles: {
     title: "Roles",

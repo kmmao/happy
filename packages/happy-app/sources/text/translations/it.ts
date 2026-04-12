@@ -3890,6 +3890,9 @@ export const it: TranslationStructure = {
     autoAcceptSkippedQuota: "Non accettato automaticamente perché la quota giornaliera di accettazioni automatiche è stata esaurita",
     autoAcceptSkippedAlreadyActed: "Non accettato automaticamente perché questo suggerimento è già stato gestito",
     autoAcceptFailed: "È stata tentata l'accettazione automatica, ma non è riuscita",
+    autoAcceptFailureDetailDispatchFailed: "L'accettazione automatica non è riuscita durante l'invio del task creato",
+    autoAcceptFailureDetailPayloadInvalid: "L'accettazione automatica non è riuscita perché il payload del suggerimento non era valido",
+    autoAcceptFailureDetailGeneric: "L'accettazione automatica non è riuscita prima di poter applicare il suggerimento",
   },
   roles: {
     title: "Roles",

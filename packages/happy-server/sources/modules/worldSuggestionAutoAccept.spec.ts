@@ -398,6 +398,138 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
     });
   });
 
+  it("records failed status with normalized dispatch detail when accept throws a dispatch error", async () => {
+    worldSuggestionAccept.mockRejectedValueOnce(new Error("Task dispatch failed: token expired"));
+
+    await expect(autoAcceptSuggestedTasksIfEnabled({
+      accountId: "user-1",
+      projectId: "project-1",
+      supervisorConfig: JSON.stringify({ worldAutonomy: { autoAcceptSafeSuggestedTasks: true } }),
+      suggestions: [
+        {
+          id: "sug-1",
+          projectId: "project-1",
+          relatedGoalId: null,
+          relatedTaskId: null,
+          type: "suggested_task",
+          title: "Investigate API retry",
+          summary: "summary",
+          reason: "reason",
+          evidence: [],
+          recommendedRole: null,
+          payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic" } },
+          requiresHuman: false,
+          status: "open",
+          dedupeKey: "dedupe:1",
+          bucket: "next_step",
+          createdAt: 1,
+          actedAt: null,
+          acceptSource: null,
+          acceptAudit: null,
+          autoAcceptStatus: null,
+          autoAcceptReasonCode: null,
+        } as any,
+      ],
+    })).rejects.toThrow("Auto-accept failed for suggestion sug-1");
+
+    expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
+      where: { id: "sug-1" },
+      data: {
+        autoAcceptStatus: "failed",
+        autoAcceptReasonCode: "accept_failed",
+        autoAcceptFailureDetail: "dispatch_failed",
+      },
+    });
+  });
+
+  it("records failed status with normalized payload detail when accept throws a payload error", async () => {
+    worldSuggestionAccept.mockRejectedValueOnce(new Error("Suggestion payload does not match suggestion type"));
+
+    await expect(autoAcceptSuggestedTasksIfEnabled({
+      accountId: "user-1",
+      projectId: "project-1",
+      supervisorConfig: JSON.stringify({ worldAutonomy: { autoAcceptSafeSuggestedTasks: true } }),
+      suggestions: [
+        {
+          id: "sug-1",
+          projectId: "project-1",
+          relatedGoalId: null,
+          relatedTaskId: null,
+          type: "suggested_task",
+          title: "Investigate API retry",
+          summary: "summary",
+          reason: "reason",
+          evidence: [],
+          recommendedRole: null,
+          payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic" } },
+          requiresHuman: false,
+          status: "open",
+          dedupeKey: "dedupe:1",
+          bucket: "next_step",
+          createdAt: 1,
+          actedAt: null,
+          acceptSource: null,
+          acceptAudit: null,
+          autoAcceptStatus: null,
+          autoAcceptReasonCode: null,
+        } as any,
+      ],
+    })).rejects.toThrow("Auto-accept failed for suggestion sug-1");
+
+    expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
+      where: { id: "sug-1" },
+      data: {
+        autoAcceptStatus: "failed",
+        autoAcceptReasonCode: "accept_failed",
+        autoAcceptFailureDetail: "payload_invalid",
+      },
+    });
+  });
+
+  it("records failed status with generic detail for unknown accept errors", async () => {
+    worldSuggestionAccept.mockRejectedValueOnce(new Error("database unavailable"));
+
+    await expect(autoAcceptSuggestedTasksIfEnabled({
+      accountId: "user-1",
+      projectId: "project-1",
+      supervisorConfig: JSON.stringify({ worldAutonomy: { autoAcceptSafeSuggestedTasks: true } }),
+      suggestions: [
+        {
+          id: "sug-1",
+          projectId: "project-1",
+          relatedGoalId: null,
+          relatedTaskId: null,
+          type: "suggested_task",
+          title: "Investigate API retry",
+          summary: "summary",
+          reason: "reason",
+          evidence: [],
+          recommendedRole: null,
+          payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic" } },
+          requiresHuman: false,
+          status: "open",
+          dedupeKey: "dedupe:1",
+          bucket: "next_step",
+          createdAt: 1,
+          actedAt: null,
+          acceptSource: null,
+          acceptAudit: null,
+          autoAcceptStatus: null,
+          autoAcceptReasonCode: null,
+        } as any,
+      ],
+    })).rejects.toThrow("Auto-accept failed for suggestion sug-1");
+
+    expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
+      where: { id: "sug-1" },
+      data: {
+        autoAcceptStatus: "failed",
+        autoAcceptReasonCode: "accept_failed",
+        autoAcceptFailureDetail: "auto_accept_failed",
+      },
+    });
+  });
+
   it("records failed status when accept throws a non-race error", async () => {
     worldSuggestionAccept.mockRejectedValueOnce(new Error("dispatch failed"));
 
@@ -430,13 +562,14 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
           autoAcceptReasonCode: null,
         } as any,
       ],
-    })).rejects.toThrow("dispatch failed");
+    })).rejects.toThrow("Auto-accept failed for suggestion sug-1");
 
     expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
       where: { id: "sug-1" },
       data: {
         autoAcceptStatus: "failed",
         autoAcceptReasonCode: "accept_failed",
+        autoAcceptFailureDetail: "auto_accept_failed",
       },
     });
   });

@@ -114,6 +114,22 @@ export function getSuggestionAutoAcceptOutcomeKey(suggestion: SuggestionSummary)
     return null;
 }
 
+export function getSuggestionAutoAcceptFailureDetailKey(suggestion: SuggestionSummary): TranslationKey | null {
+    if (suggestion.autoAcceptStatus !== "failed" || suggestion.autoAcceptReasonCode !== "accept_failed") {
+        return null;
+    }
+    if (suggestion.autoAcceptFailureDetail === "dispatch_failed") {
+        return "suggestions.autoAcceptFailureDetailDispatchFailed" as TranslationKey;
+    }
+    if (suggestion.autoAcceptFailureDetail === "payload_invalid") {
+        return "suggestions.autoAcceptFailureDetailPayloadInvalid" as TranslationKey;
+    }
+    if (suggestion.autoAcceptFailureDetail === "auto_accept_failed") {
+        return "suggestions.autoAcceptFailureDetailGeneric" as TranslationKey;
+    }
+    return null;
+}
+
 export function shouldShowSuggestionActions(suggestion: SuggestionSummary): boolean {
     return suggestion.status === "open" || suggestion.status === "suspended";
 }

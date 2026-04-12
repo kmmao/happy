@@ -3868,6 +3868,9 @@ export const ja: TranslationStructure = {
     autoAcceptSkippedQuota: "当日の自動承認枠を使い切ったため、自動承認されませんでした",
     autoAcceptSkippedAlreadyActed: "この提案はすでに処理済みのため、自動承認されませんでした",
     autoAcceptFailed: "自動承認を試みましたが失敗しました",
+    autoAcceptFailureDetailDispatchFailed: "作成された task の派行中に自動承認が失敗しました",
+    autoAcceptFailureDetailPayloadInvalid: "提案 payload が無効なため自動承認に失敗しました",
+    autoAcceptFailureDetailGeneric: "提案を適用する前に自動承認が失敗しました",
   },
   roles: {
     title: "ロール",

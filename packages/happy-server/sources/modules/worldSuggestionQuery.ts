@@ -6,11 +6,7 @@ import {
     type SuggestionStatus,
     type SuggestionType,
 } from "@kmmao/happy-wire";
-import {
-    deriveSuggestionBucket,
-    normalizeSuggestionPayload,
-    serializeSuggestion,
-} from "./worldSuggestionTypes";
+import { serializeSuggestion } from "./worldSuggestionTypes";
 
 export async function worldSuggestionQuery(
     accountId: string,
@@ -22,8 +18,6 @@ export async function worldSuggestionQuery(
         bucket?: SuggestionBucket;
     },
 ): Promise<SuggestionSerialized[]> {
-    await backfillSuggestionBuckets(accountId, projectId);
-
     const status = opts?.status ?? "open";
     const limit = opts?.limit ?? 50;
     const includeSuspended = status === "open";
@@ -49,6 +43,7 @@ export async function worldSuggestionQuery(
             acceptAudit?: string | null;
             autoAcceptStatus?: string | null;
             autoAcceptReasonCode?: string | null;
+            autoAcceptFailureDetail?: string | null;
         };
 
         return serializeSuggestion({
@@ -59,52 +54,9 @@ export async function worldSuggestionQuery(
             acceptAudit: normalizeAcceptAudit(typedRow.acceptAudit),
             autoAcceptStatus: typedRow.autoAcceptStatus ?? null,
             autoAcceptReasonCode: typedRow.autoAcceptReasonCode ?? null,
+            autoAcceptFailureDetail: typedRow.autoAcceptFailureDetail ?? null,
         });
     });
-}
-
-async function backfillSuggestionBuckets(accountId: string, projectId: string): Promise<void> {
-    const rows = await db.worldSuggestion.findMany({
-        where: {
-            accountId,
-            projectId,
-            status: { in: ["open", "suspended", "processing", "dismissed", "accepted"] },
-        },
-        select: {
-            id: true,
-            type: true,
-            title: true,
-            payload: true,
-            evidence: true,
-            requiresHuman: true,
-            bucket: true,
-        },
-        orderBy: { createdAt: "desc" },
-        take: 200,
-    });
-
-    const updates = rows.flatMap((row) => {
-        const typedRow = row as typeof row & { bucket?: SuggestionBucket | null; type: SuggestionType };
-        const normalizedPayload = normalizeSuggestionPayload({
-            type: typedRow.type,
-            title: row.title,
-            rawPayload: safeParseJson(row.payload, {}),
-        });
-        const derivedBucket = deriveSuggestionBucket({
-            type: typedRow.type,
-            payload: normalizedPayload,
-            evidence: safeParseJson(row.evidence, []),
-            requiresHuman: row.requiresHuman,
-        });
-        if (typedRow.bucket === derivedBucket) {
-            return [];
-        }
-        return [db.worldSuggestion.update({ where: { id: row.id }, data: { bucket: derivedBucket } })];
-    });
-
-    if (updates.length > 0) {
-        await Promise.all(updates);
-    }
 }
 
 function normalizeAcceptSource(raw: string | null | undefined): SuggestionAcceptSource | null {
@@ -116,12 +68,4 @@ function normalizeAcceptSource(raw: string | null | undefined): SuggestionAccept
 
 function normalizeAcceptAudit(raw: string | null | undefined): string | null {
     return raw ?? null;
-}
-
-function safeParseJson(raw: string, fallback: any) {
-    try {
-        return JSON.parse(raw);
-    } catch {
-        return fallback;
-    }
 }

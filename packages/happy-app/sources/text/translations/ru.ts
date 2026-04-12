@@ -3910,6 +3910,9 @@ export const ru: TranslationStructure = {
     autoAcceptSkippedQuota: "Не принято автоматически, потому что дневная квота авто-принятия исчерпана",
     autoAcceptSkippedAlreadyActed: "Не принято автоматически, потому что это предложение уже обработано",
     autoAcceptFailed: "Была попытка авто-принятия, но она завершилась неудачей",
+    autoAcceptFailureDetailDispatchFailed: "Авто-принятие завершилось неудачей при отправке созданной task",
+    autoAcceptFailureDetailPayloadInvalid: "Авто-принятие завершилось неудачей, потому что payload предложения был недействителен",
+    autoAcceptFailureDetailGeneric: "Авто-принятие завершилось неудачей до применения предложения",
   },
   roles: {
     title: "Roles",
