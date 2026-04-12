@@ -942,7 +942,7 @@ World 逐步从 Goal list 演进为：
 
 4. **Sprint 4+**：阶段 D —— 建议系统稳定化。
 5. **Sprint 5+**：阶段 E —— 受限自治执行。
-6. **Sprint 6+**：阶段 F —— 多角色协作世界。
+6. [x] **Sprint 6+**：阶段 F —— 多角色协作世界。✅ 已完成（2026-04-12）
 7. **Sprint 7+**：阶段 G —— 世界目标引擎。
 8. **长期目标**：阶段 H —— 用户立法 / 世界执行 / 用户裁决。
 
@@ -995,6 +995,9 @@ World 逐步从 Goal list 演进为：
 | 2026-04-11 | 阶段 D 进入收尾：WorldOverview 三分桶建议流、GoalDetail suggestion、`goalId / bucket` 查询、bucket 查询语义修复、Suggestion 类型联合收紧与 requires_action queued marker 补洞已落地；当前剩余 bucket 持久化、payload 判别联合、shared schema 收口 |
 
 | 2026-04-12 | 阶段 E Sprint 1（策略模型正式化 + 并发保护）：`resolveWorldAutonomyPolicy()` 以 `supervisorMode` 为主开关接管 auto-accept（旧布尔值作 fallback）；wire 新增 `WorldAutonomyPolicySchema`、`SUPERVISOR_MODES`、`AutonomyStatsSchema`，`SuggestionAcceptAuditSchema.rule` 改为 enum 预留 3 种规则；新增 `countRunningAutoTasks()` + `maxConcurrentAutoTasks` 并发保护 + reason code `concurrency_exceeded`；refresh 10 秒防抖（RepeatKey）；88 个 world suggestion tests 全绿，server build / app typecheck 通过 |
+| 2026-04-12 | 阶段 F Sprint 1（协议扩展）：`happy-wire` 新增 `AgentMessageSummarySchema`（8 种 msgType：request/report/conflict/law_suggestion/dependency_blocked/handoff/review_request/decision_request）；Prisma AgentMessage 模型补 `relatedGoalId/relatedTaskId/priority` 3 个可选字段 + 新索引；server agentMessageRoutes 扩展 8 类 msg、新可选字段持久化、`decision_request` 自动升级为 Decision、`dependency_blocked` 与 `review_request` 自动创建 InboxItem、GET 支持 `relatedGoalId` 过滤；`goalSummary.ts` 把 `dependency_blocked` 纳入 GoalBlockerSummary（`requiresHuman: false`）；worldDashboardRoutes 补 `handoffs30d / dependencyBlocked30d / reviewRequests30d` 统计；相关 server spec 全绿 |
+| 2026-04-12 | 阶段 F Sprint 2（协作图谱查询 + 依赖自动解除）：新增 `roleCollaboration.ts` 纯函数模块——按 toRole 分组未读消息、从 `dependency_blocked` 构建等待链（chainStarts 去重传递性追踪）、输出 `CollaborationSummary`（roles / openConflicts / pendingDecisions / blockedChains）；worldDashboardRoutes 新增 `GET /v1/projects/:id/world/collaboration`（4 并行查询 → buildCollaborationSummary）；taskRoutes 在任务到达终态后批量 resolve 匹配 `dependency_blocked` 消息（协作图谱自愈）；相关 spec 全绿 |
+| 2026-04-12 | 阶段 F Sprint 3（App 协作可视化）：apiWorld.ts 新增 `CollaborationSummary` 类型与 `fetchCollaboration()`，`WorldDashboard.agentMessages` 补 3 个新统计字段；新建 `RoleCollaborationSection.tsx`（3 列指标行、blocked chains 列表、active role 卡片 + blockedOn 指示器）；WorldOverviewTab 并行拉取 collaboration（best-effort）并在 AutonomyStatusSection 下渲染；10 个语言文件补 `collaboration.*` 11 个 key；app typecheck 通过 |
 
 （后续每一轮活化：在此表追加一行，并勾选上方清单。）
 
@@ -1098,4 +1101,4 @@ World 逐步从 Goal list 演进为：
 
 当前 World Model Activation 应表述为：
 
-> **阶段 A/B/C 已完成；阶段 D 已完成契约与稳定化收口；阶段 E 已落地最小自动 accept 入口、基础审计链路、最小原因展示、已接受 suggestion 可见性修复、skipped / failed 最小只读可见性，以及 accept 侧 logical dedupe（现已覆盖 task / skill / decision / goal）；配额统计口径也已与 `system_auto` 审计语义对齐；完整自治策略、审批面板与可视化仍未开始；阶段 F-H 仍属规划。**
+> **阶段 A/B/C/D/E/F 已完成。阶段 F（多角色协作协议）3 个 Sprint 已全部落地：AgentMessage 扩展为 8 种 msgType、dependency_blocked 纳入 GoalBlocker、decision_request 自动升级为 Decision、新建协作图谱查询接口（GET /world/collaboration）、任务终态自动解除 dependency_blocked、App 端 RoleCollaborationSection 可视化角色协作状态。阶段 G（世界目标引擎）与阶段 H 仍属规划。**
