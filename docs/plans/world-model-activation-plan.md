@@ -658,6 +658,12 @@ World 中增加：
 - 当前实现仍保持最小：只做每日数量硬上限，不引入并发保护、审批列表或自治面板，也不影响 human accept 路径。
 - 已补齐这一轮 TDD 回归：`worldSuggestionAutoAccept.spec.ts` 已覆盖默认无上限、读取 `maxAutoAcceptsPerDay`、配额耗尽时不 auto、剩余额度只接受前 N 条；相关 server 回归 34 个测试通过，`happy-server tsc --noEmit` 通过。
 
+**已确认的下一步（未实现）**：
+
+- 下一步优先不是再加新的 outcome 状态，也不是加可视化面板，而是只为 `accept_failed` 补一条**最小失败摘要**。
+- 目标边界保持克制：仅覆盖 `autoAcceptStatus = failed`；继续复用 `WorldSuggestion` / query / view model / `SuggestionCard` 链路；不改 manual accept，不做 explain panel，不直接向 UI 暴露原始异常 message。
+- 建议实现方式是：服务端把失败原因归一化为有限、安全、稳定的 detail 值（例如 `dispatch_failed` / `payload_invalid` / `auto_accept_failed`），query / wire 最小透传，app 侧只追加一行只读说明。
+
 当前仍未做（且仍不属于这轮范围）：
 
 - 并发保护（例如 maxConcurrentAutoAccepts / maxOpenAutoAcceptedTasks）
@@ -1044,6 +1050,7 @@ World 逐步从 Goal list 演进为：
 - `worldSuggestionAccept()` 已进一步接入 accept 侧 logical dedupe：task / skill / decision / goal 分支现在都基于 `projectId + dedupeKey` 使用 `RepeatKey` 做逻辑 claim；winner 成功后将同 dedupeKey 的 open/suspended sibling rows 收口为 `expired`，其中 goal 分支采用“先 processing、事务外 goalCreate、成功后 cleanup siblings、失败时仅 suspended winner”的最小方案
 - `maxAutoAcceptsPerDay` 现在只统计当日 `acceptSource = system_auto` 的 accepted suggestion，配额口径与文档一致
 - GoalDetail 的 suggestion 区继续直接复用 `SuggestionCard`，因此自动继承来源/原因展示，无需第二套展示逻辑
+- 已确认的下一步不是继续扩 outcome 状态或过滤分支，而是只为 `accept_failed` 补一条最小失败摘要；边界仍保持只读、可审计、复用现有 `WorldSuggestion` / query / view model / `SuggestionCard` 链路，不新增 explain UI，也不改 manual accept 行为
 
 ### 最终判定
 
