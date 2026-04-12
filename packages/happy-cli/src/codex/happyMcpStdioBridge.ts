@@ -1,7 +1,8 @@
 /**
  * Happy MCP STDIO Bridge
  *
- * Minimal STDIO MCP server exposing a single tool `change_title`.
+ * Minimal STDIO MCP server exposing Happy tools like `change_title`
+ * and `query_project_knowledge`.
  * On invocation it forwards the tool call to an existing Happy HTTP MCP server
  * using the StreamableHTTPClientTransport.
  *
@@ -63,7 +64,7 @@ async function main() {
     version: "1.0.0",
   });
 
-  // Register the single tool and forward to HTTP MCP
+  // Register tools and forward to the HTTP MCP server
   server.registerTool(
     "change_title",
     {
@@ -88,6 +89,37 @@ async function main() {
             {
               type: "text",
               text: `Failed to change chat title: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "query_project_knowledge",
+    {
+      description: "Search the current project's knowledge base",
+      title: "Query Project Knowledge",
+      inputSchema: {
+        query: z.string().describe("Search query describing what you want to know"),
+      } as Record<string, any>,
+    },
+    async (args: any) => {
+      try {
+        const client = await ensureHttpClient();
+        const response = await client.callTool({
+          name: "query_project_knowledge",
+          arguments: args,
+        });
+        return response as any;
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Knowledge query failed: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

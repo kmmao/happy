@@ -27,10 +27,11 @@ This folder documents how Happy works internally, with a focus on protocol, back
 - automation-operations-guide.md: Automation / Agent Loop operations guide covering daemon automation, loop management, guardian continuity, and recovered-session troubleshooting.
 - plans/world-project-naming-guideline.md: Naming boundary between Project (technical container) and World (governance semantics).
 - plans/world-model-activation-plan.md: 世界模型活化方案与阶段跟进（Goal/板子 + Task/管道 + Skill 沉淀，不接 Multica）。
+- plans/codex-config-first-app-server-plan.md: Codex 配置优先与 app-server 主路径改造计划，包含兼容 legacy MCP 的分阶段实施清单。
 
 ## Conventions
 - Paths and field names reflect the current implementation in `packages/happy-server`.
 - Examples are illustrative; the canonical source is the code.
 
 ## Last reviewed
-- 2026-04-08
+- 2026-04-12
