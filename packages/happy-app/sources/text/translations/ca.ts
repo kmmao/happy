@@ -3900,6 +3900,16 @@ export const ca: TranslationStructure = {
     autoAcceptFailureDetailPayloadInvalid: "L'acceptació automàtica ha fallat perquè el payload del suggeriment era invàlid",
     autoAcceptFailureDetailGeneric: "L'acceptació automàtica ha fallat abans de poder aplicar el suggeriment",
   },
+  autonomy: {
+    title: "Estat d'autonomia",
+    modeDisabled: "Desactivat",
+    modeSuggest: "Suggerir",
+    modeSemiAuto: "Semi-automàtic",
+    modeAuto: "Automàtic",
+    todayAccepted: "Acceptats auto avui",
+    runningTasks: "Tasques auto en curs",
+    recentActions: "Accions auto recents",
+  },
   roles: {
     title: "Roles",
     create: "Create Role",

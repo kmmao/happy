@@ -3802,6 +3802,16 @@ export const zhHans: TranslationStructure = {
     autoAcceptFailureDetailPayloadInvalid: "自动接受失败，因为建议 payload 无效",
     autoAcceptFailureDetailGeneric: "自动接受在应用建议前失败",
   },
+  autonomy: {
+    title: "自治状态",
+    modeDisabled: "已禁用",
+    modeSuggest: "建议模式",
+    modeSemiAuto: "半自动",
+    modeAuto: "全自动",
+    todayAccepted: "今日自动接受",
+    runningTasks: "运行中的自动任务",
+    recentActions: "最近自动动作",
+  },
   roles: {
     title: "角色",
     create: "创建角色",

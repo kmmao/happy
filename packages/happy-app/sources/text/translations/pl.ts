@@ -3916,6 +3916,16 @@ export const pl: TranslationStructure = {
     autoAcceptFailureDetailPayloadInvalid: "Automatyczna akceptacja nie powiodła się, ponieważ payload sugestii był nieprawidłowy",
     autoAcceptFailureDetailGeneric: "Automatyczna akceptacja nie powiodła się przed zastosowaniem sugestii",
   },
+  autonomy: {
+    title: "Status autonomii",
+    modeDisabled: "Wyłączony",
+    modeSuggest: "Tylko sugestie",
+    modeSemiAuto: "Półautomatyczny",
+    modeAuto: "Automatyczny",
+    todayAccepted: "Auto-zaakceptowane dziś",
+    runningTasks: "Uruchomione zadania auto",
+    recentActions: "Ostatnie akcje auto",
+  },
   roles: {
     title: "Roles",
     create: "Create Role",

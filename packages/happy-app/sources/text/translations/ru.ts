@@ -3914,6 +3914,16 @@ export const ru: TranslationStructure = {
     autoAcceptFailureDetailPayloadInvalid: "Авто-принятие завершилось неудачей, потому что payload предложения был недействителен",
     autoAcceptFailureDetailGeneric: "Авто-принятие завершилось неудачей до применения предложения",
   },
+  autonomy: {
+    title: "Статус автономии",
+    modeDisabled: "Отключено",
+    modeSuggest: "Предлагать",
+    modeSemiAuto: "Полуавтоматический",
+    modeAuto: "Автоматический",
+    todayAccepted: "Авто-принято сегодня",
+    runningTasks: "Выполняемые авто-задачи",
+    recentActions: "Последние авто-действия",
+  },
   roles: {
     title: "Roles",
     create: "Create Role",

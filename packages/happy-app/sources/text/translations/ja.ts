@@ -3872,6 +3872,16 @@ export const ja: TranslationStructure = {
     autoAcceptFailureDetailPayloadInvalid: "提案 payload が無効なため自動承認に失敗しました",
     autoAcceptFailureDetailGeneric: "提案を適用する前に自動承認が失敗しました",
   },
+  autonomy: {
+    title: "自律ステータス",
+    modeDisabled: "無効",
+    modeSuggest: "提案のみ",
+    modeSemiAuto: "半自動",
+    modeAuto: "自動",
+    todayAccepted: "本日の自動承認",
+    runningTasks: "実行中の自動タスク",
+    recentActions: "最近の自動アクション",
+  },
   roles: {
     title: "ロール",
     create: "ロールを作成",

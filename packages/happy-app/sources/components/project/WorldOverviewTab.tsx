@@ -23,11 +23,14 @@ import {
     refreshSuggestions,
     acceptSuggestion,
     dismissSuggestion,
+    fetchAutonomyStats,
     type SuggestionStatus,
     type WorldDashboard,
     type SuggestionSummary,
+    type AutonomyStats,
 } from "@/sync/apiWorld";
 import type { AcceptSuggestionResult } from "@/sync/apiWorld";
+import { AutonomyStatusSection } from "./AutonomyStatusSection";
 import { SuggestionCard } from "./SuggestionCard";
 import {
     applySuggestionStatusUpdate,
@@ -60,6 +63,7 @@ export const WorldOverviewTab = React.memo(
         const { theme } = useUnistyles();
         const router = useRouter();
         const [data, setData] = React.useState<WorldDashboard | null>(null);
+        const [autonomyStats, setAutonomyStats] = React.useState<AutonomyStats | null>(null);
         const [suggestions, setSuggestions] = React.useState<SuggestionSummary[]>([]);
         const [loading, setLoading] = React.useState(false);
         const [refreshing, setRefreshing] = React.useState(false);
@@ -89,12 +93,14 @@ export const WorldOverviewTab = React.memo(
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const [dashboard, activeSuggestions, acceptedSuggestions] = await Promise.all([
+                const [dashboard, activeSuggestions, acceptedSuggestions, stats] = await Promise.all([
                     fetchWorldDashboard(credentials, project.serverId),
                     fetchSuggestions(credentials, project.serverId),
                     fetchSuggestions(credentials, project.serverId, { status: "accepted" }),
+                    fetchAutonomyStats(credentials, project.serverId).catch(() => null),
                 ]);
                 setData(dashboard);
+                setAutonomyStats(stats);
                 setSuggestions(mergeVisibleSuggestions(
                     mergeFetchedSuggestions(activeSuggestions, hiddenSuggestionIdsRef.current),
                     mergeFetchedSuggestions(acceptedSuggestions, hiddenSuggestionIdsRef.current),
@@ -296,6 +302,10 @@ export const WorldOverviewTab = React.memo(
                         </View>
                     </View>
                 </View>
+
+                {autonomyStats ? (
+                    <AutonomyStatusSection stats={autonomyStats} />
+                ) : null}
 
                 <View style={styles.metricsGrid}>
                     <MetricCard icon="people" label={t("world.activeRoles")} value={String(data.roles.total)} color="#8B5CF6" />

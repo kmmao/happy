@@ -5,6 +5,7 @@ import {
     type SuggestionSummary,
     type SuggestionStatus,
     type SuggestionType,
+    type AutonomyStats,
 } from "@kmmao/happy-wire";
 export type {
     SuggestionBucket,
@@ -13,6 +14,7 @@ export type {
     SuggestionSummary,
     SuggestionStatus,
     SuggestionType,
+    AutonomyStats,
 };
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { getCurrentLanguage, type SupportedLanguage } from "@/text";
@@ -210,4 +212,21 @@ export async function dismissSuggestion(
     if (!response.ok) {
         throw new Error(`Failed to dismiss suggestion: ${response.status}`);
     }
+}
+
+export async function fetchAutonomyStats(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<AutonomyStats> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/world/autonomy-stats`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch autonomy stats: ${response.status}`);
+        }
+        return (await response.json()) as AutonomyStats;
+    });
 }

@@ -10,8 +10,33 @@ import { worldSuggestionRefresh } from "@/modules/worldSuggestionGenerate";
 import { worldSuggestionAccept } from "@/modules/worldSuggestionAccept";
 import { worldSuggestionDismiss } from "@/modules/worldSuggestionDismiss";
 import { AcceptBodySchema, SUGGESTION_BUCKETS, SUGGESTION_STATUSES, type AcceptBody } from "@kmmao/happy-wire";
+import { getAutonomyStats } from "@/modules/worldSuggestionAutonomyStats";
 
 export function worldSuggestionRoutes(app: Fastify) {
+    app.get(
+        "/v1/projects/:id/world/autonomy-stats",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const projectId = request.params.id;
+
+            const project = await db.project.findFirst({
+                where: { id: projectId, accountId: userId },
+                select: { id: true },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const stats = await getAutonomyStats(userId, projectId);
+            return reply.send(stats);
+        },
+    );
     app.get(
         "/v1/projects/:id/world/suggestions",
         {

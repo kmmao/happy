@@ -3806,6 +3806,16 @@ export const zhHant: TranslationStructure = {
     autoAcceptFailureDetailPayloadInvalid: "自動接受失敗，因為建議 payload 無效",
     autoAcceptFailureDetailGeneric: "自動接受在套用建議前失敗",
   },
+  autonomy: {
+    title: "自治狀態",
+    modeDisabled: "已停用",
+    modeSuggest: "建議模式",
+    modeSemiAuto: "半自動",
+    modeAuto: "全自動",
+    todayAccepted: "今日自動接受",
+    runningTasks: "執行中的自動任務",
+    recentActions: "最近自動動作",
+  },
   roles: {
     title: "角色",
     create: "建立角色",

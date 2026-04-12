@@ -3895,6 +3895,16 @@ export const es: TranslationStructure = {
     autoAcceptFailureDetailPayloadInvalid: "La aceptación automática falló porque el payload de la sugerencia era inválido",
     autoAcceptFailureDetailGeneric: "La aceptación automática falló antes de poder aplicar la sugerencia",
   },
+  autonomy: {
+    title: "Estado de autonomía",
+    modeDisabled: "Desactivado",
+    modeSuggest: "Sugerir",
+    modeSemiAuto: "Semi-Auto",
+    modeAuto: "Auto",
+    todayAccepted: "Aceptados auto hoy",
+    runningTasks: "Tareas auto en curso",
+    recentActions: "Acciones auto recientes",
+  },
   roles: {
     title: "Roles",
     create: "Create Role",
