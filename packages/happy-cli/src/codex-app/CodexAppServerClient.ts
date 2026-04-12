@@ -1590,6 +1590,32 @@ export class CodexAppServerClient {
           logger.debug("[CodexAppServer] Failed to refresh capabilities", error);
         });
         return;
+      case "thread/tokenUsage/updated": {
+        const notification =
+          params && typeof params === "object"
+            ? (params as {
+                threadId?: unknown;
+                turnId?: unknown;
+                tokenUsage?: unknown;
+              })
+            : {};
+        if (
+          notification.tokenUsage &&
+          typeof notification.tokenUsage === "object"
+        ) {
+          this.handler?.({
+            type: "token_count",
+            ...(typeof notification.threadId === "string"
+              ? { threadId: notification.threadId }
+              : {}),
+            ...(typeof notification.turnId === "string"
+              ? { turnId: notification.turnId }
+              : {}),
+            tokenUsage: notification.tokenUsage,
+          });
+        }
+        return;
+      }
       case "model/rerouted": {
         const notification = params as {
           fromModel?: string;

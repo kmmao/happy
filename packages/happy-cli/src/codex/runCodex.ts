@@ -61,6 +61,13 @@ import {
   mapCodexProcessorMessageToSessionEnvelopes,
 } from "./utils/sessionProtocolMapper";
 import { collectCodexLocalSurface } from "./localSurface";
+import {
+  buildCodexContextUsage,
+  codexBreakdownToUsage,
+  extractCodexTokenUsageSnapshot,
+  getCodexTokenUsageSignature,
+} from "./utils/tokenUsage";
+import { createEnvelope } from "@kmmao/happy-wire";
 
 type ReadyEventOptions = {
   pending: unknown;
@@ -419,6 +426,7 @@ export async function runCodex(opts: {
   let codexStartedSubagents = new Set<string>();
   let codexActiveSubagents = new Set<string>();
   let codexProviderSubagentToSessionSubagent = new Map<string, string>();
+  let lastCodexTokenUsageSignature: string | null = null;
   session.keepAlive(thinking, "remote");
   // Periodic keep-alive; store handle so we can clear on exit
   const keepAliveInterval = setInterval(() => {
@@ -764,6 +772,50 @@ export async function runCodex(opts: {
       session.sendSessionProtocolMessage(envelope);
     }
   });
+  const emitCodexTokenUsage = (message: Record<string, unknown>) => {
+    const snapshot = extractCodexTokenUsageSnapshot(message);
+    if (!snapshot) {
+      return false;
+    }
+
+    const signature = getCodexTokenUsageSignature(snapshot);
+    if (signature === lastCodexTokenUsageSignature) {
+      return true;
+    }
+    lastCodexTokenUsageSignature = signature;
+
+    const usage = codexBreakdownToUsage(snapshot.last);
+    const turnId = snapshot.turnId ?? currentTurnId ?? undefined;
+    if (usage) {
+      session.sendSessionProtocolMessage(
+        createEnvelope(
+          "agent",
+          {
+            t: "usage-update",
+            usage,
+          },
+          turnId ? { turn: turnId } : {},
+        ),
+      );
+      session.sendProviderUsageData("codex-session", usage);
+    }
+
+    const contextUsage = buildCodexContextUsage(snapshot);
+    if (contextUsage) {
+      session.sendSessionProtocolMessage(
+        createEnvelope(
+          "agent",
+          {
+            t: "context-usage",
+            ...contextUsage,
+          },
+          turnId ? { turn: turnId } : {},
+        ),
+      );
+    }
+
+    return true;
+  };
   const onClientMessage = (msg: any) => {
     logger.debug(`[Codex] MCP message: ${JSON.stringify(msg)}`);
 
@@ -840,6 +892,11 @@ export async function runCodex(opts: {
         ...currentMetadata,
         ...(msg.patch ?? {}),
       }));
+      return;
+    }
+
+    if (msg.type === "token_count") {
+      emitCodexTokenUsage(msg as Record<string, unknown>);
       return;
     }
 

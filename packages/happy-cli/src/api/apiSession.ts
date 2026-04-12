@@ -1037,11 +1037,35 @@ export class ApiSessionClient extends EventEmitter {
     }
   }
 
+  private emitUsageReport(
+    key: string,
+    tokens: { [key: string]: number; total: number },
+    cost: { [key: string]: number; total: number },
+    logLabel: string,
+  ) {
+    const usageReport = {
+      key,
+      sessionId: this.sessionId,
+      tokens,
+      cost,
+    };
+    logger.debugLargeJson(logLabel, usageReport);
+    this.socket.emit("usage-report", usageReport);
+  }
+
   /**
    * Send per-request usage data (tokens only) to the server.
    * Cost is reported once at turn end using SDK-provided data.
    */
   sendUsageData(usage: Usage, model?: string) {
+    this.sendProviderUsageData("claude-session", usage, model);
+  }
+
+  /**
+   * Send provider usage data (tokens only) to the server using a provider-specific key.
+   * This keeps Claude and Codex usage isolated while reusing the same socket transport.
+   */
+  sendProviderUsageData(key: string, usage: Usage, model?: string) {
     const totalTokens =
       usage.input_tokens +
       usage.output_tokens +
@@ -1066,14 +1090,7 @@ export class ApiSessionClient extends EventEmitter {
       output: 0,
     };
 
-    const usageReport = {
-      key: "claude-session",
-      sessionId: this.sessionId,
-      tokens,
-      cost,
-    };
-    logger.debugLargeJson("[SOCKET] Sending usage data:", usageReport);
-    this.socket.emit("usage-report", usageReport);
+    this.emitUsageReport(key, tokens, cost, "[SOCKET] Sending usage data:");
   }
 
   /**
@@ -1116,17 +1133,12 @@ export class ApiSessionClient extends EventEmitter {
       }
     }
 
-    const usageReport = {
-      key: "claude-session",
-      sessionId: this.sessionId,
-      tokens: { total: 0, input: 0, output: 0 },
+    this.emitUsageReport(
+      "claude-session",
+      { total: 0, input: 0, output: 0 },
       cost,
-    };
-    logger.debugLargeJson(
       "[SOCKET] Sending turn-end cost report (SDK):",
-      usageReport,
     );
-    this.socket.emit("usage-report", usageReport);
   }
 
   /**

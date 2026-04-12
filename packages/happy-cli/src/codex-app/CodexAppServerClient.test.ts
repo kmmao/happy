@@ -1441,6 +1441,65 @@ describe("CodexAppServerClient", () => {
     ).toBe(true);
   });
 
+  it("forwards thread token usage updates", async () => {
+    const events: any[] = [];
+    const client = new CodexAppServerClient();
+    client.setHandler((event) => events.push(event));
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        method: "thread/tokenUsage/updated",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-usage-1",
+          tokenUsage: {
+            total: {
+              totalTokens: 1000,
+              inputTokens: 700,
+              cachedInputTokens: 200,
+              outputTokens: 80,
+              reasoningOutputTokens: 20,
+            },
+            last: {
+              totalTokens: 220,
+              inputTokens: 150,
+              cachedInputTokens: 40,
+              outputTokens: 20,
+              reasoningOutputTokens: 10,
+            },
+            modelContextWindow: 950000,
+          },
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(events).toContainEqual({
+      type: "token_count",
+      threadId: "thread-1",
+      turnId: "turn-usage-1",
+      tokenUsage: {
+        total: {
+          totalTokens: 1000,
+          inputTokens: 700,
+          cachedInputTokens: 200,
+          outputTokens: 80,
+          reasoningOutputTokens: 20,
+        },
+        last: {
+          totalTokens: 220,
+          inputTokens: 150,
+          cachedInputTokens: 40,
+          outputTokens: 20,
+          reasoningOutputTokens: 10,
+        },
+        modelContextWindow: 950000,
+      },
+    });
+  });
+
   it("emits a diff preview as a CodexDiff tool call", async () => {
     const events: any[] = [];
     const client = new CodexAppServerClient();
