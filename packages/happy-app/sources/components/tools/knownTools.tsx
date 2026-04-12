@@ -8,6 +8,7 @@ import { t } from "@/text";
 import { getDiffStatsLight } from "@/components/diff/calculateDiff";
 import { trimIdent } from "@/utils/trimIdent";
 import { getCodexCommandPreview } from "./codexCommandUtils";
+import { getCodexDiffStats, parseCodexUnifiedDiff } from "./codexDiffUtils";
 import { getCodexPatchEntries, getCodexPatchTotals } from "./codexPatchUtils";
 
 // Icon factory functions
@@ -1312,7 +1313,18 @@ export const knownTools = {
     },
   },
   CodexDiff: {
-    title: t("tools.names.viewDiff"),
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (
+        opts.tool.input?.unified_diff &&
+        typeof opts.tool.input.unified_diff === "string"
+      ) {
+        const parsed = parseCodexUnifiedDiff(opts.tool.input.unified_diff);
+        if (parsed.fileName) {
+          return parsed.fileName.split("/").pop() || parsed.fileName;
+        }
+      }
+      return t("tools.names.viewDiff");
+    },
     icon: ICON_EDIT,
     minimal: false, // Show full diff view
     hideDefaultError: true,
@@ -1329,19 +1341,24 @@ export const knownTools = {
       })
       .partial()
       .passthrough(),
+    extractStats: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (
+        opts.tool.input?.unified_diff &&
+        typeof opts.tool.input.unified_diff === "string"
+      ) {
+        return getCodexDiffStats(opts.tool.input.unified_diff);
+      }
+      return null;
+    },
     extractSubtitle: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
       // Try to extract filename from unified diff
       if (
         opts.tool.input?.unified_diff &&
         typeof opts.tool.input.unified_diff === "string"
       ) {
-        const diffLines = opts.tool.input.unified_diff.split("\n");
-        for (const line of diffLines) {
-          if (line.startsWith("+++ b/") || line.startsWith("+++ ")) {
-            const fileName = line.replace(/^\+\+\+ (b\/)?/, "");
-            const basename = fileName.split("/").pop() || fileName;
-            return basename;
-          }
+        const parsed = parseCodexUnifiedDiff(opts.tool.input.unified_diff);
+        if (parsed.fileName) {
+          return parsed.fileName;
         }
       }
       return null;
