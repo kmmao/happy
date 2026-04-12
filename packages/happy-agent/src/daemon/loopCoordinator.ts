@@ -12,6 +12,7 @@
 import { randomUUID } from "crypto";
 import { logger } from "../logger";
 import type { AutomationScheduler } from "./scheduler";
+import type { GuardianSessionRegistry } from "./guardianRegistry";
 import { spawnSession } from "./spawnSession";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
@@ -79,16 +80,19 @@ export class AgentLoopCoordinator {
   private readonly scheduler: AutomationScheduler;
   private readonly serverUrl: string;
   private readonly authToken: string;
+  private readonly guardian: GuardianSessionRegistry | null;
   private tickTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     scheduler: AutomationScheduler,
     serverUrl: string,
     authToken: string,
+    guardian?: GuardianSessionRegistry,
   ) {
     this.scheduler = scheduler;
     this.serverUrl = serverUrl;
     this.authToken = authToken;
+    this.guardian = guardian ?? null;
   }
 
   // -----------------------------------------------------------------------
@@ -237,6 +241,9 @@ export class AgentLoopCoordinator {
     const loopId = loop.id;
     const coordinator = this;
 
+    // Resolve guardian session for resumption
+    const guardianSessionId = this.guardian?.resolve({ loopId: loop.id }) ?? undefined;
+
     const { job, deduped } = this.scheduler.enqueue({
       kind: "task",
       dedupeKey: `agent-loop:${loop.id}:${loop.iteration}`,
@@ -247,6 +254,7 @@ export class AgentLoopCoordinator {
         const result = await spawnSession({
           directory: loop.directory,
           approvedNewDirectoryCreation: false,
+          happySessionId: guardianSessionId,
           automationContext: {
             kind: "agent_loop",
             trigger: `loop:${loop.name}:iteration-${iterationNum}`,
