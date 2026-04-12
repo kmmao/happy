@@ -520,6 +520,101 @@ describe("CodexAppServerClient", () => {
     });
   });
 
+  it("responds to generic permission approval requests through the permission handler", async () => {
+    const client = new CodexAppServerClient();
+    const handleToolCall = vi.fn(async () => ({
+      decision: "approved_for_session" as const,
+    }));
+    client.setPermissionHandler({
+      handleToolCall,
+    } as any);
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        id: "perm-1",
+        method: "item/permissions/requestApproval",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          itemId: "mcp-1",
+          reason: "Allow Happy MCP title updates",
+          permissions: {
+            network: { enabled: true },
+            fileSystem: {
+              read: ["/tmp/readable"],
+              write: ["/tmp/writable"],
+            },
+          },
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(handleToolCall).toHaveBeenCalledWith("mcp-1", "CodexPermissions", {
+      itemId: "mcp-1",
+      reason: "Allow Happy MCP title updates",
+      permissions: {
+        network: { enabled: true },
+        fileSystem: {
+          read: ["/tmp/readable"],
+          write: ["/tmp/writable"],
+        },
+      },
+    });
+    expect(fakeProcesses[0].responses).toContainEqual({
+      id: "perm-1",
+      result: {
+        permissions: {
+          network: { enabled: true },
+          fileSystem: {
+            read: ["/tmp/readable"],
+            write: ["/tmp/writable"],
+          },
+        },
+        scope: "session",
+      },
+    });
+  });
+
+  it("returns an empty permission grant when generic permission approval is denied", async () => {
+    const client = new CodexAppServerClient();
+    client.setPermissionHandler({
+      handleToolCall: vi.fn(async () => ({ decision: "denied" })),
+    } as any);
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        id: "perm-2",
+        method: "item/permissions/requestApproval",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          itemId: "perm-item-2",
+          reason: "Deny extra filesystem access",
+          permissions: {
+            fileSystem: {
+              read: ["/tmp/nope"],
+              write: ["/tmp/nope-write"],
+            },
+          },
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(fakeProcesses[0].responses).toContainEqual({
+      id: "perm-2",
+      result: {
+        permissions: {},
+        scope: "turn",
+      },
+    });
+  });
+
   it("responds to request_user_input through the elicitation handler", async () => {
     const client = new CodexAppServerClient();
     client.setElicitationHandler(async () => ({

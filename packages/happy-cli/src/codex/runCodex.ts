@@ -874,6 +874,20 @@ export async function runCodex(opts: {
       }
     }
 
+    if (msg.type === "tool-call" || msg.type === "tool-call-result") {
+      const envelopes = mapCodexProcessorMessageToSessionEnvelopes(msg as any, {
+        currentTurnId,
+        startedSubagents: codexStartedSubagents,
+        activeSubagents: codexActiveSubagents,
+        providerSubagentToSessionSubagent:
+          codexProviderSubagentToSessionSubagent,
+      });
+      for (const envelope of envelopes) {
+        session.sendSessionProtocolMessage(envelope);
+      }
+      return;
+    }
+
     // Convert Codex MCP events into the unified session-protocol envelope stream.
     // Reasoning deltas are handled by ReasoningProcessor to avoid duplicate text output.
     if (
@@ -909,6 +923,11 @@ export async function runCodex(opts: {
       args: ["--url", happyServer.url],
     },
   } as const;
+  const happyTitleToolNames = new Set([
+    "change_title",
+    "happy__change_title",
+    "mcp__happy__change_title",
+  ]);
   let first = true;
 
   try {
@@ -923,6 +942,66 @@ export async function runCodex(opts: {
       appServerClient.setPermissionHandler(permissionHandler);
       appServerClient.setElicitationHandler(handleElicitation);
       appServerClient.setChatGptAuthTokensProvider(loadOpenAiAuthTokens);
+      appServerClient.setDynamicToolHandler(async (request) => {
+        if (!happyTitleToolNames.has(request.tool)) {
+          return {
+            contentItems: [
+              {
+                type: "inputText" as const,
+                text: `Unsupported dynamic tool: ${request.tool || "unknown"}`,
+              },
+            ],
+            success: false,
+          };
+        }
+
+        const title =
+          request.arguments &&
+          typeof request.arguments === "object" &&
+          "title" in request.arguments &&
+          typeof (request.arguments as { title?: unknown }).title === "string"
+            ? (request.arguments as { title: string }).title.trim()
+            : "";
+
+        if (!title) {
+          return {
+            contentItems: [
+              {
+                type: "inputText" as const,
+                text: "Failed to change chat title: missing title",
+              },
+            ],
+            success: false,
+          };
+        }
+
+        try {
+          session.sendClaudeSessionMessage({
+            type: "summary",
+            summary: title,
+            leafUuid: randomUUID(),
+          });
+          return {
+            contentItems: [
+              {
+                type: "inputText" as const,
+                text: `Successfully changed chat title to: "${title}"`,
+              },
+            ],
+            success: true,
+          };
+        } catch (error) {
+          return {
+            contentItems: [
+              {
+                type: "inputText" as const,
+                text: `Failed to change chat title: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            success: false,
+          };
+        }
+      });
       appServerClient.setHandler(onClientMessage);
       return appServerClient;
     };

@@ -370,6 +370,38 @@ function mapPermissionDecision(
   }
 }
 
+function buildGrantedPermissions(
+  permissions: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (!permissions || typeof permissions !== "object") {
+    return {};
+  }
+
+  const result: Record<string, unknown> = {};
+  const network = permissions.network;
+  const fileSystem = permissions.fileSystem;
+
+  if (network && typeof network === "object") {
+    const enabled = (network as { enabled?: unknown }).enabled;
+    if (typeof enabled === "boolean" || enabled === null) {
+      result.network = { enabled };
+    }
+  }
+
+  if (fileSystem && typeof fileSystem === "object") {
+    const read = (fileSystem as { read?: unknown }).read;
+    const write = (fileSystem as { write?: unknown }).write;
+    if (Array.isArray(read) || Array.isArray(write)) {
+      result.fileSystem = {
+        ...(Array.isArray(read) ? { read } : {}),
+        ...(Array.isArray(write) ? { write } : {}),
+      };
+    }
+  }
+
+  return result;
+}
+
 export class CodexAppServerClient {
   private process: ChildProcessWithoutNullStreams | null = null;
   private stdoutReader: ReadLineInterface | null = null;
@@ -1136,6 +1168,42 @@ export class CodexAppServerClient {
             )
           : "cancel";
         this.sendResponse(requestId, { decision });
+        return;
+      }
+
+      if (method === "item/permissions/requestApproval") {
+        const permissionId =
+          typeof params.itemId === "string" && params.itemId.length > 0
+            ? params.itemId
+            : requestKey;
+        const decision = this.permissionHandler
+          ? (
+              await this.permissionHandler.handleToolCall(
+                permissionId,
+                "CodexPermissions",
+                {
+                  itemId: params.itemId,
+                  reason: params.reason,
+                  permissions: params.permissions,
+                },
+              )
+            ).decision
+          : "abort";
+
+        if (decision === "approved" || decision === "approved_for_session") {
+          this.sendResponse(requestId, {
+            permissions: buildGrantedPermissions(
+              params.permissions as Record<string, unknown> | undefined,
+            ),
+            scope: decision === "approved_for_session" ? "session" : "turn",
+          });
+          return;
+        }
+
+        this.sendResponse(requestId, {
+          permissions: {},
+          scope: "turn",
+        });
         return;
       }
 
