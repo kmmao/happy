@@ -353,7 +353,7 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
     });
   });
 
-  it("records skipped status when accept loses already-acted race", async () => {
+  it("records skipped status when accept loses already-acted race and expires the suggestion", async () => {
     worldSuggestionAccept.mockRejectedValueOnce(new Error("Suggestion not found or already acted upon"));
 
     await autoAcceptSuggestedTasksIfEnabled({
@@ -390,6 +390,8 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
     expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
       where: { id: "sug-1" },
       data: {
+        status: "expired",
+        actedAt: expect.any(Date),
         autoAcceptStatus: "skipped",
         autoAcceptReasonCode: "already_acted",
       },

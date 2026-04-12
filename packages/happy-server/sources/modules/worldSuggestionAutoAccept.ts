@@ -124,6 +124,7 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
           suggestionId: suggestion.id,
           status: "skipped",
           reasonCode: "already_acted",
+          suggestionStatus: "expired",
         });
         continue;
       }
@@ -167,10 +168,17 @@ async function markAutoAcceptOutcome(input: {
   suggestionId: string;
   status: "skipped" | "failed";
   reasonCode: "quota_exhausted" | "already_acted" | "accept_failed";
+  suggestionStatus?: "expired";
 }): Promise<void> {
   await db.worldSuggestion.update({
     where: { id: input.suggestionId },
     data: {
+      ...(input.suggestionStatus
+        ? {
+            status: input.suggestionStatus,
+            actedAt: new Date(),
+          }
+        : {}),
       autoAcceptStatus: input.status,
       autoAcceptReasonCode: input.reasonCode,
     } as any,
