@@ -840,6 +840,7 @@ model Task {
     @@index([machineId, status])
     @@index([projectId])
     @@index([goalId])
+    @@index([goalId, status])
     @@index([accountId, createdAt(sort: Desc)])
 }
 
@@ -1043,7 +1044,7 @@ model AgentRole {
     updatedAt       DateTime  @updatedAt
 
     @@unique([accountId, projectId, name])
-    @@index([accountId, projectId])
+    @@index([accountId, projectId, enabled])
     @@index([projectId])
 }
 
@@ -1162,6 +1163,7 @@ model AgentMessage {
     @@index([projectId, createdAt(sort: Desc)])
     @@index([projectId, msgType])
     @@index([projectId, relatedGoalId])
+    @@index([relatedTaskId, msgType])
 }
 
 //
@@ -1200,5 +1202,6 @@ model WorldSuggestion {
     @@index([projectId, status])
     @@index([projectId, dedupeKey])
     @@index([projectId, bucket])
+    @@index([projectId, relatedGoalId])
     @@index([accountId])
 }

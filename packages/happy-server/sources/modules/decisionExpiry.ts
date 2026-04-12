@@ -5,6 +5,7 @@
 import { db } from "@/storage/db";
 import { inboxCreate } from "./inboxCreate";
 import { log } from "@/utils/log";
+import { truncateText, TEXT_LIMITS } from "./worldConstants";
 import { worldSuggestionRefresh } from "./worldSuggestionGenerate";
 
 export async function expireDecisions(): Promise<number> {
@@ -36,7 +37,7 @@ export async function expireDecisions(): Promise<number> {
             category: "decision",
             eventType: "decision.expired",
             severity: "info",
-            title: `Decision expired: ${d.question.substring(0, 60)}`,
+            title: `Decision expired: ${truncateText(d.question, TEXT_LIMITS.DECISION_QUESTION)}`,
             referenceUrl: `/decision/${d.id}`,
             refType: "decision",
             refId: d.id,

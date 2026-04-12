@@ -15,6 +15,7 @@ import {
     normalizeTaskStatusReport,
     shouldApplyTaskStatus,
 } from "@/modules/taskStatusLogic";
+import { truncateText, TEXT_LIMITS } from "@/modules/worldConstants";
 import { worldSuggestionRefresh } from "@/modules/worldSuggestionGenerate";
 
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
@@ -686,7 +687,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         completedAt: t.completedAt?.getTime() ?? null,
         createdAt: t.createdAt.getTime(),
         updatedAt: t.updatedAt.getTime(),
-        promptPreview: t.prompt.length > 100 ? t.prompt.slice(0, 100) : t.prompt,
+        promptPreview: truncateText(t.prompt, TEXT_LIMITS.PROMPT_PREVIEW),
         skillNames: t.skillBindings?.map((b) => b.skill.name) ?? [],
     };
 }

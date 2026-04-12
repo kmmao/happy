@@ -4,6 +4,7 @@ import { z } from "zod";
 import { log } from "@/utils/log";
 import { decisionCreate } from "@/modules/decisionCreate";
 import { inboxCreate } from "@/modules/inboxCreate";
+import { truncateText, TEXT_LIMITS } from "@/modules/worldConstants";
 import {
     eventRouter,
     buildAgentMessageEphemeral,
@@ -116,7 +117,7 @@ export function agentMessageRoutes(app: Fastify) {
                 const decisionResult = await decisionCreate({
                     accountId: userId,
                     projectId,
-                    question: `Agent conflict: ${fromRole}${toRole ? ` → ${toRole}` : ""}: ${content.length > 200 ? content.substring(0, 197) + "..." : content}`,
+                    question: `Agent conflict: ${fromRole}${toRole ? ` → ${toRole}` : ""}: ${truncateText(content, TEXT_LIMITS.AGENT_MSG_BODY)}`,
                     options: JSON.stringify([
                         { id: "resolve_a", description: `Side with ${fromRole}` },
                         { id: "resolve_b", description: toRole ? `Side with ${toRole}` : "Alternative approach" },
@@ -141,7 +142,7 @@ export function agentMessageRoutes(app: Fastify) {
                 const decisionResult = await decisionCreate({
                     accountId: userId,
                     projectId,
-                    question: `Law suggestion from ${fromRole}: ${content.length > 150 ? content.substring(0, 147) + "..." : content}`,
+                    question: `Law suggestion from ${fromRole}: ${truncateText(content, TEXT_LIMITS.REASON_SHORT)}`,
                     options: JSON.stringify([
                         { id: "approve", description: "Approve and add to project laws" },
                         { id: "reject", description: "Reject this suggestion" },
@@ -165,7 +166,7 @@ export function agentMessageRoutes(app: Fastify) {
                 const decisionResult = await decisionCreate({
                     accountId: userId,
                     projectId,
-                    question: `Decision requested by ${fromRole}${toRole ? ` → ${toRole}` : ""}: ${content.length > 200 ? content.substring(0, 197) + "..." : content}`,
+                    question: `Decision requested by ${fromRole}${toRole ? ` → ${toRole}` : ""}: ${truncateText(content, TEXT_LIMITS.AGENT_MSG_BODY)}`,
                     options: JSON.stringify([
                         { id: "approve", description: "Approve this approach" },
                         { id: "reject", description: "Reject and reconsider" },
@@ -195,7 +196,7 @@ export function agentMessageRoutes(app: Fastify) {
                     title: msgType === "conflict"
                         ? `Agent conflict: ${fromRole}${toRole ? ` → ${toRole}` : ""}`
                         : `Law suggestion from ${fromRole}`,
-                    body: content.length > 200 ? content.substring(0, 197) + "..." : content,
+                    body: truncateText(content, TEXT_LIMITS.AGENT_MSG_BODY),
                     referenceUrl: `/project/${projectId}?tab=world`,
                     refType: "agent-message",
                     refId: message.id,
@@ -210,7 +211,7 @@ export function agentMessageRoutes(app: Fastify) {
                     eventType: "agent.dependency_blocked",
                     severity: "warning",
                     title: `${fromRole} blocked${toRole ? ` waiting for ${toRole}` : ""}`,
-                    body: content.length > 200 ? content.substring(0, 197) + "..." : content,
+                    body: truncateText(content, TEXT_LIMITS.AGENT_MSG_BODY),
                     referenceUrl: `/project/${projectId}?tab=world`,
                     refType: "agent-message",
                     refId: message.id,
@@ -225,7 +226,7 @@ export function agentMessageRoutes(app: Fastify) {
                     eventType: "agent.review_request",
                     severity: "info",
                     title: `${fromRole} requests review${toRole ? ` from ${toRole}` : ""}`,
-                    body: content.length > 200 ? content.substring(0, 197) + "..." : content,
+                    body: truncateText(content, TEXT_LIMITS.AGENT_MSG_BODY),
                     referenceUrl: `/project/${projectId}?tab=world`,
                     refType: "agent-message",
                     refId: message.id,

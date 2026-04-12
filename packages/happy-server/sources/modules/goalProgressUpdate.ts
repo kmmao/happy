@@ -8,6 +8,7 @@ import { db } from "@/storage/db";
 import { inboxCreate } from "./inboxCreate";
 import { eventRouter, buildGoalProgressEphemeral } from "@/app/events/eventRouter";
 import { log } from "@/utils/log";
+import { truncateText, TEXT_LIMITS } from "./worldConstants";
 
 const MAX_RECURSION_DEPTH = 5;
 
@@ -101,7 +102,7 @@ export async function goalProgressUpdate(input: GoalProgressInput, depth: number
                 category: "goal",
                 eventType: "goal.completed",
                 severity: "info",
-                title: `Goal completed: ${goal.title.length > 60 ? `${goal.title.substring(0, 57)}...` : goal.title}`,
+                title: `Goal completed: ${truncateText(goal.title, TEXT_LIMITS.TASK_LABEL)}`,
                 body: `All ${tasks.length} tasks finished`,
                 referenceUrl: `/project/${goal.projectId}/goals/${goal.id}`,
                 refType: "goal",

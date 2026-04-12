@@ -15,6 +15,7 @@ import {
 } from "@/modules/goalSummary";
 import { goalCreate, goalDecompose } from "@/modules/goalCreate";
 import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
+import { truncateText, TEXT_LIMITS, TIME_MS } from "@/modules/worldConstants";
 
 const GoalStatusSchema = z.enum(["planning", "in_progress", "blocked", "completed", "cancelled"]);
 const GoalPrioritySchema = z.enum(["urgent", "normal", "low"]);
@@ -70,8 +71,8 @@ const PlanResultBodySchema = z.object({
 });
 
 const PLANNING_RESULT_TIMEOUT_MINUTES = 10;
-const PLANNING_RESULT_TIMEOUT_MS = PLANNING_RESULT_TIMEOUT_MINUTES * 60 * 1000;
-const DISPATCHING_RECOVERY_MS = 2 * 60 * 1000;
+const PLANNING_RESULT_TIMEOUT_MS = TIME_MS.PLANNING_TIMEOUT;
+const DISPATCHING_RECOVERY_MS = TIME_MS.DISPATCHING_RECOVERY;
 
 async function applyPlanningTimeoutFallback(opts: {
     goals: Array<{
@@ -1029,7 +1030,7 @@ function serializeGoalDetail(goal: Record<string, unknown>, agentMessages: GoalA
             status: t.status,
             sessionId: t.sessionId,
             roleType: t.roleType,
-            promptPreview: t.prompt.length > 100 ? t.prompt.slice(0, 100) : t.prompt,
+            promptPreview: truncateText(t.prompt, TEXT_LIMITS.PROMPT_PREVIEW),
             priority: t.priority,
             createdAt: t.createdAt.getTime(),
             completedAt: t.completedAt?.getTime() ?? null,

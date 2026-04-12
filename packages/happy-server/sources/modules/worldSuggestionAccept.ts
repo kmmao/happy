@@ -13,6 +13,7 @@ import { db } from "@/storage/db";
 import { afterTx, inTx } from "@/storage/inTx";
 import { claimRepeatKey } from "@/storage/repeatKey";
 import { goalCreate } from "./goalCreate";
+import { TIME_MS } from "./worldConstants";
 import { validateSuggestionPayload } from "./worldSuggestionTypes";
 
 type AcceptSource = "human" | "system_auto";
@@ -94,7 +95,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 tx as any,
                 buildSuggestionAcceptRepeatKey(projectId, fresh.dedupeKey),
                 suggestionId,
-                Date.now() + 24 * 60 * 60 * 1000,
+                Date.now() + TIME_MS.DAY,
             );
             if (!claimed) {
                 throw new Error("Suggestion not found or already acted upon");
@@ -197,7 +198,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 tx as any,
                 buildSuggestionAcceptRepeatKey(projectId, fresh.dedupeKey),
                 suggestionId,
-                Date.now() + 24 * 60 * 60 * 1000,
+                Date.now() + TIME_MS.DAY,
             );
             if (!claimed) {
                 throw new Error("Suggestion not found or already acted upon");
@@ -306,7 +307,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 tx as any,
                 buildSuggestionAcceptRepeatKey(projectId, fresh.dedupeKey),
                 suggestionId,
-                Date.now() + 24 * 60 * 60 * 1000,
+                Date.now() + TIME_MS.DAY,
             );
             if (!claimed) {
                 throw new Error("Suggestion not found or already acted upon");
@@ -400,7 +401,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                 tx as any,
                 buildSuggestionAcceptRepeatKey(projectId, fresh.dedupeKey),
                 suggestionId,
-                Date.now() + 24 * 60 * 60 * 1000,
+                Date.now() + TIME_MS.DAY,
             );
             if (!claimed) {
                 throw new Error("Suggestion not found or already acted upon");
@@ -421,7 +422,7 @@ export async function worldSuggestionAccept(input: AcceptInput): Promise<AcceptR
                         context: decisionPayload.context ?? null,
                         precedentKey: decisionPayload.precedentKey ?? null,
                         goalId: decisionPayload.goalId ?? suggestion.relatedGoalId ?? null,
-                        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                        expiresAt: new Date(Date.now() + TIME_MS.DAY),
                     },
                 })).id;
 
@@ -494,7 +495,7 @@ async function reopenExistingDecision(tx: { decision: { findFirst: typeof db.dec
             where: { id: decision.id },
             data: {
                 status: "pending",
-                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                expiresAt: new Date(Date.now() + TIME_MS.DAY),
             },
         });
     }

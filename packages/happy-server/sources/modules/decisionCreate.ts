@@ -5,6 +5,7 @@
 
 import { db } from "@/storage/db";
 import { inboxCreate } from "./inboxCreate";
+import { truncateText, TEXT_LIMITS, TIME_MS } from "./worldConstants";
 import { worldSuggestionRefresh } from "./worldSuggestionGenerate";
 
 interface DecisionCreateInput {
@@ -21,7 +22,7 @@ interface DecisionCreateInput {
 }
 
 export async function decisionCreate(input: DecisionCreateInput): Promise<{ id: string }> {
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    const expiresAt = new Date(Date.now() + TIME_MS.DAY);
 
     const decision = await db.decision.create({
         data: {
@@ -45,7 +46,7 @@ export async function decisionCreate(input: DecisionCreateInput): Promise<{ id: 
         category: "decision",
         eventType: "decision.created",
         severity: "warning",
-        title: input.question.length > 80 ? `${input.question.substring(0, 77)}...` : input.question,
+        title: truncateText(input.question, TEXT_LIMITS.TITLE),
         body: input.agentRole ? `From: ${input.agentRole}` : undefined,
         referenceUrl: `/decision/${decision.id}`,
         refType: "decision",

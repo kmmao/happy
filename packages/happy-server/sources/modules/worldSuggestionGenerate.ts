@@ -18,6 +18,7 @@ import {
     normalizeSuggestionFactText,
 } from "./summaryDetailFilter";
 import { autoAcceptSuggestedTasksIfEnabled } from "./worldSuggestionAutoAccept";
+import { truncateText, TEXT_LIMITS, TIME_MS } from "./worldConstants";
 import type { SuggestionBucket, SuggestionEvidence, SuggestionPayload, SuggestionSummary, SuggestionType } from "@kmmao/happy-wire";
 
 interface FailedTaskFact {
@@ -88,8 +89,8 @@ interface RefreshResult {
     debounced?: boolean;
 }
 
-const PROCESSING_STALE_MS = 5 * 60 * 1000;
-const REFRESH_DEBOUNCE_MS = 10_000;
+const PROCESSING_STALE_MS = TIME_MS.PROCESSING_STALE;
+const REFRESH_DEBOUNCE_MS = TIME_MS.REFRESH_DEBOUNCE;
 
 const RETRYABLE_ERROR_PATTERNS = [
     /timeout/i,
@@ -514,14 +515,14 @@ export function retryableFailedTask(task: FailedTaskFact): SuggestionCandidate {
         relatedGoalId: task.goalId,
         relatedTaskId: task.id,
         type: "suggested_task",
-        title: `Auto-retry: ${truncate(taskLabel, 60)}`,
+        title: `Auto-retry: ${truncateText(taskLabel, 60)}`,
         summary: `Task "${taskLabel}" failed with a transient error and can be safely retried.`,
-        reason: `Transient error detected: ${truncate(errorSummary, 200)}`,
+        reason: `Transient error detected: ${truncateText(errorSummary, 200)}`,
         evidence: [{ kind: "task", id: task.id, label: `Failed: ${taskLabel}` }],
         recommendedRole: "builder",
         payload: {
             task: {
-                title: `Retry: ${truncate(taskLabel, 60)}`,
+                title: `Retry: ${truncateText(taskLabel, 60)}`,
                 prompt: [
                     `The previous task "${taskLabel}" failed with a transient error.`,
                     `Error: ${errorSummary}`,
@@ -550,16 +551,16 @@ export function blockedGoalSupplement(goal: BlockedGoalFact): SuggestionCandidat
         relatedGoalId: goal.id,
         relatedTaskId: blocker.sourceTaskId ?? null,
         type: "suggested_task",
-        title: `Explore blocker: ${truncate(goal.title, 56)}`,
+        title: `Explore blocker: ${truncateText(goal.title, 56)}`,
         summary: `Read-only investigation to understand what is blocking goal "${goal.title}".`,
-        reason: `Blocker identified but may be resolvable autonomously: ${truncate(blockerSummary, 160)}`,
+        reason: `Blocker identified but may be resolvable autonomously: ${truncateText(blockerSummary, 160)}`,
         evidence: [
             { kind: "goal", id: goal.id, label: `Blocked: ${goal.title}` },
         ],
         recommendedRole: "analyst",
         payload: {
             task: {
-                title: `Investigate: ${truncate(goal.title, 56)}`,
+                title: `Investigate: ${truncateText(goal.title, 56)}`,
                 prompt: [
                     `Goal "${goal.title}" is blocked.`,
                     goal.description ? `Goal description: ${goal.description}` : "",
@@ -588,14 +589,14 @@ export function failedTaskFollowup(task: FailedTaskFact): SuggestionCandidate {
         relatedGoalId: task.goalId,
         relatedTaskId: task.id,
         type: "suggested_task",
-        title: `Follow up: ${truncate(taskLabel, 60)}`,
+        title: `Follow up: ${truncateText(taskLabel, 60)}`,
         summary: `Task "${taskLabel}" failed and still has retry budget. Run a focused follow-up task before escalating.`,
-        reason: `Task failed with: ${truncate(errorSummary, 200)}`,
+        reason: `Task failed with: ${truncateText(errorSummary, 200)}`,
         evidence: [{ kind: "task", id: task.id, label: `Failed: ${taskLabel}` }],
         recommendedRole: "builder",
         payload: {
             task: {
-                title: `Fix: ${truncate(taskLabel, 60)}`,
+                title: `Fix: ${truncateText(taskLabel, 60)}`,
                 prompt: [
                     `The previous task "${taskLabel}" failed.`,
                     `Error: ${errorSummary}`,
@@ -623,9 +624,9 @@ export function retryExhaustedDecision(task: FailedTaskFact): SuggestionCandidat
         relatedGoalId: task.goalId,
         relatedTaskId: task.id,
         type: "suggested_decision",
-        title: `Decide next step: ${truncate(taskLabel, 60)}`,
+        title: `Decide next step: ${truncateText(taskLabel, 60)}`,
         summary: `Task "${taskLabel}" exhausted retries. Human decision is needed before more execution.`,
-        reason: `Retry budget exhausted after ${task.attempt}/${task.maxAttempts} attempts. Last error: ${truncate(errorSummary, 160)}`,
+        reason: `Retry budget exhausted after ${task.attempt}/${task.maxAttempts} attempts. Last error: ${truncateText(errorSummary, 160)}`,
         evidence: [{ kind: "task", id: task.id, label: `Retry exhausted: ${taskLabel}` }],
         recommendedRole: null,
         payload: {
@@ -663,7 +664,7 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
             relatedGoalId: goal.id,
             relatedTaskId: null,
             type: "suggested_decision",
-            title: `Resolve planning timeout: ${truncate(goal.title, 50)}`,
+            title: `Resolve planning timeout: ${truncateText(goal.title, 50)}`,
             summary: `Goal "${goal.title}" is blocked because planning timed out and needs a human decision.`,
             reason: blockerSummary,
             evidence: [{ kind: "goal", id: goal.id, label: `Blocked: ${goal.title}` }],
@@ -692,7 +693,7 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
         relatedGoalId: goal.id,
         relatedTaskId: blocker.sourceTaskId ?? null,
         type: "suggested_task",
-        title: `Unblock: ${truncate(goal.title, 60)}`,
+        title: `Unblock: ${truncateText(goal.title, 60)}`,
         summary: `Goal "${goal.title}" is blocked. Create a focused task to remove the blocker.`,
         reason: blockerSummary,
         evidence: [
@@ -703,7 +704,7 @@ export function blockedGoalAttention(goal: BlockedGoalFact): SuggestionCandidate
         recommendedRole: blocker.requiresHuman ? null : "builder",
         payload: {
             task: {
-                title: `Unblock: ${truncate(goal.title, 60)}`,
+                title: `Unblock: ${truncateText(goal.title, 60)}`,
                 prompt: [
                     `Goal "${goal.title}" is blocked.`,
                     goal.description ? `Goal description: ${goal.description}` : "",
@@ -732,15 +733,15 @@ export function decisionAttention(decision: DecisionAttentionFact): SuggestionCa
         relatedTaskId: null,
         type: "suggested_decision",
         title: expired
-            ? `Expired decision: ${truncate(decision.question, 50)}`
-            : `Pending decision: ${truncate(decision.question, 50)}`,
+            ? `Expired decision: ${truncateText(decision.question, 50)}`
+            : `Pending decision: ${truncateText(decision.question, 50)}`,
         summary: expired
-            ? `Decision "${truncate(decision.question, 80)}" expired and still needs human attention.`
-            : `Decision "${truncate(decision.question, 80)}" is pending and needs human attention.`,
+            ? `Decision "${truncateText(decision.question, 80)}" expired and still needs human attention.`
+            : `Decision "${truncateText(decision.question, 80)}" is pending and needs human attention.`,
         reason: expired
             ? `Decision expired${decision.expiresAt ? ` at ${decision.expiresAt.toISOString()}` : ""}`
             : `Decision pending${decision.expiresAt ? ` until ${decision.expiresAt.toISOString()}` : ""}`,
-        evidence: [{ kind: "decision", id: decision.id, label: truncate(decision.question, 80) }],
+        evidence: [{ kind: "decision", id: decision.id, label: truncateText(decision.question, 80) }],
         recommendedRole: null,
         payload: {
             decision: {
@@ -771,17 +772,17 @@ export function completedTaskSkillSuggestion(task: CompletedTaskSkillFact): Sugg
         relatedGoalId: task.goalId,
         relatedTaskId: task.id,
         type: "suggested_skill",
-        title: `Extract skill: ${truncate(taskLabel, 60)}`,
+        title: `Extract skill: ${truncateText(taskLabel, 60)}`,
         summary: `Task "${taskLabel}" completed with a stable execution summary that can be reused as a skill.`,
-        reason: truncate(task.summary, 200),
+        reason: truncateText(task.summary, 200),
         evidence: [
             { kind: "task", id: task.id, label: `Completed: ${taskLabel}` },
-            { kind: "message", id: task.sessionId, label: truncate(task.summary, 100) },
+            { kind: "message", id: task.sessionId, label: truncateText(task.summary, 100) },
         ],
         recommendedRole: null,
         payload: {
             skill: {
-                title: `From task: ${truncate(taskLabel, 60)}`,
+                title: `From task: ${truncateText(taskLabel, 60)}`,
                 content: [
                     `When this pattern recurs, apply the approach proven by task \"${taskLabel}\".`,
                     `Successful outcome: ${task.summary}`,
@@ -858,7 +859,4 @@ function extractFactKey(dedupeKey: string): string {
     return parts.slice(1).join("|");
 }
 
-function truncate(str: string, max: number): string {
-    if (str.length <= max) return str;
-    return str.substring(0, max - 3) + "...";
-}
+// truncateText imported from worldConstants

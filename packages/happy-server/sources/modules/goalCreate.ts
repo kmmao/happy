@@ -10,6 +10,7 @@ import {
     buildGoalCreatedEphemeral,
 } from "@/app/events/eventRouter";
 import { log } from "@/utils/log";
+import { truncateText, TEXT_LIMITS } from "./worldConstants";
 
 interface GoalCreateInput {
     accountId: string;
@@ -89,7 +90,7 @@ export async function goalCreate(input: GoalCreateInput): Promise<GoalCreateResu
         category: "goal",
         eventType: "goal.created",
         severity: "info",
-        title: title.length > 80 ? `${title.substring(0, 77)}...` : title,
+        title: truncateText(title, TEXT_LIMITS.TITLE),
         body: `New goal created (priority: ${priority})`,
         referenceUrl: `/project/${projectId}/goals/${goal.id}`,
         refType: "goal",
