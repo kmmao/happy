@@ -63,6 +63,20 @@ describe('mapCodexMcpMessageToSessionEnvelopes', () => {
         });
     });
 
+    it('maps text deltas to text-delta envelopes', () => {
+        const result = mapCodexMcpMessageToSessionEnvelopes(
+            { type: 'text_delta', stream: 'item-1', delta: '你', thinking: false },
+            { currentTurnId: 'turn-1' }
+        );
+
+        expect(result.envelopes).toHaveLength(1);
+        expect(result.envelopes[0].ev).toEqual({
+            t: 'text-delta',
+            stream: 'item-1',
+            delta: '你',
+        });
+    });
+
     it('maps parent call linkage to subagent field', () => {
         const result = mapCodexMcpMessageToSessionEnvelopes(
             { type: 'agent_message', message: 'subagent hello', parent_call_id: 'parent-call-1' },

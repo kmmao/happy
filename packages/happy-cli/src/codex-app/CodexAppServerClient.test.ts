@@ -451,7 +451,7 @@ describe("CodexAppServerClient", () => {
     expect(events).toEqual(
       expect.arrayContaining([
         { type: "task_started" },
-        { type: "agent_message", message: "hello from codex" },
+        { type: "text_delta", stream: "item-1", delta: "hello from codex" },
         { type: "task_complete", status: "completed" },
       ]),
     );

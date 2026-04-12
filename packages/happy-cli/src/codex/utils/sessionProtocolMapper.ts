@@ -317,6 +317,51 @@ export function mapCodexMcpMessageToSessionEnvelopes(
     };
   }
 
+  if (type === "text_delta") {
+    if (
+      typeof message.stream !== "string" ||
+      message.stream.length === 0 ||
+      typeof message.delta !== "string" ||
+      message.delta.length === 0
+    ) {
+      return {
+        currentTurnId: state.currentTurnId,
+        startedSubagents,
+        activeSubagents,
+        providerSubagentToSessionSubagent,
+        envelopes: [],
+      };
+    }
+
+    const envelopes: SessionEnvelope[] = [];
+    maybeEmitSubagentStart(
+      subagent,
+      opts,
+      startedSubagents,
+      activeSubagents,
+      envelopes,
+    );
+    envelopes.push(
+      createEnvelope(
+        "agent",
+        {
+          t: "text-delta",
+          stream: message.stream,
+          delta: message.delta,
+          ...(message.thinking ? { thinking: true } : {}),
+        } as any,
+        opts,
+      ),
+    );
+    return {
+      currentTurnId: state.currentTurnId,
+      startedSubagents,
+      activeSubagents,
+      providerSubagentToSessionSubagent,
+      envelopes,
+    };
+  }
+
   if (type === "service_message") {
     if (typeof message.text !== "string" || message.text.length === 0) {
       return {

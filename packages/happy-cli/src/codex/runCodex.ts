@@ -221,9 +221,13 @@ export async function runCodex(opts: {
   rawMetadata.codex = {
     ...rawMetadata.codex,
     requestedBackend,
-    ...(requestedBackend === "codex-mcp-legacy"
+    ...((requestedBackend === "codex-mcp-legacy" ||
+      (requestedBackend === "auto" && !supportsCodexAppServer()))
       ? { resolvedBackend: "codex-mcp-legacy" as const }
-      : {}),
+      : requestedBackend === "codex-app-server" ||
+          (requestedBackend === "auto" && supportsCodexAppServer())
+        ? { resolvedBackend: "codex-app-server" as const }
+        : {}),
     configMode: runtimeConfig.configMode,
     ...(runtimeConfig.profileName
       ? {

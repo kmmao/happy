@@ -1059,23 +1059,40 @@ export class CodexAppServerClient {
         return;
       }
       case "item/agentMessage/delta": {
+        const notification =
+          params && typeof params === "object"
+            ? (params as { delta?: unknown; itemId?: unknown })
+            : {};
         const delta =
-          params && typeof params === "object" && typeof (params as { delta?: unknown }).delta === "string"
-            ? (params as { delta: string }).delta
-            : "";
-        if (delta) {
-          this.handler?.({ type: "agent_message", message: delta });
+          typeof notification.delta === "string" ? notification.delta : "";
+        const itemId =
+          typeof notification.itemId === "string" ? notification.itemId : null;
+        if (delta && itemId) {
+          this.handler?.({
+            type: "text_delta",
+            stream: itemId,
+            delta,
+          });
         }
         return;
       }
       case "item/reasoning/textDelta":
       case "item/reasoning/summaryTextDelta": {
+        const notification =
+          params && typeof params === "object"
+            ? (params as { delta?: unknown; itemId?: unknown })
+            : {};
         const delta =
-          params && typeof params === "object" && typeof (params as { delta?: unknown }).delta === "string"
-            ? (params as { delta: string }).delta
-            : "";
-        if (delta) {
-          this.handler?.({ type: "agent_reasoning_delta", delta });
+          typeof notification.delta === "string" ? notification.delta : "";
+        const itemId =
+          typeof notification.itemId === "string" ? notification.itemId : null;
+        if (delta && itemId) {
+          this.handler?.({
+            type: "text_delta",
+            stream: itemId,
+            delta,
+            thinking: true,
+          });
         }
         return;
       }
