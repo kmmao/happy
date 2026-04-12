@@ -33,6 +33,7 @@ import {
   type WebhookTriggerData, type SupervisorTriggerData, type TaskTriggerData,
 } from "../daemon/triggerHandlers";
 import type { AutomationScheduler } from "../daemon/scheduler";
+import type { AgentLoopCoordinator, CreateLoopInput } from "../daemon/loopCoordinator";
 
 const TAILSCALE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -119,6 +120,7 @@ export class MachineClient {
   private automationServerUrl = "";
   private automationAuthToken = "";
   private scheduler: AutomationScheduler | null = null;
+  private loopCoordinator: AgentLoopCoordinator | null = null;
 
   constructor(opts: MachineClientOptions) {
     this.token = opts.token;
@@ -178,6 +180,46 @@ export class MachineClient {
         happySessionId: s.happySessionId,
       }));
       return { sessions };
+    });
+  }
+
+  private registerLoopHandlers(): void {
+    const coord = this.loopCoordinator!;
+
+    this.rpcHandlerManager.registerHandler<
+      CreateLoopInput,
+      { loop: { id: string; name: string; state: string } }
+    >("create-loop", async (data) => {
+      const loop = coord.createLoop(data);
+      return { loop: { id: loop.id, name: loop.name, state: loop.state } };
+    });
+
+    this.rpcHandlerManager.registerHandler<
+      Record<string, never>,
+      { loops: Array<{ id: string; name: string; state: string; iteration: number; intervalMs: number }> }
+    >("list-loops", async () => {
+      return { loops: coord.listLoops() };
+    });
+
+    this.rpcHandlerManager.registerHandler<
+      { loopId: string },
+      { success: boolean }
+    >("pause-loop", async (data) => {
+      return { success: coord.pauseLoop(data.loopId) };
+    });
+
+    this.rpcHandlerManager.registerHandler<
+      { loopId: string },
+      { success: boolean }
+    >("resume-loop", async (data) => {
+      return { success: coord.resumeLoop(data.loopId) };
+    });
+
+    this.rpcHandlerManager.registerHandler<
+      { loopId: string },
+      { success: boolean }
+    >("delete-loop", async (data) => {
+      return { success: coord.deleteLoop(data.loopId) };
     });
   }
 
@@ -449,11 +491,20 @@ export class MachineClient {
    * Enable automation handling — agent will process webhook, supervisor,
    * and task triggers from the server by spawning Happy CLI sessions.
    */
-  enableAutomation(serverUrl: string, authToken: string, scheduler: AutomationScheduler): void {
+  enableAutomation(
+    serverUrl: string,
+    authToken: string,
+    scheduler: AutomationScheduler,
+    loopCoordinator?: AgentLoopCoordinator,
+  ): void {
     this.automationEnabled = true;
     this.automationServerUrl = serverUrl;
     this.automationAuthToken = authToken;
     this.scheduler = scheduler;
+    this.loopCoordinator = loopCoordinator ?? null;
+    if (this.loopCoordinator) {
+      this.registerLoopHandlers();
+    }
     logger.debug("[MACHINE] Automation enabled");
   }
 
