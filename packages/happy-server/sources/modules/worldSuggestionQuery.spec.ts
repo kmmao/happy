@@ -85,6 +85,8 @@ describe("worldSuggestionQuery", () => {
                 actedAt: null,
                 acceptSource: null,
                 acceptAudit: null,
+                autoAcceptStatus: null,
+                autoAcceptReasonCode: null,
             },
         ];
 
@@ -126,6 +128,8 @@ describe("worldSuggestionQuery", () => {
                 actedAt: null,
                 acceptSource: null,
                 acceptAudit: null,
+                autoAcceptStatus: null,
+                autoAcceptReasonCode: null,
             },
         ];
 
@@ -172,6 +176,8 @@ describe("worldSuggestionQuery", () => {
                     rule: "safe_suggested_task_auto_accept",
                     checks: ["type:suggested_task"],
                 }),
+                autoAcceptStatus: null,
+                autoAcceptReasonCode: null,
             },
         ];
 
@@ -187,6 +193,80 @@ describe("worldSuggestionQuery", () => {
                     rule: "safe_suggested_task_auto_accept",
                     checks: ["type:suggested_task"],
                 },
+            }),
+        ]);
+    });
+
+    it("returns auto-accept skipped and failed outcome fields in serialized suggestions", async () => {
+        state.suggestions = [
+            {
+                id: "sug-skip-1",
+                accountId: "user-1",
+                projectId: "project-1",
+                relatedGoalId: null,
+                relatedTaskId: "task-1",
+                type: "suggested_task",
+                title: "Retry failed API",
+                summary: "summary",
+                reason: "reason",
+                evidence: "[]",
+                recommendedRole: "builder",
+                payload: JSON.stringify({
+                    task: { title: "Retry failed API", prompt: "Inspect retry logic", priority: "user" },
+                }),
+                requiresHuman: false,
+                status: "open",
+                dedupeKey: "dedupe:skip-1",
+                bucket: "next_step",
+                createdAt: new Date("2026-04-10T12:00:00Z"),
+                actedAt: null,
+                acceptSource: null,
+                acceptAudit: null,
+                autoAcceptStatus: "skipped",
+                autoAcceptReasonCode: "quota_exhausted",
+            },
+            {
+                id: "sug-fail-1",
+                accountId: "user-1",
+                projectId: "project-1",
+                relatedGoalId: null,
+                relatedTaskId: "task-2",
+                type: "suggested_task",
+                title: "Retry failed queue",
+                summary: "summary",
+                reason: "reason",
+                evidence: "[]",
+                recommendedRole: "builder",
+                payload: JSON.stringify({
+                    task: { title: "Retry failed queue", prompt: "Inspect queue", priority: "user" },
+                }),
+                requiresHuman: false,
+                status: "open",
+                dedupeKey: "dedupe:fail-1",
+                bucket: "next_step",
+                createdAt: new Date("2026-04-10T12:10:00Z"),
+                actedAt: null,
+                acceptSource: null,
+                acceptAudit: null,
+                autoAcceptStatus: "failed",
+                autoAcceptReasonCode: "accept_failed",
+            },
+        ];
+
+        const result = await worldSuggestionQuery("user-1", "project-1", {
+            status: "open",
+        });
+
+        expect(result).toEqual([
+            expect.objectContaining({
+                id: "sug-fail-1",
+                autoAcceptStatus: "failed",
+                autoAcceptReasonCode: "accept_failed",
+            }),
+            expect.objectContaining({
+                id: "sug-skip-1",
+                autoAcceptStatus: "skipped",
+                autoAcceptReasonCode: "quota_exhausted",
             }),
         ]);
     });

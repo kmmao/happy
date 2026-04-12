@@ -1,8 +1,12 @@
 import {
   SuggestionAcceptAuditSchema,
+  SUGGESTION_AUTO_ACCEPT_REASON_CODES,
+  SUGGESTION_AUTO_ACCEPT_STATUSES,
   getSuggestionPayloadSchema,
   type SuggestionAcceptAudit,
   type SuggestionAcceptSource,
+  type SuggestionAutoAcceptReasonCode,
+  type SuggestionAutoAcceptStatus,
   type SuggestionBucket,
   type SuggestionEvidence,
   type SuggestionPayload,
@@ -29,6 +33,8 @@ export function serializeSuggestion(row: {
   bucket?: SuggestionBucket | null;
   acceptSource?: SuggestionAcceptSource | null;
   acceptAudit?: string | null;
+  autoAcceptStatus?: string | null;
+  autoAcceptReasonCode?: string | null;
   createdAt: Date;
   actedAt: Date | null;
 }): SuggestionSerialized {
@@ -56,6 +62,8 @@ export function serializeSuggestion(row: {
     }),
     acceptSource: row.acceptSource ?? null,
     acceptAudit: parseAcceptAudit(row.acceptAudit),
+    autoAcceptStatus: parseAutoAcceptStatus(row.autoAcceptStatus),
+    autoAcceptReasonCode: parseAutoAcceptReasonCode(row.autoAcceptReasonCode),
     createdAt: row.createdAt.getTime(),
     actedAt: row.actedAt?.getTime() ?? null,
   };
@@ -157,6 +165,18 @@ function parseAcceptAudit(raw: string | null | undefined): SuggestionAcceptAudit
   } catch {
     return null;
   }
+}
+
+function parseAutoAcceptStatus(raw: string | null | undefined): SuggestionAutoAcceptStatus | null {
+  return raw && SUGGESTION_AUTO_ACCEPT_STATUSES.includes(raw as SuggestionAutoAcceptStatus)
+    ? raw as SuggestionAutoAcceptStatus
+    : null;
+}
+
+function parseAutoAcceptReasonCode(raw: string | null | undefined): SuggestionAutoAcceptReasonCode | null {
+  return raw && SUGGESTION_AUTO_ACCEPT_REASON_CODES.includes(raw as SuggestionAutoAcceptReasonCode)
+    ? raw as SuggestionAutoAcceptReasonCode
+    : null;
 }
 
 function safeParseJson<T>(raw: string, fallback: T): T {

@@ -3795,6 +3795,9 @@ export const zhHans: TranslationStructure = {
     typeSkill: "技能",
     typeDecision: "决策",
     autoAcceptReasonSafeTask: "因命中安全的下一步任务规则而自动接受",
+    autoAcceptSkippedQuota: "因当日自动接受配额已用尽，未自动接受",
+    autoAcceptSkippedAlreadyActed: "因该建议已被处理，未自动接受",
+    autoAcceptFailed: "已尝试自动接受，但失败了",
   },
   roles: {
     title: "角色",

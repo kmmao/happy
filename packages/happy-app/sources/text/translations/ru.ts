@@ -3907,6 +3907,9 @@ export const ru: TranslationStructure = {
     typeSkill: "Skill",
     typeDecision: "Decision",
     autoAcceptReasonSafeTask: "Принято автоматически, потому что совпало с безопасным правилом следующего task",
+    autoAcceptSkippedQuota: "Не принято автоматически, потому что дневная квота авто-принятия исчерпана",
+    autoAcceptSkippedAlreadyActed: "Не принято автоматически, потому что это предложение уже обработано",
+    autoAcceptFailed: "Была попытка авто-принятия, но она завершилась неудачей",
   },
   roles: {
     title: "Roles",

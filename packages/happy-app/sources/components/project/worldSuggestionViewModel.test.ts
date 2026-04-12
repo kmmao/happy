@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getSuggestionAcceptanceLabelKey,
+  getSuggestionAutoAcceptOutcomeKey,
   getSuggestionAutoAcceptReasonKey,
   getSuggestionTypeLabelKey,
   getSuggestionTypeConfig,
@@ -44,6 +45,8 @@ function createSuggestion(overrides: Partial<SuggestionSummary>): SuggestionSumm
     actedAt: null,
     acceptSource: null,
     acceptAudit: null,
+    autoAcceptStatus: null,
+    autoAcceptReasonCode: null,
     ...overrides,
   } as SuggestionSummary;
 }
@@ -154,6 +157,41 @@ describe("getSuggestionAutoAcceptReasonKey", () => {
         rule: "safe_suggested_task_auto_accept",
         checks: ["type:suggested_task"],
       },
+    }))).toBe(null);
+  });
+});
+
+describe("getSuggestionAutoAcceptOutcomeKey", () => {
+  it("returns skipped quota key for skipped suggestions with quota reason", () => {
+    expect(getSuggestionAutoAcceptOutcomeKey(createSuggestion({
+      status: "open",
+      autoAcceptStatus: "skipped",
+      autoAcceptReasonCode: "quota_exhausted",
+    }))).toBe("suggestions.autoAcceptSkippedQuota");
+  });
+
+  it("returns skipped already-acted key for skipped suggestions with race reason", () => {
+    expect(getSuggestionAutoAcceptOutcomeKey(createSuggestion({
+      status: "open",
+      autoAcceptStatus: "skipped",
+      autoAcceptReasonCode: "already_acted",
+    }))).toBe("suggestions.autoAcceptSkippedAlreadyActed");
+  });
+
+  it("returns failed key for failed suggestions with accept failure reason", () => {
+    expect(getSuggestionAutoAcceptOutcomeKey(createSuggestion({
+      status: "open",
+      autoAcceptStatus: "failed",
+      autoAcceptReasonCode: "accept_failed",
+    }))).toBe("suggestions.autoAcceptFailed");
+  });
+
+  it("returns null when no tracked auto-accept outcome is present", () => {
+    expect(getSuggestionAutoAcceptOutcomeKey(createSuggestion({
+      status: "accepted",
+      acceptSource: "system_auto",
+      autoAcceptStatus: null,
+      autoAcceptReasonCode: null,
     }))).toBe(null);
   });
 });

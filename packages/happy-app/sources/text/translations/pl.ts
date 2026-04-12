@@ -3909,6 +3909,9 @@ export const pl: TranslationStructure = {
     typeSkill: "Skill",
     typeDecision: "Decision",
     autoAcceptReasonSafeTask: "Zaakceptowano automatycznie, ponieważ pasuje do bezpiecznej reguły następnego taska",
+    autoAcceptSkippedQuota: "Nie zaakceptowano automatycznie, ponieważ dzienny limit automatycznych akceptacji został wyczerpany",
+    autoAcceptSkippedAlreadyActed: "Nie zaakceptowano automatycznie, ponieważ ta sugestia została już obsłużona",
+    autoAcceptFailed: "Próba automatycznej akceptacji nie powiodła się",
   },
   roles: {
     title: "Roles",

@@ -9,6 +9,7 @@ const { worldSuggestionAccept, dbMock } = vi.hoisted(() => ({
   dbMock: {
     worldSuggestion: {
       count: vi.fn(async () => 0),
+      update: vi.fn(async () => ({})),
     },
   },
 }));
@@ -82,7 +83,10 @@ describe("shouldAutoAcceptSuggestedTask", () => {
         createdAt: 1,
         actedAt: null,
         acceptSource: null,
-      },
+        acceptAudit: null,
+        autoAcceptStatus: null,
+        autoAcceptReasonCode: null,
+      } as any,
     })).toBe(true);
   });
 
@@ -108,7 +112,10 @@ describe("shouldAutoAcceptSuggestedTask", () => {
         createdAt: 1,
         actedAt: 1,
         acceptSource: "system_auto",
-      },
+        acceptAudit: null,
+        autoAcceptStatus: null,
+        autoAcceptReasonCode: null,
+      } as any,
     })).toBe(false);
   });
 
@@ -134,7 +141,10 @@ describe("shouldAutoAcceptSuggestedTask", () => {
         createdAt: 1,
         actedAt: null,
         acceptSource: null,
-      },
+        acceptAudit: null,
+        autoAcceptStatus: null,
+        autoAcceptReasonCode: null,
+      } as any,
     })).toBe(false);
   });
 
@@ -160,7 +170,10 @@ describe("shouldAutoAcceptSuggestedTask", () => {
         createdAt: 1,
         actedAt: null,
         acceptSource: null,
-      },
+        acceptAudit: null,
+        autoAcceptStatus: null,
+        autoAcceptReasonCode: null,
+      } as any,
     })).toBe(false);
   });
 
@@ -186,7 +199,10 @@ describe("shouldAutoAcceptSuggestedTask", () => {
         createdAt: 1,
         actedAt: null,
         acceptSource: null,
-      },
+        acceptAudit: null,
+        autoAcceptStatus: null,
+        autoAcceptReasonCode: null,
+      } as any,
     })).toBe(false);
   });
 });
@@ -213,7 +229,10 @@ describe("buildAutoAcceptAudit", () => {
         createdAt: 1,
         actedAt: null,
         acceptSource: null,
-      },
+        acceptAudit: null,
+        autoAcceptStatus: null,
+        autoAcceptReasonCode: null,
+      } as any,
     });
 
     expect(audit).toEqual({
@@ -260,7 +279,10 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
           createdAt: 1,
           actedAt: null,
           acceptSource: null,
-        },
+          acceptAudit: null,
+          autoAcceptStatus: null,
+          autoAcceptReasonCode: null,
+        } as any,
       ],
     });
 
@@ -282,7 +304,58 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
     });
   });
 
-  it("skips stale non-open suggestions instead of re-accepting them", async () => {
+  it("records skipped status when daily quota is exhausted", async () => {
+    dbMock.worldSuggestion.count.mockResolvedValue(2);
+
+    await autoAcceptSuggestedTasksIfEnabled({
+      accountId: "user-1",
+      projectId: "project-1",
+      supervisorConfig: JSON.stringify({
+        worldAutonomy: {
+          autoAcceptSafeSuggestedTasks: true,
+          maxAutoAcceptsPerDay: 2,
+        },
+      }),
+      suggestions: [
+        {
+          id: "sug-1",
+          projectId: "project-1",
+          relatedGoalId: null,
+          relatedTaskId: null,
+          type: "suggested_task",
+          title: "Investigate API retry",
+          summary: "summary",
+          reason: "reason",
+          evidence: [],
+          recommendedRole: null,
+          payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic" } },
+          requiresHuman: false,
+          status: "open",
+          dedupeKey: "dedupe:1",
+          bucket: "next_step",
+          createdAt: 1,
+          actedAt: null,
+          acceptSource: null,
+          acceptAudit: null,
+          autoAcceptStatus: null,
+          autoAcceptReasonCode: null,
+        } as any,
+      ],
+    });
+
+    expect(worldSuggestionAccept).not.toHaveBeenCalled();
+    expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
+      where: { id: "sug-1" },
+      data: {
+        autoAcceptStatus: "skipped",
+        autoAcceptReasonCode: "quota_exhausted",
+      },
+    });
+  });
+
+  it("records skipped status when accept loses already-acted race", async () => {
+    worldSuggestionAccept.mockRejectedValueOnce(new Error("Suggestion not found or already acted upon"));
+
     await autoAcceptSuggestedTasksIfEnabled({
       accountId: "user-1",
       projectId: "project-1",
@@ -301,27 +374,30 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
           recommendedRole: null,
           payload: { task: { title: "Investigate API retry", prompt: "Inspect retry logic" } },
           requiresHuman: false,
-          status: "accepted",
+          status: "open",
           dedupeKey: "dedupe:1",
           bucket: "next_step",
           createdAt: 1,
-          actedAt: 1,
-          acceptSource: "system_auto",
-        },
+          actedAt: null,
+          acceptSource: null,
+          acceptAudit: null,
+          autoAcceptStatus: null,
+          autoAcceptReasonCode: null,
+        } as any,
       ],
     });
 
-    expect(worldSuggestionAccept).not.toHaveBeenCalled();
+    expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
+      where: { id: "sug-1" },
+      data: {
+        autoAcceptStatus: "skipped",
+        autoAcceptReasonCode: "already_acted",
+      },
+    });
   });
 
-  it("ignores already-acted accept races instead of failing the whole batch", async () => {
-    worldSuggestionAccept
-      .mockRejectedValueOnce(new Error("Suggestion not found or already acted upon"))
-      .mockResolvedValueOnce({
-        suggestionId: "sug-2",
-        createdEntityType: "task",
-        createdEntityId: "task-2",
-      });
+  it("records failed status when accept throws a non-race error", async () => {
+    worldSuggestionAccept.mockRejectedValueOnce(new Error("dispatch failed"));
 
     await expect(autoAcceptSuggestedTasksIfEnabled({
       accountId: "user-1",
@@ -347,31 +423,20 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
           createdAt: 1,
           actedAt: null,
           acceptSource: null,
-        },
-        {
-          id: "sug-2",
-          projectId: "project-1",
-          relatedGoalId: null,
-          relatedTaskId: null,
-          type: "suggested_task",
-          title: "Inspect flaky queue",
-          summary: "summary",
-          reason: "reason",
-          evidence: [],
-          recommendedRole: null,
-          payload: { task: { title: "Inspect flaky queue", prompt: "Inspect queue state" } },
-          requiresHuman: false,
-          status: "open",
-          dedupeKey: "dedupe:2",
-          bucket: "next_step",
-          createdAt: 2,
-          actedAt: null,
-          acceptSource: null,
-        },
+          acceptAudit: null,
+          autoAcceptStatus: null,
+          autoAcceptReasonCode: null,
+        } as any,
       ],
-    })).resolves.toBeUndefined();
+    })).rejects.toThrow("dispatch failed");
 
-    expect(worldSuggestionAccept).toHaveBeenCalledTimes(2);
+    expect(dbMock.worldSuggestion.update).toHaveBeenCalledWith({
+      where: { id: "sug-1" },
+      data: {
+        autoAcceptStatus: "failed",
+        autoAcceptReasonCode: "accept_failed",
+      },
+    });
   });
 
   it("counts only system_auto accepts toward the daily quota", async () => {
@@ -432,7 +497,10 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
           createdAt: 1,
           actedAt: null,
           acceptSource: null,
-        },
+          acceptAudit: null,
+          autoAcceptStatus: null,
+          autoAcceptReasonCode: null,
+        } as any,
       ],
     });
 
@@ -471,7 +539,10 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
           createdAt: 1,
           actedAt: null,
           acceptSource: null,
-        },
+          acceptAudit: null,
+          autoAcceptStatus: null,
+          autoAcceptReasonCode: null,
+        } as any,
         {
           id: "sug-2",
           projectId: "project-1",
@@ -491,7 +562,10 @@ describe("autoAcceptSuggestedTasksIfEnabled", () => {
           createdAt: 2,
           actedAt: null,
           acceptSource: null,
-        },
+          acceptAudit: null,
+          autoAcceptStatus: null,
+          autoAcceptReasonCode: null,
+        } as any,
       ],
     });
 

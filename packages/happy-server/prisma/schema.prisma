@@ -1183,6 +1183,8 @@ model WorldSuggestion {
     bucket          String    @default("next_step") // next_step | needs_decision | needs_human_input
     acceptSource    String?   // human | system_auto
     acceptAudit     String?   // JSON: { rule, checks }
+    autoAcceptStatus String?  // skipped | failed
+    autoAcceptReasonCode String? // quota_exhausted | already_acted | accept_failed
     actedAt         DateTime?
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt

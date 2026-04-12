@@ -101,6 +101,19 @@ export function getSuggestionAutoAcceptReasonKey(suggestion: SuggestionSummary):
     return null;
 }
 
+export function getSuggestionAutoAcceptOutcomeKey(suggestion: SuggestionSummary): TranslationKey | null {
+    if (suggestion.autoAcceptStatus === "skipped" && suggestion.autoAcceptReasonCode === "quota_exhausted") {
+        return "suggestions.autoAcceptSkippedQuota";
+    }
+    if (suggestion.autoAcceptStatus === "skipped" && suggestion.autoAcceptReasonCode === "already_acted") {
+        return "suggestions.autoAcceptSkippedAlreadyActed";
+    }
+    if (suggestion.autoAcceptStatus === "failed" && suggestion.autoAcceptReasonCode === "accept_failed") {
+        return "suggestions.autoAcceptFailed";
+    }
+    return null;
+}
+
 export function shouldShowSuggestionActions(suggestion: SuggestionSummary): boolean {
     return suggestion.status === "open" || suggestion.status === "suspended";
 }

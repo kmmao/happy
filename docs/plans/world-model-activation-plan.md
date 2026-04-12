@@ -649,6 +649,10 @@ World 中增加：
 - `worldSuggestionAutoAccept.ts` 已集中产出 `safe_suggested_task_auto_accept` 审计快照，当前 checks 至少覆盖：`type`、`bucket`、`requiresHuman`、payload 非空、evidence 干净。
 - `worldSuggestionAccept()` 已兼容可选 `acceptAudit` 入参，并把快照持久化到 `WorldSuggestion`；manual 路径默认仍为 `acceptAudit = null`。
 - `worldSuggestionAutoAccept.ts` 已进一步接入 project 级每日配额保护：当前支持 `maxAutoAcceptsPerDay`，并且只统计同一 project 下 `acceptSource = system_auto` 且当日已 accepted 的 suggestion。
+- 对“进入过 auto-accept 评估但未自动落地”的高价值结果，已补最小只读痕迹：当前只覆盖 `quota_exhausted -> skipped`、`already_acted -> skipped`、`accept_failed -> failed` 三类 outcome，并持久化到 `WorldSuggestion.autoAcceptStatus/autoAcceptReasonCode`。
+- query / serialize / wire contract 已继续打通 `autoAcceptStatus` 与 `autoAcceptReasonCode`，现有 suggestion 拉取链路可返回这些最小 outcome 字段。
+- App 侧继续复用现有 `worldSuggestionViewModel.ts` + `SuggestionCard` 链路，为 skipped / failed outcome 展示最小只读文案；不新增 dashboard、explain panel 或第二套 suggestion UI。
+- 当前展示仍保持硬边界：只显示最小可审计结果，不记录普通 rule mismatch，不改变 manual accept 行为，也不把 skipped / failed 变成可操作审批流。
 - 配额为 0 时，白名单 suggestion 会保持 `open` 而不是继续自动接受；有剩余额度时，也只会在当前 refresh 批次内接受到剩余额度为止。
 - 当前实现仍保持最小：只做每日数量硬上限，不引入并发保护、审批列表或自治面板，也不影响 human accept 路径。
 - 已补齐这一轮 TDD 回归：`worldSuggestionAutoAccept.spec.ts` 已覆盖默认无上限、读取 `maxAutoAcceptsPerDay`、配额耗尽时不 auto、剩余额度只接受前 N 条；相关 server 回归 34 个测试通过，`happy-server tsc --noEmit` 通过。
@@ -927,6 +931,7 @@ World 逐步从 Goal list 演进为：
 | 2026-04-10 | 阶段 C 实施计划定稿：3 Phase 拆解（Server 真相源 → App 展示 → Skill 可选闭环），新增 `WorldSuggestion` 模型设计、4 类输入源、3 条 generator 规则、REST/ephemeral 接口草案 |
 | 2026-04-11 | 阶段 D 最后稳定化尾项完成：`SuggestionSummary / payload` 已收成严格判别联合，wire 中的 summary 类型与 `type` 绑定 `payload` 分支，server `serializeSuggestion()` 输出严格结构，app 关键消费点已利用 `type` 自动收窄，相关 wire build / server tests / app typecheck / app tests 全绿 |
 | 2026-04-11 | 阶段 D / Phase 3 完成：Suggestion 共享契约已迁入 `happy-wire`，app/server 主要消费链已切到 wire（含 `apiWorld.ts`、`apiTypes.ts`、server 生产代码与 event builder），本地过渡层已移除；accept 写链路保持 strict validate + fail-closed；已通过 wire build、app typecheck 与 server world suggestion 相关 tests |
+| 2026-04-12 | 阶段 E skipped / failed 最小可见性已落地：对进入过 auto-accept 评估但未自动落地的 suggestion，当前只保留三类最小只读痕迹——`quota_exhausted -> skipped`、`already_acted -> skipped`、`accept_failed -> failed`；相关 outcome 已通过 `WorldSuggestion.autoAcceptStatus/autoAcceptReasonCode` 持久化，并经 wire / query / view model / `SuggestionCard` 打通展示，不新增 dashboard / explain panel，也不改变 manual accept 行为 |
 | 2026-04-12 | 阶段 E accept 侧 logical dedupe 已覆盖 goal 分支：`worldSuggestionAccept()` 现对 suggested_goal 也基于 `projectId + dedupeKey` 使用 `RepeatKey` 做逻辑 claim；winner 先进入 `processing`，`goalCreate()` 成功后再将 open/suspended siblings 收口为 `expired`，失败时仅回退 winner 为 `suspended` |
 | 2026-04-12 | 阶段 E 配额统计口径已修正：`maxAutoAcceptsPerDay` 现在只统计当日 `acceptSource = system_auto` 的 accepted suggestion，已补对应回归测试 |
 | 2026-04-12 | 阶段 E accept 侧 logical dedupe 已落地：`worldSuggestionAccept()` 在 task / skill / decision 分支基于 `projectId + dedupeKey` 使用 `RepeatKey` 做逻辑 claim，并在 winner 成功后将 open/suspended siblings 收口为 `expired`，避免同一逻辑 suggestion 被重复 accept 或重复创建实体 |
@@ -1029,9 +1034,10 @@ World 逐步从 Goal list 演进为：
 - `worldSuggestionAutoAccept.ts` 负责 project 级显式开关与白名单低风险 `suggested_task` 判定
 - auto-accept 强制复用 `worldSuggestionAccept()`，并显式写入 `acceptSource: system_auto`
 - `worldSuggestionAccept()` 按来源区分 `triggerType: manual | suggestion_auto`，同时把 `acceptSource` 持久化到 `WorldSuggestion`
-- query / serialize / wire contract 已可返回 `acceptSource` 与 `acceptAudit`
-- App 侧通过 `worldSuggestionViewModel.ts` 统一派生 accepted 来源文案与最小原因文案，`SuggestionCard` 展示来源 badge + 轻量原因文本
+- query / serialize / wire contract 已可返回 `acceptSource`、`acceptAudit`、`autoAcceptStatus` 与 `autoAcceptReasonCode`
+- App 侧通过 `worldSuggestionViewModel.ts` 统一派生 accepted 来源文案、最小原因文案，以及 skipped / failed 的最小 outcome 文案；`SuggestionCard` 展示来源 badge + 轻量只读文本
 - `fetchSuggestions()` 已支持显式 `status` 查询；`WorldOverviewTab` 与 GoalDetail 现在都会同时拉取 `open` 与 `accepted` suggestion，并在现有 suggestion 流程中真实展示 accepted + system_auto 的来源/原因
+- 对进入过 auto-accept 评估但未自动落地的 suggestion，现有 suggestion UI 也已保留 skipped / failed 的最小只读可见性；当前仅覆盖 `quota_exhausted`、`already_acted`、`accept_failed` 三类高价值 outcome，不扩成审批流或 explain UI
 - `worldSuggestionAccept()` 已进一步接入 accept 侧 logical dedupe：task / skill / decision / goal 分支现在都基于 `projectId + dedupeKey` 使用 `RepeatKey` 做逻辑 claim；winner 成功后将同 dedupeKey 的 open/suspended sibling rows 收口为 `expired`，其中 goal 分支采用“先 processing、事务外 goalCreate、成功后 cleanup siblings、失败时仅 suspended winner”的最小方案
 - `maxAutoAcceptsPerDay` 现在只统计当日 `acceptSource = system_auto` 的 accepted suggestion，配额口径与文档一致
 - GoalDetail 的 suggestion 区继续直接复用 `SuggestionCard`，因此自动继承来源/原因展示，无需第二套展示逻辑
@@ -1040,4 +1046,4 @@ World 逐步从 Goal list 演进为：
 
 当前 World Model Activation 应表述为：
 
-> **阶段 A/B/C 已完成；阶段 D 已完成契约与稳定化收口；阶段 E 已落地最小自动 accept 入口、基础审计链路、最小原因展示、已接受 suggestion 可见性修复，以及 accept 侧 logical dedupe（现已覆盖 task / skill / decision / goal）；配额统计口径也已与 `system_auto` 审计语义对齐；完整自治策略、审批面板与可视化仍未开始；阶段 F-H 仍属规划。**
+> **阶段 A/B/C 已完成；阶段 D 已完成契约与稳定化收口；阶段 E 已落地最小自动 accept 入口、基础审计链路、最小原因展示、已接受 suggestion 可见性修复、skipped / failed 最小只读可见性，以及 accept 侧 logical dedupe（现已覆盖 task / skill / decision / goal）；配额统计口径也已与 `system_auto` 审计语义对齐；完整自治策略、审批面板与可视化仍未开始；阶段 F-H 仍属规划。**

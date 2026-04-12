@@ -93,18 +93,20 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
     maxAutoAcceptsPerDay: projectConfig.maxAutoAcceptsPerDay,
   });
 
-  if (remainingQuota === 0) {
-    return;
-  }
-
   let acceptedCount = 0;
 
   for (const suggestion of input.suggestions) {
     if (!shouldAutoAcceptSuggestedTask({ projectConfig, suggestion })) {
       continue;
     }
+
     if (remainingQuota !== null && acceptedCount >= remainingQuota) {
-      break;
+      await markAutoAcceptOutcome({
+        suggestionId: suggestion.id,
+        status: "skipped",
+        reasonCode: "quota_exhausted",
+      });
+      continue;
     }
 
     try {
@@ -118,8 +120,19 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
       acceptedCount += 1;
     } catch (error) {
       if (isAlreadyActedSuggestionError(error)) {
+        await markAutoAcceptOutcome({
+          suggestionId: suggestion.id,
+          status: "skipped",
+          reasonCode: "already_acted",
+        });
         continue;
       }
+
+      await markAutoAcceptOutcome({
+        suggestionId: suggestion.id,
+        status: "failed",
+        reasonCode: "accept_failed",
+      });
       throw error;
     }
   }
@@ -148,6 +161,20 @@ async function getRemainingDailyAutoAcceptQuota(input: {
   });
 
   return Math.max(input.maxAutoAcceptsPerDay - currentCount, 0);
+}
+
+async function markAutoAcceptOutcome(input: {
+  suggestionId: string;
+  status: "skipped" | "failed";
+  reasonCode: "quota_exhausted" | "already_acted" | "accept_failed";
+}): Promise<void> {
+  await db.worldSuggestion.update({
+    where: { id: input.suggestionId },
+    data: {
+      autoAcceptStatus: input.status,
+      autoAcceptReasonCode: input.reasonCode,
+    } as any,
+  });
 }
 
 function isAlreadyActedSuggestionError(error: unknown): boolean {

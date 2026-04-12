@@ -7,6 +7,7 @@ import { t } from "@/text";
 import { type SuggestionSummary } from "@/sync/apiWorld";
 import {
     getSuggestionAcceptanceLabelKey,
+    getSuggestionAutoAcceptOutcomeKey,
     getSuggestionAutoAcceptReasonKey,
     getSuggestionTypeConfig,
     getSuggestionTypeLabelKey,
@@ -28,6 +29,7 @@ export const SuggestionCard = React.memo(function SuggestionCard({
     const typeLabel = t(getSuggestionTypeLabelKey(suggestion.type));
     const acceptanceLabelKey = getSuggestionAcceptanceLabelKey(suggestion);
     const autoAcceptReasonKey = getSuggestionAutoAcceptReasonKey(suggestion);
+    const autoAcceptOutcomeKey = getSuggestionAutoAcceptOutcomeKey(suggestion);
     const showActions = shouldShowSuggestionActions(suggestion);
 
     return (
@@ -63,6 +65,12 @@ export const SuggestionCard = React.memo(function SuggestionCard({
             {autoAcceptReasonKey ? (
                 <Text style={styles.autoAcceptReason} numberOfLines={2}>
                     {t(autoAcceptReasonKey)}
+                </Text>
+            ) : null}
+
+            {autoAcceptOutcomeKey ? (
+                <Text style={styles.autoAcceptReason} numberOfLines={2}>
+                    {t(autoAcceptOutcomeKey)}
                 </Text>
             ) : null}
 

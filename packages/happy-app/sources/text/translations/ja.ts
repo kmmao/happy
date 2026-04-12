@@ -3865,6 +3865,9 @@ export const ja: TranslationStructure = {
     typeSkill: "Skill",
     typeDecision: "Decision",
     autoAcceptReasonSafeTask: "安全な次ステップ task ルールに一致したため自動承認されました",
+    autoAcceptSkippedQuota: "当日の自動承認枠を使い切ったため、自動承認されませんでした",
+    autoAcceptSkippedAlreadyActed: "この提案はすでに処理済みのため、自動承認されませんでした",
+    autoAcceptFailed: "自動承認を試みましたが失敗しました",
   },
   roles: {
     title: "ロール",

@@ -3950,6 +3950,9 @@ export const en = {
     typeSkill: "Skill",
     typeDecision: "Decision",
     autoAcceptReasonSafeTask: "Auto-accepted because it matched the safe next-step task rule",
+    autoAcceptSkippedQuota: "Not auto-accepted because the daily auto-accept quota was exhausted",
+    autoAcceptSkippedAlreadyActed: "Not auto-accepted because this suggestion was already acted on",
+    autoAcceptFailed: "Auto-accept was attempted but failed",
   },
   roles: {
     title: "Roles",

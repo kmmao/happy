@@ -18,6 +18,16 @@ export const SuggestionAcceptAuditSchema = z.object({
 });
 export type SuggestionAcceptAudit = z.infer<typeof SuggestionAcceptAuditSchema>;
 
+export const SUGGESTION_AUTO_ACCEPT_STATUSES = ["skipped", "failed"] as const;
+export type SuggestionAutoAcceptStatus = typeof SUGGESTION_AUTO_ACCEPT_STATUSES[number];
+
+export const SUGGESTION_AUTO_ACCEPT_REASON_CODES = [
+  "quota_exhausted",
+  "already_acted",
+  "accept_failed",
+] as const;
+export type SuggestionAutoAcceptReasonCode = typeof SUGGESTION_AUTO_ACCEPT_REASON_CODES[number];
+
 export const EVIDENCE_KINDS = ["goal", "task", "decision", "message", "narrative"] as const;
 
 export const SuggestionEvidenceSchema = z.object({
@@ -127,6 +137,8 @@ export type SuggestionSerialized =
       actedAt: number | null;
       acceptSource?: SuggestionAcceptSource | null;
       acceptAudit?: SuggestionAcceptAudit | null;
+      autoAcceptStatus?: SuggestionAutoAcceptStatus | null;
+      autoAcceptReasonCode?: SuggestionAutoAcceptReasonCode | null;
     }
   | {
       id: string;
@@ -148,6 +160,8 @@ export type SuggestionSerialized =
       actedAt: number | null;
       acceptSource?: SuggestionAcceptSource | null;
       acceptAudit?: SuggestionAcceptAudit | null;
+      autoAcceptStatus?: SuggestionAutoAcceptStatus | null;
+      autoAcceptReasonCode?: SuggestionAutoAcceptReasonCode | null;
     }
   | {
       id: string;
@@ -169,6 +183,8 @@ export type SuggestionSerialized =
       actedAt: number | null;
       acceptSource?: SuggestionAcceptSource | null;
       acceptAudit?: SuggestionAcceptAudit | null;
+      autoAcceptStatus?: SuggestionAutoAcceptStatus | null;
+      autoAcceptReasonCode?: SuggestionAutoAcceptReasonCode | null;
     }
   | {
       id: string;
@@ -190,6 +206,8 @@ export type SuggestionSerialized =
       actedAt: number | null;
       acceptSource?: SuggestionAcceptSource | null;
       acceptAudit?: SuggestionAcceptAudit | null;
+      autoAcceptStatus?: SuggestionAutoAcceptStatus | null;
+      autoAcceptReasonCode?: SuggestionAutoAcceptReasonCode | null;
     };
 
 export type SuggestionSummary = SuggestionSerialized;

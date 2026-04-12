@@ -47,6 +47,8 @@ export async function worldSuggestionQuery(
             bucket?: SuggestionBucket | null;
             acceptSource?: string | null;
             acceptAudit?: string | null;
+            autoAcceptStatus?: string | null;
+            autoAcceptReasonCode?: string | null;
         };
 
         return serializeSuggestion({
@@ -55,6 +57,8 @@ export async function worldSuggestionQuery(
             status: typedRow.status,
             acceptSource: normalizeAcceptSource(typedRow.acceptSource),
             acceptAudit: normalizeAcceptAudit(typedRow.acceptAudit),
+            autoAcceptStatus: typedRow.autoAcceptStatus ?? null,
+            autoAcceptReasonCode: typedRow.autoAcceptReasonCode ?? null,
         });
     });
 }
