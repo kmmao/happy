@@ -23,6 +23,15 @@ import { registerAgentHandlers } from "./rpc/registerHandlers";
 import type { Machine, MachineMetadata, DaemonState } from "./types";
 import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "../utils/tailscale";
 import type { TunnelManager } from "../tunnel";
+import {
+  spawnSession, stopSession,
+  type SpawnSessionOptions, type SpawnSessionResult,
+} from "../daemon/spawnSession";
+import { getAllTrackedSessions } from "../daemon/trackedSessions";
+import {
+  handleWebhookTrigger, handleSupervisorTrigger, handleTaskTrigger,
+  type WebhookTriggerData, type SupervisorTriggerData, type TaskTriggerData,
+} from "../daemon/triggerHandlers";
 
 const TAILSCALE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -30,14 +39,61 @@ const TAILSCALE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 // Types
 // ---------------------------------------------------------------------------
 
+/** Strongly-typed ephemeral event from server. */
+export type EphemeralEvent =
+  | {
+      type: "activity";
+      id: string;
+      active: boolean;
+      activeAt: number;
+      thinking: boolean;
+    }
+  | {
+      type: "webhook-trigger";
+      webhookEventId: string;
+      issueNumber: number;
+      issueTitle: string;
+      issueBody: string;
+      issueAuthor: string;
+      issueLabels: string[];
+      issueUrl: string;
+      repoUrl: string;
+      repoPath: string;
+      provider: string;
+    }
+  | {
+      type: "supervisor-trigger";
+      projectId: string;
+      runId: string;
+      trigger: string;
+      machineId: string;
+      repoPath: string;
+      mode?: string;
+      dimensions?: string[];
+      changedFiles?: string[];
+      customRules?: string;
+    }
+  | {
+      type: "task-trigger";
+      taskId: string;
+      prompt: string;
+      directory: string;
+      priority: string;
+      projectId?: string;
+      resultToken?: string;
+      skillContents?: Array<{ name: string; content: string }>;
+    };
+
 export type MachineClientOptions = {
   readonly token: string;
   readonly machine: Machine;
   readonly serverUrl: string;
+  /** Agent package version for DaemonState reporting. */
+  readonly agentVersion?: string;
   /** Working directory for RPC handlers. Defaults to process.cwd(). */
   readonly workingDirectory?: string;
   /** Handler for ephemeral events from server. */
-  readonly onEphemeral?: (data: { type: string; [key: string]: unknown }) => void;
+  readonly onEphemeral?: (data: EphemeralEvent) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -55,12 +111,18 @@ export class MachineClient {
   private tunnelManager: TunnelManager | null = null;
   private readonly token: string;
   private readonly serverUrl: string;
-  private readonly onEphemeral?: (data: { type: string; [key: string]: unknown }) => void;
+  private readonly agentVersion: string;
+  private readonly startTime = Date.now();
+  private readonly onEphemeral?: (data: EphemeralEvent) => void;
+  private automationEnabled = false;
+  private automationServerUrl = "";
+  private automationAuthToken = "";
 
   constructor(opts: MachineClientOptions) {
     this.token = opts.token;
     this.machine = opts.machine;
     this.serverUrl = opts.serverUrl;
+    this.agentVersion = opts.agentVersion ?? "unknown";
     this.onEphemeral = opts.onEphemeral;
 
     // Initialize RPC handler manager scoped to this machine
@@ -71,9 +133,50 @@ export class MachineClient {
       logger: (msg, data) => logger.debug(msg, data),
     });
 
-    // Register common RPC handlers (bash, readFile, writeFile, listDirectory)
+    // Register common RPC handlers (bash, readFile, writeFile, listDirectory, etc.)
     const workDir = opts.workingDirectory ?? process.cwd();
     registerAgentHandlers(this.rpcHandlerManager, workDir, opts.machine.id);
+
+    // Register machine-scoped RPC handlers (spawn/stop session)
+    this.registerMachineHandlers();
+  }
+
+  // -----------------------------------------------------------------------
+  // Machine-scoped RPC handlers
+  // -----------------------------------------------------------------------
+
+  private registerMachineHandlers(): void {
+    // spawn-happy-session: Start a new Happy CLI session on this machine
+    this.rpcHandlerManager.registerHandler<SpawnSessionOptions, SpawnSessionResult>(
+      "spawn-happy-session",
+      async (data) => {
+        logger.debug("[MACHINE] spawn-happy-session request:", data.directory);
+        return spawnSession(data);
+      },
+    );
+
+    // stop-session: Stop a running session by PID
+    this.rpcHandlerManager.registerHandler<
+      { pid: number },
+      { stopped: boolean; error?: string }
+    >("stop-session", async (data) => {
+      logger.debug("[MACHINE] stop-session request:", data.pid);
+      return stopSession(data.pid);
+    });
+
+    // list-tracked-sessions: List all active tracked sessions
+    this.rpcHandlerManager.registerHandler<
+      Record<string, never>,
+      { sessions: Array<{ pid: number; directory: string; startedAt: number; happySessionId?: string }> }
+    >("list-tracked-sessions", async () => {
+      const sessions = getAllTrackedSessions().map((s) => ({
+        pid: s.pid,
+        directory: s.directory,
+        startedAt: s.startedAt,
+        happySessionId: s.happySessionId,
+      }));
+      return { sessions };
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -108,6 +211,8 @@ export class MachineClient {
         status: "running",
         pid: process.pid,
         startedAt: Date.now(),
+        startTime: this.startTime,
+        startedWithCliVersion: this.agentVersion,
         tailscale: this.lastTailscaleInfo ?? state?.tailscale,
       }));
 
@@ -161,12 +266,12 @@ export class MachineClient {
     });
 
     // Handle ephemeral events
-    if (this.onEphemeral) {
-      this.socket.on("ephemeral", (data: { type: string; [key: string]: unknown }) => {
-        logger.debug("[MACHINE] Received ephemeral event:", data.type);
-        this.onEphemeral?.(data);
-      });
-    }
+    this.socket.on("ephemeral", (data: unknown) => {
+      const event = data as EphemeralEvent;
+      logger.debug("[MACHINE] Received ephemeral event:", event.type);
+      this.onEphemeral?.(event);
+      this.handleAutomationEvent(event);
+    });
 
     this.socket.on("connect_error", (error: Error) => {
       logger.debug(`[MACHINE] Connection error: ${error.message}`);
@@ -251,6 +356,133 @@ export class MachineClient {
         throw new Error("Daemon state version mismatch");
       }
     }, { maxRetries: 3, label: "updateDaemonState" });
+  }
+
+  // -----------------------------------------------------------------------
+  // Socket event emitters
+  // -----------------------------------------------------------------------
+
+  /** Emit a session lifecycle event. */
+  emitSessionEvent(sessionId: string, eventType: string, summary: string, detail?: Record<string, unknown>): void {
+    this.socket?.emit("session-event" as any, { sessionId, eventType, summary, detail });
+  }
+
+  /** Report webhook processing status. */
+  emitWebhookStatus(data: {
+    webhookEventId: string;
+    status: "dispatched" | "completed" | "failed";
+    sessionId?: string;
+    errorMessage?: string;
+  }): void {
+    this.socket?.emit("webhook-status" as any, data);
+  }
+
+  /** Report supervisor run status. */
+  emitSupervisorRunStatus(data: {
+    runId: string;
+    projectId: string;
+    status: "running" | "completed" | "failed";
+    sessionId?: string;
+    actionsCount?: number;
+    issuesCreated?: number;
+    errorMessage?: string;
+  }): void {
+    this.socket?.emit("supervisor-run-status" as any, data);
+  }
+
+  /** Submit a knowledge entry from a session. */
+  emitSubmitKnowledge(sid: string, entry: {
+    entryType: string;
+    contributorType: string;
+    action: string;
+    title: string;
+    content: string;
+    request?: string;
+    outcome?: string;
+    tags: string[];
+    confidence: string;
+    model?: string;
+    affectedFiles: string[];
+  }): void {
+    this.socket?.emit("submit-knowledge" as any, { sid, entry });
+  }
+
+  /** Fetch knowledge for a session. */
+  emitFetchKnowledge(
+    sid: string,
+    mode: "auto" | "full" | "minimal",
+    contextHints: string[] | undefined,
+    callback: (response: {
+      profile: {
+        techStack: string[];
+        architectureType?: string;
+        knownPitfalls: string[];
+        coreConventions: string[];
+        lastUpdatedAt: number;
+      } | null;
+      entries: {
+        id: string;
+        entryType: string;
+        title: string;
+        content: string;
+        tags: string[];
+        confidence: string;
+        createdAt: string;
+      }[];
+    }) => void,
+  ): void {
+    this.socket?.emit("fetch-knowledge" as any, { sid, mode, contextHints }, callback);
+  }
+
+  /** Stream task log chunk. */
+  emitTaskLog(sid: string, taskId: string, outputFile: string, chunk: string, offset: number): void {
+    this.socket?.emit("task-log" as any, { sid, taskId, outputFile, chunk, offset });
+  }
+
+  // -----------------------------------------------------------------------
+  // Automation triggers
+  // -----------------------------------------------------------------------
+
+  /**
+   * Enable automation handling — agent will process webhook, supervisor,
+   * and task triggers from the server by spawning Happy CLI sessions.
+   */
+  enableAutomation(serverUrl: string, authToken: string): void {
+    this.automationEnabled = true;
+    this.automationServerUrl = serverUrl;
+    this.automationAuthToken = authToken;
+    logger.debug("[MACHINE] Automation enabled");
+  }
+
+  /** Internal dispatch for ephemeral events that need automation handling. */
+  private handleAutomationEvent(event: EphemeralEvent): void {
+    if (!this.automationEnabled) return;
+
+    switch (event.type) {
+      case "webhook-trigger":
+        void handleWebhookTrigger(
+          event as WebhookTriggerData,
+          this,
+          this.automationServerUrl,
+          this.automationAuthToken,
+        );
+        break;
+      case "supervisor-trigger":
+        void handleSupervisorTrigger(
+          event as SupervisorTriggerData,
+          this,
+          this.automationServerUrl,
+          this.automationAuthToken,
+        );
+        break;
+      case "task-trigger":
+        void handleTaskTrigger(
+          event as TaskTriggerData,
+          this.automationServerUrl,
+          this.automationAuthToken,
+        );
+        break;
+    }
   }
 
   // -----------------------------------------------------------------------
