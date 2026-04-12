@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
+import { pushSend } from "@/modules/pushSend";
 
 export function pushRoutes(app: Fastify) {
     
@@ -45,6 +46,23 @@ export function pushRoutes(app: Fastify) {
         } catch (error) {
             return reply.code(500).send({ error: 'Failed to register push token' });
         }
+    });
+
+    // Send Push Notification API
+    app.post('/v1/push/send', {
+        schema: {
+            body: z.object({
+                title: z.string(),
+                body: z.string(),
+                data: z.record(z.string(), z.unknown()).optional(),
+            }),
+        },
+        preHandler: app.authenticate
+    }, async (request, reply) => {
+        const userId = request.userId;
+        const { title, body, data } = request.body;
+        void pushSend(userId, { title, body, data });
+        return reply.send({ success: true });
     });
 
     // Delete Push Token API
