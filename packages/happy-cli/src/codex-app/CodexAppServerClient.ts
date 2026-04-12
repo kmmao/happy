@@ -1272,6 +1272,44 @@ export class CodexAppServerClient {
         return;
       }
 
+      if (method === "mcpServer/elicitation/request") {
+        const mode = params.mode === "url" ? "url" : "form";
+        const result = this.elicitationHandler
+          ? await this.elicitationHandler(
+              {
+                serverName:
+                  typeof params.serverName === "string" &&
+                  params.serverName.length > 0
+                    ? params.serverName
+                    : "MCP Server",
+                message:
+                  typeof params.message === "string" && params.message.length > 0
+                    ? params.message
+                    : "MCP server requires user input.",
+                mode,
+                url:
+                  mode === "url" && typeof params.url === "string"
+                    ? params.url
+                    : undefined,
+                requestedSchema:
+                  mode === "form" &&
+                  params.requestedSchema &&
+                  typeof params.requestedSchema === "object"
+                    ? (params.requestedSchema as Record<string, unknown>)
+                    : undefined,
+              },
+              { signal: AbortSignal.timeout(10 * 60 * 1000) },
+            )
+          : { action: "cancel" as const };
+
+        this.sendResponse(requestId, {
+          action: result.action,
+          content: result.action === "accept" ? result.content ?? null : null,
+          _meta: null,
+        });
+        return;
+      }
+
       if (method === "account/chatgptAuthTokens/refresh") {
         if (!this.chatGptAuthTokensProvider) {
           this.sendError(requestId, "No ChatGPT auth token provider configured");

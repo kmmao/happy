@@ -656,6 +656,114 @@ describe("CodexAppServerClient", () => {
     });
   });
 
+  it("responds to MCP form elicitation through the shared elicitation handler", async () => {
+    const client = new CodexAppServerClient();
+    const elicitationHandler = vi.fn(async () => ({
+      action: "accept" as const,
+      content: { token: "abc123" },
+    }));
+    client.setElicitationHandler(elicitationHandler);
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        id: "mcp-elicit-1",
+        method: "mcpServer/elicitation/request",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          serverName: "happy",
+          mode: "form",
+          message: "Provide API token",
+          requestedSchema: {
+            type: "object",
+            properties: {
+              token: {
+                type: "string",
+                description: "API token",
+              },
+            },
+          },
+          _meta: { connector: "happy" },
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(elicitationHandler).toHaveBeenCalledWith(
+      {
+        serverName: "happy",
+        message: "Provide API token",
+        mode: "form",
+        requestedSchema: {
+          type: "object",
+          properties: {
+            token: {
+              type: "string",
+              description: "API token",
+            },
+          },
+        },
+      },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(fakeProcesses[0].responses).toContainEqual({
+      id: "mcp-elicit-1",
+      result: {
+        action: "accept",
+        content: { token: "abc123" },
+        _meta: null,
+      },
+    });
+  });
+
+  it("responds to MCP URL elicitation through the shared elicitation handler", async () => {
+    const client = new CodexAppServerClient();
+    const elicitationHandler = vi.fn(async () => ({
+      action: "decline" as const,
+    }));
+    client.setElicitationHandler(elicitationHandler);
+
+    await client.connect();
+    fakeProcesses[0].stdout.write(
+      `${JSON.stringify({
+        id: "mcp-elicit-2",
+        method: "mcpServer/elicitation/request",
+        params: {
+          threadId: "thread-1",
+          turnId: null,
+          serverName: "github",
+          mode: "url",
+          message: "Open browser to finish GitHub login",
+          url: "https://github.com/login/oauth/authorize",
+          elicitationId: "oauth-1",
+          _meta: null,
+        },
+      })}\n`,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(elicitationHandler).toHaveBeenCalledWith(
+      {
+        serverName: "github",
+        message: "Open browser to finish GitHub login",
+        mode: "url",
+        url: "https://github.com/login/oauth/authorize",
+      },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(fakeProcesses[0].responses).toContainEqual({
+      id: "mcp-elicit-2",
+      result: {
+        action: "decline",
+        content: null,
+        _meta: null,
+      },
+    });
+  });
+
   it("renders plan updates from step text when title is missing", async () => {
     const events: any[] = [];
     const client = new CodexAppServerClient();
