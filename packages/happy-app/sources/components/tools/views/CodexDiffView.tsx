@@ -17,6 +17,20 @@ interface CodexDiffViewProps {
     scrollViewRef?: React.RefObject<ScrollView | null>;
 }
 
+function formatToolDuration(tool: ToolCall): string | null {
+    if (tool.createdAt == null || tool.completedAt == null) {
+        return null;
+    }
+    const seconds = (tool.completedAt - tool.createdAt) / 1000;
+    if (seconds < 1) {
+        return `${Math.round(seconds * 1000)}ms`;
+    }
+    if (seconds < 60) {
+        return `${seconds.toFixed(1)}s`;
+    }
+    return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+}
+
 export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, scrollViewRef }) => {
     const { theme } = useUnistyles();
     const showLineNumbersInToolViews = useSetting('showLineNumbersInToolViews');
@@ -41,7 +55,10 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
         [input?.unified_diff],
     );
     const isFullView = !!scrollViewRef;
+    const durationText = React.useMemo(() => formatToolDuration(tool), [tool]);
     const [expanded, setExpanded] = React.useState(isFullView);
+    const displayName = fileName ? (fileName.split("/").pop() || fileName) : t('tools.names.viewDiff');
+    const showPath = !!fileName && fileName !== displayName;
 
     React.useEffect(() => {
         setExpanded(isFullView);
@@ -50,22 +67,11 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
     return (
         <ToolSectionView fullWidth>
             <View
-                style={[
-                    styles.card,
-                    {
-                        backgroundColor: theme.colors.surfaceHigh,
-                        borderColor: expanded ? theme.colors.diff.outline : theme.colors.divider,
-                    },
-                ]}
+                style={styles.item}
             >
                 <Pressable style={styles.cardHeader} onPress={() => setExpanded((v) => !v)}>
                     <View style={styles.cardHeaderLeft}>
-                        <View
-                            style={[
-                                styles.fileIconWrap,
-                                { backgroundColor: theme.colors.surfaceHighest },
-                            ]}
-                        >
+                        <View style={styles.fileIconWrap}>
                             <Ionicons
                                 name="git-compare-outline"
                                 size={18}
@@ -74,16 +80,13 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
                         </View>
                         <View style={styles.fileMeta}>
                             <Text style={styles.fileName} numberOfLines={1}>
-                                {fileName || t('tools.names.viewDiff')}
+                                {displayName}
                             </Text>
-                            {fileName ? (
-                                <Text
-                                    style={styles.filePath}
-                                    numberOfLines={isFullView ? 2 : 1}
-                                >
+                            {showPath && (
+                                <Text style={styles.filePath} numberOfLines={1}>
                                     {fileName}
                                 </Text>
-                            ) : null}
+                            )}
                         </View>
                     </View>
                     <View style={styles.cardHeaderRight}>
@@ -91,6 +94,9 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
                             additions={diffStats.additions}
                             deletions={diffStats.deletions}
                         />
+                        {!isFullView && durationText && (
+                            <Text style={styles.durationText}>{durationText}</Text>
+                        )}
                         <Ionicons
                             name={expanded ? 'chevron-down' : 'chevron-forward'}
                             size={16}
@@ -119,9 +125,7 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
 });
 
 const styles = StyleSheet.create((theme) => ({
-    card: {
-        borderWidth: 1,
-        borderRadius: 16,
+    item: {
         overflow: 'hidden',
     },
     cardHeader: {
@@ -130,7 +134,7 @@ const styles = StyleSheet.create((theme) => ({
         justifyContent: 'space-between',
         gap: 12,
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingVertical: 10,
     },
     cardHeaderLeft: {
         flex: 1,
@@ -144,16 +148,15 @@ const styles = StyleSheet.create((theme) => ({
         gap: 8,
     },
     fileIconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
+        width: 28,
+        height: 28,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
     fileMeta: {
         flex: 1,
         minWidth: 0,
-        gap: 2,
     },
     fileName: {
         fontSize: 15,
@@ -161,11 +164,18 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.text,
     },
     filePath: {
+        marginTop: 2,
         fontSize: 12,
         color: theme.colors.textSecondary,
     },
+    durationText: {
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        fontVariant: ['tabular-nums'],
+    },
     diffWrap: {
         borderTopWidth: 1,
+        marginTop: 4,
         paddingTop: 8,
     },
 }));

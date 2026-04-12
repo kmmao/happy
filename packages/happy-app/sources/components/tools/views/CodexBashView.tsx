@@ -5,11 +5,13 @@ import { Ionicons, Octicons } from '@expo/vector-icons';
 import { ToolCall } from '@/sync/typesMessage';
 import { ToolSectionView } from '../ToolSectionView';
 import { CommandView } from '@/components/CommandView';
-import { CodeView } from '@/components/CodeView';
 import { Metadata } from '@/sync/storageTypes';
-import { resolvePath } from '@/utils/pathUtils';
 import { t } from '@/text';
-import { getCodexCommandText } from '../codexCommandUtils';
+import {
+    getCodexCommandText,
+    getCodexParsedCommandSummaries,
+    getCodexParsedCommandSummary,
+} from '../codexCommandUtils';
 
 interface CodexBashViewProps {
     tool: ToolCall;
@@ -22,45 +24,93 @@ export const CodexBashView = React.memo<CodexBashViewProps>(({ tool, metadata })
 
     // Parse the input structure
     const command = input?.command;
-    const cwd = input?.cwd;
-    const parsedCmd = input?.parsed_cmd;
+    const summary = React.useMemo(
+        () => getCodexParsedCommandSummary(input, metadata),
+        [input, metadata],
+    );
+    const summaries = React.useMemo(
+        () => getCodexParsedCommandSummaries(input, metadata),
+        [input, metadata],
+    );
+    const operationType = summary?.type ?? 'unknown';
+    const commandStr = summary?.command || getCodexCommandText(command) || null;
 
-    // Determine the type of operation from parsed_cmd
-    let operationType: 'read' | 'write' | 'bash' | 'unknown' = 'unknown';
-    let fileName: string | null = null;
-    let commandStr: string | null = null;
+    const getIconForType = React.useCallback((type: string) => {
+        switch (type) {
+            case 'read':
+                return <Octicons name="eye" size={18} color={theme.colors.textSecondary} />;
+            case 'write':
+                return <Octicons name="file-diff" size={18} color={theme.colors.textSecondary} />;
+            case 'search':
+            case 'list_files':
+                return <Octicons name="search" size={18} color={theme.colors.textSecondary} />;
+            default:
+                return <Octicons name="terminal" size={18} color={theme.colors.textSecondary} />;
+        }
+    }, [theme.colors.textSecondary]);
 
-    if (parsedCmd && Array.isArray(parsedCmd) && parsedCmd.length > 0) {
-        const firstCmd = parsedCmd[0];
-        operationType = firstCmd.type || 'unknown';
-        fileName = firstCmd.name || null;
-        commandStr = firstCmd.cmd || null;
-    }
+    const getOperationText = React.useCallback((item: (typeof summaries)[number]) => {
+        switch (item.type) {
+            case 'read':
+                return item.resolvedPath
+                    ? t('tools.desc.readingFile', { file: item.resolvedPath })
+                    : item.command;
+            case 'write':
+                return item.resolvedPath
+                    ? t('tools.desc.writingFile', { file: item.resolvedPath })
+                    : item.command;
+            case 'search':
+                return item.query
+                    ? t('tools.desc.searchPattern', { pattern: item.query })
+                    : t('tools.names.searchContent');
+            case 'list_files':
+                return item.displayName
+                    ? t('tools.desc.searchPath', { basename: item.displayName })
+                    : t('tools.names.listFiles');
+            default:
+                return item.command;
+        }
+    }, []);
 
-    // Get the appropriate icon based on operation type
-    let icon: React.ReactNode;
-    switch (operationType) {
-        case 'read':
-            icon = <Octicons name="eye" size={18} color={theme.colors.textSecondary} />;
-            break;
-        case 'write':
-            icon = <Octicons name="file-diff" size={18} color={theme.colors.textSecondary} />;
-            break;
-        default:
-            icon = <Octicons name="terminal" size={18} color={theme.colors.textSecondary} />;
+    if (summaries.length > 1) {
+        return (
+            <ToolSectionView>
+                <View style={styles.readContainer}>
+                    <View style={styles.summaryList}>
+                        {summaries.map((item, index) => {
+                            const operationText = getOperationText(item);
+                            if (!operationText) {
+                                return null;
+                            }
+
+                            return (
+                                <View key={`${item.type}-${item.command ?? item.resolvedPath ?? index}`} style={styles.commandItem}>
+                                    <View style={styles.iconRow}>
+                                        {getIconForType(item.type)}
+                                        <Text style={styles.operationText}>{operationText}</Text>
+                                    </View>
+                                    {item.command && (
+                                        <Text style={styles.commandText}>{item.command}</Text>
+                                    )}
+                                </View>
+                            );
+                        })}
+                    </View>
+                </View>
+            </ToolSectionView>
+        );
     }
 
     // Format the display based on operation type
-    if (operationType === 'read' && fileName) {
-        // Display as a read operation
-        const resolvedPath = resolvePath(fileName, metadata);
-        
+    if (operationType === 'read' && summary?.resolvedPath) {
         return (
             <ToolSectionView>
                 <View style={styles.readContainer}>
                     <View style={styles.iconRow}>
-                        {icon}
-                        <Text style={styles.operationText}>{t('tools.desc.readingFile', { file: resolvedPath })}</Text>
+                        {getIconForType(operationType)}
+                        <Text style={styles.operationText}>
+                            {t('tools.desc.readingFile', { file: summary.resolvedPath })}
+                        </Text>
                     </View>
                     {commandStr && (
                         <Text style={styles.commandText}>{commandStr}</Text>
@@ -68,16 +118,51 @@ export const CodexBashView = React.memo<CodexBashViewProps>(({ tool, metadata })
                 </View>
             </ToolSectionView>
         );
-    } else if (operationType === 'write' && fileName) {
-        // Display as a write operation
-        const resolvedPath = resolvePath(fileName, metadata);
-        
+    } else if (operationType === 'write' && summary?.resolvedPath) {
         return (
             <ToolSectionView>
                 <View style={styles.readContainer}>
                     <View style={styles.iconRow}>
-                        {icon}
-                        <Text style={styles.operationText}>{t('tools.desc.writingFile', { file: resolvedPath })}</Text>
+                        {getIconForType(operationType)}
+                        <Text style={styles.operationText}>
+                            {t('tools.desc.writingFile', { file: summary.resolvedPath })}
+                        </Text>
+                    </View>
+                    {commandStr && (
+                        <Text style={styles.commandText}>{commandStr}</Text>
+                    )}
+                </View>
+            </ToolSectionView>
+        );
+    } else if (operationType === 'search') {
+        const operationText = summary?.query
+            ? t('tools.desc.searchPattern', { pattern: summary.query })
+            : t('tools.names.searchContent');
+
+        return (
+            <ToolSectionView>
+                <View style={styles.readContainer}>
+                    <View style={styles.iconRow}>
+                        {getIconForType(operationType)}
+                        <Text style={styles.operationText}>{operationText}</Text>
+                    </View>
+                    {commandStr && (
+                        <Text style={styles.commandText}>{commandStr}</Text>
+                    )}
+                </View>
+            </ToolSectionView>
+        );
+    } else if (operationType === 'list_files') {
+        const operationText = summary?.displayName
+            ? t('tools.desc.searchPath', { basename: summary.displayName })
+            : t('tools.names.listFiles');
+
+        return (
+            <ToolSectionView>
+                <View style={styles.readContainer}>
+                    <View style={styles.iconRow}>
+                        {getIconForType(operationType)}
+                        <Text style={styles.operationText}>{operationText}</Text>
                     </View>
                     {commandStr && (
                         <Text style={styles.commandText}>{commandStr}</Text>
@@ -87,7 +172,7 @@ export const CodexBashView = React.memo<CodexBashViewProps>(({ tool, metadata })
         );
     } else {
         // Display as a regular command
-        const commandDisplay = commandStr || getCodexCommandText(command) || '';
+        const commandDisplay = commandStr || '';
         
         return (
             <ToolSectionView>
@@ -108,6 +193,12 @@ const styles = StyleSheet.create((theme) => ({
         padding: 12,
         backgroundColor: theme.colors.surfaceHigh,
         borderRadius: 8,
+    },
+    summaryList: {
+        gap: 12,
+    },
+    commandItem: {
+        gap: 8,
     },
     iconRow: {
         flexDirection: 'row',

@@ -15,7 +15,11 @@ import { CodeView } from "../CodeView";
 import { ToolSectionView } from "./ToolSectionView";
 import { useElapsedTime } from "@/hooks/useElapsedTime";
 import { ToolError } from "./ToolError";
-import { knownTools } from "@/components/tools/knownTools";
+import {
+  knownTools,
+  sessionCompactToolNames,
+} from "@/components/tools/knownTools";
+import { getCodexPatchEntries } from "./codexPatchUtils";
 import { Metadata } from "@/sync/storageTypes";
 import { useRouter } from "expo-router";
 import { parseToolUseError } from "@/utils/toolErrorParser";
@@ -29,7 +33,10 @@ import { sessionAllow } from "@/sync/ops";
 import { PermissionFooter } from "./PermissionFooter";
 import { shouldAutoApprove } from "@/utils/shouldAutoApprove";
 import { log } from '@/log';
-import { getCodexCommandText } from "./codexCommandUtils";
+import {
+  getCodexCommandText,
+  getCodexParsedCommandSummary,
+} from "./codexCommandUtils";
 
 interface ToolViewProps {
   metadata: Metadata | null;
@@ -46,6 +53,17 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   const router = useRouter();
   const { theme } = useUnistyles();
   const showAgentActivity = useSetting("showAgentActivity");
+  const SpecificToolView = getToolViewComponent(tool.name);
+  const patchEntryCount = React.useMemo(
+    () =>
+      tool.name === "CodexPatch"
+        ? getCodexPatchEntries(tool.input?.changes).length
+        : 0,
+    [tool.name, tool.input?.changes],
+  );
+  const useMergedInlineToolView =
+    tool.name === "CodexDiff" ||
+    (tool.name === "CodexPatch" && patchEntryCount === 1);
 
   // Create default onPress handler for navigation
   const handlePress = React.useCallback(() => {
@@ -142,6 +160,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   ]);
 
   let knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
+  const isSessionCompact = sessionCompactToolNames.has(tool.name);
 
   // Internal Claude Code tools (e.g. ToolSearch) are completely hidden from the UI
   if (knownTool?.hidden) {
@@ -199,7 +218,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     }
   }
 
-  if (knownTool && typeof knownTool.extractSubtitle === "function") {
+  if (
+    knownTool &&
+    typeof knownTool.extractSubtitle === "function" &&
+    !isSessionCompact
+  ) {
     const subtitle = knownTool.extractSubtitle({
       tool,
       metadata: props.metadata,
@@ -255,7 +278,8 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     tool.state === "running" &&
     !description &&
     tool.name !== "Task" &&
-    tool.name !== "Agent"
+    tool.name !== "Agent" &&
+    !isSessionCompact
   ) {
     if (tool.description) {
       description = tool.description;
@@ -287,6 +311,9 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
       minimal = knownTool.minimal;
     }
   }
+  if (isSessionCompact) {
+    minimal = true;
+  }
 
   // Special handling for CodexBash to determine icon based on parsed_cmd
   if (
@@ -295,11 +322,19 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     Array.isArray(tool.input.parsed_cmd) &&
     tool.input.parsed_cmd.length > 0
   ) {
-    const parsedCmd = tool.input.parsed_cmd[0];
-    if (parsedCmd.type === "read") {
+    const parsedSummary = getCodexParsedCommandSummary(
+      tool.input,
+      props.metadata,
+    );
+    if (parsedSummary?.type === "read") {
       icon = <Octicons name="eye" size={18} color={theme.colors.text} />;
-    } else if (parsedCmd.type === "write") {
+    } else if (parsedSummary?.type === "write") {
       icon = <Octicons name="file-diff" size={18} color={theme.colors.text} />;
+    } else if (
+      parsedSummary?.type === "search" ||
+      parsedSummary?.type === "list_files"
+    ) {
+      icon = <Octicons name="search" size={18} color={theme.colors.text} />;
     } else {
       icon = <Octicons name="terminal" size={18} color={theme.colors.text} />;
     }
@@ -360,7 +395,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   } else {
     switch (tool.state) {
       case "running":
-        if (!noStatus) {
+        if (!noStatus && !isSessionCompact) {
           statusIcon = (
             <ActivityIndicator
               size="small"
@@ -385,12 +420,40 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   }
 
   const statsBar =
-    diffStats && tool.state !== "running" ? (
+    diffStats && (tool.state !== "running" || isSessionCompact) ? (
       <DiffStatsBar
         additions={diffStats.additions}
         deletions={diffStats.deletions}
       />
     ) : null;
+
+  if (useMergedInlineToolView && SpecificToolView) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.mergedToolContent}>
+          <SpecificToolView
+            tool={tool}
+            metadata={props.metadata}
+            messages={props.messages ?? []}
+            sessionId={sessionId}
+          />
+        </View>
+        {sessionId &&
+          tool.permission &&
+          tool.permission.status === "pending" &&
+          tool.name !== "AskUserQuestion" &&
+          (!willAutoApprove || autoApproveFailed) && (
+            <PermissionFooter
+              permission={tool.permission}
+              sessionId={sessionId}
+              toolName={tool.name}
+              toolInput={tool.input}
+              metadata={props.metadata}
+            />
+          )}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -471,7 +534,6 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         }
 
         // Try to use a specific tool view component first
-        const SpecificToolView = getToolViewComponent(tool.name);
         if (SpecificToolView) {
           return (
             <View style={styles.content}>
@@ -638,6 +700,11 @@ const styles = StyleSheet.create((theme) => ({
   content: {
     paddingHorizontal: 12,
     paddingTop: 8,
+    overflow: "visible",
+  },
+  mergedToolContent: {
+    paddingHorizontal: 12,
+    paddingTop: 0,
     overflow: "visible",
   },
 }));

@@ -6,7 +6,10 @@ import { ToolCall } from "@/sync/typesMessage";
 import { Metadata } from "@/sync/storageTypes";
 import { resolvePath } from "@/utils/pathUtils";
 import { t } from "@/text";
-import { getCodexCommandPreview } from "./codexCommandUtils";
+import {
+  getCodexCommandPreview,
+  getCodexParsedCommandSummary,
+} from "./codexCommandUtils";
 const COLOR_SUCCESS = "#34C759";
 const COLOR_ERROR = "#FF3B30";
 const COLOR_WARNING = "#FF9500";
@@ -122,7 +125,10 @@ function generateSimpleContent(
 
     case "Bash":
     case "CodexBash": {
-      const title = t("tools.fullView.simple.runCommand");
+      const summary =
+        tool.name === "CodexBash"
+          ? getCodexParsedCommandSummary(tool.input, metadata)
+          : null;
       const description =
         typeof tool.description === "string"
           ? tool.description
@@ -130,6 +136,49 @@ function generateSimpleContent(
             ? tool.input.description
             : null;
       const command = getCodexCommandPreview(tool.input?.command, 120);
+      let title = t("tools.fullView.simple.runCommand");
+
+      if (summary?.type === "read") {
+        title = t("tools.fullView.simple.readFile", {
+          file: summary.displayName || "unknown",
+        });
+        if (summary.resolvedPath) {
+          rows.push({
+            label: t("tools.fullView.simple.fileName"),
+            value: summary.resolvedPath,
+          });
+        }
+      } else if (summary?.type === "write") {
+        title = t("tools.fullView.simple.writeFile", {
+          file: summary.displayName || "unknown",
+        });
+        if (summary.resolvedPath) {
+          rows.push({
+            label: t("tools.fullView.simple.fileName"),
+            value: summary.resolvedPath,
+          });
+        }
+      } else if (summary?.type === "search") {
+        title = t("tools.fullView.simple.searchCode", {
+          pattern: (summary.query || summary.command || "search").slice(0, 60),
+        });
+        if (summary.query) {
+          rows.push({
+            label: t("tools.fullView.simple.pattern"),
+            value: summary.query,
+          });
+        }
+      } else if (summary?.type === "list_files") {
+        title = t("tools.fullView.simple.findFiles", {
+          pattern: (summary.displayName || summary.command || "files").slice(0, 60),
+        });
+        if (summary.resolvedPath) {
+          rows.push({
+            label: t("tools.fullView.simple.fileName"),
+            value: summary.resolvedPath,
+          });
+        }
+      }
 
       if (description) {
         rows.push({

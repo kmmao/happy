@@ -17,6 +17,20 @@ interface CodexPatchViewProps {
   scrollViewRef?: React.RefObject<ScrollView | null>;
 }
 
+function formatToolDuration(tool: ToolCall): string | null {
+  if (tool.createdAt == null || tool.completedAt == null) {
+    return null;
+  }
+  const seconds = (tool.completedAt - tool.createdAt) / 1000;
+  if (seconds < 1) {
+    return `${Math.round(seconds * 1000)}ms`;
+  }
+  if (seconds < 60) {
+    return `${seconds.toFixed(1)}s`;
+  }
+  return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+}
+
 export const CodexPatchView = React.memo<CodexPatchViewProps>(
   ({ tool, metadata, scrollViewRef }) => {
     const { theme } = useUnistyles();
@@ -34,6 +48,7 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
       [tool.input?.changes, metadata],
     );
     const isFullView = !!scrollViewRef;
+    const durationText = React.useMemo(() => formatToolDuration(tool), [tool]);
     const [expandedIndexes, setExpandedIndexes] = React.useState<Set<number>>(
       () => new Set(isFullView && entries.length === 1 ? [0] : []),
     );
@@ -69,27 +84,14 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
             return (
               <View
                 key={`${entry.index}-${entry.resolvedPath}`}
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: theme.colors.surfaceHigh,
-                    borderColor: expanded
-                      ? theme.colors.diff.outline
-                      : theme.colors.divider,
-                  },
-                ]}
+                style={styles.item}
               >
                 <Pressable
                   style={styles.cardHeader}
                   onPress={() => toggleEntry(entry.index)}
                 >
                   <View style={styles.cardHeaderLeft}>
-                    <View
-                      style={[
-                        styles.fileIconWrap,
-                        { backgroundColor: theme.colors.surfaceHighest },
-                      ]}
-                    >
+                    <View style={styles.fileIconWrap}>
                       <Ionicons
                         name="document-text-outline"
                         size={18}
@@ -100,12 +102,11 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
                       <Text style={styles.fileName} numberOfLines={1}>
                         {fileName}
                       </Text>
-                      <Text
-                        style={styles.filePath}
-                        numberOfLines={isFullView ? 2 : 1}
-                      >
-                        {entry.resolvedPath}
-                      </Text>
+                      {entry.resolvedPath !== fileName && (
+                        <Text style={styles.filePath} numberOfLines={1}>
+                          {entry.resolvedPath}
+                        </Text>
+                      )}
                     </View>
                   </View>
                   <View style={styles.cardHeaderRight}>
@@ -113,6 +114,9 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
                       additions={entry.additions}
                       deletions={entry.deletions}
                     />
+                    {!isFullView && entries.length === 1 && durationText && (
+                      <Text style={styles.durationText}>{durationText}</Text>
+                    )}
                     <Ionicons
                       name={expanded ? "chevron-down" : "chevron-forward"}
                       size={16}
@@ -150,9 +154,7 @@ const styles = StyleSheet.create((theme) => ({
   list: {
     gap: 12,
   },
-  card: {
-    borderWidth: 1,
-    borderRadius: 16,
+  item: {
     overflow: "hidden",
   },
   cardHeader: {
@@ -160,7 +162,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 10,
     gap: 12,
   },
   cardHeaderLeft: {
@@ -175,16 +177,15 @@ const styles = StyleSheet.create((theme) => ({
     gap: 8,
   },
   fileIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
   fileMeta: {
     flex: 1,
     minWidth: 0,
-    gap: 2,
   },
   fileName: {
     fontSize: 15,
@@ -192,11 +193,18 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.text,
   },
   filePath: {
+    marginTop: 2,
     fontSize: 12,
     color: theme.colors.textSecondary,
   },
+  durationText: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    fontVariant: ["tabular-nums"],
+  },
   diffWrap: {
     borderTopWidth: 1,
+    marginTop: 4,
     paddingTop: 8,
   },
 }));

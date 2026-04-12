@@ -29,6 +29,7 @@ import { parseTaskStatusMessage, getThinkingLabelTitle } from "./messageProgress
 import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
 import { parseLegacyCodexPlanPreview } from "./tools/codexPlanCompat";
 import { parseCodexServicePreview } from "./tools/codexServiceCompat";
+import { CodexDiffView } from "./tools/views/CodexDiffView";
 
 export const MessageView = (props: {
   message: Message;
@@ -447,6 +448,38 @@ function AgentTextBlock(props: {
               ? t("message.taskStopped")
               : null;
 
+  if (!taskStatus && legacyDiffPreview) {
+    return (
+      <View style={styles.legacyPreviewContainer}>
+        {legacyDiffPreview.prefixMarkdown ? (
+          <View style={styles.legacyPreviewMarkdown}>
+            <MarkdownView
+              markdown={legacyDiffPreview.prefixMarkdown}
+              onOptionPress={handleOptionPress}
+            />
+          </View>
+        ) : null}
+        <View style={styles.toolContainer}>
+          <CodexDiffView
+            tool={{
+              name: "CodexDiff",
+              state: "completed",
+              input: {
+                unified_diff: legacyDiffPreview.unifiedDiff,
+              },
+              createdAt: props.message.createdAt,
+              startedAt: null,
+              completedAt: null,
+              description: null,
+              result: { status: "completed" },
+            }}
+            metadata={null}
+          />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.agentMessageRow}>
       <View style={styles.avatarSlot}>
@@ -510,35 +543,6 @@ function AgentTextBlock(props: {
               ) : null}
             </View>
           </View>
-        ) : legacyDiffPreview ? (
-          <>
-            {legacyDiffPreview.prefixMarkdown ? (
-              <MarkdownView
-                markdown={legacyDiffPreview.prefixMarkdown}
-                onOptionPress={handleOptionPress}
-              />
-            ) : null}
-            <View style={styles.toolContainer}>
-              <ToolView
-                tool={{
-                  name: "CodexDiff",
-                  state: "completed",
-                  input: {
-                    unified_diff: legacyDiffPreview.unifiedDiff,
-                  },
-                  createdAt: props.message.createdAt,
-                  startedAt: props.message.createdAt,
-                  completedAt: props.message.createdAt,
-                  description: null,
-                  result: { status: "completed" },
-                }}
-                metadata={null}
-                messages={[]}
-                sessionId={props.sessionId}
-                permissionModeKey={null}
-              />
-            </View>
-          </>
         ) : legacyPlanPreview ? (
           <View style={styles.codexPlanCard}>
             {legacyPlanPreview.explanation ? (
@@ -573,7 +577,7 @@ function AgentTextBlock(props: {
                   item.status === "completed"
                     ? t("supervisor.status_completed")
                     : item.status === "in_progress"
-                      ? t("projectKanban.columns.inProgress")
+                      ? t("message.taskProgress")
                       : item.status === "pending"
                         ? t("supervisor.status_pending")
                         : t("timeline.typeToolCall");
@@ -1183,6 +1187,13 @@ const styles = StyleSheet.create((theme) => ({
   },
   toolContainer: {
     marginHorizontal: 8,
+  },
+  legacyPreviewContainer: {
+    marginBottom: 8,
+  },
+  legacyPreviewMarkdown: {
+    marginHorizontal: 8,
+    marginBottom: 8,
   },
   codexPlanCard: {
     borderRadius: 12,

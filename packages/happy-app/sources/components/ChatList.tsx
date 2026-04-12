@@ -17,6 +17,7 @@ import { ChatFooter } from "./ChatFooter";
 import { isSessionRunning } from "@/utils/sessionUtils";
 import { Message } from "@/sync/typesMessage";
 import { knownTools } from "./tools/knownTools";
+import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
 import { TypingBubble } from "./TypingBubble";
 
 type DisplayItem = Message;
@@ -157,30 +158,58 @@ const ChatListInternal = React.memo(
     // When viewInline is off, hide main agent tool calls (except special ones).
     const viewInline = useSetting("viewInline");
     const displayItems: DisplayItem[] = React.useMemo(() => {
-      if (viewInline) {
-        return props.messages;
+      const visibleMessages = viewInline
+        ? props.messages
+        : (() => {
+            // When viewInline is off, filter out tool-call messages.
+            const ALWAYS_VISIBLE_TOOLS = new Set([
+              "Task",
+              "Agent",
+              "AskUserQuestion",
+              "TodoWrite",
+              "Edit",
+              "MultiEdit",
+              "Write",
+              "NotebookEdit",
+              "CodexPatch",
+              "GeminiPatch",
+              "CodexDiff",
+              "GeminiDiff",
+              "edit",
+            ]);
+            return props.messages.filter((msg) => {
+              if (msg.kind !== "tool-call") return true;
+              if (ALWAYS_VISIBLE_TOOLS.has(msg.tool.name)) return true;
+              if (msg.tool.permission?.status === "pending") return true;
+              const knownTool = knownTools[
+                msg.tool.name as keyof typeof knownTools
+              ] as any;
+              if (knownTool?.hidden) return false;
+              return false;
+            });
+          })();
+
+      const dedupedMessages: DisplayItem[] = [];
+      for (const msg of visibleMessages) {
+        if (msg.kind === "agent-text") {
+          const preview = parseLegacyCodexDiffPreview(msg.text);
+          const lastMessage = dedupedMessages[dedupedMessages.length - 1];
+          if (preview && lastMessage?.kind === "agent-text") {
+            const lastPreview = parseLegacyCodexDiffPreview(lastMessage.text);
+            if (
+              lastPreview &&
+              lastPreview.unifiedDiff === preview.unifiedDiff &&
+              (lastPreview.prefixMarkdown ?? "") ===
+                (preview.prefixMarkdown ?? "")
+            ) {
+              continue;
+            }
+          }
+        }
+        dedupedMessages.push(msg);
       }
-      // When viewInline is off, filter out tool-call messages
-      // Keep special tools that have important UI (Task, Agent, AskUserQuestion, TodoWrite, Edit, etc.)
-      const ALWAYS_VISIBLE_TOOLS = new Set([
-        "Task",
-        "Agent",
-        "AskUserQuestion",
-        "TodoWrite",
-        "Edit",
-        "MultiEdit",
-        "Write",
-        "NotebookEdit",
-      ]);
-      return props.messages.filter((msg) => {
-        if (msg.kind !== "tool-call") return true;
-        if (ALWAYS_VISIBLE_TOOLS.has(msg.tool.name)) return true;
-        // Always show tools with pending permissions so PermissionFooter can render
-        if (msg.tool.permission?.status === "pending") return true;
-        const knownTool = knownTools[msg.tool.name as keyof typeof knownTools] as any;
-        if (knownTool?.hidden) return false;
-        return false;
-      });
+
+      return dedupedMessages;
     }, [props.messages, viewInline]);
 
     // Collect user-text message indices in displayItems (not props.messages)
