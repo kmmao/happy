@@ -22,6 +22,7 @@ import { requireCredentials } from "../credentials";
 import { getOrCreateMachine } from "../api";
 import { MachineClient } from "../api/machineClient";
 import { detectTailscale, detectTailscaleServe } from "../utils/tailscale";
+import { AutomationScheduler } from "./scheduler";
 import { logger } from "../logger";
 
 // ---------------------------------------------------------------------------
@@ -118,8 +119,11 @@ export async function startDaemon(options: {
     workingDirectory: workDir,
   });
 
+  // 3b. Create scheduler
+  const scheduler = new AutomationScheduler({ maxConcurrentJobs: 2 });
+
   client.setTailscaleInfo(fullTailscale);
-  client.enableAutomation(config.serverUrl, creds.token);
+  client.enableAutomation(config.serverUrl, creds.token, scheduler);
 
   // 4. Connect
   client.connect();
@@ -135,6 +139,7 @@ export async function startDaemon(options: {
     shuttingDown = true;
     logger.debug(`[DAEMON] Received ${signal}, shutting down...`);
     console.log(`\nReceived ${signal}, shutting down...`);
+    scheduler.shutdown();
     client.shutdown();
     removePidFile(config.homeDir);
     process.exit(0);

@@ -32,6 +32,7 @@ import {
   handleWebhookTrigger, handleSupervisorTrigger, handleTaskTrigger,
   type WebhookTriggerData, type SupervisorTriggerData, type TaskTriggerData,
 } from "../daemon/triggerHandlers";
+import type { AutomationScheduler } from "../daemon/scheduler";
 
 const TAILSCALE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -117,6 +118,7 @@ export class MachineClient {
   private automationEnabled = false;
   private automationServerUrl = "";
   private automationAuthToken = "";
+  private scheduler: AutomationScheduler | null = null;
 
   constructor(opts: MachineClientOptions) {
     this.token = opts.token;
@@ -447,39 +449,43 @@ export class MachineClient {
    * Enable automation handling — agent will process webhook, supervisor,
    * and task triggers from the server by spawning Happy CLI sessions.
    */
-  enableAutomation(serverUrl: string, authToken: string): void {
+  enableAutomation(serverUrl: string, authToken: string, scheduler: AutomationScheduler): void {
     this.automationEnabled = true;
     this.automationServerUrl = serverUrl;
     this.automationAuthToken = authToken;
+    this.scheduler = scheduler;
     logger.debug("[MACHINE] Automation enabled");
   }
 
   /** Internal dispatch for ephemeral events that need automation handling. */
   private handleAutomationEvent(event: EphemeralEvent): void {
-    if (!this.automationEnabled) return;
+    if (!this.automationEnabled || !this.scheduler) return;
 
     switch (event.type) {
       case "webhook-trigger":
-        void handleWebhookTrigger(
+        handleWebhookTrigger(
           event as WebhookTriggerData,
           this,
           this.automationServerUrl,
           this.automationAuthToken,
+          this.scheduler,
         );
         break;
       case "supervisor-trigger":
-        void handleSupervisorTrigger(
+        handleSupervisorTrigger(
           event as SupervisorTriggerData,
           this,
           this.automationServerUrl,
           this.automationAuthToken,
+          this.scheduler,
         );
         break;
       case "task-trigger":
-        void handleTaskTrigger(
+        handleTaskTrigger(
           event as TaskTriggerData,
           this.automationServerUrl,
           this.automationAuthToken,
+          this.scheduler,
         );
         break;
     }

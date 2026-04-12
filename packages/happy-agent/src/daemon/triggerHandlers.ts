@@ -1,9 +1,7 @@
 /**
  * Ephemeral trigger handlers — process webhook, supervisor, and task triggers
- * by spawning Happy CLI sessions with appropriate environment and prompts.
- *
- * Unlike the CLI daemon which uses AutomationScheduler with job queues,
- * the agent spawns sessions directly (no dedup, no queue).
+ * by enqueueing jobs into the AutomationScheduler, which manages priority,
+ * deduplication, concurrency limits, and retry.
  */
 
 import { writeFile, mkdir } from "fs/promises";
@@ -12,6 +10,7 @@ import { tmpdir } from "os";
 import { logger } from "../logger";
 import { spawnSession } from "./spawnSession";
 import type { MachineClient } from "../api/machineClient";
+import type { AutomationScheduler } from "./scheduler";
 
 // ---------------------------------------------------------------------------
 // Types (from server ephemeral events)
@@ -101,157 +100,178 @@ function buildSupervisorPrompt(data: SupervisorTriggerData): string {
 // Handlers
 // ---------------------------------------------------------------------------
 
-export async function handleWebhookTrigger(
+function mapTaskPriority(priority: string): "urgent" | "user" | "background" {
+  if (priority === "urgent" || priority === "high") return "urgent";
+  if (priority === "background" || priority === "low") return "background";
+  return "user";
+}
+
+export function handleWebhookTrigger(
   data: WebhookTriggerData,
   client: MachineClient,
   serverUrl: string,
   authToken: string,
-): Promise<void> {
+  scheduler: AutomationScheduler,
+): void {
   logger.debug(`[TRIGGER] Webhook: issue #${data.issueNumber} in ${data.repoPath}`);
 
-  client.emitWebhookStatus({
-    webhookEventId: data.webhookEventId,
-    status: "dispatched",
+  const { deduped } = scheduler.enqueue({
+    kind: "webhook",
+    dedupeKey: `webhook:${data.webhookEventId}`,
+    priority: "background",
+    run: async (jobId) => {
+      client.emitWebhookStatus({ webhookEventId: data.webhookEventId, status: "dispatched" });
+
+      const promptFile = await writePromptFile("webhook", buildWebhookPrompt(data));
+      const result = await spawnSession({
+        directory: data.repoPath,
+        approvedNewDirectoryCreation: false,
+        automationContext: { kind: "webhook", trigger: `issue#${data.issueNumber}` },
+        environmentVariables: {
+          HAPPY_INITIAL_PROMPT_FILE: promptFile,
+          HAPPY_WEBHOOK_EVENT_ID: data.webhookEventId,
+          HAPPY_WEBHOOK_ISSUE_URL: data.issueUrl,
+          HAPPY_SERVER_URL: serverUrl,
+          HAPPY_AUTH_TOKEN: authToken,
+        },
+      });
+
+      if (result.type !== "success") {
+        const msg = result.type === "error" ? result.errorMessage : "Directory creation not approved";
+        client.emitWebhookStatus({ webhookEventId: data.webhookEventId, status: "failed", errorMessage: msg });
+        throw new Error(msg);
+      }
+
+      // Register exit handler for scheduler lifecycle
+      const tracked = (await import("./trackedSessions")).getTrackedSession(result.pid);
+      if (tracked?.childProcess) {
+        tracked.childProcess.on("exit", (code) => {
+          if (code === 0) scheduler.markCompleted(jobId);
+          else scheduler.markFailed(jobId, `exit code ${code}`);
+          client.emitWebhookStatus({ webhookEventId: data.webhookEventId, status: code === 0 ? "completed" : "failed" });
+        });
+      }
+
+      return { pid: result.pid };
+    },
   });
 
-  try {
-    const promptFile = await writePromptFile("webhook", buildWebhookPrompt(data));
-
-    const result = await spawnSession({
-      directory: data.repoPath,
-      approvedNewDirectoryCreation: false,
-      automationContext: {
-        kind: "webhook",
-        trigger: `issue#${data.issueNumber}`,
-      },
-      environmentVariables: {
-        HAPPY_INITIAL_PROMPT_FILE: promptFile,
-        HAPPY_WEBHOOK_EVENT_ID: data.webhookEventId,
-        HAPPY_WEBHOOK_ISSUE_URL: data.issueUrl,
-        HAPPY_SERVER_URL: serverUrl,
-        HAPPY_AUTH_TOKEN: authToken,
-      },
-    });
-
-    if (result.type === "success") {
-      logger.debug(`[TRIGGER] Webhook session spawned: PID ${result.pid}`);
-    } else {
-      logger.debug(`[TRIGGER] Webhook spawn failed: ${result.type === "error" ? result.errorMessage : "needs approval"}`);
-      client.emitWebhookStatus({
-        webhookEventId: data.webhookEventId,
-        status: "failed",
-        errorMessage: result.type === "error" ? result.errorMessage : "Directory creation not approved",
-      });
-    }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.debug(`[TRIGGER] Webhook error: ${msg}`);
-    client.emitWebhookStatus({
-      webhookEventId: data.webhookEventId,
-      status: "failed",
-      errorMessage: msg,
-    });
+  if (deduped) {
+    logger.debug(`[TRIGGER] Webhook deduped: ${data.webhookEventId}`);
   }
 }
 
-export async function handleSupervisorTrigger(
+export function handleSupervisorTrigger(
   data: SupervisorTriggerData,
   client: MachineClient,
   serverUrl: string,
   authToken: string,
-): Promise<void> {
+  scheduler: AutomationScheduler,
+): void {
   logger.debug(`[TRIGGER] Supervisor: run ${data.runId} in ${data.repoPath}`);
 
-  client.emitSupervisorRunStatus({
-    runId: data.runId,
-    projectId: data.projectId,
-    status: "running",
+  const { deduped } = scheduler.enqueue({
+    kind: "supervisor",
+    dedupeKey: `supervisor:${data.runId}`,
+    priority: "background",
+    run: async (jobId) => {
+      client.emitSupervisorRunStatus({ runId: data.runId, projectId: data.projectId, status: "running" });
+
+      const promptFile = await writePromptFile("supervisor", buildSupervisorPrompt(data));
+      const result = await spawnSession({
+        directory: data.repoPath,
+        approvedNewDirectoryCreation: false,
+        automationContext: { kind: "supervisor", trigger: data.trigger, projectId: data.projectId, runId: data.runId },
+        environmentVariables: {
+          HAPPY_INITIAL_PROMPT_FILE: promptFile,
+          HAPPY_SUPERVISOR_RUN_ID: data.runId,
+          HAPPY_SUPERVISOR_PROJECT_ID: data.projectId,
+          HAPPY_SUPERVISOR_SERVER_URL: serverUrl,
+          HAPPY_SUPERVISOR_AUTH_TOKEN: authToken,
+        },
+      });
+
+      if (result.type !== "success") {
+        const msg = result.type === "error" ? result.errorMessage : "Directory creation not approved";
+        client.emitSupervisorRunStatus({ runId: data.runId, projectId: data.projectId, status: "failed", errorMessage: msg });
+        throw new Error(msg);
+      }
+
+      const tracked = (await import("./trackedSessions")).getTrackedSession(result.pid);
+      if (tracked?.childProcess) {
+        tracked.childProcess.on("exit", (code) => {
+          const status = code === 0 ? "completed" : "failed";
+          if (code === 0) scheduler.markCompleted(jobId);
+          else scheduler.markFailed(jobId, `exit code ${code}`);
+          client.emitSupervisorRunStatus({ runId: data.runId, projectId: data.projectId, status });
+        });
+      }
+
+      return { pid: result.pid };
+    },
   });
 
-  try {
-    const promptFile = await writePromptFile("supervisor", buildSupervisorPrompt(data));
-
-    const result = await spawnSession({
-      directory: data.repoPath,
-      approvedNewDirectoryCreation: false,
-      automationContext: {
-        kind: "supervisor",
-        trigger: data.trigger,
-        projectId: data.projectId,
-        runId: data.runId,
-      },
-      environmentVariables: {
-        HAPPY_INITIAL_PROMPT_FILE: promptFile,
-        HAPPY_SUPERVISOR_RUN_ID: data.runId,
-        HAPPY_SUPERVISOR_PROJECT_ID: data.projectId,
-        HAPPY_SUPERVISOR_SERVER_URL: serverUrl,
-        HAPPY_SUPERVISOR_AUTH_TOKEN: authToken,
-      },
-    });
-
-    if (result.type !== "success") {
-      client.emitSupervisorRunStatus({
-        runId: data.runId,
-        projectId: data.projectId,
-        status: "failed",
-        errorMessage: result.type === "error" ? result.errorMessage : "Directory creation not approved",
-      });
-    }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.debug(`[TRIGGER] Supervisor error: ${msg}`);
-    client.emitSupervisorRunStatus({
-      runId: data.runId,
-      projectId: data.projectId,
-      status: "failed",
-      errorMessage: msg,
-    });
+  if (deduped) {
+    logger.debug(`[TRIGGER] Supervisor deduped: ${data.runId}`);
   }
 }
 
-export async function handleTaskTrigger(
+export function handleTaskTrigger(
   data: TaskTriggerData,
   serverUrl: string,
   _authToken: string,
-): Promise<void> {
+  scheduler: AutomationScheduler,
+): void {
   logger.debug(`[TRIGGER] Task: ${data.taskId} in ${data.directory}`);
 
-  try {
-    const promptFile = await writePromptFile("task", data.prompt);
+  const { deduped } = scheduler.enqueue({
+    kind: "task",
+    dedupeKey: `task:${data.taskId}`,
+    priority: mapTaskPriority(data.priority),
+    run: async (jobId) => {
+      const promptFile = await writePromptFile("task", data.prompt);
 
-    // Build skill injection env if present
-    const skillEnv: Record<string, string> = {};
-    if (data.skillContents?.length) {
-      skillEnv.HAPPY_TASK_SKILL_COUNT = String(data.skillContents.length);
-      for (let i = 0; i < data.skillContents.length; i++) {
-        skillEnv[`HAPPY_TASK_SKILL_${i}_NAME`] = data.skillContents[i].name;
-        skillEnv[`HAPPY_TASK_SKILL_${i}_CONTENT`] = data.skillContents[i].content;
+      const skillEnv: Record<string, string> = {};
+      if (data.skillContents?.length) {
+        skillEnv.HAPPY_TASK_SKILL_COUNT = String(data.skillContents.length);
+        for (let i = 0; i < data.skillContents.length; i++) {
+          skillEnv[`HAPPY_TASK_SKILL_${i}_NAME`] = data.skillContents[i].name;
+          skillEnv[`HAPPY_TASK_SKILL_${i}_CONTENT`] = data.skillContents[i].content;
+        }
       }
-    }
 
-    const result = await spawnSession({
-      directory: data.directory,
-      approvedNewDirectoryCreation: true, // Tasks always auto-approve directory
-      automationContext: {
-        kind: "task",
-        trigger: "task-dispatch",
-        projectId: data.projectId,
-      },
-      environmentVariables: {
-        HAPPY_INITIAL_PROMPT_FILE: promptFile,
-        HAPPY_TASK_ID: data.taskId,
-        HAPPY_TASK_PRIORITY: data.priority,
-        HAPPY_TASK_SERVER_URL: serverUrl,
-        HAPPY_TASK_RESULT_TOKEN: data.resultToken ?? "",
-        HAPPY_TASK_REPORT_URL: `${serverUrl}/v1/tasks/${data.taskId}/result`,
-        ...skillEnv,
-      },
-    });
+      const result = await spawnSession({
+        directory: data.directory,
+        approvedNewDirectoryCreation: true,
+        automationContext: { kind: "task", trigger: "task-dispatch", projectId: data.projectId },
+        environmentVariables: {
+          HAPPY_INITIAL_PROMPT_FILE: promptFile,
+          HAPPY_TASK_ID: data.taskId,
+          HAPPY_TASK_PRIORITY: data.priority,
+          HAPPY_TASK_SERVER_URL: serverUrl,
+          HAPPY_TASK_RESULT_TOKEN: data.resultToken ?? "",
+          HAPPY_TASK_REPORT_URL: `${serverUrl}/v1/tasks/${data.taskId}/result`,
+          ...skillEnv,
+        },
+      });
 
-    if (result.type !== "success") {
-      logger.debug(`[TRIGGER] Task spawn failed: ${result.type === "error" ? result.errorMessage : "needs approval"}`);
-    }
-  } catch (error) {
-    logger.debug(`[TRIGGER] Task error: ${error instanceof Error ? error.message : String(error)}`);
+      if (result.type !== "success") {
+        throw new Error(result.type === "error" ? result.errorMessage : "Directory creation not approved");
+      }
+
+      const tracked = (await import("./trackedSessions")).getTrackedSession(result.pid);
+      if (tracked?.childProcess) {
+        tracked.childProcess.on("exit", (code) => {
+          if (code === 0) scheduler.markCompleted(jobId);
+          else scheduler.markFailed(jobId, `exit code ${code}`);
+        });
+      }
+
+      return { pid: result.pid };
+    },
+  });
+
+  if (deduped) {
+    logger.debug(`[TRIGGER] Task deduped: ${data.taskId}`);
   }
 }
