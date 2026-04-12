@@ -1593,8 +1593,13 @@ export class CodexAppServerClient {
 
         const toolName = itemId ? this.mcpToolNames.get(itemId) : null;
         this.handler?.({
-          type: "service_message",
-          text: toolName ? `${toolName}: ${progressMessage}` : progressMessage,
+          type: "tool-call",
+          callId: itemId ?? "mcp-tool-progress",
+          toolName: toolName ?? "mcpToolCall",
+          args: {
+            title: toolName ?? "MCP tool call",
+            description: progressMessage,
+          },
         });
         return;
       }

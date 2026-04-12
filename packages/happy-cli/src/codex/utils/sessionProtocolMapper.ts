@@ -587,6 +587,11 @@ export function mapCodexProcessorMessageToSessionEnvelopes(
   }
 
   if (message.type === "tool-call") {
+    const description =
+      typeof (toolLikeMessage.input as { description?: unknown } | undefined)
+        ?.description === "string"
+        ? (toolLikeMessage.input as { description: string }).description
+        : null;
     const title =
       typeof (toolLikeMessage.input as { title?: unknown } | undefined)
         ?.title === "string"
@@ -601,7 +606,7 @@ export function mapCodexProcessorMessageToSessionEnvelopes(
           call: toolLikeMessage.callId,
           name: toolLikeMessage.name || "unknown",
           title,
-          description: title,
+          description: description || title,
           args: (toolLikeMessage.input &&
           typeof toolLikeMessage.input === "object"
             ? toolLikeMessage.input

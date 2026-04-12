@@ -136,6 +136,25 @@ describe('mapCodexMcpMessageToSessionEnvelopes', () => {
         }
     });
 
+    it('preserves description overrides on generic tool-call messages', () => {
+        const events = mapCodexProcessorMessageToSessionEnvelopes({
+            type: 'tool-call',
+            callId: 'call-1',
+            name: 'mcp__happy__change_title',
+            input: {
+                title: 'mcp__happy__change_title',
+                description: 'waiting for permission review',
+            },
+            id: 'legacy-id-progress',
+        } as any, { currentTurnId: 'turn-1' });
+
+        expect(events).toHaveLength(1);
+        expect(events[0].ev.t).toBe('tool-call-start');
+        if (events[0].ev.t === 'tool-call-start') {
+            expect(events[0].ev.description).toBe('waiting for permission review');
+        }
+    });
+
     it('skips token_count messages', () => {
         const result = mapCodexMcpMessageToSessionEnvelopes(
             { type: 'token_count', total_tokens: 10 },

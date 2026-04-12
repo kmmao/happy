@@ -1104,8 +1104,13 @@ describe("CodexAppServerClient", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(events).toContainEqual({
-      type: "service_message",
-      text: "mcp__happy__change_title: waiting for permission review",
+      type: "tool-call",
+      callId: "mcp-progress-1",
+      toolName: "mcp__happy__change_title",
+      args: {
+        title: "mcp__happy__change_title",
+        description: "waiting for permission review",
+      },
     });
   });
 
