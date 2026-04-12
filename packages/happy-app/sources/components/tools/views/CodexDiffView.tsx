@@ -8,6 +8,7 @@ import { ToolDiffView } from '@/components/tools/ToolDiffView';
 import { Metadata } from '@/sync/storageTypes';
 import { useSetting } from '@/sync/storage';
 import { t } from '@/text';
+import { DiffStatsBar } from '@/components/diff/DiffStatsBar';
 import { getCodexDiffStats, parseCodexUnifiedDiff } from '../codexDiffUtils';
 
 interface CodexDiffViewProps {
@@ -44,76 +45,127 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
 
     React.useEffect(() => {
         setExpanded(isFullView);
-    }, [isFullView, tool.id]);
-
-    // If we have a filename, show it as a header
-    const fileHeader = fileName && isFullView ? (
-        <View style={styles.fileHeader}>
-            <Text style={styles.fileName}>{fileName}</Text>
-        </View>
-    ) : null;
+    }, [isFullView, tool.createdAt]);
 
     return (
-        <>
-            {fileHeader}
-            <ToolSectionView fullWidth>
-                {!isFullView && (
-                    <Pressable style={styles.toggleRow} onPress={() => setExpanded((v) => !v)}>
+        <ToolSectionView fullWidth>
+            <View
+                style={[
+                    styles.card,
+                    {
+                        backgroundColor: theme.colors.surfaceHigh,
+                        borderColor: expanded ? theme.colors.diff.outline : theme.colors.divider,
+                    },
+                ]}
+            >
+                <Pressable style={styles.cardHeader} onPress={() => setExpanded((v) => !v)}>
+                    <View style={styles.cardHeaderLeft}>
+                        <View
+                            style={[
+                                styles.fileIconWrap,
+                                { backgroundColor: theme.colors.surfaceHighest },
+                            ]}
+                        >
+                            <Ionicons
+                                name="git-compare-outline"
+                                size={18}
+                                color={theme.colors.text}
+                            />
+                        </View>
+                        <View style={styles.fileMeta}>
+                            <Text style={styles.fileName} numberOfLines={1}>
+                                {fileName || t('tools.names.viewDiff')}
+                            </Text>
+                            {fileName ? (
+                                <Text
+                                    style={styles.filePath}
+                                    numberOfLines={isFullView ? 2 : 1}
+                                >
+                                    {fileName}
+                                </Text>
+                            ) : null}
+                        </View>
+                    </View>
+                    <View style={styles.cardHeaderRight}>
+                        <DiffStatsBar
+                            additions={diffStats.additions}
+                            deletions={diffStats.deletions}
+                        />
                         <Ionicons
                             name={expanded ? 'chevron-down' : 'chevron-forward'}
-                            size={14}
+                            size={16}
                             color={theme.colors.textSecondary}
                         />
-                        <Text style={styles.toggleText}>
-                            {expanded ? t('diff.toolbar.collapse') : t('diff.toolbar.expand')}
-                        </Text>
-                        <Text style={[styles.statsText, { color: theme.colors.diff.success }]}>
-                            +{diffStats.additions}
-                        </Text>
-                        <Text style={[styles.statsText, { color: theme.colors.diff.error }]}>
-                            -{diffStats.deletions}
-                        </Text>
-                    </Pressable>
+                    </View>
+                </Pressable>
+                {expanded && (
+                    <View
+                        style={[
+                            styles.diffWrap,
+                            { borderTopColor: theme.colors.divider },
+                        ]}
+                    >
+                        <ToolDiffView 
+                            oldText={oldText} 
+                            newText={newText} 
+                            showLineNumbers={showLineNumbersInToolViews}
+                            showPlusMinusSymbols={showLineNumbersInToolViews}
+                        />
+                    </View>
                 )}
-                {(expanded || isFullView) && (
-                    <ToolDiffView 
-                        oldText={oldText} 
-                        newText={newText} 
-                        showLineNumbers={showLineNumbersInToolViews}
-                        showPlusMinusSymbols={showLineNumbersInToolViews}
-                    />
-                )}
-            </ToolSectionView>
-        </>
+            </View>
+        </ToolSectionView>
     );
 });
 
 const styles = StyleSheet.create((theme) => ({
-    fileHeader: {
+    card: {
+        borderWidth: 1,
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
         paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: theme.colors.surfaceHigh,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.divider,
+        paddingVertical: 14,
     },
-    fileName: {
-        fontSize: 13,
-        color: theme.colors.textSecondary,
-        fontFamily: 'monospace',
+    cardHeaderLeft: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
-    toggleRow: {
+    cardHeaderRight: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        paddingHorizontal: 4,
-        paddingBottom: 8,
     },
-    toggleText: {
+    fileIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    fileMeta: {
+        flex: 1,
+        minWidth: 0,
+        gap: 2,
+    },
+    fileName: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: theme.colors.text,
+    },
+    filePath: {
         fontSize: 12,
         color: theme.colors.textSecondary,
-        flex: 1,
     },
-    statsText: {
-        fontSize: 11,
+    diffWrap: {
+        borderTopWidth: 1,
+        paddingTop: 8,
     },
 }));
