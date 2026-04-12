@@ -47,7 +47,7 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
     }, [isFullView, tool.id]);
 
     // If we have a filename, show it as a header
-    const fileHeader = fileName ? (
+    const fileHeader = fileName && isFullView ? (
         <View style={styles.fileHeader}>
             <Text style={styles.fileName}>{fileName}</Text>
         </View>
@@ -65,7 +65,7 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
                             color={theme.colors.textSecondary}
                         />
                         <Text style={styles.toggleText}>
-                            {expanded ? t('common.collapse') : t('common.expand')}
+                            {expanded ? t('diff.toolbar.collapse') : t('diff.toolbar.expand')}
                         </Text>
                         <Text style={[styles.statsText, { color: theme.colors.diff.success }]}>
                             +{diffStats.additions}

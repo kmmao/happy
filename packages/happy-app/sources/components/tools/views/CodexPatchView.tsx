@@ -77,7 +77,9 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
               color={theme.colors.textSecondary}
             />
             <Text style={styles.toggleText}>
-              {expanded ? t("common.collapse") : t("common.expand")}
+              {expanded
+                ? t("diff.toolbar.collapse")
+                : t("diff.toolbar.expand")}
             </Text>
             {totals && (
               <>
@@ -91,14 +93,16 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
             )}
           </Pressable>
         )}
-        <View style={styles.pathHeader}>
-          <View style={styles.pathPill}>
-            <View style={styles.pathDot} />
-            <Text style={styles.pathLabel} numberOfLines={1}>
-              {activeEntry.resolvedPath}
-            </Text>
+        {isFullView && (
+          <View style={styles.pathHeader}>
+            <View style={styles.pathPill}>
+              <View style={styles.pathDot} />
+              <Text style={styles.pathLabel} numberOfLines={1}>
+                {activeEntry.resolvedPath}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
         {(expanded || isFullView) && (
           <ToolDiffView
             oldText={activeEntry.oldText}

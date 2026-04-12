@@ -26,4 +26,20 @@ tail`);
   it("returns null for non-diff markdown", () => {
     expect(parseLegacyCodexDiffPreview("plain text")).toBeNull();
   });
+
+  it("simplifies local file markdown links in the prefix", () => {
+    const parsed = parseLegacyCodexDiffPreview(`[startHappyServer.ts](/Users/test/project/startHappyServer.ts)
+
+Latest diff preview:
+
+\`\`\`diff
+--- a/file.ts
++++ b/file.ts
+@@
+-old
++new
+\`\`\``);
+
+    expect(parsed?.prefixMarkdown).toBe("`startHappyServer.ts`");
+  });
 });

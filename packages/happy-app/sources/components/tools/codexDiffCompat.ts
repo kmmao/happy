@@ -5,6 +5,13 @@ export type LegacyCodexDiffPreview = {
 
 const DIFF_PREVIEW_MARKER = "Latest diff preview:";
 
+function simplifyLocalFileLinks(markdown: string): string {
+  return markdown.replace(
+    /\[([^\]]+)\]\((\/[^)\s]+)\)/g,
+    (_match, label: string) => `\`${label}\``,
+  );
+}
+
 export function parseLegacyCodexDiffPreview(
   markdown: string,
 ): LegacyCodexDiffPreview | null {
@@ -31,7 +38,10 @@ export function parseLegacyCodexDiffPreview(
   const prefixParts = [before, after].filter((part) => part.length > 0);
 
   return {
-    prefixMarkdown: prefixParts.length > 0 ? prefixParts.join("\n\n") : null,
+    prefixMarkdown:
+      prefixParts.length > 0
+        ? simplifyLocalFileLinks(prefixParts.join("\n\n"))
+        : null,
     unifiedDiff: diff,
   };
 }
