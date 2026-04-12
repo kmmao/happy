@@ -146,6 +146,97 @@ function formatDangerouslySkipPermissionsMetadata(
   return "Unknown";
 }
 
+function formatCodexBackendMetadata(
+  codex:
+    | {
+        requestedBackend?: "auto" | "codex-app-server" | "codex-mcp-legacy";
+        resolvedBackend?: "codex-app-server" | "codex-mcp-legacy";
+        configMode?: "inherit" | "managed-profile" | "managed-overrides";
+        fallbackReason?: string;
+        backendVersion?: string;
+      }
+    | undefined,
+): string | null {
+  if (!codex || typeof codex !== "object") {
+    return null;
+  }
+
+  const resolvedBackend = (codex as { resolvedBackend?: unknown }).resolvedBackend;
+  if (resolvedBackend === "codex-app-server") {
+    return t("sessionInfo.codexBackendAppServer");
+  }
+  if (resolvedBackend === "codex-mcp-legacy") {
+    return t("sessionInfo.codexBackendLegacyMcp");
+  }
+
+  return null;
+}
+
+function formatCodexRequestedBackendMetadata(
+  codex:
+    | {
+        requestedBackend?: "auto" | "codex-app-server" | "codex-mcp-legacy";
+      }
+    | undefined,
+): string | null {
+  const requestedBackend = codex?.requestedBackend;
+  if (requestedBackend === "auto") {
+    return t("sessionInfo.codexBackendAuto");
+  }
+  if (requestedBackend === "codex-app-server") {
+    return t("sessionInfo.codexBackendAppServer");
+  }
+  if (requestedBackend === "codex-mcp-legacy") {
+    return t("sessionInfo.codexBackendLegacyMcp");
+  }
+  return null;
+}
+
+function formatCodexConfigModeMetadata(
+  codex:
+    | {
+        configMode?: "inherit" | "managed-profile" | "managed-overrides";
+      }
+    | undefined,
+): string | null {
+  const configMode = codex?.configMode;
+  if (configMode === "inherit") {
+    return t("sessionInfo.codexConfigModeInherit");
+  }
+  if (configMode === "managed-profile") {
+    return t("sessionInfo.codexConfigModeManagedProfile");
+  }
+  if (configMode === "managed-overrides") {
+    return t("sessionInfo.codexConfigModeManagedOverrides");
+  }
+  return null;
+}
+
+function formatCodexAccountMetadata(
+  codex:
+    | {
+        account?: {
+          type?: "apiKey" | "chatgpt" | null;
+          email?: string | null;
+        };
+      }
+    | undefined,
+): string | null {
+  const account = codex?.account;
+  if (!account?.type) {
+    return null;
+  }
+  if (account.type === "apiKey") {
+    return t("sessionInfo.codexAccountApiKey");
+  }
+  if (account.type === "chatgpt") {
+    return account.email
+      ? `${t("sessionInfo.codexAccountChatgpt")} (${account.email})`
+      : t("sessionInfo.codexAccountChatgpt");
+  }
+  return null;
+}
+
 function SessionInfoContent({ session }: { session: Session }) {
   const { theme } = useUnistyles();
   const router = useRouter();
@@ -685,6 +776,130 @@ function SessionInfoContent({ session }: { session: Session }) {
               }
               showChevron={false}
             />
+            {session.metadata.flavor === "codex" &&
+              formatCodexRequestedBackendMetadata(session.metadata.codex) && (
+                <Item
+                  title={t("sessionInfo.codexRequestedBackend")}
+                  subtitle={
+                    formatCodexRequestedBackendMetadata(session.metadata.codex)!
+                  }
+                  icon={
+                    <Ionicons
+                      name="options-outline"
+                      size={29}
+                      color="#5856D6"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              formatCodexBackendMetadata(session.metadata.codex) && (
+                <Item
+                  title={t("sessionInfo.codexResolvedBackend")}
+                  subtitle={formatCodexBackendMetadata(session.metadata.codex)!}
+                  icon={
+                    <Ionicons
+                      name="git-network-outline"
+                      size={29}
+                      color="#5856D6"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              session.metadata.codex?.backendVersion && (
+                <Item
+                  title={t("sessionInfo.codexBackendVersion")}
+                  subtitle={session.metadata.codex.backendVersion}
+                  icon={
+                    <Ionicons
+                      name="layers-outline"
+                      size={29}
+                      color="#5856D6"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              session.metadata.codex?.config?.profile && (
+                <Item
+                  title={t("sessionInfo.codexProfile")}
+                  subtitle={session.metadata.codex.config.profile}
+                  icon={
+                    <Ionicons
+                      name="layers-outline"
+                      size={29}
+                      color="#5856D6"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              formatCodexAccountMetadata(session.metadata.codex) && (
+                <Item
+                  title={t("sessionInfo.codexAccount")}
+                  subtitle={formatCodexAccountMetadata(session.metadata.codex)!}
+                  icon={
+                    <Ionicons
+                      name="person-outline"
+                      size={29}
+                      color="#5856D6"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              session.metadata.codex?.account?.planType && (
+                <Item
+                  title={t("sessionInfo.codexPlan")}
+                  subtitle={session.metadata.codex.account.planType}
+                  icon={
+                    <Ionicons
+                      name="card-outline"
+                      size={29}
+                      color="#5856D6"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              formatCodexConfigModeMetadata(session.metadata.codex) && (
+                <Item
+                  title={t("sessionInfo.codexConfigMode")}
+                  subtitle={
+                    formatCodexConfigModeMetadata(session.metadata.codex)!
+                  }
+                  icon={
+                    <Ionicons
+                      name="settings-outline"
+                      size={29}
+                      color="#5856D6"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              session.metadata.codex?.fallbackReason && (
+                <Item
+                  title={t("sessionInfo.codexFallbackReason")}
+                  subtitle={session.metadata.codex.fallbackReason}
+                  icon={
+                    <Ionicons
+                      name="warning-outline"
+                      size={29}
+                      color="#FF9500"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
             <Item
               title="Sandbox"
               subtitle={formatSandboxMetadata(

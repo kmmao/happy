@@ -89,6 +89,25 @@ const TogetherAIConfigSchema = z.object({
   model: z.string().optional(),
 });
 
+const CodexConfigSchema = z.object({
+  backendMode: z
+    .enum(["auto", "codex-app-server", "codex-mcp-legacy"])
+    .optional(),
+  configMode: z
+    .enum(["inherit", "managed-profile", "managed-overrides"])
+    .optional(),
+  codexProfileName: z.string().optional(),
+  model: z.string().optional(),
+  reasoningEffort: z.string().optional(),
+  reasoningSummary: z.string().optional(),
+  verbosity: z.string().optional(),
+  personality: z.string().optional(),
+  serviceTier: z.string().optional(),
+  webSearchEnabled: z.boolean().optional(),
+  approvalPolicy: z.string().optional(),
+  sandboxMode: z.string().optional(),
+});
+
 // Tmux configuration schema
 const TmuxConfigSchema = z.object({
   sessionName: z.string().optional(),
@@ -123,6 +142,7 @@ export const AIBackendProfileSchema = z.object({
   openaiConfig: OpenAIConfigSchema.optional(),
   azureOpenAIConfig: AzureOpenAIConfigSchema.optional(),
   togetherAIConfig: TogetherAIConfigSchema.optional(),
+  codexConfig: CodexConfigSchema.optional(),
 
   // Tmux configuration
   tmuxConfig: TmuxConfigSchema.optional(),
@@ -280,6 +300,50 @@ export function getProfileEnvironmentVariables(
       envVars.TOGETHER_API_KEY = profile.togetherAIConfig.apiKey;
     if (profile.togetherAIConfig.model)
       envVars.TOGETHER_MODEL = profile.togetherAIConfig.model;
+  }
+
+  if (profile.codexConfig) {
+    if (profile.codexConfig.backendMode) {
+      envVars.HAPPY_CODEX_BACKEND = profile.codexConfig.backendMode;
+    }
+    if (profile.codexConfig.configMode) {
+      envVars.HAPPY_CODEX_CONFIG_MODE = profile.codexConfig.configMode;
+    }
+    if (profile.codexConfig.codexProfileName) {
+      envVars.HAPPY_CODEX_PROFILE = profile.codexConfig.codexProfileName;
+    }
+    if (profile.codexConfig.model) {
+      envVars.HAPPY_CODEX_MODEL = profile.codexConfig.model;
+    }
+    if (profile.codexConfig.reasoningEffort) {
+      envVars.HAPPY_CODEX_REASONING_EFFORT =
+        profile.codexConfig.reasoningEffort;
+    }
+    if (profile.codexConfig.reasoningSummary) {
+      envVars.HAPPY_CODEX_REASONING_SUMMARY =
+        profile.codexConfig.reasoningSummary;
+    }
+    if (profile.codexConfig.verbosity) {
+      envVars.HAPPY_CODEX_VERBOSITY = profile.codexConfig.verbosity;
+    }
+    if (profile.codexConfig.personality) {
+      envVars.HAPPY_CODEX_PERSONALITY = profile.codexConfig.personality;
+    }
+    if (profile.codexConfig.serviceTier) {
+      envVars.HAPPY_CODEX_SERVICE_TIER = profile.codexConfig.serviceTier;
+    }
+    if (profile.codexConfig.webSearchEnabled !== undefined) {
+      envVars.HAPPY_CODEX_WEB_SEARCH = profile.codexConfig.webSearchEnabled
+        ? "live"
+        : "disabled";
+    }
+    if (profile.codexConfig.approvalPolicy) {
+      envVars.HAPPY_CODEX_APPROVAL_POLICY =
+        profile.codexConfig.approvalPolicy;
+    }
+    if (profile.codexConfig.sandboxMode) {
+      envVars.HAPPY_CODEX_SANDBOX_MODE = profile.codexConfig.sandboxMode;
+    }
   }
 
   // Add Tmux config

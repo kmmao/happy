@@ -5,6 +5,7 @@ import {
   getClaudeModelModes,
   getCodexModelModes,
   getClaudePermissionModes,
+  getDefaultModelKey,
   mapMetadataOptions,
   resolveCurrentOption,
 } from "./modelModeOptions";
@@ -40,6 +41,7 @@ describe("modelModeOptions", () => {
   it("builds codex model fallbacks with translated labels", () => {
     const models = getCodexModelModes(translate);
     expect(models.map((model) => model.key)).toEqual([
+      "default",
       "gpt-5.4",
       "gpt-5.4-pro",
       "gpt-5.4-mini",
@@ -50,7 +52,12 @@ describe("modelModeOptions", () => {
       "gpt-5.1-codex",
       "gpt-5-codex",
     ]);
-    expect(models[0].name).toBe("tr:agentInput.codexModel.gpt54");
+    expect(models[0]).toEqual({
+      key: "default",
+      name: "Default",
+      description: "Use Codex default settings",
+    });
+    expect(models[1].name).toBe("tr:agentInput.codexModel.gpt54");
   });
 
   it("prefers metadata models over hardcoded fallbacks", () => {
@@ -72,6 +79,35 @@ describe("modelModeOptions", () => {
       {
         key: "custom-gemini",
         name: "Gemini Custom",
+        description: "From metadata",
+      },
+    ]);
+  });
+
+  it("prepends a codex default option before metadata models", () => {
+    const models = getAvailableModels(
+      "codex",
+      {
+        models: [
+          {
+            code: "gpt-5.4",
+            value: "GPT-5.4",
+            description: "From metadata",
+          },
+        ],
+      } as any,
+      translate,
+    );
+
+    expect(models).toEqual([
+      {
+        key: "default",
+        name: "Default",
+        description: "Use Codex default settings",
+      },
+      {
+        key: "gpt-5.4",
+        name: "GPT-5.4",
         description: "From metadata",
       },
     ]);
@@ -173,5 +209,9 @@ describe("modelModeOptions", () => {
       name: "B",
     });
     expect(resolveCurrentOption(options, ["missing"])).toBeNull();
+  });
+
+  it("uses default as the codex fallback model key", () => {
+    expect(getDefaultModelKey("codex")).toBe("default");
   });
 });

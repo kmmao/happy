@@ -132,7 +132,7 @@ export function getCodexPermissionModes(
     {
       key: "default",
       name: translate("agentInput.codexPermissionMode.default"),
-      description: "Use CLI default settings",
+      description: "Use Codex default settings",
     },
     {
       key: "read-only",
@@ -221,6 +221,11 @@ export function getClaudeModelModes(): ModelMode[] {
 
 export function getCodexModelModes(translate: Translate): ModelMode[] {
   return [
+    {
+      key: "default",
+      name: "Default",
+      description: "Use Codex default settings",
+    },
     {
       key: "gpt-5.4",
       name: translate("agentInput.codexModel.gpt54"),
@@ -355,13 +360,23 @@ export function getAvailableModels(
   // Priority 1 (non-Claude): CLI dynamically reported models
   const metadataModels = dedupeModeOptions(mapMetadataOptions(metadata?.models));
   if (metadataModels.length > 0) {
+    if (flavor === "codex") {
+      return dedupeModeOptions([
+        { key: "default", name: "Default", description: "Use Codex default settings" },
+        ...metadataModels,
+      ]);
+    }
     return metadataModels;
   }
 
   // Priority 2 (non-Claude): Profile custom models
   if (customModels && customModels.length > 0) {
+    const defaultOption =
+      flavor === "codex"
+        ? { key: "default", name: "Default", description: "Use Codex default settings" }
+        : { key: "default", name: "Default", description: "Use CLI settings" };
     return dedupeModeOptions([
-      { key: "default", name: "Default", description: "Use CLI settings" },
+      defaultOption,
       ...customModels.map((m) => ({
         key: m.id,
         name: m.name,
@@ -416,7 +431,7 @@ export function resolveCurrentOption<T extends ModeOption>(
 
 export function getDefaultModelKey(flavor: AgentFlavor): string {
   if (flavor === "codex") {
-    return "gpt-5.4";
+    return "default";
   }
   if (flavor === "gemini") {
     return "gemini-3-flash-preview";

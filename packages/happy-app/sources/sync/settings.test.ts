@@ -748,6 +748,21 @@ describe("settings", () => {
       };
       expect(() => AIBackendProfileSchema.parse(invalidProfile)).toThrow();
     });
+
+    it("accepts codexConfig profile settings", () => {
+      const profile = {
+        id: crypto.randomUUID(),
+        name: "Codex Config Profile",
+        codexConfig: {
+          backendMode: "codex-app-server",
+          configMode: "managed-profile",
+          codexProfileName: "happy_max",
+        },
+        environmentVariables: [],
+        compatibility: { claude: true, codex: true, gemini: true },
+      };
+      expect(() => AIBackendProfileSchema.parse(profile)).not.toThrow();
+    });
   });
 
   describe("version-mismatch scenario (bug fix)", () => {

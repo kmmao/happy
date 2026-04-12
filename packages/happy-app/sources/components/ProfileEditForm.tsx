@@ -92,6 +92,40 @@ export function ProfileEditForm({
       return "codex";
     return "claude"; // Default to Claude if both or neither
   });
+  const [codexBackendMode, setCodexBackendMode] = React.useState<
+    "auto" | "codex-app-server" | "codex-mcp-legacy"
+  >(profile.codexConfig?.backendMode || "auto");
+  const [codexConfigMode, setCodexConfigMode] = React.useState<
+    "inherit" | "managed-profile" | "managed-overrides"
+  >(profile.codexConfig?.configMode || "inherit");
+  const [codexProfileName, setCodexProfileName] = React.useState(
+    profile.codexConfig?.codexProfileName || "",
+  );
+  const [codexOverrideModel, setCodexOverrideModel] = React.useState(
+    profile.codexConfig?.model || "",
+  );
+  const [codexOverrideReasoningEffort, setCodexOverrideReasoningEffort] =
+    React.useState(profile.codexConfig?.reasoningEffort || "");
+  const [codexOverrideReasoningSummary, setCodexOverrideReasoningSummary] =
+    React.useState(profile.codexConfig?.reasoningSummary || "");
+  const [codexOverrideVerbosity, setCodexOverrideVerbosity] = React.useState(
+    profile.codexConfig?.verbosity || "",
+  );
+  const [codexOverridePersonality, setCodexOverridePersonality] =
+    React.useState(profile.codexConfig?.personality || "");
+  const [codexOverrideServiceTier, setCodexOverrideServiceTier] =
+    React.useState(profile.codexConfig?.serviceTier || "");
+  const [codexOverrideWebSearch, setCodexOverrideWebSearch] = React.useState(
+    profile.codexConfig?.webSearchEnabled === undefined
+      ? ""
+      : profile.codexConfig.webSearchEnabled
+        ? "live"
+        : "disabled",
+  );
+  const [codexOverrideApprovalPolicy, setCodexOverrideApprovalPolicy] =
+    React.useState(profile.codexConfig?.approvalPolicy || "");
+  const [codexOverrideSandboxMode, setCodexOverrideSandboxMode] =
+    React.useState(profile.codexConfig?.sandboxMode || "");
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -123,6 +157,62 @@ export function ProfileEditForm({
       startupBashScript: useStartupScript
         ? startupScript.trim() || undefined
         : undefined,
+      codexConfig:
+        agentType === "codex"
+          ? {
+              backendMode: codexBackendMode,
+              configMode: codexConfigMode,
+              codexProfileName:
+                codexConfigMode === "managed-profile"
+                  ? codexProfileName.trim() || undefined
+                  : undefined,
+              ...(codexConfigMode === "managed-overrides" &&
+              codexOverrideModel.trim()
+                ? { model: codexOverrideModel.trim() }
+                : {}),
+              ...(codexConfigMode === "managed-overrides" &&
+              codexOverrideReasoningEffort.trim()
+                ? {
+                    reasoningEffort: codexOverrideReasoningEffort.trim(),
+                  }
+                : {}),
+              ...(codexConfigMode === "managed-overrides" &&
+              codexOverrideReasoningSummary.trim()
+                ? {
+                    reasoningSummary: codexOverrideReasoningSummary.trim(),
+                  }
+                : {}),
+              ...(codexConfigMode === "managed-overrides" &&
+              codexOverrideVerbosity.trim()
+                ? { verbosity: codexOverrideVerbosity.trim() }
+                : {}),
+              ...(codexConfigMode === "managed-overrides" &&
+              codexOverridePersonality.trim()
+                ? { personality: codexOverridePersonality.trim() }
+                : {}),
+              ...(codexConfigMode === "managed-overrides" &&
+              codexOverrideServiceTier.trim()
+                ? { serviceTier: codexOverrideServiceTier.trim() }
+                : {}),
+              ...(codexConfigMode === "managed-overrides" &&
+              codexOverrideWebSearch.trim()
+                ? {
+                    webSearchEnabled:
+                      codexOverrideWebSearch.trim() === "live",
+                  }
+                : {}),
+              ...(codexConfigMode === "managed-overrides" &&
+              codexOverrideApprovalPolicy.trim()
+                ? {
+                    approvalPolicy: codexOverrideApprovalPolicy.trim(),
+                  }
+                : {}),
+              ...(codexConfigMode === "managed-overrides" &&
+              codexOverrideSandboxMode.trim()
+                ? { sandboxMode: codexOverrideSandboxMode.trim() }
+                : {}),
+            }
+          : profile.codexConfig,
       defaultSessionType: defaultSessionType,
       defaultPermissionMode: defaultPermissionMode,
       updatedAt: Date.now(),
@@ -411,6 +501,244 @@ export function ProfileEditForm({
             );
           })}
         </View>
+
+        {agentType === "codex" && (
+          <>
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: "600",
+                color: theme.colors.text,
+                marginBottom: 12,
+                ...Typography.default("semiBold"),
+              }}
+            >
+              {t("profiles.codexSettings")}
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.colors.textSecondary,
+                marginBottom: 8,
+                ...Typography.default(),
+              }}
+            >
+              {t("profiles.codexBackendMode")}
+            </Text>
+            <View style={{ gap: 8, marginBottom: 16 }}>
+              {([
+                {
+                  value: "auto" as const,
+                  label: t("profiles.codexBackendAuto"),
+                },
+                {
+                  value: "codex-app-server" as const,
+                  label: t("profiles.codexBackendAppServer"),
+                },
+                {
+                  value: "codex-mcp-legacy" as const,
+                  label: t("profiles.codexBackendLegacy"),
+                },
+              ]).map((option) => {
+                const isSelected = codexBackendMode === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setCodexBackendMode(option.value)}
+                    style={{
+                      backgroundColor: isSelected
+                        ? theme.colors.button.primary.background
+                        : theme.colors.input.background,
+                      borderRadius: 10,
+                      padding: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: isSelected
+                          ? theme.colors.button.primary.tint
+                          : theme.colors.text,
+                        ...Typography.default("semiBold"),
+                      }}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.colors.textSecondary,
+                marginBottom: 8,
+                ...Typography.default(),
+              }}
+            >
+              {t("profiles.codexConfigMode")}
+            </Text>
+            <View style={{ gap: 8, marginBottom: 16 }}>
+              {([
+                {
+                  value: "inherit" as const,
+                  label: t("profiles.codexConfigInherit"),
+                },
+                {
+                  value: "managed-profile" as const,
+                  label: t("profiles.codexConfigManagedProfile"),
+                },
+                {
+                  value: "managed-overrides" as const,
+                  label: t("profiles.codexConfigManagedOverrides"),
+                },
+              ]).map((option) => {
+                const isSelected = codexConfigMode === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setCodexConfigMode(option.value)}
+                    style={{
+                      backgroundColor: isSelected
+                        ? theme.colors.button.primary.background
+                        : theme.colors.input.background,
+                      borderRadius: 10,
+                      padding: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: isSelected
+                          ? theme.colors.button.primary.tint
+                          : theme.colors.text,
+                        ...Typography.default("semiBold"),
+                      }}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {codexConfigMode === "managed-profile" && (
+              <>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: theme.colors.textSecondary,
+                    marginBottom: 8,
+                    ...Typography.default(),
+                  }}
+                >
+                  {t("profiles.codexProfileName")}
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: theme.colors.input.background,
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: 16,
+                    color: theme.colors.text,
+                    marginBottom: 16,
+                    borderWidth: 1,
+                    borderColor: theme.colors.textSecondary,
+                  }}
+                  placeholder={t("profiles.codexProfilePlaceholder")}
+                  value={codexProfileName}
+                  onChangeText={setCodexProfileName}
+                />
+              </>
+            )}
+            {codexConfigMode === "managed-overrides" && (
+              <>
+                {([
+                  {
+                    key: "model",
+                    label: t("profiles.codexOverrideModel"),
+                    value: codexOverrideModel,
+                    onChange: setCodexOverrideModel,
+                  },
+                  {
+                    key: "reasoningEffort",
+                    label: t("profiles.codexOverrideReasoningEffort"),
+                    value: codexOverrideReasoningEffort,
+                    onChange: setCodexOverrideReasoningEffort,
+                  },
+                  {
+                    key: "reasoningSummary",
+                    label: t("profiles.codexOverrideReasoningSummary"),
+                    value: codexOverrideReasoningSummary,
+                    onChange: setCodexOverrideReasoningSummary,
+                  },
+                  {
+                    key: "verbosity",
+                    label: t("profiles.codexOverrideVerbosity"),
+                    value: codexOverrideVerbosity,
+                    onChange: setCodexOverrideVerbosity,
+                  },
+                  {
+                    key: "personality",
+                    label: t("profiles.codexOverridePersonality"),
+                    value: codexOverridePersonality,
+                    onChange: setCodexOverridePersonality,
+                  },
+                  {
+                    key: "serviceTier",
+                    label: t("profiles.codexOverrideServiceTier"),
+                    value: codexOverrideServiceTier,
+                    onChange: setCodexOverrideServiceTier,
+                  },
+                  {
+                    key: "webSearch",
+                    label: t("profiles.codexOverrideWebSearch"),
+                    value: codexOverrideWebSearch,
+                    onChange: setCodexOverrideWebSearch,
+                  },
+                  {
+                    key: "approvalPolicy",
+                    label: t("profiles.codexOverrideApprovalPolicy"),
+                    value: codexOverrideApprovalPolicy,
+                    onChange: setCodexOverrideApprovalPolicy,
+                  },
+                  {
+                    key: "sandboxMode",
+                    label: t("profiles.codexOverrideSandboxMode"),
+                    value: codexOverrideSandboxMode,
+                    onChange: setCodexOverrideSandboxMode,
+                  },
+                ] as const).map((field) => (
+                  <React.Fragment key={field.key}>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: theme.colors.textSecondary,
+                        marginBottom: 8,
+                        ...Typography.default(),
+                      }}
+                    >
+                      {field.label}
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: theme.colors.input.background,
+                        borderRadius: 10,
+                        padding: 12,
+                        fontSize: 16,
+                        color: theme.colors.text,
+                        marginBottom: 16,
+                        borderWidth: 1,
+                        borderColor: theme.colors.textSecondary,
+                      }}
+                      value={field.value}
+                      onChangeText={field.onChange}
+                    />
+                  </React.Fragment>
+                ))}
+              </>
+            )}
+          </>
+        )}
 
         {/* Tmux Enable/Disable */}
         <View

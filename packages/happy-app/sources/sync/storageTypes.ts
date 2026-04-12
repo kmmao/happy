@@ -59,6 +59,80 @@ export const MetadataSchema = z.object({
   hostPid: z.number().optional(), // Process ID of the session
   startedBy: z.enum(["daemon", "terminal"]).optional(), // How the session was started
   flavor: z.string().nullish(), // Session flavor/variant identifier
+  codex: z
+    .object({
+      requestedBackend: z
+        .enum(["auto", "codex-app-server", "codex-mcp-legacy"])
+        .optional(),
+      resolvedBackend: z
+        .enum(["codex-app-server", "codex-mcp-legacy"])
+        .optional(),
+      configMode: z
+        .enum(["inherit", "managed-profile", "managed-overrides"])
+        .optional(),
+      fallbackReason: z.string().optional(),
+      backendVersion: z.string().optional(),
+      threadId: z.string().optional(),
+      config: z
+        .object({
+          model: z.string().nullish(),
+          profile: z.string().nullish(),
+          approvalPolicy: z.string().nullish(),
+          sandboxMode: z.string().nullish(),
+          serviceTier: z.string().nullish(),
+          reasoningEffort: z.string().nullish(),
+          reasoningSummary: z.string().nullish(),
+          verbosity: z.string().nullish(),
+          webSearch: z.string().nullish(),
+        })
+        .optional(),
+      account: z
+        .object({
+          type: z.enum(["apiKey", "chatgpt"]).nullable().optional(),
+          email: z.string().nullish(),
+          planType: z.string().nullish(),
+          requiresOpenaiAuth: z.boolean().optional(),
+        })
+        .optional(),
+      rateLimits: z
+        .object({
+          limitId: z.string().nullish(),
+          limitName: z.string().nullish(),
+          planType: z.string().nullish(),
+          hasCredits: z.boolean().optional(),
+        })
+        .optional(),
+      experimentalFeatures: z
+        .array(
+          z.object({
+            name: z.string(),
+            stage: z.string(),
+            enabled: z.boolean(),
+            defaultEnabled: z.boolean(),
+          }),
+        )
+        .optional(),
+      skills: z
+        .array(
+          z.object({
+            name: z.string(),
+            description: z.string(),
+            path: z.string(),
+            enabled: z.boolean(),
+          }),
+        )
+        .optional(),
+      mcpServers: z
+        .array(
+          z.object({
+            name: z.string(),
+            authStatus: z.string(),
+            toolCount: z.number(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
   sandbox: z.any().nullish(), // Sandbox config metadata from CLI (or null when disabled)
   dangerouslySkipPermissions: z.boolean().nullish(), // Claude --dangerously-skip-permissions mode (or null when unknown)
   packageScripts: z.record(z.string(), z.string()).optional(), // package.json scripts from working directory

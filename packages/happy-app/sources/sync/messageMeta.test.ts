@@ -57,6 +57,16 @@ describe("resolveMessageModeMeta", () => {
     });
   });
 
+  it("does not send a model override when model mode is default", () => {
+    const meta = resolveMessageModeMeta({
+      permissionMode: "default",
+      modelMode: "default",
+      metadata: null,
+    } as any);
+
+    expect(meta.model).toBeNull();
+  });
+
   it("resolves thinking mode as adaptive", () => {
     const meta = resolveMessageModeMeta({
       permissionMode: "default",

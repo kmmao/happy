@@ -344,6 +344,7 @@ class ProfileSyncService {
             openaiConfig: { ...cliProfile.openaiConfig, ...guiProfile.openaiConfig },
             azureOpenAIConfig: { ...cliProfile.azureOpenAIConfig, ...guiProfile.azureOpenAIConfig },
             togetherAIConfig: { ...cliProfile.togetherAIConfig, ...guiProfile.togetherAIConfig },
+            codexConfig: { ...cliProfile.codexConfig, ...guiProfile.codexConfig },
             tmuxConfig: { ...cliProfile.tmuxConfig, ...guiProfile.tmuxConfig },
             environmentVariables: this.mergeEnvironmentVariables(
                 cliProfile.environmentVariables || [],

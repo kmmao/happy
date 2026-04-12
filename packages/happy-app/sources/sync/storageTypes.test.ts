@@ -46,4 +46,18 @@ describe('MetadataSchema', () => {
             expect(result.success).toBe(false);
         });
     });
+
+    it('accepts codex backend metadata', () => {
+        const result = MetadataSchema.safeParse({
+            ...baseMetadata,
+            flavor: 'codex',
+            codex: {
+                requestedBackend: 'codex-mcp-legacy',
+                resolvedBackend: 'codex-mcp-legacy',
+                configMode: 'inherit',
+            },
+        });
+
+        expect(result.success).toBe(true);
+    });
 });
