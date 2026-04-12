@@ -103,10 +103,11 @@ Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。Phase 6.1 已完成（�
 - [x] LoopCoordinator 自动传 --happy-session-id
 - [ ] Session 健康检查 + 自动回收（后续按需）
 
-### 6.4 AutomationAuditStore（审计日志）
-- [ ] 本地 JSON 持久化审计事件
-- [ ] job_enqueued / job_started / job_completed / job_failed 事件
-- [ ] 通过 RPC 查询审计历史
+### ~~6.4 AutomationAuditStore（审计日志）~~ ✅ 已完成 (d9ca6360)
+- [x] 内存环形缓冲区（500 条上限）
+- [x] job_enqueued / dispatched / completed / failed / retried 事件
+- [x] query-audit-log + audit-summary RPC 查询
+- [x] Scheduler onAudit 回调自动记录 + 8 个测试
 
 ### 6.5 Webhook 回调系统
 - [ ] Agent 启动微型 HTTP server 接收 spawned session 回调
