@@ -28,6 +28,7 @@ import { useAppendToInput } from "@/hooks/useInputContext";
 import { parseTaskStatusMessage, getThinkingLabelTitle } from "./messageProgress";
 import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
 import { parseLegacyCodexPlanPreview } from "./tools/codexPlanCompat";
+import { parseCodexServicePreview } from "./tools/codexServiceCompat";
 
 export const MessageView = (props: {
   message: Message;
@@ -397,6 +398,10 @@ function AgentTextBlock(props: {
     () => parseLegacyCodexPlanPreview(props.message.text),
     [props.message.text],
   );
+  const codexServicePreview = React.useMemo(
+    () => parseCodexServicePreview(props.message.text),
+    [props.message.text],
+  );
   const taskStatusIcon =
     taskStatus?.status === "completed"
       ? "checkmark-circle-outline"
@@ -592,6 +597,79 @@ function AgentTextBlock(props: {
               })}
             </View>
           </View>
+        ) : codexServicePreview ? (
+          codexServicePreview.kind === "steering" ? (
+            <View style={styles.codexServiceInline}>
+              <Ionicons
+                name="sync-outline"
+                size={12}
+                color={theme.colors.textSecondary}
+              />
+              <Text style={styles.codexServiceInlineText}>
+                {codexServicePreview.title}
+              </Text>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.codexServiceCard,
+                codexServicePreview.kind === "warning"
+                  ? {
+                      backgroundColor: theme.colors.box.warning.background,
+                      borderColor: theme.colors.box.warning.border,
+                    }
+                  : codexServicePreview.kind === "review"
+                    ? {
+                        backgroundColor: theme.colors.surfaceHigh,
+                        borderColor: theme.colors.divider,
+                      }
+                    : {
+                        backgroundColor: theme.colors.accentBlue + "10",
+                        borderColor: theme.colors.accentBlue + "24",
+                      },
+              ]}
+            >
+              <View style={styles.codexServiceHeader}>
+                <Ionicons
+                  name={
+                    codexServicePreview.kind === "warning"
+                      ? "alert-circle-outline"
+                      : codexServicePreview.kind === "review"
+                        ? "eye-outline"
+                        : "swap-horizontal-outline"
+                  }
+                  size={14}
+                  color={
+                    codexServicePreview.kind === "warning"
+                      ? theme.colors.box.warning.text
+                      : codexServicePreview.kind === "review"
+                        ? theme.colors.textSecondary
+                        : theme.colors.accentBlue
+                  }
+                />
+                <Text
+                  style={[
+                    styles.codexServiceTitle,
+                    {
+                      color:
+                        codexServicePreview.kind === "warning"
+                          ? theme.colors.box.warning.text
+                          : codexServicePreview.kind === "review"
+                            ? theme.colors.textSecondary
+                            : theme.colors.accentBlue,
+                    },
+                  ]}
+                >
+                  {codexServicePreview.title}
+                </Text>
+              </View>
+              {codexServicePreview.detail ? (
+                <Text style={styles.codexServiceDetail}>
+                  {codexServicePreview.detail}
+                </Text>
+              ) : null}
+            </View>
+          )
         ) : (
           <MarkdownView
             markdown={props.message.text}
@@ -1148,6 +1226,41 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 12.5,
     lineHeight: 17,
     color: theme.colors.text,
+    ...Typography.default(),
+  },
+  codexServiceCard: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  codexServiceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  codexServiceTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    ...Typography.default("semiBold"),
+  },
+  codexServiceDetail: {
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: theme.colors.text,
+    ...Typography.default(),
+  },
+  codexServiceInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  codexServiceInlineText: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
     ...Typography.default(),
   },
   debugText: {
