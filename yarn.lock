@@ -2579,7 +2579,7 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@kmmao/happy-wire@^0.10.4", "@kmmao/happy-wire@^0.10.5":
+"@kmmao/happy-wire@^0.10.4":
   version "0.10.5"
   resolved "https://registry.yarnpkg.com/@kmmao/happy-wire/-/happy-wire-0.10.5.tgz#9b0e94e0038a8a96f85e807fce2abe77dad4520f"
   integrity sha512-y1iTTXZKgNRi1MSerAK0wvVwg8lL+HdTF6SFHLzxOiNmGiIYddWtPvI9k2ssRql99aVVXtsrP0+/36eLbS6zsQ==
