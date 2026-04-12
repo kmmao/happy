@@ -3235,4 +3235,47 @@ describe('reducer', () => {
             });
         });
     });
+
+    describe('session-protocol text streaming', () => {
+        it('appends text deltas into a single agent message for the same stream', () => {
+            const state = createReducer();
+
+            reducer(state, [
+                {
+                    id: 'delta-1',
+                    localId: null,
+                    createdAt: 100,
+                    role: 'agent',
+                    isSidechain: false,
+                    content: [{
+                        type: 'text-delta',
+                        delta: '你',
+                        streamId: 'stream-1',
+                        uuid: 'stream-1',
+                        parentUUID: null,
+                    }],
+                } as any,
+                {
+                    id: 'delta-2',
+                    localId: null,
+                    createdAt: 101,
+                    role: 'agent',
+                    isSidechain: false,
+                    content: [{
+                        type: 'text-delta',
+                        delta: '好',
+                        streamId: 'stream-1',
+                        uuid: 'stream-1',
+                        parentUUID: null,
+                    }],
+                } as any,
+            ]);
+
+            const textMessages = Array.from(state.messages.values()).filter(
+                (message) => message.role === 'agent' && message.text !== null,
+            );
+            expect(textMessages).toHaveLength(1);
+            expect(textMessages[0].text).toBe('你好');
+        });
+    });
 });

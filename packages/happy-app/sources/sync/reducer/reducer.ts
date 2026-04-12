@@ -140,6 +140,7 @@ export type BackgroundTaskEntry = {
 
 export type ReducerState = {
   toolIdToMessageId: Map<string, string>; // toolId/permissionId -> messageId (since they're the same now)
+  textStreamIdToMessageId: Map<string, string>; // app-server text stream id -> messageId
   sidechainToolIdToMessageId: Map<string, string>; // toolId -> sidechain messageId (for dual tracking)
   permissions: Map<string, StoredPermission>; // Store permission details by ID for quick lookup
   localIds: Map<string, string>;
@@ -210,6 +211,7 @@ export type ReducerState = {
 export function createReducer(): ReducerState {
   return {
     toolIdToMessageId: new Map(),
+    textStreamIdToMessageId: new Map(),
     sidechainToolIdToMessageId: new Map(),
     permissions: new Map(),
     messages: new Map(),
@@ -725,6 +727,44 @@ export function reducer(
 
       // Process text and thinking content (tool calls handled in Phase 2)
       for (let c of msg.content) {
+        if (c.type === "text-delta") {
+          const existingMessageId = state.textStreamIdToMessageId.get(c.streamId);
+          const existingMessage =
+            existingMessageId ? state.messages.get(existingMessageId) : null;
+          if (
+            existingMessage &&
+            existingMessage.role === "agent" &&
+            existingMessage.text !== null
+          ) {
+            existingMessage.text += c.delta;
+            changed.add(existingMessageId!);
+            if (!c.thinking && msg.createdAt > state.latestAgentTextTime) {
+              state.latestAgentTextTime = msg.createdAt;
+            }
+            continue;
+          }
+
+          let mid = allocateId();
+          const initialText = c.thinking ? `*${c.delta}*` : c.delta;
+          state.messages.set(mid, {
+            id: mid,
+            realID: msg.id,
+            role: "agent",
+            createdAt: msg.createdAt,
+            text: initialText,
+            isThinking: c.thinking === true,
+            tool: null,
+            event: null,
+            meta: msg.meta,
+          });
+          state.textStreamIdToMessageId.set(c.streamId, mid);
+          changed.add(mid);
+          if (!c.thinking && msg.createdAt > state.latestAgentTextTime) {
+            state.latestAgentTextTime = msg.createdAt;
+          }
+          continue;
+        }
+
         if (c.type === "text" || c.type === "thinking") {
           let mid = allocateId();
           const isThinking = c.type === "thinking";
