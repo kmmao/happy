@@ -237,6 +237,18 @@ function formatCodexAccountMetadata(
   return null;
 }
 
+function formatNamePreview(
+  names: readonly string[],
+  limit = 4,
+): string {
+  if (names.length <= limit) {
+    return names.join(", ");
+  }
+
+  const visible = names.slice(0, limit).join(", ");
+  return `${visible}, +${names.length - limit}`;
+}
+
 function SessionInfoContent({ session }: { session: Session }) {
   const { theme } = useUnistyles();
   const router = useRouter();
@@ -895,6 +907,82 @@ function SessionInfoContent({ session }: { session: Session }) {
                       name="warning-outline"
                       size={29}
                       color="#FF9500"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              session.metadata.slashCommands &&
+              session.metadata.slashCommands.length > 0 && (
+                <Item
+                  title={t("settingsPlugins.commands", {
+                    count: session.metadata.slashCommands.length,
+                  })}
+                  subtitle={formatNamePreview(session.metadata.slashCommands)}
+                  icon={
+                    <Ionicons
+                      name="terminal-outline"
+                      size={29}
+                      color="#5856D6"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              session.metadata.codex?.skills &&
+              session.metadata.codex.skills.length > 0 && (
+                <Item
+                  title={t("settingsPlugins.skills", {
+                    count: session.metadata.codex.skills.length,
+                  })}
+                  subtitle={formatNamePreview(
+                    session.metadata.codex.skills.map((skill) => skill.name),
+                  )}
+                  icon={
+                    <Ionicons
+                      name="school-outline"
+                      size={29}
+                      color="#5856D6"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              session.metadata.codex?.agents &&
+              session.metadata.codex.agents.length > 0 && (
+                <Item
+                  title={t("settingsPlugins.agents", {
+                    count: session.metadata.codex.agents.length,
+                  })}
+                  subtitle={formatNamePreview(
+                    session.metadata.codex.agents.map((agent) => agent.name),
+                  )}
+                  icon={
+                    <Ionicons
+                      name="people-outline"
+                      size={29}
+                      color="#5856D6"
+                    />
+                  }
+                  showChevron={false}
+                />
+              )}
+            {session.metadata.flavor === "codex" &&
+              session.metadata.codex?.mcpServers &&
+              session.metadata.codex.mcpServers.length > 0 && (
+                <Item
+                  title={t("settingsMcp.title")}
+                  subtitle={formatNamePreview(
+                    session.metadata.codex.mcpServers.map((server) => server.name),
+                  )}
+                  icon={
+                    <Ionicons
+                      name="git-network-outline"
+                      size={29}
+                      color="#5856D6"
                     />
                   }
                   showChevron={false}

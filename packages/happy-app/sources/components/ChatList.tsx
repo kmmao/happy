@@ -167,10 +167,17 @@ const ChatListInternal = React.memo(
               "Agent",
               "AskUserQuestion",
               "TodoWrite",
+              "Read",
               "Edit",
               "MultiEdit",
               "Write",
+              "Grep",
+              "Glob",
+              "LS",
               "NotebookEdit",
+              "CodexDynamicTool",
+              "CodexPermissions",
+              "unknown",
               "CodexPatch",
               "GeminiPatch",
               "CodexDiff",
@@ -180,6 +187,7 @@ const ChatListInternal = React.memo(
             return props.messages.filter((msg) => {
               if (msg.kind !== "tool-call") return true;
               if (ALWAYS_VISIBLE_TOOLS.has(msg.tool.name)) return true;
+              if (msg.tool.name.startsWith("mcp__")) return true;
               if (msg.tool.permission?.status === "pending") return true;
               const knownTool = knownTools[
                 msg.tool.name as keyof typeof knownTools

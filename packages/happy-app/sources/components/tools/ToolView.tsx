@@ -37,6 +37,7 @@ import {
   getCodexCommandText,
   getCodexParsedCommandSummary,
 } from "./codexCommandUtils";
+import { shouldHideToolCall } from "./shouldHideToolCall";
 
 interface ToolViewProps {
   metadata: Metadata | null;
@@ -128,9 +129,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   // In other modes: auto-approve per shouldAutoApprove() with fallback on failure.
   const [autoApproveFailed, setAutoApproveFailed] = React.useState(false);
   const willAutoApprove = shouldAutoApprove(props.permissionModeKey, tool.name);
+  const hideToolCall = shouldHideToolCall(tool);
 
   React.useEffect(() => {
     if (
+      hideToolCall ||
       !sessionId ||
       tool.permission?.status !== "pending" ||
       !tool.permission?.id ||
@@ -157,7 +160,12 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     tool.permission?.status,
     tool.permission?.id,
     willAutoApprove,
+    hideToolCall,
   ]);
+
+  if (hideToolCall) {
+    return null;
+  }
 
   let knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
   const isSessionCompact = sessionCompactToolNames.has(tool.name);
@@ -200,7 +208,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   let toolTitle = tool.name;
 
   // Special handling for MCP tools
-  if (tool.name.startsWith("mcp__")) {
+  if (tool.name.startsWith("mcp__") && !knownTool) {
     toolTitle = formatMCPTitle(tool.name);
     icon = (
       <Ionicons

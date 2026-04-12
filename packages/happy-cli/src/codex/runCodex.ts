@@ -60,6 +60,7 @@ import {
   mapCodexMcpMessageToSessionEnvelopes,
   mapCodexProcessorMessageToSessionEnvelopes,
 } from "./utils/sessionProtocolMapper";
+import { collectCodexLocalSurface } from "./localSurface";
 
 type ReadyEventOptions = {
   pending: unknown;
@@ -118,6 +119,25 @@ function requireSuccessfulCodexResponse(
 
   const message = extractCodexResponseText(response);
   throw new Error(message || `Codex ${action} session failed`);
+}
+
+function mergeNamedEntries<T extends { name: string }>(
+  current: readonly T[] | undefined,
+  next: readonly T[] | undefined,
+): T[] | undefined {
+  if ((!current || current.length === 0) && (!next || next.length === 0)) {
+    return undefined;
+  }
+
+  const merged = new Map<string, T>();
+  for (const item of current ?? []) {
+    merged.set(item.name, item);
+  }
+  for (const item of next ?? []) {
+    merged.set(item.name, item);
+  }
+
+  return [...merged.values()];
 }
 
 /**
@@ -218,6 +238,14 @@ export async function runCodex(opts: {
     startedBy: opts.startedBy,
     sandbox: sandboxConfig,
   });
+  const localSurface = await collectCodexLocalSurface({
+    cwd: process.cwd(),
+  });
+  rawMetadata.slashCommands = localSurface.slashCommands;
+  if (Object.keys(localSurface.slashCommandDescriptions).length > 0) {
+    rawMetadata.slashCommandDescriptions =
+      localSurface.slashCommandDescriptions;
+  }
   rawMetadata.codex = {
     ...rawMetadata.codex,
     requestedBackend,
@@ -235,6 +263,21 @@ export async function runCodex(opts: {
             ...(rawMetadata.codex?.config ?? {}),
             profile: runtimeConfig.profileName,
           },
+        }
+      : {}),
+    ...(localSurface.prompts.length > 0
+      ? {
+          prompts: localSurface.prompts,
+        }
+      : {}),
+    ...(localSurface.skills.length > 0
+      ? {
+          skills: localSurface.skills,
+        }
+      : {}),
+    ...(localSurface.agents.length > 0
+      ? {
+          agents: localSurface.agents,
         }
       : {}),
   };
@@ -755,10 +798,20 @@ export async function runCodex(opts: {
             ? { experimentalFeatures: capabilities.experimentalFeatures as any }
             : {}),
           ...(capabilities.skills && capabilities.skills.length > 0
-            ? { skills: capabilities.skills as any }
+            ? {
+                skills: mergeNamedEntries(
+                  currentMetadata.codex?.skills as any,
+                  capabilities.skills as any,
+                ),
+              }
             : {}),
           ...(capabilities.mcpServers && capabilities.mcpServers.length > 0
-            ? { mcpServers: capabilities.mcpServers as any }
+            ? {
+                mcpServers: mergeNamedEntries(
+                  currentMetadata.codex?.mcpServers as any,
+                  capabilities.mcpServers as any,
+                ),
+              }
             : {}),
         },
         ...(capabilities.models && capabilities.models.length > 0
@@ -1155,9 +1208,21 @@ export async function runCodex(opts: {
           ...(capabilities.experimentalFeatures.length > 0
             ? { experimentalFeatures: capabilities.experimentalFeatures }
             : {}),
-          ...(capabilities.skills.length > 0 ? { skills: capabilities.skills } : {}),
+          ...(capabilities.skills.length > 0
+            ? {
+                skills: mergeNamedEntries(
+                  currentMetadata.codex?.skills,
+                  capabilities.skills,
+                ),
+              }
+            : {}),
           ...(capabilities.mcpServers.length > 0
-            ? { mcpServers: capabilities.mcpServers }
+            ? {
+                mcpServers: mergeNamedEntries(
+                  currentMetadata.codex?.mcpServers,
+                  capabilities.mcpServers,
+                ),
+              }
             : {}),
         },
         ...(capabilities.models.length > 0

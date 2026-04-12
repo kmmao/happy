@@ -13,6 +13,7 @@ import {
 } from "./codexCommandUtils";
 import { getCodexDiffStats, parseCodexUnifiedDiff } from "./codexDiffUtils";
 import { getCodexPatchEntries, getCodexPatchTotals } from "./codexPatchUtils";
+import { formatMCPTitle } from "./views/MCPToolView";
 
 // Icon factory functions
 const ICON_TERMINAL = (size: number = 24, color: string = "#000") => (
@@ -41,6 +42,9 @@ const ICON_REASONING = (size: number = 24, color: string = "#000") => (
 );
 const ICON_QUESTION = (size: number = 24, color: string = "#000") => (
   <Ionicons name="help-circle-outline" size={size} color={color} />
+);
+const ICON_PUZZLE = (size: number = 24, color: string = "#000") => (
+  <Ionicons name="extension-puzzle-outline" size={size} color={color} />
 );
 
 /**
@@ -126,10 +130,64 @@ function extractGeminiEditPayload(input: any): {
   };
 }
 
+function formatHappyMcpToolTitle(toolName: string): string {
+  const normalized = toolName.trim();
+  switch (normalized) {
+    case "change_title":
+    case "happy__change_title":
+    case "mcp__happy__change_title":
+      return "Change Title";
+    case "query_project_knowledge":
+    case "happy__query_project_knowledge":
+    case "mcp__happy__query_project_knowledge":
+      return "Project Knowledge";
+    case "save_memory":
+    case "happy__save_memory":
+    case "mcp__happy__save_memory":
+      return "Save Memory";
+    default:
+      return normalized.startsWith("mcp__")
+        ? formatMCPTitle(normalized)
+        : normalized;
+  }
+}
+
+function formatHappyMcpToolAction(
+  toolName: string,
+  mode: "dynamic" | "permission" | "fallback",
+): string {
+  const normalized = toolName.trim();
+  switch (normalized) {
+    case "change_title":
+    case "happy__change_title":
+    case "mcp__happy__change_title":
+      return mode === "permission"
+        ? "Waiting for approval to update chat title"
+        : mode === "dynamic"
+          ? "Updating chat title"
+          : "Update chat title";
+    case "query_project_knowledge":
+    case "happy__query_project_knowledge":
+    case "mcp__happy__query_project_knowledge":
+      return mode === "permission"
+        ? "Waiting for approval to search project knowledge"
+        : mode === "dynamic"
+          ? "Searching project knowledge"
+          : "Search project knowledge";
+    case "save_memory":
+    case "happy__save_memory":
+    case "mcp__happy__save_memory":
+      return mode === "permission"
+        ? "Waiting for approval to save memory"
+        : mode === "dynamic"
+          ? "Saving memory"
+          : "Save memory";
+    default:
+      return mode === "permission" ? "Permission request" : "Tool call";
+  }
+}
+
 export const sessionCompactToolNames = new Set([
-  "Edit",
-  "MultiEdit",
-  "Write",
   "NotebookEdit",
   "edit",
   "CodexPatch",
@@ -1121,6 +1179,163 @@ export const knownTools = {
       .partial()
       .passthrough(),
     result: z.object({}).partial().passthrough(),
+  },
+  mcp__happy__change_title: {
+    title: "Change Title",
+    icon: ICON_EDIT,
+    minimal: true,
+    noStatus: true,
+    input: z
+      .object({
+        title: z.string().optional().describe("New session title"),
+      })
+      .partial()
+      .passthrough(),
+    extractDescription: (opts: {
+      metadata: Metadata | null;
+      tool: ToolCall;
+    }) => {
+      if (typeof opts.tool.input?.title === "string" && opts.tool.input.title) {
+        return opts.tool.input.title;
+      }
+      return "Update chat title";
+    },
+  },
+  mcp__happy__query_project_knowledge: {
+    title: "Project Knowledge",
+    icon: ICON_READ,
+    minimal: true,
+    noStatus: true,
+    input: z
+      .object({
+        query: z.string().optional().describe("Knowledge query"),
+      })
+      .partial()
+      .passthrough(),
+    extractDescription: (opts: {
+      metadata: Metadata | null;
+      tool: ToolCall;
+    }) => {
+      if (typeof opts.tool.input?.query === "string" && opts.tool.input.query) {
+        return opts.tool.input.query;
+      }
+      return "Search project knowledge";
+    },
+  },
+  mcp__happy__save_memory: {
+    title: "Save Memory",
+    icon: ICON_TODO,
+    minimal: true,
+    noStatus: true,
+    input: z.object({}).partial().passthrough(),
+    extractDescription: () => "Save memory",
+  },
+  CodexDynamicTool: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const requestedToolName =
+        typeof opts.tool.input?.requestedToolName === "string"
+          ? opts.tool.input.requestedToolName
+          : typeof opts.tool.input?.toolName === "string"
+            ? opts.tool.input.toolName
+            : null;
+      if (requestedToolName) {
+        return formatHappyMcpToolTitle(requestedToolName);
+      }
+      return "Dynamic Tool";
+    },
+    icon: ICON_PUZZLE,
+    minimal: true,
+    noStatus: true,
+    input: z.object({}).partial().passthrough(),
+    extractDescription: (opts: {
+      metadata: Metadata | null;
+      tool: ToolCall;
+    }) => {
+      const requestedToolName =
+        typeof opts.tool.input?.requestedToolName === "string"
+          ? opts.tool.input.requestedToolName
+          : typeof opts.tool.input?.toolName === "string"
+            ? opts.tool.input.toolName
+            : null;
+      if (requestedToolName) {
+        if (
+          requestedToolName === "mcp__happy__change_title" &&
+          typeof opts.tool.input?.title === "string" &&
+          opts.tool.input.title
+        ) {
+          return opts.tool.input.title;
+        }
+        if (
+          requestedToolName === "mcp__happy__query_project_knowledge" &&
+          typeof opts.tool.input?.query === "string" &&
+          opts.tool.input.query
+        ) {
+          return opts.tool.input.query;
+        }
+        return formatHappyMcpToolAction(requestedToolName, "dynamic");
+      }
+      return "Dynamic tool call";
+    },
+  },
+  CodexPermissions: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const requestedToolName =
+        typeof opts.tool.input?.requestedToolName === "string"
+          ? opts.tool.input.requestedToolName
+          : null;
+      if (requestedToolName) {
+        return formatHappyMcpToolTitle(requestedToolName);
+      }
+      return "Permission Request";
+    },
+    icon: ICON_QUESTION,
+    minimal: true,
+    noStatus: true,
+    input: z.object({}).partial().passthrough(),
+    extractDescription: (opts: {
+      metadata: Metadata | null;
+      tool: ToolCall;
+    }) => {
+      const requestedToolName =
+        typeof opts.tool.input?.requestedToolName === "string"
+          ? opts.tool.input.requestedToolName
+          : null;
+      if (requestedToolName) {
+        const reason =
+          typeof opts.tool.input?.reason === "string" ? opts.tool.input.reason : null;
+        return reason || formatHappyMcpToolAction(requestedToolName, "permission");
+      }
+      return "Permission request";
+    },
+  },
+  unknown: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const requestedToolName =
+        typeof opts.tool.input?.requestedToolName === "string"
+          ? opts.tool.input.requestedToolName
+          : null;
+      if (requestedToolName) {
+        return formatHappyMcpToolTitle(requestedToolName);
+      }
+      return "Tool Call";
+    },
+    icon: ICON_PUZZLE,
+    minimal: true,
+    noStatus: true,
+    input: z.object({}).partial().passthrough(),
+    extractDescription: (opts: {
+      metadata: Metadata | null;
+      tool: ToolCall;
+    }) => {
+      const requestedToolName =
+        typeof opts.tool.input?.requestedToolName === "string"
+          ? opts.tool.input.requestedToolName
+          : null;
+      if (requestedToolName) {
+        return formatHappyMcpToolAction(requestedToolName, "fallback");
+      }
+      return opts.tool.description || "Tool call";
+    },
   },
   // Gemini internal tools - should be hidden (minimal)
   search: {

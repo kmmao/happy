@@ -94,6 +94,26 @@ function mergeSlashCommands(
   }
 }
 
+function mergeCodexPromptCommands(
+  commands: CommandItem[],
+  prompts:
+    | Array<{
+        name: string;
+        description?: string | null;
+      }>
+    | undefined,
+): void {
+  for (const prompt of prompts ?? []) {
+    if (IGNORED_COMMANDS.includes(prompt.name)) continue;
+    if (!commands.find((command) => command.command === prompt.name)) {
+      commands.push({
+        command: prompt.name,
+        description: prompt.description ?? undefined,
+      });
+    }
+  }
+}
+
 // Get commands from session metadata
 function getCommandsFromSession(sessionId: string): CommandItem[] {
   const state = storage.getState();
@@ -106,6 +126,7 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
       if (session?.metadata?.slashCommands) {
         mergeSlashCommands(commands, session.metadata.slashCommands, session.metadata.slashCommandDescriptions);
       }
+      mergeCodexPromptCommands(commands, session?.metadata?.codex?.prompts);
     }
     return commands;
   }
@@ -119,6 +140,7 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
   if (session.metadata.slashCommands) {
     mergeSlashCommands(commands, session.metadata.slashCommands, session.metadata.slashCommandDescriptions);
   }
+  mergeCodexPromptCommands(commands, session.metadata.codex?.prompts);
 
   return commands;
 }

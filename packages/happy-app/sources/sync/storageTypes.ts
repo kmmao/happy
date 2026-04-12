@@ -122,6 +122,23 @@ export const MetadataSchema = z.object({
           }),
         )
         .optional(),
+      prompts: z
+        .array(
+          z.object({
+            name: z.string(),
+            path: z.string(),
+            description: z.string().nullish(),
+          }),
+        )
+        .optional(),
+      agents: z
+        .array(
+          z.object({
+            name: z.string(),
+            path: z.string(),
+          }),
+        )
+        .optional(),
       mcpServers: z
         .array(
           z.object({

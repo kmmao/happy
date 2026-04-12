@@ -787,3 +787,30 @@ legacy backend 退役条件：
 - [x] `review/start` 的输出是否需要映射到单独的 review UI，而不是普通消息流
   - 当前阶段先走普通消息流 / service message
   - 后续若 review 交互复杂度提升，再单独抽 review UI
+
+## Follow-up Backlog
+
+- [ ] 把 Codex capability surface 从 Claude 兼容心智中彻底拆出来
+  - 背景：`scripts/sync-ecc-to-codex.sh` 不会把 ECC `commands/` 安装成 Claude 风格插件命令；它会把命令生成为 `~/.codex/prompts/ecc-*.md`，skills 则由 Codex 直接从 `~/.agents/skills/` 读取。
+  - 当前问题：Happy 前端很多地方仍把 Codex 当成“会提供 `slashCommands` 的 Claude 变体”，导致已安装的 prompts / skills / agents 在 Codex 会话里显示不完整或语义错位。
+  - 目标：定义一套明确的 `codex surface` 模型，至少包含 `prompts`、`skills`、`agents`、`mcpServers`，不要继续把所有能力硬塞进 `slashCommands`。
+
+- [ ] 调研 Codex 原生 prompt / command surface 的可执行语义，而不只是展示
+  - 需要确认 `~/.codex/prompts/*.md` 在 Codex CLI / app-server 中到底是：
+    - 仅作为 starter prompt / prompt library
+    - 还是存在可枚举、可触发、可参数化执行的正式协议
+  - 只有确认执行语义后，才能决定 Happy 的输入框是否应该把这些项渲染成“可发送命令”，还是“可插入 prompt 模板”。
+
+- [ ] 将会话页、命令面板、设置页对 Codex 的展示统一到同一份 metadata contract
+  - 避免出现：
+    - 会话信息页能看到 skills，但命令面板看不到 prompts
+    - 设置页展示 MCP，session 页不展示
+    - 不同页面各自扫描本地目录，造成状态漂移
+  - 建议后续把 Codex surface 收口到共享 schema，并加旧 CLI fallback。
+
+- [ ] 为 Codex 安装方式补一条产品内说明
+  - 明确告诉用户：
+    - ECC for Codex 的 skills 来自 `~/.agents/skills/`
+    - ECC 兼容命令会落到 `~/.codex/prompts/`
+    - 它不是 Claude 插件市场那套 `commands/skills/plugins` 目录模型
+  - 否则用户会继续误以为“没显示就是没安装成功”。

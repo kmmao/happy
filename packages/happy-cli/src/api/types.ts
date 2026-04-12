@@ -477,6 +477,15 @@ export type Metadata = {
       path: string;
       enabled: boolean;
     }>;
+    prompts?: Array<{
+      name: string;
+      path: string;
+      description?: string | null;
+    }>;
+    agents?: Array<{
+      name: string;
+      path: string;
+    }>;
     mcpServers?: Array<{
       name: string;
       authStatus: string;

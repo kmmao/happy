@@ -60,4 +60,37 @@ describe('MetadataSchema', () => {
 
         expect(result.success).toBe(true);
     });
+
+    it('accepts codex surface metadata for prompts, skills, and agents', () => {
+        const result = MetadataSchema.safeParse({
+            ...baseMetadata,
+            flavor: 'codex',
+            slashCommands: ['ecc-plan'],
+            codex: {
+                prompts: [
+                    {
+                        name: 'ecc-plan',
+                        path: '/Users/test/.codex/prompts/ecc-plan.md',
+                        description: 'Run the ECC planning workflow.',
+                    },
+                ],
+                skills: [
+                    {
+                        name: 'tdd-workflow',
+                        description: 'Test-driven development workflow',
+                        path: '/Users/test/.agents/skills/tdd-workflow/SKILL.md',
+                        enabled: true,
+                    },
+                ],
+                agents: [
+                    {
+                        name: 'reviewer',
+                        path: '/Users/test/.codex/agents/reviewer.toml',
+                    },
+                ],
+            },
+        });
+
+        expect(result.success).toBe(true);
+    });
 });
