@@ -149,7 +149,7 @@ const {
 
     const dbMock = {
         project: {
-            findUnique: vi.fn(async () => ({ supervisorConfig: state.projectSupervisorConfig, supervisorMode: state.projectSupervisorMode })),
+            findUnique: vi.fn(async () => ({ supervisorConfig: state.projectSupervisorConfig, supervisorMode: state.projectSupervisorMode, narrative: null })),
         },
         worldSuggestion: {
             findMany: vi.fn(async (args: any) => {
@@ -231,6 +231,11 @@ const {
         },
         goal: {
             findMany: vi.fn(async (args: any) => {
+                // Health refresh query (status is {in: [...]}) — return empty for test simplicity
+                if (args?.where?.status?.in) {
+                    return [];
+                }
+
                 if (args?.where?.plannerTaskId?.not === null) {
                     return state.blockedGoals
                         .filter((goal) => goal.accountId === args.where.accountId)

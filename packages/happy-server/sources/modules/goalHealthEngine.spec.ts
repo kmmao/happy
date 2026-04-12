@@ -9,6 +9,9 @@ import {
     detectBlockedAging,
     detectRepeatedFailure,
     detectAllTerminalWithFailures,
+    detectNarrativeDeviation,
+    classifyGoalLayer,
+    tokenize,
     scoreGoalHealth,
     buildHealthSuggestionCandidates,
     type GoalHealthInput,
@@ -281,6 +284,143 @@ describe("scoreGoalHealth", () => {
 });
 
 // ---------------------------------------------------------------------------
+// classifyGoalLayer
+// ---------------------------------------------------------------------------
+
+describe("classifyGoalLayer", () => {
+    it("returns strategic for root goal with subGoals", () => {
+        expect(classifyGoalLayer({ parentGoalId: null, subGoalCount: 3, taskCount: 0 })).toBe("strategic");
+    });
+
+    it("returns operational for non-root goal with subGoals", () => {
+        expect(classifyGoalLayer({ parentGoalId: "p-1", subGoalCount: 2, taskCount: 5 })).toBe("operational");
+    });
+
+    it("returns execution for leaf goal (has parent, no subGoals)", () => {
+        expect(classifyGoalLayer({ parentGoalId: "p-1", subGoalCount: 0, taskCount: 3 })).toBe("execution");
+    });
+
+    it("returns operational for root goal with no subGoals but has tasks", () => {
+        expect(classifyGoalLayer({ parentGoalId: null, subGoalCount: 0, taskCount: 5 })).toBe("operational");
+    });
+
+    it("returns operational for root goal with no subGoals and no tasks", () => {
+        expect(classifyGoalLayer({ parentGoalId: null, subGoalCount: 0, taskCount: 0 })).toBe("operational");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// tokenize
+// ---------------------------------------------------------------------------
+
+describe("tokenize", () => {
+    it("lowercases and splits on whitespace", () => {
+        const tokens = tokenize("Build Payment System");
+        expect(tokens.has("build")).toBe(true);
+        expect(tokens.has("payment")).toBe(true);
+        expect(tokens.has("system")).toBe(true);
+    });
+
+    it("removes stop words", () => {
+        const tokens = tokenize("build the system for the user");
+        expect(tokens.has("the")).toBe(false);
+        expect(tokens.has("for")).toBe(false);
+        expect(tokens.has("build")).toBe(true);
+    });
+
+    it("removes short words (≤2 chars)", () => {
+        const tokens = tokenize("go to a new db or vm");
+        expect(tokens.has("go")).toBe(false);
+        expect(tokens.has("db")).toBe(false);
+        expect(tokens.has("new")).toBe(true);
+    });
+
+    it("splits on punctuation", () => {
+        const tokens = tokenize("build-payment.system:now");
+        expect(tokens.has("build")).toBe(true);
+        expect(tokens.has("payment")).toBe(true);
+        expect(tokens.has("system")).toBe(true);
+        expect(tokens.has("now")).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// detectNarrativeDeviation
+// ---------------------------------------------------------------------------
+
+describe("detectNarrativeDeviation", () => {
+    it("returns null when project narrative is null", () => {
+        expect(detectNarrativeDeviation({
+            goalTitle: "Build payment system",
+            goalDescription: null,
+            projectNarrative: null,
+        })).toBeNull();
+    });
+
+    it("returns null when project narrative is empty", () => {
+        expect(detectNarrativeDeviation({
+            goalTitle: "Build payment system",
+            goalDescription: null,
+            projectNarrative: "  ",
+        })).toBeNull();
+    });
+
+    it("returns null when overlap is above 10%", () => {
+        expect(detectNarrativeDeviation({
+            goalTitle: "Build payment integration for e-commerce platform",
+            goalDescription: "Integrate Stripe payment processing",
+            projectNarrative: "Build an e-commerce platform with payment processing, user accounts, and product catalog",
+        })).toBeNull();
+    });
+
+    it("returns warning when overlap is below 10%", () => {
+        const result = detectNarrativeDeviation({
+            goalTitle: "Optimize Redis caching layer",
+            goalDescription: "Tune eviction policies and TTL settings",
+            projectNarrative: "Build a mobile social media app with photo sharing and messaging",
+        });
+        expect(result).not.toBeNull();
+        expect(result!.kind).toBe("narrative_deviation");
+        expect(result!.severity).toBe("warning");
+    });
+
+    it("returns null for empty goal text", () => {
+        expect(detectNarrativeDeviation({
+            goalTitle: "a",
+            goalDescription: null,
+            projectNarrative: "Build something great",
+        })).toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// scoreGoalHealth with narrative context
+// ---------------------------------------------------------------------------
+
+describe("scoreGoalHealth with narrative", () => {
+    it("deducts 15 for narrative_deviation", () => {
+        const goal = makeGoal({
+            title: "Optimize Redis caching layer",
+            description: "Tune eviction policies",
+            status: "in_progress",
+            updatedAt: hoursAgo(1),
+        });
+        const result = scoreGoalHealth(goal, new Date(), {
+            projectNarrative: "Build a mobile social media app with photo sharing and messaging",
+        });
+        expect(result.signals.some((s) => s.kind === "narrative_deviation")).toBe(true);
+        expect(result.score).toBe(85);
+    });
+
+    it("does not add narrative_deviation when narrative is null", () => {
+        const goal = makeGoal({ title: "Build something", status: "in_progress", updatedAt: hoursAgo(1) });
+        const result = scoreGoalHealth(goal, new Date(), { projectNarrative: null });
+        expect(result.signals.some((s) => s.kind === "narrative_deviation")).toBe(false);
+        expect(result.score).toBe(100);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // buildHealthSuggestionCandidates
 // ---------------------------------------------------------------------------
 
@@ -360,6 +500,17 @@ describe("buildHealthSuggestionCandidates", () => {
         })];
         const candidates = buildHealthSuggestionCandidates(results);
         expect(candidates[0].dedupeKey).toBe("goal_replan_needed:g-1");
+        expect(candidates[0].requiresHuman).toBe(true);
+        expect(candidates[0].bucket).toBe("needs_decision");
+    });
+
+    it("generates narrative_deviation suggestion", () => {
+        const results = [makeResult({
+            signals: [{ kind: "narrative_deviation", severity: "warning", detail: "0% overlap" }],
+        })];
+        const candidates = buildHealthSuggestionCandidates(results);
+        expect(candidates).toHaveLength(1);
+        expect(candidates[0].dedupeKey).toBe("narrative_deviation:g-1");
         expect(candidates[0].requiresHuman).toBe(true);
         expect(candidates[0].bucket).toBe("needs_decision");
     });

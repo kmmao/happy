@@ -12,6 +12,7 @@ import {
 import { log } from "@/utils/log";
 import { safeParseJsonArray } from "./goalHelpers";
 import { truncateText, TEXT_LIMITS } from "./worldConstants";
+import { classifyGoalLayer } from "./goalHealthEngine";
 
 interface GoalCreateInput {
     accountId: string;
@@ -59,7 +60,13 @@ export async function goalCreate(input: GoalCreateInput): Promise<GoalCreateResu
         }
     }
 
-    // Create the goal
+    // Create the goal (set initial layer based on hierarchy position)
+    const initialLayer = classifyGoalLayer({
+        parentGoalId: parentGoalId ?? null,
+        subGoalCount: 0,
+        taskCount: 0,
+    });
+
     const goal = await db.goal.create({
         data: {
             accountId,
@@ -71,8 +78,28 @@ export async function goalCreate(input: GoalCreateInput): Promise<GoalCreateResu
             deadline: deadline ?? null,
             parentGoalId: parentGoalId ?? null,
             createdBy: "user",
+            layer: initialLayer,
         },
     });
+
+    // Reclassify parent layer (it now has a subGoal)
+    if (parentGoalId) {
+        const parentGoal = await db.goal.findFirst({
+            where: { id: parentGoalId },
+            select: { parentGoalId: true, _count: { select: { subGoals: true, tasks: true } } },
+        });
+        if (parentGoal) {
+            const parentLayer = classifyGoalLayer({
+                parentGoalId: parentGoal.parentGoalId,
+                subGoalCount: parentGoal._count.subGoals,
+                taskCount: parentGoal._count.tasks,
+            });
+            await db.goal.update({
+                where: { id: parentGoalId },
+                data: { layer: parentLayer },
+            });
+        }
+    }
 
     // Emit ephemeral to App
     eventRouter.emitEphemeral({

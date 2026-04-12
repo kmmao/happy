@@ -39,7 +39,26 @@ export type GoalHealthSignalKind =
     | "stale_in_progress"
     | "blocked_aging"
     | "repeated_failure"
-    | "all_tasks_terminal_with_failures";
+    | "all_tasks_terminal_with_failures"
+    | "narrative_deviation";
+
+// ---------------------------------------------------------------------------
+// Goal Layer classification
+// ---------------------------------------------------------------------------
+
+export type GoalLayer = "strategic" | "operational" | "execution";
+
+export function classifyGoalLayer(goal: {
+    parentGoalId: string | null;
+    subGoalCount: number;
+    taskCount: number;
+}): GoalLayer {
+    if (!goal.parentGoalId && goal.subGoalCount > 0) return "strategic";
+    if (goal.parentGoalId && goal.subGoalCount > 0) return "operational";
+    if (goal.parentGoalId) return "execution";
+    // Root goal with no subGoals but has tasks → operational
+    return "operational";
+}
 
 export interface GoalHealthSignal {
     kind: GoalHealthSignalKind;
@@ -137,10 +156,68 @@ export function detectAllTerminalWithFailures(
 }
 
 // ---------------------------------------------------------------------------
+// Narrative deviation (V1: lexical overlap, no LLM)
+// ---------------------------------------------------------------------------
+
+const STOP_WORDS = new Set([
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
+    "should", "may", "might", "must", "can", "could", "to", "of", "in",
+    "for", "on", "with", "at", "by", "from", "as", "into", "through",
+    "and", "but", "or", "nor", "not", "so", "yet", "both", "either",
+    "it", "its", "this", "that", "these", "those", "i", "we", "you",
+    "he", "she", "they", "me", "us", "him", "her", "them", "my", "our",
+    "your", "his", "their",
+]);
+
+/** Tokenize text: split on whitespace/punctuation, lowercase, drop short/stop words. */
+export function tokenize(text: string): Set<string> {
+    const tokens = text
+        .toLowerCase()
+        .split(/[\s,.\-;:!?()[\]{}"'/\\]+/)
+        .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+    return new Set(tokens);
+}
+
+export function detectNarrativeDeviation(input: {
+    goalTitle: string;
+    goalDescription: string | null;
+    projectNarrative: string | null;
+}): GoalHealthSignal | null {
+    if (!input.projectNarrative || input.projectNarrative.trim().length === 0) return null;
+
+    const narrativeTokens = tokenize(input.projectNarrative);
+    if (narrativeTokens.size === 0) return null;
+
+    const goalText = [input.goalTitle, input.goalDescription].filter(Boolean).join(" ");
+    const goalTokens = tokenize(goalText);
+    if (goalTokens.size === 0) return null;
+
+    let overlap = 0;
+    for (const token of goalTokens) {
+        if (narrativeTokens.has(token)) overlap++;
+    }
+    const overlapRate = overlap / goalTokens.size;
+
+    if (overlapRate < 0.1) {
+        return {
+            kind: "narrative_deviation",
+            severity: "warning",
+            detail: `Goal tokens overlap with project narrative at ${Math.round(overlapRate * 100)}% (threshold: 10%). Goal may have drifted from project vision.`,
+        };
+    }
+    return null;
+}
+
+// ---------------------------------------------------------------------------
 // Core scoring (pure function, no DB dependency)
 // ---------------------------------------------------------------------------
 
-export function scoreGoalHealth(goal: GoalHealthInput, now: Date): GoalHealthResult {
+export function scoreGoalHealth(
+    goal: GoalHealthInput,
+    now: Date,
+    context?: { projectNarrative?: string | null },
+): GoalHealthResult {
     const signals: GoalHealthSignal[] = [];
 
     const stale = detectStaleInProgress(goal, now);
@@ -154,6 +231,15 @@ export function scoreGoalHealth(goal: GoalHealthInput, now: Date): GoalHealthRes
 
     const terminal = detectAllTerminalWithFailures(goal);
     if (terminal) signals.push(terminal);
+
+    if (context?.projectNarrative) {
+        const deviation = detectNarrativeDeviation({
+            goalTitle: goal.title,
+            goalDescription: goal.description,
+            projectNarrative: context.projectNarrative,
+        });
+        if (deviation) signals.push(deviation);
+    }
 
     let score = 100;
     for (const signal of signals) {
@@ -171,6 +257,9 @@ export function scoreGoalHealth(goal: GoalHealthInput, now: Date): GoalHealthRes
             }
             case "all_tasks_terminal_with_failures":
                 score -= 30;
+                break;
+            case "narrative_deviation":
+                score -= 15;
                 break;
         }
     }
@@ -191,6 +280,7 @@ export function scoreGoalHealth(goal: GoalHealthInput, now: Date): GoalHealthRes
 export async function refreshGoalHealthScores(
     accountId: string,
     projectId: string,
+    projectNarrative?: string | null,
 ): Promise<GoalHealthResult[]> {
     const goals = await db.goal.findMany({
         where: {
@@ -220,19 +310,27 @@ export async function refreshGoalHealthScores(
                     updatedAt: true,
                 },
             },
+            _count: { select: { subGoals: true } },
         },
     });
 
     const now = new Date();
+    const context = projectNarrative ? { projectNarrative } : undefined;
     const results: GoalHealthResult[] = [];
 
     for (const goal of goals) {
-        const result = scoreGoalHealth(goal, now);
+        const result = scoreGoalHealth(goal, now, context);
         results.push(result);
+
+        const layer = classifyGoalLayer({
+            parentGoalId: goal.parentGoalId,
+            subGoalCount: goal._count.subGoals,
+            taskCount: goal.tasks.length,
+        });
 
         await db.goal.update({
             where: { id: goal.id },
-            data: { healthScore: result.score },
+            data: { healthScore: result.score, layer },
         });
     }
 
@@ -383,6 +481,35 @@ function buildCandidateForSignal(
                 bucket: "needs_decision",
                 dedupeKey: `goal_replan_needed:${goalId}`,
                 factKey: `${goalId}|replan_needed`,
+            };
+
+        case "narrative_deviation":
+            return {
+                relatedGoalId: goalId,
+                relatedTaskId: null,
+                type: "suggested_decision",
+                title: `Off-narrative: ${truncateText(goalTitle, 50)}`,
+                summary: `Goal "${goalTitle}" appears to have drifted from the project narrative.`,
+                reason: signal.detail,
+                evidence: [{ kind: "goal", id: goalId, label: `Drifted: ${goalTitle}` }],
+                recommendedRole: null,
+                payload: {
+                    decision: {
+                        question: `Goal "${goalTitle}" has low overlap with the project narrative. Is this intentional?`,
+                        context: goalDescription ?? signal.detail,
+                        goalId,
+                        precedentKey: "goal.narrative_deviation",
+                        options: [
+                            { id: "keep_as_is", description: "This goal is intentionally outside the main narrative" },
+                            { id: "realign", description: "Update the goal to better align with the narrative" },
+                            { id: "cancel_goal", description: "Cancel this goal as off-track" },
+                        ],
+                    },
+                },
+                requiresHuman: true,
+                bucket: "needs_decision",
+                dedupeKey: `narrative_deviation:${goalId}`,
+                factKey: `${goalId}|narrative_deviation`,
             };
 
         default:

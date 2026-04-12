@@ -44,6 +44,7 @@ describe("goalProgressUpdate", () => {
             status: "in_progress",
             parentGoalId: null,
             plannerTaskId: null,
+            _count: { subGoals: 0 },
         });
     });
 
@@ -57,7 +58,7 @@ describe("goalProgressUpdate", () => {
 
         expect(mocks.goalUpdate).toHaveBeenCalledWith({
             where: { id: "goal-1" },
-            data: { progress: 0, status: "cancelled" },
+            data: { progress: 0, status: "cancelled", layer: "operational" },
         });
         expect(mocks.emitEphemeral).toHaveBeenCalledWith(
             expect.objectContaining({

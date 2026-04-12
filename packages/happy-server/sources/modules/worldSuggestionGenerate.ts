@@ -116,7 +116,7 @@ export async function worldSuggestionRefresh(
 ): Promise<RefreshResult> {
     const project = await db.project.findUnique({
         where: { id: projectId },
-        select: { supervisorConfig: true, supervisorMode: true },
+        select: { supervisorConfig: true, supervisorMode: true, narrative: true },
     });
 
     // Debounce: skip regeneration if refreshed within REFRESH_DEBOUNCE_MS
@@ -165,7 +165,7 @@ export async function worldSuggestionRefresh(
         }
     }
 
-    const facts = await collectSuggestionFacts(accountId, projectId);
+    const facts = await collectSuggestionFacts(accountId, projectId, project?.narrative ?? null);
     const candidates = buildSuggestionCandidates(facts);
 
     const existingRows = await db.worldSuggestion.findMany({
@@ -294,7 +294,7 @@ export async function worldSuggestionRefresh(
     };
 }
 
-async function collectSuggestionFacts(accountId: string, projectId: string): Promise<{
+async function collectSuggestionFacts(accountId: string, projectId: string, projectNarrative: string | null): Promise<{
     failedTasks: FailedTaskFact[];
     blockedGoals: BlockedGoalFact[];
     attentionDecisions: DecisionAttentionFact[];
@@ -381,7 +381,7 @@ async function collectSuggestionFacts(accountId: string, projectId: string): Pro
     }));
 
     const completedTaskSkills = await buildCompletedTaskSkillFacts(completedTasks);
-    const goalHealthResults = await refreshGoalHealthScores(accountId, projectId);
+    const goalHealthResults = await refreshGoalHealthScores(accountId, projectId, projectNarrative);
 
     return {
         failedTasks: failedTasks.map((task) => ({

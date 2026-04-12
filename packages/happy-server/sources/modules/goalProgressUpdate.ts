@@ -9,6 +9,7 @@ import { inboxCreate } from "./inboxCreate";
 import { eventRouter, buildGoalProgressEphemeral } from "@/app/events/eventRouter";
 import { log } from "@/utils/log";
 import { truncateText, TEXT_LIMITS } from "./worldConstants";
+import { classifyGoalLayer } from "./goalHealthEngine";
 
 const MAX_RECURSION_DEPTH = 5;
 
@@ -34,6 +35,7 @@ export async function goalProgressUpdate(input: GoalProgressInput, depth: number
                 status: true,
                 parentGoalId: true,
                 plannerTaskId: true,
+                _count: { select: { subGoals: true } },
             },
         });
 
@@ -77,7 +79,7 @@ export async function goalProgressUpdate(input: GoalProgressInput, depth: number
             newStatus = goal.status; // Keep current status
         }
 
-        // Update goal (manage blockedSince for health aging detection)
+        // Update goal (manage blockedSince for health aging detection + layer)
         const wasBlocked = goal.status === "blocked";
         const becomesBlocked = newStatus === "blocked";
         const blockedSinceUpdate: { blockedSince?: Date | null } =
@@ -85,9 +87,15 @@ export async function goalProgressUpdate(input: GoalProgressInput, depth: number
             : wasBlocked && !becomesBlocked ? { blockedSince: null }
             : {};
 
+        const layer = classifyGoalLayer({
+            parentGoalId: goal.parentGoalId,
+            subGoalCount: goal._count.subGoals,
+            taskCount: tasks.length,
+        });
+
         await db.goal.update({
             where: { id: goal.id },
-            data: { progress, status: newStatus, ...blockedSinceUpdate },
+            data: { progress, status: newStatus, layer, ...blockedSinceUpdate },
         });
 
         // Emit ephemeral to App
