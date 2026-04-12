@@ -148,6 +148,9 @@ describe("serializeSuggestion", () => {
       actedAt: null,
       acceptSource: null,
       acceptAudit: null,
+      autoAcceptStatus: null,
+      autoAcceptReasonCode: null,
+      autoAcceptFailureDetail: null,
     });
   });
 

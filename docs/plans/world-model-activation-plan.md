@@ -20,7 +20,8 @@
 - [x] **阶段 A — 阻塞**：用 AgentMessage（或约定 `content` 结构）表达阻塞，与 Goal `blocked` 规则对齐
 - [x] **阶段 B — 语义完成**：CLI 任务结果上报闭环、Server 状态机统一与 task-scoped 窄权限 token 已落地；默认仍进程退出结算
 - [x] **阶段 C — 主动性**：基于 narrative / decisions / failures 生成建议 Goal/Task（先确认后派发）+ 可选 Skill 提炼闭环
-- [ ] **阶段 D — 建议系统稳定化收尾**：三分桶建议流与 GoalDetail suggestion 已落地；bucket 已持久化并带回填修正，仍待 payload 按 `type` 的判别联合进一步收口，以及 shared schema 统一进入单一来源（例如 `happy-wire`）
+- [x] **阶段 D — 建议系统稳定化收尾**：三分桶建议流与 GoalDetail suggestion 已落地；bucket 持久化、payload 判别联合、shared schema 迁入 `happy-wire` 均已完成
+- [x] **阶段 E — 受限自治执行**：策略模型正式化（supervisorMode → WorldAutonomyPolicy）、并发保护、Autonomy Dashboard、扩展自动动作范围（retryable task / blocked goal supplement）、策略分层（semi-auto / auto）均已完成
 
 ---
 
@@ -660,13 +661,58 @@ World 中增加：
 
 - **已完成**：`accept_failed` 的最小失败摘要已补齐。服务端现在把 auto-accept 失败原因归一化为有限 detail：`dispatch_failed` / `payload_invalid` / `auto_accept_failed`；`WorldSuggestion`、wire contract、query / serialize 已可最小透传 `autoAcceptFailureDetail`；app 侧继续复用 `worldSuggestionViewModel.ts` + `SuggestionCard`，仅追加一行只读说明，不暴露原始异常 message，也不引入 explain panel 或审批流。
 
-- 并发保护（例如 maxConcurrentAutoAccepts / maxOpenAutoAcceptedTasks）
-- autonomy dashboard / approvals / pending approvals 可视化
-- auto-safe / auto-guarded 的完整策略模型落库
-- 非 `suggested_task` 的自动执行
-- 更细的策略快照（例如策略版本、调用来源链、人工 override 原因）
-- GoalDetail 之外更多二级入口的来源展示扩散
+##### E.9 策略模型正式化 + 并发保护（2026-04-12 Sprint 1）
 
+已落地：
+
+- **supervisorMode 接管 auto-accept 开关**：`resolveWorldAutonomyPolicy()` 以 Project 表的 `supervisorMode`（`disabled | suggest | semi-auto | auto`）为主开关；`disabled` / `suggest` 不自动；`semi-auto` 只白名单 `suggested_task`；`auto` 预留扩展。旧 `autoAcceptSafeSuggestedTasks` 布尔值作为 fallback（supervisorMode 为 null 且布尔值为 true → 映射为 `semi-auto`），未删除旧字段。
+- **WorldAutonomyPolicy wire 契约**：`happy-wire` 新增 `WorldAutonomyPolicySchema`（`level` / `maxAutoAcceptsPerDay` / `maxConcurrentAutoTasks` / `autoTaskTypes`）、`SUPERVISOR_MODES` 常量、`SuggestionAcceptAuditSchema.rule` 从 literal 改为 enum（预留 3 种规则）。
+- **并发保护**：`countRunningAutoTasks()` 查询 `task.triggerType = "suggestion_auto"` 且 `status in ["dispatching", "running"]`；`maxConcurrentAutoTasks` 从 `supervisorConfig.worldAutonomy` 读取；超限时标记 suggestion 为 `skipped / concurrency_exceeded`。
+- **新增 reason codes**：wire 新增 `concurrency_exceeded`、`mode_disabled`。
+- **Refresh 防抖**：`worldSuggestionRefresh()` 使用 `RepeatKey` 做 10 秒防抖，同一 project 短时间内重复 refresh 返回 `{ debounced: true }`，不重新生成。
+- **AutonomyStatsSchema 预留**：wire 已新增 Sprint 2 用的 `AutonomyStatsSchema`。
+- **测试**：88 个 world suggestion 测试全绿，覆盖策略解析（11 用例）、并发超限、防抖、supervisorMode 优先级、legacy fallback 所有分支。
+
+##### E.10 Autonomy Dashboard 最小版（2026-04-12 Sprint 2）
+
+已落地：
+
+- **Server**：新增 `worldSuggestionAutonomyStats.ts` 模块，3 个并行查询（今日 auto-accept 计数、运行中自动任务数、最近 10 条自动动作），通过 `resolveWorldAutonomyPolicy()` 获取策略。
+- **路由**：新增 `GET /v1/projects/:id/world/autonomy-stats`，纯只读，不修改配置。
+- **App**：新增 `AutonomyStatusSection.tsx` 组件，展示模式徽章（Disabled / Suggest / Semi-Auto / Auto，颜色编码）、今日配额使用量、并发任务数、最近自动动作列表。
+- **集成**：`WorldOverviewTab.tsx` 在 autonomy card 下方集成 `AutonomyStatusSection`，best-effort fetch（失败不影响主界面）。
+- **i18n**：`autonomy.*` 键已添加到 10 个语言文件（en / zh-Hans / zh-Hant / ja / es / it / ca / pl / pt / ru）及 `_default.ts`。
+- **验证**：551 个 server 测试全绿，app typecheck 通过。
+
+##### E.11 扩展自动动作范围（2026-04-12 Sprint 3）
+
+已落地：
+
+- **Generator 新规则**：
+  - `retryableFailedTask`：当失败任务的 errorMessage 匹配瞬态错误模式（timeout / ECONNRESET / ETIMEDOUT / rate limit / 503 / 429 / temporary / unavailable）时，生成 `requiresHuman: false` 的 `suggested_task`，用于自动重试。
+  - `blockedGoalSupplement`：当 blocked goal 的 blocker `kind !== "planner_timeout"` 且 `requiresHuman === false` 时，额外生成一条只读探索任务，用于自治诊断。
+- **Auto-accept 策略分层**：
+  - `semi-auto`：只接受原有白名单（`safe_suggested_task_auto_accept` 规则），tier-2 dedupeKey 被拒绝。
+  - `auto`：额外接受 `retryable_failed_task:*` 和 `blocked_goal_supplement:*` dedupeKey 前缀的 suggestion。
+- **审计规则**：`buildAutoAcceptAudit()` 根据 dedupeKey 前缀选择审计规则（`safe_suggested_task_auto_accept` / `retryable_failed_task_auto_accept` / `blocked_goal_supplement_auto_accept`），checks 数组新增 `dedupeKey:<prefix>` 字段。
+- **路由分叉逻辑**：`buildSuggestionCandidates()` 根据 `isRetryableError()` 判定将 failed task 路由到 `retryableFailedTask` 或 `failedTaskFollowup`。
+- **测试**：551 个 server 测试全绿（新增 12 个测试覆盖 generator 路由选择、策略分层、审计规则选择），app typecheck 通过。
+
+##### E.12 阶段 E 结论
+
+阶段 E 的 3 个 Sprint 已全部完成，核心闭环已落地：
+
+1. **策略驱动**：`supervisorMode` 是唯一开关，`WorldAutonomyPolicy` 是唯一策略结构。
+2. **可观测**：Autonomy Dashboard 展示模式、配额、并发、历史；审计快照可追溯每一条自动决策。
+3. **分层扩展**：`semi-auto` 保守白名单，`auto` 扩展到瞬态重试和自治诊断；策略与 generator 规则正交，可独立演进。
+4. **安全边界**：并发上限、每日配额、dedupeKey 分层、仅 `suggested_task` 可自动接受。
+
+当前仍可继续增强但不阻塞阶段 E 收口：
+
+- pending approvals 可视化（超限 suggestion 的审批列表）
+- 更细的策略快照（策略版本、调用来源链、人工 override 原因）
+- GoalDetail 之外更多二级入口的来源展示扩散
+- `auto_guarded` 模式（关键动作仍需审批）
 
 #### F.2 最小消息协议
 
@@ -947,6 +993,8 @@ World 逐步从 Goal list 演进为：
 | 2026-04-11 | 阶段 D / Phase 2 完成：server 内已完成 Suggestion 可导出共享契约边界整理——新增 `worldSuggestionContract.ts` 纯 contract 层，纯 schema/类型与 server-only helper 分层，happy-server build 通过，相关 routes/modules/tests 已切到 contract 层消费纯定义 |
 | 2026-04-11 | 阶段 D 进度核对修正：`WorldSuggestion.bucket` 已作为稳定字段入库并在 query 路径补回填修正；文档不再将其表述为“尚未持久化”。当前剩余收尾聚焦 `payload` 判别联合进一步收口与 shared schema 单一来源化 |
 | 2026-04-11 | 阶段 D 进入收尾：WorldOverview 三分桶建议流、GoalDetail suggestion、`goalId / bucket` 查询、bucket 查询语义修复、Suggestion 类型联合收紧与 requires_action queued marker 补洞已落地；当前剩余 bucket 持久化、payload 判别联合、shared schema 收口 |
+
+| 2026-04-12 | 阶段 E Sprint 1（策略模型正式化 + 并发保护）：`resolveWorldAutonomyPolicy()` 以 `supervisorMode` 为主开关接管 auto-accept（旧布尔值作 fallback）；wire 新增 `WorldAutonomyPolicySchema`、`SUPERVISOR_MODES`、`AutonomyStatsSchema`，`SuggestionAcceptAuditSchema.rule` 改为 enum 预留 3 种规则；新增 `countRunningAutoTasks()` + `maxConcurrentAutoTasks` 并发保护 + reason code `concurrency_exceeded`；refresh 10 秒防抖（RepeatKey）；88 个 world suggestion tests 全绿，server build / app typecheck 通过 |
 
 （后续每一轮活化：在此表追加一行，并勾选上方清单。）
 
