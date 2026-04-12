@@ -27,6 +27,7 @@ import { useBookmarks } from "@/hooks/useBookmarks";
 import { useAppendToInput } from "@/hooks/useInputContext";
 import { parseTaskStatusMessage, getThinkingLabelTitle } from "./messageProgress";
 import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
+import { parseLegacyCodexPlanPreview } from "./tools/codexPlanCompat";
 
 export const MessageView = (props: {
   message: Message;
@@ -392,6 +393,10 @@ function AgentTextBlock(props: {
     () => parseLegacyCodexDiffPreview(props.message.text),
     [props.message.text],
   );
+  const legacyPlanPreview = React.useMemo(
+    () => parseLegacyCodexPlanPreview(props.message.text),
+    [props.message.text],
+  );
   const taskStatusIcon =
     taskStatus?.status === "completed"
       ? "checkmark-circle-outline"
@@ -529,6 +534,64 @@ function AgentTextBlock(props: {
               />
             </View>
           </>
+        ) : legacyPlanPreview ? (
+          <View style={styles.codexPlanCard}>
+            {legacyPlanPreview.explanation ? (
+              <Text style={styles.codexPlanTitle}>
+                {legacyPlanPreview.explanation}
+              </Text>
+            ) : null}
+            <View style={styles.codexPlanList}>
+              {legacyPlanPreview.items.map((item, index) => {
+                const tone =
+                  item.status === "completed"
+                    ? {
+                        dot: theme.colors.success,
+                        label: theme.colors.success,
+                      }
+                    : item.status === "in_progress"
+                      ? {
+                          dot: theme.colors.accentBlue,
+                          label: theme.colors.accentBlue,
+                        }
+                      : item.status === "pending"
+                        ? {
+                            dot: theme.colors.accentOrange,
+                            label: theme.colors.accentOrange,
+                          }
+                        : {
+                            dot: theme.colors.textSecondary,
+                            label: theme.colors.textSecondary,
+                          };
+
+                const statusLabel =
+                  item.status === "completed"
+                    ? t("supervisor.status_completed")
+                    : item.status === "in_progress"
+                      ? t("projectKanban.columns.inProgress")
+                      : item.status === "pending"
+                        ? t("supervisor.status_pending")
+                        : t("timeline.typeToolCall");
+
+                return (
+                  <View key={`${item.status}-${index}-${item.text}`} style={styles.codexPlanRow}>
+                    <View
+                      style={[
+                        styles.codexPlanDot,
+                        { backgroundColor: tone.dot },
+                      ]}
+                    />
+                    <View style={styles.codexPlanTextWrap}>
+                      <Text style={[styles.codexPlanStatus, { color: tone.label }]}>
+                        {statusLabel}
+                      </Text>
+                      <Text style={styles.codexPlanText}>{item.text}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
         ) : (
           <MarkdownView
             markdown={props.message.text}
@@ -1042,6 +1105,50 @@ const styles = StyleSheet.create((theme) => ({
   },
   toolContainer: {
     marginHorizontal: 8,
+  },
+  codexPlanCard: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.divider,
+    backgroundColor: theme.colors.surfaceHigh,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  codexPlanTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: theme.colors.textSecondary,
+    ...Typography.default("semiBold"),
+  },
+  codexPlanList: {
+    gap: 8,
+  },
+  codexPlanRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  codexPlanDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 5,
+  },
+  codexPlanTextWrap: {
+    flex: 1,
+    gap: 1,
+  },
+  codexPlanStatus: {
+    fontSize: 11,
+    fontWeight: "600",
+    ...Typography.default("semiBold"),
+  },
+  codexPlanText: {
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: theme.colors.text,
+    ...Typography.default(),
   },
   debugText: {
     color: theme.colors.agentEventText,

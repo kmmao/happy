@@ -987,10 +987,13 @@ describe("CodexAppServerClient", () => {
         status: "canceled",
       },
     });
-    expect(events).toContainEqual({
-      type: "service_message",
-      text: "save_memory failed: storage unavailable",
-    });
+    expect(
+      events.some(
+        (event) =>
+          event.type === "service_message" &&
+          event.text === "save_memory failed: storage unavailable",
+      ),
+    ).toBe(false);
   });
 
   it("emits visible failure events for completed mcp tool calls", async () => {
@@ -1057,10 +1060,13 @@ describe("CodexAppServerClient", () => {
         status: "canceled",
       },
     });
-    expect(events).toContainEqual({
-      type: "service_message",
-      text: "user rejected MCP tool call",
-    });
+    expect(
+      events.some(
+        (event) =>
+          event.type === "service_message" &&
+          event.text === "user rejected MCP tool call",
+      ),
+    ).toBe(false);
   });
 
   it("emits readable progress updates for running mcp tool calls", async () => {

@@ -1711,12 +1711,6 @@ export class CodexAppServerClient {
             status: success ? "completed" : "canceled",
           },
         });
-        if (!success) {
-          this.handler?.({
-            type: "service_message",
-            text: content ?? `Tool call failed: ${toolName}`,
-          });
-        }
         return;
       }
       case "mcpToolCall": {
@@ -1758,12 +1752,6 @@ export class CodexAppServerClient {
           },
         });
         this.mcpToolNames.delete(callId);
-        if (item.status !== "completed") {
-          this.handler?.({
-            type: "service_message",
-            text: content ?? `MCP tool call failed: ${toolName}`,
-          });
-        }
         return;
       }
       default:
