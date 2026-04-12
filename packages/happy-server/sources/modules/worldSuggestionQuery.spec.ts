@@ -197,6 +197,69 @@ describe("worldSuggestionQuery", () => {
         ]);
     });
 
+    it("excludes expired already-acted suggestions from open query results", async () => {
+        state.suggestions = [
+            {
+                id: "sug-expired-race",
+                accountId: "user-1",
+                projectId: "project-1",
+                relatedGoalId: null,
+                relatedTaskId: "task-1",
+                type: "suggested_task",
+                title: "Retry failed API",
+                summary: "summary",
+                reason: "reason",
+                evidence: "[]",
+                recommendedRole: "builder",
+                payload: JSON.stringify({
+                    task: { title: "Retry failed API", prompt: "Inspect retry logic", priority: "user" },
+                }),
+                requiresHuman: false,
+                status: "expired",
+                dedupeKey: "dedupe:expired-1",
+                bucket: "next_step",
+                createdAt: new Date("2026-04-10T12:00:00Z"),
+                actedAt: new Date("2026-04-10T12:05:00Z"),
+                acceptSource: null,
+                acceptAudit: null,
+                autoAcceptStatus: "skipped",
+                autoAcceptReasonCode: "already_acted",
+            },
+            {
+                id: "sug-open-1",
+                accountId: "user-1",
+                projectId: "project-1",
+                relatedGoalId: null,
+                relatedTaskId: "task-2",
+                type: "suggested_task",
+                title: "Inspect queue",
+                summary: "summary",
+                reason: "reason",
+                evidence: "[]",
+                recommendedRole: "builder",
+                payload: JSON.stringify({
+                    task: { title: "Inspect queue", prompt: "Inspect queue", priority: "user" },
+                }),
+                requiresHuman: false,
+                status: "open",
+                dedupeKey: "dedupe:open-1",
+                bucket: "next_step",
+                createdAt: new Date("2026-04-10T12:10:00Z"),
+                actedAt: null,
+                acceptSource: null,
+                acceptAudit: null,
+                autoAcceptStatus: null,
+                autoAcceptReasonCode: null,
+            },
+        ];
+
+        const result = await worldSuggestionQuery("user-1", "project-1", {
+            status: "open",
+        });
+
+        expect(result.map((item) => item.id)).toEqual(["sug-open-1"]);
+    });
+
     it("returns auto-accept skipped and failed outcome fields in serialized suggestions", async () => {
         state.suggestions = [
             {
@@ -271,3 +334,4 @@ describe("worldSuggestionQuery", () => {
         ]);
     });
 });
+
