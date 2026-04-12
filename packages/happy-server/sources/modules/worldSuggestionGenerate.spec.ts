@@ -28,6 +28,7 @@ const {
 
     const state = {
         projectSupervisorConfig: null as string | null,
+        projectSupervisorMode: null as string | null,
         blockedGoals: [] as Array<{
             id: string;
             accountId: string;
@@ -87,6 +88,7 @@ const {
 
     const resetState = () => {
         state.projectSupervisorConfig = null;
+        state.projectSupervisorMode = null;
         state.blockedGoals = [];
         state.failedTasks = [];
         state.completedTasks = [];
@@ -147,7 +149,7 @@ const {
 
     const dbMock = {
         project: {
-            findUnique: vi.fn(async () => ({ supervisorConfig: state.projectSupervisorConfig })),
+            findUnique: vi.fn(async () => ({ supervisorConfig: state.projectSupervisorConfig, supervisorMode: state.projectSupervisorMode })),
         },
         worldSuggestion: {
             findMany: vi.fn(async (args: any) => {
@@ -259,6 +261,10 @@ const {
                     })),
             ),
         },
+        repeatKey: {
+            findUnique: vi.fn(async () => null) as any,
+            upsert: vi.fn(async () => ({})),
+        },
     };
 
     return {
@@ -294,8 +300,10 @@ import {
     buildSuggestionCandidates,
     reconcileSuggestionCandidates,
     failedTaskFollowup,
+    retryableFailedTask,
     retryExhaustedDecision,
     blockedGoalAttention,
+    blockedGoalSupplement,
     decisionAttention,
     completedTaskSkillSuggestion,
     worldSuggestionRefresh,
@@ -640,17 +648,18 @@ describe("worldSuggestionGenerate", () => {
         expect(autoAcceptSuggestedTasksIfEnabled).toHaveBeenCalledWith({
             accountId: "user-1",
             projectId: "project-1",
+            supervisorMode: null,
             supervisorConfig: JSON.stringify({
                 worldAutonomy: { autoAcceptSafeSuggestedTasks: true },
             }),
-            suggestions: [
+            suggestions: expect.arrayContaining([
                 expect.objectContaining({
                     type: "suggested_task",
                     projectId: "project-1",
                     status: "open",
                     relatedGoalId: "goal-1",
                 }),
-            ],
+            ]),
         });
     });
 
@@ -667,10 +676,183 @@ describe("worldSuggestionGenerate", () => {
         expect(autoAcceptSuggestedTasksIfEnabled).toHaveBeenCalledWith({
             accountId: "user-1",
             projectId: "project-1",
+            supervisorMode: null,
             supervisorConfig: JSON.stringify({
                 worldAutonomy: { autoAcceptSafeSuggestedTasks: true },
             }),
             suggestions: [],
         });
+    });
+
+    it("returns debounced result when refresh is called within the debounce window", async () => {
+        dbMock.repeatKey.findUnique.mockResolvedValueOnce({
+            key: "world-suggestion-refresh:project-1",
+            value: "1",
+            expiresAt: new Date(Date.now() + 5_000),
+            createdAt: new Date(),
+        });
+        setCountResult(3);
+
+        const result = await worldSuggestionRefresh("user-1", "project-1");
+
+        expect(result).toEqual({ created: 0, unchanged: 0, total: 3, debounced: true });
+        expect(autoAcceptSuggestedTasksIfEnabled).not.toHaveBeenCalled();
+    });
+
+    it("proceeds normally when debounce key has expired", async () => {
+        dbMock.repeatKey.findUnique.mockResolvedValueOnce({
+            key: "world-suggestion-refresh:project-1",
+            value: "1",
+            expiresAt: new Date(Date.now() - 1_000),
+            createdAt: new Date(),
+        });
+        setCountResult(0);
+
+        const result = await worldSuggestionRefresh("user-1", "project-1");
+
+        expect(result.debounced).toBeUndefined();
+        expect(dbMock.repeatKey.upsert).toHaveBeenCalled();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Sprint 3: retryableFailedTask
+// ---------------------------------------------------------------------------
+
+describe("retryableFailedTask", () => {
+    it("builds a requiresHuman=false suggested_task for transient errors", () => {
+        const task = {
+            id: "task-1",
+            title: "Deploy service",
+            errorMessage: "Connection timeout",
+            goalId: "goal-1",
+            attempt: 1,
+            maxAttempts: 3,
+        };
+        const candidate = retryableFailedTask(task);
+
+        expect(candidate.type).toBe("suggested_task");
+        expect(candidate.requiresHuman).toBe(false);
+        expect(candidate.bucket).toBe("next_step");
+        expect(candidate.dedupeKey).toMatch(/^retryable_failed_task:task-1:/);
+        expect(candidate.payload).toHaveProperty("task");
+        if ("task" in candidate.payload) {
+            expect(candidate.payload.task.goalId).toBe("goal-1");
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Sprint 3: blockedGoalSupplement
+// ---------------------------------------------------------------------------
+
+describe("blockedGoalSupplement", () => {
+    it("builds a requiresHuman=false read-only investigation task", () => {
+        const goal = {
+            id: "goal-1",
+            title: "Ship v2.0",
+            description: "Release version 2.0",
+            blocker: {
+                kind: "task_failed" as const,
+                summary: "API call returned 503",
+                requiresHuman: false,
+                sourceTaskId: "task-9",
+            },
+        };
+        const candidate = blockedGoalSupplement(goal);
+
+        expect(candidate.type).toBe("suggested_task");
+        expect(candidate.requiresHuman).toBe(false);
+        expect(candidate.bucket).toBe("next_step");
+        expect(candidate.dedupeKey).toMatch(/^blocked_goal_supplement:goal-1:/);
+        expect(candidate.payload).toHaveProperty("task");
+        if ("task" in candidate.payload) {
+            expect(candidate.payload.task.goalId).toBe("goal-1");
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Sprint 3: buildSuggestionCandidates route selection
+// ---------------------------------------------------------------------------
+
+describe("buildSuggestionCandidates Sprint 3 routing", () => {
+    it("emits retryableFailedTask for transient error (attempt < maxAttempts)", () => {
+        const candidates = buildSuggestionCandidates({
+            failedTasks: [{
+                id: "task-1",
+                title: "Call API",
+                errorMessage: "timeout: upstream unreachable",
+                goalId: null,
+                attempt: 1,
+                maxAttempts: 3,
+            }],
+            blockedGoals: [],
+            attentionDecisions: [],
+            completedTaskSkills: [],
+        });
+        expect(candidates).toHaveLength(1);
+        expect(candidates[0].dedupeKey).toMatch(/^retryable_failed_task:/);
+        expect(candidates[0].requiresHuman).toBe(false);
+    });
+
+    it("emits failedTaskFollowup for non-transient error (attempt < maxAttempts)", () => {
+        const candidates = buildSuggestionCandidates({
+            failedTasks: [{
+                id: "task-2",
+                title: "Parse data",
+                errorMessage: "SyntaxError: unexpected token",
+                goalId: null,
+                attempt: 1,
+                maxAttempts: 3,
+            }],
+            blockedGoals: [],
+            attentionDecisions: [],
+            completedTaskSkills: [],
+        });
+        expect(candidates).toHaveLength(1);
+        expect(candidates[0].dedupeKey).toMatch(/^failed_task_followup:/);
+    });
+
+    it("emits both blockedGoalAttention and blockedGoalSupplement for non-human blocker", () => {
+        const candidates = buildSuggestionCandidates({
+            failedTasks: [],
+            blockedGoals: [{
+                id: "goal-1",
+                title: "Ship feature",
+                description: null,
+                blocker: {
+                    kind: "task_failed" as const,
+                    summary: "connection refused",
+                    requiresHuman: false,
+                    sourceTaskId: "task-9",
+                },
+            }],
+            attentionDecisions: [],
+            completedTaskSkills: [],
+        });
+        expect(candidates).toHaveLength(2);
+        expect(candidates.some((c) => c.dedupeKey.startsWith("blocked_goal_attention:"))).toBe(true);
+        expect(candidates.some((c) => c.dedupeKey.startsWith("blocked_goal_supplement:"))).toBe(true);
+    });
+
+    it("emits only blockedGoalAttention for requires-human blocker", () => {
+        const candidates = buildSuggestionCandidates({
+            failedTasks: [],
+            blockedGoals: [{
+                id: "goal-2",
+                title: "Decide scope",
+                description: null,
+                blocker: {
+                    kind: "agent_request" as const,
+                    summary: "needs human decision",
+                    requiresHuman: true,
+                },
+            }],
+            attentionDecisions: [],
+            completedTaskSkills: [],
+        });
+        expect(candidates).toHaveLength(1);
+        expect(candidates[0].dedupeKey).toMatch(/^blocked_goal_attention:/);
     });
 });

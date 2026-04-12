@@ -85,9 +85,28 @@ interface RefreshResult {
     created: number;
     unchanged: number;
     total: number;
+    debounced?: boolean;
 }
 
 const PROCESSING_STALE_MS = 5 * 60 * 1000;
+const REFRESH_DEBOUNCE_MS = 10_000;
+
+const RETRYABLE_ERROR_PATTERNS = [
+    /timeout/i,
+    /ECONNRESET/i,
+    /ECONNREFUSED/i,
+    /ETIMEDOUT/i,
+    /rate.?limit/i,
+    /\b503\b/,
+    /\b429\b/,
+    /temporary/i,
+    /unavailable/i,
+];
+
+function isRetryableError(errorMessage: string | null): boolean {
+    if (!errorMessage) return false;
+    return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(errorMessage));
+}
 
 export async function worldSuggestionRefresh(
     accountId: string,
@@ -95,7 +114,24 @@ export async function worldSuggestionRefresh(
 ): Promise<RefreshResult> {
     const project = await db.project.findUnique({
         where: { id: projectId },
-        select: { supervisorConfig: true },
+        select: { supervisorConfig: true, supervisorMode: true },
+    });
+
+    // Debounce: skip regeneration if refreshed within REFRESH_DEBOUNCE_MS
+    const debounceKey = `world-suggestion-refresh:${projectId}`;
+    const existing = await db.repeatKey.findUnique({
+        where: { key: debounceKey },
+    });
+    if (existing && existing.expiresAt >= new Date()) {
+        const total = await db.worldSuggestion.count({
+            where: { projectId, accountId, status: "open" },
+        });
+        return { created: 0, unchanged: 0, total, debounced: true };
+    }
+    await db.repeatKey.upsert({
+        where: { key: debounceKey },
+        create: { key: debounceKey, value: "1", expiresAt: new Date(Date.now() + REFRESH_DEBOUNCE_MS) },
+        update: { expiresAt: new Date(Date.now() + REFRESH_DEBOUNCE_MS) },
     });
 
     const staleProcessingRows = await db.worldSuggestion.findMany({
@@ -240,6 +276,7 @@ export async function worldSuggestionRefresh(
     await autoAcceptSuggestedTasksIfEnabled({
         accountId,
         projectId,
+        supervisorMode: project?.supervisorMode ?? null,
         supervisorConfig: project?.supervisorConfig ?? null,
         suggestions: createdSuggestions,
     });
@@ -376,12 +413,22 @@ export function buildSuggestionCandidates(input: {
             candidates.push(retryExhaustedDecision(task));
             continue;
         }
-        candidates.push(failedTaskFollowup(task));
+        if (isRetryableError(task.errorMessage)) {
+            candidates.push(retryableFailedTask(task));
+        } else {
+            candidates.push(failedTaskFollowup(task));
+        }
     }
 
     for (const goal of input.blockedGoals) {
         if (!goal.blocker) continue;
         candidates.push(blockedGoalAttention(goal));
+        if (
+            goal.blocker.kind !== "planner_timeout"
+            && !goal.blocker.requiresHuman
+        ) {
+            candidates.push(blockedGoalSupplement(goal));
+        }
     }
 
     for (const decision of input.attentionDecisions) {
@@ -455,6 +502,80 @@ export function reconcileSuggestionCandidates(input: {
         toCreate,
         toExpireIds: Array.from(toExpireIds),
         unchanged,
+    };
+}
+
+export function retryableFailedTask(task: FailedTaskFact): SuggestionCandidate {
+    const taskLabel = task.title ?? task.id;
+    const errorSummary = normalizeSuggestionFactText(task.errorMessage, "Unknown error");
+    const factKey = [task.id, task.attempt, task.maxAttempts, errorSummary].join("|");
+
+    return {
+        relatedGoalId: task.goalId,
+        relatedTaskId: task.id,
+        type: "suggested_task",
+        title: `Auto-retry: ${truncate(taskLabel, 60)}`,
+        summary: `Task "${taskLabel}" failed with a transient error and can be safely retried.`,
+        reason: `Transient error detected: ${truncate(errorSummary, 200)}`,
+        evidence: [{ kind: "task", id: task.id, label: `Failed: ${taskLabel}` }],
+        recommendedRole: "builder",
+        payload: {
+            task: {
+                title: `Retry: ${truncate(taskLabel, 60)}`,
+                prompt: [
+                    `The previous task "${taskLabel}" failed with a transient error.`,
+                    `Error: ${errorSummary}`,
+                    "",
+                    "This is a read-only investigation and retry. Do not change any persistent state beyond what is strictly needed to complete the original task.",
+                    "Verify connectivity or resource availability before retrying, then proceed if clear.",
+                ].join("\n"),
+                goalId: task.goalId ?? undefined,
+                priority: "user",
+            },
+        },
+        requiresHuman: false,
+        bucket: "next_step",
+        dedupeKey: `retryable_failed_task:${task.id}:${task.attempt}:${errorSummary}`,
+        factKey,
+    };
+}
+
+export function blockedGoalSupplement(goal: BlockedGoalFact): SuggestionCandidate {
+    const blocker = goal.blocker!;
+    const summary = normalizeSuggestionFactText(goal.description, "Goal is blocked");
+    const blockerSummary = normalizeSuggestionFactText(blocker.summary, summary);
+    const factKey = [goal.id, blocker.kind, "supplement", blockerSummary].join("|");
+
+    return {
+        relatedGoalId: goal.id,
+        relatedTaskId: blocker.sourceTaskId ?? null,
+        type: "suggested_task",
+        title: `Explore blocker: ${truncate(goal.title, 56)}`,
+        summary: `Read-only investigation to understand what is blocking goal "${goal.title}".`,
+        reason: `Blocker identified but may be resolvable autonomously: ${truncate(blockerSummary, 160)}`,
+        evidence: [
+            { kind: "goal", id: goal.id, label: `Blocked: ${goal.title}` },
+        ],
+        recommendedRole: "analyst",
+        payload: {
+            task: {
+                title: `Investigate: ${truncate(goal.title, 56)}`,
+                prompt: [
+                    `Goal "${goal.title}" is blocked.`,
+                    goal.description ? `Goal description: ${goal.description}` : "",
+                    `Blocker: ${blockerSummary}`,
+                    "",
+                    "Perform a read-only investigation. Identify the root cause of the blocker and summarize findings.",
+                    "Do not make any persistent changes. Output a structured analysis with recommended next steps.",
+                ].filter(Boolean).join("\n"),
+                goalId: goal.id,
+                priority: "user",
+            },
+        },
+        requiresHuman: false,
+        bucket: "next_step",
+        dedupeKey: `blocked_goal_supplement:${goal.id}:${blocker.kind}:${blockerSummary}`,
+        factKey,
     };
 }
 
