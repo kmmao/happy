@@ -23,6 +23,7 @@
 - [x] **阶段 D — 建议系统稳定化收尾**：三分桶建议流与 GoalDetail suggestion 已落地；bucket 持久化、payload 判别联合、shared schema 迁入 `happy-wire` 均已完成
 - [x] **阶段 E — 受限自治执行**：策略模型正式化（supervisorMode → WorldAutonomyPolicy）、并发保护、Autonomy Dashboard、扩展自动动作范围（retryable task / blocked goal supplement）、策略分层（semi-auto / auto）均已完成
 - [x] **阶段 F — 多角色协作协议**：AgentMessage 扩展为 8 种 msgType（含 dependency_blocked / decision_request / handoff / review_request）、协作图谱查询接口（GET /world/collaboration）、任务终态自动解除 dependency_blocked、App RoleCollaborationSection 可视化角色协作状态与等待链；均已完成（2026-04-12）
+- [x] **阶段 G — 世界目标引擎**：纯函数 goalHealthEngine（stale/blocked aging/repeated failure/all-terminal 检测 + narrative deviation V1）、Goal +blockedSince/healthScore/layer 三字段、classifyGoalLayer 自动分层（strategic/operational/execution）、健康仪表盘（dashboard goalHealth + GoalCard 健康圆点 + layer badge + Replan 按钮 + "unhealthy" 筛选）、POST replan 端点、i18n 10 语言 15 键；均已完成（2026-04-12）
 
 ---
 
@@ -762,7 +763,7 @@ World 中增加：
 - 冲突可以显式升级为 Decision
 - 用户能看懂“谁在等谁、谁卡住了什么、谁需要裁决”
 
-### 阶段 G — 世界目标引擎
+### 阶段 G — 世界目标引擎 ✅（2026-04-12）
 
 **目标**：让世界具备长期连续性，能够围绕 narrative 自动维护目标树。
 
@@ -814,9 +815,9 @@ World 逐步从 Goal list 演进为：
 
 #### G.6 验收标准
 
-- 世界能围绕 narrative 持续维护目标网络
-- 失败和阻塞会驱动重规划，而不是只停留在“失败了”
-- 世界具备跨会话连续性，而不是一次运行一次遗忘
+- [x] 世界能围绕 narrative 持续维护目标网络（detectNarrativeDeviation + classifyGoalLayer + refreshGoalHealthScores）
+- [x] 失败和阻塞会驱动重规划，而不是只停留在”失败了”（all_tasks_terminal_with_failures → goal_replan_needed suggestion + POST replan endpoint）
+- [x] 世界具备跨会话连续性，而不是一次运行一次遗忘（healthScore/blockedSince/layer 持久化、suggestion pipeline 自动刷新健康信号）
 
 ### 阶段 H — 用户立法，世界执行，用户裁决
 
@@ -944,7 +945,7 @@ World 逐步从 Goal list 演进为：
 4. [x] **Sprint 4+**：阶段 D —— 建议系统稳定化。✅ 已完成（2026-04-11）
 5. [x] **Sprint 5+**：阶段 E —— 受限自治执行。✅ 已完成（2026-04-12）
 6. [x] **Sprint 6+**：阶段 F —— 多角色协作世界。✅ 已完成（2026-04-12）
-7. **Sprint 7+**：阶段 G —— 世界目标引擎。
+7. [x] **Sprint 7+**：阶段 G —— 世界目标引擎。✅ 已完成（2026-04-12）
 8. **长期目标**：阶段 H —— 用户立法 / 世界执行 / 用户裁决。
 
 ---
@@ -1102,4 +1103,4 @@ World 逐步从 Goal list 演进为：
 
 当前 World Model Activation 应表述为：
 
-> **阶段 A/B/C/D/E/F 已完成。阶段 F（多角色协作协议）3 个 Sprint 已全部落地：AgentMessage 扩展为 8 种 msgType、dependency_blocked 纳入 GoalBlocker、decision_request 自动升级为 Decision、新建协作图谱查询接口（GET /world/collaboration）、任务终态自动解除 dependency_blocked、App 端 RoleCollaborationSection 可视化角色协作状态。阶段 G（世界目标引擎）与阶段 H 仍属规划。**
+> **阶段 A/B/C/D/E/F/G 已完成。阶段 G（世界目标引擎）3 个 Sprint 已全部落地：纯函数 goalHealthEngine（4 种健康信号 + narrative deviation V1）、Goal +blockedSince/healthScore/layer 三字段、classifyGoalLayer 自动分层、健康仪表盘（dashboard goalHealth + GoalCard 健康圆点/layer badge/Replan 按钮 + "unhealthy" 筛选）、POST replan 端点。阶段 H（用户立法 / 世界执行 / 用户裁决）仍属规划。**
