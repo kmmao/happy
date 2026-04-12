@@ -79,13 +79,14 @@ CLI 侧已完成 SDK 选项映射（commit aff7302c），以下三个功能需�
 
 ## Happy-Agent Phase 6: 高级自动化（2026-04-12 记录）
 
-Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。以下为后续可增强项，按优先级排列。
+Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。Phase 6.1 已完成（未发布）。
 
-### 6.1 AutomationScheduler（任务队列调度）
-- [ ] Job 队列 + 去重（dedupeKey）
-- [ ] 优先级排序（urgent > user > background）
-- [ ] 并发限制（maxConcurrentJobs）
-- [ ] 失败重试策略
+### ~~6.1 AutomationScheduler（任务队列调度）~~ ✅ 已完成 (39b18f2a)
+- [x] Job 队列 + 去重（dedupeKey）
+- [x] 优先级排序（urgent > user > background）
+- [x] 并发限制（maxConcurrentJobs=2）
+- [x] 失败重试策略（maxAttempts=3, 递增退避）
+- [x] 12 个单元测试覆盖
 
 ### 6.2 AgentLoopCoordinator（定时/cron 循环执行）
 - [ ] Loop 定义（interval / cron expression）
