@@ -8,29 +8,16 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
-import {
-    buildGoalBlockerSummary,
-    buildGoalTaskStatusSummary,
-    selectLatestGoalSession,
-} from "@/modules/goalSummary";
 import { goalCreate, goalDecompose } from "@/modules/goalCreate";
-import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
-import { truncateText, TEXT_LIMITS, TIME_MS } from "@/modules/worldConstants";
+import { buildWorldSessionBaseline, buildRoleIdentityPrefix } from "@/modules/goalHelpers";
+import { serializeGoal, serializeGoalDetail, type GoalAgentMessageSummary } from "@/modules/goalSerializer";
+import { TIME_MS } from "@/modules/worldConstants";
 
 const GoalStatusSchema = z.enum(["planning", "in_progress", "blocked", "completed", "cancelled"]);
 const GoalPrioritySchema = z.enum(["urgent", "normal", "low"]);
 const BLOCKER_MESSAGE_TYPES = ["conflict", "request"] as const;
 
-type GoalAgentMessageSummary = {
-    id: string;
-    fromRole: string;
-    msgType: string;
-    content: string;
-    status: string;
-    sessionId: string | null;
-    decisionId: string | null;
-    createdAt: Date;
-};
+// GoalAgentMessageSummary imported from goalSerializer
 
 const CreateGoalBodySchema = z.object({
     title: z.string().min(1).max(500),
@@ -181,15 +168,6 @@ async function recoverStuckDispatchingTasks(opts: {
     );
 }
 
-function safeParseJsonArray(json: string): string[] {
-    try {
-        const parsed = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
-}
-
 async function fetchAgentMessagesBySessions(opts: {
     accountId: string;
     projectId: string;
@@ -279,58 +257,6 @@ async function fetchAgentMessagesForGoalDetail(opts: {
     });
 
     return dedupeAgentMessages(messages);
-}
-
-/**
- * Narrative + laws are the universal baseline for all sessions; injected once at the top of each task prompt.
- */
-function buildWorldSessionBaseline(project: { narrative: string | null; laws: string | null }): string | null {
-    const narrative = project.narrative?.trim();
-    const laws = project.laws?.trim();
-    if (!narrative && !laws) {
-        return null;
-    }
-    const parts: string[] = [
-        "## World session baseline",
-        "",
-        "The **narrative** and **laws** below apply to every agent session for this project. Formal decisions, inter-role messages, and any context not shown here must be fetched on demand (e.g. via app/API tools) when a workflow requires them.",
-        "",
-    ];
-    if (narrative) {
-        parts.push("### Narrative", narrative, "");
-    }
-    if (laws) {
-        parts.push("### Laws", laws, "");
-    }
-    return parts.join("\n").trimEnd();
-}
-
-/**
- * Role-specific slice for a task (on-demand). World narrative/laws are not repeated here — see baseline above.
- */
-function buildRoleIdentityPrefix(
-    suggestedRole: string | undefined,
-    roleMap: Map<string, { name: string; type: string; description: string | null; duties: string }>,
-): string | null {
-    if (!suggestedRole) return null;
-    const role = roleMap.get(suggestedRole);
-    if (!role) return null;
-
-    const parts: string[] = [];
-    parts.push(`## Your Role: ${role.name} (${role.type})`);
-    if (role.description) {
-        parts.push(`\n${role.description}`);
-    }
-
-    const duties = safeParseJsonArray(role.duties);
-    if (duties.length > 0) {
-        parts.push(`\n### Duties`);
-        for (const duty of duties) {
-            parts.push(`- ${duty}`);
-        }
-    }
-
-    return parts.join("\n");
 }
 
 /**
@@ -910,138 +836,4 @@ export function goalRoutes(app: Fastify) {
     );
 }
 
-// === Serialization ===
-
-function serializeGoal(goal: Record<string, unknown>, agentMessages: GoalAgentMessageSummary[] = []): Record<string, unknown> {
-    const g = goal as {
-        id: string;
-        projectId: string;
-        title: string;
-        description: string | null;
-        status: string;
-        progress: number;
-        priority: string;
-        deadline: Date | null;
-        parentGoalId: string | null;
-        machineId: string;
-        createdBy: string;
-        plannerTaskId: string | null;
-        createdAt: Date;
-        updatedAt: Date;
-        tasks?: Array<{
-            id: string;
-            title: string | null;
-            status: string;
-            sessionId: string | null;
-            roleType: string | null;
-            errorMessage: string | null;
-            createdAt: Date;
-            completedAt: Date | null;
-        }>;
-        _count?: { subGoals: number; tasks: number; decisions: number };
-    };
-
-    const tasks = g.tasks ?? [];
-    const taskStatusSummary = buildGoalTaskStatusSummary(tasks);
-    const latestSession = selectLatestGoalSession(tasks.map((task) => ({
-        id: task.id,
-        title: task.title,
-        status: task.status,
-        sessionId: task.sessionId,
-        updatedAt: task.completedAt ?? task.createdAt,
-    })));
-    const blocker = buildGoalBlockerSummary({
-        goalStatus: g.status,
-        plannerTimedOut: g.status === "blocked" && Boolean(g.plannerTaskId) && tasks.length === 0,
-        tasks: tasks.map((task) => ({
-            id: task.id,
-            title: task.title,
-            status: task.status,
-            errorMessage: task.errorMessage,
-        })),
-        agentMessages,
-    });
-
-    return {
-        id: g.id,
-        projectId: g.projectId,
-        title: g.title,
-        description: g.description,
-        status: g.status,
-        progress: g.progress,
-        priority: g.priority,
-        deadline: g.deadline?.getTime() ?? null,
-        parentGoalId: g.parentGoalId,
-        machineId: g.machineId,
-        createdBy: g.createdBy,
-        plannerTaskId: g.plannerTaskId,
-        createdAt: g.createdAt.getTime(),
-        updatedAt: g.updatedAt.getTime(),
-        subGoalCount: g._count?.subGoals ?? 0,
-        taskCount: g._count?.tasks ?? 0,
-        decisionCount: g._count?.decisions ?? 0,
-        taskStatusSummary,
-        latestSession,
-        blocker,
-        tasks: tasks.map((t) => ({
-            id: t.id,
-            title: t.title,
-            status: t.status,
-            sessionId: t.sessionId,
-            roleType: t.roleType,
-        })),
-    };
-}
-
-function serializeGoalDetail(goal: Record<string, unknown>, agentMessages: GoalAgentMessageSummary[] = []): Record<string, unknown> {
-    const base = serializeGoal(goal, agentMessages);
-    const g = goal as {
-        tasks?: Array<{
-            id: string;
-            title: string | null;
-            status: string;
-            sessionId: string | null;
-            roleType: string | null;
-            prompt: string;
-            priority: string;
-            createdAt: Date;
-            completedAt: Date | null;
-        }>;
-        subGoals?: Array<{
-            id: string;
-            title: string;
-            status: string;
-            progress: number;
-            priority: string;
-        }>;
-        decisions?: Array<{
-            id: string;
-            question: string;
-            status: string;
-            createdAt: Date;
-        }>;
-    };
-
-    return {
-        ...base,
-        tasks: g.tasks?.map((t) => ({
-            id: t.id,
-            title: t.title,
-            status: t.status,
-            sessionId: t.sessionId,
-            roleType: t.roleType,
-            promptPreview: truncateText(t.prompt, TEXT_LIMITS.PROMPT_PREVIEW),
-            priority: t.priority,
-            createdAt: t.createdAt.getTime(),
-            completedAt: t.completedAt?.getTime() ?? null,
-        })) ?? [],
-        subGoals: g.subGoals ?? [],
-        blockers: base.blocker ? [base.blocker] : [],
-        decisions: g.decisions?.map((d) => ({
-            id: d.id,
-            question: d.question,
-            status: d.status,
-            createdAt: d.createdAt.getTime(),
-        })) ?? [],
-    };
-}
+// serializeGoal / serializeGoalDetail imported from @/modules/goalSerializer

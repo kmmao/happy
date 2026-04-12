@@ -10,6 +10,7 @@ import {
     buildGoalCreatedEphemeral,
 } from "@/app/events/eventRouter";
 import { log } from "@/utils/log";
+import { safeParseJsonArray } from "./goalHelpers";
 import { truncateText, TEXT_LIMITS } from "./worldConstants";
 
 interface GoalCreateInput {
@@ -402,13 +403,4 @@ function buildPlannerPrompt(opts: {
     return sections.join("\n");
 }
 
-// === Helpers ===
-
-function safeParseJsonArray(json: string): string[] {
-    try {
-        const parsed = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
-}
+// safeParseJsonArray imported from goalHelpers
