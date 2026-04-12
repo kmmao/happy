@@ -8,6 +8,7 @@ import { t } from "@/text";
 import { getDiffStatsLight } from "@/components/diff/calculateDiff";
 import { trimIdent } from "@/utils/trimIdent";
 import { getCodexCommandPreview } from "./codexCommandUtils";
+import { getCodexPatchEntries, getCodexPatchTotals } from "./codexPatchUtils";
 
 // Icon factory functions
 const ICON_TERMINAL = (size: number = 24, color: string = "#000") => (
@@ -1149,6 +1150,10 @@ export const knownTools = {
       })
       .partial()
       .passthrough(),
+    extractStats: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const entries = getCodexPatchEntries(opts.tool.input?.changes);
+      return getCodexPatchTotals(entries);
+    },
     extractSubtitle: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
       // Show the first file being modified
       if (
