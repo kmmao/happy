@@ -9,6 +9,7 @@ import { CodeView } from '@/components/CodeView';
 import { Metadata } from '@/sync/storageTypes';
 import { resolvePath } from '@/utils/pathUtils';
 import { t } from '@/text';
+import { getCodexCommandText } from '../codexCommandUtils';
 
 interface CodexBashViewProps {
     tool: ToolCall;
@@ -86,7 +87,7 @@ export const CodexBashView = React.memo<CodexBashViewProps>(({ tool, metadata })
         );
     } else {
         // Display as a regular command
-        const commandDisplay = commandStr || (command && Array.isArray(command) ? command.join(' ') : '');
+        const commandDisplay = commandStr || getCodexCommandText(command) || '';
         
         return (
             <ToolSectionView>

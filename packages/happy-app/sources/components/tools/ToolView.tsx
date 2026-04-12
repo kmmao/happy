@@ -29,6 +29,7 @@ import { sessionAllow } from "@/sync/ops";
 import { PermissionFooter } from "./PermissionFooter";
 import { shouldAutoApprove } from "@/utils/shouldAutoApprove";
 import { log } from '@/log';
+import { getCodexCommandText } from "./codexCommandUtils";
 
 interface ToolViewProps {
   metadata: Metadata | null;
@@ -74,8 +75,8 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     }
 
     // Copy command
-    const command = tool.input?.command;
-    if (command && typeof command === "string") {
+    const command = getCodexCommandText(tool.input?.command);
+    if (command) {
       buttons.push({
         text: t("tools.contextMenu.copyCommand"),
         onPress: () => {

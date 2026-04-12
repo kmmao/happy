@@ -7,6 +7,7 @@ import React from "react";
 import { t } from "@/text";
 import { getDiffStatsLight } from "@/components/diff/calculateDiff";
 import { trimIdent } from "@/utils/trimIdent";
+import { getCodexCommandPreview } from "./codexCommandUtils";
 
 // Icon factory functions
 const ICON_TERMINAL = (size: number = 24, color: string = "#000") => (
@@ -787,7 +788,9 @@ export const knownTools = {
     isMutable: true,
     input: z
       .object({
-        command: z.array(z.string()).describe("The command array to execute"),
+        command: z
+          .union([z.string(), z.array(z.string())])
+          .describe("The command to execute"),
         cwd: z.string().optional().describe("Current working directory"),
         parsed_cmd: z
           .array(
@@ -835,21 +838,9 @@ export const knownTools = {
           return parsedCmd.cmd;
         }
       }
-      if (opts.tool.input?.command && Array.isArray(opts.tool.input.command)) {
-        let cmdArray = opts.tool.input.command;
-        // Remove shell wrapper prefix if present (bash/zsh with -lc flag)
-        if (
-          cmdArray.length >= 3 &&
-          (cmdArray[0] === "bash" ||
-            cmdArray[0] === "/bin/bash" ||
-            cmdArray[0] === "zsh" ||
-            cmdArray[0] === "/bin/zsh") &&
-          cmdArray[1] === "-lc"
-        ) {
-          // The actual command is in the third element
-          return cmdArray[2];
-        }
-        return cmdArray.join(" ");
+      const commandPreview = getCodexCommandPreview(opts.tool.input?.command, 160);
+      if (commandPreview) {
+        return commandPreview;
       }
       return null;
     },
@@ -1540,4 +1531,3 @@ export function isMutableTool(toolName: string): boolean {
   // If tool is unknown, assume it's mutable to be safe
   return true;
 }
-

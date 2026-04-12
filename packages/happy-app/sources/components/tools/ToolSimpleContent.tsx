@@ -6,6 +6,7 @@ import { ToolCall } from "@/sync/typesMessage";
 import { Metadata } from "@/sync/storageTypes";
 import { resolvePath } from "@/utils/pathUtils";
 import { t } from "@/text";
+import { getCodexCommandPreview } from "./codexCommandUtils";
 const COLOR_SUCCESS = "#34C759";
 const COLOR_ERROR = "#FF3B30";
 const COLOR_WARNING = "#FF9500";
@@ -128,10 +129,7 @@ function generateSimpleContent(
           : typeof tool.input?.description === "string"
             ? tool.input.description
             : null;
-      const command =
-        typeof tool.input?.command === "string"
-          ? tool.input.command.slice(0, 120)
-          : null;
+      const command = getCodexCommandPreview(tool.input?.command, 120);
 
       if (description) {
         rows.push({
