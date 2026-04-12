@@ -56,4 +56,16 @@ export const TIME_MS = {
     PLANNING_TIMEOUT: 10 * 60 * 1000,
     /** Dispatching recovery window. */
     DISPATCHING_RECOVERY: 2 * 60 * 1000,
+    // Stage G: Goal health thresholds
+    /** in_progress goal with no task updates for this long → warning. */
+    STALE_IN_PROGRESS_WARN: 48 * 60 * 60 * 1000,
+    /** in_progress goal with no task updates for this long → critical. */
+    STALE_IN_PROGRESS_CRITICAL: 96 * 60 * 60 * 1000,
+    /** Blocked goal still blocked after this long → warning. */
+    BLOCKED_AGING_WARN: 24 * 60 * 60 * 1000,
+    /** Blocked goal still blocked after this long → critical. */
+    BLOCKED_AGING_CRITICAL: 72 * 60 * 60 * 1000,
 } as const;
+
+/** Minimum number of failed tasks before "repeated failure" signal fires. */
+export const REPEATED_FAILURE_THRESHOLD = 3;

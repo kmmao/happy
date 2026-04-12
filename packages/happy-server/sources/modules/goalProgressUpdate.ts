@@ -77,10 +77,17 @@ export async function goalProgressUpdate(input: GoalProgressInput, depth: number
             newStatus = goal.status; // Keep current status
         }
 
-        // Update goal
+        // Update goal (manage blockedSince for health aging detection)
+        const wasBlocked = goal.status === "blocked";
+        const becomesBlocked = newStatus === "blocked";
+        const blockedSinceUpdate: { blockedSince?: Date | null } =
+            !wasBlocked && becomesBlocked ? { blockedSince: new Date() }
+            : wasBlocked && !becomesBlocked ? { blockedSince: null }
+            : {};
+
         await db.goal.update({
             where: { id: goal.id },
-            data: { progress, status: newStatus },
+            data: { progress, status: newStatus, ...blockedSinceUpdate },
         });
 
         // Emit ephemeral to App

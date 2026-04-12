@@ -154,7 +154,8 @@ export function shouldAutoAcceptSuggestedTask(input: {
 
 function isExtendedAutoTier(dedupeKey: string): boolean {
     return dedupeKey.startsWith("retryable_failed_task:")
-        || dedupeKey.startsWith("blocked_goal_supplement:");
+        || dedupeKey.startsWith("blocked_goal_supplement:")
+        || dedupeKey.startsWith("stale_goal_attention:");
 }
 
 // ---------------------------------------------------------------------------

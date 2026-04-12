@@ -1127,12 +1127,18 @@ model Goal {
     tasks           Task[]
     decisions       Decision[]
 
+    // Health tracking (Stage G)
+    blockedSince    DateTime?                       // 进入 blocked 状态的时间点
+    healthScore     Int?                            // 0-100，goalHealthEngine 计算
+    layer           String?                         // strategic | operational | execution
+
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 
     @@index([accountId, projectId, status])
     @@index([projectId, status])
     @@index([parentGoalId])
+    @@index([projectId, healthScore])
 }
 
 // World Model — Phase 4: Agent Messages (Inter-agent communication)

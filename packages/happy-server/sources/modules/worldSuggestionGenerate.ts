@@ -18,7 +18,8 @@ import {
     normalizeSuggestionFactText,
 } from "./summaryDetailFilter";
 import { autoAcceptSuggestedTasksIfEnabled } from "./worldSuggestionAutoAccept";
-import { truncateText, TEXT_LIMITS, TIME_MS } from "./worldConstants";
+import { truncateText, TIME_MS } from "./worldConstants";
+import { refreshGoalHealthScores, buildHealthSuggestionCandidates, type GoalHealthResult } from "./goalHealthEngine";
 import type { SuggestionBucket, SuggestionEvidence, SuggestionPayload, SuggestionSummary, SuggestionType } from "@kmmao/happy-wire";
 
 interface FailedTaskFact {
@@ -298,6 +299,7 @@ async function collectSuggestionFacts(accountId: string, projectId: string): Pro
     blockedGoals: BlockedGoalFact[];
     attentionDecisions: DecisionAttentionFact[];
     completedTaskSkills: CompletedTaskSkillFact[];
+    goalHealthResults: GoalHealthResult[];
 }> {
     const [failedTasks, completedTasks, blockedGoalsRaw, pendingDecisions, expiredDecisions, planningTimeoutGoalIds] = await Promise.all([
         db.task.findMany({
@@ -379,6 +381,7 @@ async function collectSuggestionFacts(accountId: string, projectId: string): Pro
     }));
 
     const completedTaskSkills = await buildCompletedTaskSkillFacts(completedTasks);
+    const goalHealthResults = await refreshGoalHealthScores(accountId, projectId);
 
     return {
         failedTasks: failedTasks.map((task) => ({
@@ -398,6 +401,7 @@ async function collectSuggestionFacts(accountId: string, projectId: string): Pro
             expiresAt: decision.expiresAt,
         })),
         completedTaskSkills,
+        goalHealthResults,
     };
 }
 
@@ -406,6 +410,7 @@ export function buildSuggestionCandidates(input: {
     blockedGoals: BlockedGoalFact[];
     attentionDecisions: DecisionAttentionFact[];
     completedTaskSkills: CompletedTaskSkillFact[];
+    goalHealthResults?: GoalHealthResult[];
 }): SuggestionCandidate[] {
     const candidates: SuggestionCandidate[] = [];
 
@@ -438,6 +443,10 @@ export function buildSuggestionCandidates(input: {
 
     for (const task of input.completedTaskSkills) {
         candidates.push(completedTaskSkillSuggestion(task));
+    }
+
+    if (input.goalHealthResults && input.goalHealthResults.length > 0) {
+        candidates.push(...buildHealthSuggestionCandidates(input.goalHealthResults));
     }
 
     return candidates;

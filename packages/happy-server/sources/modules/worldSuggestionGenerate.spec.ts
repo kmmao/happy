@@ -245,6 +245,7 @@ const {
                     .filter((goal) => goal.accountId === args.where.accountId)
                     .filter((goal) => goal.projectId === args.where.projectId);
             }),
+            update: vi.fn(async () => ({})),
         },
         decision: {
             findMany: vi.fn(async (args: any) =>
