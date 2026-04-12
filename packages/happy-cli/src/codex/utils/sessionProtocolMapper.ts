@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { basename } from "node:path";
 import { createId } from "@paralleldrive/cuid2";
 import type { ReasoningOutput } from "./reasoningProcessor";
 import type { DiffToolCall, DiffToolResult } from "./diffProcessor";
@@ -157,6 +158,132 @@ function commandToTitle(command: string | null): string {
   }
   const short = command.length > 80 ? `${command.slice(0, 77)}...` : command;
   return `Run \`${short}\``;
+}
+
+type ParsedCodexCommandType =
+  | "read"
+  | "write"
+  | "search"
+  | "list_files"
+  | "unknown";
+
+type ParsedCodexCommand = {
+  type: ParsedCodexCommandType;
+  cmd?: string;
+  name?: string;
+  path?: string | null;
+  query?: string;
+};
+
+function normalizeParsedCodexCommandType(value: unknown): ParsedCodexCommandType {
+  if (
+    value === "read" ||
+    value === "write" ||
+    value === "search" ||
+    value === "list_files"
+  ) {
+    return value;
+  }
+  return "unknown";
+}
+
+function getParsedCodexCommands(
+  args: Record<string, unknown>,
+): ParsedCodexCommand[] {
+  if (!Array.isArray(args.parsed_cmd)) {
+    return [];
+  }
+
+  return args.parsed_cmd
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((item) => ({
+      type: normalizeParsedCodexCommandType(item.type),
+      cmd: typeof item.cmd === "string" ? item.cmd : undefined,
+      name: typeof item.name === "string" ? item.name : undefined,
+      path: typeof item.path === "string" ? item.path : null,
+      query: typeof item.query === "string" ? item.query : undefined,
+    }));
+}
+
+function describeExtraParsedCommands(parsedCommands: ParsedCodexCommand[]): string {
+  const extraCount = Math.max(parsedCommands.length - 1, 0);
+  return extraCount > 0 ? ` (+${extraCount} more actions)` : "";
+}
+
+function buildCodexExecToolPayload(
+  args: Record<string, unknown>,
+): {
+  name: string;
+  title: string;
+  description: string;
+  args: Record<string, unknown>;
+} {
+  const command = summarizeCommand(args.command);
+  const parsedCommands = getParsedCodexCommands(args);
+  const primaryCommand = parsedCommands[0];
+  const extraSuffix = describeExtraParsedCommands(parsedCommands);
+
+  if (primaryCommand?.type === "read") {
+    const filePath = primaryCommand.path ?? primaryCommand.name;
+    const fileName = filePath ? basename(filePath) : "file";
+    return {
+      name: "Read",
+      title: filePath || fileName,
+      description: `Reading ${fileName}${extraSuffix}`,
+      args: {
+        file_path: filePath,
+        parsed_cmd: args.parsed_cmd,
+        command: args.command,
+        cwd: args.cwd,
+      },
+    };
+  }
+
+  if (primaryCommand?.type === "search") {
+    const pattern = primaryCommand.query ?? command ?? "";
+    return {
+      name: "Grep",
+      title: pattern ? `grep(pattern: ${pattern})` : "Search Content",
+      description: pattern
+        ? `Search(pattern: ${pattern})${extraSuffix}`
+        : `Search${extraSuffix}`,
+      args: {
+        pattern,
+        ...(primaryCommand.path ? { path: primaryCommand.path } : {}),
+        parsed_cmd: args.parsed_cmd,
+        command: args.command,
+        cwd: args.cwd,
+      },
+    };
+  }
+
+  if (primaryCommand?.type === "list_files") {
+    const path = primaryCommand.path ?? null;
+    const label = path ? basename(path) || path : "List Files";
+    return {
+      name: "LS",
+      title: path || "List Files",
+      description: path
+        ? `Search(path: ${label})${extraSuffix}`
+        : `List files${extraSuffix}`,
+      args: {
+        ...(path ? { path } : {}),
+        parsed_cmd: args.parsed_cmd,
+        command: args.command,
+        cwd: args.cwd,
+      },
+    };
+  }
+
+  return {
+    name: "CodexBash",
+    title: commandToTitle(command),
+    description:
+      typeof args.description === "string"
+        ? args.description
+        : (command ?? "Execute command"),
+    args,
+  };
 }
 
 function patchDescription(changes: unknown): string {
@@ -439,12 +566,7 @@ export function mapCodexMcpMessageToSessionEnvelopes(
       type: _type,
       ...args
     } = message;
-
-    const command = summarizeCommand((args as Record<string, unknown>).command);
-    const description =
-      typeof (args as Record<string, unknown>).description === "string"
-        ? (args as Record<string, string>).description
-        : (command ?? "Execute command");
+    const payload = buildCodexExecToolPayload(args as Record<string, unknown>);
 
     const envelopes: SessionEnvelope[] = [];
     maybeEmitSubagentStart(
@@ -460,10 +582,10 @@ export function mapCodexMcpMessageToSessionEnvelopes(
         {
           t: "tool-call-start",
           call,
-          name: "CodexBash",
-          title: commandToTitle(command),
-          description,
-          args: args as Record<string, unknown>,
+          name: payload.name,
+          title: payload.title,
+          description: payload.description,
+          args: payload.args,
         },
         opts,
       ),

@@ -136,6 +136,71 @@ describe('mapCodexMcpMessageToSessionEnvelopes', () => {
         }
     });
 
+    it('maps parsed read commands to Read tool semantics', () => {
+        const result = mapCodexMcpMessageToSessionEnvelopes(
+            {
+                type: 'exec_command_begin',
+                call_id: 'call-read',
+                command: ['/bin/zsh', '-lc', "sed -n '1,40p' src/foo.ts"],
+                cwd: '/tmp',
+                parsed_cmd: [
+                    {
+                        type: 'read',
+                        cmd: "sed -n '1,40p' src/foo.ts",
+                        name: 'foo.ts',
+                        path: 'src/foo.ts',
+                    },
+                ],
+            },
+            { currentTurnId: 'turn-1' }
+        );
+
+        const envelope = result.envelopes[0];
+        expect(envelope.ev.t).toBe('tool-call-start');
+        if (envelope.ev.t === 'tool-call-start') {
+            expect(envelope.ev.name).toBe('Read');
+            expect(envelope.ev.title).toBe('src/foo.ts');
+            expect(envelope.ev.description).toBe('Reading foo.ts');
+            expect(envelope.ev.args).toMatchObject({
+                file_path: 'src/foo.ts',
+                cwd: '/tmp',
+            });
+        }
+    });
+
+    it('maps parsed search commands to Grep tool semantics', () => {
+        const result = mapCodexMcpMessageToSessionEnvelopes(
+            {
+                type: 'exec_command_begin',
+                call_id: 'call-search',
+                command: ['/bin/zsh', '-lc', 'rg -n "foo" src -S'],
+                cwd: '/tmp',
+                parsed_cmd: [
+                    {
+                        type: 'search',
+                        cmd: 'rg -n "foo" src -S',
+                        query: 'foo',
+                        path: 'src',
+                    },
+                ],
+            },
+            { currentTurnId: 'turn-1' }
+        );
+
+        const envelope = result.envelopes[0];
+        expect(envelope.ev.t).toBe('tool-call-start');
+        if (envelope.ev.t === 'tool-call-start') {
+            expect(envelope.ev.name).toBe('Grep');
+            expect(envelope.ev.title).toBe('grep(pattern: foo)');
+            expect(envelope.ev.description).toBe('Search(pattern: foo)');
+            expect(envelope.ev.args).toMatchObject({
+                pattern: 'foo',
+                path: 'src',
+                cwd: '/tmp',
+            });
+        }
+    });
+
     it('preserves description overrides on generic tool-call messages', () => {
         const events = mapCodexProcessorMessageToSessionEnvelopes({
             type: 'tool-call',
