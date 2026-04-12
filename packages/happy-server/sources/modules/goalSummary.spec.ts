@@ -204,4 +204,65 @@ describe("buildGoalBlockerSummary", () => {
 
         expect(result).toBeNull();
     });
+
+    it("should build dependency_blocked blocker with requiresHuman false", () => {
+        const result = buildGoalBlockerSummary({
+            goalStatus: "blocked",
+            plannerTimedOut: false,
+            tasks: [],
+            agentMessages: [
+                {
+                    id: "msg-1",
+                    fromRole: "builder",
+                    msgType: "dependency_blocked",
+                    content: "waiting for Planner to complete schema design",
+                    status: "unread",
+                    sessionId: "session-1",
+                    decisionId: null,
+                    createdAt: new Date("2026-04-12T10:00:00Z"),
+                },
+            ],
+        });
+
+        expect(result).toEqual({
+            kind: "dependency_blocked",
+            summary: "builder blocked: waiting for Planner to complete schema design",
+            requiresHuman: false,
+            sourceMessageId: "msg-1",
+            sessionId: "session-1",
+            messageStatus: "unread",
+        });
+    });
+
+    it("should prefer conflict over dependency_blocked blocker", () => {
+        const result = buildGoalBlockerSummary({
+            goalStatus: "blocked",
+            plannerTimedOut: false,
+            tasks: [],
+            agentMessages: [
+                {
+                    id: "msg-conflict",
+                    fromRole: "builder",
+                    msgType: "conflict",
+                    content: "Architecture disagreement",
+                    status: "unread",
+                    sessionId: null,
+                    decisionId: "decision-1",
+                    createdAt: new Date("2026-04-12T09:00:00Z"),
+                },
+                {
+                    id: "msg-dep",
+                    fromRole: "tester",
+                    msgType: "dependency_blocked",
+                    content: "waiting for builder",
+                    status: "unread",
+                    sessionId: null,
+                    decisionId: null,
+                    createdAt: new Date("2026-04-12T10:00:00Z"),
+                },
+            ],
+        });
+
+        expect(result?.kind).toBe("agent_conflict");
+    });
 });

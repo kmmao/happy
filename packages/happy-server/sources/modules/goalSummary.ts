@@ -55,7 +55,7 @@ export interface GoalLatestSessionSummary {
 }
 
 export interface GoalBlockerSummary {
-    kind: "planner_timeout" | "task_failed" | "agent_conflict" | "agent_request";
+    kind: "planner_timeout" | "task_failed" | "agent_conflict" | "agent_request" | "dependency_blocked";
     summary: string;
     sourceTaskId?: string;
     sourceMessageId?: string;
@@ -138,6 +138,18 @@ function buildAgentMessageBlockerSummary(
             sessionId: request.sessionId ?? undefined,
             decisionId: request.decisionId ?? undefined,
             messageStatus: request.status as GoalBlockerSummary["messageStatus"],
+        };
+    }
+
+    const depBlocked = unresolved.find((message) => message.msgType === "dependency_blocked");
+    if (depBlocked) {
+        return {
+            kind: "dependency_blocked",
+            summary: `${depBlocked.fromRole} blocked: ${depBlocked.content}`,
+            requiresHuman: false,
+            sourceMessageId: depBlocked.id,
+            sessionId: depBlocked.sessionId ?? undefined,
+            messageStatus: depBlocked.status as GoalBlockerSummary["messageStatus"],
         };
     }
 

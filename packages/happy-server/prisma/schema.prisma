@@ -1149,8 +1149,11 @@ model AgentMessage {
     status      String   @default("unread")     // unread | read | resolved
 
     // Context references
-    sessionId   String?
-    decisionId  String?                         // If conflict escalated to Decision
+    sessionId       String?
+    decisionId      String?                         // If conflict escalated to Decision
+    relatedGoalId   String?                         // Goal this message relates to
+    relatedTaskId   String?                         // Task this message relates to
+    priority        String?  @default("normal")     // urgent | normal | low
 
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
@@ -1158,6 +1161,7 @@ model AgentMessage {
     @@index([accountId, projectId, status])
     @@index([projectId, createdAt(sort: Desc)])
     @@index([projectId, msgType])
+    @@index([projectId, relatedGoalId])
 }
 
 //

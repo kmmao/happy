@@ -111,10 +111,16 @@ export function worldDashboardRoutes(app: Fastify) {
             let totalMessages30d = 0;
             let conflicts30d = 0;
             let lawSuggestions30d = 0;
+            let handoffs30d = 0;
+            let dependencyBlocked30d = 0;
+            let reviewRequests30d = 0;
             for (const m of messagesData) {
                 totalMessages30d += m._count;
                 if (m.msgType === "conflict") conflicts30d = m._count;
                 if (m.msgType === "law_suggestion") lawSuggestions30d = m._count;
+                if (m.msgType === "handoff") handoffs30d = m._count;
+                if (m.msgType === "dependency_blocked") dependencyBlocked30d = m._count;
+                if (m.msgType === "review_request") reviewRequests30d = m._count;
             }
 
             return reply.send({
@@ -152,6 +158,9 @@ export function worldDashboardRoutes(app: Fastify) {
                     total30d: totalMessages30d,
                     conflicts30d,
                     lawSuggestions30d,
+                    handoffs30d,
+                    dependencyBlocked30d,
+                    reviewRequests30d,
                 },
             });
         },

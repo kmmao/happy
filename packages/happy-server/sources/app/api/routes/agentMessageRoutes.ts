@@ -9,7 +9,16 @@ import {
     buildAgentMessageEphemeral,
 } from "@/app/events/eventRouter";
 
-const MsgTypeSchema = z.enum(["request", "report", "conflict", "law_suggestion"]);
+const MsgTypeSchema = z.enum([
+    "request",
+    "report",
+    "conflict",
+    "law_suggestion",
+    "dependency_blocked",
+    "handoff",
+    "review_request",
+    "decision_request",
+]);
 
 const CreateMessageBodySchema = z.object({
     fromRole: z.string().min(1).max(200),
@@ -17,6 +26,9 @@ const CreateMessageBodySchema = z.object({
     msgType: MsgTypeSchema,
     content: z.string().min(1).max(10000),
     sessionId: z.string().optional(),
+    relatedGoalId: z.string().optional(),
+    relatedTaskId: z.string().optional(),
+    priority: z.enum(["urgent", "normal", "low"]).optional(),
 });
 
 const UserWritableMessageStatusSchema = z.enum(["unread", "read"]);
@@ -24,6 +36,7 @@ const UserWritableMessageStatusSchema = z.enum(["unread", "read"]);
 const QueryMessagesSchema = z.object({
     msgType: MsgTypeSchema.optional(),
     status: z.enum(["unread", "read", "resolved"]).optional(),
+    relatedGoalId: z.string().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     offset: z.coerce.number().int().min(0).default(0),
 });
@@ -31,6 +44,10 @@ const QueryMessagesSchema = z.object({
 
 /**
  * AgentMessage CRUD — inter-agent communication records.
+ * Supports 8 msgTypes: request, report, conflict, law_suggestion,
+ * dependency_blocked, handoff, review_request, decision_request.
+ * conflict + law_suggestion + decision_request auto-escalate to Decision.
+ * dependency_blocked + review_request create InboxItems.
  */
 export function agentMessageRoutes(app: Fastify) {
     // POST /v1/projects/:id/agent-messages — create a message
@@ -55,7 +72,16 @@ export function agentMessageRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Project not found" });
             }
 
-            const { fromRole, toRole, msgType, content, sessionId } = request.body;
+            const {
+                fromRole,
+                toRole,
+                msgType,
+                content,
+                sessionId,
+                relatedGoalId,
+                relatedTaskId,
+                priority,
+            } = request.body;
 
             const message = await db.agentMessage.create({
                 data: {
@@ -66,6 +92,9 @@ export function agentMessageRoutes(app: Fastify) {
                     msgType,
                     content,
                     sessionId: sessionId ?? null,
+                    relatedGoalId: relatedGoalId ?? null,
+                    relatedTaskId: relatedTaskId ?? null,
+                    priority: priority ?? "normal",
                 },
             });
 
@@ -131,7 +160,32 @@ export function agentMessageRoutes(app: Fastify) {
                 log({ module: "agent-message" }, `Law suggestion escalated to decision ${decisionResult.id}`);
             }
 
-            // Create InboxItem for conflict and law_suggestion
+            // Auto-create Decision for decision_request messages
+            if (msgType === "decision_request") {
+                const decisionResult = await decisionCreate({
+                    accountId: userId,
+                    projectId,
+                    question: `Decision requested by ${fromRole}${toRole ? ` → ${toRole}` : ""}: ${content.length > 200 ? content.substring(0, 197) + "..." : content}`,
+                    options: JSON.stringify([
+                        { id: "approve", description: "Approve this approach" },
+                        { id: "reject", description: "Reject and reconsider" },
+                        { id: "defer", description: "Defer decision" },
+                    ]),
+                    context: content,
+                    precedentKey: `decision_request:${fromRole}:${toRole ?? "broadcast"}`,
+                    agentRole: fromRole,
+                    sessionId,
+                });
+
+                await db.agentMessage.update({
+                    where: { id: message.id },
+                    data: { decisionId: decisionResult.id },
+                });
+
+                log({ module: "agent-message" }, `Decision request escalated to decision ${decisionResult.id}`);
+            }
+
+            // Create InboxItem for conflict, law_suggestion, dependency_blocked, review_request
             if (msgType === "conflict" || msgType === "law_suggestion") {
                 void inboxCreate({
                     accountId: userId,
@@ -146,6 +200,36 @@ export function agentMessageRoutes(app: Fastify) {
                     refType: "agent-message",
                     refId: message.id,
                     groupKey: `agent:${msgType}:${projectId}:${fromRole}`,
+                });
+            }
+
+            if (msgType === "dependency_blocked") {
+                void inboxCreate({
+                    accountId: userId,
+                    category: "agent",
+                    eventType: "agent.dependency_blocked",
+                    severity: "warning",
+                    title: `${fromRole} blocked${toRole ? ` waiting for ${toRole}` : ""}`,
+                    body: content.length > 200 ? content.substring(0, 197) + "..." : content,
+                    referenceUrl: `/project/${projectId}?tab=world`,
+                    refType: "agent-message",
+                    refId: message.id,
+                    groupKey: `agent:dependency_blocked:${projectId}:${fromRole}:${toRole ?? ""}`,
+                });
+            }
+
+            if (msgType === "review_request") {
+                void inboxCreate({
+                    accountId: userId,
+                    category: "agent",
+                    eventType: "agent.review_request",
+                    severity: "info",
+                    title: `${fromRole} requests review${toRole ? ` from ${toRole}` : ""}`,
+                    body: content.length > 200 ? content.substring(0, 197) + "..." : content,
+                    referenceUrl: `/project/${projectId}?tab=world`,
+                    refType: "agent-message",
+                    refId: message.id,
+                    groupKey: `agent:review_request:${projectId}:${fromRole}:${toRole ?? ""}`,
                 });
             }
 
@@ -168,7 +252,7 @@ export function agentMessageRoutes(app: Fastify) {
         async (request, reply) => {
             const userId = request.userId;
             const projectId = request.params.id;
-            const { msgType, status, limit, offset } = request.query;
+            const { msgType, status, relatedGoalId, limit, offset } = request.query;
 
             const where: Record<string, unknown> = {
                 accountId: userId,
@@ -176,6 +260,7 @@ export function agentMessageRoutes(app: Fastify) {
             };
             if (msgType) where.msgType = msgType;
             if (status) where.status = status;
+            if (relatedGoalId) where.relatedGoalId = relatedGoalId;
 
             const [messages, total] = await Promise.all([
                 db.agentMessage.findMany({
@@ -240,6 +325,9 @@ function serializeMessage(m: {
     status: string;
     sessionId: string | null;
     decisionId: string | null;
+    relatedGoalId: string | null;
+    relatedTaskId: string | null;
+    priority: string | null;
     createdAt: Date;
     updatedAt: Date;
 }) {
@@ -253,6 +341,9 @@ function serializeMessage(m: {
         status: m.status,
         sessionId: m.sessionId,
         decisionId: m.decisionId,
+        relatedGoalId: m.relatedGoalId,
+        relatedTaskId: m.relatedTaskId,
+        priority: m.priority ?? "normal",
         createdAt: m.createdAt.getTime(),
         updatedAt: m.updatedAt.getTime(),
     };
