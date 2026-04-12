@@ -109,19 +109,19 @@ Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。Phase 6.1 已完成（�
 - [x] query-audit-log + audit-summary RPC 查询
 - [x] Scheduler onAudit 回调自动记录 + 8 个测试
 
-### 6.5 Webhook 回调系统
-- [ ] Agent 启动微型 HTTP server 接收 spawned session 回调
-- [ ] 通过 HAPPY_DAEMON_WEBHOOK_PORT env 传递给子进程
-- [ ] 实现 awaiter 系统：spawn → wait for callback → return sessionId
+### ~~6.5 Webhook 回调系统~~ ✅ 已完成 (d4208a1a)
+- [x] Agent 启动微型 HTTP server（127.0.0.1 随机端口）
+- [x] HAPPY_DAEMON_HTTP_PORT 全局 env 传递给子进程
+- [x] /session-started POST 回调链接 sessionId → PID + guardian
 
-### 6.6 TrackedSession 持久化
-- [ ] tracked-sessions.json 写盘（daemon 重启恢复）
-- [ ] PID 有效性校验（revalidate on restart）
+### ~~6.6 TrackedSession 持久化~~ ✅ 已完成 (d4208a1a)
+- [x] enablePersistence() 加载 + PID 有效性校验
+- [x] 每次 track/untrack 自动 flush 到 JSON 文件
 
-### 6.7 Tmux 集成
-- [ ] 检测 tmux 可用性
-- [ ] 在 tmux session 中 spawn（便于手动 attach 调试）
-- [ ] tmux window PID 提取
+### ~~6.7 Tmux 集成~~ ✅ 已完成 (d4208a1a)
+- [x] isTmuxAvailable() 检测 + 缓存
+- [x] spawnInTmux() 创建/复用命名 tmux 会话
+- [x] 返回 {sessionWindow, pid} 用于跟踪
 
 ## Auto-Option-Send 跨设备同步（2026-04-11 记录）
 
