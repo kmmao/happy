@@ -70,6 +70,9 @@ export interface WorldDashboard {
         total30d: number;
         conflicts30d: number;
         lawSuggestions30d: number;
+        handoffs30d: number;
+        dependencyBlocked30d: number;
+        reviewRequests30d: number;
     };
 }
 
@@ -212,6 +215,46 @@ export async function dismissSuggestion(
     if (!response.ok) {
         throw new Error(`Failed to dismiss suggestion: ${response.status}`);
     }
+}
+
+export interface CollaborationRoleEntry {
+    roleName: string;
+    roleType: string;
+    activeTasks: number;
+    pendingMessages: number;
+    blockedOn: Array<{
+        waitingFor: string;
+        reason: string;
+        messageId: string;
+        relatedGoalId: string | null;
+        since: number;
+    }>;
+    pendingHandoffs: number;
+    pendingReviews: number;
+}
+
+export interface CollaborationSummary {
+    roles: CollaborationRoleEntry[];
+    openConflicts: number;
+    pendingDecisions: number;
+    blockedChains: Array<{ chain: string[]; rootCause: string }>;
+}
+
+export async function fetchCollaboration(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<CollaborationSummary> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/world/collaboration`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch collaboration: ${response.status}`);
+        }
+        return (await response.json()) as CollaborationSummary;
+    });
 }
 
 export async function fetchAutonomyStats(

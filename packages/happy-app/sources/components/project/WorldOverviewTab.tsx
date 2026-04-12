@@ -24,13 +24,16 @@ import {
     acceptSuggestion,
     dismissSuggestion,
     fetchAutonomyStats,
+    fetchCollaboration,
     type SuggestionStatus,
     type WorldDashboard,
     type SuggestionSummary,
     type AutonomyStats,
+    type CollaborationSummary,
 } from "@/sync/apiWorld";
 import type { AcceptSuggestionResult } from "@/sync/apiWorld";
 import { AutonomyStatusSection } from "./AutonomyStatusSection";
+import { RoleCollaborationSection } from "./RoleCollaborationSection";
 import { SuggestionCard } from "./SuggestionCard";
 import {
     applySuggestionStatusUpdate,
@@ -64,6 +67,7 @@ export const WorldOverviewTab = React.memo(
         const router = useRouter();
         const [data, setData] = React.useState<WorldDashboard | null>(null);
         const [autonomyStats, setAutonomyStats] = React.useState<AutonomyStats | null>(null);
+        const [collaboration, setCollaboration] = React.useState<CollaborationSummary | null>(null);
         const [suggestions, setSuggestions] = React.useState<SuggestionSummary[]>([]);
         const [loading, setLoading] = React.useState(false);
         const [refreshing, setRefreshing] = React.useState(false);
@@ -93,14 +97,16 @@ export const WorldOverviewTab = React.memo(
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const [dashboard, activeSuggestions, acceptedSuggestions, stats] = await Promise.all([
+                const [dashboard, activeSuggestions, acceptedSuggestions, stats, collab] = await Promise.all([
                     fetchWorldDashboard(credentials, project.serverId),
                     fetchSuggestions(credentials, project.serverId),
                     fetchSuggestions(credentials, project.serverId, { status: "accepted" }),
                     fetchAutonomyStats(credentials, project.serverId).catch(() => null),
+                    fetchCollaboration(credentials, project.serverId).catch(() => null),
                 ]);
                 setData(dashboard);
                 setAutonomyStats(stats);
+                setCollaboration(collab);
                 setSuggestions(mergeVisibleSuggestions(
                     mergeFetchedSuggestions(activeSuggestions, hiddenSuggestionIdsRef.current),
                     mergeFetchedSuggestions(acceptedSuggestions, hiddenSuggestionIdsRef.current),
@@ -305,6 +311,10 @@ export const WorldOverviewTab = React.memo(
 
                 {autonomyStats ? (
                     <AutonomyStatusSection stats={autonomyStats} />
+                ) : null}
+
+                {collaboration ? (
+                    <RoleCollaborationSection summary={collaboration} />
                 ) : null}
 
                 <View style={styles.metricsGrid}>
