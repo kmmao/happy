@@ -174,10 +174,13 @@ export function buildCodexContextUsage(
     return null;
   }
 
+  const estimatedContextTokens =
+    snapshot.last.inputTokens + snapshot.last.cachedInputTokens;
+
   return {
-    totalTokens: snapshot.total.totalTokens,
+    totalTokens: estimatedContextTokens,
     maxTokens: snapshot.modelContextWindow,
     percentage:
-      (snapshot.total.totalTokens / snapshot.modelContextWindow) * 100,
+      (estimatedContextTokens / snapshot.modelContextWindow) * 100,
   };
 }

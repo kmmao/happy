@@ -40,9 +40,9 @@ describe("codex token usage helpers", () => {
       cache_read_input_tokens: 50,
     });
     expect(buildCodexContextUsage(snapshot!)).toEqual({
-      totalTokens: 1250,
+      totalTokens: 150,
       maxTokens: 258400,
-      percentage: (1250 / 258400) * 100,
+      percentage: (150 / 258400) * 100,
     });
   });
 
