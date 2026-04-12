@@ -7,6 +7,9 @@ import { db } from "@/storage/db";
 import { inboxCreate } from "./inboxCreate";
 import { truncateText, TEXT_LIMITS, TIME_MS } from "./worldConstants";
 import { worldSuggestionRefresh } from "./worldSuggestionGenerate";
+import { matchPrecedent } from "./decisionMatch";
+import { canAutoResolveDecision, autoResolveDecision } from "./decisionAutoResolve";
+import { resolveWorldAutonomyPolicy } from "./worldSuggestionAutoAccept";
 
 interface DecisionCreateInput {
     accountId: string;
@@ -21,7 +24,7 @@ interface DecisionCreateInput {
     loopId?: string;
 }
 
-export async function decisionCreate(input: DecisionCreateInput): Promise<{ id: string }> {
+export async function decisionCreate(input: DecisionCreateInput): Promise<{ id: string; autoResolved?: boolean }> {
     const expiresAt = new Date(Date.now() + TIME_MS.DAY);
 
     const decision = await db.decision.create({
@@ -40,7 +43,42 @@ export async function decisionCreate(input: DecisionCreateInput): Promise<{ id: 
         },
     });
 
-    // Create high-priority InboxItem
+    // Attempt precedent-based auto-resolution before creating Inbox noise
+    if (input.precedentKey) {
+        const project = await db.project.findUnique({
+            where: { id: input.projectId },
+            select: { supervisorMode: true, supervisorConfig: true },
+        });
+
+        const policy = resolveWorldAutonomyPolicy({
+            supervisorMode: project?.supervisorMode ?? null,
+            supervisorConfig: project?.supervisorConfig ?? null,
+        });
+
+        const precedent = await matchPrecedent(input.projectId, input.precedentKey, input.question);
+
+        if (precedent) {
+            let parsedOptions: Array<{ id: string; description: string }> = [];
+            try { parsedOptions = JSON.parse(input.options); } catch { /* keep empty */ }
+
+            const check = canAutoResolveDecision({ policy, precedent, decisionOptions: parsedOptions });
+
+            if (check.allowed) {
+                const result = await autoResolveDecision({
+                    accountId: input.accountId,
+                    projectId: input.projectId,
+                    decisionId: decision.id,
+                    precedent,
+                });
+
+                if (result.resolved) {
+                    return { id: decision.id, autoResolved: true };
+                }
+            }
+        }
+    }
+
+    // Create high-priority InboxItem (only when not auto-resolved)
     void inboxCreate({
         accountId: input.accountId,
         category: "decision",

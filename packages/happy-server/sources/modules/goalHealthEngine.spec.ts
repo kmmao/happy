@@ -47,6 +47,7 @@ function makeGoal(overrides: Partial<GoalHealthInput> = {}): GoalHealthInput {
         blockedSince: null,
         layer: null,
         parentGoalId: null,
+        subGoalCount: 0,
         tasks: [],
         ...overrides,
     };
@@ -430,6 +431,7 @@ describe("buildHealthSuggestionCandidates", () => {
             goalId: "g-1",
             goalTitle: "Test",
             goalDescription: null,
+            goalLayer: "operational",
             score: 100,
             signals: [],
             ...overrides,
@@ -494,14 +496,40 @@ describe("buildHealthSuggestionCandidates", () => {
         expect(candidates[0].requiresHuman).toBe(true);
     });
 
-    it("generates goal_replan_needed for all_tasks_terminal_with_failures", () => {
+    it("generates suggested_goal (requiresHuman:false) for operational all_tasks_terminal_with_failures", () => {
         const results = [makeResult({
+            goalLayer: "operational",
             signals: [{ kind: "all_tasks_terminal_with_failures", severity: "critical", detail: "all failed" }],
         })];
         const candidates = buildHealthSuggestionCandidates(results);
         expect(candidates[0].dedupeKey).toBe("goal_replan_needed:g-1");
+        expect(candidates[0].type).toBe("suggested_goal");
+        expect(candidates[0].requiresHuman).toBe(false);
+        expect(candidates[0].bucket).toBe("next_step");
+    });
+
+    it("generates suggested_goal (requiresHuman:true) for strategic all_tasks_terminal_with_failures", () => {
+        const results = [makeResult({
+            goalLayer: "strategic",
+            signals: [{ kind: "all_tasks_terminal_with_failures", severity: "critical", detail: "all failed" }],
+        })];
+        const candidates = buildHealthSuggestionCandidates(results);
+        expect(candidates[0].dedupeKey).toBe("goal_replan_needed:g-1");
+        expect(candidates[0].type).toBe("suggested_goal");
         expect(candidates[0].requiresHuman).toBe(true);
         expect(candidates[0].bucket).toBe("needs_decision");
+    });
+
+    it("generates suggested_task for execution all_tasks_terminal_with_failures", () => {
+        const results = [makeResult({
+            goalLayer: "execution",
+            signals: [{ kind: "all_tasks_terminal_with_failures", severity: "critical", detail: "all failed" }],
+        })];
+        const candidates = buildHealthSuggestionCandidates(results);
+        expect(candidates[0].dedupeKey).toBe("goal_replan_needed:g-1");
+        expect(candidates[0].type).toBe("suggested_task");
+        expect(candidates[0].requiresHuman).toBe(false);
+        expect(candidates[0].bucket).toBe("next_step");
     });
 
     it("generates narrative_deviation suggestion", () => {

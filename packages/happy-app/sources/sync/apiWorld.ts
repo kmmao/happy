@@ -284,3 +284,83 @@ export async function fetchAutonomyStats(
         return (await response.json()) as AutonomyStats;
     });
 }
+
+// ---------------------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------------------
+
+export interface AuditLogEntry {
+    id: string;
+    type: string;
+    title: string;
+    status: string;
+    acceptAudit: string | null;
+    actedAt: number | null;
+    autoAcceptStatus: string | null;
+    autoAcceptReasonCode: string | null;
+}
+
+export async function fetchAuditLog(
+    credentials: AuthCredentials,
+    projectId: string,
+    limit = 50,
+): Promise<AuditLogEntry[]> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/world/audit-log?limit=${limit}`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch audit log: ${response.status}`);
+        }
+        const data = (await response.json()) as { entries: AuditLogEntry[] };
+        return data.entries;
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Veto
+// ---------------------------------------------------------------------------
+
+export async function vetoSuggestion(
+    credentials: AuthCredentials,
+    projectId: string,
+    suggestionId: string,
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+    const response = await fetch(
+        `${API_ENDPOINT}/v1/projects/${projectId}/world/veto/${suggestionId}`,
+        { method: "POST", headers: authHeaders(credentials) },
+    );
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error((err as any).error ?? `Failed to veto suggestion: ${response.status}`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Policy update
+// ---------------------------------------------------------------------------
+
+export interface WorldPolicyUpdate {
+    supervisorMode?: "disabled" | "suggest" | "semi-auto" | "auto";
+    maxAutoAcceptsPerDay?: number | null;
+    maxConcurrentAutoTasks?: number | null;
+    autoAcceptTypes?: string[];
+}
+
+export async function updateWorldPolicy(
+    credentials: AuthCredentials,
+    projectId: string,
+    policy: WorldPolicyUpdate,
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+    const response = await fetch(
+        `${API_ENDPOINT}/v1/projects/${projectId}/world/policy`,
+        { method: "PATCH", headers: authHeaders(credentials), body: JSON.stringify(policy) },
+    );
+    if (!response.ok) {
+        throw new Error(`Failed to update world policy: ${response.status}`);
+    }
+}

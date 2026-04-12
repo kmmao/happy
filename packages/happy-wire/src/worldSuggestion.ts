@@ -19,7 +19,7 @@ export const WorldAutonomyPolicySchema = z.object({
   level: z.enum(SUPERVISOR_MODES),
   maxAutoAcceptsPerDay: z.number().int().positive().nullable(),
   maxConcurrentAutoTasks: z.number().int().positive().nullable(),
-  autoTaskTypes: z.array(z.string()),
+  autoAcceptTypes: z.array(z.string()),
 });
 export type WorldAutonomyPolicy = z.infer<typeof WorldAutonomyPolicySchema>;
 
@@ -27,6 +27,8 @@ export const SUGGESTION_ACCEPT_AUDIT_RULES = [
   "safe_suggested_task_auto_accept",
   "retryable_failed_task_auto_accept",
   "blocked_goal_supplement_auto_accept",
+  "precedent_auto_resolve",
+  "goal_replan_auto_accept",
 ] as const;
 export type SuggestionAcceptAuditRule = typeof SUGGESTION_ACCEPT_AUDIT_RULES[number];
 

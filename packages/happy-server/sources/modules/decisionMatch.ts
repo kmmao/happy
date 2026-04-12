@@ -5,7 +5,7 @@
 
 import { db } from "@/storage/db";
 
-interface PrecedentMatch {
+export interface PrecedentMatch {
     decisionId: string;
     knowledgeId: string;
     chosenOption: string;

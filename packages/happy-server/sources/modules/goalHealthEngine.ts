@@ -25,6 +25,7 @@ export interface GoalHealthInput {
     blockedSince: Date | null;
     layer: string | null;
     parentGoalId: string | null;
+    subGoalCount: number;
     tasks: Array<{
         id: string;
         status: string;
@@ -70,6 +71,7 @@ export interface GoalHealthResult {
     goalId: string;
     goalTitle: string;
     goalDescription: string | null;
+    goalLayer: GoalLayer;
     score: number;
     signals: GoalHealthSignal[];
 }
@@ -219,6 +221,11 @@ export function scoreGoalHealth(
     context?: { projectNarrative?: string | null },
 ): GoalHealthResult {
     const signals: GoalHealthSignal[] = [];
+    const goalLayer = classifyGoalLayer({
+        parentGoalId: goal.parentGoalId,
+        subGoalCount: goal.subGoalCount,
+        taskCount: goal.tasks.length,
+    });
 
     const stale = detectStaleInProgress(goal, now);
     if (stale) signals.push(stale);
@@ -268,6 +275,7 @@ export function scoreGoalHealth(
         goalId: goal.id,
         goalTitle: goal.title,
         goalDescription: goal.description,
+        goalLayer,
         score: Math.max(0, score),
         signals,
     };
@@ -319,18 +327,16 @@ export async function refreshGoalHealthScores(
     const results: GoalHealthResult[] = [];
 
     for (const goal of goals) {
-        const result = scoreGoalHealth(goal, now, context);
+        const result = scoreGoalHealth(
+            { ...goal, subGoalCount: goal._count.subGoals },
+            now,
+            context,
+        );
         results.push(result);
-
-        const layer = classifyGoalLayer({
-            parentGoalId: goal.parentGoalId,
-            subGoalCount: goal._count.subGoals,
-            taskCount: goal.tasks.length,
-        });
 
         await db.goal.update({
             where: { id: goal.id },
-            data: { healthScore: result.score, layer },
+            data: { healthScore: result.score, layer: result.goalLayer },
         });
     }
 
@@ -360,7 +366,7 @@ function buildCandidateForSignal(
     result: GoalHealthResult,
     signal: GoalHealthSignal,
 ): SuggestionCandidate | null {
-    const { goalId, goalTitle, goalDescription } = result;
+    const { goalId, goalTitle, goalDescription, goalLayer } = result;
 
     switch (signal.kind) {
         case "stale_in_progress":
@@ -454,6 +460,38 @@ function buildCandidateForSignal(
             };
 
         case "all_tasks_terminal_with_failures":
+            // Strategic layer: suggest a new high-level goal (human required)
+            // Operational layer: suggest a new sub-goal (can be auto-accepted)
+            // Execution layer: suggest a replan task (granular, not a new goal)
+            if (goalLayer === "strategic" || goalLayer === "operational") {
+                const isStrategic = goalLayer === "strategic";
+                return {
+                    relatedGoalId: goalId,
+                    relatedTaskId: null,
+                    type: "suggested_goal",
+                    title: `Replan goal: ${truncateText(goalTitle, 50)}`,
+                    summary: `All tasks for ${goalLayer} goal "${goalTitle}" are terminal with failures — a new goal is needed.`,
+                    reason: signal.detail,
+                    evidence: [{ kind: "goal", id: goalId, label: `Needs replan: ${goalTitle}` }],
+                    recommendedRole: "planner",
+                    payload: {
+                        goal: {
+                            title: `Replan: ${truncateText(goalTitle, 56)}`,
+                            detail: [
+                                `Original goal "${goalTitle}" had all tasks fail.`,
+                                goalDescription ? `Description: ${goalDescription}` : "",
+                                "Create a new decomposition with root-cause analysis built in.",
+                            ].filter(Boolean).join(" "),
+                            priority: "normal",
+                        },
+                    },
+                    requiresHuman: isStrategic,
+                    bucket: isStrategic ? "needs_decision" : "next_step",
+                    dedupeKey: `goal_replan_needed:${goalId}`,
+                    factKey: `${goalId}|replan_needed`,
+                };
+            }
+            // Execution layer: a targeted replan task suffices
             return {
                 relatedGoalId: goalId,
                 relatedTaskId: null,
@@ -477,8 +515,8 @@ function buildCandidateForSignal(
                         priority: "user",
                     },
                 },
-                requiresHuman: true,
-                bucket: "needs_decision",
+                requiresHuman: false,
+                bucket: "next_step",
                 dedupeKey: `goal_replan_needed:${goalId}`,
                 factKey: `${goalId}|replan_needed`,
             };

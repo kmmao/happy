@@ -21,7 +21,7 @@ export function resolveWorldAutonomyPolicy(input: {
         level,
         maxAutoAcceptsPerDay: params.maxAutoAcceptsPerDay,
         maxConcurrentAutoTasks: params.maxConcurrentAutoTasks,
-        autoTaskTypes: ["suggested_task"],
+        autoAcceptTypes: ["suggested_task"],
     };
 }
 
@@ -159,13 +159,74 @@ function isExtendedAutoTier(dedupeKey: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Goal eligibility check
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if the suggestion should be auto-accepted as a new goal.
+ *
+ * Requires "auto" mode (not semi-auto) because goal creation is higher risk.
+ * Only operational-layer re-plan goals (requiresHuman=false, bucket=next_step) qualify.
+ */
+export function shouldAutoAcceptSuggestedGoal(input: {
+    policy: WorldAutonomyPolicy;
+    suggestion: SuggestionSummary;
+}): boolean {
+    const { policy, suggestion } = input;
+
+    if (policy.level !== "auto") {
+        return false;
+    }
+
+    if (!policy.autoAcceptTypes.includes("suggested_goal")) {
+        return false;
+    }
+
+    if (suggestion.status !== "open") {
+        return false;
+    }
+
+    if (suggestion.type !== "suggested_goal") {
+        return false;
+    }
+
+    if (suggestion.bucket !== "next_step") {
+        return false;
+    }
+
+    if (suggestion.requiresHuman) {
+        return false;
+    }
+
+    if (!("goal" in suggestion.payload) || !suggestion.payload.goal.title.trim()) {
+        return false;
+    }
+
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // Audit snapshot
 // ---------------------------------------------------------------------------
 
 export function buildAutoAcceptAudit(input: {
     suggestion: SuggestionSummary;
 }): SuggestionAcceptAudit {
-    const { dedupeKey } = input.suggestion;
+    const { dedupeKey, type } = input.suggestion;
+
+    if (type === "suggested_goal") {
+        return {
+            rule: "goal_replan_auto_accept",
+            checks: [
+                `type:${type}`,
+                `bucket:${input.suggestion.bucket}`,
+                `requiresHuman:${String(input.suggestion.requiresHuman)}`,
+                "payload:goal_title_present",
+                `dedupeKey:${dedupeKey.split(":")[0]}`,
+            ],
+        };
+    }
+
     const rule = dedupeKey.startsWith("retryable_failed_task:")
         ? "retryable_failed_task_auto_accept"
         : dedupeKey.startsWith("blocked_goal_supplement:")
@@ -175,7 +236,7 @@ export function buildAutoAcceptAudit(input: {
     return {
         rule,
         checks: [
-            `type:${input.suggestion.type}`,
+            `type:${type}`,
             `bucket:${input.suggestion.bucket}`,
             `requiresHuman:${String(input.suggestion.requiresHuman)}`,
             "payload:task_title_prompt_present",
@@ -213,6 +274,7 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
     supervisorMode?: string | null;
     supervisorConfig: string | null;
     suggestions: SuggestionSummary[];
+    machineId?: string;
 }): Promise<void> {
     const policy = resolveWorldAutonomyPolicy({
         supervisorMode: input.supervisorMode ?? null,
@@ -253,7 +315,11 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
     let acceptedCount = 0;
 
     for (const suggestion of input.suggestions) {
-        if (!shouldAutoAcceptSuggestedTask({ policy, suggestion })) {
+        const eligible =
+            shouldAutoAcceptSuggestedTask({ policy, suggestion }) ||
+            shouldAutoAcceptSuggestedGoal({ policy, suggestion });
+
+        if (!eligible) {
             continue;
         }
 
@@ -271,6 +337,7 @@ export async function autoAcceptSuggestedTasksIfEnabled(input: {
                 accountId: input.accountId,
                 projectId: input.projectId,
                 suggestionId: suggestion.id,
+                machineId: input.machineId,
                 acceptSource: "system_auto",
                 acceptAudit: buildAutoAcceptAudit({ suggestion }),
             });

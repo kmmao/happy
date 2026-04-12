@@ -39,7 +39,7 @@ function makePolicy(overrides: Partial<WorldAutonomyPolicy> = {}): WorldAutonomy
         level: "semi-auto",
         maxAutoAcceptsPerDay: null,
         maxConcurrentAutoTasks: null,
-        autoTaskTypes: ["suggested_task"],
+        autoAcceptTypes: ["suggested_task"],
         ...overrides,
     };
 }
