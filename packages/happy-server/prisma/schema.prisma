@@ -65,6 +65,7 @@ model Account {
     Goal                Goal[]
     AgentMessage        AgentMessage[]
     WorldSuggestion     WorldSuggestion[]
+    WorldMember         WorldMember[]
 }
 
 model TerminalAuthRequest {
@@ -466,6 +467,7 @@ model Project {
     goals              Goal[]
     agentMessages      AgentMessage[]
     worldSuggestions   WorldSuggestion[]
+    worldMembers       WorldMember[]
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
@@ -1056,6 +1058,44 @@ model AgentRole {
     @@index([projectId])
 }
 
+// World Model — WorldMember (Team Collaboration)
+model WorldMember {
+    id              String    @id @default(cuid())
+
+    // Ownership
+    accountId       String
+    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    projectId       String
+    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    // Identity
+    displayName     String?                         // Override Account.firstName for this project
+    role            String    @default("member")    // owner | admin | member | observer
+
+    // Expertise tags (used for Decision routing)
+    expertise       String    @default("[]")        // JSON: ["database", "frontend", "security", "devops"]
+
+    // Authority
+    lawAuthority    String    @default("suggest")   // create | suggest | readonly
+    decisionScope   String    @default("assigned")  // all | assigned | none
+    goalAuthority   String    @default("create")    // create | suggest | readonly
+
+    // Notification preference
+    notifyLevel     String    @default("all")       // all | critical | assigned | none
+
+    // Availability
+    availability    String    @default("active")    // active | away | delegate
+    delegateTo      String?                         // WorldMember.id to delegate to
+
+    // Lifecycle
+    joinedAt        DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    @@unique([accountId, projectId])
+    @@index([projectId, role])
+    @@index([projectId, availability])
+}
+
 // World Model — Phase 2: Decisions (Adjudication)
 model Decision {
     id              String    @id @default(cuid())
@@ -1087,6 +1127,10 @@ model Decision {
     goalId          String?
     goal            Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
 
+    // Member routing (WorldMember integration)
+    assignedTo      String?                         // WorldMember.id — currently assigned member
+    assignHistory   String    @default("[]")        // JSON: [{memberId, assignedAt, reason}]
+
     // Lifecycle
     expiresAt       DateTime?
     decidedAt       DateTime?
@@ -1097,6 +1141,7 @@ model Decision {
     @@index([projectId, precedentKey])
     @@index([status, expiresAt])
     @@index([goalId])
+    @@index([assignedTo, status])
 }
 
 // World Model — Phase 3: Goals (Goal Engine)
@@ -1159,6 +1204,7 @@ model AgentMessage {
 
     fromRole    String                          // Sender role name
     toRole      String?                         // Receiver role name (null = broadcast)
+    toMemberId  String?                         // WorldMember.id — escalate to specific human
     msgType     String                          // request | report | conflict | law_suggestion
     content     String                          // Message content (plaintext)
     status      String   @default("unread")     // unread | read | resolved

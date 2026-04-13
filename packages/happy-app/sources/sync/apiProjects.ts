@@ -773,3 +773,122 @@ export async function replanGoal(
         return (await response.json()) as { replanned: boolean; plannerTaskId: string | null };
     });
 }
+
+// === WorldMember API ===
+
+export interface WorldMemberAccount {
+    id: string;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    avatar: unknown;
+}
+
+export interface WorldMemberSummary {
+    id: string;
+    accountId: string;
+    projectId: string;
+    displayName: string | null;
+    role: string;
+    expertise: string[];
+    lawAuthority: string;
+    decisionScope: string;
+    goalAuthority: string;
+    notifyLevel: string;
+    availability: string;
+    delegateTo: string | null;
+    joinedAt: number;
+    updatedAt: number;
+    account: WorldMemberAccount | null;
+}
+
+export async function fetchWorldMembers(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<WorldMemberSummary[]> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/members`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch members: ${response.status}`);
+        }
+        const data = (await response.json()) as { members: WorldMemberSummary[]; total: number };
+        return data.members;
+    });
+}
+
+export async function createWorldMember(
+    credentials: AuthCredentials,
+    projectId: string,
+    body: {
+        accountId: string;
+        role?: string;
+        displayName?: string;
+        expertise?: string[];
+    },
+): Promise<WorldMemberSummary> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(`${API_ENDPOINT}/v1/projects/${projectId}/members`, {
+            method: "POST",
+            headers: authHeaders(credentials),
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to create member: ${response.status}`);
+        }
+        const data = (await response.json()) as { member: WorldMemberSummary };
+        return data.member;
+    });
+}
+
+export async function updateWorldMember(
+    credentials: AuthCredentials,
+    projectId: string,
+    memberId: string,
+    body: {
+        role?: string;
+        displayName?: string | null;
+        expertise?: string[];
+        lawAuthority?: string;
+        decisionScope?: string;
+        goalAuthority?: string;
+        notifyLevel?: string;
+        availability?: string;
+        delegateTo?: string | null;
+    },
+): Promise<WorldMemberSummary> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(`${API_ENDPOINT}/v1/projects/${projectId}/members/${memberId}`, {
+            method: "PATCH",
+            headers: authHeaders(credentials),
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to update member: ${response.status}`);
+        }
+        const data = (await response.json()) as { member: WorldMemberSummary };
+        return data.member;
+    });
+}
+
+export async function deleteWorldMember(
+    credentials: AuthCredentials,
+    projectId: string,
+    memberId: string,
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+    await backoff(async () => {
+        const response = await fetch(`${API_ENDPOINT}/v1/projects/${projectId}/members/${memberId}`, {
+            method: "DELETE",
+            headers: authHeaders(credentials),
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to delete member: ${response.status}`);
+        }
+    });
+}

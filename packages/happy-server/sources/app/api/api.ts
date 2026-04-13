@@ -52,6 +52,7 @@ import { goalRoutes } from "./routes/goalRoutes";
 import { worldDashboardRoutes } from "./routes/worldDashboardRoutes";
 import { worldSuggestionRoutes } from "./routes/worldSuggestionRoutes";
 import { agentMessageRoutes } from "./routes/agentMessageRoutes";
+import { worldMemberRoutes } from "./routes/worldMemberRoutes";
 import { sessionEventRoutes } from "./routes/sessionEventRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
@@ -179,6 +180,7 @@ export async function startApi() {
   worldDashboardRoutes(typed);
   worldSuggestionRoutes(typed);
   agentMessageRoutes(typed);
+  worldMemberRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
