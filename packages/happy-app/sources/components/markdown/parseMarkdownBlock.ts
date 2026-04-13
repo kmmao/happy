@@ -144,6 +144,42 @@ export function parseMarkdownBlock(markdown: string) {
             continue;
         }
 
+        // Plan card block  <plan title="..."> ... </plan>
+        if (trimmed.startsWith('<plan ')) {
+            const titleMatch = trimmed.match(/title="([^"]*)"/);
+            const title = titleMatch ? titleMatch[1] : '';
+            let summary: string | null = null;
+            const phases: { id: string; name: string; depends: string; description: string }[] = [];
+            let risks: string | null = null;
+
+            while (index < lines.length) {
+                const planLine = lines[index].trim();
+                index++;
+
+                if (planLine === '</plan>' || planLine.startsWith('</plan>')) break;
+
+                const summaryMatch = planLine.match(/<summary>(.*?)<\/summary>/);
+                if (summaryMatch) { summary = summaryMatch[1].trim(); continue; }
+
+                const phaseMatch = planLine.match(/<phase\s+id="([^"]*)"\s+name="([^"]*)"\s+depends="([^"]*)">(.*?)<\/phase>/);
+                if (phaseMatch) {
+                    phases.push({
+                        id: phaseMatch[1],
+                        name: phaseMatch[2],
+                        depends: phaseMatch[3],
+                        description: phaseMatch[4].trim(),
+                    });
+                    continue;
+                }
+
+                const risksMatch = planLine.match(/<risks>(.*?)<\/risks>/);
+                if (risksMatch) { risks = risksMatch[1].trim(); continue; }
+            }
+
+            blocks.push({ type: 'plan-card', title, summary, phases, risks });
+            continue;
+        }
+
         // Options block
         if (trimmed.startsWith('<options>')) {
             let items: string[] = [];

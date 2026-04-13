@@ -129,6 +129,16 @@ export const MarkdownView = React.memo(
                   onOptionPress={props.onOptionPress}
                 />
               );
+            } else if (block.type === "plan-card") {
+              return (
+                <RenderPlanCardBlock
+                  key={index}
+                  title={block.title}
+                  summary={block.summary}
+                  phases={block.phases}
+                  risks={block.risks}
+                />
+              );
             } else if (block.type === "table") {
               return (
                 <RenderTableBlock
@@ -171,6 +181,44 @@ export const MarkdownView = React.memo(
     );
   },
 );
+
+function RenderPlanCardBlock(props: {
+  title: string;
+  summary: string | null;
+  phases: { id: string; name: string; depends: string; description: string }[];
+  risks: string | null;
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <View style={planStyle.card}>
+      <View style={planStyle.header}>
+        <Ionicons name="document-text-outline" size={13} color={theme.colors.accentOrange} />
+        <Text style={planStyle.title} numberOfLines={3}>{props.title}</Text>
+      </View>
+      {props.summary ? (
+        <Text style={planStyle.summary}>{props.summary}</Text>
+      ) : null}
+      {props.phases.length > 0 ? (
+        <View style={planStyle.phaseList}>
+          {props.phases.map((phase) => (
+            <View key={phase.id} style={planStyle.phaseRow}>
+              <Text style={planStyle.phaseId}>{phase.id}.</Text>
+              <View style={planStyle.phaseBody}>
+                <Text style={planStyle.phaseName}>{phase.name}</Text>
+                {phase.description ? (
+                  <Text style={planStyle.phaseDesc}>{phase.description}</Text>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {props.risks ? (
+        <Text style={planStyle.risks}>{props.risks}</Text>
+      ) : null}
+    </View>
+  );
+}
 
 function RenderTextBlock(props: {
   spans: MarkdownSpan[];
@@ -892,4 +940,74 @@ const style = StyleSheet.create((theme) => ({
         _____web_global_styles: {},
       }
     : {}),
+}));
+
+const planStyle = StyleSheet.create((theme) => ({
+  card: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.accentOrange + "40",
+    backgroundColor: theme.colors.accentOrange + "0c",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+    marginBottom: 8,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
+  title: {
+    ...Typography.default("semiBold"),
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.accentOrange,
+    flex: 1,
+  },
+  summary: {
+    ...Typography.default(),
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: theme.colors.textSecondary,
+  },
+  phaseList: {
+    gap: 5,
+    marginTop: 2,
+  },
+  phaseRow: {
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "flex-start",
+  },
+  phaseId: {
+    ...Typography.default("semiBold"),
+    fontSize: 12,
+    lineHeight: 17,
+    color: theme.colors.accentOrange,
+    minWidth: 16,
+  },
+  phaseBody: {
+    flex: 1,
+    gap: 1,
+  },
+  phaseName: {
+    ...Typography.default("semiBold"),
+    fontSize: 12,
+    lineHeight: 17,
+    color: theme.colors.text,
+  },
+  phaseDesc: {
+    ...Typography.default(),
+    fontSize: 12,
+    lineHeight: 16,
+    color: theme.colors.textSecondary,
+  },
+  risks: {
+    ...Typography.default(),
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
 }));

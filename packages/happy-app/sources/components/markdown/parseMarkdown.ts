@@ -32,6 +32,12 @@ export type MarkdownBlock = {
 } | {
     type: 'math-block',
     content: string
+} | {
+    type: 'plan-card'
+    title: string
+    summary: string | null
+    phases: { id: string; name: string; depends: string; description: string }[]
+    risks: string | null
 }
 
 export type MarkdownSpan = {

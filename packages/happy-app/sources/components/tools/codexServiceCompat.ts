@@ -12,6 +12,11 @@ export function parseCodexServicePreview(
     return null;
   }
 
+  // Plan messages start with <plan title="..."> — do not misidentify as warnings
+  if (trimmed.startsWith("<plan ")) {
+    return null;
+  }
+
   if (trimmed === "Steering active Codex turn...") {
     return {
       kind: "steering",
