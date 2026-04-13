@@ -163,6 +163,8 @@ export async function claudeRemoteLauncher(
 
   // Track current SDK Query for runtime control (interrupt, stopTask)
   let currentQuery: OfficialQuery | null = null;
+  // Keep last completed query so rewindFiles can be called after a turn ends
+  let lastCompletedQuery: OfficialQuery | null = null;
 
   // Knowledge base: turn-level data collection + injection
   // Default ON — collection runs silently in background (minimal overhead).
@@ -362,14 +364,15 @@ export async function claudeRemoteLauncher(
   session.client.rpcHandlerManager.registerHandler(
     "rewindFiles",
     async (args: { userMessageId: string; dryRun?: boolean }) => {
-      if (!currentQuery) {
+      const queryForRewind = currentQuery ?? lastCompletedQuery;
+      if (!queryForRewind) {
         return { canRewind: false, error: "No active query" };
       }
       if (!args.userMessageId) {
         return { canRewind: false, error: "Missing userMessageId" };
       }
       try {
-        const result = await currentQuery.rewindFiles(args.userMessageId, {
+        const result = await queryForRewind.rewindFiles(args.userMessageId, {
           dryRun: args.dryRun ?? false,
         });
         return result;
@@ -1640,6 +1643,8 @@ export async function claudeRemoteLauncher(
         midTurnPushFn = null;
 
         // Clear query reference immediately to prevent stale interrupt/stopTask calls
+        // But preserve a reference for post-turn rewindFiles operations
+        lastCompletedQuery = currentQuery;
         currentQuery = null;
 
         // Terminate all ongoing tool calls
