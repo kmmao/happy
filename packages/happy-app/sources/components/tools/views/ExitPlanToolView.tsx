@@ -8,7 +8,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { sessionGetPlanFileContent } from '@/sync/ops';
 import { t } from '@/text';
 
-export const ExitPlanToolView = React.memo<ToolViewProps>(({ tool, sessionId, onOptionPress }) => {
+export const ExitPlanToolView = React.memo<ToolViewProps>(({ tool, sessionId }) => {
     const { theme } = useUnistyles();
     const [planContent, setPlanContent] = React.useState<string | null>(null);
     const [planFilePath, setPlanFilePath] = React.useState<string | null>(null);
@@ -42,7 +42,7 @@ export const ExitPlanToolView = React.memo<ToolViewProps>(({ tool, sessionId, on
     return (
         <ToolSectionView>
             <View style={{ paddingHorizontal: 8, marginTop: -10 }}>
-                <MarkdownView markdown={displayPlan} onOptionPress={onOptionPress} />
+                <MarkdownView markdown={displayPlan} />
             </View>
 
             {/* Plan file actions */}

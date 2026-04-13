@@ -14,31 +14,6 @@ function emptyResult(): LatestOptionsResult {
   };
 }
 
-const EXIT_PLAN_TOOL_NAMES = new Set(["ExitPlanMode", "exit_plan_mode"]);
-
-/** Try to extract options from a markdown string. */
-function extractOptionsFromMarkdown(
-  text: string,
-): string[] | null {
-  const blocks = parseMarkdown(text);
-  const optionsBlock = blocks.find((b) => b.type === "options");
-  if (optionsBlock && optionsBlock.type === "options" && optionsBlock.items.length > 0) {
-    return optionsBlock.items;
-  }
-  return null;
-}
-
-/** Try to extract options from a tool-call message (e.g. ExitPlanMode plan field). */
-function extractOptionsFromToolCall(
-  msg: Message,
-): string[] | null {
-  if (msg.kind !== "tool-call") return null;
-  if (!EXIT_PLAN_TOOL_NAMES.has(msg.tool.name)) return null;
-  const plan = msg.tool.input?.plan;
-  if (typeof plan !== "string") return null;
-  return extractOptionsFromMarkdown(plan);
-}
-
 export function extractLatestOptions(
   messages: Message[],
   anchorIndex = -1,
@@ -50,15 +25,14 @@ export function extractLatestOptions(
       const msg = messages[i];
       if (msg.kind === "user-text") break;
       if (msg.kind === "agent-text") {
-        const items = extractOptionsFromMarkdown(msg.text);
-        if (items) {
-          return { sourceMessageId: msg.id, items };
+        const blocks = parseMarkdown(msg.text);
+        const optionsBlock = blocks.find((b) => b.type === "options");
+        if (optionsBlock && optionsBlock.type === "options") {
+          return {
+            sourceMessageId: msg.id,
+            items: optionsBlock.items,
+          };
         }
-      }
-      // Check ExitPlanMode tool input for embedded options
-      const toolItems = extractOptionsFromToolCall(msg);
-      if (toolItems) {
-        return { sourceMessageId: msg.id, items: toolItems };
       }
     }
     return emptyResult();
@@ -72,15 +46,14 @@ export function extractLatestOptions(
       continue;
     }
     if (msg.kind === "agent-text") {
-      const items = extractOptionsFromMarkdown(msg.text);
-      if (items) {
-        return { sourceMessageId: msg.id, items };
+      const blocks = parseMarkdown(msg.text);
+      const optionsBlock = blocks.find((b) => b.type === "options");
+      if (optionsBlock && optionsBlock.type === "options") {
+        return {
+          sourceMessageId: msg.id,
+          items: optionsBlock.items,
+        };
       }
-    }
-    // Check ExitPlanMode tool input for embedded options
-    const toolItems = extractOptionsFromToolCall(msg);
-    if (toolItems) {
-      return { sourceMessageId: msg.id, items: toolItems };
     }
   }
 
@@ -94,9 +67,6 @@ export function extractLatestOptions(
  * When anchorIndex >= 0: extracts from the AI turn that follows the
  * user message at that index (in the inverted list, "follows" means
  * lower indices = visually below = AI response to that user message).
- *
- * Also checks ExitPlanMode tool inputs for embedded <options> blocks,
- * so plan proposals in YOLO mode surface interactive follow-up options.
  */
 export function useLatestOptions(
   messages: Message[],

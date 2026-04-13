@@ -962,13 +962,6 @@ function ToolCallBlock(props: {
   getMessageById?: (id: string) => Message | null;
   permissionModeKey?: string | null;
 }) {
-  const handleOptionPress = React.useCallback(
-    (option: Option) => {
-      sync.sendMessage(props.sessionId, option.title);
-    },
-    [props.sessionId],
-  );
-
   if (!props.message.tool) {
     return null;
   }
@@ -981,7 +974,6 @@ function ToolCallBlock(props: {
         sessionId={props.sessionId}
         messageId={props.message.id}
         permissionModeKey={props.permissionModeKey}
-        onOptionPress={handleOptionPress}
       />
     </View>
   );
