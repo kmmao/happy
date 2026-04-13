@@ -808,7 +808,7 @@ model Task {
 
     // Execution
     priority        String    @default("user")     // urgent | user | background
-    status          String    @default("queued")    // queued | dispatching | running | completed | failed | cancelled
+    status          String    @default("queued")    // queued | dispatching | running | waiting_decision | completed | failed | cancelled
     attempt         Int       @default(0)
     maxAttempts     Int       @default(3)
 
@@ -1041,7 +1041,7 @@ model AgentRole {
     duties          String    @default("[]")        // JSON array of duty strings
     skillIds        String    @default("[]")        // JSON array of Skill IDs to bind
 
-    maxConcurrency  Int       @default(1)           // Max concurrent loops (Phase 1: recorded only, not enforced)
+    maxConcurrency  Int       @default(1)           // Max concurrent task slots per role (enforced by roleConcurrencyCheck)
     enabled         Boolean   @default(true)
 
     // Execution environment — null means inherit from CLI active profile

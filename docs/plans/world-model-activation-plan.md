@@ -25,6 +25,7 @@
 - [x] **阶段 F — 多角色协作协议**：AgentMessage 扩展为 8 种 msgType（含 dependency_blocked / decision_request / handoff / review_request）、协作图谱查询接口（GET /world/collaboration）、任务终态自动解除 dependency_blocked、App RoleCollaborationSection 可视化角色协作状态与等待链；均已完成（2026-04-12）
 - [x] **阶段 G — 世界目标引擎**：纯函数 goalHealthEngine（stale/blocked aging/repeated failure/all-terminal 检测 + narrative deviation V1）、Goal +blockedSince/healthScore/layer 三字段、classifyGoalLayer 自动分层（strategic/operational/execution）、健康仪表盘（dashboard goalHealth + GoalCard 健康圆点 + layer badge + Replan 按钮 + "unhealthy" 筛选）、POST replan 端点、i18n 10 语言 15 键；均已完成（2026-04-12）
 - [x] **阶段 H — God Mode（用户立法 + 世界执行 + 用户裁决）**：Decision 判例自动裁决（decisionAutoResolve + precedent matching）、Goal 按 layer 分级自动建议（suggested_goal for strategic/operational）、风险分级引擎（worldEscalationPolicy: low/medium/high + shouldEscalate）、1 小时 veto 撤销机制（worldSuggestionVeto）、审计日志路由（GET audit-log）、策略 PATCH 端点、Governance Dashboard UI（4 级模式选择器 + 审计日志 + veto 按钮）、i18n 10 语言 22 键；均已完成（2026-04-12）
+- [x] **阶段 I — 并发治理 + 裁决等待机制**：AgentRole.maxConcurrency 强制执行（roleConcurrencyCheck 模块：可用槽位检查 + 队列自动派发）、plan-result 按角色并发限流（超限任务排队）、Task 终态释放槽位触发下一队列任务、`waiting_decision` 新状态（Task 等 Decision 裁决完成后恢复）、decision_request 自动暂停运行中 Task 并释放并发槽、adjudicate 后创建延续 Task（注入裁决结果）并发检查后派发；均已完成（2026-04-14）
 
 ---
 
@@ -996,7 +997,8 @@ World 逐步从 Goal list 演进为：
 5. [x] **Sprint 5+**：阶段 E —— 受限自治执行。✅ 已完成（2026-04-12）
 6. [x] **Sprint 6+**：阶段 F —— 多角色协作世界。✅ 已完成（2026-04-12）
 7. [x] **Sprint 7+**：阶段 G —— 世界目标引擎。✅ 已完成（2026-04-12）
-8. **长期目标**：阶段 H —— 用户立法 / 世界执行 / 用户裁决。
+8. [x] **Sprint 8**：阶段 H —— God Mode（用户立法 / 世界执行 / 用户裁决）。✅ 已完成（2026-04-12）
+9. [x] **Sprint 9**：阶段 I —— 并发治理 + 裁决等待机制。✅ 已完成（2026-04-14）
 
 ---
 
@@ -1033,6 +1035,7 @@ World 逐步从 Goal list 演进为：
 | 2026-04-12 | 阶段 E already_acted outcome 已做最小收口：auto-accept 若因“Suggestion not found or already acted upon”丢失竞争，会在保留 `autoAcceptStatus=skipped` / `autoAcceptReasonCode=already_acted` 审计痕迹的同时，将 suggestion 主状态收口为 `expired`，避免长期停留在 open suggestion 流；`quota_exhausted` 与 `accept_failed` 继续保持 open 以支持后续人工介入 |
 | 2026-04-12 | 阶段 E skipped / failed 最小可见性已落地：对进入过 auto-accept 评估但未自动落地的 suggestion，当前只保留三类最小只读痕迹——`quota_exhausted -> skipped`、`already_acted -> skipped`、`accept_failed -> failed`；相关 outcome 已通过 `WorldSuggestion.autoAcceptStatus/autoAcceptReasonCode` 持久化，并经 wire / query / view model / `SuggestionCard` 打通展示，不新增 dashboard / explain panel，也不改变 manual accept 行为 |
 | 2026-04-12 | 阶段 E accept 侧 logical dedupe 已覆盖 goal 分支：`worldSuggestionAccept()` 现对 suggested_goal 也基于 `projectId + dedupeKey` 使用 `RepeatKey` 做逻辑 claim；winner 先进入 `processing`，`goalCreate()` 成功后再将 open/suspended siblings 收口为 `expired`，失败时仅回退 winner 为 `suspended` |
+| 2026-04-14 | 阶段 I 已完成：`maxConcurrency` 强制执行 + Decision 等待机制。新建 `roleConcurrencyCheck.ts` 模块（`availableSlotsForRole` + `dispatchQueuedTasksForRole`）；`goalRoutes.ts` plan-result 创建任务时按角色并发检查、超限任务设为 queued 不派发、存储 directory 支持重调度；`goalCreate.ts` planner 任务也存储 directory；`taskRoutes.ts` 终态后触发 `dispatchQueuedTasksForRole` 填充空出槽位；`taskStatusLogic.ts` 新增 `waiting_decision` 状态（不在 TASK_STATUS_PROGRESS 中，允许任意非终态转入/转出）；Prisma Task 新增 `waitingDecisionId String?` + 索引；`agentMessageRoutes.ts` decision_request 处理后按 sessionId 找到运行中 Task 暂停为 `waiting_decision` 并释放并发槽；`decisionAdjudicate.ts` 裁决后找到 waiting 任务创建延续 Task（注入裁决结果到 prompt）、取消原任务、并发检查后派发；`serializeTask` 新增 `roleType` + `waitingDecisionId` 返回字段；647 server tests 全绿、tsc 通过、Docker 已部署 |
 | 2026-04-12 | 阶段 E 配额统计口径已修正：`maxAutoAcceptsPerDay` 现在只统计当日 `acceptSource = system_auto` 的 accepted suggestion，已补对应回归测试 |
 | 2026-04-12 | 阶段 E accept 侧 logical dedupe 已落地：`worldSuggestionAccept()` 在 task / skill / decision 分支基于 `projectId + dedupeKey` 使用 `RepeatKey` 做逻辑 claim，并在 winner 成功后将 open/suspended siblings 收口为 `expired`，避免同一逻辑 suggestion 被重复 accept 或重复创建实体 |
 | 2026-04-12 | 阶段 E `accept_failed` 最小失败摘要已落地：服务端将 auto-accept 失败原因归一化为 `dispatch_failed / payload_invalid / auto_accept_failed` 三类 detail，并通过 `WorldSuggestion.autoAcceptFailureDetail`、wire contract、query / serialize 打通；app 侧继续复用 `worldSuggestionViewModel.ts` + `SuggestionCard` 追加只读说明，不暴露原始异常 message，不新增 explain panel；相关 server spec、app view-model test、happy-wire build、happy-server build 与 happy-app typecheck 全绿 |
@@ -1153,4 +1156,4 @@ World 逐步从 Goal list 演进为：
 
 当前 World Model Activation 应表述为：
 
-> **阶段 A/B/C/D/E/F/G 已完成。阶段 G（世界目标引擎）3 个 Sprint 已全部落地：纯函数 goalHealthEngine（4 种健康信号 + narrative deviation V1）、Goal +blockedSince/healthScore/layer 三字段、classifyGoalLayer 自动分层、健康仪表盘（dashboard goalHealth + GoalCard 健康圆点/layer badge/Replan 按钮 + "unhealthy" 筛选）、POST replan 端点。阶段 H（用户立法 / 世界执行 / 用户裁决）仍属规划。**
+> **阶段 A-I 已完成。阶段 I（并发治理 + 裁决等待机制）已落地：AgentRole.maxConcurrency 从记录变为强制执行（roleConcurrencyCheck 模块）、plan-result 按角色并发限流、Task 终态释放槽位并自动派发队列、`waiting_decision` 新状态实现 Task↔Decision 双向暂停/恢复、decision_request 自动暂停运行中 Task 并释放并发槽、裁决完成后创建延续 Task 注入决策结果。**

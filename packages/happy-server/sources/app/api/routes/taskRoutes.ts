@@ -20,7 +20,7 @@ import { worldSuggestionRefresh } from "@/modules/worldSuggestionGenerate";
 import { dispatchQueuedTasksForRole } from "@/modules/roleConcurrencyCheck";
 
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
-const TaskStatusSchema = z.enum(["queued", "dispatching", "running", "completed", "failed", "cancelled"]);
+const TaskStatusSchema = z.enum(["queued", "dispatching", "running", "waiting_decision", "completed", "failed", "cancelled"]);
 const TaskOutcomeSchema = z.enum(["completed", "failed", "blocked"]);
 
 const CreateTaskBodySchema = z.object({

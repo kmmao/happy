@@ -114,7 +114,7 @@ App 世界 Tab（总览 / 目标 / 角色）
 - `description`：角色行为指令，注入提示词
 - `duties`：职责列表（JSON 数组）
 - `skillIds`：绑定的 Skill ID 列表
-- `maxConcurrency`：最大并发循环数（当前记录未强制执行）
+- `maxConcurrency`：最大并发循环数（已强制执行：plan-result 创建任务时检查、超限排队、终态释放槽位后自动派发队列）
 - `enabled`：是否启用
 
 **影响范围：**
@@ -280,11 +280,35 @@ open → processing → accepted
 - Agent 执行中遇到不确定情况，调用接口创建
 - 建议系统 accept `suggested_decision` 时创建
 
+**Decision 等待机制（Task↔Decision 联动）：**
+
+当 Agent 通过 `decision_request` 消息请求裁决时：
+1. 服务端自动创建 Decision（pending）
+2. 按 `sessionId` 找到运行中的 Task，将其状态更新为 `waiting_decision`，记录 `waitingDecisionId`
+3. 释放该角色的并发槽位，允许队列中的下一个任务被派发
+4. 用户在 App 中裁决后（`decisionAdjudicate`）：
+   - 找到所有 `waitingDecisionId = decisionId` 的暂停任务
+   - 为每个暂停任务创建**延续任务**（原始 prompt + 裁决结果）
+   - 取消原始暂停任务
+   - 检查并发槽位后派发延续任务（超限则排队）
+
+```
+Agent 执行中 → decision_request → Task 暂停 (waiting_decision) → 释放并发槽
+    ↓
+用户裁决 → 创建延续 Task (原始 prompt + 裁决结果) → 并发检查 → 派发或排队
+```
+
+**Task 状态 `waiting_decision`：**
+- 不属于终态（completed/failed/cancelled）
+- 不在进度序列中（queued→dispatching→running），因此可从任何非终态转入，也可转出到任何状态
+- CLI 侧：Task 实际上仍在运行（CLI 不感知 Server 的 waiting_decision 状态），Server 只是在语义上标记为暂停
+
 **影响范围：**
 - World Dashboard 中 `decisions.pending` 计数
 - `decisions.recentDecided` 最近 5 条已决列表
 - Autonomy Score 计算（已决定 vs 待定 vs 过期）
 - AgentMessage 的 `decisionId` 关联（冲突升级为裁决时）
+- Task 的 `waitingDecisionId` 关联（暂停等待裁决时）
 
 ---
 
@@ -416,7 +440,7 @@ curl -s -X POST "${HAPPY_SUPERVISOR_SERVER_URL}/v1/projects/${projectId}/agent-m
 | `report` | 上报结果 | 无 |
 | `conflict` | 角色间冲突 | 自动创建 Decision + InboxItem（severity: warning） |
 | `law_suggestion` | 建议新规则 | 自动创建 Decision + InboxItem（severity: info） |
-| `decision_request` | 请求用户决策 | 自动创建 Decision |
+| `decision_request` | 请求用户决策 | 自动创建 Decision + 暂停运行中 Task（`waiting_decision`）+ 释放并发槽 |
 | `handoff` | 任务移交 | 无 |
 | `dependency_blocked` | 等待依赖 | 创建 InboxItem（severity: warning） |
 | `review_request` | 请求审查 | 创建 InboxItem（severity: info） |
@@ -438,6 +462,9 @@ POST /v1/projects/:id/agent-messages
   conflict / law_suggestion / decision_request
     → decisionCreate() 创建 Decision（含 precedentKey）
     → 更新 agentMessage.decisionId
+  decision_request 额外：
+    → 按 sessionId 找到运行中 Task → 更新为 waiting_decision + waitingDecisionId
+    → 释放并发槽 → dispatchQueuedTasksForRole()
   conflict / law_suggestion / dependency_blocked / review_request
     → inboxCreate() 写入收件箱（用户 App 内收件箱 Tab 可见）
         ↓
@@ -565,13 +592,14 @@ Planner Session 关键约束：
    - **worldBaseline**：当前世界宪法摘要（narrative + 重要 laws）
    - **roleIdentity**：该 Task 分配角色的身份指令（`roleType` 对应 AgentRole.description）
    - **branchPolicy**：分支策略提示（需在独立分支工作、完成后提 PR）
-3. 批量发送 `buildTaskTriggerEphemeral` → CLI 并行启动各执行 Session
-4. Goal 状态更新为 `in_progress`
-5. 调用 `goalProgressUpdate()` 触发初始进度计算
+3. **并发检查**：对每个任务按其 `roleType` 查询 `AgentRole.maxConcurrency`，若当前活跃任务数（dispatching/running/waiting_decision）已达上限，任务状态设为 `queued` 而非 `dispatching`，不发送 ephemeral 触发事件。批量创建时使用内存计数器避免 N+1 查询。
+4. 对通过并发检查的任务发送 `buildTaskTriggerEphemeral` → CLI 启动执行 Session；排队任务等待槽位释放后自动派发
+5. Goal 状态更新为 `in_progress`
+6. 调用 `goalProgressUpdate()` 触发初始进度计算
 
 ### 5.6 目标进度递归更新（goalProgressUpdate）
 
-每当一个 Task 状态变更（完成/失败/取消），触发 `goalProgressUpdate()`。
+每当一个 Task 状态变更（完成/失败/取消），触发 `goalProgressUpdate()`，并调用 `dispatchQueuedTasksForRole()` 尝试填充释放的并发槽位。
 
 **状态推导规则（从 Task 终态集合推导 Goal 状态）：**
 
@@ -693,7 +721,8 @@ Project
 ├── AgentRole[]
 ├── Goal[]
 │   ├── Goal[] (subGoals)
-│   ├── Task[]
+│   ├── Task[]  (status: queued|dispatching|running|waiting_decision|completed|failed|cancelled)
+│   │   └── waitingDecisionId → Decision (暂停等待裁决)
 │   ├── Decision[]
 │   └── healthScore / layer / blockedSince
 ├── AgentMessage[]
@@ -854,18 +883,29 @@ CLI TaskRunner
 服务端 plan-result 处理
   ├── 为每个 task 注入前缀：worldBaseline + roleIdentity + branchPolicy
   ├── 批量创建执行 Task 记录
+  │   └── 每个 task 按 roleType 检查 maxConcurrency
+  │       ├── 有槽位 → status=dispatching, 发送 ephemeral
+  │       └── 无槽位 → status=queued, 等待释放
   ├── Goal.status → in_progress
-  ├── 批量 buildTaskTriggerEphemeral → CLI 并行启动执行 Session
   └── goalProgressUpdate()
         ↓
 [执行 Session 运行中]
-  每个 Task 完成 / 失败 / 取消
+  ├── 每个 Task 完成 / 失败 / 取消
+  │     ↓
+  │   goalProgressUpdate()  （递归，最多 5 层父目标）
+  │     ├── 推导 Goal.status（completed / blocked / in_progress / cancelled）
+  │     ├── 更新 blockedSince / layer
+  │     └── dispatchQueuedTasksForRole() → 填充空出的并发槽
+  │
+  └── Agent 发送 decision_request
         ↓
-goalProgressUpdate()  （递归，最多 5 层父目标）
-  ├── 推导 Goal.status（completed / blocked / in_progress / cancelled）
-  ├── 更新 blockedSince（进入 blocked 时设置，离开时清空）
-  ├── 更新 layer（classifyGoalLayer）
-  └── buildGoalProgressEphemeral → App 实时刷新 WorldGoalsTab
+      Task → waiting_decision + waitingDecisionId
+      dispatchQueuedTasksForRole() → 释放的槽位派发排队任务
+        ↓
+      用户裁决 (decisionAdjudicate)
+        ├── 创建延续 Task (原始 prompt + 裁决结果)
+        ├── 取消原暂停 Task
+        └── 并发检查 → 派发或排队
 
 [超时保障]
   若 10 min 内 Planner 未返回 plan-result
@@ -918,6 +958,14 @@ goalProgressUpdate()  （递归，最多 5 层父目标）
 **Q: 目标健康度什么时候更新**
 
 `healthScore` 在每次「刷新建议」时批量重新计算，不是实时的。若目标状态刚变为 blocked，需下次刷新建议后才能看到更新的健康度。
+
+**Q: maxConcurrency 如何工作**
+
+AgentRole 的 `maxConcurrency` 限制该角色同时活跃的任务数。活跃状态包括 `dispatching`、`running`、`waiting_decision`。plan-result 创建任务时会检查角色并发槽位：超限任务设为 `queued` 排队。当活跃任务终止（completed/failed/cancelled）或进入 `waiting_decision` 释放槽位时，`dispatchQueuedTasksForRole()` 自动从队列中取出最老的 queued 任务派发。
+
+**Q: decision_request 如何暂停任务**
+
+当 Agent 发送 `decision_request` 消息时，服务端按 `sessionId` 找到运行中的 Task，将其标记为 `waiting_decision` 并记录 `waitingDecisionId`。这释放了该角色的一个并发槽位。用户裁决后，服务端创建延续任务（注入裁决结果到原始 prompt），取消原暂停任务，并按并发规则派发或排队。注意：CLI 侧 Task 仍在运行（CLI 不感知 `waiting_decision`），服务端只是在语义上标记暂停。
 
 **Q: 修改叙事/规则后何时生效**
 
