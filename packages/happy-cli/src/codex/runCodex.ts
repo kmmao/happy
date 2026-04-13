@@ -82,6 +82,11 @@ type ReadyEventOptions = {
   notify?: () => void;
 };
 
+type CodexControlHandlerRegistrar = Pick<
+  ApiSessionClient["rpcHandlerManager"],
+  "registerHandler"
+>;
+
 /**
  * Notify connected clients when Codex finishes processing and the queue is idle.
  * Returns true when a ready event was emitted.
@@ -119,6 +124,17 @@ export function extractCodexResponseText(response: CodexToolResponse): string {
     .filter(Boolean)
     .join("\n")
     .trim();
+}
+
+export function registerCodexControlHandlers({
+  rpcHandlerManager,
+  handleAbort,
+}: {
+  rpcHandlerManager: CodexControlHandlerRegistrar;
+  handleAbort: () => Promise<void> | void;
+}): void {
+  rpcHandlerManager.registerHandler("abort", handleAbort);
+  rpcHandlerManager.registerHandler("interrupt", handleAbort);
 }
 
 function requireSuccessfulCodexResponse(
@@ -585,8 +601,10 @@ export async function runCodex(opts: {
     }
   };
 
-  // Register abort handler
-  session.rpcHandlerManager.registerHandler("abort", handleAbort);
+  registerCodexControlHandlers({
+    rpcHandlerManager: session.rpcHandlerManager,
+    handleAbort,
+  });
 
   registerKillSessionHandler(session.rpcHandlerManager, handleKillSession);
 

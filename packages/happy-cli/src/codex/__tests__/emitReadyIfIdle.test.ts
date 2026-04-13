@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { emitReadyIfIdle, extractCodexResponseText } from '../runCodex';
+import {
+    emitReadyIfIdle,
+    extractCodexResponseText,
+    registerCodexControlHandlers,
+} from '../runCodex';
+
 
 describe('emitReadyIfIdle', () => {
     it('emits ready and notification when queue is idle', () => {
@@ -63,6 +68,54 @@ describe('emitReadyIfIdle', () => {
 });
 
 
+describe('registerCodexControlHandlers', () => {
+    it('registers both abort and interrupt handlers to the same callback', () => {
+        const registerHandler = vi.fn();
+
+        registerCodexControlHandlers({
+            rpcHandlerManager: {
+                registerHandler,
+            },
+            handleAbort: vi.fn(),
+        });
+
+        expect(registerHandler).toHaveBeenCalledTimes(2);
+        expect(registerHandler).toHaveBeenNthCalledWith(
+            1,
+            'abort',
+            expect.any(Function),
+        );
+        expect(registerHandler).toHaveBeenNthCalledWith(
+            2,
+            'interrupt',
+            expect.any(Function),
+        );
+        expect(registerHandler.mock.calls[0]?.[1]).toBe(
+            registerHandler.mock.calls[1]?.[1],
+        );
+    });
+
+    it('invokes handleAbort when interrupt handler runs', async () => {
+        const registerHandler = vi.fn();
+        const handleAbort = vi.fn(async () => {});
+
+        registerCodexControlHandlers({
+            rpcHandlerManager: {
+                registerHandler,
+            },
+            handleAbort,
+        });
+
+        const interruptHandler = registerHandler.mock.calls.find(
+            ([name]) => name === 'interrupt',
+        )?.[1];
+
+        await interruptHandler?.({});
+
+        expect(handleAbort).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('extractCodexResponseText', () => {
     it('joins text fragments and ignores non-text entries', () => {
         const text = extractCodexResponseText({
@@ -78,9 +131,7 @@ describe('extractCodexResponseText', () => {
 
     it('returns empty string when no text payload exists', () => {
         const text = extractCodexResponseText({
-            content: [
-                { type: 'resource', data: { ok: false } },
-            ],
+            content: [{ type: 'resource', data: { ok: false } }],
         });
 
         expect(text).toBe('');
