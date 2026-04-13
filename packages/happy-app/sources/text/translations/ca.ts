@@ -939,6 +939,8 @@ export const ca: TranslationStructure = {
       mediumDesc: "Profunditat de raonament per defecte",
       high: "Alt",
       highDesc: "Raonament més profund",
+      xhigh: "XHigh",
+      xhighDesc: "Profunditat màxima de raonament",
       max: "Màxim",
       maxDesc: "Pensament ampliat, millor qualitat",
     },

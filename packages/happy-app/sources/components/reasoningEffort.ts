@@ -1,7 +1,15 @@
 import type { Metadata } from "@/sync/storageTypes";
 import type { ReasoningProps } from "./AgentInputTypes";
 
-const ALL_EFFORT_LEVELS = ["high", "max", "medium", "low"] as const;
+const CLAUDE_EFFORT_LEVELS = ["high", "max", "medium", "low"] as const;
+const CODEX_EFFORT_LEVELS = ["xhigh", "high", "medium", "low"] as const;
+const ALL_EFFORT_LEVELS = [
+    "xhigh",
+    "high",
+    "max",
+    "medium",
+    "low",
+] as const;
 
 type EffortLevel = (typeof ALL_EFFORT_LEVELS)[number];
 
@@ -46,6 +54,7 @@ export function shouldShowEffortSelector(params: {
 }
 
 export function getVisibleEffortLevels(params: {
+    isCodex?: boolean;
     metadata?: Metadata | null;
     modelModeKey?: string | null;
     currentModelCode?: string | null;
@@ -54,7 +63,9 @@ export function getVisibleEffortLevels(params: {
         resolveCurrentModelInfo(params)?.supportedEffortLevels ?? null;
 
     if (!supported || supported.length === 0) {
-        return [...ALL_EFFORT_LEVELS];
+        return params.isCodex
+            ? [...CODEX_EFFORT_LEVELS]
+            : [...CLAUDE_EFFORT_LEVELS];
     }
 
     return ALL_EFFORT_LEVELS.filter((level) => supported.includes(level));

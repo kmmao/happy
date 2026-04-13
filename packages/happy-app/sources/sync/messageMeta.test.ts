@@ -109,6 +109,20 @@ describe("resolveMessageModeMeta", () => {
     expect(meta.effort).toBe("max");
   });
 
+  it("resolves xhigh effort level for codex sessions", () => {
+    const meta = resolveMessageModeMeta({
+      permissionMode: "default",
+      modelMode: "default",
+      metadata: null,
+      thinkingMode: null,
+      thinkingBudget: null,
+      effortLevel: "xhigh",
+      maxBudgetUsd: null,
+    } as any);
+
+    expect(meta.effort).toBe("xhigh");
+  });
+
   it("resolves maxBudgetUsd", () => {
     const meta = resolveMessageModeMeta({
       permissionMode: "default",

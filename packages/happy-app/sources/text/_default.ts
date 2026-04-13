@@ -923,6 +923,8 @@ export const en = {
       mediumDesc: "Default reasoning depth",
       high: "High",
       highDesc: "Deeper reasoning",
+      xhigh: "XHigh",
+      xhighDesc: "Maximum reasoning depth",
       max: "Max",
       maxDesc: "Extended thinking, best quality",
     },

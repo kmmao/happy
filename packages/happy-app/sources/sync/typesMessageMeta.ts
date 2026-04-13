@@ -21,7 +21,7 @@ export const MessageMetaSchema = z.object({
     })
     .nullable()
     .optional(), // Thinking configuration
-  effort: z.enum(["low", "medium", "high", "max"]).nullable().optional(), // Reasoning effort level
+  effort: z.enum(["low", "medium", "high", "max", "xhigh"]).nullable().optional(), // Reasoning effort level
   locale: z.string().optional(), // User's preferred UI language (e.g. 'en', 'zh-Hans', 'ja')
 });
 

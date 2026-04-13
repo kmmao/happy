@@ -298,6 +298,7 @@ export const AgentInputSettingsOverlay = React.memo(
                                             {t("agentInput.effort.title")}
                                         </Text>
                                         {getVisibleEffortLevels({
+                                            isCodex,
                                             metadata,
                                             modelModeKey: modelMode?.key,
                                             currentModelCode,

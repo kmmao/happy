@@ -19,7 +19,7 @@ export interface ResolvedMessageMeta {
     type: "adaptive" | "enabled";
     budgetTokens?: number;
   } | null;
-  effort: "low" | "medium" | "high" | "max" | null;
+  effort: "low" | "medium" | "high" | "max" | "xhigh" | null;
   maxBudgetUsd: number | null;
   taskBudget: { total: number } | null;
 }
@@ -71,7 +71,7 @@ export function resolveMessageModeMeta(
   // Resolve effort level
   const effortLevel = session.effortLevel;
   const effort = effortLevel
-    ? (effortLevel as "low" | "medium" | "high" | "max")
+    ? (effortLevel as "low" | "medium" | "high" | "max" | "xhigh")
     : null;
 
   // Resolve max budget

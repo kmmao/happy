@@ -61,12 +61,12 @@ describe("formatCodexReasoningEffortMetadata", () => {
         expect(
             formatCodexReasoningEffortMetadata(
                 {
-                    effortLevel: "max",
+                    effortLevel: "xhigh",
                     metadata: null,
                 } as any,
                 translate,
             ),
-        ).toBe("agentInput.effort.max");
+        ).toBe("agentInput.effort.xhigh");
     });
 
     it("preserves unknown future effort labels instead of hiding them", () => {

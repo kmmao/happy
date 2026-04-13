@@ -10,6 +10,7 @@ const translate = (key: string) => key;
 describe("reasoningEffort", () => {
     it("uses the current Codex model when the picker is on default", () => {
         const levels = getVisibleEffortLevels({
+            isCodex: true,
             modelModeKey: "default",
             currentModelCode: "gpt-5.4",
             metadata: {
@@ -18,13 +19,33 @@ describe("reasoningEffort", () => {
                     {
                         code: "gpt-5.4",
                         value: "GPT-5.4",
-                        supportedEffortLevels: ["low", "high"],
+                        supportedEffortLevels: ["low", "high", "xhigh"],
                     },
                 ],
             } as any,
         });
 
-        expect(levels).toEqual(["high", "low"]);
+        expect(levels).toEqual(["xhigh", "high", "low"]);
+    });
+
+    it("uses provider-specific fallback effort levels when metadata is absent", () => {
+        expect(
+            getVisibleEffortLevels({
+                isCodex: true,
+                modelModeKey: "default",
+                currentModelCode: null,
+                metadata: null,
+            }),
+        ).toEqual(["xhigh", "high", "medium", "low"]);
+
+        expect(
+            getVisibleEffortLevels({
+                isCodex: false,
+                modelModeKey: "default",
+                currentModelCode: null,
+                metadata: null,
+            }),
+        ).toEqual(["high", "max", "medium", "low"]);
     });
 
     it("shows the effort selector for Codex when the active model supports it", () => {
@@ -55,12 +76,12 @@ describe("reasoningEffort", () => {
                 isCodex: true,
                 isGemini: false,
                 reasoning: {
-                    effortLevel: "high",
+                    effortLevel: "xhigh",
                     thinkingMode: "disabled",
                 },
                 translate,
             }),
-        ).toEqual(["agentInput.effort.high"]);
+        ).toEqual(["agentInput.effort.xhigh"]);
 
         expect(
             getReasoningSummaryLabels({

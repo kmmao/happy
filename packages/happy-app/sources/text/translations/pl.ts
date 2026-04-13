@@ -947,6 +947,8 @@ export const pl: TranslationStructure = {
       mediumDesc: "Domyślna głębokość rozumowania",
       high: "Wysoki",
       highDesc: "Głębsze rozumowanie",
+      xhigh: "XHigh",
+      xhighDesc: "Maksymalna głębokość rozumowania",
       max: "Maksymalny",
       maxDesc: "Rozszerzone myślenie, najlepsza jakość",
     },

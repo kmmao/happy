@@ -1033,6 +1033,8 @@ export const ja: TranslationStructure = {
       mediumDesc: "デフォルトの推論深度",
       high: "高",
       highDesc: "より深い推論",
+      xhigh: "超高",
+      xhighDesc: "最高の推論深度",
       max: "最大",
       maxDesc: "拡張思考、最高品質",
     },

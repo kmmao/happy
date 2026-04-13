@@ -292,7 +292,7 @@ export interface Session {
   // SDK reasoning & budget controls (Phase 3A)
   thinkingMode?: string | null; // "disabled" | "adaptive" | "enabled"
   thinkingBudget?: number | null; // Budget tokens when thinkingMode is "enabled"
-  effortLevel?: string | null; // "low" | "medium" | "high" | "max"
+  effortLevel?: string | null; // "low" | "medium" | "high" | "max" | "xhigh"
   maxBudgetUsd?: number | null; // Max budget in USD
   taskBudgetTokens?: number | null; // Task token budget (alpha) — model self-paces within limit
   // IMPORTANT: latestUsage is extracted from reducerState.latestUsage after message processing.

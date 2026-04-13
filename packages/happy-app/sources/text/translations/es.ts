@@ -940,6 +940,8 @@ export const es: TranslationStructure = {
       mediumDesc: "Profundidad de razonamiento por defecto",
       high: "Alto",
       highDesc: "Razonamiento más profundo",
+      xhigh: "XHigh",
+      xhighDesc: "Profundidad máxima de razonamiento",
       max: "Máximo",
       maxDesc: "Pensamiento extendido, mejor calidad",
     },

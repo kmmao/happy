@@ -903,6 +903,8 @@ export const zhHans: TranslationStructure = {
       mediumDesc: "默认推理深度",
       high: "高",
       highDesc: "更深度推理",
+      xhigh: "超高",
+      xhighDesc: "最高推理深度",
       max: "最大",
       maxDesc: "深度思考，最佳质量",
     },

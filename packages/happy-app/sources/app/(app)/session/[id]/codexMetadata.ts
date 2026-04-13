@@ -1,6 +1,12 @@
 import type { Session } from "@/sync/storageTypes";
 
-const KNOWN_REASONING_EFFORTS = new Set(["low", "medium", "high", "max"]);
+const KNOWN_REASONING_EFFORTS = new Set([
+    "low",
+    "medium",
+    "high",
+    "max",
+    "xhigh",
+]);
 
 export function resolveCodexEffectiveReasoningEffort(
     session: Pick<Session, "effortLevel" | "metadata">,
