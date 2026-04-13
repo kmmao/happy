@@ -111,6 +111,23 @@ interface WorldRolesTabProps {
     isActive: boolean;
 }
 
+// Preset models for dropdown
+const MODEL_PRESET_VALUES = [
+    "",
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+    "gpt-4.5",
+];
+
+const MODEL_PRESET_LABELS: Record<string, string> = {
+    "": "",
+    "claude-opus-4-6": "Claude Opus 4.6",
+    "claude-sonnet-4-6": "Claude Sonnet 4.6",
+    "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
+    "gpt-4.5": "gpt-4.5",
+};
+
 const TASK_STATUS_COLORS: Record<string, string> = {
     running: "#10B981",
     dispatching: "#F59E0B",
@@ -323,7 +340,17 @@ const RoleFormSheet = React.memo(function RoleFormSheet({
         role?.type && role.type !== "custom" ? role.type : undefined,
     );
     const [agentType, setAgentType] = React.useState<string | null>(role?.agentType ?? null);
-    const [modelOverride, setModelOverride] = React.useState(role?.modelOverride ?? "");
+
+    const initModelPreset = (): string => {
+        if (!role?.modelOverride) return "";
+        if (MODEL_PRESET_VALUES.includes(role.modelOverride)) return role.modelOverride;
+        return "custom";
+    };
+    const [modelPreset, setModelPreset] = React.useState(initModelPreset);
+    const [modelCustomValue, setModelCustomValue] = React.useState(
+        role?.modelOverride && !MODEL_PRESET_VALUES.includes(role.modelOverride) ? role.modelOverride : "",
+    );
+    const [modelDropdownOpen, setModelDropdownOpen] = React.useState(false);
 
     const handleSave = React.useCallback(async () => {
         if (!name.trim()) return;
@@ -331,13 +358,16 @@ const RoleFormSheet = React.memo(function RoleFormSheet({
         try {
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) return;
+            const resolvedModel = modelPreset === "custom"
+                ? (modelCustomValue.trim() || null)
+                : (modelPreset || null);
             const body = {
                 name: name.trim(),
                 type,
                 description: description.trim() || undefined,
                 duties: duties.filter((d) => d.trim()),
                 agentType: agentType ?? null,
-                modelOverride: modelOverride.trim() || null,
+                modelOverride: resolvedModel,
             };
             const saved = isNew
                 ? await createAgentRole(credentials, {
@@ -353,7 +383,7 @@ const RoleFormSheet = React.memo(function RoleFormSheet({
         } finally {
             setSaving(false);
         }
-    }, [name, type, description, duties, isNew, projectId, role, onSave, templateType, agentType, modelOverride]);
+    }, [name, type, description, duties, isNew, projectId, role, onSave, templateType, agentType, modelPreset, modelCustomValue]);
 
     const addDuty = React.useCallback(() => {
         if (newDuty.trim() && duties.length < 10) {
@@ -510,6 +540,13 @@ const RoleFormSheet = React.memo(function RoleFormSheet({
                         </View>
                     )}
 
+                    {/* Execution Config Section */}
+                    <View style={styles.sectionDivider}>
+                        <View style={styles.sectionDividerLine} />
+                        <Text style={styles.sectionDividerLabel}>{t("roles.execConfigSection")}</Text>
+                        <View style={styles.sectionDividerLine} />
+                    </View>
+
                     {/* Agent Type */}
                     <Text style={styles.fieldLabel}>{t("roles.agentTypeLabel")}</Text>
                     <View style={styles.chipRow}>
@@ -528,18 +565,87 @@ const RoleFormSheet = React.memo(function RoleFormSheet({
                         })}
                     </View>
 
-                    {/* Model Override */}
+                    {/* Model Override Dropdown */}
                     <Text style={styles.fieldLabel}>{t("roles.modelOverrideLabel")}</Text>
-                    <TextInput
-                        style={styles.textInput}
-                        value={modelOverride}
-                        onChangeText={setModelOverride}
-                        placeholder={t("roles.modelOverridePlaceholder")}
-                        placeholderTextColor={theme.colors.textSecondary}
-                        maxLength={100}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                    />
+                    <Pressable
+                        style={styles.modelSelector}
+                        onPress={() => setModelDropdownOpen((v) => !v)}
+                    >
+                        <Text style={[
+                            styles.modelSelectorText,
+                            !modelPreset && { color: theme.colors.textSecondary },
+                        ]}>
+                            {modelPreset === ""
+                                ? t("roles.modelDefault")
+                                : modelPreset === "custom"
+                                    ? t("roles.modelCustom")
+                                    : (MODEL_PRESET_LABELS[modelPreset] ?? modelPreset)}
+                        </Text>
+                        <Ionicons
+                            name={modelDropdownOpen ? "chevron-up" : "chevron-down"}
+                            size={16}
+                            color={theme.colors.textSecondary}
+                        />
+                    </Pressable>
+                    {modelDropdownOpen && (
+                        <View style={styles.modelDropdownList}>
+                            {MODEL_PRESET_VALUES.map((val) => {
+                                const selected = modelPreset === val;
+                                const label = val === ""
+                                    ? t("roles.modelDefault")
+                                    : (MODEL_PRESET_LABELS[val] ?? val);
+                                return (
+                                    <Pressable
+                                        key={val || "__default__"}
+                                        style={[styles.modelDropdownItem, selected && styles.modelDropdownItemSelected]}
+                                        onPress={() => {
+                                            setModelPreset(val);
+                                            setModelDropdownOpen(false);
+                                        }}
+                                    >
+                                        <Text style={[
+                                            styles.modelDropdownItemText,
+                                            selected && { color: theme.colors.accentPurple },
+                                        ]}>
+                                            {label}
+                                        </Text>
+                                        {selected && (
+                                            <Ionicons name="checkmark" size={16} color={theme.colors.accentPurple} />
+                                        )}
+                                    </Pressable>
+                                );
+                            })}
+                            <Pressable
+                                style={[styles.modelDropdownItem, modelPreset === "custom" && styles.modelDropdownItemSelected]}
+                                onPress={() => {
+                                    setModelPreset("custom");
+                                    setModelDropdownOpen(false);
+                                }}
+                            >
+                                <Text style={[
+                                    styles.modelDropdownItemText,
+                                    modelPreset === "custom" && { color: theme.colors.accentPurple },
+                                ]}>
+                                    {t("roles.modelCustom")}
+                                </Text>
+                                {modelPreset === "custom" && (
+                                    <Ionicons name="checkmark" size={16} color={theme.colors.accentPurple} />
+                                )}
+                            </Pressable>
+                        </View>
+                    )}
+                    {modelPreset === "custom" && (
+                        <TextInput
+                            style={[styles.textInput, { marginTop: 8 }]}
+                            value={modelCustomValue}
+                            onChangeText={setModelCustomValue}
+                            placeholder={t("roles.modelOverridePlaceholder")}
+                            placeholderTextColor={theme.colors.textSecondary}
+                            maxLength={100}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
+                    )}
 
                     {/* Actions */}
                     <View style={styles.modalActions}>
@@ -762,7 +868,7 @@ const styles = StyleSheet.create((theme) => ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "transparent",
+        backgroundColor: "rgba(0,0,0,0.4)",
     },
     modalScroll: {
         width: "90%" as const,
@@ -854,6 +960,65 @@ const styles = StyleSheet.create((theme) => ({
     },
     addDutyButton: {
         padding: 8,
+    },
+    sectionDivider: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 8,
+        marginTop: 16,
+        marginBottom: 4,
+    },
+    sectionDividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: theme.colors.groupped.background,
+    },
+    sectionDividerLabel: {
+        ...Typography.default("semiBold"),
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        letterSpacing: 0.5,
+        textTransform: "uppercase" as const,
+    },
+    modelSelector: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "space-between" as const,
+        backgroundColor: theme.colors.groupped.background,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+    },
+    modelSelectorText: {
+        ...Typography.default(),
+        fontSize: 15,
+        color: theme.colors.text,
+        flex: 1,
+    },
+    modelDropdownList: {
+        marginTop: 4,
+        backgroundColor: theme.colors.groupped.background,
+        borderRadius: 8,
+        overflow: "hidden" as const,
+    },
+    modelDropdownItem: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "space-between" as const,
+        paddingHorizontal: 14,
+        paddingVertical: 11,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.surface,
+    },
+    modelDropdownItemSelected: {
+        backgroundColor: theme.dark
+            ? "rgba(139,92,246,0.12)"
+            : "rgba(109,40,217,0.06)",
+    },
+    modelDropdownItemText: {
+        ...Typography.default(),
+        fontSize: 14,
+        color: theme.colors.text,
     },
     modalActions: {
         flexDirection: "row" as const,

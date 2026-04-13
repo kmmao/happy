@@ -154,7 +154,10 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
     try {
       const preview = await sessionRewindFiles(props.sessionId, rewindId, true);
       if (!preview.canRewind) {
-        Modal.alert(t("session.rewindFailed"), preview.error ?? t("session.rewindUnavailable"));
+        const errorMsg = preview.error === "No active query"
+          ? t("session.rewindSessionNotActive")
+          : (preview.error ?? t("session.rewindUnavailable"));
+        Modal.alert(t("session.rewindFailed"), errorMsg);
         return;
       }
       const fileCount = preview.filesChanged?.length ?? 0;
