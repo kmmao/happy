@@ -14,6 +14,20 @@ import { type Message } from "@/sync/typesMessage";
 
 const DURATION_MS = 10_000;
 
+/** localStorage key prefix for cross-tab send lock. */
+const LOCK_PREFIX = "happy-aos-lock:";
+/** BroadcastChannel name for cross-tab coordination. */
+const CHANNEL_NAME = "happy-auto-option-send";
+/** How long a localStorage lock stays valid (ms). */
+const LOCK_TTL_MS = 30_000;
+
+interface CrossTabMessage {
+    type: "fired";
+    tabId: string;
+    sessionId: string;
+    optionsHash: string;
+}
+
 interface SnapshotWithFreshness {
     snapshot: SessionFollowUpOptionsSnapshot;
     /** true when options come from the latest agent turn (no user message after). */
@@ -85,6 +99,11 @@ class AutoOptionSendService {
         ) => Promise<void>)
         | null = null;
 
+    /** Unique ID for this tab/instance, used for cross-tab dedup. */
+    private readonly tabId = Math.random().toString(36).slice(2, 10);
+    /** BroadcastChannel for cross-tab coordination (web only). */
+    private channel: BroadcastChannel | null = null;
+
     /** Called once by sync.ts during init. */
     init(
         sendMessage: (
@@ -104,6 +123,18 @@ class AutoOptionSendService {
                     enabled: true,
                     status: "idle",
                 });
+            }
+        }
+
+        // Cross-tab coordination (web only, no-op on React Native)
+        if (typeof BroadcastChannel !== "undefined") {
+            try {
+                this.channel = new BroadcastChannel(CHANNEL_NAME);
+                this.channel.onmessage = (event: MessageEvent) => {
+                    this.handleCrossTabMessage(event.data);
+                };
+            } catch {
+                // BroadcastChannel not supported or blocked
             }
         }
     }
@@ -304,13 +335,117 @@ class AutoOptionSendService {
 
         // Clear shouldSendText before notifying UI
         const textToSend = firedState.shouldSendText;
+        const optionsHash = state.candidate?.optionsHash ?? "";
         this.setState(sessionId, { ...firedState, shouldSendText: null });
 
         if (textToSend) {
+            // Cross-tab dedup: try to acquire localStorage lock
+            if (!this.acquireSendLock(sessionId, optionsHash)) {
+                return;
+            }
+
+            // Notify other tabs to cancel their timers
+            this.broadcastFired(sessionId, optionsHash);
+
             this.sendMessageFn?.(sessionId, textToSend, undefined, {
                 source: "auto-option-send",
             }).catch(() => {});
         }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Cross-tab coordination
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Handle a message from another tab via BroadcastChannel.
+     * If another tab already fired for the same session+options, cancel our timer.
+     */
+    private handleCrossTabMessage(data: unknown): void {
+        if (!data || typeof data !== "object") return;
+        const msg = data as CrossTabMessage;
+        if (msg.type !== "fired" || msg.tabId === this.tabId) return;
+
+        const state = this.states.get(msg.sessionId);
+        if (!state) return;
+        if (state.status !== "armed" && state.status !== "ready") return;
+        if (state.candidate?.optionsHash !== msg.optionsHash) return;
+
+        // Another tab already sent this option — cancel our countdown
+        this.clearTimer(msg.sessionId);
+        this.setState(msg.sessionId, {
+            ...state,
+            status: "idle",
+            candidate: null,
+            remainingMs: null,
+            lastAutoSentKey: state.candidate
+                ? `${state.candidate.sourceMessageId ?? "none"}:${state.candidate.optionsHash}:${state.candidate.recommendedText}`
+                : state.lastAutoSentKey,
+            lastAutoSentText:
+                state.candidate?.recommendedText ?? state.lastAutoSentText,
+            lastCancelReason: "sent-by-other-tab",
+            shouldSendText: null,
+        });
+    }
+
+    /** Broadcast to other tabs that we fired for this session+options. */
+    private broadcastFired(sessionId: string, optionsHash: string): void {
+        try {
+            this.channel?.postMessage({
+                type: "fired",
+                tabId: this.tabId,
+                sessionId,
+                optionsHash,
+            } satisfies CrossTabMessage);
+        } catch {
+            // Channel closed or unavailable
+        }
+    }
+
+    /**
+     * Try to claim a send lock via localStorage. Returns true if this tab
+     * should proceed with sending (no other tab sent the same options recently).
+     *
+     * There is a theoretical sub-millisecond race window between getItem and
+     * setItem across tabs, but this is negligible in practice. The
+     * BroadcastChannel notification provides the secondary defense.
+     */
+    private acquireSendLock(
+        sessionId: string,
+        optionsHash: string,
+    ): boolean {
+        if (typeof localStorage === "undefined") return true; // React Native
+
+        const key = `${LOCK_PREFIX}${sessionId}`;
+        const now = Date.now();
+
+        try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+                const lock = JSON.parse(raw) as {
+                    hash: string;
+                    ts: number;
+                    tabId: string;
+                };
+                // Same options already sent by another tab within TTL
+                if (
+                    lock.hash === optionsHash &&
+                    lock.tabId !== this.tabId &&
+                    now - lock.ts < LOCK_TTL_MS
+                ) {
+                    return false;
+                }
+            }
+        } catch {
+            // Corrupt data, proceed and overwrite
+        }
+
+        // Claim the lock
+        localStorage.setItem(
+            key,
+            JSON.stringify({ hash: optionsHash, ts: now, tabId: this.tabId }),
+        );
+        return true;
     }
 
     private setState(sessionId: string, state: AutoOptionSendState): void {
