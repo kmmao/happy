@@ -3,6 +3,12 @@ export type CodexConfigMode =
   | "managed-profile"
   | "managed-overrides";
 
+function normalizeCodexReasoningEffort(
+  effort: string | undefined,
+): string | undefined {
+  return effort === "max" ? "xhigh" : effort;
+}
+
 export interface ResolvedCodexRuntimeConfig {
   configMode: CodexConfigMode;
   profileName?: string;
@@ -42,7 +48,9 @@ export function resolveCodexRuntimeConfigFromEnv(
     profileName: env.HAPPY_CODEX_PROFILE?.trim() || undefined,
     overrides: {
       model: env.HAPPY_CODEX_MODEL?.trim() || undefined,
-      reasoningEffort: env.HAPPY_CODEX_REASONING_EFFORT?.trim() || undefined,
+      reasoningEffort: normalizeCodexReasoningEffort(
+        env.HAPPY_CODEX_REASONING_EFFORT?.trim() || undefined,
+      ),
       reasoningSummary:
         env.HAPPY_CODEX_REASONING_SUMMARY?.trim() || undefined,
       verbosity: env.HAPPY_CODEX_VERBOSITY?.trim() || undefined,

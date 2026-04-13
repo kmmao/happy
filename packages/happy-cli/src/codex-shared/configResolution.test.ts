@@ -41,4 +41,19 @@ describe("resolveCodexRuntimeConfigFromEnv", () => {
       },
     });
   });
+
+  it("normalizes legacy max reasoning effort to xhigh", () => {
+    expect(
+      resolveCodexRuntimeConfigFromEnv({
+        HAPPY_CODEX_CONFIG_MODE: "managed-overrides",
+        HAPPY_CODEX_REASONING_EFFORT: "max",
+      }),
+    ).toEqual({
+      configMode: "managed-overrides",
+      profileName: undefined,
+      overrides: {
+        reasoningEffort: "xhigh",
+      },
+    });
+  });
 });

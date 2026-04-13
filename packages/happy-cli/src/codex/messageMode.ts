@@ -4,7 +4,11 @@ import { hashObject } from "@/utils/deterministicJson";
 function normalizeCodexReasoningEffort(
   effort: NonNullable<MessageMeta["effort"]> | undefined,
 ): NonNullable<MessageMeta["effort"]> | undefined {
-  return effort === "xhigh" ? "max" : effort;
+  if (effort === "max") {
+    return "xhigh";
+  }
+
+  return effort;
 }
 
 export interface CodexMessageModeState {
@@ -46,7 +50,7 @@ export function resolveCodexMessageMode(params: {
     model = meta.model || undefined;
   }
 
-  let reasoningEffort = current.reasoningEffort;
+  let reasoningEffort = normalizeCodexReasoningEffort(current.reasoningEffort);
   if (meta && Object.prototype.hasOwnProperty.call(meta, "effort")) {
     reasoningEffort = normalizeCodexReasoningEffort(meta.effort ?? undefined);
   }

@@ -27,7 +27,7 @@ describe('resolveCodexMessageMode', () => {
     });
   });
 
-  it('normalizes xhigh effort to max', () => {
+  it('preserves xhigh effort for Codex sessions', () => {
     const result = resolveCodexMessageMode({
       current: {
         permissionMode: 'default',
@@ -38,8 +38,23 @@ describe('resolveCodexMessageMode', () => {
       } as MessageMeta,
     });
 
-    expect(result.mode.reasoningEffort).toBe('max');
-    expect(result.next.reasoningEffort).toBe('max');
+    expect(result.mode.reasoningEffort).toBe('xhigh');
+    expect(result.next.reasoningEffort).toBe('xhigh');
+  });
+
+  it('normalizes legacy max effort to xhigh for Codex sessions', () => {
+    const result = resolveCodexMessageMode({
+      current: {
+        permissionMode: 'default',
+        model: 'gpt-5.4',
+      },
+      meta: {
+        effort: 'max',
+      } as MessageMeta,
+    });
+
+    expect(result.mode.reasoningEffort).toBe('xhigh');
+    expect(result.next.reasoningEffort).toBe('xhigh');
   });
 
   it('clears persisted reasoning effort when the message explicitly resets it', () => {
@@ -79,7 +94,7 @@ describe('hashCodexMode', () => {
     );
   });
 
-  it('treats xhigh and max as the same mode identity', () => {
+  it('treats legacy max and xhigh as the same mode identity', () => {
     expect(
       hashCodexMode({
         permissionMode: 'default',
@@ -95,3 +110,4 @@ describe('hashCodexMode', () => {
     );
   });
 });
+
