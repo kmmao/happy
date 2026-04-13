@@ -445,10 +445,16 @@ describe("CodexAppServerClient", () => {
     const response = await client.startSession({
       prompt: "hello",
       model: "gpt-5.4",
+      "base-instructions": "Use request_user_input for questions",
     });
 
     expect(response).toEqual({ content: [] });
     expect(client.getSessionId()).toBe("thread-1");
+    expect(
+      fakeProcesses[0].requests.find((request) => request.method === "thread/start")?.params,
+    ).toMatchObject({
+      baseInstructions: "Use request_user_input for questions",
+    });
     expect(events).toEqual(
       expect.arrayContaining([
         { type: "task_started" },
@@ -770,10 +776,11 @@ describe("CodexAppServerClient", () => {
 
   it("responds to request_user_input through the elicitation handler", async () => {
     const client = new CodexAppServerClient();
-    client.setElicitationHandler(async () => ({
-      action: "accept",
+    const elicitationHandler = vi.fn(async () => ({
+      action: "accept" as const,
       content: { choice: "A" },
     }));
+    client.setElicitationHandler(elicitationHandler);
 
     await client.connect();
     fakeProcesses[0].stdout.write(
@@ -797,6 +804,28 @@ describe("CodexAppServerClient", () => {
 
     await new Promise((resolve) => setImmediate(resolve));
 
+    expect(elicitationHandler).toHaveBeenCalledWith(
+      {
+        serverName: "Codex",
+        message: "Choose an option",
+        mode: "form",
+        requestedSchema: {
+          type: "object",
+          required: ["choice"],
+          properties: {
+            choice: {
+              type: "string",
+              title: "Pick one",
+              description: "Choose an option",
+              oneOf: [{ const: "A", title: "A", description: "Option A" }],
+              "x-happy-other": false,
+              "x-happy-secret": false,
+            },
+          },
+        },
+      },
+      expect.any(Object),
+    );
     expect(fakeProcesses[0].responses).toContainEqual({
       id: "question-1",
       result: {
@@ -1333,9 +1362,17 @@ describe("CodexAppServerClient", () => {
     const client = new CodexAppServerClient();
 
     await client.connect();
-    await client.resumeThread({ threadId: "thread-existing" });
+    await client.resumeThread({
+      threadId: "thread-existing",
+      baseInstructions: "Use request_user_input for questions",
+    });
 
     expect(client.getSessionId()).toBe("thread-existing");
+    expect(
+      fakeProcesses[0].requests.find((request) => request.method === "thread/resume")?.params,
+    ).toMatchObject({
+      baseInstructions: "Use request_user_input for questions",
+    });
   });
 
   it("interrupts an active turn when aborted", async () => {

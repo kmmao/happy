@@ -68,6 +68,7 @@ import {
   getCodexTokenUsageSignature,
 } from "./utils/tokenUsage";
 import { createEnvelope } from "@kmmao/happy-wire";
+import { codexBaseInstructions } from "./baseInstructions";
 
 type ReadyEventOptions = {
   pending: unknown;
@@ -1207,6 +1208,7 @@ export async function runCodex(opts: {
         try {
           await appServerClient.resumeThread({
             threadId: resumeThreadId,
+            baseInstructions: codexBaseInstructions,
             profile: runtimeConfig.profileName,
             model: runtimeConfig.overrides.model,
             approvalPolicy:
@@ -1413,6 +1415,7 @@ export async function runCodex(opts: {
             prompt: first
               ? message.message + "\n\n" + CHANGE_TITLE_INSTRUCTION
               : message.message,
+            "base-instructions": codexBaseInstructions,
             config: {
               mcp_servers: mcpServers,
               ...(runtimeConfig.overrides.reasoningEffort

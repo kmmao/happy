@@ -5,13 +5,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
 import { sessionElicitationResponse } from "@/sync/ops";
 import { Typography } from "@/constants/Typography";
-
-interface SchemaProperty {
-    type?: string;
-    description?: string;
-    default?: unknown;
-    enum?: string[];
-}
+import {
+    coerceElicitationValue,
+    parseElicitationFields,
+} from "./elicitationSchema";
 
 interface ElicitationData {
     id: string;
@@ -27,6 +24,20 @@ interface Props {
     elicitation: ElicitationData;
 }
 
+function parseRecommendedLabel(label: string): {
+    cleanLabel: string;
+    isRecommended: boolean;
+} {
+    const match = label.match(/^(.+?)\s*\(Recommended\)\s*$/i);
+    if (!match) {
+        return { cleanLabel: label, isRecommended: false };
+    }
+    return {
+        cleanLabel: match[1].trim(),
+        isRecommended: true,
+    };
+}
+
 export const ElicitationBanner = React.memo(({ sessionId, elicitation }: Props) => {
     const { theme } = useUnistyles();
     const [formValues, setFormValues] = React.useState<Record<string, string>>({});
@@ -38,39 +49,46 @@ export const ElicitationBanner = React.memo(({ sessionId, elicitation }: Props) 
         setIsSubmitting(false);
     }, [elicitation.id]);
 
-    // Extract properties from JSON Schema
-    const properties = React.useMemo(() => {
-        const schema = elicitation.requestedSchema;
-        if (!schema || elicitation.mode !== "form") return {};
-        return (schema.properties ?? {}) as Record<string, SchemaProperty>;
+    const fields = React.useMemo(() => {
+        if (elicitation.mode !== "form") return [];
+        return parseElicitationFields(elicitation.requestedSchema);
     }, [elicitation.requestedSchema, elicitation.mode]);
 
+    const canSubmit = React.useMemo(() => {
+        if (elicitation.mode !== "form") {
+            return true;
+        }
+
+        return fields.every((field) => {
+            if (!field.required) {
+                return true;
+            }
+            const currentValue = (formValues[field.key] ?? field.defaultValue).trim();
+            return currentValue.length > 0;
+        });
+    }, [elicitation.mode, fields, formValues]);
+
     const handleAccept = React.useCallback(async () => {
-        if (isSubmitting) return;
+        if (isSubmitting || !canSubmit) return;
         setIsSubmitting(true);
         try {
             if (elicitation.mode === "url") {
                 await sessionElicitationResponse(sessionId, elicitation.id, "accept");
             } else {
-                // Convert string values to appropriate types based on schema
                 const content: Record<string, unknown> = {};
-                for (const [key, value] of Object.entries(formValues)) {
-                    const prop = properties[key];
-                    if (prop?.type === "number" || prop?.type === "integer") {
-                        const num = Number(value);
-                        content[key] = Number.isNaN(num) ? 0 : num;
-                    } else if (prop?.type === "boolean") {
-                        content[key] = value === "true";
-                    } else {
-                        content[key] = value;
+                for (const field of fields) {
+                    const value = formValues[field.key] ?? field.defaultValue;
+                    if (value.trim().length === 0) {
+                        continue;
                     }
+                    content[field.key] = coerceElicitationValue(field, value);
                 }
                 await sessionElicitationResponse(sessionId, elicitation.id, "accept", content);
             }
         } finally {
             setIsSubmitting(false);
         }
-    }, [sessionId, elicitation.id, elicitation.mode, formValues, properties, isSubmitting]);
+    }, [canSubmit, sessionId, elicitation.id, elicitation.mode, fields, formValues, isSubmitting]);
 
     const handleDecline = React.useCallback(async () => {
         if (isSubmitting) return;
@@ -118,31 +136,129 @@ export const ElicitationBanner = React.memo(({ sessionId, elicitation }: Props) 
                 </Pressable>
             )}
 
-            {elicitation.mode === "form" && Object.keys(properties).length > 0 && (
+            {elicitation.mode === "form" && fields.length > 0 && (
                 <View style={styles.formContainer}>
-                    {Object.entries(properties).map(([key, prop]) => (
-                        <View key={key} style={styles.formField}>
-                            <Text style={[styles.fieldLabel, { color: theme.colors.textSecondary }]}>
-                                {prop.description ?? key}
-                            </Text>
-                            <TextInput
-                                style={[
-                                    styles.fieldInput,
-                                    {
-                                        color: theme.colors.text,
-                                        backgroundColor: theme.colors.surfaceHighest,
-                                        borderColor: theme.colors.surfaceHighest,
-                                    },
-                                ]}
-                                value={formValues[key] ?? String(prop.default ?? "")}
-                                onChangeText={(v) => updateFormValue(key, v)}
-                                placeholder={key}
-                                placeholderTextColor={theme.colors.textSecondary}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                            />
-                        </View>
-                    ))}
+                    {fields.map((field) => {
+                        const currentValue = formValues[field.key] ?? field.defaultValue;
+                        const showOtherInput =
+                            field.allowOther &&
+                            !field.options.some((option) => option.value === currentValue);
+
+                        return (
+                            <View key={field.key} style={styles.formField}>
+                                <Text style={[styles.fieldLabel, { color: theme.colors.textSecondary }]}>
+                                    {field.label}
+                                </Text>
+                                {field.description ? (
+                                    <Text style={[styles.fieldDescription, { color: theme.colors.textSecondary }]}>
+                                        {field.description}
+                                    </Text>
+                                ) : null}
+
+                                {field.options.length > 0 ? (
+                                    <View style={styles.optionList}>
+                                        {field.options.map((option) => {
+                                            const isSelected = currentValue === option.value;
+                                            const { cleanLabel, isRecommended } = parseRecommendedLabel(option.label);
+                                            return (
+                                                <Pressable
+                                                    key={option.value}
+                                                    onPress={() => updateFormValue(field.key, option.value)}
+                                                    style={({ pressed }) => [
+                                                        styles.optionButton,
+                                                        {
+                                                            borderColor: isSelected
+                                                                ? theme.colors.textLink
+                                                                : theme.colors.surfaceHighest,
+                                                            backgroundColor: isSelected
+                                                                ? theme.colors.surfaceHighest
+                                                                : theme.colors.surface,
+                                                        },
+                                                        pressed && { opacity: 0.8 },
+                                                    ]}
+                                                >
+                                                    <View
+                                                        style={[
+                                                            styles.radioOuter,
+                                                            {
+                                                                borderColor: isSelected
+                                                                    ? theme.colors.textLink
+                                                                    : theme.colors.textSecondary,
+                                                            },
+                                                            isSelected && { backgroundColor: theme.colors.textLink },
+                                                        ]}
+                                                    >
+                                                        {isSelected ? <View style={styles.radioInner} /> : null}
+                                                    </View>
+                                                    <View style={styles.optionContent}>
+                                                        <View style={styles.optionTitleRow}>
+                                                            <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
+                                                                {cleanLabel}
+                                                            </Text>
+                                                            {isRecommended ? (
+                                                                <View style={[styles.recommendedTag, { backgroundColor: theme.colors.textLink }]}>
+                                                                    <Text style={styles.recommendedText}>
+                                                                        {t("tools.askUserQuestion.recommended")}
+                                                                    </Text>
+                                                                </View>
+                                                            ) : null}
+                                                        </View>
+                                                        {option.description ? (
+                                                            <Text style={[styles.optionDescription, { color: theme.colors.textSecondary }]}>
+                                                                {option.description}
+                                                            </Text>
+                                                        ) : null}
+                                                    </View>
+                                                </Pressable>
+                                            );
+                                        })}
+                                        {field.allowOther ? (
+                                            <View style={styles.otherContainer}>
+                                                <Text style={[styles.fieldLabel, { color: theme.colors.textSecondary }]}>
+                                                    {t("tools.askUserQuestion.other")}
+                                                </Text>
+                                                <TextInput
+                                                    style={[
+                                                        styles.fieldInput,
+                                                        {
+                                                            color: theme.colors.text,
+                                                            backgroundColor: theme.colors.surfaceHighest,
+                                                            borderColor: theme.colors.surfaceHighest,
+                                                        },
+                                                    ]}
+                                                    value={showOtherInput ? currentValue : ""}
+                                                    onChangeText={(value) => updateFormValue(field.key, value)}
+                                                    placeholder={t("tools.askUserQuestion.other")}
+                                                    placeholderTextColor={theme.colors.textSecondary}
+                                                    autoCapitalize="none"
+                                                    autoCorrect={false}
+                                                    secureTextEntry={field.secret}
+                                                />
+                                            </View>
+                                        ) : null}
+                                    </View>
+                                ) : (
+                                    <TextInput
+                                        style={[
+                                            styles.fieldInput,
+                                            {
+                                                color: theme.colors.text,
+                                                backgroundColor: theme.colors.surfaceHighest,
+                                                borderColor: theme.colors.surfaceHighest,
+                                            },
+                                        ]}
+                                        value={currentValue}
+                                        onChangeText={(value) => updateFormValue(field.key, value)}
+                                        placeholder={field.key}
+                                        placeholderTextColor={theme.colors.textSecondary}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        secureTextEntry={field.secret}
+                                    />
+                                )}
+                            </View>
+                        );
+                    })}
                 </View>
             )}
 
@@ -162,11 +278,12 @@ export const ElicitationBanner = React.memo(({ sessionId, elicitation }: Props) 
                 </Pressable>
                 <Pressable
                     onPress={handleAccept}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !canSubmit}
                     style={({ pressed }) => [
                         styles.button,
                         styles.acceptButton,
                         { backgroundColor: theme.colors.textLink },
+                        (isSubmitting || !canSubmit) && { opacity: 0.5 },
                         pressed && { opacity: 0.7 },
                     ]}
                 >
@@ -225,6 +342,11 @@ const styles = StyleSheet.create(() => ({
         fontSize: 12,
         ...Typography.default(),
     },
+    fieldDescription: {
+        fontSize: 13,
+        lineHeight: 18,
+        ...Typography.default(),
+    },
     fieldInput: {
         fontSize: 14,
         paddingHorizontal: 10,
@@ -232,6 +354,68 @@ const styles = StyleSheet.create(() => ({
         borderRadius: 8,
         borderWidth: 1,
         ...Typography.default(),
+    },
+    optionList: {
+        gap: 8,
+    },
+    optionButton: {
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        flexDirection: "row",
+        gap: 10,
+        alignItems: "flex-start",
+    },
+    optionContent: {
+        flex: 1,
+        gap: 4,
+    },
+    optionTitleRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+    },
+    optionTitle: {
+        fontSize: 14,
+        fontWeight: "600",
+        ...Typography.default(),
+    },
+    optionDescription: {
+        fontSize: 13,
+        lineHeight: 18,
+        ...Typography.default(),
+    },
+    radioOuter: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        borderWidth: 1.5,
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: 1,
+    },
+    radioInner: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: "#fff",
+    },
+    recommendedTag: {
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+    },
+    recommendedText: {
+        fontSize: 10,
+        fontWeight: "700",
+        color: "#fff",
+        ...Typography.default(),
+    },
+    otherContainer: {
+        gap: 6,
+        marginTop: 4,
     },
     actions: {
         flexDirection: "row",

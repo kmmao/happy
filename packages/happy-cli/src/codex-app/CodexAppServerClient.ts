@@ -401,16 +401,26 @@ function buildElicitationSchema(
       question.id,
       {
         type: "string",
-        description: `${question.header}: ${question.question}`,
+        title: question.header,
+        description: question.question,
         ...(question.options
-          ? { enum: question.options.map((option) => option.label) }
+          ? {
+              oneOf: question.options.map((option) => ({
+                const: option.label,
+                title: option.label,
+                description: option.description,
+              })),
+            }
           : {}),
+        "x-happy-other": question.isOther,
+        "x-happy-secret": question.isSecret,
       },
     ]),
   );
 
   return {
     type: "object",
+    required: questions.map((question) => question.id),
     properties,
   };
 }
@@ -922,6 +932,7 @@ export class CodexAppServerClient {
       model: config.model ?? null,
       cwd: config.cwd ?? process.cwd(),
       approvalPolicy: config["approval-policy"] ?? null,
+      baseInstructions: config["base-instructions"] ?? null,
       sandbox: config.sandbox ?? null,
       config: {
         ...(config.config ?? {}),
@@ -994,6 +1005,7 @@ export class CodexAppServerClient {
     threadId: string;
     model?: string;
     approvalPolicy?: CodexSessionConfig["approval-policy"];
+    baseInstructions?: CodexSessionConfig["base-instructions"];
     sandbox?: CodexSessionConfig["sandbox"];
     profile?: string;
     serviceTier?: string;
@@ -1010,6 +1022,7 @@ export class CodexAppServerClient {
       model: params.model ?? null,
       cwd: process.cwd(),
       approvalPolicy: params.approvalPolicy ?? null,
+      baseInstructions: params.baseInstructions ?? null,
       sandbox: params.sandbox ?? null,
       serviceTier: params.serviceTier ?? null,
       personality: params.personality ?? null,
