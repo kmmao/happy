@@ -38,12 +38,12 @@ import { hackMode, hackModes } from "@/sync/modeHacks";
 import { getAllCommands } from "@/sync/suggestionCommands";
 import { t } from "@/text";
 import { getBuiltInProfile } from "@/sync/profileUtils";
-import { AnimatedTokensCost } from "./AnimatedTokensCost";
+import { useAnimatedTokensCostValue } from "./AnimatedTokensCost";
 import { GitBrowseTab } from "./git/GitBrowseTab";
 
 import type { AgentInputProps } from "./AgentInputTypes";
 import { stylesheet, FAVORITE_CHIP_GRADIENTS } from "./AgentInputStyles";
-import { getContextWarning, ContextProgressBar } from "./ContextProgressBar";
+import { ContextProgressBar } from "./ContextProgressBar";
 import { AttachButton, type AttachAction } from "./AttachButton";
 import { GitStatusButton } from "./GitStatusButton";
 import { AgentInputSettingsOverlay } from "./AgentInputSettingsOverlay";
@@ -103,10 +103,6 @@ export const AgentInput = React.memo(
       }
       return true;
     }, [props.metadata?.sandbox]);
-    const isSandboxedYoloMode =
-      isSandboxEnabled &&
-      (permissionModeKey === "bypassPermissions" ||
-        permissionModeKey === "yolo");
 
     const withSandboxSuffix = React.useCallback(
       (label: string, modeKey?: string) => {
@@ -133,16 +129,16 @@ export const AgentInput = React.memo(
     }, [profiles, props.profileId]);
 
     // Calculate context warning
-    const contextWarning = props.usageData?.contextSize
-      ? getContextWarning(
-          props.usageData.contextSize,
-          props.alwaysShowContextSize ?? false,
-          theme,
-          props.usageData.totalInputTokens + props.usageData.totalOutputTokens,
-          props.currentModelCode,
-          props.usageData.contextWindow,
-        )
-      : null;
+    const animatedTokensCostValue = useAnimatedTokensCostValue({
+      totalTokens:
+        (props.usageData?.totalInputTokens ?? 0) +
+        (props.usageData?.totalOutputTokens ?? 0),
+      totalCostUsd: props.usageData?.totalCostUsd,
+      totalDurationMs: props.totalDurationMs,
+      completedTurnsDurationMs: props.completedTurnsDurationMs,
+      isThinking: props.isThinking,
+      turnStartedAt: props.turnStartedAt,
+    });
 
     const agentInputEnterToSend = useSetting("agentInputEnterToSend");
 
@@ -215,6 +211,7 @@ export const AgentInput = React.memo(
 
     // Settings modal state
     const [showSettings, setShowSettings] = React.useState(false);
+    const [showModelSelectorModal, setShowModelSelectorModal] = React.useState(false);
     const [showQuickCommands, setShowQuickCommands] = React.useState(false);
     const [showFileBrowser, setShowFileBrowser] = React.useState(false);
 
@@ -254,6 +251,21 @@ export const AgentInput = React.memo(
         return !prev;
       });
     }, []);
+
+    const handleModelSummaryPress = React.useCallback(() => {
+      if (!props.onModelModeChange || availableModels.length === 0) {
+        return;
+      }
+
+      hapticsLight();
+      setShowSettings(true);
+      setShowModelSelectorModal(false);
+      setShowQuickCommands(false);
+      setShowFileBrowser(false);
+    }, [
+      props.onModelModeChange,
+      availableModels.length,
+    ]);
 
     // Handle settings selection
     const handleSettingsSelect = React.useCallback(
@@ -595,6 +607,131 @@ export const AgentInput = React.memo(
             maxHeight={overlayMaxHeight}
           />
 
+          <RNModal
+            visible={showModelSelectorModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowModelSelectorModal(false)}
+          >
+            <Pressable
+              style={{
+                flex: 1,
+                backgroundColor: "rgba(0,0,0,0.45)",
+                justifyContent: "center",
+                paddingHorizontal: 16,
+                paddingVertical: 24,
+              }}
+              onPress={() => setShowModelSelectorModal(false)}
+            >
+              <Pressable
+                onPress={(event) => event.stopPropagation()}
+                style={{
+                  maxHeight: "70%",
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  backgroundColor: theme.colors.surface,
+                  borderWidth: 1,
+                  borderColor: theme.colors.divider,
+                }}
+              >
+                <View
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingTop: 16,
+                    paddingBottom: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.colors.divider,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: theme.colors.text,
+                      ...Typography.default("semiBold"),
+                    }}
+                  >
+                    {t("agentInput.model.title")}
+                  </Text>
+                </View>
+
+                <ScrollView>
+                  {availableModels.map((model) => {
+                    const isSelected = props.modelMode?.key === model.key;
+                    return (
+                      <Pressable
+                        key={model.key}
+                        onPress={() => {
+                          hapticsLight();
+                          props.onModelModeChange?.(model);
+                          setShowModelSelectorModal(false);
+                        }}
+                        style={({ pressed }) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingHorizontal: 16,
+                          paddingVertical: 12,
+                          backgroundColor: pressed
+                            ? theme.colors.surfacePressed
+                            : "transparent",
+                        })}
+                      >
+                        <View
+                          style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: 8,
+                            borderWidth: 2,
+                            borderColor: isSelected
+                              ? theme.colors.radio.active
+                              : theme.colors.radio.inactive,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginRight: 12,
+                          }}
+                        >
+                          {isSelected && (
+                            <View
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: 3,
+                                backgroundColor: theme.colors.radio.dot,
+                              }}
+                            />
+                          )}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              color: isSelected
+                                ? theme.colors.radio.active
+                                : theme.colors.text,
+                              ...Typography.default(),
+                            }}
+                          >
+                            {model.name}
+                          </Text>
+                          {!!model.description && (
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: theme.colors.textSecondary,
+                                ...Typography.default(),
+                              }}
+                            >
+                              {model.description}
+                            </Text>
+                          )}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </Pressable>
+            </Pressable>
+          </RNModal>
+
           {/* Slash Command List - toggled by slash command button */}
           {props.commands?.showCommandList && (
             <>
@@ -698,7 +835,7 @@ export const AgentInput = React.memo(
                 justifyContent: "space-between",
                 paddingHorizontal: 16,
                 paddingBottom: 4,
-                minHeight: 20, // Fixed minimum height to prevent jumping
+                minHeight: 20,
               }}
             >
               <View
@@ -707,6 +844,7 @@ export const AgentInput = React.memo(
                   alignItems: "center",
                   flex: 1,
                   gap: 11,
+                  minWidth: 0,
                 }}
               >
                 {props.connectionStatus && (
@@ -716,6 +854,7 @@ export const AgentInput = React.memo(
                         flexDirection: "row",
                         alignItems: "center",
                         gap: 4,
+                        minWidth: 0,
                       }}
                     >
                       <StatusDot
@@ -732,25 +871,8 @@ export const AgentInput = React.memo(
                         numberOfLines={1}
                       >
                         {props.connectionStatus.text}
-                        {props.usageData &&
-                          props.usageData.totalInputTokens +
-                            props.usageData.totalOutputTokens >
-                            0 && (
-                            <AnimatedTokensCost
-                              totalTokens={
-                                props.usageData.totalInputTokens +
-                                props.usageData.totalOutputTokens
-                              }
-                              totalCostUsd={props.usageData.totalCostUsd}
-                              totalDurationMs={props.totalDurationMs}
-                              completedTurnsDurationMs={props.completedTurnsDurationMs}
-                              isThinking={props.isThinking}
-                              turnStartedAt={props.turnStartedAt}
-                            />
-                          )}
                       </Text>
                     </View>
-                    {/* CLI Status - only shown when provided (wizard only) */}
                     {props.connectionStatus.cliStatus && (
                       <>
                         <View
@@ -815,8 +937,7 @@ export const AgentInput = React.memo(
                             codex
                           </Text>
                         </View>
-                        {props.connectionStatus.cliStatus.gemini !==
-                          undefined && (
+                        {props.connectionStatus.cliStatus.gemini !== undefined && (
                           <View
                             style={{
                               flexDirection: "row",
@@ -855,63 +976,73 @@ export const AgentInput = React.memo(
                   </>
                 )}
               </View>
-              <View
-                style={{
-                  flexDirection: "column",
-                  alignItems: "flex-end",
-                  minWidth: 150, // Fixed minimum width to prevent layout shift
-                }}
+              <Pressable
+                onPress={handleModelSummaryPress}
+                disabled={!props.onModelModeChange || availableModels.length === 0}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                style={({ pressed }) => ({
+                  flexDirection: "row",
+                  alignItems: "center",
+                  alignSelf: "flex-end",
+                  minWidth: 150,
+                  maxWidth: 260,
+                  marginLeft: 12,
+                  paddingLeft: 10,
+                  paddingRight: 8,
+                  paddingVertical: 6,
+                  borderRadius: 12,
+                  backgroundColor:
+                    !props.onModelModeChange || availableModels.length === 0
+                      ? "transparent"
+                      : pressed
+                        ? theme.colors.surfacePressed
+                        : `${theme.colors.surfacePressed}CC`,
+                  opacity:
+                    !props.onModelModeChange || availableModels.length === 0
+                      ? 1
+                      : pressed
+                        ? 0.85
+                        : 1,
+                  gap: 4,
+                })}
               >
-                {displayPermissionMode && (
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: isSandboxedYoloMode
-                        ? "#4169E1"
-                        : permissionModeKey === "acceptEdits"
-                          ? theme.colors.permission.acceptEdits
-                          : permissionModeKey === "bypassPermissions"
-                            ? theme.colors.permission.bypass
-                            : permissionModeKey === "plan"
-                              ? theme.colors.permission.plan
-                              : permissionModeKey === "dontAsk"
-                                ? theme.colors.permission.dontAsk
-                                : permissionModeKey === "read-only"
-                                  ? theme.colors.permission.readOnly
-                                  : permissionModeKey === "safe-yolo"
-                                    ? theme.colors.permission.safeYolo
-                                    : permissionModeKey === "yolo"
-                                      ? theme.colors.permission.yolo
-                                      : theme.colors.textSecondary, // Use secondary text color for default
-                      ...Typography.default(),
-                    }}
-                  >
-                    {withSandboxSuffix(
-                      displayPermissionMode.name,
-                      permissionModeKey,
-                    )}
-                  </Text>
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={{
+                    flex: 1,
+                    fontSize: 11,
+                    color: theme.colors.textSecondary,
+                    textAlign: "right",
+                    ...Typography.default(),
+                  }}
+                >
+                  {[
+                    displayPermissionMode
+                      ? withSandboxSuffix(
+                          displayPermissionMode.name,
+                          permissionModeKey,
+                        )
+                      : null,
+                    props.effectiveModelLabel ?? props.modelMode?.name,
+                    ...getReasoningSummaryLabels({
+                      isCodex,
+                      isGemini,
+                      reasoning: props.reasoning,
+                      translate: t,
+                    }),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+                {!!props.onModelModeChange && availableModels.length > 0 && (
+                  <Ionicons
+                    name="chevron-forward"
+                    size={12}
+                    color={theme.colors.textSecondary}
+                  />
                 )}
-                {props.modelMode && (
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: theme.colors.textSecondary,
-                      ...Typography.default(),
-                    }}
-                  >
-                    {[
-                      props.effectiveModelLabel ?? props.modelMode.name,
-                      ...getReasoningSummaryLabels({
-                        isCodex,
-                        isGemini,
-                        reasoning: props.reasoning,
-                        translate: t,
-                      }),
-                    ].join(" · ")}
-                  </Text>
-                )}
-              </View>
+              </Pressable>
             </View>
           )}
 
@@ -1015,6 +1146,7 @@ export const AgentInput = React.memo(
                 sdkContextWindow={props.usageData.contextWindow}
                 theme={theme}
                 sdkContextUsage={props.sdkContextUsage}
+                extraSummary={animatedTokensCostValue}
               />
             ) : null}
 

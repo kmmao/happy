@@ -8,6 +8,7 @@ import {
     formatTokenCountShort,
     getContextWindowSize,
 } from "@/utils/formatUsage";
+import type { AnimatedTokensCostValue } from "./AnimatedTokensCost";
 
 export const getContextWarning = (
     contextSize: number,
@@ -45,7 +46,7 @@ export const getContextWarning = (
             color: theme.colors.textSecondary,
         };
     }
-    return null; // No display needed
+    return null;
 };
 
 export const getProgressBarColor = (
@@ -60,7 +61,6 @@ export const getProgressBarColor = (
     return theme.colors.success;
 };
 
-/** SDK-provided precise context usage data (from getContextUsage API) */
 export type ContextUsageData = {
     totalTokens: number;
     maxTokens: number;
@@ -84,10 +84,9 @@ export const ContextProgressBar: React.FC<{
     modelCode?: string | null;
     sdkContextWindow?: number;
     theme: Theme;
-    /** SDK-provided precise context usage (preferred over contextSize when available) */
     sdkContextUsage?: ContextUsageData | null;
-}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme, sdkContextUsage }) => {
-    // Prefer SDK-provided precise data; fall back to estimated contextSize
+    extraSummary?: AnimatedTokensCostValue | null;
+}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme, sdkContextUsage, extraSummary }) => {
     const hasPreciseData = sdkContextUsage && sdkContextUsage.maxTokens > 0;
     const percentageUsed = hasPreciseData
         ? Math.min(100, sdkContextUsage.percentage)
@@ -140,8 +139,27 @@ export const ContextProgressBar: React.FC<{
                     textAlign: "right",
                     ...Typography.default(),
                 }}
+                numberOfLines={1}
             >
                 {label}
+                {extraSummary?.tokensLabel ? (
+                    <Text style={{ color: theme.colors.textSecondary }}>
+                        {` · `}
+                        <Text style={{ color: theme.colors.textLink }}>
+                            {extraSummary.tokensLabel}
+                        </Text>
+                        {extraSummary.costLabel ? (
+                            <Text style={{ color: theme.colors.accentOrange }}>
+                                {` · ${extraSummary.costLabel}`}
+                            </Text>
+                        ) : null}
+                        {extraSummary.durationLabel ? (
+                            <Text style={{ color: theme.colors.success }}>
+                                {` · ${extraSummary.durationLabel}`}
+                            </Text>
+                        ) : null}
+                    </Text>
+                ) : null}
             </Text>
         </View>
     );
