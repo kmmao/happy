@@ -276,6 +276,7 @@ async function dispatchPlannerTask(opts: {
             triggerType: "manual",
             status: "dispatching",
             goalId: goal.id,
+            directory: project.path,
         },
     });
 

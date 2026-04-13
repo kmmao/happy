@@ -9,6 +9,7 @@ import {
     eventRouter,
     buildAgentMessageEphemeral,
 } from "@/app/events/eventRouter";
+import { dispatchQueuedTasksForRole } from "@/modules/roleConcurrencyCheck";
 
 const MsgTypeSchema = z.enum([
     "request",
@@ -184,6 +185,36 @@ export function agentMessageRoutes(app: Fastify) {
                 });
 
                 log({ module: "agent-message" }, `Decision request escalated to decision ${decisionResult.id}`);
+
+                // Pause the task that issued this decision request
+                if (sessionId) {
+                    const runningTask = await db.task.findFirst({
+                        where: {
+                            accountId: userId,
+                            projectId,
+                            sessionId,
+                            status: { in: ["running", "dispatching"] },
+                        },
+                        select: { id: true, roleType: true, machineId: true },
+                    });
+                    if (runningTask) {
+                        await db.task.update({
+                            where: { id: runningTask.id },
+                            data: { status: "waiting_decision", waitingDecisionId: decisionResult.id },
+                        });
+                        log({ module: "agent-message" }, `Task ${runningTask.id} paused waiting for decision ${decisionResult.id}`);
+
+                        // Free concurrency slot so queued tasks can proceed
+                        if (runningTask.roleType) {
+                            void dispatchQueuedTasksForRole({
+                                accountId: userId,
+                                projectId,
+                                roleType: runningTask.roleType,
+                                machineId: runningTask.machineId,
+                            });
+                        }
+                    }
+                }
             }
 
             // Create InboxItem for conflict, law_suggestion, dependency_blocked, review_request

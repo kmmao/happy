@@ -832,6 +832,9 @@ model Task {
     // Role identity (e.g. "builder", "healer") assigned by the Planner
     roleType        String?
 
+    // Decision wait mechanism — task paused waiting for human adjudication
+    waitingDecisionId String?
+
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 
@@ -842,6 +845,7 @@ model Task {
     @@index([goalId])
     @@index([goalId, status])
     @@index([accountId, createdAt(sort: Desc)])
+    @@index([waitingDecisionId])
 }
 
 //

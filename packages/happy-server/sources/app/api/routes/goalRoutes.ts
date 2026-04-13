@@ -12,6 +12,7 @@ import { goalCreate, goalDecompose } from "@/modules/goalCreate";
 import { buildWorldSessionBaseline, buildRoleIdentityPrefix } from "@/modules/goalHelpers";
 import { serializeGoal, serializeGoalDetail, type GoalAgentMessageSummary } from "@/modules/goalSerializer";
 import { TIME_MS } from "@/modules/worldConstants";
+import { availableSlotsForRole } from "@/modules/roleConcurrencyCheck";
 
 const GoalStatusSchema = z.enum(["planning", "in_progress", "blocked", "completed", "cancelled"]);
 const GoalPrioritySchema = z.enum(["urgent", "normal", "low"]);
@@ -818,8 +819,11 @@ export function goalRoutes(app: Fastify) {
                 low: "background",
             };
 
+            // Track per-role active counts for batch concurrency check (avoids N+1 DB queries)
+            const roleActiveCounts = new Map<string, number>();
+
             // Create tasks in order, injecting role identity and branch instructions
-            const createdTasks: Array<{ id: string; prompt: string; priority: string; agentType: string | null; modelOverride: string | null }> = [];
+            const createdTasks: Array<{ id: string; prompt: string; priority: string; agentType: string | null; modelOverride: string | null; shouldDispatch: boolean }> = [];
             for (const taskDef of taskDefs) {
                 const matchedRole = taskDef.suggestedRole ? roleMap.get(taskDef.suggestedRole) : undefined;
                 const worldBaseline = buildWorldSessionBaseline(project);
@@ -840,6 +844,23 @@ export function goalRoutes(app: Fastify) {
                 promptParts.push(`## Your Task\n\n${taskDef.prompt}`);
                 const fullPrompt = promptParts.join("\n\n---\n\n");
 
+                // Concurrency check: does this role have an available slot?
+                let shouldDispatch = true;
+                if (taskDef.suggestedRole) {
+                    const alreadyActive = roleActiveCounts.get(taskDef.suggestedRole) ?? 0;
+                    const slots = await availableSlotsForRole({
+                        accountId: userId,
+                        projectId,
+                        roleType: taskDef.suggestedRole,
+                        alreadyActive,
+                    });
+                    if (slots <= 0) {
+                        shouldDispatch = false;
+                    } else {
+                        roleActiveCounts.set(taskDef.suggestedRole, alreadyActive + 1);
+                    }
+                }
+
                 const task = await db.task.create({
                     data: {
                         accountId: userId,
@@ -850,12 +871,13 @@ export function goalRoutes(app: Fastify) {
                         priority: priorityMap[taskDef.priority] ?? "user",
                         maxAttempts: 3,
                         triggerType: "manual",
-                        status: "dispatching",
+                        status: shouldDispatch ? "dispatching" : "queued",
                         goalId: goal.id,
                         roleType: taskDef.suggestedRole ?? null,
+                        directory: project.path,
                     },
                 });
-                createdTasks.push({ id: task.id, prompt: task.prompt, priority: task.priority, agentType: matchedRole?.agentType ?? null, modelOverride: matchedRole?.modelOverride ?? null });
+                createdTasks.push({ id: task.id, prompt: task.prompt, priority: task.priority, agentType: matchedRole?.agentType ?? null, modelOverride: matchedRole?.modelOverride ?? null, shouldDispatch });
             }
 
             // Update goal status
@@ -864,8 +886,9 @@ export function goalRoutes(app: Fastify) {
                 data: { status: "in_progress" },
             });
 
-            // Dispatch all tasks to CLI
+            // Dispatch tasks that passed the concurrency check
             for (const task of createdTasks) {
+                if (!task.shouldDispatch) continue;
                 eventRouter.emitEphemeral({
                     userId,
                     payload: buildTaskTriggerEphemeral({

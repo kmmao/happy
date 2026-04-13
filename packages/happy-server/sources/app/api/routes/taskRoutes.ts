@@ -17,6 +17,7 @@ import {
 } from "@/modules/taskStatusLogic";
 import { truncateText, TEXT_LIMITS } from "@/modules/worldConstants";
 import { worldSuggestionRefresh } from "@/modules/worldSuggestionGenerate";
+import { dispatchQueuedTasksForRole } from "@/modules/roleConcurrencyCheck";
 
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
 const TaskStatusSchema = z.enum(["queued", "dispatching", "running", "completed", "failed", "cancelled"]);
@@ -76,7 +77,7 @@ function buildTaskStatusPayload(input: {
         outcome: input.outcome,
     });
     return {
-        status: normalized.status,
+        status: normalized.status as z.infer<typeof TaskStatusSchema>,
         outcome: normalized.outcome,
         errorMessage: normalized.status === "completed" ? undefined : (input.errorMessage ?? input.summary),
     };
@@ -540,6 +541,16 @@ export function taskRoutes(app: Fastify) {
             // Auto-resolve dependency_blocked messages waiting on this task
             void resolveBlockedMessagesByTask({ taskId, accountId: request.userId });
 
+            // Free up concurrency slot for next queued task of same role
+            if (updated.roleType && updated.projectId) {
+                void dispatchQueuedTasksForRole({
+                    accountId: request.userId,
+                    projectId: updated.projectId,
+                    roleType: updated.roleType,
+                    machineId: updated.machineId,
+                });
+            }
+
             log({ module: "task" }, `Task ${taskId} outcome → ${outcome} (status=${resolvedStatus})`);
             return reply.send({ task: serializeTask(updated) });
         },
@@ -622,6 +633,16 @@ export function taskRoutes(app: Fastify) {
                 void resolveBlockedMessagesByTask({ taskId, accountId: request.userId });
             }
 
+            // Free up concurrency slot for next queued task of same role
+            if (isTerminal && updated.roleType && updated.projectId) {
+                void dispatchQueuedTasksForRole({
+                    accountId: request.userId,
+                    projectId: updated.projectId,
+                    roleType: updated.roleType,
+                    machineId: updated.machineId,
+                });
+            }
+
             log({ module: "task" }, `Task ${taskId} status → ${resolvedStatus}`);
             return reply.send({ task: serializeTask(updated) });
         },
@@ -667,6 +688,8 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         completedAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
+        roleType?: string | null;
+        waitingDecisionId?: string | null;
         skillBindings?: Array<{ skill: { name: string } }>;
     };
 
@@ -688,6 +711,8 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         createdAt: t.createdAt.getTime(),
         updatedAt: t.updatedAt.getTime(),
         promptPreview: truncateText(t.prompt, TEXT_LIMITS.PROMPT_PREVIEW),
+        roleType: t.roleType ?? null,
+        waitingDecisionId: t.waitingDecisionId ?? null,
         skillNames: t.skillBindings?.map((b) => b.skill.name) ?? [],
     };
 }
