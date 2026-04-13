@@ -11,6 +11,7 @@ export interface UsageDataPoint {
 
 export interface UsageQueryParams {
   sessionId?: string;
+  projectId?: string;
   startTime?: number; // Unix timestamp in seconds
   endTime?: number; // Unix timestamp in seconds
   groupBy?: "hour" | "day";
@@ -149,6 +150,7 @@ export async function getUsageForPeriod(
   credentials: AuthCredentials,
   period: "today" | "7days" | "30days",
   sessionId?: string,
+  projectId?: string,
 ): Promise<UsageResponse> {
   const now = Math.floor(Date.now() / 1000);
   const oneDaySeconds = 24 * 60 * 60;
@@ -176,6 +178,7 @@ export async function getUsageForPeriod(
 
   const response = await queryUsage(credentials, {
     sessionId,
+    projectId,
     startTime,
     endTime: now,
     groupBy,

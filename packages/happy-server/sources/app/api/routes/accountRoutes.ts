@@ -181,6 +181,7 @@ export function accountRoutes(app: Fastify) {
         schema: {
             body: z.object({
                 sessionId: z.string().nullish(),
+                projectId: z.string().nullish(),
                 startTime: z.number().int().positive().nullish(),
                 endTime: z.number().int().positive().nullish(),
                 groupBy: z.enum(['hour', 'day']).nullish(),
@@ -190,7 +191,7 @@ export function accountRoutes(app: Fastify) {
         preHandler: app.authenticate
     }, async (request, reply) => {
         const userId = request.userId;
-        const { sessionId, startTime, endTime, groupBy, timezone } = request.body;
+        const { sessionId, projectId, startTime, endTime, groupBy, timezone } = request.body;
         const actualGroupBy = groupBy || 'day';
 
         // Validate timezone: Intl check + strict character allowlist to prevent SQL injection.
@@ -212,6 +213,15 @@ export function accountRoutes(app: Fastify) {
                 });
                 if (!session) {
                     return reply.code(404).send({ error: 'Session not found' });
+                }
+            }
+
+            if (projectId) {
+                const project = await db.project.findFirst({
+                    where: { id: projectId, accountId: userId }
+                });
+                if (!project) {
+                    return reply.code(404).send({ error: 'Project not found' });
                 }
             }
 
@@ -243,7 +253,9 @@ export function accountRoutes(app: Fastify) {
                     kv.key,
                     SUM(kv.value::double precision) AS total_value,
                     COUNT(DISTINCT ur.id) AS report_count
-                FROM "UsageReport" ur,
+                FROM "UsageReport" ur
+                LEFT JOIN "Session" s ON s.id = ur."sessionId"
+                ,
                 LATERAL (
                     VALUES ('tokens', COALESCE(ur.data->'tokens', '{}'::jsonb)),
                            ('cost', COALESCE(ur.data->'cost', '{}'::jsonb))
@@ -251,6 +263,7 @@ export function accountRoutes(app: Fastify) {
                 LATERAL jsonb_each_text(cat.obj) AS kv(key, value)
                 WHERE ur."accountId" = ${userId}
                     AND (${sessionId}::text IS NULL OR ur."sessionId" = ${sessionId})
+                    AND (${projectId}::text IS NULL OR s."projectId" = ${projectId})
                     AND (${startDate}::timestamp IS NULL OR ur."createdAt" >= ${startDate})
                     AND (${endDate}::timestamp IS NULL OR ur."createdAt" <= ${endDate})
                 GROUP BY bucket_epoch, cat.category, kv.key

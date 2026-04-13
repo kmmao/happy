@@ -92,7 +92,7 @@ export const ProjectAnalyticsTab = React.memo(
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const response = await getUsageForPeriod(credentials, period);
+                const response = await getUsageForPeriod(credentials, period, undefined, project.id);
                 setUsageData(response.usage || []);
                 setTotals(calculateTotals(response.usage || []));
             } catch (err) {
@@ -100,7 +100,7 @@ export const ProjectAnalyticsTab = React.memo(
             } finally {
                 setUsageLoading(false);
             }
-        }, []);
+        }, [project.id]);
 
         // Load supervisor data
         const loadSupervisorData = React.useCallback(async (days: number) => {
