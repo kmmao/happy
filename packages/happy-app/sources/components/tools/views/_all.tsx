@@ -25,6 +25,7 @@ export type ToolViewProps = {
   messages: Message[];
   sessionId?: string;
   scrollViewRef?: React.RefObject<ScrollView | null>;
+  onOptionPress?: (option: { title: string }) => void;
 };
 
 // Type for tool view components

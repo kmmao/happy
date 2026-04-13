@@ -47,6 +47,7 @@ interface ToolViewProps {
   sessionId?: string;
   messageId?: string;
   permissionModeKey?: string | null;
+  onOptionPress?: (option: { title: string }) => void;
 }
 
 export const ToolView = React.memo<ToolViewProps>((props) => {
@@ -444,6 +445,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
             metadata={props.metadata}
             messages={props.messages ?? []}
             sessionId={sessionId}
+            onOptionPress={props.onOptionPress}
           />
         </View>
         {sessionId &&
@@ -550,6 +552,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                 metadata={props.metadata}
                 messages={props.messages ?? []}
                 sessionId={sessionId}
+                onOptionPress={props.onOptionPress}
               />
               {tool.state === "error" &&
                 tool.result &&
