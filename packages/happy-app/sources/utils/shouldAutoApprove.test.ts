@@ -30,12 +30,15 @@ describe("shouldAutoApprove", () => {
         });
     });
 
-    // ExitPlanMode: only auto-approve in bypassPermissions
+    // ExitPlanMode: auto-approve in bypassPermissions and yolo
     describe("ExitPlanMode", () => {
-        it("returns true only in bypassPermissions mode", () => {
-            expect(shouldAutoApprove("bypassPermissions", "ExitPlanMode")).toBe(true);
-            expect(shouldAutoApprove("bypassPermissions", "exit_plan_mode")).toBe(true);
-        });
+        it.each(["bypassPermissions", "yolo"] as const)(
+            "returns true in %s mode",
+            (mode) => {
+                expect(shouldAutoApprove(mode, "ExitPlanMode")).toBe(true);
+                expect(shouldAutoApprove(mode, "exit_plan_mode")).toBe(true);
+            },
+        );
 
         it.each(["default", "plan", "acceptEdits", null, undefined] as const)(
             "returns false in %s mode",

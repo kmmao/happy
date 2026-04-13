@@ -33,9 +33,9 @@ export function shouldAutoApprove(
         return false;
     }
 
-    // ExitPlanMode always requires manual approval (except in bypassPermissions)
+    // ExitPlanMode always requires manual approval (except in bypassPermissions/yolo)
     if (EXIT_PLAN_TOOLS.has(toolName)) {
-        return permissionModeKey === "bypassPermissions";
+        return permissionModeKey === "bypassPermissions" || permissionModeKey === "yolo";
     }
 
     switch (permissionModeKey) {
