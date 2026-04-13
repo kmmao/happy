@@ -82,6 +82,8 @@ export interface TaskTriggerData {
   projectId?: string;
   resultToken?: string;
   skillContents?: Array<{ name: string; content: string }>;
+  agentType?: string | null;    // "claude" | "codex" | "gemini" — null = inherit CLI default
+  modelOverride?: string | null; // e.g. "claude-sonnet-4-20250514" — null = agent default
 }
 
 export type AutomationJobKind = "supervisor" | "webhook" | "agent_loop" | "task";

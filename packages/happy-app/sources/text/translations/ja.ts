@@ -3996,6 +3996,10 @@ export const ja: TranslationStructure = {
     typeCustom: "カスタム",
     activeTasks: ({ count }: { count: number }) => `${count} 件のアクティブタスク`,
     taskStatus: ({ index, status }: { index: number; status: string }) => `タスク #${index} · ${status}`,
+    agentTypeLabel: "エージェントタイプ",
+    agentTypeInherit: "デフォルト（継承）",
+    modelOverrideLabel: "モデルオーバーライド",
+    modelOverridePlaceholder: "例: claude-sonnet-4-20250514（空欄でデフォルト）",
   },
   goals: {
     title: "ゴール",

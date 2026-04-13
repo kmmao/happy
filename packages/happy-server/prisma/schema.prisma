@@ -1040,6 +1040,10 @@ model AgentRole {
     maxConcurrency  Int       @default(1)           // Max concurrent loops (Phase 1: recorded only, not enforced)
     enabled         Boolean   @default(true)
 
+    // Execution environment — null means inherit from CLI active profile
+    agentType       String?                         // "claude" | "codex" | "gemini" — null = inherit
+    modelOverride   String?                         // e.g. "claude-sonnet-4-20250514" — null = agent default
+
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 

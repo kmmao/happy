@@ -5,6 +5,8 @@ import { log } from "@/utils/log";
 
 const ROLE_TYPES = ["guardian", "builder", "healer", "chronicler", "planner", "messenger", "custom"] as const;
 
+const AGENT_TYPES = ["claude", "codex", "gemini"] as const;
+
 const CreateAgentRoleBodySchema = z.object({
     projectId: z.string(),
     name: z.string().min(1).max(200),
@@ -14,6 +16,8 @@ const CreateAgentRoleBodySchema = z.object({
     skillIds: z.array(z.string()).max(10).default([]),
     maxConcurrency: z.number().int().min(1).max(10).default(1),
     templateType: z.enum(ROLE_TYPES).optional(),
+    agentType: z.enum(AGENT_TYPES).nullable().optional(),
+    modelOverride: z.string().max(100).nullable().optional(),
 });
 
 const UpdateAgentRoleBodySchema = z.object({
@@ -24,6 +28,8 @@ const UpdateAgentRoleBodySchema = z.object({
     skillIds: z.array(z.string()).max(10).optional(),
     maxConcurrency: z.number().int().min(1).max(10).optional(),
     enabled: z.boolean().optional(),
+    agentType: z.enum(AGENT_TYPES).nullable().optional(),
+    modelOverride: z.string().max(100).nullable().optional(),
 });
 
 const QueryAgentRolesSchema = z.object({
@@ -104,7 +110,7 @@ export function agentRoleRoutes(app: Fastify) {
             schema: { body: CreateAgentRoleBodySchema },
         },
         async (request, reply) => {
-            const { projectId, name, type, description, duties, skillIds, maxConcurrency, templateType } = request.body;
+            const { projectId, name, type, description, duties, skillIds, maxConcurrency, templateType, agentType, modelOverride } = request.body;
 
             // Verify project ownership
             const project = await db.project.findFirst({
@@ -132,6 +138,8 @@ export function agentRoleRoutes(app: Fastify) {
                         duties: JSON.stringify(finalDuties),
                         skillIds: JSON.stringify(skillIds),
                         maxConcurrency,
+                        agentType: agentType ?? null,
+                        modelOverride: modelOverride ?? null,
                     },
                 });
 
@@ -282,7 +290,7 @@ export function agentRoleRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Agent role not found" });
             }
 
-            const { name, type, description, duties, skillIds, maxConcurrency, enabled } = request.body;
+            const { name, type, description, duties, skillIds, maxConcurrency, enabled, agentType, modelOverride } = request.body;
             const data: Record<string, unknown> = {};
 
             if (name !== undefined) data.name = name;
@@ -292,6 +300,8 @@ export function agentRoleRoutes(app: Fastify) {
             if (skillIds !== undefined) data.skillIds = JSON.stringify(skillIds);
             if (maxConcurrency !== undefined) data.maxConcurrency = maxConcurrency;
             if (enabled !== undefined) data.enabled = enabled;
+            if (agentType !== undefined) data.agentType = agentType;
+            if (modelOverride !== undefined) data.modelOverride = modelOverride;
 
             try {
                 const updated = await db.agentRole.update({
@@ -359,6 +369,8 @@ function serializeAgentRole(role: {
     skillIds: string;
     maxConcurrency: number;
     enabled: boolean;
+    agentType: string | null;
+    modelOverride: string | null;
     createdAt: Date;
     updatedAt: Date;
 }) {
@@ -372,6 +384,8 @@ function serializeAgentRole(role: {
         skillIds: safeParseJsonArray(role.skillIds),
         maxConcurrency: role.maxConcurrency,
         enabled: role.enabled,
+        agentType: role.agentType,
+        modelOverride: role.modelOverride,
         createdAt: role.createdAt.getTime(),
         updatedAt: role.updatedAt.getTime(),
     };

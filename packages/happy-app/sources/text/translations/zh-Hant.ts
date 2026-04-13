@@ -3930,6 +3930,10 @@ export const zhHant: TranslationStructure = {
     typeCustom: "自訂",
     activeTasks: ({ count }: { count: number }) => `${count} 個活躍任務`,
     taskStatus: ({ index, status }: { index: number; status: string }) => `任務 #${index} · ${status}`,
+    agentTypeLabel: "Agent 類型",
+    agentTypeInherit: "繼承（預設）",
+    modelOverrideLabel: "指定模型",
+    modelOverridePlaceholder: "如 claude-sonnet-4-20250514（留空則使用預設）",
   },
   goals: {
     title: "目標",

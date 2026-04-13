@@ -304,6 +304,8 @@ export interface AgentRoleSummary {
     skillIds: string[];
     maxConcurrency: number;
     enabled: boolean;
+    agentType: string | null;
+    modelOverride: string | null;
     activeTasks: RoleActiveTask[];
     createdAt: number;
     updatedAt: number;
@@ -342,6 +344,8 @@ export async function createAgentRole(
         duties?: string[];
         skillIds?: string[];
         templateType?: string;
+        agentType?: string | null;
+        modelOverride?: string | null;
     },
 ): Promise<AgentRoleSummary> {
     const API_ENDPOINT = getServerUrl();
@@ -370,6 +374,8 @@ export async function updateAgentRole(
         skillIds?: string[];
         maxConcurrency?: number;
         enabled?: boolean;
+        agentType?: string | null;
+        modelOverride?: string | null;
     },
 ): Promise<AgentRoleSummary> {
     const API_ENDPOINT = getServerUrl();

@@ -4024,6 +4024,10 @@ export const ca: TranslationStructure = {
     typeCustom: "Custom",
     activeTasks: ({ count }: { count: number }) => `${count} ${count === 1 ? "tasca activa" : "tasques actives"}`,
     taskStatus: ({ index, status }: { index: number; status: string }) => `Tasca #${index} · ${status}`,
+    agentTypeLabel: "Tipus d'agent",
+    agentTypeInherit: "Heretar (per defecte)",
+    modelOverrideLabel: "Substitució de model",
+    modelOverridePlaceholder: "p.ex. claude-sonnet-4-20250514 (buit = per defecte)",
   },
   goals: {
     title: "Objectius",

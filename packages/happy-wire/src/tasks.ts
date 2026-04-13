@@ -75,6 +75,8 @@ export const TaskTriggerDataSchema = z.object({
     name: z.string(),
     content: z.string(),
   })).optional(),
+  agentType: z.string().nullable().optional(),    // "claude" | "codex" | "gemini" — null = inherit CLI default
+  modelOverride: z.string().nullable().optional(), // e.g. "claude-sonnet-4-20250514" — null = agent default
 });
 export type TaskTriggerData = z.infer<typeof TaskTriggerDataSchema>;
 

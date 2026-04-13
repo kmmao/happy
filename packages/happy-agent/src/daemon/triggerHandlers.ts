@@ -52,6 +52,8 @@ export interface TaskTriggerData {
   projectId?: string;
   resultToken?: string;
   skillContents?: Array<{ name: string; content: string }>;
+  agentType?: string | null;    // "claude" | "codex" | "gemini" — null = inherit default
+  modelOverride?: string | null; // e.g. "claude-sonnet-4-20250514" — null = agent default
 }
 
 const PROMPT_DIR = join(tmpdir(), "happy", "agent-prompts");

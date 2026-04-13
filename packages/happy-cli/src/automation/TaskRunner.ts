@@ -102,10 +102,11 @@ export async function runTaskJob(
 
   await deps.onTaskStatusChange?.(data.taskId, "running");
 
+  const agentType = (data.agentType ?? "claude") as "claude" | "codex";
   const spawnResult = await deps.spawnSession({
     directory: resolvedDirectory,
     approvedNewDirectoryCreation: false,
-    agent: "claude",
+    agent: agentType,
     automationContext: {
       kind: "task",
       trigger: "task",
@@ -119,6 +120,9 @@ export async function runTaskJob(
       ...(deps.serverUrl ? { HAPPY_TASK_SERVER_URL: deps.serverUrl } : {}),
       ...(data.resultToken ? { HAPPY_TASK_RESULT_TOKEN: data.resultToken } : {}),
       ...(deps.serverUrl ? { HAPPY_TASK_REPORT_URL: `${deps.serverUrl.replace(/\/$/, "")}/v1/tasks/result` } : {}),
+      // Per-role model override: inject into the spawned agent's environment
+      ...(data.modelOverride && agentType === "claude" ? { ANTHROPIC_MODEL: data.modelOverride } : {}),
+      // TODO: Codex model override via OPENAI_MODEL (Phase 2)
     },
   });
 

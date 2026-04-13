@@ -1171,6 +1171,8 @@ export function buildTaskTriggerEphemeral(opts: {
   projectId?: string;
   resultToken?: string;
   skillContents?: Array<{ name: string; content: string }>;
+  agentType?: string | null;
+  modelOverride?: string | null;
 }): EphemeralPayload {
   return {
     type: "task-trigger",

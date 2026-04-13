@@ -807,7 +807,7 @@ export function goalRoutes(app: Fastify) {
             // Load all enabled roles for role identity injection
             const roles = await db.agentRole.findMany({
                 where: { accountId: userId, projectId, enabled: true },
-                select: { name: true, type: true, description: true, duties: true },
+                select: { name: true, type: true, description: true, duties: true, agentType: true, modelOverride: true },
             });
             const roleMap = new Map(roles.map((r) => [r.type, r]));
 
@@ -819,8 +819,9 @@ export function goalRoutes(app: Fastify) {
             };
 
             // Create tasks in order, injecting role identity and branch instructions
-            const createdTasks: Array<{ id: string; prompt: string; priority: string }> = [];
+            const createdTasks: Array<{ id: string; prompt: string; priority: string; agentType: string | null; modelOverride: string | null }> = [];
             for (const taskDef of taskDefs) {
+                const matchedRole = taskDef.suggestedRole ? roleMap.get(taskDef.suggestedRole) : undefined;
                 const worldBaseline = buildWorldSessionBaseline(project);
                 const roleIdentity = buildRoleIdentityPrefix(taskDef.suggestedRole, roleMap);
                 const branchName = `goal/${goal.id.slice(-8)}/${taskDef.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`;
@@ -854,7 +855,7 @@ export function goalRoutes(app: Fastify) {
                         roleType: taskDef.suggestedRole ?? null,
                     },
                 });
-                createdTasks.push({ id: task.id, prompt: task.prompt, priority: task.priority });
+                createdTasks.push({ id: task.id, prompt: task.prompt, priority: task.priority, agentType: matchedRole?.agentType ?? null, modelOverride: matchedRole?.modelOverride ?? null });
             }
 
             // Update goal status
@@ -873,6 +874,8 @@ export function goalRoutes(app: Fastify) {
                         directory: project.path,
                         priority: task.priority,
                         projectId,
+                        agentType: task.agentType,
+                        modelOverride: task.modelOverride,
                     }),
                     recipientFilter: {
                         type: "machine-scoped-only",

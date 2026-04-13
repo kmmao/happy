@@ -4040,6 +4040,10 @@ export const pl: TranslationStructure = {
     typeCustom: "Custom",
     activeTasks: ({ count }: { count: number }) => `${count} ${count === 1 ? "aktywne zadanie" : "aktywnych zadań"}`,
     taskStatus: ({ index, status }: { index: number; status: string }) => `Zadanie #${index} · ${status}`,
+    agentTypeLabel: "Typ agenta",
+    agentTypeInherit: "Domyślny (odziedziczony)",
+    modelOverrideLabel: "Zastąpienie modelu",
+    modelOverridePlaceholder: "np. claude-sonnet-4-20250514 (puste = domyślny)",
   },
   goals: {
     title: "Cele",

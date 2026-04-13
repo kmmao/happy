@@ -4019,6 +4019,10 @@ export const es: TranslationStructure = {
     typeCustom: "Custom",
     activeTasks: ({ count }: { count: number }) => `${count} ${count === 1 ? "tarea activa" : "tareas activas"}`,
     taskStatus: ({ index, status }: { index: number; status: string }) => `Tarea #${index} · ${status}`,
+    agentTypeLabel: "Tipo de agente",
+    agentTypeInherit: "Heredar (predeterminado)",
+    modelOverrideLabel: "Reemplazar modelo",
+    modelOverridePlaceholder: "p.ej. claude-sonnet-4-20250514 (vacío = predeterminado)",
   },
   goals: {
     title: "Objetivos",

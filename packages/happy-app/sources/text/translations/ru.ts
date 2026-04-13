@@ -4038,6 +4038,10 @@ export const ru: TranslationStructure = {
     typeCustom: "Custom",
     activeTasks: ({ count }: { count: number }) => `${count} ${count === 1 ? "активная задача" : "активных задач"}`,
     taskStatus: ({ index, status }: { index: number; status: string }) => `Задача #${index} · ${status}`,
+    agentTypeLabel: "Тип агента",
+    agentTypeInherit: "По умолчанию (наследовать)",
+    modelOverrideLabel: "Переопределение модели",
+    modelOverridePlaceholder: "напр. claude-sonnet-4-20250514 (оставьте пустым для по умолчанию)",
   },
   goals: {
     title: "Цели",

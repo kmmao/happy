@@ -223,7 +223,7 @@ async function dispatchPlannerTask(opts: {
     // Find planner role and its bound skills
     const plannerRole = await db.agentRole.findFirst({
         where: { accountId, projectId, type: "planner", enabled: true },
-        select: { name: true, skillIds: true },
+        select: { name: true, skillIds: true, agentType: true, modelOverride: true },
     });
 
     // Load skills if role has bindings
@@ -289,6 +289,8 @@ async function dispatchPlannerTask(opts: {
             priority: task.priority,
             projectId,
             skillContents,
+            agentType: plannerRole?.agentType ?? null,
+            modelOverride: plannerRole?.modelOverride ?? null,
         }),
         recipientFilter: {
             type: "machine-scoped-only",

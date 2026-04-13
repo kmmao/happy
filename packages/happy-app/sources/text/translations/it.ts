@@ -4018,6 +4018,10 @@ export const it: TranslationStructure = {
     typeCustom: "Custom",
     activeTasks: ({ count }: { count: number }) => `${count} ${count === 1 ? "attività attiva" : "attività attive"}`,
     taskStatus: ({ index, status }: { index: number; status: string }) => `Attività #${index} · ${status}`,
+    agentTypeLabel: "Tipo di agente",
+    agentTypeInherit: "Eredita (predefinito)",
+    modelOverrideLabel: "Override modello",
+    modelOverridePlaceholder: "es. claude-sonnet-4-20250514 (vuoto = predefinito)",
   },
   goals: {
     title: "Obiettivi",

@@ -314,6 +314,8 @@ const RoleFormSheet = React.memo(function RoleFormSheet({
     const [templateType, setTemplateType] = React.useState<string | undefined>(
         role?.type && role.type !== "custom" ? role.type : undefined,
     );
+    const [agentType, setAgentType] = React.useState<string | null>(role?.agentType ?? null);
+    const [modelOverride, setModelOverride] = React.useState(role?.modelOverride ?? "");
 
     const handleSave = React.useCallback(async () => {
         if (!name.trim()) return;
@@ -326,6 +328,8 @@ const RoleFormSheet = React.memo(function RoleFormSheet({
                 type,
                 description: description.trim() || undefined,
                 duties: duties.filter((d) => d.trim()),
+                agentType: agentType ?? null,
+                modelOverride: modelOverride.trim() || null,
             };
             const saved = isNew
                 ? await createAgentRole(credentials, {
@@ -341,7 +345,7 @@ const RoleFormSheet = React.memo(function RoleFormSheet({
         } finally {
             setSaving(false);
         }
-    }, [name, type, description, duties, isNew, projectId, role, onSave, templateType]);
+    }, [name, type, description, duties, isNew, projectId, role, onSave, templateType, agentType, modelOverride]);
 
     const addDuty = React.useCallback(() => {
         if (newDuty.trim() && duties.length < 10) {
@@ -497,6 +501,37 @@ const RoleFormSheet = React.memo(function RoleFormSheet({
                             </Pressable>
                         </View>
                     )}
+
+                    {/* Agent Type */}
+                    <Text style={styles.fieldLabel}>{t("roles.agentTypeLabel")}</Text>
+                    <View style={styles.chipRow}>
+                        {([null, "claude", "codex"] as Array<string | null>).map((at) => {
+                            const selected = agentType === at;
+                            const label = at === null ? t("roles.agentTypeInherit") : at.charAt(0).toUpperCase() + at.slice(1);
+                            return (
+                                <Pressable
+                                    key={at ?? "inherit"}
+                                    style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
+                                    onPress={() => setAgentType(at)}
+                                >
+                                    <Text style={[styles.chipText, selected && { color: "#fff" }]}>{label}</Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+
+                    {/* Model Override */}
+                    <Text style={styles.fieldLabel}>{t("roles.modelOverrideLabel")}</Text>
+                    <TextInput
+                        style={styles.textInput}
+                        value={modelOverride}
+                        onChangeText={setModelOverride}
+                        placeholder={t("roles.modelOverridePlaceholder")}
+                        placeholderTextColor={theme.colors.textSecondary}
+                        maxLength={100}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                    />
 
                     {/* Actions */}
                     <View style={styles.modalActions}>

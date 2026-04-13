@@ -3926,6 +3926,10 @@ export const zhHans: TranslationStructure = {
     typeCustom: "自定义",
     activeTasks: ({ count }: { count: number }) => `${count} 个活跃任务`,
     taskStatus: ({ index, status }: { index: number; status: string }) => `任务 #${index} · ${status}`,
+    agentTypeLabel: "Agent 类型",
+    agentTypeInherit: "继承（默认）",
+    modelOverrideLabel: "指定模型",
+    modelOverridePlaceholder: "如 claude-sonnet-4-20250514（留空则使用默认）",
   },
   goals: {
     title: "目标",
