@@ -243,6 +243,14 @@ export const WorldRolesTab = React.memo(
                                         {role.description}
                                     </Text>
                                 )}
+                                {(role.agentType || role.modelOverride) && (
+                                    <Text style={styles.roleExecEnv}>
+                                        {[
+                                            role.agentType ? role.agentType.charAt(0).toUpperCase() + role.agentType.slice(1) : null,
+                                            role.modelOverride,
+                                        ].filter(Boolean).join(" · ")}
+                                    </Text>
+                                )}
                                 {role.activeTasks && role.activeTasks.length > 0 && (
                                     <View style={styles.activeTasksContainer}>
                                         <Text style={styles.activeTasksLabel}>
@@ -654,6 +662,13 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         marginTop: 8,
         lineHeight: 18,
+    },
+    roleExecEnv: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.accentPurple,
+        marginTop: 6,
+        opacity: 0.8,
     },
     activeTasksContainer: {
         marginTop: 10,

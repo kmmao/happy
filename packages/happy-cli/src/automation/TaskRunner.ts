@@ -122,7 +122,7 @@ export async function runTaskJob(
       ...(deps.serverUrl ? { HAPPY_TASK_REPORT_URL: `${deps.serverUrl.replace(/\/$/, "")}/v1/tasks/result` } : {}),
       // Per-role model override: inject into the spawned agent's environment
       ...(data.modelOverride && agentType === "claude" ? { ANTHROPIC_MODEL: data.modelOverride } : {}),
-      // TODO: Codex model override via OPENAI_MODEL (Phase 2)
+      ...(data.modelOverride && agentType === "codex" ? { OPENAI_MODEL: data.modelOverride } : {}),
     },
   });
 
