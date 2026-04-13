@@ -11,13 +11,23 @@ interface AgentContentViewProps {
   placeholder?: React.ReactNode | null;
   inputCollapsed?: boolean;
   collapsedOverlay?: React.ReactNode | null;
+  collapsedOverlayBottomInset?: number;
 }
 
 export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(
-  ({ input, content, placeholder, inputCollapsed, collapsedOverlay }) => {
+  ({
+    input,
+    content,
+    placeholder,
+    inputCollapsed,
+    collapsedOverlay,
+    collapsedOverlayBottomInset = 0,
+  }) => {
     const safeArea = useSafeAreaInsets();
     const headerHeight = useHeaderHeight();
     const state = useKeyboardState();
+    const contentBottomInset = inputCollapsed ? collapsedOverlayBottomInset : 0;
+
     return (
       <View
         style={{
@@ -29,24 +39,26 @@ export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(
         <View style={{ flexBasis: 0, flexGrow: 1 }}>
           {content && (
             <View
-              style={[
-                { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-              ]}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: contentBottomInset,
+              }}
             >
               {content}
             </View>
           )}
           {placeholder && (
             <ScrollView
-              style={[
-                {
-                  position: "absolute",
-                  top: safeArea.top + headerHeight,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                },
-              ]}
+              style={{
+                position: "absolute",
+                top: safeArea.top + headerHeight,
+                left: 0,
+                right: 0,
+                bottom: contentBottomInset,
+              }}
               contentContainerStyle={{
                 alignItems: "center",
                 justifyContent: "center",

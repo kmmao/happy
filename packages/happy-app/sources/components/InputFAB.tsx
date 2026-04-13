@@ -1,6 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as React from "react";
-import { Animated, Pressable, Text, View } from "react-native";
+import {
+  Animated,
+  LayoutChangeEvent,
+  Pressable,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
@@ -12,6 +19,8 @@ import {
   formatTokenCountShort,
   getContextWindowSize,
 } from "@/utils/formatUsage";
+
+const COMPACT_LAYOUT_BREAKPOINT = 520;
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -30,21 +39,40 @@ const stylesheet = StyleSheet.create((theme) => ({
     alignItems: "flex-end" as const,
     paddingHorizontal: 16,
   },
+  innerCompact: {
+    flexDirection: "column" as const,
+    alignItems: "flex-end" as const,
+    justifyContent: "flex-start" as const,
+    gap: 8,
+  },
   column: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 6,
+  },
+  columnCompact: {
+    alignSelf: "flex-end" as const,
   },
   statusColumn: {
     alignItems: "flex-start" as const,
     gap: 2,
     flex: 1,
   },
+  statusColumnCompact: {
+    flex: 0,
+    alignItems: "flex-end" as const,
+    width: "100%",
+  },
   statusLine: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 4,
   },
+  statusLineCompact: {
+    justifyContent: "flex-end" as const,
+    alignSelf: "flex-end" as const,
+  },
+
   button: {
     minWidth: 36,
     height: 36,
@@ -123,6 +151,7 @@ interface InputFABProps {
     remainingMs: number | null;
     onToggle: (next: boolean) => void;
   };
+  onHeightChange?: (height: number) => void;
 }
 
 export const InputFAB = React.memo(function InputFAB({
@@ -140,11 +169,14 @@ export const InputFAB = React.memo(function InputFAB({
   onBookmarksPress,
   statusInfo,
   autoOptionSend,
+  onHeightChange,
 }: InputFABProps) {
   const { theme } = useUnistyles();
+  const { width } = useWindowDimensions();
   const styles = stylesheet;
   const opacity = React.useRef(new Animated.Value(visible ? 1 : 0)).current;
   const [shouldRender, setShouldRender] = React.useState(visible);
+  const isCompactLayout = width <= COMPACT_LAYOUT_BREAKPOINT;
 
   React.useEffect(() => {
     if (visible) {
@@ -154,18 +186,32 @@ export const InputFAB = React.memo(function InputFAB({
         duration: 200,
         useNativeDriver: true,
       }).start();
-    } else {
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) {
-          setShouldRender(false);
-        }
-      });
+      return;
     }
+
+    Animated.timing(opacity, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setShouldRender(false);
+      }
+    });
   }, [visible, opacity]);
+
+  React.useEffect(() => {
+    if (!visible) {
+      onHeightChange?.(0);
+    }
+  }, [visible, onHeightChange]);
+
+  const handleLayout = React.useCallback(
+    (event: LayoutChangeEvent) => {
+      onHeightChange?.(event.nativeEvent.layout.height);
+    },
+    [onHeightChange],
+  );
 
   if (!shouldRender) return null;
 
@@ -176,24 +222,36 @@ export const InputFAB = React.memo(function InputFAB({
   const iconColor = theme.colors.fab.icon;
   const disabledIconColor = theme.colors.textSecondary;
   const badgeColor = theme.colors.radio.dot;
-
-  // noop for disabled buttons
   const noop = () => {};
 
   return (
-    <Animated.View style={[styles.container, { opacity }]}>
-      <View style={styles.inner}>
-        {/* Status info — left-aligned, bottom-aligned */}
+    <Animated.View
+      style={[styles.container, { opacity }]}
+      onLayout={handleLayout}
+    >
+      <View
+        style={[
+          styles.inner,
+          isCompactLayout && styles.innerCompact,
+        ]}
+      >
         {statusInfo ? (
-          <CompactStatus info={statusInfo} theme={theme} />
+          <CompactStatus
+            info={statusInfo}
+            theme={theme}
+            compact={isCompactLayout}
+          />
         ) : (
           <View />
         )}
 
-        {/* Vertical button column — right side */}
-        <View style={styles.column}>
+        <View
+          style={[
+            styles.column,
+            isCompactLayout && styles.columnCompact,
+          ]}
+        >
           <FABButton
-            key="options"
             icon="sparkles"
             onPress={onOptionsPress ?? noop}
             styles={styles}
@@ -203,7 +261,6 @@ export const InputFAB = React.memo(function InputFAB({
           />
           {autoOptionSend?.visible && (
             <FABButton
-              key="auto-option-send"
               icon="sparkles"
               label={
                 autoOptionSend.enabled && autoOptionSend.remainingMs != null
@@ -225,7 +282,6 @@ export const InputFAB = React.memo(function InputFAB({
             />
           )}
           <FABButton
-            key="bookmarks"
             icon="bookmark"
             onPress={onBookmarksPress ?? noop}
             styles={styles}
@@ -234,7 +290,6 @@ export const InputFAB = React.memo(function InputFAB({
             disabled={!showBookmarks}
           />
           <FABButton
-            key="prev"
             icon="arrow-up"
             onPress={onPrevUserMessage ?? noop}
             styles={styles}
@@ -244,7 +299,6 @@ export const InputFAB = React.memo(function InputFAB({
           />
           {showScrollDown ? (
             <FABButton
-              key="scroll-down"
               icon="chevron-down"
               onPress={onScrollDown}
               styles={styles}
@@ -253,7 +307,6 @@ export const InputFAB = React.memo(function InputFAB({
             />
           ) : (
             <FABButton
-              key="scroll-down"
               icon="chevron-down"
               onPress={noop}
               styles={styles}
@@ -263,7 +316,6 @@ export const InputFAB = React.memo(function InputFAB({
             />
           )}
           <FABButton
-            key="next"
             icon="arrow-down"
             onPress={onNextUserMessage ?? noop}
             styles={styles}
@@ -271,10 +323,7 @@ export const InputFAB = React.memo(function InputFAB({
             disabledIconColor={disabledIconColor}
             disabled={!showNavButtons}
           />
-
-          {/* Expand input button */}
           <FABButton
-            key="expand"
             icon="expand-outline"
             onPress={onExpandPress}
             badgeColor={
@@ -293,25 +342,24 @@ export const InputFAB = React.memo(function InputFAB({
 const CompactStatus = React.memo(function CompactStatus({
   info,
   theme,
+  compact,
 }: {
   info: InputFABStatusInfo;
   theme: ReturnType<typeof useUnistyles>["theme"];
+  compact: boolean;
 }) {
   const styles = stylesheet;
 
-  // Real-time elapsed time — ticks every second while AI is thinking
   const currentTurnElapsedSec = useElapsedTime(
     info.isThinking ? info.turnStartedAt : undefined,
   );
 
-  // Combine accumulated duration with current turn elapsed
   const elapsedLabel = React.useMemo(() => {
     const currentTurnMs = currentTurnElapsedSec * 1000;
     if (info.isThinking) {
       const totalMs = (info.completedTurnsDurationMs ?? 0) + currentTurnMs;
       if (totalMs <= 0) return null;
       const totalStr = formatDurationMs(totalMs);
-      // Show current turn time in brackets when there are previous turns
       if ((info.completedTurnsDurationMs ?? 0) > 0 && currentTurnMs > 0) {
         return `${totalStr} (${formatDurationMs(currentTurnMs)})`;
       }
@@ -320,9 +368,13 @@ const CompactStatus = React.memo(function CompactStatus({
     const totalMs = info.totalDurationMs ?? 0;
     if (totalMs <= 0) return null;
     return formatDurationMs(totalMs);
-  }, [info.totalDurationMs, info.completedTurnsDurationMs, info.isThinking, currentTurnElapsedSec]);
+  }, [
+    info.totalDurationMs,
+    info.completedTurnsDurationMs,
+    info.isThinking,
+    currentTurnElapsedSec,
+  ]);
 
-  // Context bar computation
   const contextSize = info.contextSize ?? 0;
   const knownWindowSize = getContextWindowSize(
     info.modelCode,
@@ -353,14 +405,12 @@ const CompactStatus = React.memo(function CompactStatus({
   const elapsedSuffix = elapsedLabel ? ` · ${elapsedLabel}` : "";
   const contextLabel = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(contextSize)}/${formatTokenCountShort(contextWindowSize)}${sessionTokensSuffix}${costSuffix}${elapsedSuffix}`;
 
-  // Always-visible session tokens line (shown even when context bar is hidden)
   const sessionTokens = info.totalSessionTokens;
   const sessionTokensLabel =
     sessionTokens != null && sessionTokens > 0
       ? `Σ${formatTokenCountShort(sessionTokens)}${costSuffix}${elapsedSuffix}`
       : null;
 
-  // Build status segments: "● status · permission · model"
   const segments: { text: string; color: string }[] = [
     { text: info.statusText, color: info.statusColor },
   ];
@@ -381,9 +431,18 @@ const CompactStatus = React.memo(function CompactStatus({
   } as const;
 
   return (
-    <View style={styles.statusColumn}>
-      {/* Status line: ● text · perm · model */}
-      <View style={styles.statusLine}>
+    <View
+      style={[
+        styles.statusColumn,
+        compact && styles.statusColumnCompact,
+      ]}
+    >
+      <View
+        style={[
+          styles.statusLine,
+          compact && styles.statusLineCompact,
+        ]}
+      >
         <StatusDot
           color={info.statusDotColor}
           isPulsing={info.isPulsing}
@@ -406,112 +465,87 @@ const CompactStatus = React.memo(function CompactStatus({
         ))}
       </View>
 
-      {/* Context usage (shown when context is running low) */}
-      {shouldShowContext && (
+      {shouldShowContext ? (
         <Text
           style={{
             fontSize: 9,
             color: barColor,
+            textAlign: compact ? "right" : "left",
+            alignSelf: compact ? "flex-end" : "auto",
             ...Typography.default(),
           }}
           numberOfLines={1}
         >
           {contextLabel}
         </Text>
-      )}
-
-      {/* Session tokens (shown when context bar is hidden but tokens exist) */}
-      {!shouldShowContext && sessionTokensLabel != null && (
+      ) : sessionTokensLabel ? (
         <Text
           style={{
             fontSize: 9,
             color: theme.colors.textSecondary,
+            textAlign: compact ? "right" : "left",
+            alignSelf: compact ? "flex-end" : "auto",
             ...Typography.default(),
           }}
           numberOfLines={1}
         >
           {sessionTokensLabel}
         </Text>
-      )}
+      ) : null}
     </View>
   );
 });
 
-const FABButton = React.memo(function FABButton({
-  icon,
-  onPress,
-  size = 18,
-  label,
-  badgeColor,
-  styles,
-  iconColor,
-  disabledIconColor,
-  disabled = false,
-}: {
+interface FABButtonProps {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   onPress: () => void;
-  size?: number;
-  label?: string;
-  badgeColor?: string;
   styles: typeof stylesheet;
   iconColor: string;
   disabledIconColor: string;
   disabled?: boolean;
-}) {
-  const scaleAnim = React.useRef(new Animated.Value(1)).current;
-  const wasDisabled = React.useRef(disabled);
+  label?: string;
+  badgeColor?: string;
+}
 
-  React.useEffect(() => {
-    if (wasDisabled.current && !disabled) {
-      // Pulse animation when becoming enabled
-      Animated.sequence([
-        Animated.timing(scaleAnim, {
-          toValue: 1.25,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-    wasDisabled.current = disabled;
-  }, [disabled, scaleAnim]);
-
+function FABButton({
+  icon,
+  onPress,
+  styles,
+  iconColor,
+  disabledIconColor,
+  disabled = false,
+  label,
+  badgeColor,
+}: FABButtonProps) {
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          pressed && !disabled ? styles.buttonPressed : styles.buttonDefault,
-          disabled ? styles.buttonDisabled : undefined,
-        ]}
-        onPress={disabled ? undefined : onPress}
-        hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        accessibilityRole="button"
-        disabled={disabled}
-      >
-        <Ionicons
-          name={icon}
-          size={size}
-          color={disabled ? disabledIconColor : iconColor}
-        />
-        {label ? (
-          <Text
-            style={[
-              styles.buttonLabel,
-              { color: disabled ? disabledIconColor : iconColor },
-            ]}
-          >
-            {label}
-          </Text>
-        ) : null}
-      </Pressable>
-      {badgeColor && !disabled && (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.button,
+        pressed && !disabled ? styles.buttonPressed : styles.buttonDefault,
+        disabled && styles.buttonDisabled,
+      ]}
+      hitSlop={8}
+    >
+      <Ionicons
+        name={icon}
+        size={18}
+        color={disabled ? disabledIconColor : iconColor}
+      />
+      {label ? (
+        <Text
+          style={[
+            styles.buttonLabel,
+            { color: disabled ? disabledIconColor : iconColor },
+          ]}
+        >
+          {label}
+        </Text>
+      ) : null}
+      {badgeColor ? (
         <View style={[styles.badge, { backgroundColor: badgeColor }]} />
-      )}
-    </Animated.View>
+      ) : null}
+    </Pressable>
   );
-});
+}

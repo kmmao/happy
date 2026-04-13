@@ -17,14 +17,24 @@ interface AgentContentViewProps {
   placeholder?: React.ReactNode | null;
   inputCollapsed?: boolean;
   collapsedOverlay?: React.ReactNode | null;
+  collapsedOverlayBottomInset?: number;
 }
 
 export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(
-  ({ input, content, placeholder, inputCollapsed, collapsedOverlay }) => {
+  ({
+    input,
+    content,
+    placeholder,
+    inputCollapsed,
+    collapsedOverlay,
+    collapsedOverlayBottomInset = 0,
+  }) => {
     const safeArea = useSafeAreaInsets();
     const height = useReanimatedKeyboardAnimation();
     const headerHeight = useHeaderHeight();
     const animatedPadding = useSharedValue(0);
+    const contentBottomInset = inputCollapsed ? collapsedOverlayBottomInset : 0;
+
     useKeyboardHandler(
       {
         onEnd(e) {
@@ -32,13 +42,14 @@ export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(
           animatedPadding.value =
             e.progress === 1 ? -height.height.value - safeArea.bottom : 0;
         },
-        onStart(e) {
+        onStart() {
           "worklet";
           animatedPadding.value = 0;
         },
       },
       [safeArea.bottom],
     );
+
     const animatedStyle = useAnimatedStyle(
       () => ({
         paddingTop: animatedPadding.value,
@@ -51,6 +62,7 @@ export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(
       }),
       [safeArea.bottom],
     );
+
     const animatedInputStyle = useAnimatedStyle(
       () => ({
         transform: [
@@ -62,6 +74,7 @@ export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(
       }),
       [safeArea.bottom],
     );
+
     const animatePlaceholderdStyle = useAnimatedStyle(
       () => ({
         paddingTop: height.progress.value === 1 ? height.height.value : 0,
@@ -75,13 +88,20 @@ export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(
       }),
       [safeArea.bottom],
     );
+
     return (
       <View style={{ flexBasis: 0, flexGrow: 1 }}>
         <View style={{ flexBasis: 0, flexGrow: 1 }}>
           {content && (
             <Animated.View
               style={[
-                { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+                {
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: contentBottomInset,
+                },
                 animatedStyle,
               ]}
             >
@@ -96,7 +116,7 @@ export const AgentContentView: React.FC<AgentContentViewProps> = React.memo(
                   top: safeArea.top + headerHeight,
                   left: 0,
                   right: 0,
-                  bottom: 0,
+                  bottom: contentBottomInset,
                 },
                 animatePlaceholderdStyle,
               ]}
