@@ -56,6 +56,7 @@ import {
   ISSUE_STATUS_COLORS,
   ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
+import { getSessionDisplayModelLabel } from "@/utils/sessionModelLabel";
 
 function buildSessionModelDebugLabel(session: Session): string | null {
   const parts = [

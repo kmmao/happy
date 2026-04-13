@@ -56,6 +56,7 @@ import {
   ISSUE_STATUS_COLORS,
   ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
+import { getSessionDisplayModelLabel } from "@/utils/sessionModelLabel";
 import { useAutoOptionSendEnabled } from "@/hooks/useAutoOptionSendEnabled";
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
@@ -860,23 +861,7 @@ const CompactSessionRow = React.memo(
               <Text style={styles.sessionMetaValue} numberOfLines={1}>
                 {[
                   getSessionProviderLabel(session),
-                  session.modelMode && session.modelMode !== "default"
-                    ? session.modelMode === "opus-1m"
-                      ? "Opus (1M)"
-                      : session.modelMode === "opus"
-                        ? "Opus"
-                        : session.modelMode === "sonnet-1m"
-                          ? "Sonnet (1M)"
-                          : session.modelMode === "sonnet"
-                            ? "Sonnet"
-                            : session.modelMode === "haiku"
-                              ? "Haiku"
-                              : session.modelMode
-                    : session.resolvedModelId
-                      ? session.resolvedModelId.replace(/-\d{8}$/, "")
-                      : session.metadata?.currentModelCode
-                        ? session.metadata.currentModelCode.replace(/-\d{8}$/, "")
-                        : Object.keys(session.latestUsage?.modelUsage ?? {})[0]?.replace(/-\d{8}$/, "") ?? null,
+                  getSessionDisplayModelLabel(session),
                 ]
                   .filter(Boolean)
                   .join(" · ")}
