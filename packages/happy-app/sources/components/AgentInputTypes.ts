@@ -9,7 +9,7 @@ export interface ReasoningProps {
     /** API-side task budget in tokens — model self-paces tool use within the limit (alpha) */
     taskBudgetTokens?: number | null;
     onThinkingModeChange?: (mode: string) => void;
-    onEffortLevelChange?: (level: string) => void;
+    onEffortLevelChange?: (level: string | null) => void;
     onMaxBudgetUsdChange?: (budget: number | null) => void;
     onTaskBudgetTokensChange?: (tokens: number | null) => void;
 }

@@ -9,6 +9,10 @@ import { stylesheet } from "./AgentInputStyles";
 import { t } from "@/text";
 import { Metadata } from "@/sync/storageTypes";
 import type { ReasoningProps } from "./AgentInputTypes";
+import {
+    getVisibleEffortLevels,
+    shouldShowEffortSelector,
+} from "./reasoningEffort";
 
 export interface AgentInputSettingsOverlayProps {
     visible: boolean;
@@ -22,6 +26,7 @@ export interface AgentInputSettingsOverlayProps {
     onModelModeChange?: (mode: ModelMode) => void;
     reasoning?: ReasoningProps;
     metadata?: Metadata | null;
+    currentModelCode?: string | null;
     isCodex: boolean;
     isGemini: boolean;
     withSandboxSuffix: (label: string, modeKey?: string) => string;
@@ -42,6 +47,7 @@ export const AgentInputSettingsOverlay = React.memo(
             onModelModeChange,
             reasoning,
             metadata,
+            currentModelCode,
             isCodex,
             isGemini,
             withSandboxSuffix,
@@ -261,19 +267,15 @@ export const AgentInputSettingsOverlay = React.memo(
                             )}
                         </View>
 
-                        {/* Effort Level Section (only for Claude) */}
-                        {!isCodex &&
-                            !isGemini &&
-                            reasoning?.onEffortLevelChange &&
-                            (() => {
-                                const currentModelInfo = metadata?.models?.find(
-                                    (m) => m.code === modelMode?.key,
-                                );
-                                // Hide entire section if model explicitly doesn't support effort
-                                if (currentModelInfo?.supportsEffort === false)
-                                    return null;
-                                return true;
-                            })() && (
+                        {/* Effort Level Section */}
+                        {shouldShowEffortSelector({
+                            isCodex,
+                            isGemini,
+                            hasEffortHandler: !!reasoning?.onEffortLevelChange,
+                            metadata,
+                            modelModeKey: modelMode?.key,
+                            currentModelCode,
+                        }) && (
                                 <>
                                     <View
                                         style={{
@@ -295,52 +297,27 @@ export const AgentInputSettingsOverlay = React.memo(
                                         >
                                             {t("agentInput.effort.title")}
                                         </Text>
-                                        {(() => {
-                                            const currentModelInfo =
-                                                metadata?.models?.find(
-                                                    (m) => m.code === modelMode?.key,
-                                                );
-                                            const allLevels = [
-                                                {
-                                                    key: "high",
-                                                    name: t("agentInput.effort.high"),
-                                                    description: t("agentInput.effort.highDesc"),
-                                                },
-                                                {
-                                                    key: "max",
-                                                    name: t("agentInput.effort.max"),
-                                                    description: t("agentInput.effort.maxDesc"),
-                                                },
-                                                {
-                                                    key: "medium",
-                                                    name: t("agentInput.effort.medium"),
-                                                    description: t("agentInput.effort.mediumDesc"),
-                                                },
-                                                {
-                                                    key: "low",
-                                                    name: t("agentInput.effort.low"),
-                                                    description: t("agentInput.effort.lowDesc"),
-                                                },
-                                            ] as const;
-                                            const supported =
-                                                currentModelInfo?.supportedEffortLevels;
-                                            const levels = supported
-                                                ? allLevels.filter((l) =>
-                                                    supported.includes(l.key),
-                                                )
-                                                : allLevels;
-                                            return levels;
-                                        })().map((level) => {
+                                        {getVisibleEffortLevels({
+                                            metadata,
+                                            modelModeKey: modelMode?.key,
+                                            currentModelCode,
+                                        }).map((level) => {
                                             const isSelected =
-                                                reasoning?.effortLevel === level.key ||
-                                                (!reasoning?.effortLevel && level.key === "medium");
+                                                reasoning?.effortLevel === level ||
+                                                (!isCodex &&
+                                                    !reasoning?.effortLevel &&
+                                                    level === "medium");
 
                                             return (
                                                 <Pressable
-                                                    key={level.key}
+                                                    key={level}
                                                     onPress={() => {
                                                         hapticsLight();
-                                                        reasoning?.onEffortLevelChange?.(level.key);
+                                                        reasoning?.onEffortLevelChange?.(
+                                                            isCodex && isSelected
+                                                                ? null
+                                                                : level,
+                                                        );
                                                     }}
                                                     style={({ pressed }) => ({
                                                         flexDirection: "row",
@@ -387,26 +364,24 @@ export const AgentInputSettingsOverlay = React.memo(
                                                                 ...Typography.default(),
                                                             }}
                                                         >
-                                                            {level.name}
+                                                            {t(`agentInput.effort.${level}`)}
                                                         </Text>
-                                                        {!!level.description && (
-                                                            <Text
-                                                                style={{
-                                                                    fontSize: 11,
-                                                                    color: theme.colors.textSecondary,
-                                                                    ...Typography.default(),
-                                                                }}
-                                                            >
-                                                                {level.description}
-                                                            </Text>
-                                                        )}
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 11,
+                                                                color: theme.colors.textSecondary,
+                                                                ...Typography.default(),
+                                                            }}
+                                                        >
+                                                            {t(`agentInput.effort.${level}Desc`)}
+                                                        </Text>
                                                     </View>
                                                 </Pressable>
                                             );
                                         })}
                                     </View>
                                 </>
-                            )}
+                        )}
 
                         {/* Thinking Mode Section (only for Claude) */}
                         {!isCodex && !isGemini && reasoning?.onThinkingModeChange && (

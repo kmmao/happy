@@ -913,7 +913,7 @@ function SessionViewInner({
   );
 
   const updateEffortLevel = React.useCallback(
-    (level: string) => {
+    (level: string | null) => {
       storage
         .getState()
         .updateSessionSdkSettings(sessionId, { effortLevel: level });

@@ -92,6 +92,7 @@ import {
   getCachedMetadataForMachine,
   getRecentPathForMachine,
 } from "./newSessionHelpers";
+import { applySessionStartPreferences } from "./sessionStartPreferences";
 import { CLIWarningBanner } from "./CLIWarningBanner";
 import { log } from '@/log';
 
@@ -347,7 +348,7 @@ function NewSessionWizard() {
     sync.applySettings({ lastUsedThinkingMode: mode });
   }, []);
 
-  const handleEffortLevelChange = React.useCallback((level: string) => {
+  const handleEffortLevelChange = React.useCallback((level: string | null) => {
     setEffortLevel(level);
     sync.applySettings({ lastUsedEffortLevel: level });
   }, []);
@@ -1254,43 +1255,24 @@ function NewSessionWizard() {
 
         await sync.refreshSessions();
 
-        // Set permission mode and model mode on the session
-        storage
-          .getState()
-          .updateSessionPermissionMode(result.sessionId, permissionMode.key);
-        if (modelMode) {
-          storage
-            .getState()
-            .updateSessionModelMode(result.sessionId, modelMode.key);
-        }
-        // Save profile custom models to session for model picker
-        if (
-          resolvedProfile?.customModels &&
-          resolvedProfile.customModels.length > 0
-        ) {
-          storage
-            .getState()
-            .updateSessionCustomModels(
-              result.sessionId,
-              resolvedProfile.customModels,
-            );
-        }
-        // Save profile model mappings (e.g., opus → MiniMax-M2.7)
-        if (resolvedProfile?.modelMappings) {
-          storage
-            .getState()
-            .updateSessionModelMappings(
-              result.sessionId,
-              resolvedProfile.modelMappings,
-            );
-        }
-        // Save profile info for display in session info page
-        if (selectedProfileId && resolvedProfile) {
-          storage.getState().updateSessionProfile(result.sessionId, {
-            profileId: selectedProfileId,
-            profileName: resolvedProfile.name,
-          });
-        }
+        applySessionStartPreferences(storage.getState(), {
+          sessionId: result.sessionId,
+          permissionModeKey: permissionMode.key,
+          modelModeKey: modelMode?.key ?? null,
+          sdkSettings: {
+            ...(thinkingMode != null ? { thinkingMode } : {}),
+            ...(effortLevel != null ? { effortLevel } : {}),
+          },
+          customModels: resolvedProfile?.customModels ?? null,
+          modelMappings: resolvedProfile?.modelMappings ?? null,
+          profile:
+            selectedProfileId && resolvedProfile
+              ? {
+                  id: selectedProfileId,
+                  name: resolvedProfile.name,
+                }
+              : null,
+        });
 
         // Send initial message (with any attached images) if provided
         const currentImages = pendingImagesRef.current;

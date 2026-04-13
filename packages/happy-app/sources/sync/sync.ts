@@ -739,7 +739,7 @@ class Sync {
         locale: getCurrentLanguage(),
         ...(displayText && { displayText }),
         ...(thinking && { thinking }),
-        ...(effort && { effort }),
+        effort,
         ...(maxBudgetUsd != null && { maxBudgetUsd }),
         ...(taskBudget && { taskBudget }),
         ...(options?.continue && { continue: true }),

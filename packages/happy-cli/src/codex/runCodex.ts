@@ -23,7 +23,6 @@ import packageJson from "../../package.json";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
-import { hashObject } from "@/utils/deterministicJson";
 import { projectPath } from "@/projectPath";
 import { resolve, join } from "node:path";
 import {
@@ -69,6 +68,11 @@ import {
 } from "./utils/tokenUsage";
 import { createEnvelope } from "@kmmao/happy-wire";
 import { codexBaseInstructions } from "./baseInstructions";
+import {
+  hashCodexMode,
+  resolveCodexMessageMode,
+  type CodexMessageMode,
+} from "./messageMode";
 
 type ReadyEventOptions = {
   pending: unknown;
@@ -157,13 +161,6 @@ export async function runCodex(opts: {
   noSandbox?: boolean;
   happySessionId?: string;
 }): Promise<void> {
-  // Use shared PermissionMode type for cross-agent compatibility
-  type PermissionMode = import("@/api/types").PermissionMode;
-  interface EnhancedMode {
-    permissionMode: PermissionMode;
-    model?: string;
-  }
-
   //
   // Define session
   //
@@ -368,11 +365,8 @@ export async function runCodex(opts: {
     }
   }
 
-  const messageQueue = new MessageQueue2<EnhancedMode>((mode) =>
-    hashObject({
-      permissionMode: mode.permissionMode,
-      model: mode.model,
-    }),
+  const messageQueue = new MessageQueue2<CodexMessageMode>((mode) =>
+    hashCodexMode(mode),
   );
 
   // Track current overrides to apply per message
@@ -380,35 +374,41 @@ export async function runCodex(opts: {
   let currentPermissionMode: import("@/api/types").PermissionMode | undefined =
     undefined;
   let currentModel: string | undefined = undefined;
+  let currentReasoningEffort:
+    | NonNullable<import("@/api/types").MessageMeta["effort"]>
+    | undefined = undefined;
   session.onUserMessage((message) => {
-    // Resolve permission mode (accept all modes, will be mapped in switch statement)
-    let messagePermissionMode = currentPermissionMode;
+    const resolvedMode = resolveCodexMessageMode({
+      current: {
+        permissionMode: currentPermissionMode,
+        model: currentModel,
+        reasoningEffort: currentReasoningEffort,
+      },
+      meta: message.meta,
+    });
+    currentPermissionMode = resolvedMode.next.permissionMode;
+    currentModel = resolvedMode.next.model;
+    currentReasoningEffort = resolvedMode.next.reasoningEffort;
+
     if (message.meta?.permissionMode) {
-      messagePermissionMode = message.meta
-        .permissionMode as import("@/api/types").PermissionMode;
-      currentPermissionMode = messagePermissionMode;
       if (permissionHandler) {
-        permissionHandler.setPermissionMode(currentPermissionMode);
+        permissionHandler.setPermissionMode(resolvedMode.mode.permissionMode);
       }
       logger.debug(
         `[Codex] Permission mode updated from user message to: ${currentPermissionMode}`,
       );
     } else {
       if (permissionHandler) {
-        permissionHandler.setPermissionMode(messagePermissionMode || "default");
+        permissionHandler.setPermissionMode(resolvedMode.mode.permissionMode);
       }
       logger.debug(
         `[Codex] User message received with no permission mode override, using current: ${currentPermissionMode ?? "default (effective)"}`,
       );
     }
 
-    // Resolve model; explicit null resets to default (undefined)
-    let messageModel = currentModel;
     if (message.meta?.hasOwnProperty("model")) {
-      messageModel = message.meta.model || undefined;
-      currentModel = messageModel;
       logger.debug(
-        `[Codex] Model updated from user message: ${messageModel || "reset to default"}`,
+        `[Codex] Model updated from user message: ${resolvedMode.mode.model || "reset to default"}`,
       );
     } else {
       logger.debug(
@@ -416,11 +416,17 @@ export async function runCodex(opts: {
       );
     }
 
-    const enhancedMode: EnhancedMode = {
-      permissionMode: messagePermissionMode || "default",
-      model: messageModel,
-    };
-    messageQueue.push(message.content.text, enhancedMode);
+    if (message.meta?.hasOwnProperty("effort")) {
+      logger.debug(
+        `[Codex] Reasoning effort updated from user message: ${resolvedMode.mode.reasoningEffort || "reset to default"}`,
+      );
+    } else {
+      logger.debug(
+        `[Codex] User message received with no reasoning effort override, using current: ${currentReasoningEffort || "default"}`,
+      );
+    }
+
+    messageQueue.push(message.content.text, resolvedMode.mode);
   });
   let thinking = false;
   let currentTurnId: string | null = null;
@@ -1314,7 +1320,7 @@ export async function runCodex(opts: {
     let currentModeHash: string | null = null;
     let pending: {
       message: string;
-      mode: EnhancedMode;
+      mode: CodexMessageMode;
       isolate: boolean;
       hash: string;
     } | null = null;
@@ -1326,7 +1332,7 @@ export async function runCodex(opts: {
       // Get next batch; respect mode boundaries like Claude
       let message: {
         message: string;
-        mode: EnhancedMode;
+        mode: CodexMessageMode;
         isolate: boolean;
         hash: string;
       } | null = pending;
@@ -1411,6 +1417,9 @@ export async function runCodex(opts: {
         );
 
         if (!wasCreated) {
+          const resolvedReasoningEffort =
+            message.mode.reasoningEffort ??
+            runtimeConfig.overrides.reasoningEffort;
           const startConfig: CodexSessionConfig = {
             prompt: first
               ? message.message + "\n\n" + CHANGE_TITLE_INSTRUCTION
@@ -1418,10 +1427,9 @@ export async function runCodex(opts: {
             "base-instructions": codexBaseInstructions,
             config: {
               mcp_servers: mcpServers,
-              ...(runtimeConfig.overrides.reasoningEffort
+              ...(resolvedReasoningEffort
                 ? {
-                    model_reasoning_effort:
-                      runtimeConfig.overrides.reasoningEffort,
+                    model_reasoning_effort: resolvedReasoningEffort,
                   }
                 : {}),
               ...(runtimeConfig.overrides.reasoningSummary
@@ -1455,9 +1463,8 @@ export async function runCodex(opts: {
           if (runtimeConfig.overrides.serviceTier) {
             startConfig.serviceTier = runtimeConfig.overrides.serviceTier;
           }
-          if (runtimeConfig.overrides.reasoningEffort) {
-            startConfig.reasoningEffort =
-              runtimeConfig.overrides.reasoningEffort;
+          if (resolvedReasoningEffort) {
+            startConfig.reasoningEffort = resolvedReasoningEffort;
           }
           if (runtimeConfig.overrides.reasoningSummary) {
             startConfig.reasoningSummary =
@@ -1543,7 +1550,9 @@ export async function runCodex(opts: {
               approvalPolicy: executionPolicy.approvalPolicy,
               sandbox: executionPolicy.sandbox,
               serviceTier: runtimeConfig.overrides.serviceTier,
-              reasoningEffort: runtimeConfig.overrides.reasoningEffort,
+              reasoningEffort:
+                message.mode.reasoningEffort ??
+                runtimeConfig.overrides.reasoningEffort,
               reasoningSummary: runtimeConfig.overrides.reasoningSummary,
               verbosity: runtimeConfig.overrides.verbosity,
               personality: runtimeConfig.overrides.personality,

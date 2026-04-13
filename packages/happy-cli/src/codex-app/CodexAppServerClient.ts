@@ -959,6 +959,12 @@ export class CodexAppServerClient {
       model: config.model ?? undefined,
       approvalPolicy: config["approval-policy"] ?? undefined,
       sandbox: config.sandbox ?? undefined,
+      serviceTier: config.serviceTier ?? undefined,
+      reasoningEffort: config.reasoningEffort ?? undefined,
+      reasoningSummary: config.reasoningSummary ?? undefined,
+      verbosity: config.verbosity ?? undefined,
+      personality: config.personality ?? undefined,
+      webSearch: config.webSearch ?? undefined,
     });
 
     return { content: [] };

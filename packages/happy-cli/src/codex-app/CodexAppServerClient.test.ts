@@ -467,6 +467,28 @@ describe("CodexAppServerClient", () => {
     expect(fakeProcesses[0].killed).toBe(true);
   });
 
+  it("forwards reasoning effort to the first turn when starting a session", async () => {
+    const client = new CodexAppServerClient();
+
+    await client.connect();
+    await client.startSession({
+      prompt: "hello",
+      model: "gpt-5.4",
+      reasoningEffort: "high",
+      reasoningSummary: "concise",
+    });
+
+    const turnStartRequest = fakeProcesses[0].requests.find(
+      (request) => request.method === "turn/start",
+    );
+    expect(turnStartRequest?.params).toMatchObject({
+      effort: "high",
+      summary: "concise",
+    });
+
+    await client.disconnect();
+  });
+
   it("normalizes reasoning effort shapes returned by newer app-server builds", async () => {
     const fakeProcess = new FakeProcess();
     fakeProcess.modelListOverride = [

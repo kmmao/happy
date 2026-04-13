@@ -47,6 +47,7 @@ import { getContextWarning, ContextProgressBar } from "./ContextProgressBar";
 import { AttachButton, type AttachAction } from "./AttachButton";
 import { GitStatusButton } from "./GitStatusButton";
 import { AgentInputSettingsOverlay } from "./AgentInputSettingsOverlay";
+import { getReasoningSummaryLabels } from "./reasoningEffort";
 import { log } from '@/log';
 
 export type {
@@ -587,6 +588,7 @@ export const AgentInput = React.memo(
             onModelModeChange={props.onModelModeChange}
             reasoning={props.reasoning}
             metadata={props.metadata}
+            currentModelCode={props.currentModelCode}
             isCodex={isCodex}
             isGemini={isGemini}
             withSandboxSuffix={withSandboxSuffix}
@@ -900,23 +902,12 @@ export const AgentInput = React.memo(
                   >
                     {[
                       props.effectiveModelLabel ?? props.modelMode.name,
-                      ...(!isCodex && !isGemini
-                        ? [
-                            (props.reasoning?.effortLevel ?? "medium") === "low"
-                              ? t("agentInput.effort.low")
-                              : (props.reasoning?.effortLevel ?? "medium") === "high"
-                                ? t("agentInput.effort.high")
-                                : (props.reasoning?.effortLevel ?? "medium") === "max"
-                                  ? t("agentInput.effort.max")
-                                  : t("agentInput.effort.medium"),
-                            (props.reasoning?.thinkingMode ?? "adaptive") === "enabled"
-                              ? t("agentInput.thinking.enabled")
-                              : (props.reasoning?.thinkingMode ?? "adaptive") ===
-                                  "disabled"
-                                ? t("agentInput.thinking.disabled")
-                                : t("agentInput.thinking.adaptive"),
-                          ]
-                        : []),
+                      ...getReasoningSummaryLabels({
+                        isCodex,
+                        isGemini,
+                        reasoning: props.reasoning,
+                        translate: t,
+                      }),
                     ].join(" · ")}
                   </Text>
                 )}
