@@ -43,8 +43,9 @@ export function parseCodexServicePreview(
     };
   }
 
-  if (/warning/i.test(trimmed)) {
-    const [firstLine, ...rest] = trimmed.split("\n");
+  const firstLine = trimmed.split("\n")[0];
+  if (/warning/i.test(firstLine)) {
+    const rest = trimmed.split("\n").slice(1);
     return {
       kind: "warning",
       title: firstLine,
