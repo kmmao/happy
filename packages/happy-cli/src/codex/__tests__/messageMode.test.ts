@@ -27,6 +27,21 @@ describe('resolveCodexMessageMode', () => {
     });
   });
 
+  it('normalizes xhigh effort to max', () => {
+    const result = resolveCodexMessageMode({
+      current: {
+        permissionMode: 'default',
+        model: 'gpt-5.4',
+      },
+      meta: {
+        effort: 'xhigh',
+      } as MessageMeta,
+    });
+
+    expect(result.mode.reasoningEffort).toBe('max');
+    expect(result.next.reasoningEffort).toBe('max');
+  });
+
   it('clears persisted reasoning effort when the message explicitly resets it', () => {
     const result = resolveCodexMessageMode({
       current: {
@@ -60,6 +75,22 @@ describe('hashCodexMode', () => {
         permissionMode: 'default',
         model: 'gpt-5.4',
         reasoningEffort: 'high',
+      }),
+    );
+  });
+
+  it('treats xhigh and max as the same mode identity', () => {
+    expect(
+      hashCodexMode({
+        permissionMode: 'default',
+        model: 'gpt-5.4',
+        reasoningEffort: 'xhigh',
+      }),
+    ).toBe(
+      hashCodexMode({
+        permissionMode: 'default',
+        model: 'gpt-5.4',
+        reasoningEffort: 'max',
       }),
     );
   });

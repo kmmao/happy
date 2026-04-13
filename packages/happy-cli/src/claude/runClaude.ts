@@ -620,7 +620,10 @@ export async function runClaude(
     // Resolve effort
     let messageEffort = currentEffort;
     if (message.meta?.hasOwnProperty("effort")) {
-      messageEffort = message.meta.effort ?? undefined;
+      messageEffort =
+        message.meta.effort === "xhigh"
+          ? "max"
+          : (message.meta.effort ?? undefined);
       currentEffort = messageEffort;
       logger.debug(`[loop] effort updated: ${messageEffort ?? "none"}`);
     }

@@ -1,6 +1,12 @@
 import type { MessageMeta, PermissionMode } from "@/api/types";
 import { hashObject } from "@/utils/deterministicJson";
 
+function normalizeCodexReasoningEffort(
+  effort: NonNullable<MessageMeta["effort"]> | undefined,
+): NonNullable<MessageMeta["effort"]> | undefined {
+  return effort === "xhigh" ? "max" : effort;
+}
+
 export interface CodexMessageModeState {
   permissionMode?: PermissionMode;
   model?: string;
@@ -17,7 +23,7 @@ export function hashCodexMode(mode: CodexMessageMode): string {
   return hashObject({
     permissionMode: mode.permissionMode,
     model: mode.model,
-    reasoningEffort: mode.reasoningEffort,
+    reasoningEffort: normalizeCodexReasoningEffort(mode.reasoningEffort),
   });
 }
 
@@ -42,7 +48,7 @@ export function resolveCodexMessageMode(params: {
 
   let reasoningEffort = current.reasoningEffort;
   if (meta && Object.prototype.hasOwnProperty.call(meta, "effort")) {
-    reasoningEffort = meta.effort ?? undefined;
+    reasoningEffort = normalizeCodexReasoningEffort(meta.effort ?? undefined);
   }
 
   return {
