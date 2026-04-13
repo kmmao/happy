@@ -9,6 +9,10 @@ import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
 import { backoff } from "@/utils/time";
+import {
+    shouldApplyKnowledgeRequestResult,
+    shouldResetSessionKnowledgeState,
+} from "./sessionKnowledgeState";
 
 export interface SessionKnowledgeEntry {
     id: string;
@@ -33,10 +37,18 @@ export function useSessionKnowledge(
     const [entries, setEntries] = React.useState<SessionKnowledgeEntry[]>([]);
     const [loading, setLoading] = React.useState(false);
     const mountedRef = React.useRef(true);
+    const latestRequestTokenRef = React.useRef(0);
 
     React.useEffect(() => {
         return () => { mountedRef.current = false; };
     }, []);
+
+    React.useEffect(() => {
+        if (!shouldResetSessionKnowledgeState({ projectServerId, sessionId })) return;
+        latestRequestTokenRef.current += 1;
+        setEntries([]);
+        setLoading(false);
+    }, [projectServerId, sessionId]);
 
     const refresh = React.useCallback(async () => {
         if (!projectServerId || !sessionId) return;
@@ -44,6 +56,8 @@ export function useSessionKnowledge(
         if (!credentials) return;
 
         const API_ENDPOINT = getServerUrl();
+        const requestToken = latestRequestTokenRef.current + 1;
+        latestRequestTokenRef.current = requestToken;
         setLoading(true);
         try {
             const result = await backoff(async () => {
@@ -62,11 +76,24 @@ export function useSessionKnowledge(
             });
 
             if (!mountedRef.current) return;
+            if (!shouldApplyKnowledgeRequestResult({
+                requestToken,
+                latestRequestToken: latestRequestTokenRef.current,
+            })) {
+                return;
+            }
             setEntries(result.entries);
         } catch {
             // Keep empty state on failure
         } finally {
-            if (mountedRef.current) setLoading(false);
+            if (!mountedRef.current) return;
+            if (!shouldApplyKnowledgeRequestResult({
+                requestToken,
+                latestRequestToken: latestRequestTokenRef.current,
+            })) {
+                return;
+            }
+            setLoading(false);
         }
     }, [projectServerId, sessionId]);
 

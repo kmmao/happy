@@ -9,6 +9,8 @@ import { t } from "@/text";
 import { layout } from "@/components/layout";
 import { useSessionKnowledge, type SessionKnowledgeEntry } from "@/hooks/useSessionKnowledge";
 import { useSessionKnowledgeAccesses, type SessionKnowledgeAccessEntry } from "@/hooks/useSessionKnowledgeAccesses";
+import { getSessionKnowledgeDisplayTimestamp } from "./sessionKnowledgeDisplayTimestamp";
+import { getSessionKnowledgeLoadState, type SessionKnowledgeTab } from "./sessionKnowledgeLoadState";
 
 const TYPE_COLORS: Record<string, string> = {
     discovery: "#3B82F6",
@@ -39,14 +41,13 @@ function formatTime(timestamp: number): string {
     });
 }
 
-type Tab = "changes" | "references";
-
 interface EntryRowProps {
+    activeTab: SessionKnowledgeTab;
     entry: SessionKnowledgeEntry | SessionKnowledgeAccessEntry;
     onPress?: () => void;
 }
 
-const EntryRow = React.memo<EntryRowProps>(({ entry, onPress }) => {
+const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress }) => {
     const { theme } = useUnistyles();
     const typeColor = TYPE_COLORS[entry.entryType] ?? theme.colors.textSecondary;
     const statusColor = STATUS_COLORS[entry.status] ?? theme.colors.textSecondary;
@@ -71,7 +72,7 @@ const EntryRow = React.memo<EntryRowProps>(({ entry, onPress }) => {
                     </View>
                 )}
                 <Text style={[styles.entryTime, { color: theme.colors.textSecondary }]}>
-                    {formatTime(entry.createdAt)}
+                    {formatTime(getSessionKnowledgeDisplayTimestamp({ activeTab, entry }))}
                 </Text>
             </View>
             <Text style={[styles.entryTitle, { color: theme.colors.text }]} numberOfLines={2}>
@@ -79,8 +80,8 @@ const EntryRow = React.memo<EntryRowProps>(({ entry, onPress }) => {
             </Text>
             {entry.tags.length > 0 && (
                 <View style={styles.tagsRow}>
-                    {entry.tags.slice(0, 3).map((tag) => (
-                        <View key={tag} style={[styles.tag, { backgroundColor: theme.colors.surfaceHighest }]}>
+                    {entry.tags.slice(0, 3).map((tag, index) => (
+                        <View key={`${tag}-${index}`} style={[styles.tag, { backgroundColor: theme.colors.surfaceHighest }]}>
                             <Text style={[styles.tagText, { color: theme.colors.textSecondary }]}>
                                 {tag}
                             </Text>
@@ -107,16 +108,34 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
         const router = useRouter();
         const opacity = React.useRef(new Animated.Value(0)).current;
         const [shouldRender, setShouldRender] = React.useState(false);
-        const [activeTab, setActiveTab] = React.useState<Tab>("changes");
+        const [activeTab, setActiveTab] = React.useState<SessionKnowledgeTab>("changes");
+        const [hasLoadedChanges, setHasLoadedChanges] = React.useState(false);
+        const [hasLoadedReferences, setHasLoadedReferences] = React.useState(false);
+
+        React.useEffect(() => {
+            if (!visible) return;
+            if (activeTab === "changes") {
+                setHasLoadedChanges(true);
+                return;
+            }
+            setHasLoadedReferences(true);
+        }, [activeTab, visible]);
+
+        const loadState = getSessionKnowledgeLoadState({
+            visible,
+            activeTab,
+            hasLoadedChanges,
+            hasLoadedReferences,
+        });
 
         const { entries, loading: changesLoading } = useSessionKnowledge(
-            visible ? projectServerId : undefined,
-            visible ? sessionId : undefined,
+            loadState.shouldLoadChanges ? projectServerId : undefined,
+            loadState.shouldLoadChanges ? sessionId : undefined,
         );
 
         const { accesses, loading: accessesLoading } = useSessionKnowledgeAccesses(
-            visible ? projectServerId : undefined,
-            visible ? sessionId : undefined,
+            loadState.shouldLoadReferences ? projectServerId : undefined,
+            loadState.shouldLoadReferences ? sessionId : undefined,
         );
 
         React.useEffect(() => {
@@ -175,7 +194,6 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                         </Pressable>
                     </View>
 
-                    {/* Tabs */}
                     <View style={[styles.tabBar, { borderBottomColor: theme.colors.surfaceHighest }]}>
                         <Pressable
                             style={[
@@ -244,13 +262,14 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
                             {isChangesTab
                                 ? entries.map((entry) => (
-                                    <EntryRow key={entry.id} entry={entry} />
+                                    <EntryRow key={entry.id} entry={entry} activeTab={activeTab} />
                                 ))
                                 : accesses.map((entry) => (
                                     <EntryRow
                                         key={entry.id}
                                         entry={entry}
                                         onPress={entry.sessionId ? () => handleAccessEntryPress(entry) : undefined}
+                                        activeTab={activeTab}
                                     />
                                 ))}
                         </ScrollView>

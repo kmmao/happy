@@ -4081,6 +4081,10 @@ export const en = {
     typeCustom: "Custom",
     activeTasks: ({ count }: { count: number }) => `${count} active ${count === 1 ? "task" : "tasks"}`,
     taskStatus: ({ index, status }: { index: number; status: string }) => `Task #${index} · ${status}`,
+    agentTypeLabel: "Agent Type",
+    agentTypeInherit: "Inherit (default)",
+    modelOverrideLabel: "Model Override",
+    modelOverridePlaceholder: "e.g. claude-sonnet-4-20250514 (leave empty for default)",
   },
   goals: {
     title: "Goals",

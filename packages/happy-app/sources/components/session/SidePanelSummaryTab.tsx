@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Platform } from "react-native";
+import { View, Platform, Pressable } from "react-native";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { Octicons } from "@expo/vector-icons";
@@ -10,25 +10,34 @@ import {
     useSessionGitStatus,
     useSessionProjectGitStatus,
     useProjectForSession,
+    useSessionKnowledgeCount,
 } from "@/sync/storage";
 import {
     formatPathRelativeToHome,
     getSessionName,
 } from "@/utils/sessionUtils";
 import { ItemList } from "@/components/ItemList";
+import { useSessionKnowledge } from "@/hooks/useSessionKnowledge";
+import { useSessionKnowledgeAccesses } from "@/hooks/useSessionKnowledgeAccesses";
+import { buildKnowledgeSummaryRows, type KnowledgeSummaryTranslate } from "./sidePanelSummaryData";
 
 interface SidePanelSummaryTabProps {
     sessionId: string;
+    onOpenKnowledge?: () => void;
 }
 
 export const SidePanelSummaryTab = React.memo<SidePanelSummaryTabProps>(
-    function SidePanelSummaryTab({ sessionId }) {
+    function SidePanelSummaryTab({ sessionId, onOpenKnowledge }) {
         const { theme } = useUnistyles();
         const session = useSession(sessionId);
         const projectGitStatus = useSessionProjectGitStatus(sessionId);
         const sessionGitStatus = useSessionGitStatus(sessionId);
         const gitStatus = projectGitStatus || sessionGitStatus;
         const project = useProjectForSession(sessionId);
+        const knowledgeCount = useSessionKnowledgeCount(sessionId);
+        const projectServerId = project?.serverId ?? undefined;
+        const { entries } = useSessionKnowledge(projectServerId, sessionId);
+        const { accesses } = useSessionKnowledgeAccesses(projectServerId, sessionId);
 
         if (!session) return null;
 
@@ -40,7 +49,15 @@ export const SidePanelSummaryTab = React.memo<SidePanelSummaryTabProps>(
             : undefined;
         const cliVersion = session.metadata?.version;
 
-        const rows: Array<{ icon: string; label: string; value: string }> = [];
+        const knowledgeTranslate: KnowledgeSummaryTranslate = (key, params = {}) =>
+            t(key as any, params as any);
+
+        const rows: Array<{
+            icon: string;
+            label: string;
+            value: string;
+            isInteractive?: boolean;
+        }> = [];
 
         if (displayPath) {
             rows.push({
@@ -94,6 +111,15 @@ export const SidePanelSummaryTab = React.memo<SidePanelSummaryTabProps>(
             });
         }
 
+        rows.push(
+            ...buildKnowledgeSummaryRows({
+                knowledgeCount,
+                capturedEntries: entries,
+                referencedEntries: accesses,
+                t: knowledgeTranslate,
+            }),
+        );
+
         if (cliVersion) {
             rows.push({
                 icon: "terminal",
@@ -104,7 +130,6 @@ export const SidePanelSummaryTab = React.memo<SidePanelSummaryTabProps>(
 
         return (
             <ItemList style={{ flex: 1 }}>
-                {/* Connection status */}
                 <View
                     style={{
                         flexDirection: "row",
@@ -159,53 +184,73 @@ export const SidePanelSummaryTab = React.memo<SidePanelSummaryTabProps>(
                     </View>
                 )}
 
-                {/* Info rows */}
-                {rows.map((row, i) => (
-                    <View
-                        key={row.label}
-                        style={{
-                            flexDirection: "row",
-                            alignItems: "flex-start",
-                            paddingHorizontal: 16,
-                            paddingVertical: 10,
-                            borderBottomWidth:
-                                i < rows.length - 1
-                                    ? Platform.select({ ios: 0.33, default: 1 })
-                                    : 0,
-                            borderBottomColor: theme.colors.divider,
-                            gap: 10,
-                        }}
-                    >
-                        <Octicons
-                            name={row.icon as any}
-                            size={15}
-                            color={theme.colors.textSecondary}
-                            style={{ marginTop: 2 }}
-                        />
-                        <View style={{ flex: 1 }}>
-                            <Text
-                                style={{
-                                    fontSize: 11,
-                                    color: theme.colors.textSecondary,
-                                    marginBottom: 2,
-                                    ...Typography.default(),
-                                }}
+                {rows.map((row, i) => {
+                    const content = (
+                        <>
+                            <Octicons
+                                name={row.icon as any}
+                                size={15}
+                                color={theme.colors.textSecondary}
+                                style={{ marginTop: 2 }}
+                            />
+                            <View style={{ flex: 1 }}>
+                                <Text
+                                    style={{
+                                        fontSize: 11,
+                                        color: theme.colors.textSecondary,
+                                        marginBottom: 2,
+                                        ...Typography.default(),
+                                    }}
+                                >
+                                    {row.label}
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 13,
+                                        color: row.isInteractive && onOpenKnowledge
+                                            ? theme.colors.textLink
+                                            : theme.colors.text,
+                                        ...Typography.mono(),
+                                    }}
+                                    numberOfLines={2}
+                                >
+                                    {row.value}
+                                </Text>
+                            </View>
+                        </>
+                    );
+
+                    const sharedStyle = {
+                        flexDirection: "row" as const,
+                        alignItems: "flex-start" as const,
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderBottomWidth:
+                            i < rows.length - 1
+                                ? Platform.select({ ios: 0.33, default: 1 })
+                                : 0,
+                        borderBottomColor: theme.colors.divider,
+                        gap: 10,
+                    };
+
+                    if (row.isInteractive && onOpenKnowledge) {
+                        return (
+                            <Pressable
+                                key={row.label}
+                                onPress={onOpenKnowledge}
+                                style={sharedStyle}
                             >
-                                {row.label}
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 13,
-                                    color: theme.colors.text,
-                                    ...Typography.mono(),
-                                }}
-                                numberOfLines={2}
-                            >
-                                {row.value}
-                            </Text>
+                                {content}
+                            </Pressable>
+                        );
+                    }
+
+                    return (
+                        <View key={row.label} style={sharedStyle}>
+                            {content}
                         </View>
-                    </View>
-                ))}
+                    );
+                })}
             </ItemList>
         );
     },

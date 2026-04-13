@@ -83,6 +83,7 @@ import {
 } from "@/utils/sessionUtils";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
 import { SessionSidePanel, SIDE_PANEL_MIN_WINDOW_WIDTH } from "@/components/session/SessionSidePanel";
+import { MobileSessionPanelSheet } from "@/components/session/MobileSessionPanelSheet";
 import { ResizableDivider, DIVIDER_WIDTH } from "@/components/session/ResizableDivider";
 import { layout } from "@/components/layout";
 import { Ionicons } from "@expo/vector-icons";
@@ -109,6 +110,7 @@ import {
 import { getSessionContentMaxWidth } from "./sessionContentWidth";
 import { autoOptionSendService } from "@/sync/autoOptionSendService";
 import { log } from '@/log';
+import { shouldShowMobileSessionPanelButton } from "@/components/session/mobileSessionPanelState";
 
 const FILE_EDIT_TOOLS = new Set(["Edit", "edit", "MultiEdit", "Write"]);
 
@@ -161,6 +163,10 @@ export const SessionView = React.memo((props: { id: string }) => {
   const storedPanelWidth = useLocalSetting("sidePanelWidth");
   const sessionIsOnline = session?.presence === "online";
   const showSidePanelOuter = isTablet && windowWidth >= SIDE_PANEL_MIN_WINDOW_WIDTH && !!sessionIsOnline;
+  const shouldShowMobilePanelButton = shouldShowMobileSessionPanelButton({
+    showSidePanelOuter,
+    sessionIsOnline: !!sessionIsOnline,
+  });
   const toggleSidePanelOuter = React.useCallback(() => {
     storage.getState().applyLocalSettings({ sidePanelCollapsed: !sidePanelCollapsed });
   }, [sidePanelCollapsed]);
@@ -231,6 +237,7 @@ export const SessionView = React.memo((props: { id: string }) => {
   const knowledgeCount = useSessionKnowledgeCount(sessionId);
   const sessionProject = useProjectForSession(sessionId);
   const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
+  const [showMobilePanelSheet, setShowMobilePanelSheet] = React.useState(false);
 
   const showAgentActivity = useSetting("showAgentActivity");
 
@@ -351,6 +358,7 @@ export const SessionView = React.memo((props: { id: string }) => {
                 {...headerProps}
                 knowledgeCount={knowledgeCount}
                 onKnowledgePress={knowledgeCount > 0 ? () => setShowKnowledgeSheet(true) : undefined}
+                onPanelPress={shouldShowMobilePanelButton ? () => setShowMobilePanelSheet(true) : undefined}
                 onBackPress={() => router.back()}
                 onRefreshPress={() => sync.refreshSession(sessionId)}
                 onPreviewPress={
@@ -359,9 +367,9 @@ export const SessionView = React.memo((props: { id: string }) => {
                     : undefined
                 }
                 onChangesPress={hasChanges ? () => router.push(`/session/${sessionId}/changes`) : undefined}
-                devButtonState={headerProps.isConnected ? "idle" : "hidden"}
-                onDevPress={headerProps.isConnected ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
-                onDevLongPress={headerProps.isConnected ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
+                devButtonState={headerProps.isConnected && hasDevConfig ? "idle" : "hidden"}
+                onDevPress={headerProps.isConnected && hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
+                onDevLongPress={headerProps.isConnected && hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
               />
               {/* Voice status bar below header - not on tablet (shown in sidebar) */}
               {!isTablet && realtimeStatus !== "disconnected" && (
@@ -454,9 +462,15 @@ export const SessionView = React.memo((props: { id: string }) => {
             sessionId={sessionId}
             collapsed={sidePanelCollapsed}
             onToggleCollapse={toggleSidePanelOuter}
+            onOpenKnowledge={() => setShowKnowledgeSheet(true)}
           />
         )}
       </View>
+      <MobileSessionPanelSheet
+        visible={showMobilePanelSheet}
+        onClose={() => setShowMobilePanelSheet(false)}
+        sessionId={sessionId}
+      />
       <SessionKnowledgeSheet
         visible={showKnowledgeSheet}
         onClose={() => setShowKnowledgeSheet(false)}
@@ -764,6 +778,7 @@ function SessionViewInner({
 
   const { bookmarks, toggleBookmark } = useBookmarks();
   const [showBookmarksPopover, setShowBookmarksPopover] = React.useState(false);
+  const [collapsedOverlayHeight, setCollapsedOverlayHeight] = React.useState(0);
   const handleBookmarkOptionPress = React.useCallback(
     (option: string) => {
       setShowBookmarksPopover(false);
@@ -1412,6 +1427,7 @@ function SessionViewInner({
           input={input}
           placeholder={placeholder}
           inputCollapsed={collapsibleInput.collapsed}
+          collapsedOverlayBottomInset={collapsedOverlayHeight}
           collapsedOverlay={
             <InputFAB
               visible={collapsibleInput.collapsed}
@@ -1424,6 +1440,7 @@ function SessionViewInner({
               {...scrollNavProps}
               statusInfo={fabStatusInfo}
               autoOptionSend={autoOptionSendControl}
+              onHeightChange={setCollapsedOverlayHeight}
             />
           }
         />

@@ -24,11 +24,12 @@ interface SessionSidePanelProps {
     sessionId: string;
     collapsed: boolean;
     onToggleCollapse: () => void;
+    onOpenKnowledge?: () => void;
     width?: number;
 }
 
 export const SessionSidePanel = React.memo<SessionSidePanelProps>(
-    function SessionSidePanel({ sessionId, collapsed, onToggleCollapse }) {
+    function SessionSidePanel({ sessionId, collapsed, onToggleCollapse, onOpenKnowledge }) {
         const { theme } = useUnistyles();
         const [activeTab, setActiveTab] = React.useState<TabKey>("files");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
@@ -168,7 +169,10 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                 <SidePanelGitPanel sessionId={sessionId} />
                             )}
                             {activeTab === "summary" && (
-                                <SidePanelSummaryTab sessionId={sessionId} />
+                                <SidePanelSummaryTab
+                                    sessionId={sessionId}
+                                    onOpenKnowledge={onOpenKnowledge}
+                                />
                             )}
                             {activeTab === "timeline" && (
                                 <SidePanelTimelineTab sessionId={sessionId} />
