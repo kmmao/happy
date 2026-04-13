@@ -7,6 +7,7 @@ import {
   useWindowDimensions,
   ScrollView,
   TextInput,
+  Modal as RNModal,
 } from "react-native";
 import Constants from "expo-constants";
 import { Typography } from "@/constants/Typography";
@@ -1363,6 +1364,7 @@ function NewSessionWizard() {
   ]);
 
   const screenWidth = useWindowDimensions().width;
+  const useProfileBottomSheet = screenWidth < 700;
 
   // Machine online status for AgentInput (DRY - reused in info box too)
   const connectionStatus = React.useMemo(() => {
@@ -1512,84 +1514,206 @@ function NewSessionWizard() {
                 </Pressable>
 
                 {/* Dropdown list */}
-                {showProfileDropdown && (
-                  <View
-                    style={{
-                      marginTop: 4,
-                      borderRadius: 12,
-                      backgroundColor: theme.colors.surface,
-                      borderWidth: 1,
-                      borderColor: theme.colors.divider,
-                      overflow: "hidden",
-                      alignSelf: "flex-start",
-                      minWidth: 200,
-                    }}
-                  >
-                    {allProfiles.map((profile) => {
-                      const isSelected = profile.id === selectedProfileId;
-                      return (
+                {showProfileDropdown &&
+                  (useProfileBottomSheet ? (
+                    <RNModal
+                      visible={showProfileDropdown}
+                      transparent
+                      animationType="slide"
+                      onRequestClose={() => setShowProfileDropdown(false)}
+                    >
+                      <Pressable
+                        style={{
+                          flex: 1,
+                          backgroundColor: "rgba(0,0,0,0.35)",
+                          justifyContent: "flex-end",
+                        }}
+                        onPress={() => setShowProfileDropdown(false)}
+                      >
                         <Pressable
-                          key={profile.id}
-                          onPress={() => {
-                            selectProfile(profile.id);
-                            setShowProfileDropdown(false);
+                          onPress={(event) => event.stopPropagation()}
+                          style={{
+                            backgroundColor: theme.colors.surface,
+                            borderTopLeftRadius: 20,
+                            borderTopRightRadius: 20,
+                            paddingTop: 12,
+                            paddingBottom: Math.max(16, safeArea.bottom),
+                            maxHeight: "70%",
                           }}
-                          style={({ pressed }) => ({
-                            flexDirection: "row",
-                            alignItems: "center",
-                            paddingHorizontal: 14,
-                            paddingVertical: 10,
-                            backgroundColor: pressed
-                              ? theme.colors.surfacePressed
-                              : isSelected
-                                ? theme.colors.surfacePressed
-                                : "transparent",
-                            gap: 10,
-                          })}
                         >
                           <View
                             style={{
-                              width: 16,
-                              height: 16,
-                              borderRadius: 8,
-                              borderWidth: 2,
-                              borderColor: isSelected
-                                ? theme.colors.radio.active
-                                : theme.colors.radio.inactive,
                               alignItems: "center",
-                              justifyContent: "center",
+                              paddingBottom: 8,
                             }}
                           >
-                            {isSelected && (
-                              <View
-                                style={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: 3,
-                                  backgroundColor: theme.colors.radio.dot,
-                                }}
-                              />
-                            )}
+                            <View
+                              style={{
+                                width: 36,
+                                height: 4,
+                                borderRadius: 999,
+                                backgroundColor: theme.colors.divider,
+                              }}
+                            />
                           </View>
                           <Text
                             style={{
-                              fontSize: 14,
-                              color: isSelected
-                                ? theme.colors.radio.active
-                                : theme.colors.text,
-                              fontWeight: isSelected ? "600" : "400",
-                              ...Typography.default(
-                                isSelected ? "semiBold" : undefined,
-                              ),
+                              fontSize: 16,
+                              color: theme.colors.text,
+                              paddingHorizontal: 16,
+                              paddingBottom: 12,
+                              ...Typography.default("semiBold"),
                             }}
                           >
-                            {profile.name}
+                            AI 配置文件
                           </Text>
+                          <ScrollView>
+                            {allProfiles.map((profile) => {
+                              const isSelected = profile.id === selectedProfileId;
+                              return (
+                                <Pressable
+                                  key={profile.id}
+                                  onPress={() => {
+                                    selectProfile(profile.id);
+                                    setShowProfileDropdown(false);
+                                  }}
+                                  style={({ pressed }) => ({
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 12,
+                                    backgroundColor: pressed
+                                      ? theme.colors.surfacePressed
+                                      : isSelected
+                                        ? theme.colors.surfacePressed
+                                        : "transparent",
+                                    gap: 10,
+                                  })}
+                                >
+                                  <View
+                                    style={{
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: 8,
+                                      borderWidth: 2,
+                                      borderColor: isSelected
+                                        ? theme.colors.radio.active
+                                        : theme.colors.radio.inactive,
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    {isSelected && (
+                                      <View
+                                        style={{
+                                          width: 6,
+                                          height: 6,
+                                          borderRadius: 3,
+                                          backgroundColor: theme.colors.radio.dot,
+                                        }}
+                                      />
+                                    )}
+                                  </View>
+                                  <Text
+                                    style={{
+                                      flex: 1,
+                                      fontSize: 14,
+                                      color: isSelected
+                                        ? theme.colors.radio.active
+                                        : theme.colors.text,
+                                      fontWeight: isSelected ? "600" : "400",
+                                      ...Typography.default(
+                                        isSelected ? "semiBold" : undefined,
+                                      ),
+                                    }}
+                                  >
+                                    {profile.name}
+                                  </Text>
+                                </Pressable>
+                              );
+                            })}
+                          </ScrollView>
                         </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
+                      </Pressable>
+                    </RNModal>
+                  ) : (
+                    <View
+                      style={{
+                        marginTop: 4,
+                        borderRadius: 12,
+                        backgroundColor: theme.colors.surface,
+                        borderWidth: 1,
+                        borderColor: theme.colors.divider,
+                        overflow: "hidden",
+                        alignSelf: "flex-start",
+                        minWidth: 200,
+                      }}
+                    >
+                      {allProfiles.map((profile) => {
+                        const isSelected = profile.id === selectedProfileId;
+                        return (
+                          <Pressable
+                            key={profile.id}
+                            onPress={() => {
+                              selectProfile(profile.id);
+                              setShowProfileDropdown(false);
+                            }}
+                            style={({ pressed }) => ({
+                              flexDirection: "row",
+                              alignItems: "center",
+                              paddingHorizontal: 14,
+                              paddingVertical: 10,
+                              backgroundColor: pressed
+                                ? theme.colors.surfacePressed
+                                : isSelected
+                                  ? theme.colors.surfacePressed
+                                  : "transparent",
+                              gap: 10,
+                            })}
+                          >
+                            <View
+                              style={{
+                                width: 16,
+                                height: 16,
+                                borderRadius: 8,
+                                borderWidth: 2,
+                                borderColor: isSelected
+                                  ? theme.colors.radio.active
+                                  : theme.colors.radio.inactive,
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              {isSelected && (
+                                <View
+                                  style={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: 3,
+                                    backgroundColor: theme.colors.radio.dot,
+                                  }}
+                                />
+                              )}
+                            </View>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                color: isSelected
+                                  ? theme.colors.radio.active
+                                  : theme.colors.text,
+                                fontWeight: isSelected ? "600" : "400",
+                                ...Typography.default(
+                                  isSelected ? "semiBold" : undefined,
+                                ),
+                              }}
+                            >
+                              {profile.name}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ))}
               </View>
             </View>
           )}

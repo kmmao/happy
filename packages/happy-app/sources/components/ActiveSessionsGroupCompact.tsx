@@ -57,6 +57,21 @@ import {
   ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
 
+function buildSessionModelDebugLabel(session: Session): string | null {
+  const parts = [
+    session.modelMode ? `mode=${session.modelMode}` : null,
+    session.resolvedModelId ? `resolved=${session.resolvedModelId}` : null,
+    session.metadata?.currentModelCode
+      ? `current=${session.metadata.currentModelCode}`
+      : null,
+    Object.keys(session.latestUsage?.modelUsage ?? {}).length > 0
+      ? `usage=${Object.keys(session.latestUsage?.modelUsage ?? {}).join(",")}`
+      : null,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" | ") : null;
+}
+
 const stylesheet = StyleSheet.create((theme, runtime) => ({
   container: {
     backgroundColor: theme.colors.groupped.background,
@@ -831,6 +846,9 @@ const CompactSessionRow = React.memo(
                 </Text>
                 <Text style={styles.sessionMetaValue} numberOfLines={1}>
                   {getSessionProviderLabel(session)}
+                </Text>
+                <Text style={[styles.requestPreviewText, { color: "#FF3B30" }]} numberOfLines={2}>
+                  {buildSessionModelDebugLabel(session) ?? "debug:no-model-fields"}
                 </Text>
               </View>
             </View>

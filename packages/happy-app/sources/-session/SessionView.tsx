@@ -239,7 +239,6 @@ export const SessionView = React.memo((props: { id: string }) => {
   const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
   const [showMobilePanelSheet, setShowMobilePanelSheet] = React.useState(false);
 
-  const showAgentActivity = useSetting("showAgentActivity");
 
   // Dev environment: detect .happy/dev.yml on connected sessions
   const sessionIsConnected = session?.presence === "online";
@@ -286,17 +285,13 @@ export const SessionView = React.memo((props: { id: string }) => {
     // Normal state - show session info
     const isConnected = session.presence === "online";
 
-    // When showAgentActivity is enabled and agent is thinking, show thinking indicator
     const pathSubtitle = session.metadata?.path
       ? formatPathRelativeToHome(
           session.metadata.path,
           session.metadata?.homeDir,
         )
       : undefined;
-    const subtitle =
-      showAgentActivity && isSessionRunning(session)
-        ? t("tools.taskView.agentThinking")
-        : pathSubtitle;
+    const subtitle = pathSubtitle;
 
     return {
       title: getSessionName(session),
@@ -308,7 +303,7 @@ export const SessionView = React.memo((props: { id: string }) => {
       provider: getSessionProviderKey(session),
       tintColor: isConnected ? theme.colors.text : theme.colors.textSecondary,
     };
-  }, [session, isDataReady, sessionId, router, showAgentActivity, theme]);
+  }, [session, isDataReady, sessionId, router, theme]);
 
   return (
     <InputContext.Provider value={{ appendToInput: appendToInputOuter }}>

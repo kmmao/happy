@@ -651,6 +651,9 @@ export const storage = create<StorageState>()((set, get) => {
             ? (state.sessions[session.id]?.thinkingAt ?? session.thinkingAt)
             : session.thinkingAt;
 
+          const preservedResolvedModelId =
+            state.sessions[session.id]?.resolvedModelId ?? session.resolvedModelId;
+
           mergedSessions[session.id] = {
             ...session,
             thinking: preservedThinking,
@@ -672,6 +675,9 @@ export const storage = create<StorageState>()((set, get) => {
             needsAttention: resolvedNeedsAttention,
             // Preserve client-only latestUsage — server doesn't return it
             latestUsage: state.sessions[session.id]?.latestUsage,
+            ...(preservedResolvedModelId && {
+              resolvedModelId: preservedResolvedModelId,
+            }),
           };
         });
 
@@ -902,9 +908,18 @@ export const storage = create<StorageState>()((set, get) => {
           };
         }
 
+        const nextSessionListViewData =
+          updatedSessions !== state.sessions
+            ? buildSessionListViewData(
+                updatedSessions,
+                state.settings.realtimeSessionSort ?? true,
+              )
+            : state.sessionListViewData;
+
         return {
           ...state,
           sessions: updatedSessions,
+          sessionListViewData: nextSessionListViewData,
           sessionMessages: {
             ...state.sessionMessages,
             [sessionId]: {
