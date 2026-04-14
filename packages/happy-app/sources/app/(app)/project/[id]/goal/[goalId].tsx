@@ -275,6 +275,7 @@ function GoalDetailScreen() {
                                 <Text style={styles.rowMeta}>{task.status}</Text>
                             </View>
                             {task.roleType ? <Text style={styles.rowMeta}>{task.roleType}</Text> : null}
+                            {task.assignedMemberId ? <Text style={styles.rowMeta}>{"\u00B7"} assigned</Text> : null}
                         </Pressable>
                     ))}
                 </View>

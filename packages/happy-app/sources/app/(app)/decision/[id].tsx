@@ -11,6 +11,7 @@ import { layout } from "@/components/layout";
 import {
     adjudicateDecision,
     fetchDecisionById,
+    submitDecisionOpinion,
     type ServerDecision,
     type DecisionOption,
 } from "@/sync/apiDecision";
@@ -203,6 +204,61 @@ const DecisionDetailScreen = React.memo(function DecisionDetailScreen() {
                     );
                 })}
             </View>
+
+            {/* Opinions */}
+            {(decision.opinions.length > 0 || isPending) && (
+                <View style={styles.card}>
+                    <Text style={styles.sectionLabel}>
+                        {t("decision.opinions")} ({decision.opinions.length})
+                    </Text>
+                    {decision.opinions.map((op, idx) => {
+                        const optDesc = options.find((o) => o.id === op.chosenOption)?.description ?? op.chosenOption;
+                        return (
+                            <View key={idx} style={styles.opinionRow}>
+                                <Ionicons name="chatbubble-outline" size={14} color={theme.colors.textSecondary} />
+                                <Text style={styles.opinionText} numberOfLines={2}>
+                                    <Text style={{ fontWeight: "600" }}>{op.accountId.slice(0, 8)}</Text>
+                                    {" → "}{optDesc}
+                                    {op.rationale ? ` — ${op.rationale}` : ""}
+                                </Text>
+                            </View>
+                        );
+                    })}
+                    {isPending && selectedOption && (
+                        <Pressable
+                            style={[styles.opinionButton, submitting && { opacity: 0.4 }]}
+                            disabled={submitting}
+                            onPress={async () => {
+                                if (!decision || !selectedOption) return;
+                                setSubmitting(true);
+                                try {
+                                    const credentials = await TokenStorage.getCredentials();
+                                    if (!credentials) return;
+                                    const result = await submitDecisionOpinion(
+                                        credentials,
+                                        decision.projectId,
+                                        decision.id,
+                                        { chosenOption: selectedOption, rationale: rationale.trim() || undefined },
+                                    );
+                                    setDecision((prev) => prev ? { ...prev, opinions: result.opinions } : prev);
+                                    if (result.conflict) {
+                                        Modal.toast(t("decision.opinionConflict"));
+                                    } else {
+                                        Modal.toast(t("decision.opinionSubmitted"));
+                                    }
+                                } catch {
+                                    Modal.toast(t("decision.adjudicateError"));
+                                } finally {
+                                    setSubmitting(false);
+                                }
+                            }}
+                        >
+                            <Ionicons name="chatbubble-ellipses" size={16} color={theme.colors.accentPurple} />
+                            <Text style={styles.opinionButtonText}>{t("decision.submitOpinion")}</Text>
+                        </Pressable>
+                    )}
+                </View>
+            )}
 
             {/* Rationale Input (pending only) */}
             {isPending && selectedOption && (
@@ -442,6 +498,36 @@ const styles = StyleSheet.create((theme) => ({
         gap: 8,
     },
     precedentLinkText: {
+        ...Typography.default("semiBold"),
+        fontSize: 14,
+        color: theme.colors.accentPurple,
+    },
+    opinionRow: {
+        flexDirection: "row" as const,
+        alignItems: "flex-start" as const,
+        gap: 8,
+        paddingVertical: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.groupped.background,
+    },
+    opinionText: {
+        ...Typography.default(),
+        fontSize: 13,
+        color: theme.colors.text,
+        flex: 1,
+        lineHeight: 18,
+    },
+    opinionButton: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+        gap: 6,
+        marginTop: 10,
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: theme.colors.groupped.background,
+    },
+    opinionButtonText: {
         ...Typography.default("semiBold"),
         fontSize: 14,
         color: theme.colors.accentPurple,

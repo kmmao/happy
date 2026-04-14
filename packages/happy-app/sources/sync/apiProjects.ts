@@ -444,6 +444,7 @@ export interface GoalTaskSummary {
     status: string;
     sessionId: string | null;
     roleType: string | null;
+    assignedMemberId: string | null;
 }
 
 export interface GoalSummary {
@@ -478,6 +479,7 @@ export interface GoalDetailTask {
     status: string;
     sessionId: string | null;
     roleType: string | null;
+    assignedMemberId: string | null;
     promptPreview: string;
     priority: string;
     createdAt: number;
@@ -573,6 +575,7 @@ const GoalDetailTaskSchema = z.object({
     status: z.string(),
     sessionId: z.string().nullable(),
     roleType: z.string().nullable(),
+    assignedMemberId: z.string().nullable().optional(),
     promptPreview: z.string(),
     priority: z.string(),
     createdAt: z.number().int().nonnegative(),
@@ -895,5 +898,76 @@ export async function deleteWorldMember(
         if (!response.ok) {
             throw new Error(`Failed to delete member: ${response.status}`);
         }
+    });
+}
+
+// === Member Stats API ===
+
+export interface MemberStatSummary {
+    memberId: string;
+    accountId: string;
+    displayName: string | null;
+    role: string;
+    availability: string;
+    account: { username: string | null; firstName: string | null; lastName: string | null } | null;
+    decisionsResolved: number;
+    auditActions: number;
+}
+
+export async function fetchMemberStats(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<MemberStatSummary[]> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/member-stats`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch member stats: ${response.status}`);
+        }
+        const data = (await response.json()) as { stats: MemberStatSummary[] };
+        return data.stats;
+    });
+}
+
+// === Audit Log API ===
+
+export interface AuditLogEntry {
+    id: string;
+    accountId: string;
+    memberId: string | null;
+    action: string;
+    entityType: string;
+    entityId: string | null;
+    summary: string;
+    before: unknown;
+    after: unknown;
+    createdAt: number;
+    account: { id: string; username: string | null; firstName: string | null; lastName: string | null } | null;
+}
+
+export async function fetchAuditLog(
+    credentials: AuthCredentials,
+    projectId: string,
+    opts?: { entityType?: string; limit?: number; offset?: number },
+): Promise<{ logs: AuditLogEntry[]; total: number }> {
+    const API_ENDPOINT = getServerUrl();
+    const params = new URLSearchParams();
+    if (opts?.entityType) params.set("entityType", opts.entityType);
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    if (opts?.offset) params.set("offset", String(opts.offset));
+    const qs = params.toString();
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/audit-log${qs ? `?${qs}` : ""}`,
+            { headers: authHeaders(credentials) },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to fetch audit log: ${response.status}`);
+        }
+        return (await response.json()) as { logs: AuditLogEntry[]; total: number };
     });
 }

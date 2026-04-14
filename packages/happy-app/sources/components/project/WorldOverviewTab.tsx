@@ -25,18 +25,17 @@ import {
     dismissSuggestion,
     fetchAutonomyStats,
     fetchCollaboration,
-    fetchAuditLog,
     type SuggestionStatus,
     type WorldDashboard,
     type SuggestionSummary,
     type AutonomyStats,
     type CollaborationSummary,
-    type AuditLogEntry,
 } from "@/sync/apiWorld";
 import type { AcceptSuggestionResult } from "@/sync/apiWorld";
 import { AutonomyStatusSection } from "./AutonomyStatusSection";
 import { GovernanceDashboard } from "./GovernanceDashboard";
 import { AuditLogSection } from "./AuditLogSection";
+import { MemberStatsSection } from "./MemberStatsSection";
 import { RoleCollaborationSection } from "./RoleCollaborationSection";
 import { SuggestionCard } from "./SuggestionCard";
 import {
@@ -71,7 +70,6 @@ export const WorldOverviewTab = React.memo(
         const router = useRouter();
         const [data, setData] = React.useState<WorldDashboard | null>(null);
         const [autonomyStats, setAutonomyStats] = React.useState<AutonomyStats | null>(null);
-        const [auditLog, setAuditLog] = React.useState<AuditLogEntry[]>([]);
         const [collaboration, setCollaboration] = React.useState<CollaborationSummary | null>(null);
         const [suggestions, setSuggestions] = React.useState<SuggestionSummary[]>([]);
         const [loading, setLoading] = React.useState(false);
@@ -102,17 +100,15 @@ export const WorldOverviewTab = React.memo(
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const [dashboard, activeSuggestions, acceptedSuggestions, stats, collab, auditEntries] = await Promise.all([
+                const [dashboard, activeSuggestions, acceptedSuggestions, stats, collab] = await Promise.all([
                     fetchWorldDashboard(credentials, project.serverId),
                     fetchSuggestions(credentials, project.serverId),
                     fetchSuggestions(credentials, project.serverId, { status: "accepted" }),
                     fetchAutonomyStats(credentials, project.serverId).catch(() => null),
                     fetchCollaboration(credentials, project.serverId).catch(() => null),
-                    fetchAuditLog(credentials, project.serverId, 20).catch(() => [] as AuditLogEntry[]),
                 ]);
                 setData(dashboard);
                 setAutonomyStats(stats);
-                setAuditLog(auditEntries);
                 setCollaboration(collab);
                 setSuggestions(mergeVisibleSuggestions(
                     mergeFetchedSuggestions(activeSuggestions, hiddenSuggestionIdsRef.current),
@@ -328,15 +324,12 @@ export const WorldOverviewTab = React.memo(
                     />
                 ) : null}
 
-                <AuditLogSection
-                    projectId={project.serverId ?? ""}
-                    entries={auditLog}
-                    onVetoed={() => void loadData()}
-                />
-
                 {collaboration ? (
                     <RoleCollaborationSection summary={collaboration} />
                 ) : null}
+
+                <MemberStatsSection projectId={project.serverId ?? ""} isActive={isActive} />
+                <AuditLogSection projectId={project.serverId ?? ""} isActive={isActive} />
 
                 <View style={styles.metricsGrid}>
                     <MetricCard icon="people" label={t("world.activeRoles")} value={String(data.roles.total)} color="#8B5CF6" />

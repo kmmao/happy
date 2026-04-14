@@ -127,3 +127,26 @@ export async function adjudicateDecision(
         return (await response.json()) as { decision: { id: string; status: string; knowledgeId: string | null } };
     });
 }
+
+export async function submitDecisionOpinion(
+    credentials: AuthCredentials,
+    projectId: string,
+    decisionId: string,
+    body: { chosenOption: string; rationale?: string },
+): Promise<{ added: boolean; conflict: boolean; opinions: ServerDecision["opinions"]; conflictSummary?: string }> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/decisions/${decisionId}/opinion`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+                body: JSON.stringify(body),
+            },
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to submit opinion: ${response.status}`);
+        }
+        return (await response.json()) as { added: boolean; conflict: boolean; opinions: ServerDecision["opinions"]; conflictSummary?: string };
+    });
+}
