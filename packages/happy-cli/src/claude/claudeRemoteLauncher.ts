@@ -347,6 +347,33 @@ export async function claudeRemoteLauncher(
         logger.debug(
           `[remote]: forked session ${claudeSessionId} → ${result.sessionId}`,
         );
+
+        // Copy the latest compaction summary from the source session JSONL
+        // into the forked JSONL so getCompactionSummary works on the fork.
+        try {
+          const projectDir = getProjectPath(session.path);
+          const sourceFile = join(projectDir, `${claudeSessionId}.jsonl`);
+          const sourceContent = await readFile(sourceFile, "utf-8");
+          let latestSummary: string | null = null;
+          for (const line of sourceContent.split("\n")) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line);
+              if (parsed.type === "summary" && parsed.summary) {
+                latestSummary = parsed.summary;
+              }
+            } catch { continue; }
+          }
+          if (latestSummary) {
+            const forkFile = join(projectDir, `${result.sessionId}.jsonl`);
+            const summaryRecord = JSON.stringify({ type: "summary", summary: latestSummary });
+            await writeFile(forkFile, "\n" + summaryRecord + "\n", { flag: "a" });
+            logger.debug("[remote]: copied compaction summary to fork JSONL");
+          }
+        } catch (copyErr) {
+          logger.debug(`[remote]: failed to copy summary to fork: ${copyErr}`);
+        }
+
         return {
           claudeSessionId: result.sessionId,
           path: session.path,

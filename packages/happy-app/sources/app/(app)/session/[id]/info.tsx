@@ -274,9 +274,10 @@ function SessionInfoContent({ session }: { session: Session }) {
       throw new HappyError(spawnResult.errorMessage, false);
     }
     if (spawnResult.type === "success") {
-      // Fire-and-forget: record fork relationship on server
+      // Record fork relationship on server BEFORE navigating so
+      // forkedFromSessionId is available when EmptyMessages renders.
       if (auth.credentials) {
-        void setSessionForkSource(spawnResult.sessionId, session.id, auth.credentials);
+        await setSessionForkSource(spawnResult.sessionId, session.id, auth.credentials);
       }
       Modal.toast(t("sessionInfo.forkSessionSuccess"));
       navigateToSession(spawnResult.sessionId);
