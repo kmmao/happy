@@ -224,6 +224,13 @@ interface MemberFormSheetProps {
 
 const ROLES = ["owner", "admin", "member", "observer"] as const;
 
+const PERMISSION_DEFAULTS: Record<string, { lawAuthority: string; decisionScope: string; goalAuthority: string; notifyLevel: string }> = {
+    owner:    { lawAuthority: "create",   decisionScope: "all",      goalAuthority: "create",   notifyLevel: "all" },
+    admin:    { lawAuthority: "create",   decisionScope: "all",      goalAuthority: "create",   notifyLevel: "all" },
+    member:   { lawAuthority: "suggest",  decisionScope: "assigned", goalAuthority: "create",   notifyLevel: "assigned" },
+    observer: { lawAuthority: "readonly", decisionScope: "none",     goalAuthority: "readonly",  notifyLevel: "critical" },
+};
+
 const MemberFormSheet = React.memo(function MemberFormSheet({
     member,
     projectId,
@@ -234,15 +241,31 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
 }: MemberFormSheetProps) {
     const { theme } = useUnistyles();
     const isNew = !member;
+    const initDefaults = PERMISSION_DEFAULTS[member?.role ?? "member"] ?? PERMISSION_DEFAULTS.member;
     const [username, setUsername] = React.useState("");
     const [role, setRole] = React.useState(member?.role ?? "member");
     const [expertise, setExpertise] = React.useState<string[]>(member?.expertise ?? []);
     const [newTag, setNewTag] = React.useState("");
     const [maxConcurrency, setMaxConcurrency] = React.useState(member?.maxConcurrency ?? 3);
-    const [notifyLevel, setNotifyLevel] = React.useState(member?.notifyLevel ?? "all");
+    const [notifyLevel, setNotifyLevel] = React.useState(member?.notifyLevel ?? initDefaults.notifyLevel);
     const [availability, setAvailability] = React.useState(member?.availability ?? "active");
     const [assignedRoleIds, setAssignedRoleIds] = React.useState<string[]>(member?.assignedRoleIds ?? []);
+    const [lawAuthority, setLawAuthority] = React.useState(member?.lawAuthority ?? initDefaults.lawAuthority);
+    const [decisionScope, setDecisionScope] = React.useState(member?.decisionScope ?? initDefaults.decisionScope);
+    const [goalAuthority, setGoalAuthority] = React.useState(member?.goalAuthority ?? initDefaults.goalAuthority);
     const [saving, setSaving] = React.useState(false);
+
+    // When picking a permission level, snap dependent fields to defaults (user can still override)
+    const handleRoleChange = React.useCallback((newRole: string) => {
+        setRole(newRole);
+        if (isNew) {
+            const defaults = PERMISSION_DEFAULTS[newRole] ?? PERMISSION_DEFAULTS.member;
+            setLawAuthority(defaults.lawAuthority);
+            setDecisionScope(defaults.decisionScope);
+            setGoalAuthority(defaults.goalAuthority);
+            setNotifyLevel(defaults.notifyLevel);
+        }
+    }, [isNew]);
 
     const addTag = React.useCallback(() => {
         const trimmed = newTag.trim().toLowerCase();
@@ -268,12 +291,22 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                     accountId: username.trim(), // Server resolves username → accountId
                     role,
                     expertise,
+                    lawAuthority,
+                    decisionScope,
+                    goalAuthority,
+                    notifyLevel,
+                    availability,
+                    maxConcurrency,
+                    assignedRoleIds: assignedRoleIds.length > 0 ? assignedRoleIds : undefined,
                 });
                 onSave(saved);
             } else {
                 const saved = await updateWorldMember(credentials, projectId, member!.id, {
                     role: member!.role === "owner" ? undefined : role,
                     expertise,
+                    lawAuthority,
+                    decisionScope,
+                    goalAuthority,
                     maxConcurrency,
                     notifyLevel,
                     availability,
@@ -287,7 +320,7 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
         } finally {
             setSaving(false);
         }
-    }, [isNew, username, role, expertise, notifyLevel, availability, projectId, member, onSave]);
+    }, [isNew, username, role, expertise, lawAuthority, decisionScope, goalAuthority, notifyLevel, availability, maxConcurrency, assignedRoleIds, projectId, member, onSave]);
 
     const canSave = isNew ? username.trim().length > 0 : true;
 
@@ -327,7 +360,7 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                         </>
                     )}
 
-                    {/* Role */}
+                    {/* Permission Level */}
                     <Text style={styles.fieldLabel}>{t("members.roleLabel")}</Text>
                     <View style={styles.chipRow}>
                         {ROLES.map((r) => {
@@ -341,7 +374,7 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                                         selected && { backgroundColor: ROLE_COLORS[r] },
                                         disabled && { opacity: 0.3 },
                                     ]}
-                                    onPress={() => !disabled && setRole(r)}
+                                    onPress={() => !disabled && handleRoleChange(r)}
                                     disabled={disabled}
                                 >
                                     <Ionicons
@@ -385,8 +418,8 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                         </View>
                     )}
 
-                    {/* Assigned Agent Roles (edit only, when roles exist) */}
-                    {!isNew && agentRoles.length > 0 && (
+                    {/* Assigned Agent Roles */}
+                    {agentRoles.length > 0 && (
                         <>
                             <View style={styles.sectionDivider}>
                                 <View style={styles.sectionDividerLine} />
@@ -427,79 +460,132 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                         </>
                     )}
 
-                    {/* Task Capacity (edit only) */}
-                    {!isNew && (
-                        <>
-                            <View style={styles.sectionDivider}>
-                                <View style={styles.sectionDividerLine} />
-                                <Text style={styles.sectionDividerLabel}>{t("members.capacitySection")}</Text>
-                                <View style={styles.sectionDividerLine} />
-                            </View>
+                    {/* Permissions */}
+                    <View style={styles.sectionDivider}>
+                        <View style={styles.sectionDividerLine} />
+                        <Text style={styles.sectionDividerLabel}>{t("members.permissionsSection")}</Text>
+                        <View style={styles.sectionDividerLine} />
+                    </View>
 
-                            <Text style={styles.fieldLabel}>{t("members.maxConcurrencyLabel")}</Text>
-                            <View style={styles.chipRow}>
-                                {[1, 2, 3, 5, 10].map((n) => {
-                                    const selected = maxConcurrency === n;
-                                    return (
-                                        <Pressable
-                                            key={n}
-                                            style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
-                                            onPress={() => setMaxConcurrency(n)}
-                                        >
-                                            <Text style={[styles.chipText, selected && { color: "#fff" }]}>{n}</Text>
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
-                        </>
-                    )}
+                    <Text style={styles.fieldLabel}>{t("members.lawAuthorityLabel")}</Text>
+                    <View style={styles.chipRow}>
+                        {(["create", "suggest", "readonly"] as const).map((v) => {
+                            const selected = lawAuthority === v;
+                            return (
+                                <Pressable
+                                    key={v}
+                                    style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
+                                    onPress={() => setLawAuthority(v)}
+                                >
+                                    <Text style={[styles.chipText, selected && { color: "#fff" }]}>
+                                        {v === "create" ? t("members.lawCreate") : v === "suggest" ? t("members.lawSuggest") : t("members.lawReadonly")}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
 
-                    {/* Notifications Section (edit only) */}
-                    {!isNew && (
-                        <>
-                            <View style={styles.sectionDivider}>
-                                <View style={styles.sectionDividerLine} />
-                                <Text style={styles.sectionDividerLabel}>{t("members.notificationsSection")}</Text>
-                                <View style={styles.sectionDividerLine} />
-                            </View>
+                    <Text style={styles.fieldLabel}>{t("members.decisionScopeLabel")}</Text>
+                    <View style={styles.chipRow}>
+                        {(["all", "assigned", "none"] as const).map((v) => {
+                            const selected = decisionScope === v;
+                            return (
+                                <Pressable
+                                    key={v}
+                                    style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
+                                    onPress={() => setDecisionScope(v)}
+                                >
+                                    <Text style={[styles.chipText, selected && { color: "#fff" }]}>
+                                        {v === "all" ? t("members.decisionAll") : v === "assigned" ? t("members.decisionAssigned") : t("members.decisionNone")}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
 
-                            <Text style={styles.fieldLabel}>{t("members.notifyLevelLabel")}</Text>
-                            <View style={styles.chipRow}>
-                                {(["all", "critical", "assigned", "none"] as const).map((level) => {
-                                    const selected = notifyLevel === level;
-                                    return (
-                                        <Pressable
-                                            key={level}
-                                            style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
-                                            onPress={() => setNotifyLevel(level)}
-                                        >
-                                            <Text style={[styles.chipText, selected && { color: "#fff" }]}>
-                                                {NOTIFY_LABELS[level]?.() ?? level}
-                                            </Text>
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
+                    <Text style={styles.fieldLabel}>{t("members.goalAuthorityLabel")}</Text>
+                    <View style={styles.chipRow}>
+                        {(["create", "suggest", "readonly"] as const).map((v) => {
+                            const selected = goalAuthority === v;
+                            return (
+                                <Pressable
+                                    key={v}
+                                    style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
+                                    onPress={() => setGoalAuthority(v)}
+                                >
+                                    <Text style={[styles.chipText, selected && { color: "#fff" }]}>
+                                        {v === "create" ? t("members.goalCreate") : v === "suggest" ? t("members.goalSuggest") : t("members.goalReadonly")}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
 
-                            <Text style={styles.fieldLabel}>{t("members.availabilityLabel")}</Text>
-                            <View style={styles.chipRow}>
-                                {(["active", "away", "delegate"] as const).map((av) => {
-                                    const selected = availability === av;
-                                    return (
-                                        <Pressable
-                                            key={av}
-                                            style={[styles.chip, selected && { backgroundColor: AVAILABILITY_COLORS[av] }]}
-                                            onPress={() => setAvailability(av)}
-                                        >
-                                            <Text style={[styles.chipText, selected && { color: "#fff" }]}>
-                                                {AVAILABILITY_LABELS[av]?.() ?? av}
-                                            </Text>
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
-                        </>
-                    )}
+                    {/* Task Capacity */}
+                    <View style={styles.sectionDivider}>
+                        <View style={styles.sectionDividerLine} />
+                        <Text style={styles.sectionDividerLabel}>{t("members.capacitySection")}</Text>
+                        <View style={styles.sectionDividerLine} />
+                    </View>
+
+                    <Text style={styles.fieldLabel}>{t("members.maxConcurrencyLabel")}</Text>
+                    <View style={styles.chipRow}>
+                        {[1, 2, 3, 5, 10].map((n) => {
+                            const selected = maxConcurrency === n;
+                            return (
+                                <Pressable
+                                    key={n}
+                                    style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
+                                    onPress={() => setMaxConcurrency(n)}
+                                >
+                                    <Text style={[styles.chipText, selected && { color: "#fff" }]}>{n}</Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+
+                    {/* Notifications */}
+                    <View style={styles.sectionDivider}>
+                        <View style={styles.sectionDividerLine} />
+                        <Text style={styles.sectionDividerLabel}>{t("members.notificationsSection")}</Text>
+                        <View style={styles.sectionDividerLine} />
+                    </View>
+
+                    <Text style={styles.fieldLabel}>{t("members.notifyLevelLabel")}</Text>
+                    <View style={styles.chipRow}>
+                        {(["all", "critical", "assigned", "none"] as const).map((level) => {
+                            const selected = notifyLevel === level;
+                            return (
+                                <Pressable
+                                    key={level}
+                                    style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
+                                    onPress={() => setNotifyLevel(level)}
+                                >
+                                    <Text style={[styles.chipText, selected && { color: "#fff" }]}>
+                                        {NOTIFY_LABELS[level]?.() ?? level}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+
+                    <Text style={styles.fieldLabel}>{t("members.availabilityLabel")}</Text>
+                    <View style={styles.chipRow}>
+                        {(["active", "away", "delegate"] as const).map((av) => {
+                            const selected = availability === av;
+                            return (
+                                <Pressable
+                                    key={av}
+                                    style={[styles.chip, selected && { backgroundColor: AVAILABILITY_COLORS[av] }]}
+                                    onPress={() => setAvailability(av)}
+                                >
+                                    <Text style={[styles.chipText, selected && { color: "#fff" }]}>
+                                        {AVAILABILITY_LABELS[av]?.() ?? av}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
 
                     {/* Actions */}
                     <View style={styles.modalActions}>

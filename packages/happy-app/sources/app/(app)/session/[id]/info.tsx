@@ -1,4 +1,5 @@
 import React, { useCallback } from "react";
+import { randomUUID } from "expo-crypto";
 import { View, Text, Animated } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,6 +21,8 @@ import {
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
 import { sessionKill, sessionDelete, machineSpawnNewSession, sessionForkSession } from "@/sync/ops";
+import { setSessionForkSource } from "@/sync/apiProjects";
+import { useAuth } from "@/auth/AuthContext";
 import { useUnistyles } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
@@ -86,6 +89,7 @@ function StatusDot({
 function SessionInfoContent({ session }: { session: Session }) {
   const { theme } = useUnistyles();
   const router = useRouter();
+  const auth = useAuth();
   const devModeEnabled = __DEV__;
   const sessionName = getSessionName(session);
   const sessionStatus = useSessionStatus(session);
@@ -255,17 +259,25 @@ function SessionInfoContent({ session }: { session: Session }) {
     if ("error" in forkResult) {
       throw new HappyError(forkResult.error, false);
     }
-    // Spawn a new Happy session using the forked Claude session ID
+    // Pre-allocate a Happy session ID so the spawned process command includes
+    // --happy-session-id, enabling diagnostics to identify and navigate to this fork.
+    const preAllocatedSessionId = randomUUID();
     const spawnResult = await machineSpawnNewSession({
       machineId: session.metadata!.machineId!,
       directory: forkResult.path,
       claudeSessionId: forkResult.claudeSessionId,
+      happySessionId: preAllocatedSessionId,
+      forkSourceId: session.id,
       agent: "claude",
     });
     if (spawnResult.type === "error") {
       throw new HappyError(spawnResult.errorMessage, false);
     }
     if (spawnResult.type === "success") {
+      // Fire-and-forget: record fork relationship on server
+      if (auth.credentials) {
+        void setSessionForkSource(spawnResult.sessionId, session.id, auth.credentials);
+      }
       Modal.toast(t("sessionInfo.forkSessionSuccess"));
       navigateToSession(spawnResult.sessionId);
     }

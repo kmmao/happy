@@ -14,6 +14,14 @@ interface WorldMemberCreateInput {
     role?: string;              // owner | admin | member | observer — default: member
     displayName?: string;
     expertise?: string[];
+    // Optional overrides — if omitted, role-based defaults apply
+    lawAuthority?: string;
+    decisionScope?: string;
+    goalAuthority?: string;
+    notifyLevel?: string;
+    availability?: string;
+    maxConcurrency?: number;
+    assignedRoleIds?: string[];
 }
 
 interface WorldMemberRecord {
@@ -85,7 +93,13 @@ export async function worldMemberCreate(input: WorldMemberCreateInput): Promise<
             role,
             displayName: input.displayName ?? null,
             expertise: JSON.stringify(input.expertise ?? []),
-            ...defaults,
+            lawAuthority: input.lawAuthority ?? defaults.lawAuthority,
+            decisionScope: input.decisionScope ?? defaults.decisionScope,
+            goalAuthority: input.goalAuthority ?? defaults.goalAuthority,
+            notifyLevel: input.notifyLevel ?? defaults.notifyLevel,
+            availability: input.availability ?? "active",
+            ...(input.maxConcurrency !== undefined ? { maxConcurrency: input.maxConcurrency } : {}),
+            ...(input.assignedRoleIds !== undefined ? { assignedRoleIds: JSON.stringify(input.assignedRoleIds) } : {}),
         },
     });
 

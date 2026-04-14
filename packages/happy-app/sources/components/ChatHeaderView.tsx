@@ -30,6 +30,7 @@ interface ChatHeaderViewProps {
   provider?: string | null;
   knowledgeCount?: number;
   onKnowledgePress?: () => void;
+  onForkPress?: () => void;
   devButtonState?: DevButtonState;
   devRunningCount?: number;
   devTotalCount?: number;
@@ -52,6 +53,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   provider,
   knowledgeCount,
   onKnowledgePress,
+  onForkPress,
   devButtonState,
   devRunningCount,
   devTotalCount,
@@ -192,6 +194,20 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
               onLongPress={onDevLongPress}
               tintColor={theme.colors.header.tint}
             />
+          )}
+
+          {onForkPress && (
+            <Pressable
+              onPress={onForkPress}
+              hitSlop={15}
+              style={styles.actionButton}
+            >
+              <Ionicons
+                name="git-branch-outline"
+                size={20}
+                color={theme.colors.header.tint}
+              />
+            </Pressable>
           )}
 
           {onRefreshPress && (

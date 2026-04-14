@@ -362,6 +362,7 @@ export const SessionView = React.memo((props: { id: string }) => {
                     : undefined
                 }
                 onChangesPress={hasChanges ? () => router.push(`/session/${sessionId}/changes`) : undefined}
+                onForkPress={session?.forkedFromSessionId ? () => router.push(`/session/${session.forkedFromSessionId!}` as any) : undefined}
                 devButtonState={headerProps.isConnected && hasDevConfig ? "idle" : "hidden"}
                 onDevPress={headerProps.isConnected && hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
                 onDevLongPress={headerProps.isConnected && hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}

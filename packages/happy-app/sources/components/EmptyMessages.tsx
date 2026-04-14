@@ -4,9 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Typography } from '@/constants/Typography';
 import { Session } from '@/sync/storageTypes';
 import { useMachine } from '@/sync/storage';
-import { useSessionStatus, formatPathRelativeToHome } from '@/utils/sessionUtils';
+import { formatPathRelativeToHome } from '@/utils/sessionUtils';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
+import { sessionGetCompactionSummary } from '@/sync/ops';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -46,6 +47,30 @@ const stylesheet = StyleSheet.create((theme) => ({
         lineHeight: 24,
         ...Typography.default(),
     },
+    summaryCard: {
+        width: '100%',
+        backgroundColor: theme.colors.surface,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 24,
+    },
+    summaryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+        gap: 6,
+    },
+    summaryTitle: {
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        ...Typography.default('semiBold'),
+    },
+    summaryText: {
+        fontSize: 14,
+        color: theme.colors.text,
+        lineHeight: 20,
+        ...Typography.default('regular'),
+    },
 }));
 
 interface EmptyMessagesProps {
@@ -54,7 +79,7 @@ interface EmptyMessagesProps {
 
 function getOSIcon(os?: string): keyof typeof Ionicons.glyphMap {
     if (!os) return 'hardware-chip-outline';
-    
+
     const osLower = os.toLowerCase();
     if (osLower.includes('darwin') || osLower.includes('mac')) {
         return 'laptop-outline';
@@ -72,7 +97,7 @@ function formatRelativeTime(timestamp: number): string {
     const diffMinutes = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMinutes / 60);
     const diffDays = Math.floor(diffHours / 24);
-    
+
     if (diffMinutes < 1) {
         return t('time.justNow');
     } else if (diffMinutes < 60) {
@@ -88,9 +113,24 @@ export function EmptyMessages({ session }: EmptyMessagesProps) {
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const osIcon = getOSIcon(session.metadata?.os);
-    const sessionStatus = useSessionStatus(session);
     const machine = useMachine(session.metadata?.machineId ?? "");
     const startedTime = formatRelativeTime(session.createdAt);
+
+    const isOnline = session.presence === "online";
+    const hasForkSource = !!session.forkedFromSessionId;
+
+    const [compactionSummary, setCompactionSummary] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        if (!isOnline || !hasForkSource) return;
+        let cancelled = false;
+        sessionGetCompactionSummary(session.id).then((summary) => {
+            if (!cancelled) {
+                setCompactionSummary(summary);
+            }
+        });
+        return () => { cancelled = true; };
+    }, [session.id, isOnline, hasForkSource]);
 
     return (
         <View style={styles.container}>
@@ -106,13 +146,25 @@ export function EmptyMessages({ session }: EmptyMessagesProps) {
                     {machine?.metadata?.displayName || session.metadata?.host}
                 </Text>
             )}
-            
+
             {session.metadata?.path && (
                 <Text style={styles.pathText}>
                     {formatPathRelativeToHome(session.metadata.path, session.metadata.homeDir)}
                 </Text>
             )}
-            
+
+            {compactionSummary && (
+                <View style={styles.summaryCard}>
+                    <View style={styles.summaryHeader}>
+                        <Ionicons name="git-branch-outline" size={14} color={theme.colors.textSecondary} />
+                        <Text style={styles.summaryTitle}>{t('session.contextSummaryTitle')}</Text>
+                    </View>
+                    <Text style={styles.summaryText} numberOfLines={12}>
+                        {compactionSummary}
+                    </Text>
+                </View>
+            )}
+
             <Text style={styles.noMessagesText}>
                 {t('session.noMessages')}
             </Text>

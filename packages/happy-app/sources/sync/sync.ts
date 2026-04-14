@@ -991,6 +991,7 @@ class Sync {
       createdAt: number;
       updatedAt: number;
       lastMessage: ApiMessage | null;
+      forkedFromSessionId: string | null;
     }>;
 
     // Initialize all session encryptions first

@@ -145,8 +145,10 @@ export interface SpawnSessionOptions {
   agent?: "codex" | "claude" | "gemini";
   // Claude Code session ID for --resume (resumes an existing session with full context)
   claudeSessionId?: string;
-  // Happy session ID for reconnecting to the same Happy session (preserves message history)
+  // Happy session ID for reconnecting to the same Happy session (or pre-allocating for fork)
   happySessionId?: string;
+  // Source session ID when forking — daemon writes --happy-fork-source so diagnostics can identify & navigate forks
+  forkSourceId?: string;
   // Profile ID — sent to daemon so it can verify trust (profile exists in local settings)
   // Trusted profiles are allowed to override operator-only env vars (ANTHROPIC_BASE_URL, etc.)
   profileId?: string;
@@ -179,6 +181,7 @@ export async function machineSpawnNewSession(
     agent,
     claudeSessionId,
     happySessionId,
+    forkSourceId,
     profileId,
     environmentVariables,
   } = options;
@@ -207,6 +210,7 @@ export async function machineSpawnNewSession(
         agent?: "codex" | "claude" | "gemini";
         sessionId?: string;
         happySessionId?: string;
+        forkSourceId?: string;
         profileId?: string;
         environmentVariables?: Record<string, string>;
       }
@@ -218,6 +222,7 @@ export async function machineSpawnNewSession(
       agent,
       sessionId: claudeSessionId,
       happySessionId,
+      forkSourceId,
       profileId,
       environmentVariables: mergedEnvironmentVariables,
     });
@@ -2088,6 +2093,24 @@ export async function sessionGetPlanFileContent(
         return response;
     } catch {
         return { content: null, filePath: null };
+    }
+}
+
+/**
+ * Fetch the compaction summary from the CLI (reads the session JSONL file).
+ * Returns null when no summary exists (fresh session or no compaction has occurred).
+ */
+export async function sessionGetCompactionSummary(
+    sessionId: string,
+): Promise<string | null> {
+    try {
+        const response = await apiSocket.sessionRPC<
+            { summary: string | null },
+            Record<string, never>
+        >(sessionId, "getCompactionSummary", {});
+        return response.summary ?? null;
+    } catch {
+        return null;
     }
 }
 

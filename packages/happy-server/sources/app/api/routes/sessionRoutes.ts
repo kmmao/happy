@@ -255,6 +255,7 @@ export function sessionRoutes(app: Fastify) {
           dataEncryptionKey: true,
           active: true,
           lastActiveAt: true,
+          forkedFromSessionId: true,
         },
       });
 
@@ -286,6 +287,7 @@ export function sessionRoutes(app: Fastify) {
           dataEncryptionKey: v.dataEncryptionKey
             ? Buffer.from(v.dataEncryptionKey).toString("base64")
             : null,
+          forkedFromSessionId: v.forkedFromSessionId ?? null,
         })),
         nextCursor,
         hasNext,
@@ -314,13 +316,50 @@ export function sessionRoutes(app: Fastify) {
       const userId = request.userId;
       const { tag, metadata, dataEncryptionKey, sessionId, machineId, path } = request.body;
 
-      // Reconnect to existing session by ID (for resume functionality)
+      // Reconnect to existing session by ID (for resume / fork pre-allocation)
       if (sessionId) {
         const existing = await db.session.findFirst({
           where: { id: sessionId, accountId: userId },
         });
         if (!existing) {
-          return reply.status(404).send({ error: "Session not found" });
+          // Session not found — create a new one with the requested ID.
+          // This supports the fork flow where the App pre-allocates a UUID
+          // before spawning, so the process command includes --happy-session-id
+          // and diagnostics can navigate to the forked session.
+          const updSeq = await allocateUserSeq(userId);
+          const created = await db.session.create({
+            data: {
+              id: sessionId,
+              accountId: userId,
+              tag: tag,
+              metadata: metadata,
+              dataEncryptionKey: dataEncryptionKey
+                ? new Uint8Array(Buffer.from(dataEncryptionKey, "base64"))
+                : undefined,
+            },
+          });
+          await resolveAndLinkProject(userId, created.id, machineId, path);
+          const updatePayload = buildNewSessionUpdate(created, updSeq, randomKeyNaked(12));
+          eventRouter.emitUpdate({ userId, payload: updatePayload, recipientFilter: { type: "user-scoped-only" } });
+          return reply.send({
+            session: {
+              id: created.id,
+              tag: created.tag,
+              seq: created.seq,
+              metadata: created.metadata,
+              metadataVersion: created.metadataVersion,
+              agentState: created.agentState,
+              agentStateVersion: created.agentStateVersion,
+              dataEncryptionKey: created.dataEncryptionKey
+                ? Buffer.from(created.dataEncryptionKey).toString("base64")
+                : null,
+              active: created.active,
+              activeAt: created.lastActiveAt.getTime(),
+              createdAt: created.createdAt.getTime(),
+              updatedAt: created.updatedAt.getTime(),
+              lastMessage: null,
+            },
+          });
         }
 
         log(
@@ -677,6 +716,45 @@ export function sessionRoutes(app: Fastify) {
         updSeq,
         randomKeyNaked(12),
       );
+      eventRouter.emitUpdate({
+        userId,
+        payload: updatePayload,
+        recipientFilter: { type: "user-scoped-only" },
+      });
+
+      return reply.send({ success: true });
+    },
+  );
+
+  // Set fork source — records which parent session this was forked from
+  app.patch(
+    "/v1/sessions/:sessionId/fork-source",
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: z.object({ sessionId: z.string() }),
+        body: z.object({ forkedFromSessionId: z.string() }),
+      },
+    },
+    async (request, reply) => {
+      const userId = request.userId;
+      const { sessionId } = request.params;
+      const { forkedFromSessionId } = request.body;
+
+      const session = await db.session.findFirst({
+        where: { id: sessionId, accountId: userId },
+      });
+      if (!session) {
+        return reply.code(404).send({ error: "Session not found" });
+      }
+
+      const updSeq = await allocateUserSeq(userId);
+      const updated = await db.session.update({
+        where: { id: sessionId },
+        data: { forkedFromSessionId },
+      });
+
+      const updatePayload = buildNewSessionUpdate(updated, updSeq, randomKeyNaked(12));
       eventRouter.emitUpdate({
         userId,
         payload: updatePayload,

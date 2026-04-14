@@ -834,6 +834,13 @@ export async function createWorldMember(
         role?: string;
         displayName?: string;
         expertise?: string[];
+        lawAuthority?: string;
+        decisionScope?: string;
+        goalAuthority?: string;
+        notifyLevel?: string;
+        availability?: string;
+        maxConcurrency?: number;
+        assignedRoleIds?: string[];
     },
 ): Promise<WorldMemberSummary> {
     const API_ENDPOINT = getServerUrl();
@@ -971,3 +978,21 @@ export async function fetchAuditLog(
         return (await response.json()) as { logs: AuditLogEntry[]; total: number };
     });
 }
+
+/**
+ * Record that a session was forked from a parent session.
+ * Called immediately after fork+spawn succeeds so the relationship is persisted.
+ */
+export async function setSessionForkSource(
+    sessionId: string,
+    forkedFromSessionId: string,
+    credentials: AuthCredentials,
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+    await fetch(`${API_ENDPOINT}/v1/sessions/${sessionId}/fork-source`, {
+        method: "PATCH",
+        headers: authHeaders(credentials),
+        body: JSON.stringify({ forkedFromSessionId }),
+    });
+}
+

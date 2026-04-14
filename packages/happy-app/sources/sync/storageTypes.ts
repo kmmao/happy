@@ -263,6 +263,7 @@ export interface Session {
   updatedAt: number;
   active: boolean;
   activeAt: number;
+  forkedFromSessionId?: string | null;
   rpcReady: boolean; // true when at least one RPC method is registered for this session
   metadata: Metadata | null;
   metadataVersion: number;

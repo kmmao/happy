@@ -14,6 +14,13 @@ const CreateMemberBodySchema = z.object({
     role: z.enum(MEMBER_ROLES).default("member"),
     displayName: z.string().max(100).optional(),
     expertise: z.array(z.string().max(50)).max(20).default([]),
+    lawAuthority: z.enum(["create", "suggest", "readonly"]).optional(),
+    decisionScope: z.enum(["all", "assigned", "none"]).optional(),
+    goalAuthority: z.enum(["create", "suggest", "readonly"]).optional(),
+    notifyLevel: z.enum(["all", "critical", "assigned", "none"]).optional(),
+    availability: z.enum(["active", "away", "delegate"]).optional(),
+    maxConcurrency: z.number().int().min(1).max(20).optional(),
+    assignedRoleIds: z.array(z.string()).max(10).optional(),
 });
 
 const UpdateMemberBodySchema = z.object({
@@ -97,6 +104,13 @@ export function worldMemberRoutes(app: Fastify) {
                     role: request.body.role,
                     displayName: request.body.displayName,
                     expertise: request.body.expertise,
+                    lawAuthority: request.body.lawAuthority,
+                    decisionScope: request.body.decisionScope,
+                    goalAuthority: request.body.goalAuthority,
+                    notifyLevel: request.body.notifyLevel,
+                    availability: request.body.availability,
+                    maxConcurrency: request.body.maxConcurrency,
+                    assignedRoleIds: request.body.assignedRoleIds,
                 });
 
                 // Re-fetch with account info for serialization

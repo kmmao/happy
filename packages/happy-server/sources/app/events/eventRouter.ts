@@ -622,6 +622,7 @@ export function buildNewSessionUpdate(
     lastActiveAt: Date;
     createdAt: Date;
     updatedAt: Date;
+    forkedFromSessionId?: string | null;
   },
   updateSeq: number,
   updateId: string,
@@ -644,6 +645,7 @@ export function buildNewSessionUpdate(
       activeAt: session.lastActiveAt.getTime(),
       createdAt: session.createdAt.getTime(),
       updatedAt: session.updatedAt.getTime(),
+      forkedFromSessionId: session.forkedFromSessionId ?? null,
     },
     createdAt: Date.now(),
   };
