@@ -218,15 +218,16 @@ export function useSessionStatus(session: Session): SessionStatus {
  * Returns the last segment of the path, or 'unknown' if no path is available.
  */
 export function getSessionName(session: Session): string {
+  const forkPrefix = session.forkedFromSessionId ? "🔀 " : "";
   if (session.metadata?.summary) {
-    return session.metadata.summary.text;
+    return forkPrefix + session.metadata.summary.text;
   } else if (session.metadata) {
     const segments = session.metadata.path.split("/").filter(Boolean);
     const lastSegment = segments.pop();
     if (!lastSegment) {
-      return t("status.unknown");
+      return forkPrefix + t("status.unknown");
     }
-    return lastSegment;
+    return forkPrefix + lastSegment;
   }
   return t("status.unknown");
 }
