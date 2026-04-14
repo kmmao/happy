@@ -2432,29 +2432,6 @@ export const ru: TranslationStructure = {
     noData: "Данные об использовании недоступны",
   },
 
-  analytics: {
-    usageOverview: "Обзор использования",
-    totalTokens: "Всего токенов",
-    totalCost: "Общая стоимость",
-    last7Days: "7 дней",
-    last30Days: "30 дней",
-    tokenTrend: "Тренд токенов",
-    costTrend: "Тренд стоимости",
-    costByModel: "Стоимость по модели",
-    tokensByModel: "Токены по модели",
-    supervisorCost: "Стоимость супервизора",
-    totalRuns: "Запуски",
-    agentEfficiency: "Эффективность агента",
-    completionRate: "Процент завершения",
-    avgDuration: "Средняя длительность",
-    avgCostPerRun: "Средняя стоимость/запуск",
-    avgTokensPerRun: "Средние токены/запуск",
-    completed: "Завершено",
-    failed: "Ошибка",
-    noData: "Нет данных аналитики",
-    noDataSubtitle: "Данные об использовании появятся здесь после запуска сессий",
-  },
-
   feed: {
     // Feed notifications for friend requests and acceptances
     friendRequestFrom: ({ name }: { name: string }) =>
@@ -3083,7 +3060,6 @@ export const ru: TranslationStructure = {
     tabHealth: "Здоровье",
     tabActions: "Действия",
     tabResearch: "Анализ",
-    tabAnalytics: "Аналитика",
     tabConfig: "Настройки",
     tabRoles: "Roles",
     tabMembers: "Участники",

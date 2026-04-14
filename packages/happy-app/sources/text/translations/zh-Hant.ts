@@ -2345,29 +2345,6 @@ export const zhHant: TranslationStructure = {
     noData: "暫無使用資料",
   },
 
-  analytics: {
-    usageOverview: "用量概覽",
-    totalTokens: "總令牌數",
-    totalCost: "總費用",
-    last7Days: "7 天",
-    last30Days: "30 天",
-    tokenTrend: "令牌用量趨勢",
-    costTrend: "費用趨勢",
-    costByModel: "按模型費用",
-    tokensByModel: "按模型令牌",
-    supervisorCost: "監督器費用",
-    totalRuns: "運行次數",
-    agentEfficiency: "代理效率",
-    completionRate: "完成率",
-    avgDuration: "平均時長",
-    avgCostPerRun: "平均每次費用",
-    avgTokensPerRun: "平均每次令牌",
-    completed: "已完成",
-    failed: "失敗",
-    noData: "暫無分析資料",
-    noDataSubtitle: "會話運行後將在此顯示用量資料",
-  },
-
   feed: {
     // Feed notifications for friend requests and acceptances
     friendRequestFrom: ({ name }: { name: string }) =>
@@ -2980,7 +2957,6 @@ export const zhHant: TranslationStructure = {
     tabHealth: "健康",
     tabActions: "操作",
     tabResearch: "調研",
-    tabAnalytics: "分析",
     tabConfig: "設定",
     tabRoles: "角色",
     tabMembers: "成員",

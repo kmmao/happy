@@ -9,7 +9,6 @@ export type ProjectDetailTabKey =
     | "world"
     | "roles"
     | "members"
-    | "analytics"
     | "config";
 
 const BASE_TABS: ProjectDetailTabKey[] = [
@@ -22,7 +21,6 @@ const BASE_TABS: ProjectDetailTabKey[] = [
     "health",
     "actions",
     "research",
-    "analytics",
     "config",
 ];
 

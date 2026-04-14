@@ -2517,29 +2517,6 @@ export const it: TranslationStructure = {
     noData: "Nessun dato di utilizzo disponibile",
   },
 
-  analytics: {
-    usageOverview: "Panoramica utilizzo",
-    totalTokens: "Token totali",
-    totalCost: "Costo totale",
-    last7Days: "7 giorni",
-    last30Days: "30 giorni",
-    tokenTrend: "Tendenza token",
-    costTrend: "Tendenza costi",
-    costByModel: "Costo per modello",
-    tokensByModel: "Token per modello",
-    supervisorCost: "Costo supervisore",
-    totalRuns: "Esecuzioni",
-    agentEfficiency: "Efficienza agente",
-    completionRate: "Tasso di completamento",
-    avgDuration: "Durata media",
-    avgCostPerRun: "Costo medio/esecuzione",
-    avgTokensPerRun: "Token medi/esecuzione",
-    completed: "Completato",
-    failed: "Fallito",
-    noData: "Nessun dato analitico",
-    noDataSubtitle: "I dati di utilizzo appariranno qui quando le sessioni saranno in esecuzione",
-  },
-
   feed: {
     // Feed notifications for friend requests and acceptances
     friendRequestFrom: ({ name }: { name: string }) =>
@@ -3061,7 +3038,6 @@ export const it: TranslationStructure = {
     tabHealth: "Salute",
     tabActions: "Azioni",
     tabResearch: "Ricerca",
-    tabAnalytics: "Analisi",
     tabConfig: "Configurazione",
     tabRoles: "Roles",
     tabMembers: "Membri",

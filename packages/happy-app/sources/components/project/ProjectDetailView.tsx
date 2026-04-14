@@ -10,7 +10,6 @@ import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTa
 import { ProjectActionsTab } from "./ProjectActionsTab";
 import { ProjectConfigTab } from "./ProjectConfigTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
-import { ProjectAnalyticsTab } from "./ProjectAnalyticsTab";
 import { WorldRolesTab } from "./WorldRolesTab";
 import { WorldMembersTab } from "./WorldMembersTab";
 import { WorldGoalsTab } from "./WorldGoalsTab";
@@ -72,7 +71,6 @@ export const ProjectDetailView = React.memo(
                 if (knowledgeBaseEnabled) {
                     base.push({ key: "knowledge", label: t("projects.tabKnowledge") });
                 }
-                base.push({ key: "analytics", label: t("projects.tabAnalytics") });
                 base.push({ key: "config", label: t("projects.tabConfig") });
                 return base;
             },
@@ -226,15 +224,6 @@ export const ProjectDetailView = React.memo(
                         }
                     >
                         <WorldGoalsTab project={project} isActive={activeTab === "goals"} />
-                    </View>
-                    <View
-                        style={
-                            activeTab === "analytics"
-                                ? styles.tabVisible
-                                : styles.tabHidden
-                        }
-                    >
-                        <ProjectAnalyticsTab project={project} />
                     </View>
                     <View
                         style={
