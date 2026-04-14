@@ -3058,7 +3058,6 @@ export const ru: TranslationStructure = {
     tabSessions: "Сессии",
     tabGit: "Git",
     tabHealth: "Здоровье",
-    tabActions: "Действия",
     tabResearch: "Анализ",
     tabConfig: "Настройки",
     tabRoles: "Roles",

@@ -3039,7 +3039,6 @@ export const pt: TranslationStructure = {
     tabSessions: "Sessões",
     tabGit: "Git",
     tabHealth: "Saúde",
-    tabActions: "Ações",
     tabResearch: "Pesquisa",
     tabConfig: "Config",
     tabRoles: "Roles",

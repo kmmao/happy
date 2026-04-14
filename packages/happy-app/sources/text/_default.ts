@@ -3034,7 +3034,6 @@ export const en = {
     tabSessions: "Sessions",
     tabGit: "Git",
     tabHealth: "Health",
-    tabActions: "Actions",
     tabResearch: "Research",
     tabConfig: "Config",
     tabRoles: "Roles",

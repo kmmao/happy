@@ -7,7 +7,6 @@ import { ProjectSessionsTab } from "./ProjectSessionsTab";
 import { ProjectGitTab } from "./ProjectGitTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTab";
-import { ProjectActionsTab } from "./ProjectActionsTab";
 import { ProjectConfigTab } from "./ProjectConfigTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
 import { WorldRolesTab } from "./WorldRolesTab";
@@ -65,7 +64,6 @@ export const ProjectDetailView = React.memo(
                     { key: "sessions", label: t("projects.tabSessions") },
                     { key: "git", label: t("projects.tabGit") },
                     { key: "health", label: t("projects.tabHealth") },
-                    { key: "actions", label: t("projects.tabActions") },
                     { key: "research", label: t("projects.tabResearch") },
                 ];
                 if (knowledgeBaseEnabled) {
@@ -156,15 +154,6 @@ export const ProjectDetailView = React.memo(
                         }
                     >
                         <ProjectHealthTab project={project} />
-                    </View>
-                    <View
-                        style={
-                            activeTab === "actions"
-                                ? styles.tabVisible
-                                : styles.tabHidden
-                        }
-                    >
-                        <ProjectActionsTab project={project} />
                     </View>
                     <View
                         style={

@@ -3014,7 +3014,6 @@ export const ja: TranslationStructure = {
     tabSessions: "セッション",
     tabGit: "Git",
     tabHealth: "ヘルス",
-    tabActions: "操作",
     tabResearch: "調査",
     tabConfig: "設定",
     tabRoles: "ロール",

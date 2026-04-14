@@ -2955,7 +2955,6 @@ export const zhHant: TranslationStructure = {
     tabSessions: "工作階段",
     tabGit: "Git",
     tabHealth: "健康",
-    tabActions: "操作",
     tabResearch: "調研",
     tabConfig: "設定",
     tabRoles: "角色",

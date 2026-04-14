@@ -3040,7 +3040,6 @@ export const ca: TranslationStructure = {
     tabSessions: "Sessions",
     tabGit: "Git",
     tabHealth: "Salut",
-    tabActions: "Accions",
     tabResearch: "Recerca",
     tabConfig: "Configuració",
     tabRoles: "Roles",
