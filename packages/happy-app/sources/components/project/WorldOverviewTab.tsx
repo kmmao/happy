@@ -333,7 +333,7 @@ export const WorldOverviewTab = React.memo(
                 <AuditLogSection projectId={project.serverId ?? ""} isActive={isActive} />
 
                 <View style={styles.metricsGrid}>
-                    <MetricCard icon="people" label={t("world.activeGroups")} value={String(data.roles.total)} color="#8B5CF6" />
+                    <MetricCard icon="people" label={t("world.activeGroups")} value={String(data.members?.total ?? 0)} color="#8B5CF6" />
                     <MetricCard icon="alert-circle" label={t("world.pendingDecisions")} value={String(data.decisions.pending)} color={data.decisions.pending > 0 ? "#F59E0B" : "#10B981"} />
                     <MetricCard icon="document-text" label={t("world.lawCount")} value={String(data.lawCount)} color="#3B82F6" onPress={project.serverId ? () => router.push(`/project/${project.id}/world-laws` as any) : undefined} />
                     <MetricCard icon="chatbubbles" label={t("world.agentMessages")} value={String(data.agentMessages.total30d)} color="#6B7280" />
@@ -613,19 +613,19 @@ const styles = StyleSheet.create((theme) => ({
         marginHorizontal: 16,
         marginBottom: 12,
         flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 12,
+        gap: 8,
     },
     metricCard: {
-        width: "47%",
+        flex: 1,
         backgroundColor: theme.colors.surface,
-        borderRadius: 16,
-        padding: 16,
-        gap: 8,
+        borderRadius: 12,
+        padding: 10,
+        alignItems: "center",
+        gap: 4,
     },
     metricValue: {
         ...Typography.default("semiBold"),
-        fontSize: 22,
+        fontSize: 18,
     },
     metricLabel: {
         ...Typography.default(),

@@ -39,6 +39,7 @@ export function worldDashboardRoutes(app: Fastify) {
                 pendingDecisions,
                 recentDecisions,
                 messagesData,
+                membersCount,
                 goalHealthRows,
             ] = await Promise.all([
                 autonomyScore(projectId, userId),
@@ -79,6 +80,10 @@ export function worldDashboardRoutes(app: Fastify) {
                         createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
                     },
                     _count: true,
+                }),
+
+                db.worldMember.count({
+                    where: { accountId: userId, projectId },
                 }),
 
                 db.goal.findMany({
@@ -167,6 +172,9 @@ export function worldDashboardRoutes(app: Fastify) {
                 roles: {
                     total: totalEnabledRoles,
                     byType: rolesByType,
+                },
+                members: {
+                    total: membersCount,
                 },
                 goals: {
                     total: totalGoals,

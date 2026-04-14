@@ -48,6 +48,9 @@ export interface WorldDashboard {
         total: number;
         byType: Record<string, number>;
     };
+    members: {
+        total: number;
+    };
     goals: {
         total: number;
         active: number;
