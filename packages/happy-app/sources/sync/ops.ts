@@ -1353,12 +1353,17 @@ export async function machineTunnelDetect(
     }
 }
 
-/** Allowed signals for machineKillProcess — whitelist to prevent abuse. */
-const KILL_SIGNALS = new Set(["SIGTERM", "SIGKILL", "SIGINT"]);
+/** Signal name → number mapping (POSIX portable, works in /bin/sh). */
+const KILL_SIGNAL_NUMS: Record<string, number> = {
+    SIGTERM: 15,
+    SIGKILL: 9,
+    SIGINT: 2,
+};
 
 /**
  * Kill a process on a machine by PID.
  * Safety: PID must be > 1, signal must be in whitelist.
+ * Uses numeric signal (-15 / -9 / -2) for /bin/sh compatibility.
  */
 export async function machineKillProcess(
     machineId: string,
@@ -1368,10 +1373,11 @@ export async function machineKillProcess(
     if (!Number.isInteger(pid) || pid <= 1) {
         return { success: false, error: `Invalid PID: ${pid}` };
     }
-    if (!KILL_SIGNALS.has(signal)) {
+    const sigNum = KILL_SIGNAL_NUMS[signal];
+    if (sigNum === undefined) {
         return { success: false, error: `Invalid signal: ${signal}` };
     }
-    return machineBash(machineId, `kill -s ${signal} ${pid}`, "/");
+    return machineBash(machineId, `kill -${sigNum} ${pid}`, "/");
 }
 
 /**
