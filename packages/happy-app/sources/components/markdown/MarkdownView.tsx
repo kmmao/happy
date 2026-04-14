@@ -266,7 +266,7 @@ function RenderHeaderBlock(props: {
 }
 
 function RenderListBlock(props: {
-  items: MarkdownSpan[][];
+  items: { spans: MarkdownSpan[]; checked?: boolean }[];
   first: boolean;
   last: boolean;
   selectable: boolean;
@@ -276,28 +276,17 @@ function RenderListBlock(props: {
   return (
     <View style={{ flexDirection: "column", marginBottom: 8, gap: 1 }}>
       {props.items.map((item, index) => {
-        // Detect task list: first span starts with "[ ] " or "[x] "
-        const firstSpan = item[0];
-        const firstText = firstSpan?.text ?? "";
-        const isUnchecked = firstText.startsWith("[ ] ");
-        const isChecked = firstText.startsWith("[x] ") || firstText.startsWith("[X] ");
-
-        if (isUnchecked || isChecked) {
-          // Strip the checkbox prefix from the first span
-          const strippedSpans: MarkdownSpan[] = [
-            { ...firstSpan, text: firstText.slice(4) },
-            ...item.slice(1),
-          ];
+        if (item.checked !== undefined) {
           return (
             <View key={index} style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
               <Ionicons
-                name={isChecked ? "checkbox" : "square-outline"}
+                name={item.checked ? "checkbox" : "square-outline"}
                 size={16}
-                color={isChecked ? theme.colors.success : theme.colors.textSecondary}
+                color={item.checked ? theme.colors.success : theme.colors.textSecondary}
                 style={{ marginTop: 3 }}
               />
               <Text selectable={props.selectable} style={[listStyle, { flex: 1 }]}>
-                <RenderSpans spans={strippedSpans} baseStyle={listStyle} />
+                <RenderSpans spans={item.spans} baseStyle={listStyle} />
               </Text>
             </View>
           );
@@ -305,7 +294,7 @@ function RenderListBlock(props: {
 
         return (
           <Text selectable={props.selectable} style={listStyle} key={index}>
-            - <RenderSpans spans={item} baseStyle={listStyle} />
+            - <RenderSpans spans={item.spans} baseStyle={listStyle} />
           </Text>
         );
       })}

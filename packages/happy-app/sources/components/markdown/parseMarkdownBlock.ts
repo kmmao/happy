@@ -244,7 +244,19 @@ export function parseMarkdownBlock(markdown: string) {
                 allLines.push(lines[index].trim().slice(2));
                 index++;
             }
-            blocks.push({ type: 'list', items: allLines.map((l) => parseMarkdownSpans(l, false)) });
+            blocks.push({
+                type: 'list',
+                items: allLines.map((l) => {
+                    // Detect task list checkbox prefix
+                    if (l.startsWith('[ ] ') || l.startsWith('[  ] ')) {
+                        return { spans: parseMarkdownSpans(l.replace(/^\[\s*\]\s*/, ''), false), checked: false };
+                    }
+                    if (l.startsWith('[x] ') || l.startsWith('[X] ') || l.startsWith('[x ] ') || l.startsWith('[X ] ')) {
+                        return { spans: parseMarkdownSpans(l.replace(/^\[[xX]\s*\]\s*/, ''), false), checked: true };
+                    }
+                    return { spans: parseMarkdownSpans(l, false) };
+                }),
+            });
             continue;
         }
 
