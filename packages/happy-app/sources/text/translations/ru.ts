@@ -3457,6 +3457,30 @@ export const ru: TranslationStructure = {
     noHiddenProcessesHint: "Вы ещё не скрыли ни одного процесса.",
   },
 
+  diagnostics: {
+    title: "Диагностика",
+    viewAll: "Диагностика",
+    viewAllHint: "Процессы Happy и очистка",
+    loading: "Сканирование процессов...",
+    processCount: ({ count }: { count: number }) =>
+      `Найдено ${count} процесс${count === 1 ? "" : count < 5 ? "а" : "ов"}`,
+    noProcesses: "Нет процессов Happy",
+    noProcessesHint: "Процессы Happy CLI не обнаружены на этом устройстве.",
+    cleanRunaway: "Очистить лишние",
+    cleanConfirmTitle: "Очистить лишние процессы",
+    cleanConfirmMessage: "Завершить все осиротевшие процессы daemon и сессий?",
+    cleanSuccess: ({ killed }: { killed: number }) =>
+      `Очищено ${killed} процесс${killed === 1 ? "" : killed < 5 ? "а" : "ов"}`,
+    cleanFailed: "Не удалось очистить процессы",
+    killConfirmTitle: "Завершить процесс",
+    killConfirmMessage: ({ pid }: { pid: number }) => `Завершить процесс PID ${pid}?`,
+    typeDaemon: "Daemon",
+    typeSession: "Сессия",
+    typeVersionCheck: "Проверка версии",
+    typeOther: "Другое",
+    errorScanning: "Ошибка при сканировании процессов",
+  },
+
   supervisor: {
     title: "Мониторинг здоровья",
     description: "AI-анализ кода, отслеживающий здоровье проекта по множеству измерений.",
@@ -4050,6 +4074,7 @@ export const ru: TranslationStructure = {
     boundMembers: ({ count }: { count: number }) => `${count} ${count === 1 ? "участник" : "участников"}`,
     boundMembersSection: "Привязанные участники",
     boundMembersHint: "Выберите, какие участники могут выполнять эту роль",
+    deleteHasMembersBody: ({ count }: { count: number }) => `Эта роль назначена ${count} ${count === 1 ? "участнику" : "участникам"}. Удаление снимет привязку. Продолжить?`,
   },
   members: {
     title: "Участники",
@@ -4101,6 +4126,8 @@ export const ru: TranslationStructure = {
     notificationsSection: "Уведомления",
     capacitySection: "Ёмкость задач",
     maxConcurrencyLabel: "Макс. параллельных задач",
+    assignedRolesSection: "Назначенные роли агентов",
+    assignedRolesHint: "Выберите, какие роли агентов может выполнять этот участник",
   },
   goals: {
     title: "Цели",

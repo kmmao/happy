@@ -181,10 +181,12 @@ export const WorldRolesTab = React.memo(
         }, [isActive, loadRoles]);
 
         const handleDelete = React.useCallback(async (role: AgentRoleSummary) => {
-            const confirmed = await Modal.confirm(
-                t("roles.deleteConfirmTitle"),
-                t("roles.deleteConfirmBody"),
-            );
+            const boundCount = getBoundMemberCount(role.id);
+            const confirmTitle = t("roles.deleteConfirmTitle");
+            const confirmBody = boundCount > 0
+                ? t("roles.deleteHasMembersBody", { count: boundCount })
+                : t("roles.deleteConfirmBody");
+            const confirmed = await Modal.confirm(confirmTitle, confirmBody);
             if (!confirmed) return;
             try {
                 const credentials = await TokenStorage.getCredentials();
@@ -195,7 +197,7 @@ export const WorldRolesTab = React.memo(
             } catch {
                 Modal.toast(t("roles.saveError"));
             }
-        }, []);
+        }, [getBoundMemberCount]);
 
         const handleToggle = React.useCallback(async (role: AgentRoleSummary) => {
             try {

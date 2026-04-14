@@ -13,7 +13,9 @@ import {
     createWorldMember,
     updateWorldMember,
     deleteWorldMember,
+    fetchAgentRoles,
     type WorldMemberSummary,
+    type AgentRoleSummary,
 } from "@/sync/apiProjects";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -65,6 +67,7 @@ export const WorldMembersTab = React.memo(
     ({ project, isActive }: WorldMembersTabProps) => {
         const { theme } = useUnistyles();
         const [members, setMembers] = React.useState<WorldMemberSummary[]>([]);
+        const [agentRoles, setAgentRoles] = React.useState<AgentRoleSummary[]>([]);
         const [loading, setLoading] = React.useState(false);
         const [editingMember, setEditingMember] = React.useState<WorldMemberSummary | "new" | null>(null);
 
@@ -74,8 +77,12 @@ export const WorldMembersTab = React.memo(
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const fetched = await fetchWorldMembers(credentials, project.serverId);
+                const [fetched, fetchedRoles] = await Promise.all([
+                    fetchWorldMembers(credentials, project.serverId),
+                    fetchAgentRoles(credentials, project.serverId).catch(() => [] as AgentRoleSummary[]),
+                ]);
                 setMembers(fetched);
+                setAgentRoles(fetchedRoles);
             } catch {
                 // best effort
             } finally {
@@ -193,6 +200,7 @@ export const WorldMembersTab = React.memo(
                     <MemberFormSheet
                         member={editingMember === "new" ? undefined : editingMember}
                         projectId={project.serverId ?? ""}
+                        agentRoles={agentRoles}
                         onSave={handleSaved}
                         onDelete={handleDelete}
                         onClose={() => setEditingMember(null)}
@@ -208,6 +216,7 @@ export const WorldMembersTab = React.memo(
 interface MemberFormSheetProps {
     member?: WorldMemberSummary;
     projectId: string;
+    agentRoles: AgentRoleSummary[];
     onSave: (member: WorldMemberSummary) => void;
     onDelete: (member: WorldMemberSummary) => void;
     onClose: () => void;

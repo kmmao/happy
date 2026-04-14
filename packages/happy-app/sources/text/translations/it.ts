@@ -3437,6 +3437,30 @@ export const it: TranslationStructure = {
     noHiddenProcessesHint: "Non hai ancora nascosto nessun processo.",
   },
 
+  diagnostics: {
+    title: "Diagnostica",
+    viewAll: "Diagnostica",
+    viewAllHint: "Processi Happy e pulizia",
+    loading: "Scansione processi...",
+    processCount: ({ count }: { count: number }) =>
+      `${count} processo${count !== 1 ? "i" : ""} trovato${count !== 1 ? "i" : ""}`,
+    noProcesses: "Nessun processo Happy",
+    noProcessesHint: "Nessun processo Happy CLI rilevato su questo dispositivo.",
+    cleanRunaway: "Pulisci orfani",
+    cleanConfirmTitle: "Pulisci processi orfani",
+    cleanConfirmMessage: "Terminare tutti i processi daemon e di sessione orfani?",
+    cleanSuccess: ({ killed }: { killed: number }) =>
+      `Puliti ${killed} processo${killed !== 1 ? "i" : ""}`,
+    cleanFailed: "Pulizia processi non riuscita",
+    killConfirmTitle: "Termina processo",
+    killConfirmMessage: ({ pid }: { pid: number }) => `Terminare il processo PID ${pid}?`,
+    typeDaemon: "Daemon",
+    typeSession: "Sessione",
+    typeVersionCheck: "Verifica versione",
+    typeOther: "Altro",
+    errorScanning: "Scansione processi non riuscita",
+  },
+
   supervisor: {
     title: "Monitor della salute",
     description: "Analisi del codice basata su AI che monitora la salute del progetto su più dimensioni.",
@@ -4030,6 +4054,7 @@ export const it: TranslationStructure = {
     boundMembers: ({ count }: { count: number }) => `${count} ${count === 1 ? "membro" : "membri"}`,
     boundMembersSection: "Membri associati",
     boundMembersHint: "Seleziona quali membri del team possono svolgere questo ruolo",
+    deleteHasMembersBody: ({ count }: { count: number }) => `Questo ruolo è assegnato a ${count} ${count === 1 ? "membro" : "membri"}. L'eliminazione rimuoverà il collegamento. Continuare?`,
   },
   members: {
     title: "Membri",
@@ -4081,6 +4106,8 @@ export const it: TranslationStructure = {
     notificationsSection: "Notifiche",
     capacitySection: "Capacità attività",
     maxConcurrencyLabel: "Max attività concorrenti",
+    assignedRolesSection: "Ruoli agente assegnati",
+    assignedRolesHint: "Seleziona i ruoli agente che questo membro può svolgere",
   },
   goals: {
     title: "Obiettivi",

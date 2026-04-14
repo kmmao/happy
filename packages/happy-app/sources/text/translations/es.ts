@@ -3438,6 +3438,30 @@ export const es: TranslationStructure = {
     noHiddenProcessesHint: "Aún no has ocultado ningún proceso.",
   },
 
+  diagnostics: {
+    title: "Diagnóstico",
+    viewAll: "Diagnóstico",
+    viewAllHint: "Procesos Happy y limpieza",
+    loading: "Escaneando procesos...",
+    processCount: ({ count }: { count: number }) =>
+      `${count} proceso${count !== 1 ? "s" : ""} encontrado${count !== 1 ? "s" : ""}`,
+    noProcesses: "Sin procesos Happy",
+    noProcessesHint: "No se detectaron procesos Happy CLI en este equipo.",
+    cleanRunaway: "Limpiar huérfanos",
+    cleanConfirmTitle: "Limpiar procesos huérfanos",
+    cleanConfirmMessage: "¿Terminar todos los procesos daemon y de sesión huérfanos?",
+    cleanSuccess: ({ killed }: { killed: number }) =>
+      `Limpiados ${killed} proceso${killed !== 1 ? "s" : ""}`,
+    cleanFailed: "Error al limpiar procesos",
+    killConfirmTitle: "Terminar proceso",
+    killConfirmMessage: ({ pid }: { pid: number }) => `¿Terminar proceso PID ${pid}?`,
+    typeDaemon: "Daemon",
+    typeSession: "Sesión",
+    typeVersionCheck: "Comprobación de versión",
+    typeOther: "Otro",
+    errorScanning: "Error al escanear procesos",
+  },
+
   supervisor: {
     title: "Monitor de salud",
     description: "Análisis de código con IA que monitorea la salud del proyecto en múltiples dimensiones.",
@@ -4031,6 +4055,7 @@ export const es: TranslationStructure = {
     boundMembers: ({ count }: { count: number }) => `${count} ${count === 1 ? "miembro" : "miembros"}`,
     boundMembersSection: "Miembros vinculados",
     boundMembersHint: "Alterna qué miembros del equipo pueden desempeñar este rol",
+    deleteHasMembersBody: ({ count }: { count: number }) => `Este rol está asignado a ${count} ${count === 1 ? "miembro" : "miembros"}. Al eliminarlo se quitará el vínculo. ¿Continuar?`,
   },
   members: {
     title: "Miembros",
@@ -4082,6 +4107,8 @@ export const es: TranslationStructure = {
     notificationsSection: "Notificaciones",
     capacitySection: "Capacidad de tareas",
     maxConcurrencyLabel: "Máx. tareas concurrentes",
+    assignedRolesSection: "Roles de agente asignados",
+    assignedRolesHint: "Selecciona qué roles de agente puede realizar este miembro",
   },
   goals: {
     title: "Objetivos",

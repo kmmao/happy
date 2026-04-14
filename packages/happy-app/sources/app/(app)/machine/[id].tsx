@@ -560,6 +560,16 @@ function MachineDetailScreen() {
           onPress={() => router.push(`/machine/${machineId}/processes`)}
         />
 
+        {/* Diagnostics — Happy CLI process inspector & cleanup */}
+        <MachineNavigationSummaryItem
+          groupTitle={t("diagnostics.title")}
+          title={t("diagnostics.viewAll")}
+          subtitle={t("diagnostics.viewAllHint")}
+          iconName="medkit-outline"
+          iconColor="#F59E0B"
+          onPress={() => router.push(`/machine/${machineId}/diagnostics` as any)}
+        />
+
         {/* Docker Containers (Provision Tokens) — only if Docker is available */}
         {hasDocker && (
           <MachineNavigationSummaryItem

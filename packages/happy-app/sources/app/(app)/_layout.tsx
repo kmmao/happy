@@ -527,6 +527,14 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="machine/[id]/diagnostics"
+        options={{
+          headerShown: true,
+          headerTitle: t("diagnostics.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="skills/index"
         options={{
           headerShown: true,

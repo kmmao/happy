@@ -3348,6 +3348,28 @@ export const zhHant: TranslationStructure = {
     noHiddenProcessesHint: "你還沒有隱藏任何程序。",
   },
 
+  diagnostics: {
+    title: "診斷",
+    viewAll: "診斷",
+    viewAllHint: "Happy 程序狀態與清理",
+    loading: "正在掃描程序...",
+    processCount: ({ count }: { count: number }) => `發現 ${count} 個程序`,
+    noProcesses: "無 Happy 程序",
+    noProcessesHint: "當前機器上未檢測到 Happy CLI 程序。",
+    cleanRunaway: "清理孤兒程序",
+    cleanConfirmTitle: "清理孤兒程序",
+    cleanConfirmMessage: "終止所有孤立的 daemon 和會話程序？",
+    cleanSuccess: ({ killed }: { killed: number }) => `已清理 ${killed} 個程序`,
+    cleanFailed: "清理程序失敗",
+    killConfirmTitle: "終止程序",
+    killConfirmMessage: ({ pid }: { pid: number }) => `終止 PID ${pid} 程序？`,
+    typeDaemon: "Daemon",
+    typeSession: "會話",
+    typeVersionCheck: "版本檢查",
+    typeOther: "其他",
+    errorScanning: "掃描程序失敗",
+  },
+
   supervisor: {
     title: "健康監控",
     description: "AI 驅動的程式碼分析，多維度監控專案健康狀況。",
@@ -3942,6 +3964,7 @@ export const zhHant: TranslationStructure = {
     boundMembers: ({ count }: { count: number }) => `${count} 個成員`,
     boundMembersSection: "綁定成員",
     boundMembersHint: "切換哪些團隊成員可以執行此角色",
+    deleteHasMembersBody: ({ count }: { count: number }) => `此角色已綁定到 ${count} 個成員。刪除將移除綁定關係，是否繼續？`,
   },
   members: {
     title: "成員",
@@ -3993,6 +4016,8 @@ export const zhHant: TranslationStructure = {
     notificationsSection: "通知",
     capacitySection: "任務容量",
     maxConcurrencyLabel: "最大並行任務數",
+    assignedRolesSection: "綁定 Agent 角色",
+    assignedRolesHint: "選擇此成員可以執行的 Agent 角色",
   },
   goals: {
     title: "目標",

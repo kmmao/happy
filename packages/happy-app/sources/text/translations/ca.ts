@@ -3443,6 +3443,30 @@ export const ca: TranslationStructure = {
     noHiddenProcessesHint: "Encara no has amagat cap procés.",
   },
 
+  diagnostics: {
+    title: "Diagnòstic",
+    viewAll: "Diagnòstic",
+    viewAllHint: "Processos Happy i neteja",
+    loading: "Escanejant processos...",
+    processCount: ({ count }: { count: number }) =>
+      `${count} procés${count !== 1 ? "sos" : ""} trobat${count !== 1 ? "s" : ""}`,
+    noProcesses: "Sense processos Happy",
+    noProcessesHint: "No s'han detectat processos Happy CLI en aquest equip.",
+    cleanRunaway: "Netejar orfes",
+    cleanConfirmTitle: "Netejar processos orfes",
+    cleanConfirmMessage: "Finalitzar tots els processos daemon i de sessió orfes?",
+    cleanSuccess: ({ killed }: { killed: number }) =>
+      `S'han netejat ${killed} procés${killed !== 1 ? "sos" : ""}`,
+    cleanFailed: "Error en netejar processos",
+    killConfirmTitle: "Finalitzar procés",
+    killConfirmMessage: ({ pid }: { pid: number }) => `Finalitzar el procés PID ${pid}?`,
+    typeDaemon: "Daemon",
+    typeSession: "Sessió",
+    typeVersionCheck: "Comprovació de versió",
+    typeOther: "Altre",
+    errorScanning: "Error en escanejar processos",
+  },
+
   supervisor: {
     title: "Monitor de salut",
     description: "Anàlisi de codi amb IA que monitoritza la salut del projecte en múltiples dimensions.",
@@ -4036,6 +4060,7 @@ export const ca: TranslationStructure = {
     boundMembers: ({ count }: { count: number }) => `${count} ${count === 1 ? "membre" : "membres"}`,
     boundMembersSection: "Membres vinculats",
     boundMembersHint: "Commuta quins membres de l'equip poden exercir aquest rol",
+    deleteHasMembersBody: ({ count }: { count: number }) => `Aquest rol està assignat a ${count} ${count === 1 ? "membre" : "membres"}. Eliminar-lo eliminarà el vincle. Continuar?`,
   },
   members: {
     title: "Membres",
@@ -4087,6 +4112,8 @@ export const ca: TranslationStructure = {
     notificationsSection: "Notificacions",
     capacitySection: "Capacitat de tasques",
     maxConcurrencyLabel: "Màx. tasques concurrents",
+    assignedRolesSection: "Rols d'agent assignats",
+    assignedRolesHint: "Selecciona quins rols d'agent pot exercir aquest membre",
   },
   goals: {
     title: "Objectius",

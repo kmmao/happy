@@ -3459,6 +3459,30 @@ export const pl: TranslationStructure = {
     noHiddenProcessesHint: "Nie ukryłeś jeszcze żadnych procesów.",
   },
 
+  diagnostics: {
+    title: "Diagnostyka",
+    viewAll: "Diagnostyka",
+    viewAllHint: "Procesy Happy i czyszczenie",
+    loading: "Skanowanie procesów...",
+    processCount: ({ count }: { count: number }) =>
+      `Znaleziono ${count} proces${count === 1 ? "" : count < 5 ? "y" : "ów"}`,
+    noProcesses: "Brak procesów Happy",
+    noProcessesHint: "Nie wykryto procesów Happy CLI na tym urządzeniu.",
+    cleanRunaway: "Wyczyść osierocone",
+    cleanConfirmTitle: "Wyczyść osierocone procesy",
+    cleanConfirmMessage: "Zakończyć wszystkie osierocone procesy daemona i sesji?",
+    cleanSuccess: ({ killed }: { killed: number }) =>
+      `Wyczyszczono ${killed} proces${killed === 1 ? "" : killed < 5 ? "y" : "ów"}`,
+    cleanFailed: "Nie udało się wyczyścić procesów",
+    killConfirmTitle: "Zakończ proces",
+    killConfirmMessage: ({ pid }: { pid: number }) => `Zakończyć proces PID ${pid}?`,
+    typeDaemon: "Daemon",
+    typeSession: "Sesja",
+    typeVersionCheck: "Sprawdzenie wersji",
+    typeOther: "Inne",
+    errorScanning: "Błąd skanowania procesów",
+  },
+
   supervisor: {
     title: "Monitor zdrowia",
     description: "Analiza kodu AI monitorująca kondycję projektu w wielu wymiarach.",
@@ -4052,6 +4076,7 @@ export const pl: TranslationStructure = {
     boundMembers: ({ count }: { count: number }) => `${count} ${count === 1 ? "członek" : "członków"}`,
     boundMembersSection: "Powiązani członkowie",
     boundMembersHint: "Przełącz, którzy członkowie zespołu mogą pełnić tę rolę",
+    deleteHasMembersBody: ({ count }: { count: number }) => `Ta rola jest przypisana do ${count} ${count === 1 ? "członka" : "członków"}. Usunięcie spowoduje usunięcie powiązania. Kontynuować?`,
   },
   members: {
     title: "Członkowie",
@@ -4103,6 +4128,8 @@ export const pl: TranslationStructure = {
     notificationsSection: "Powiadomienia",
     capacitySection: "Pojemność zadań",
     maxConcurrencyLabel: "Maks. równoległych zadań",
+    assignedRolesSection: "Przypisane role agentów",
+    assignedRolesHint: "Wybierz, które role agentów może pełnić ten członek",
   },
   goals: {
     title: "Cele",

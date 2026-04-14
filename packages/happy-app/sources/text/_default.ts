@@ -3437,6 +3437,30 @@ export const en = {
     noHiddenProcessesHint: "You haven't hidden any processes yet.",
   },
 
+  diagnostics: {
+    title: "Diagnostics",
+    viewAll: "Diagnostics",
+    viewAllHint: "Happy processes & cleanup",
+    loading: "Scanning processes...",
+    processCount: ({ count }: { count: number }) =>
+      `${count} process${count !== 1 ? "es" : ""} found`,
+    noProcesses: "No Happy Processes",
+    noProcessesHint: "No Happy CLI processes detected on this machine.",
+    cleanRunaway: "Clean Runaway",
+    cleanConfirmTitle: "Clean Runaway Processes",
+    cleanConfirmMessage: "Kill all orphaned daemon and session processes?",
+    cleanSuccess: ({ killed }: { killed: number }) =>
+      `Cleaned up ${killed} process${killed !== 1 ? "es" : ""}`,
+    cleanFailed: "Failed to clean processes",
+    killConfirmTitle: "Kill Process",
+    killConfirmMessage: ({ pid }: { pid: number }) => `Kill process PID ${pid}?`,
+    typeDaemon: "Daemon",
+    typeSession: "Session",
+    typeVersionCheck: "Version Check",
+    typeOther: "Other",
+    errorScanning: "Failed to scan processes",
+  },
+
   supervisor: {
     // General
     title: "Health Monitor",
@@ -4093,6 +4117,7 @@ export const en = {
     boundMembers: ({ count }: { count: number }) => `${count} ${count === 1 ? "member" : "members"}`,
     boundMembersSection: "Bound Members",
     boundMembersHint: "Toggle which team members can perform this role",
+    deleteHasMembersBody: ({ count }: { count: number }) => `This role is assigned to ${count} ${count === 1 ? "member" : "members"}. Deleting will remove the binding. Continue?`,
   },
   members: {
     title: "Members",
@@ -4144,6 +4169,8 @@ export const en = {
     notificationsSection: "Notifications",
     capacitySection: "Task Capacity",
     maxConcurrencyLabel: "Max Concurrent Tasks",
+    assignedRolesSection: "Assigned Agent Roles",
+    assignedRolesHint: "Select which Agent roles this member can perform",
   },
   goals: {
     title: "Goals",

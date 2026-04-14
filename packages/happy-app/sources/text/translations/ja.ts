@@ -3415,6 +3415,28 @@ export const ja: TranslationStructure = {
     noHiddenProcessesHint: "まだプロセスを非表示にしていません。",
   },
 
+  diagnostics: {
+    title: "診断",
+    viewAll: "診断",
+    viewAllHint: "Happyプロセスと管理",
+    loading: "プロセスをスキャン中...",
+    processCount: ({ count }: { count: number }) => `${count}件のプロセスが見つかりました`,
+    noProcesses: "Happyプロセスなし",
+    noProcessesHint: "このマシンにHappy CLIプロセスは検出されませんでした。",
+    cleanRunaway: "暴走プロセスをクリーン",
+    cleanConfirmTitle: "暴走プロセスをクリーン",
+    cleanConfirmMessage: "孤立したdaemonとセッションプロセスを終了しますか？",
+    cleanSuccess: ({ killed }: { killed: number }) => `${killed}件のプロセスをクリーンしました`,
+    cleanFailed: "プロセスのクリーンに失敗しました",
+    killConfirmTitle: "プロセスを終了",
+    killConfirmMessage: ({ pid }: { pid: number }) => `PID ${pid}のプロセスを終了しますか？`,
+    typeDaemon: "Daemon",
+    typeSession: "セッション",
+    typeVersionCheck: "バージョン確認",
+    typeOther: "その他",
+    errorScanning: "プロセスのスキャンに失敗しました",
+  },
+
   supervisor: {
     title: "ヘルスモニター",
     description: "AIによるコード分析で、プロジェクトの健全性を多角的に監視します。",
@@ -4008,6 +4030,7 @@ export const ja: TranslationStructure = {
     boundMembers: ({ count }: { count: number }) => `${count}人のメンバー`,
     boundMembersSection: "割り当てメンバー",
     boundMembersHint: "このロールを実行できるメンバーを切り替え",
+    deleteHasMembersBody: ({ count }: { count: number }) => `このロールは ${count} 人のメンバーに割り当てられています。削除するとバインドが解除されます。続行しますか？`,
   },
   members: {
     title: "メンバー",
@@ -4059,6 +4082,8 @@ export const ja: TranslationStructure = {
     notificationsSection: "通知",
     capacitySection: "タスク容量",
     maxConcurrencyLabel: "最大同時実行タスク数",
+    assignedRolesSection: "割り当てられたAgentロール",
+    assignedRolesHint: "このメンバーが実行できるAgentロールを選択",
   },
   goals: {
     title: "ゴール",

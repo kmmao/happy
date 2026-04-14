@@ -3346,6 +3346,28 @@ export const zhHans: TranslationStructure = {
     noHiddenProcessesHint: "你还没有隐藏任何进程。",
   },
 
+  diagnostics: {
+    title: "诊断",
+    viewAll: "诊断",
+    viewAllHint: "Happy 进程状态与清理",
+    loading: "正在扫描进程...",
+    processCount: ({ count }: { count: number }) => `发现 ${count} 个进程`,
+    noProcesses: "无 Happy 进程",
+    noProcessesHint: "当前机器上未检测到 Happy CLI 进程。",
+    cleanRunaway: "清理孤儿进程",
+    cleanConfirmTitle: "清理孤儿进程",
+    cleanConfirmMessage: "终止所有孤立的 daemon 和会话进程？",
+    cleanSuccess: ({ killed }: { killed: number }) => `已清理 ${killed} 个进程`,
+    cleanFailed: "清理进程失败",
+    killConfirmTitle: "终止进程",
+    killConfirmMessage: ({ pid }: { pid: number }) => `终止 PID ${pid} 进程？`,
+    typeDaemon: "Daemon",
+    typeSession: "会话",
+    typeVersionCheck: "版本检查",
+    typeOther: "其他",
+    errorScanning: "扫描进程失败",
+  },
+
   supervisor: {
     title: "健康监控",
     description: "AI 驱动的代码分析，多维度监控项目健康状况。",
@@ -3938,6 +3960,7 @@ export const zhHans: TranslationStructure = {
     boundMembers: ({ count }: { count: number }) => `${count} 个成员`,
     boundMembersSection: "绑定成员",
     boundMembersHint: "切换哪些团队成员可以执行此角色",
+    deleteHasMembersBody: ({ count }: { count: number }) => `此角色已绑定到 ${count} 个成员。删除将移除绑定关系，是否继续？`,
   },
   members: {
     title: "成员",
@@ -3989,6 +4012,8 @@ export const zhHans: TranslationStructure = {
     notificationsSection: "通知",
     capacitySection: "任务容量",
     maxConcurrencyLabel: "最大并发任务数",
+    assignedRolesSection: "绑定 Agent 角色",
+    assignedRolesHint: "选择此成员可以执行的 Agent 角色",
   },
   goals: {
     title: "目标",
