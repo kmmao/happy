@@ -66,6 +66,14 @@ export class PermissionHandler {
   }
 
   /**
+   * Returns true when the current mode is bypassPermissions or yolo.
+   * Used by the launcher to avoid downgrading from bypass → plan on EnterPlanMode.
+   */
+  isInBypassMode(): boolean {
+    return BYPASS_MODES.has(this.permissionMode);
+  }
+
+  /**
    * Handler response
    */
   private handlePermissionResponse(

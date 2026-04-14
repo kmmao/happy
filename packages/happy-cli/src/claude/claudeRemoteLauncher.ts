@@ -605,12 +605,19 @@ export async function claudeRemoteLauncher(
               }
             }
             // When SDK enters plan mode via EnterPlanMode tool, sync permissionHandler
-            // so ExitPlanMode goes through the normal approval flow instead of auto-approving
+            // so ExitPlanMode goes through the normal approval flow instead of auto-approving.
+            // Skip if already in bypass mode — ExitPlanMode should auto-approve in YOLO/bypass.
             if (c.name === "enter_plan_mode" || c.name === "EnterPlanMode") {
-              logger.debug(
-                "[remote]: detected EnterPlanMode — syncing permissionHandler to plan mode",
-              );
-              permissionHandler.handleModeChange("plan");
+              if (permissionHandler.isInBypassMode()) {
+                logger.debug(
+                  "[remote]: detected EnterPlanMode in bypass mode — keeping bypass for auto-approve on ExitPlanMode",
+                );
+              } else {
+                logger.debug(
+                  "[remote]: detected EnterPlanMode — syncing permissionHandler to plan mode",
+                );
+                permissionHandler.handleModeChange("plan");
+              }
             }
           }
         }
