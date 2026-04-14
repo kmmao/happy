@@ -65,7 +65,7 @@ export async function getGitStatusFiles(
     // Get git status in porcelain v2 format (includes branch info and repo check)
     // --untracked-files=all ensures we get individual files, not directories
     const statusResult = await sessionBash(sessionId, {
-      command: "git status --porcelain=v2 --branch --untracked-files=all",
+      command: "git -c core.quotePath=false status --porcelain=v2 --branch --untracked-files=all",
       cwd,
       timeout: 10000,
     });
@@ -82,7 +82,7 @@ export async function getGitStatusFiles(
     // Get combined diff statistics for both staged and unstaged changes
     const diffStatResult = await sessionBash(sessionId, {
       command:
-        'git diff --numstat HEAD && echo "---STAGED---" && git diff --cached --numstat',
+        'git -c core.quotePath=false diff --numstat HEAD && echo "---STAGED---" && git -c core.quotePath=false diff --cached --numstat',
       cwd,
       timeout: 10000,
     });
@@ -170,7 +170,7 @@ async function fetchSubmoduleFiles(
     const fullPath = `${projectPath}/${submodulePath}`;
 
     const statusResult = await sessionBash(sessionId, {
-      command: "git status --porcelain=v2 --branch --untracked-files=all",
+      command: "git -c core.quotePath=false status --porcelain=v2 --branch --untracked-files=all",
       cwd: fullPath,
       timeout: 10000,
     });
@@ -181,7 +181,7 @@ async function fetchSubmoduleFiles(
 
     const diffStatResult = await sessionBash(sessionId, {
       command:
-        'git diff --numstat HEAD && echo "---STAGED---" && git diff --cached --numstat',
+        'git -c core.quotePath=false diff --numstat HEAD && echo "---STAGED---" && git -c core.quotePath=false diff --cached --numstat',
       cwd: fullPath,
       timeout: 10000,
     });

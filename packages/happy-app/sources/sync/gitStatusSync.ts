@@ -215,17 +215,17 @@ export class GitStatusSync {
       ] = await Promise.all([
         sessionBash(sessionId, {
           command:
-            "git status --porcelain=v2 --branch --show-stash --untracked-files=all",
+            "git -c core.quotePath=false status --porcelain=v2 --branch --show-stash --untracked-files=all",
           cwd: session.metadata.path,
           timeout: 10000,
         }),
         sessionBash(sessionId, {
-          command: "git diff --numstat",
+          command: "git -c core.quotePath=false diff --numstat",
           cwd: session.metadata.path,
           timeout: 10000,
         }),
         sessionBash(sessionId, {
-          command: "git diff --cached --numstat",
+          command: "git -c core.quotePath=false diff --cached --numstat",
           cwd: session.metadata.path,
           timeout: 10000,
         }),
@@ -489,17 +489,17 @@ export class GitStatusSync {
         await Promise.all([
           sessionBash(sessionId, {
             command:
-              "git status --porcelain=v2 --branch --show-stash --untracked-files=all",
+              "git -c core.quotePath=false status --porcelain=v2 --branch --show-stash --untracked-files=all",
             cwd: fullPath,
             timeout: 10000,
           }),
           sessionBash(sessionId, {
-            command: "git diff --numstat",
+            command: "git -c core.quotePath=false diff --numstat",
             cwd: fullPath,
             timeout: 10000,
           }),
           sessionBash(sessionId, {
-            command: "git diff --cached --numstat",
+            command: "git -c core.quotePath=false diff --cached --numstat",
             cwd: fullPath,
             timeout: 10000,
           }),
