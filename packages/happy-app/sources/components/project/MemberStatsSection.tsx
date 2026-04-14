@@ -3,6 +3,7 @@ import { View, Text, ActivityIndicator } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
+import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchMemberStats, type MemberStatSummary } from "@/sync/apiProjects";
 
@@ -47,7 +48,7 @@ export const MemberStatsSection = React.memo(
             <View style={styles.container}>
                 <View style={styles.headerRow}>
                     <Ionicons name="people" size={16} color={theme.colors.text} />
-                    <Text style={styles.headerText}>Team Activity</Text>
+                    <Text style={styles.headerText}>{t("collaboration.groupActivity")}</Text>
                 </View>
                 {stats.map((s) => {
                     const name = s.displayName ?? s.account?.firstName ?? s.account?.username ?? s.accountId.slice(0, 8);

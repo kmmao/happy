@@ -82,7 +82,7 @@ export const RoleCollaborationSection = React.memo(function RoleCollaborationSec
             {activeRoles.length > 0 ? (
                 <View style={styles.rolesSection}>
                     <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
-                        {t("collaboration.roleActivity")}
+                        {t("collaboration.groupActivity")}
                     </Text>
                     {activeRoles.map((role) => (
                         <View key={role.roleName} style={styles.roleRow}>

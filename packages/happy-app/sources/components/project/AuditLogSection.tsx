@@ -1,8 +1,9 @@
 import * as React from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
+import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchAuditLog, type AuditLogEntry } from "@/sync/apiProjects";
 
@@ -22,12 +23,12 @@ const ACTION_ICONS: Record<string, string> = {
 function formatTimeAgo(ts: number): string {
     const diff = Date.now() - ts;
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1) return t("time.justNow");
+    if (mins < 60) return t("time.minutesAgo", { count: mins });
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return t("time.hoursAgo", { count: hours });
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return `${days}d`;
 }
 
 interface AuditLogSectionProps {
@@ -35,11 +36,14 @@ interface AuditLogSectionProps {
     isActive: boolean;
 }
 
+const PREVIEW_COUNT = 5;
+
 export const AuditLogSection = React.memo(
     ({ projectId, isActive }: AuditLogSectionProps) => {
         const { theme } = useUnistyles();
         const [logs, setLogs] = React.useState<AuditLogEntry[]>([]);
         const [loading, setLoading] = React.useState(false);
+        const [expanded, setExpanded] = React.useState(false);
 
         React.useEffect(() => {
             if (!isActive || !projectId) return;
@@ -61,13 +65,16 @@ export const AuditLogSection = React.memo(
         if (loading && logs.length === 0) return <ActivityIndicator style={{ marginVertical: 12 }} />;
         if (logs.length === 0) return null;
 
+        const visibleLogs = expanded ? logs : logs.slice(0, PREVIEW_COUNT);
+        const hasMore = logs.length > PREVIEW_COUNT;
+
         return (
             <View style={styles.container}>
                 <View style={styles.headerRow}>
                     <Ionicons name="time" size={16} color={theme.colors.text} />
-                    <Text style={styles.headerText}>Audit Log</Text>
+                    <Text style={styles.headerText}>{t("collaboration.auditLog")}</Text>
                 </View>
-                {logs.map((log) => {
+                {visibleLogs.map((log) => {
                     const icon = ACTION_ICONS[log.action] ?? "ellipse";
                     const who = log.account?.username ?? log.account?.firstName ?? "system";
                     return (
@@ -83,6 +90,12 @@ export const AuditLogSection = React.memo(
                         </View>
                     );
                 })}
+                {hasMore && !expanded && (
+                    <Pressable style={styles.showMoreRow} onPress={() => setExpanded(true)}>
+                        <Text style={styles.showMoreText}>{t("collaboration.viewMore")}</Text>
+                        <Ionicons name="chevron-down" size={14} color={theme.colors.accentPurple} />
+                    </Pressable>
+                )}
             </View>
         );
     },
@@ -129,5 +142,20 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 11,
         color: theme.colors.textSecondary,
         marginTop: 2,
+    },
+    showMoreRow: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+        gap: 4,
+        paddingVertical: 10,
+        marginTop: 4,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.groupped.background,
+    },
+    showMoreText: {
+        ...Typography.default("semiBold"),
+        fontSize: 13,
+        color: theme.colors.accentPurple,
     },
 }));
