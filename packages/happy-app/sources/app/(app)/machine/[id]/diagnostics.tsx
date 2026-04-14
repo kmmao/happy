@@ -185,6 +185,7 @@ function ProcessRow({
     };
 
     const canOpenSession = (proc.type === "session" || proc.type === "fork") && !!proc.sessionId;
+    const canOpenSource = proc.type === "fork" && !!proc.forkSourceId;
 
     return (
         <View style={[rowStyles.row, { backgroundColor: theme.colors.surfaceHighest }]}>
@@ -209,6 +210,19 @@ function ProcessRow({
                 <Text style={[rowStyles.cmd, { color: theme.colors.textSecondary }]}>
                     {proc.command}
                 </Text>
+                {canOpenSource && (
+                    <Pressable
+                        onPress={() => onOpenSession(proc.forkSourceId!)}
+                        style={rowStyles.forkSourceBtn}
+                        hitSlop={8}
+                    >
+                        <Ionicons name="git-branch-outline" size={11} color={theme.colors.textLink} />
+                        <Text style={[rowStyles.forkSourceText, { color: theme.colors.textLink }]}>
+                            {t("diagnostics.forkSource")}
+                        </Text>
+                        <Ionicons name="chevron-forward-outline" size={11} color={theme.colors.textLink} />
+                    </Pressable>
+                )}
             </Pressable>
             <Pressable
                 onPress={handleKill}
@@ -265,6 +279,17 @@ const rowStyles = StyleSheet.create(() => ({
         borderRadius: 8,
         alignItems: "center" as const,
         justifyContent: "center" as const,
+    },
+    forkSourceBtn: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 3,
+        marginTop: 2,
+        alignSelf: "flex-start" as const,
+    },
+    forkSourceText: {
+        fontSize: 11,
+        fontWeight: "600" as const,
     },
 }));
 

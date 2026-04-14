@@ -3370,6 +3370,7 @@ export const zhHant: TranslationStructure = {
     typeVersionCheck: "版本檢查",
     typeOther: "其他",
     errorScanning: "掃描程序失敗",
+    forkSource: "源會話",
   },
 
   supervisor: {

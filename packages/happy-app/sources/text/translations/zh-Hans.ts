@@ -3368,6 +3368,7 @@ export const zhHans: TranslationStructure = {
     typeVersionCheck: "版本检查",
     typeOther: "其他",
     errorScanning: "扫描进程失败",
+    forkSource: "源会话",
   },
 
   supervisor: {

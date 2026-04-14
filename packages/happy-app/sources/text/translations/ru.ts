@@ -3481,6 +3481,7 @@ export const ru: TranslationStructure = {
     typeVersionCheck: "Проверка версии",
     typeOther: "Другое",
     errorScanning: "Ошибка при сканировании процессов",
+    forkSource: "Исходная сессия",
   },
 
   supervisor: {

@@ -3437,6 +3437,7 @@ export const ja: TranslationStructure = {
     typeVersionCheck: "バージョン確認",
     typeOther: "その他",
     errorScanning: "プロセスのスキャンに失敗しました",
+    forkSource: "ソースセッション",
   },
 
   supervisor: {

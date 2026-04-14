@@ -3467,6 +3467,7 @@ export const ca: TranslationStructure = {
     typeVersionCheck: "Comprovació de versió",
     typeOther: "Altre",
     errorScanning: "Error en escanejar processos",
+    forkSource: "Sessió d'origen",
   },
 
   supervisor: {

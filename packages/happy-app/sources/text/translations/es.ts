@@ -3462,6 +3462,7 @@ export const es: TranslationStructure = {
     typeVersionCheck: "Comprobación de versión",
     typeOther: "Otro",
     errorScanning: "Error al escanear procesos",
+    forkSource: "Sesión de origen",
   },
 
   supervisor: {

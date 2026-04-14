@@ -3461,6 +3461,7 @@ export const en = {
     typeVersionCheck: "Version Check",
     typeOther: "Other",
     errorScanning: "Failed to scan processes",
+    forkSource: "Source Session",
   },
 
   supervisor: {

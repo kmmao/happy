@@ -3454,6 +3454,7 @@ export const en: TranslationStructure = {
     typeVersionCheck: "Version Check",
     typeOther: "Other",
     errorScanning: "Failed to scan processes",
+    forkSource: "Source Session",
   },
 
   supervisor: {
