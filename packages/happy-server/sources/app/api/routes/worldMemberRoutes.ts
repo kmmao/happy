@@ -197,7 +197,7 @@ export function worldMemberRoutes(app: Fastify) {
             }
 
             try {
-                await worldMemberRemove(memberId);
+                await worldMemberRemove(memberId, { actorId: request.userId, projectId });
                 return reply.send({ deleted: true });
             } catch (e: any) {
                 if (e.statusCode) {
