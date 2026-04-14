@@ -3056,7 +3056,6 @@ export const ru: TranslationStructure = {
     emptySubtitle: "Подключите CLI или нажмите кнопку ниже, чтобы добавить проект",
     allProjects: "Все проекты",
     tabSessions: "Сессии",
-    tabGit: "Git",
     tabHealth: "Здоровье",
     tabResearch: "Анализ",
     tabRoles: "Roles",

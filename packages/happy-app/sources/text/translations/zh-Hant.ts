@@ -2953,7 +2953,6 @@ export const zhHant: TranslationStructure = {
     emptySubtitle: "連接 CLI 或點擊下方按鈕新增專案",
     allProjects: "所有專案",
     tabSessions: "工作階段",
-    tabGit: "Git",
     tabHealth: "健康",
     tabResearch: "調研",
     tabRoles: "角色",

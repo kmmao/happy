@@ -4,7 +4,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Project } from "@/sync/projectManager";
 import { ProjectSessionsTab } from "./ProjectSessionsTab";
-import { ProjectGitTab } from "./ProjectGitTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
@@ -14,8 +13,7 @@ import { WorldGoalsTab } from "./WorldGoalsTab";
 import { WorldOverviewTab } from "./WorldOverviewTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
-import { storage, useSetting } from "@/sync/storage";
-import { gitStatusSync } from "@/sync/gitStatusSync";
+import { useSetting } from "@/sync/storage";
 
 import { resolveProjectDetailInitialTab, type ProjectDetailTabKey } from "./projectDetailTabs";
 
@@ -34,17 +32,6 @@ export const ProjectDetailView = React.memo(
             React.useState<ResearchSyncStatus>("idle");
         const knowledgeBaseEnabled = useSetting("knowledgeBase");
 
-        // Proactively trigger git status refresh on mount if project has active sessions
-        React.useEffect(() => {
-            const sessions = storage.getState().sessions;
-            const activeSessionId = project.sessionIds.find(
-                (id) => sessions[id]?.active,
-            );
-            if (activeSessionId) {
-                gitStatusSync.getSync(activeSessionId).invalidate();
-            }
-        }, [project.sessionIds]);
-
         React.useEffect(() => {
             const nextTab = resolveProjectDetailInitialTab({
                 requestedTab: initialTab,
@@ -61,7 +48,6 @@ export const ProjectDetailView = React.memo(
                     { key: "members", label: t("projects.tabMembers") },
                     { key: "goals", label: t("projects.tabGoals") },
                     { key: "sessions", label: t("projects.tabSessions") },
-                    { key: "git", label: t("projects.tabGit") },
                     { key: "health", label: t("projects.tabHealth") },
                     { key: "research", label: t("projects.tabResearch") },
                 ];
@@ -134,15 +120,6 @@ export const ProjectDetailView = React.memo(
                         }
                     >
                         <ProjectSessionsTab project={project} />
-                    </View>
-                    <View
-                        style={
-                            activeTab === "git"
-                                ? styles.tabVisible
-                                : styles.tabHidden
-                        }
-                    >
-                        <ProjectGitTab project={project} />
                     </View>
                     <View
                         style={

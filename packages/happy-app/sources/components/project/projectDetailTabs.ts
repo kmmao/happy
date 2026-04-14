@@ -1,6 +1,5 @@
 export type ProjectDetailTabKey =
     | "sessions"
-    | "git"
     | "health"
     | "research"
     | "knowledge"
@@ -16,7 +15,6 @@ const BASE_TABS: ProjectDetailTabKey[] = [
     "members",
     "goals",
     "sessions",
-    "git",
     "health",
     "research",
 ];

@@ -3060,7 +3060,6 @@ export const pl: TranslationStructure = {
     emptySubtitle: "Połącz CLI lub naciśnij przycisk poniżej, aby dodać projekt",
     allProjects: "Wszystkie projekty",
     tabSessions: "Sesje",
-    tabGit: "Git",
     tabHealth: "Zdrowie",
     tabResearch: "Badania",
     tabRoles: "Roles",

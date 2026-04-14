@@ -3038,7 +3038,6 @@ export const ca: TranslationStructure = {
     emptySubtitle: "Connecta un CLI o prem el botó de sota per afegir un projecte",
     allProjects: "Tots els projectes",
     tabSessions: "Sessions",
-    tabGit: "Git",
     tabHealth: "Salut",
     tabResearch: "Recerca",
     tabRoles: "Roles",

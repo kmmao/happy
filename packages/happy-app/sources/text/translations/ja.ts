@@ -3012,7 +3012,6 @@ export const ja: TranslationStructure = {
     emptySubtitle: "CLIを接続するか、下のボタンをタップしてプロジェクトを追加してください",
     allProjects: "すべてのプロジェクト",
     tabSessions: "セッション",
-    tabGit: "Git",
     tabHealth: "ヘルス",
     tabResearch: "調査",
     tabRoles: "ロール",

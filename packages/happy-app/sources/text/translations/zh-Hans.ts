@@ -2952,7 +2952,6 @@ export const zhHans: TranslationStructure = {
     emptySubtitle: "连接 CLI 或点击下方按钮添加项目",
     allProjects: "所有项目",
     tabSessions: "会话",
-    tabGit: "Git",
     tabHealth: "健康",
     tabResearch: "调研",
     tabRoles: "角色",

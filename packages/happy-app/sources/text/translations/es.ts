@@ -3035,7 +3035,6 @@ export const es: TranslationStructure = {
     emptySubtitle: "Conecta un CLI o pulsa el botón de abajo para añadir un proyecto",
     allProjects: "Todos los proyectos",
     tabSessions: "Sesiones",
-    tabGit: "Git",
     tabHealth: "Salud",
     tabResearch: "Investigación",
     tabRoles: "Roles",

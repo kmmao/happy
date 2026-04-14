@@ -3027,7 +3027,6 @@ export const en: TranslationStructure = {
     emptySubtitle: "Connect a CLI or tap the button below to add a project",
     allProjects: "All Projects",
     tabSessions: "Sessions",
-    tabGit: "Git",
     tabHealth: "Health",
     tabResearch: "Research",
     tabRoles: "Roles",
