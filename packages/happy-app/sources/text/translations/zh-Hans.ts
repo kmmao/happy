@@ -2954,6 +2954,7 @@ export const zhHans: TranslationStructure = {
     tabSessions: "会话",
     tabHealth: "健康",
     tabResearch: "调研",
+    tabTeam: "团队",
     tabRoles: "角色",
     tabMembers: "成员",
     tabGoals: "目标",

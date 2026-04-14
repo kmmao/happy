@@ -3034,6 +3034,7 @@ export const en = {
     tabSessions: "Sessions",
     tabHealth: "Health",
     tabResearch: "Research",
+    tabTeam: "Team",
     tabRoles: "Roles",
     tabMembers: "Members",
     tabGoals: "Goals",

@@ -7,9 +7,8 @@ import { ProjectSessionsTab } from "./ProjectSessionsTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
-import { WorldRolesTab } from "./WorldRolesTab";
-import { WorldMembersTab } from "./WorldMembersTab";
 import { WorldGoalsTab } from "./WorldGoalsTab";
+import { WorldTeamTab } from "./WorldTeamTab";
 import { WorldOverviewTab } from "./WorldOverviewTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
@@ -44,8 +43,7 @@ export const ProjectDetailView = React.memo(
             () => {
                 const base: { key: TabKey; label: string }[] = [
                     { key: "world", label: t("projects.tabWorld") },
-                    { key: "roles", label: t("projects.tabRoles") },
-                    { key: "members", label: t("projects.tabMembers") },
+                    { key: "team", label: t("projects.tabTeam") },
                     { key: "goals", label: t("projects.tabGoals") },
                     { key: "sessions", label: t("projects.tabSessions") },
                     { key: "health", label: t("projects.tabHealth") },
@@ -164,21 +162,12 @@ export const ProjectDetailView = React.memo(
                     </View>
                     <View
                         style={
-                            activeTab === "roles"
+                            activeTab === "team"
                                 ? styles.tabVisible
                                 : styles.tabHidden
                         }
                     >
-                        <WorldRolesTab project={project} isActive={activeTab === "roles"} />
-                    </View>
-                    <View
-                        style={
-                            activeTab === "members"
-                                ? styles.tabVisible
-                                : styles.tabHidden
-                        }
-                    >
-                        <WorldMembersTab project={project} isActive={activeTab === "members"} />
+                        <WorldTeamTab project={project} isActive={activeTab === "team"} />
                     </View>
                     <View
                         style={

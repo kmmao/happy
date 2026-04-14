@@ -5,14 +5,12 @@ export type ProjectDetailTabKey =
     | "knowledge"
     | "goals"
     | "world"
-    | "roles"
-    | "members"
+    | "team"
 ;
 
 const BASE_TABS: ProjectDetailTabKey[] = [
     "world",
-    "roles",
-    "members",
+    "team",
     "goals",
     "sessions",
     "health",
