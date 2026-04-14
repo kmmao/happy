@@ -194,7 +194,7 @@ function ProcessRow({
                         />
                     )}
                 </View>
-                <Text style={[rowStyles.cmd, { color: theme.colors.textSecondary }]} numberOfLines={4}>
+                <Text style={[rowStyles.cmd, { color: theme.colors.textSecondary }]}>
                     {proc.command}
                 </Text>
             </Pressable>
