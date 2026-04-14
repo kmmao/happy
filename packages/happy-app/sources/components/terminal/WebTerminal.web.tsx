@@ -79,9 +79,10 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
         let exitCleanup: (() => void) | null = null;
 
         async function init() {
-            const [{ Terminal }, { FitAddon }] = await Promise.all([
+            const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
                 import("@xterm/xterm"),
                 import("@xterm/addon-fit"),
+                import("@xterm/addon-web-links"),
             ]);
 
             if (!document.querySelector('link[data-xterm-css]')) {
@@ -111,7 +112,9 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
             });
 
             const fitAddon = new FitAddon();
+            const webLinksAddon = new WebLinksAddon();
             terminal.loadAddon(fitAddon);
+            terminal.loadAddon(webLinksAddon);
             terminalRef.current = terminal;
             fitAddonRef.current = fitAddon;
 

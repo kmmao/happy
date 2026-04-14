@@ -102,9 +102,10 @@ const GitChangesTab = React.memo<{
   sessionId: string;
   repoPath?: string;
   compact?: boolean;
+  onFilePress?: (fullPath: string) => void;
   onPullDown?: () => void;
   onScrollUp?: () => void;
-}>(({ sessionId, repoPath, compact, onPullDown, onScrollUp }) => {
+}>(({ sessionId, repoPath, compact, onFilePress: onFilePressExternal, onPullDown, onScrollUp }) => {
   const router = useRouter();
 
   const [gitStatusFiles, setGitStatusFiles] =
@@ -351,10 +352,14 @@ const GitChangesTab = React.memo<{
 
   const handleFilePress = React.useCallback(
     (file: GitFileStatus | FileItem) => {
-      const encodedPath = btoa(file.fullPath);
-      router.push(`/session/${sessionId}/file?path=${encodedPath}`);
+      if (onFilePressExternal) {
+        onFilePressExternal(file.fullPath);
+      } else {
+        const encodedPath = btoa(file.fullPath);
+        router.push(`/session/${sessionId}/file?path=${encodedPath}`);
+      }
     },
-    [router, sessionId],
+    [router, sessionId, onFilePressExternal],
   );
 
   const renderFileIcon = (file: GitFileStatus) => {
@@ -437,7 +442,13 @@ const GitChangesTab = React.memo<{
 
   // File item rendering with selection support
   const compactItemStyle = compact
-    ? { paddingVertical: 6, minHeight: 36 }
+    ? { paddingVertical: 6, paddingHorizontal: 12, minHeight: 36 }
+    : undefined;
+  const compactTitleStyle = compact
+    ? { fontSize: 14 }
+    : undefined;
+  const compactSubtitleStyle = compact
+    ? { fontSize: 12 }
     : undefined;
 
   const renderGitFileItem = (
@@ -465,6 +476,8 @@ const GitChangesTab = React.memo<{
       }
       showDivider={showDivider}
       style={compactItemStyle}
+      titleStyle={compactTitleStyle}
+      subtitleStyle={compactSubtitleStyle}
     />
   );
 
@@ -505,7 +518,7 @@ const GitChangesTab = React.memo<{
         >
           <Octicons
             name="search"
-            size={16}
+            size={compact ? 14 : 16}
             color={theme.colors.textSecondary}
             style={{ marginRight: 8 }}
           />
@@ -515,7 +528,7 @@ const GitChangesTab = React.memo<{
             placeholder={t("files.searchPlaceholder")}
             style={{
               flex: 1,
-              fontSize: 16,
+              fontSize: compact ? 14 : 16,
               ...Typography.default(),
             }}
             placeholderTextColor={theme.colors.input.placeholder}
@@ -752,6 +765,9 @@ const GitChangesTab = React.memo<{
                   icon={renderFileIconForSearch(file)}
                   onPress={() => handleFilePress(file)}
                   showDivider={index < searchResults.length - 1}
+                  style={compactItemStyle}
+                  titleStyle={compactTitleStyle}
+                  subtitleStyle={compactSubtitleStyle}
                 />
               ))}
             </>

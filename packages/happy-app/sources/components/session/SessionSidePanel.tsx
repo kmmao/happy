@@ -166,7 +166,10 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                 />
                             )}
                             {activeTab === "changes" && (
-                                <SidePanelGitPanel sessionId={sessionId} />
+                                <SidePanelGitPanel
+                                    sessionId={sessionId}
+                                    onFilePress={handleFilePress}
+                                />
                             )}
                             {activeTab === "summary" && (
                                 <SidePanelSummaryTab
