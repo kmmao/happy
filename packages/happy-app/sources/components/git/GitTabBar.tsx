@@ -11,6 +11,7 @@ export type GitTabId = "changes" | "history" | "branches" | "stash" | "issues" |
 interface GitTabBarProps {
   activeTab: GitTabId;
   onTabChange: (tab: GitTabId) => void;
+  compact?: boolean;
   stashCount?: number;
   issueCount?: number;
   prCount?: number;
@@ -37,6 +38,7 @@ const TABS: readonly {
 export const GitTabBar = React.memo<GitTabBarProps>(function GitTabBar({
   activeTab,
   onTabChange,
+  compact,
   stashCount,
   issueCount,
   prCount,
@@ -61,7 +63,7 @@ export const GitTabBar = React.memo<GitTabBarProps>(function GitTabBar({
             style={{
               flex: 1,
               alignItems: "center",
-              paddingVertical: 12,
+              paddingVertical: compact ? 8 : 12,
               borderBottomWidth: isActive ? 2 : 0,
               borderBottomColor: isActive
                 ? theme.colors.textLink
@@ -71,7 +73,7 @@ export const GitTabBar = React.memo<GitTabBarProps>(function GitTabBar({
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Text
                 style={{
-                  fontSize: 14,
+                  fontSize: compact ? 12 : 14,
                   fontWeight: isActive ? "600" : "400",
                   color: isActive
                     ? theme.colors.textLink

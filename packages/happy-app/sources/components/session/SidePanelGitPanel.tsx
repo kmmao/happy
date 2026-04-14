@@ -142,10 +142,12 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                     sessionId={sessionId}
                     repoPath={selectedRepoPath ?? undefined}
                     gitStatus={activeGitStatus}
+                    compact
                 />
                 <GitTabBar
                     activeTab={activeTab}
                     onTabChange={handleTabChange}
+                    compact
                     stashCount={gitStatus?.stashCount}
                     issueCount={issueCount}
                     prCount={prCount}

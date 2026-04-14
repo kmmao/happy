@@ -15,6 +15,7 @@ interface GitBranchHeaderProps {
   readonly sessionId: string;
   readonly repoPath?: string;
   readonly gitStatus: GitStatus | null;
+  readonly compact?: boolean;
 }
 
 type GitRemoteOp = "fetch" | "pull" | "push";
@@ -34,7 +35,7 @@ const OP_FAILED_KEYS = {
 } as const;
 
 export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
-  function GitBranchHeader({ sessionId, repoPath, gitStatus }) {
+  function GitBranchHeader({ sessionId, repoPath, gitStatus, compact }) {
     const { theme } = useUnistyles();
     const [activeOp, setActiveOp] = React.useState<GitRemoteOp | null>(null);
     const [autoFetching, setAutoFetching] = React.useState(false);
@@ -112,6 +113,7 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
           {
             backgroundColor: theme.colors.surfaceHigh,
             borderBottomColor: theme.colors.divider,
+            ...(compact ? { paddingHorizontal: 12, paddingVertical: 8, gap: 6 } : undefined),
           },
         ]}
       >
@@ -131,10 +133,10 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
               color={theme.colors.textSecondary}
             />
           )}
-          <Octicons name="git-branch" size={16} color={theme.colors.textLink} />
+          <Octicons name="git-branch" size={compact ? 13 : 16} color={theme.colors.textLink} />
           <Text
             style={{
-              fontSize: 14,
+              fontSize: compact ? 12 : 14,
               fontWeight: "600",
               color: theme.colors.text,
               ...Typography.mono(),
@@ -147,12 +149,12 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
             <>
               <Ionicons
                 name="arrow-forward"
-                size={12}
+                size={compact ? 10 : 12}
                 color={theme.colors.textSecondary}
               />
               <Text
                 style={{
-                  fontSize: 13,
+                  fontSize: compact ? 11 : 13,
                   color: theme.colors.textSecondary,
                   ...Typography.mono(),
                   flexShrink: 1,
@@ -170,7 +172,7 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
               {aheadCount > 0 && (
                 <Text
                   style={{
-                    fontSize: 13,
+                    fontSize: compact ? 11 : 13,
                     fontWeight: "600",
                     color: theme.colors.textLink,
                     ...Typography.mono(),
@@ -182,7 +184,7 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
               {behindCount > 0 && (
                 <Text
                   style={{
-                    fontSize: 13,
+                    fontSize: compact ? 11 : 13,
                     fontWeight: "600",
                     color: theme.colors.box.warning.text,
                     ...Typography.mono(),
@@ -204,7 +206,7 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
             !autoFetching && (
               <Text
                 style={{
-                  fontSize: 12,
+                  fontSize: compact ? 10 : 12,
                   color: theme.colors.success,
                   ...Typography.default(),
                 }}
@@ -216,7 +218,7 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
           {!hasUpstream && (
             <Text
               style={{
-                fontSize: 12,
+                fontSize: compact ? 10 : 12,
                 color: theme.colors.textSecondary,
                 fontStyle: "italic",
                 ...Typography.default(),
@@ -236,6 +238,7 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
             disabled={activeOp !== null}
             onPress={() => handleOp("fetch")}
             theme={theme}
+            compact={compact}
           />
           {hasUpstream && (
             <OpButton
@@ -245,6 +248,7 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
               disabled={activeOp !== null}
               onPress={() => handleOp("pull")}
               theme={theme}
+              compact={compact}
             />
           )}
           {hasUpstream && (
@@ -255,6 +259,7 @@ export const GitBranchHeader = React.memo<GitBranchHeaderProps>(
               disabled={activeOp !== null}
               onPress={() => handleOp("push")}
               theme={theme}
+              compact={compact}
             />
           )}
         </View>
@@ -270,6 +275,7 @@ function OpButton({
   disabled,
   onPress,
   theme,
+  compact,
 }: {
   readonly label: string;
   readonly icon: React.ComponentProps<typeof Ionicons>["name"];
@@ -277,6 +283,7 @@ function OpButton({
   readonly disabled: boolean;
   readonly onPress: () => void;
   readonly theme: Theme;
+  readonly compact?: boolean;
 }) {
   return (
     <Pressable
@@ -285,10 +292,10 @@ function OpButton({
       style={(p) => ({
         flexDirection: "row",
         alignItems: "center",
-        gap: 4,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 8,
+        gap: compact ? 3 : 4,
+        paddingHorizontal: compact ? 8 : 10,
+        paddingVertical: compact ? 4 : 6,
+        borderRadius: compact ? 6 : 8,
         backgroundColor: p.pressed
           ? theme.colors.surfaceHigh
           : theme.colors.surface,
@@ -296,13 +303,13 @@ function OpButton({
       })}
     >
       {loading ? (
-        <ActivityIndicator size={14} color={theme.colors.textLink} />
+        <ActivityIndicator size={compact ? 12 : 14} color={theme.colors.textLink} />
       ) : (
-        <Ionicons name={icon} size={14} color={theme.colors.textLink} />
+        <Ionicons name={icon} size={compact ? 12 : 14} color={theme.colors.textLink} />
       )}
       <Text
         style={{
-          fontSize: 13,
+          fontSize: compact ? 11 : 13,
           fontWeight: "500",
           color: theme.colors.textLink,
           ...Typography.default(),
