@@ -128,21 +128,31 @@ export async function goalCreate(input: GoalCreateInput): Promise<GoalCreateResu
         groupKey: `goal:${goal.id}:created`,
     });
 
-    // Dispatch Planner Task if autoDecompose
+    // Dispatch Planner Task if autoDecompose AND autonomy mode allows it.
+    // In "suggest" or "disabled" mode, the user must manually trigger decomposition.
     let plannerTaskId: string | null = null;
     if (autoDecompose) {
-        plannerTaskId = await dispatchPlannerTask({
-            accountId,
-            projectId,
-            machineId,
-            goal,
+        const project = await db.project.findFirst({
+            where: { id: projectId, accountId },
+            select: { supervisorMode: true },
         });
+        const mode = project?.supervisorMode ?? "suggest";
+        const shouldAutoDispatch = mode === "semi-auto" || mode === "auto";
 
-        if (plannerTaskId) {
-            await db.goal.update({
-                where: { id: goal.id },
-                data: { plannerTaskId },
+        if (shouldAutoDispatch) {
+            plannerTaskId = await dispatchPlannerTask({
+                accountId,
+                projectId,
+                machineId,
+                goal,
             });
+
+            if (plannerTaskId) {
+                await db.goal.update({
+                    where: { id: goal.id },
+                    data: { plannerTaskId },
+                });
+            }
         }
     }
 

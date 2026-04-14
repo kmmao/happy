@@ -12,7 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { layout } from "@/components/layout";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { fetchGoalDetail, type GoalDetail } from "@/sync/apiProjects";
+import { decomposeGoal, fetchGoalDetail, type GoalDetail } from "@/sync/apiProjects";
 import {
     acceptSuggestion,
     dismissSuggestion,
@@ -177,6 +177,24 @@ function GoalDetailScreen() {
         }
     }, [projectServerId]);
 
+    const [decomposing, setDecomposing] = React.useState(false);
+
+    const handleStartDecompose = React.useCallback(async () => {
+        if (!projectServerId || !readyGoalId) return;
+        setDecomposing(true);
+        try {
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return;
+            await decomposeGoal(credentials, projectServerId, readyGoalId);
+            Modal.toast(t("goals.decomposeTriggered"));
+            void loadGoal();
+        } catch (e: any) {
+            Modal.toast(e.message ?? t("goals.decomposeError"));
+        } finally {
+            setDecomposing(false);
+        }
+    }, [projectServerId, readyGoalId, loadGoal]);
+
     const screenState = deriveGoalDetailScreenState({ loading, goal, error });
 
     if (waitingForProject) {
@@ -243,6 +261,29 @@ function GoalDetailScreen() {
                     ))}
                 </View>
             </View>
+
+            {readyGoal.status === "planning" && !readyGoal.plannerTaskId ? (
+                <View style={styles2.decomposeCard}>
+                    <View style={styles2.decomposeInfo}>
+                        <Ionicons name="bulb-outline" size={20} color="#F59E0B" />
+                        <Text style={styles2.decomposeHint}>{t("goals.plannerPending")}</Text>
+                    </View>
+                    <Pressable
+                        style={[styles2.decomposeButton, decomposing && { opacity: 0.5 }]}
+                        disabled={decomposing}
+                        onPress={handleStartDecompose}
+                    >
+                        {decomposing ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <>
+                                <Ionicons name="play" size={16} color="#fff" />
+                                <Text style={styles2.decomposeButtonText}>{t("goals.startDecompose")}</Text>
+                            </>
+                        )}
+                    </Pressable>
+                </View>
+            ) : null}
 
             {goalSuggestions.length > 0 ? (
                 <View style={styles.card}>
@@ -521,6 +562,42 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 13,
         color: theme.colors.textSecondary,
+    },
+}));
+
+const styles2 = StyleSheet.create((theme) => ({
+    decomposeCard: {
+        marginHorizontal: 16,
+        marginTop: 12,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 12,
+        padding: 16,
+        gap: 12,
+    },
+    decomposeInfo: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 8,
+    },
+    decomposeHint: {
+        ...Typography.default(),
+        fontSize: 14,
+        color: theme.colors.textSecondary,
+        flex: 1,
+    },
+    decomposeButton: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+        gap: 6,
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+    },
+    decomposeButtonText: {
+        ...Typography.default("semiBold"),
+        fontSize: 15,
+        color: "#fff",
     },
 }));
 
