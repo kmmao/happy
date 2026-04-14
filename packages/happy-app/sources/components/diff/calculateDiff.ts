@@ -364,6 +364,136 @@ export function formatUnifiedDiffText(
 }
 
 /**
+ * Parse a unified diff patch (git diff output) into DiffHunk[] + stats.
+ * Strips the file header lines (diff --git, index, ---, +++) and parses
+ * @@ hunk headers plus their content lines.
+ */
+export function parseUnifiedPatch(patchText: string): DiffResult {
+    const lines = patchText.split("\n");
+    const hunks: DiffHunk[] = [];
+    let additions = 0;
+    let deletions = 0;
+
+    let currentHunk: DiffHunk | null = null;
+    let oldLine = 0;
+    let newLine = 0;
+
+    for (const line of lines) {
+        // Skip file-level headers
+        if (
+            line.startsWith("diff --git") ||
+            line.startsWith("index ") ||
+            line.startsWith("--- ") ||
+            line.startsWith("+++ ") ||
+            line.startsWith("new file mode") ||
+            line.startsWith("deleted file mode") ||
+            line.startsWith("old mode") ||
+            line.startsWith("new mode") ||
+            line.startsWith("similarity index") ||
+            line.startsWith("rename from") ||
+            line.startsWith("rename to") ||
+            line.startsWith("Binary files")
+        ) {
+            continue;
+        }
+
+        // Hunk header: @@ -oldStart,oldLines +newStart,newLines @@
+        const hunkMatch = line.match(
+            /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/,
+        );
+        if (hunkMatch) {
+            currentHunk = {
+                oldStart: parseInt(hunkMatch[1], 10),
+                oldLines: hunkMatch[2] != null ? parseInt(hunkMatch[2], 10) : 1,
+                newStart: parseInt(hunkMatch[3], 10),
+                newLines: hunkMatch[4] != null ? parseInt(hunkMatch[4], 10) : 1,
+                lines: [],
+            };
+            hunks.push(currentHunk);
+            oldLine = currentHunk.oldStart;
+            newLine = currentHunk.newStart;
+            continue;
+        }
+
+        if (!currentHunk) continue;
+
+        if (line.startsWith("+")) {
+            currentHunk.lines.push({
+                type: "add",
+                content: line.slice(1),
+                newLineNumber: newLine++,
+            });
+            additions++;
+        } else if (line.startsWith("-")) {
+            currentHunk.lines.push({
+                type: "remove",
+                content: line.slice(1),
+                oldLineNumber: oldLine++,
+            });
+            deletions++;
+        } else if (line.startsWith(" ") || line === "") {
+            // Context line (starts with space) or empty trailing line
+            const content = line.startsWith(" ") ? line.slice(1) : line;
+            // Only add as context if we're inside a hunk and it's a real context line
+            if (line.startsWith(" ")) {
+                currentHunk.lines.push({
+                    type: "normal",
+                    content,
+                    oldLineNumber: oldLine++,
+                    newLineNumber: newLine++,
+                });
+            }
+        } else if (line.startsWith("\\")) {
+            // "\ No newline at end of file" — skip
+            continue;
+        }
+    }
+
+    // Post-process: compute inline diff tokens for paired remove/add sequences
+    for (const hunk of hunks) {
+        const hunkLines = hunk.lines;
+        let i = 0;
+        while (i < hunkLines.length) {
+            if (hunkLines[i].type === "remove") {
+                // Collect consecutive removes
+                const removeStart = i;
+                while (i < hunkLines.length && hunkLines[i].type === "remove") i++;
+                const removeEnd = i;
+
+                // Collect consecutive adds
+                const addStart = i;
+                while (i < hunkLines.length && hunkLines[i].type === "add") i++;
+                const addEnd = i;
+
+                // Pair them up for inline diff
+                const removeCount = removeEnd - removeStart;
+                const addCount = addEnd - addStart;
+                const pairCount = Math.min(removeCount, addCount);
+
+                for (let p = 0; p < pairCount; p++) {
+                    const removeLine = hunkLines[removeStart + p];
+                    const addLine = hunkLines[addStart + p];
+                    const inlineTokens = diffWordsWithSpace(
+                        removeLine.content,
+                        addLine.content,
+                    ).map((part) => ({
+                        value: part.value,
+                        added: part.added,
+                        removed: part.removed,
+                    }));
+                    removeLine.tokens = inlineTokens.filter((t) => !t.added);
+                    addLine.tokens = inlineTokens.filter((t) => !t.removed);
+                }
+            } else {
+                i++;
+            }
+        }
+    }
+
+    return { hunks, stats: { additions, deletions } };
+}
+
+/**
  * Export additional utilities
  */
 export function getDiffStats(

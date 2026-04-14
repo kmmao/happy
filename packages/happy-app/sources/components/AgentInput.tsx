@@ -45,7 +45,6 @@ import type { AgentInputProps } from "./AgentInputTypes";
 import { stylesheet, FAVORITE_CHIP_GRADIENTS } from "./AgentInputStyles";
 import { ContextProgressBar } from "./ContextProgressBar";
 import { AttachButton, type AttachAction } from "./AttachButton";
-import { GitStatusButton } from "./GitStatusButton";
 import { AgentInputSettingsOverlay } from "./AgentInputSettingsOverlay";
 import { getReasoningSummaryLabels } from "./reasoningEffort";
 import { log } from '@/log';
@@ -1864,11 +1863,6 @@ export const AgentInput = React.memo(
                       />
                     )}
 
-                    {/* Git Status Badge */}
-                    <GitStatusButton
-                      sessionId={props.sessionId}
-                      onPress={props.onFileViewerPress}
-                    />
                   </ScrollView>
 
                   {/* Send/Voice button - aligned with first row */}

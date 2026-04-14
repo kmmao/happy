@@ -13,6 +13,12 @@ import { SidePanelTimelineTab } from "./SidePanelTimelineTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
 import { InputContext } from "@/hooks/useInputContext";
 import { buildFileReferenceText } from "./sessionSidePanelReference";
+import {
+    useSessionGitStatus,
+    useSessionProjectGitStatus,
+    useSessionProjectSubmodules,
+} from "@/sync/storage";
+import { aggregateLineChanges } from "@/utils/gitStatusUtils";
 
 export const SIDE_PANEL_WIDTH = 360;
 export const SIDE_PANEL_MIN_WINDOW_WIDTH = 1200;
@@ -49,6 +55,19 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             },
             [inputContext],
         );
+
+        // Git status for changes tab badge
+        const projectGitStatus = useSessionProjectGitStatus(sessionId);
+        const sessionGitStatus = useSessionGitStatus(sessionId);
+        const gitStatus = projectGitStatus || sessionGitStatus;
+        const submodules = useSessionProjectSubmodules(sessionId);
+
+        const changesInfo = React.useMemo(() => {
+            if (!gitStatus || gitStatus.lastUpdatedAt === 0) return null;
+            const { totalAdded, totalRemoved } = aggregateLineChanges(gitStatus, submodules);
+            if (totalAdded === 0 && totalRemoved === 0) return null;
+            return { totalAdded, totalRemoved };
+        }, [gitStatus, submodules]);
 
         // Collapsed state: show a thin vertical bar with expand button
         if (collapsed) {
@@ -120,6 +139,9 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                             activeTab === tab.key
                                                 ? theme.colors.textLink
                                                 : "transparent",
+                                        flexDirection: "row",
+                                        justifyContent: "center",
+                                        gap: 4,
                                     }}
                                 >
                                     <Text
@@ -135,6 +157,16 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                     >
                                         {tab.label}
                                     </Text>
+                                    {tab.key === "changes" && changesInfo && (
+                                        <View style={{ flexDirection: "row", gap: 2 }}>
+                                            <Text style={{ fontSize: 10, fontWeight: "600", color: theme.colors.gitAddedText }}>
+                                                +{changesInfo.totalAdded}
+                                            </Text>
+                                            <Text style={{ fontSize: 10, fontWeight: "600", color: theme.colors.gitRemovedText }}>
+                                                -{changesInfo.totalRemoved}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </Pressable>
                             ))}
                             {/* Collapse button */}
