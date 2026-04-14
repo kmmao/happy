@@ -9,7 +9,7 @@
 
 import * as React from "react";
 import { View, ScrollView, Pressable, ActivityIndicator } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,6 +28,8 @@ interface HappyProcess {
     pid: number;
     type: HappyProcessType;
     command: string;
+    /** Parsed from --happy-session-id flag; present when type === "session". */
+    sessionId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -39,6 +41,12 @@ function classifyProcess(cmd: string): HappyProcessType {
     if (cmd.includes("--started-by daemon")) return "session";
     if (cmd.includes("--version")) return "version-check";
     return "other";
+}
+
+/** Extract --happy-session-id <value> from a process command string. */
+function parseSessionId(cmd: string): string | undefined {
+    const match = cmd.match(/--happy-session-id\s+(\S+)/);
+    return match?.[1];
 }
 
 /**
@@ -56,7 +64,9 @@ function parsePsOutput(stdout: string): HappyProcess[] {
         const pid = parseInt(parts[1], 10);
         if (isNaN(pid) || pid <= 1) continue;
         const command = parts.slice(10).join(" ");
-        result.push({ pid, type: classifyProcess(command), command });
+        const type = classifyProcess(command);
+        const sessionId = type === "session" ? parseSessionId(command) : undefined;
+        result.push({ pid, type, command, sessionId });
     }
 
     return result;
@@ -144,9 +154,11 @@ const typeStyles = StyleSheet.create((theme) => ({
 function ProcessRow({
     proc,
     onKill,
+    onOpenSession,
 }: {
     proc: HappyProcess;
     onKill: (proc: HappyProcess) => Promise<void>;
+    onOpenSession: (sessionId: string) => void;
 }) {
     const { theme } = useUnistyles();
     const [isKilling, setIsKilling] = React.useState(false);
@@ -165,19 +177,32 @@ function ProcessRow({
         ? proc.command.slice(0, 57) + "..."
         : proc.command;
 
+    const canOpenSession = proc.type === "session" && !!proc.sessionId;
+
     return (
         <View style={[rowStyles.row, { backgroundColor: theme.colors.surfaceHighest }]}>
-            <View style={rowStyles.info}>
+            <Pressable
+                style={rowStyles.info}
+                onPress={canOpenSession ? () => onOpenSession(proc.sessionId!) : undefined}
+                disabled={!canOpenSession}
+            >
                 <View style={rowStyles.header}>
                     <ProcessTypeLabel type={proc.type} />
                     <Text style={[rowStyles.pid, { color: theme.colors.textSecondary }]}>
                         PID {proc.pid}
                     </Text>
+                    {canOpenSession && (
+                        <Ionicons
+                            name="chevron-forward-outline"
+                            size={13}
+                            color={theme.colors.textLink}
+                        />
+                    )}
                 </View>
                 <Text style={[rowStyles.cmd, { color: theme.colors.textSecondary }]} numberOfLines={2}>
                     {shortCmd}
                 </Text>
-            </View>
+            </Pressable>
             <Pressable
                 onPress={handleKill}
                 disabled={isKilling}
@@ -243,8 +268,13 @@ const rowStyles = StyleSheet.create((theme) => ({
 export default React.memo(function DiagnosticsPage() {
     const { id: machineId } = useLocalSearchParams<{ id: string }>();
     const { theme } = useUnistyles();
+    const router = useRouter();
     const { processes, isLoading, error, scan } = useHappyProcesses(machineId);
     const [isCleaning, setIsCleaning] = React.useState(false);
+
+    const handleOpenSession = React.useCallback((sessionId: string) => {
+        router.push(`/session/${sessionId}` as any);
+    }, [router]);
 
     const handleKill = React.useCallback(async (proc: HappyProcess) => {
         const confirmed = await Modal.confirm(
@@ -387,7 +417,7 @@ export default React.memo(function DiagnosticsPage() {
 
                 {/* Process list */}
                 {processes.map((proc) => (
-                    <ProcessRow key={proc.pid} proc={proc} onKill={handleKill} />
+                    <ProcessRow key={proc.pid} proc={proc} onKill={handleKill} onOpenSession={handleOpenSession} />
                 ))}
             </View>
         </ScrollView>
