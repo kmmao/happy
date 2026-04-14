@@ -22,14 +22,16 @@ import { t } from "@/text";
 // Types
 // ---------------------------------------------------------------------------
 
-type HappyProcessType = "daemon" | "session" | "version-check" | "other";
+type HappyProcessType = "daemon" | "session" | "fork" | "version-check" | "other";
 
 interface HappyProcess {
     pid: number;
     type: HappyProcessType;
     command: string;
-    /** Parsed from --happy-session-id flag; present when type === "session". */
+    /** Parsed from --happy-session-id flag; present when type === "session" or "fork". */
     sessionId?: string;
+    /** Parsed from --happy-fork-source flag; present when type === "fork". */
+    forkSourceId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,7 +40,9 @@ interface HappyProcess {
 
 function classifyProcess(cmd: string): HappyProcessType {
     if (cmd.includes("daemon start")) return "daemon";
-    if (cmd.includes("--started-by daemon")) return "session";
+    if (cmd.includes("--started-by daemon")) {
+        return cmd.includes("--happy-fork-source") ? "fork" : "session";
+    }
     if (cmd.includes("--version")) return "version-check";
     return "other";
 }
@@ -46,6 +50,12 @@ function classifyProcess(cmd: string): HappyProcessType {
 /** Extract --happy-session-id <value> from a process command string. */
 function parseSessionId(cmd: string): string | undefined {
     const match = cmd.match(/--happy-session-id\s+(\S+)/);
+    return match?.[1];
+}
+
+/** Extract --happy-fork-source <value> from a process command string. */
+function parseForkSourceId(cmd: string): string | undefined {
+    const match = cmd.match(/--happy-fork-source\s+(\S+)/);
     return match?.[1];
 }
 
@@ -65,8 +75,9 @@ function parsePsOutput(stdout: string): HappyProcess[] {
         if (isNaN(pid) || pid <= 1) continue;
         const command = parts.slice(10).join(" ");
         const type = classifyProcess(command);
-        const sessionId = type === "session" ? parseSessionId(command) : undefined;
-        result.push({ pid, type, command, sessionId });
+        const sessionId = (type === "session" || type === "fork") ? parseSessionId(command) : undefined;
+        const forkSourceId = type === "fork" ? parseForkSourceId(command) : undefined;
+        result.push({ pid, type, command, sessionId, forkSourceId });
     }
 
     return result;
@@ -122,6 +133,7 @@ function ProcessTypeLabel({ type }: { type: HappyProcessType }) {
     const config: Record<HappyProcessType, { label: string; color: string; icon: string }> = {
         daemon: { label: t("diagnostics.typeDaemon"), color: theme.colors.textLink, icon: "pulse-outline" },
         session: { label: t("diagnostics.typeSession"), color: "#10B981", icon: "terminal-outline" },
+        fork: { label: t("diagnostics.typeFork"), color: "#A855F7", icon: "git-branch-outline" },
         "version-check": { label: t("diagnostics.typeVersionCheck"), color: theme.colors.textSecondary, icon: "search-outline" },
         other: { label: t("diagnostics.typeOther"), color: theme.colors.textSecondary, icon: "help-circle-outline" },
     };
@@ -172,7 +184,7 @@ function ProcessRow({
         }
     };
 
-    const canOpenSession = proc.type === "session" && !!proc.sessionId;
+    const canOpenSession = (proc.type === "session" || proc.type === "fork") && !!proc.sessionId;
 
     return (
         <View style={[rowStyles.row, { backgroundColor: theme.colors.surfaceHighest }]}>
@@ -315,9 +327,9 @@ export default React.memo(function DiagnosticsPage() {
         }
     }, [machineId, scan]);
 
-    // Runaway processes = daemon, version-check, session
+    // Runaway processes = daemon, version-check, session, fork
     const runawayCount = processes.filter(
-        (p) => p.type === "daemon" || p.type === "version-check" || p.type === "session",
+        (p) => p.type === "daemon" || p.type === "version-check" || p.type === "session" || p.type === "fork",
     ).length;
 
     if (isLoading && processes.length === 0) {
