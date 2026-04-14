@@ -43,7 +43,7 @@ export const ProjectDetailView = React.memo(
             () => {
                 const base: { key: TabKey; label: string }[] = [
                     { key: "world", label: t("projects.tabWorld") },
-                    { key: "team", label: t("projects.tabTeam") },
+                    { key: "team", label: t("projects.tabGroups") },
                     { key: "goals", label: t("projects.tabGoals") },
                     { key: "sessions", label: t("projects.tabSessions") },
                     { key: "health", label: t("projects.tabHealth") },

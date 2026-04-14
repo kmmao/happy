@@ -36,13 +36,6 @@ export const WorldConfigSection = React.memo(
             setConfig(parseProjectConfig(project.serverMetadata));
         }, [project.serverMetadata]);
 
-        const machineName =
-            project.machineMetadata?.displayName ||
-            project.machineMetadata?.host ||
-            project.key.machineId;
-
-        const createdDate = new Date(project.createdAt).toLocaleDateString();
-
         const saveConfig = React.useCallback(
             async (newConfig: ProjectConfig) => {
                 if (!project.serverId) return;
@@ -76,8 +69,8 @@ export const WorldConfigSection = React.memo(
         const handleSetAlias = React.useCallback(async () => {
             const currentName = getProjectDisplayName(project);
             const newAlias = await Modal.prompt(
-                t("projects.configAliasPromptTitle"),
-                t("projects.configAliasPromptMessage"),
+                t("world.worldAliasPromptTitle"),
+                t("world.worldAliasPromptMessage"),
                 {
                     defaultValue: config.alias || "",
                     placeholder: currentName,
@@ -99,13 +92,13 @@ export const WorldConfigSection = React.memo(
 
             const isArchived = project.archived ?? false;
             const confirmMessage = isArchived
-                ? t("projects.configUnarchiveConfirm")
-                : t("projects.configArchiveConfirm");
+                ? t("world.worldReviveConfirm")
+                : t("world.worldTerminateConfirm");
 
             const confirmed = await Modal.confirm(
                 isArchived
-                    ? t("projects.configUnarchive")
-                    : t("projects.configArchive"),
+                    ? t("world.worldRevive")
+                    : t("world.worldTerminate"),
                 confirmMessage,
             );
             if (!confirmed) return;
@@ -137,29 +130,13 @@ export const WorldConfigSection = React.memo(
 
         return (
             <View>
-                <ItemGroup title={t("projects.configProjectInfo")}>
-                    <Item
-                        title={t("projects.configPath")}
-                        detail={project.key.path}
-                        copy={project.key.path}
-                    />
-                    <Item
-                        title={t("projects.configMachine")}
-                        detail={machineName}
-                    />
-                    <Item
-                        title={t("projects.configCreatedAt")}
-                        detail={createdDate}
-                    />
-                </ItemGroup>
-
                 <ItemGroup
-                    title={t("projects.configAlias")}
-                    footer={t("projects.configAliasDescription")}
+                    title={t("world.worldAlias")}
+                    footer={t("world.worldAliasDescription")}
                 >
                     <Item
-                        title={t("projects.configAlias")}
-                        detail={config.alias || t("projects.configAliasNotSet")}
+                        title={t("world.worldAlias")}
+                        detail={config.alias || t("world.worldAliasNotSet")}
                         onPress={handleSetAlias}
                         showChevron
                         disabled={saving || !project.serverId}
@@ -170,8 +147,8 @@ export const WorldConfigSection = React.memo(
                     <Item
                         title={
                             project.archived
-                                ? t("projects.configUnarchive")
-                                : t("projects.configArchive")
+                                ? t("world.worldRevive")
+                                : t("world.worldTerminate")
                         }
                         destructive={!project.archived}
                         onPress={handleToggleArchive}
