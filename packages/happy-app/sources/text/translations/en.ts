@@ -3912,6 +3912,7 @@ export const en: TranslationStructure = {
     autonomyAuto: "auto",
     autonomyPending: "pending",
     emptyDescription: "(no description)",
+    elementMember: "Owner Member",
     generateTitle: "World Initialization",
     generateHint: "Generate narrative, laws, roles, and goals for this world",
     generateAction: "Generate",

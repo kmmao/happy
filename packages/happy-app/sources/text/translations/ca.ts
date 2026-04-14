@@ -3918,6 +3918,7 @@ export const ca: TranslationStructure = {
     autonomyAuto: "auto",
     autonomyPending: "pendent",
     emptyDescription: "(sense descripció)",
+    elementMember: "Membre propietari",
     generateTitle: "Inicialització del món",
     generateHint: "Genera narrativa, lleis, rols i objectius per a aquest món",
     generateAction: "Genera",

@@ -3888,6 +3888,7 @@ export const ja: TranslationStructure = {
     autonomyAuto: "自動",
     autonomyPending: "保留中",
     emptyDescription: "（説明なし）",
+    elementMember: "オーナーメンバー",
     generateTitle: "ワールド初期化",
     generateHint: "このワールドのナラティブ、法則、ロール、ゴールを生成します",
     generateAction: "生成",

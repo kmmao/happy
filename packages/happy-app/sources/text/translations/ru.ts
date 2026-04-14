@@ -3932,6 +3932,7 @@ export const ru: TranslationStructure = {
     autonomyAuto: "авто",
     autonomyPending: "ожидание",
     emptyDescription: "(нет описания)",
+    elementMember: "Владелец",
     generateTitle: "Инициализация мира",
     generateHint: "Генерация нарратива, правил, ролей и целей для этого мира",
     generateAction: "Сгенерировать",

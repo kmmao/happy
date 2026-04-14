@@ -3934,6 +3934,7 @@ export const pl: TranslationStructure = {
     autonomyAuto: "auto",
     autonomyPending: "oczekuje",
     emptyDescription: "(brak opisu)",
+    elementMember: "Członek-właściciel",
     generateTitle: "Inicjalizacja świata",
     generateHint: "Generowanie narracji, praw, ról i celów dla tego świata",
     generateAction: "Generuj",

@@ -3822,6 +3822,7 @@ export const zhHant: TranslationStructure = {
     autonomyAuto: "自動",
     autonomyPending: "待處理",
     emptyDescription: "（無描述）",
+    elementMember: "擁有者成員",
     generateTitle: "世界初始化",
     generateHint: "為這個世界生成敘事、法則、角色和目標",
     generateAction: "生成",

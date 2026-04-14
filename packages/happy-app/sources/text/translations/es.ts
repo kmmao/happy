@@ -3913,6 +3913,7 @@ export const es: TranslationStructure = {
     autonomyAuto: "auto",
     autonomyPending: "pendiente",
     emptyDescription: "(sin descripción)",
+    elementMember: "Miembro propietario",
     generateTitle: "Inicialización del mundo",
     generateHint: "Generar narrativa, leyes, roles y objetivos para este mundo",
     generateAction: "Generar",

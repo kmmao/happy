@@ -3818,6 +3818,7 @@ export const zhHans: TranslationStructure = {
     autonomyAuto: "自动",
     autonomyPending: "待处理",
     emptyDescription: "（无描述）",
+    elementMember: "所有者成员",
     generateTitle: "世界初始化",
     generateHint: "为这个世界生成叙事、法则、角色和目标",
     generateAction: "生成",
