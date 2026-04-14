@@ -3035,7 +3035,6 @@ export const en = {
     tabGit: "Git",
     tabHealth: "Health",
     tabResearch: "Research",
-    tabConfig: "Config",
     tabRoles: "Roles",
     tabMembers: "Members",
     tabGoals: "Goals",

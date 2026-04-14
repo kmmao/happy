@@ -8,7 +8,7 @@ export type ProjectDetailTabKey =
     | "world"
     | "roles"
     | "members"
-    | "config";
+;
 
 const BASE_TABS: ProjectDetailTabKey[] = [
     "world",
@@ -19,7 +19,6 @@ const BASE_TABS: ProjectDetailTabKey[] = [
     "git",
     "health",
     "research",
-    "config",
 ];
 
 export function resolveProjectDetailInitialTab(input: {
@@ -27,7 +26,7 @@ export function resolveProjectDetailInitialTab(input: {
     knowledgeBaseEnabled: boolean;
 }): ProjectDetailTabKey {
     const allowedTabs = input.knowledgeBaseEnabled
-        ? [...BASE_TABS.slice(0, 8), "knowledge", ...BASE_TABS.slice(8)]
+        ? [...BASE_TABS, "knowledge"]
         : BASE_TABS;
 
     if (input.requestedTab && allowedTabs.includes(input.requestedTab as ProjectDetailTabKey)) {

@@ -38,6 +38,7 @@ import { AuditLogSection } from "./AuditLogSection";
 import { MemberStatsSection } from "./MemberStatsSection";
 import { RoleCollaborationSection } from "./RoleCollaborationSection";
 import { SuggestionCard } from "./SuggestionCard";
+import { WorldConfigSection } from "./WorldConfigSection";
 import {
     applySuggestionStatusUpdate,
     getSuggestionTypeLabelKey,
@@ -434,6 +435,8 @@ export const WorldOverviewTab = React.memo(
                         ))}
                     </View>
                 ) : null}
+
+                <WorldConfigSection project={project} />
             </ScrollView>
         );
     },

@@ -2955,7 +2955,6 @@ export const zhHans: TranslationStructure = {
     tabGit: "Git",
     tabHealth: "健康",
     tabResearch: "调研",
-    tabConfig: "配置",
     tabRoles: "角色",
     tabMembers: "成员",
     tabGoals: "目标",

@@ -3063,7 +3063,6 @@ export const pl: TranslationStructure = {
     tabGit: "Git",
     tabHealth: "Zdrowie",
     tabResearch: "Badania",
-    tabConfig: "Konfiguracja",
     tabRoles: "Roles",
     tabMembers: "Członkowie",
     tabGoals: "Cele",

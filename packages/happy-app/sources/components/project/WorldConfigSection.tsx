@@ -1,8 +1,6 @@
 import * as React from "react";
-import { ScrollView } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { View } from "react-native";
 import { Project, projectManager, getProjectDisplayName } from "@/sync/projectManager";
-import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
@@ -23,18 +21,17 @@ function parseProjectConfig(metadata: string | null | undefined): ProjectConfig 
     }
 }
 
-interface ProjectConfigTabProps {
+interface WorldConfigSectionProps {
     project: Project;
 }
 
-export const ProjectConfigTab = React.memo(
-    ({ project }: ProjectConfigTabProps) => {
+export const WorldConfigSection = React.memo(
+    ({ project }: WorldConfigSectionProps) => {
         const [config, setConfig] = React.useState<ProjectConfig>(() =>
             parseProjectConfig(project.serverMetadata),
         );
         const [saving, setSaving] = React.useState(false);
 
-        // Sync config when project metadata changes externally
         React.useEffect(() => {
             setConfig(parseProjectConfig(project.serverMetadata));
         }, [project.serverMetadata]);
@@ -60,7 +57,6 @@ export const ProjectConfigTab = React.memo(
                     const metadata = JSON.stringify(newConfig);
                     await updateProject(credentials, project.serverId, { metadata });
 
-                    // Update local cache (follows existing pattern in supervisor-settings)
                     const localProject = projectManager.getProject(project.id);
                     if (localProject) {
                         localProject.serverMetadata = metadata;
@@ -126,7 +122,6 @@ export const ProjectConfigTab = React.memo(
                     archived: !isArchived,
                 });
 
-                // Update local cache (follows existing pattern in supervisor-settings)
                 const localProject = projectManager.getProject(project.id);
                 if (localProject) {
                     localProject.archived = !isArchived;
@@ -141,11 +136,7 @@ export const ProjectConfigTab = React.memo(
         }, [project.serverId, project.id, project.archived]);
 
         return (
-            <ScrollView
-                style={styles.container}
-                contentContainerStyle={styles.scrollContent}
-            >
-                {/* Project Info (read-only) */}
+            <View>
                 <ItemGroup title={t("projects.configProjectInfo")}>
                     <Item
                         title={t("projects.configPath")}
@@ -162,7 +153,6 @@ export const ProjectConfigTab = React.memo(
                     />
                 </ItemGroup>
 
-                {/* Project Alias */}
                 <ItemGroup
                     title={t("projects.configAlias")}
                     footer={t("projects.configAliasDescription")}
@@ -176,7 +166,6 @@ export const ProjectConfigTab = React.memo(
                     />
                 </ItemGroup>
 
-                {/* Archive */}
                 <ItemGroup>
                     <Item
                         title={
@@ -190,20 +179,7 @@ export const ProjectConfigTab = React.memo(
                         loading={saving}
                     />
                 </ItemGroup>
-            </ScrollView>
+            </View>
         );
     },
 );
-
-const styles = StyleSheet.create((theme) => ({
-    container: {
-        flex: 1,
-        backgroundColor: theme.colors.groupped.background,
-    },
-    scrollContent: {
-        paddingBottom: 32,
-        maxWidth: layout.maxWidth,
-        alignSelf: "center" as const,
-        width: "100%" as const,
-    },
-}));

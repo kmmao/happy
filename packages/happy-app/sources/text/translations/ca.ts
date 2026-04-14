@@ -3041,7 +3041,6 @@ export const ca: TranslationStructure = {
     tabGit: "Git",
     tabHealth: "Salut",
     tabResearch: "Recerca",
-    tabConfig: "Configuració",
     tabRoles: "Roles",
     tabMembers: "Membres",
     tabGoals: "Objectius",
