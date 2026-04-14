@@ -113,6 +113,7 @@ App 世界 Tab（总览 / 目标 / 角色）
 | `healer` | 修复者，处理 Bug 和回归 |
 | `chronicler` | 记录者，维护文档 |
 | `planner` | 规划者，负责目标分解 |
+| `messenger` | 信使，Agent 间协调 |
 | `custom` | 自定义 |
 
 **关键字段：**
@@ -363,20 +364,30 @@ Agent 执行中 → decision_request → Task 暂停 (waiting_decision) → 释�
 **存储位置：** `WorldMember` 表
 
 **角色层级与权限：**
-| 角色 | 修改叙事 | 创建法则 | 裁决 Decision | 创建 Goal | 管理角色 | 邀请成员 |
-|------|:---:|:---:|:---:|:---:|:---:|:---:|
-| `owner` | ✅ | ✅ | ✅ 全部 | ✅ | ✅ | ✅ |
-| `admin` | ✅ | ✅ | ✅ 全部 | ✅ | ✅ | ✅ |
-| `member` | ❌ | 仅建议 | 仅分配的 | ✅ | ❌ | ❌ |
-| `observer` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 角色 | API 访问（requireRole） | decisionScope 默认 | notifyLevel 默认 |
+|------|:---:|:---:|:---:|
+| `owner` | 全部操作 | all | all |
+| `admin` | 管理操作（CRUD 成员/角色） | all | all |
+| `member` | 基础操作（读取、提交意见） | assigned | assigned |
+| `observer` | 只读 | none | critical |
+
+> **实际强制执行的权限**：`role`（API 入口 `requireRole` 鉴权）、`decisionScope`（Decision 路由和意见提交校验）、`notifyLevel`（Inbox 通知过滤）。`lawAuthority` 和 `goalAuthority` 存储在数据库中但未被任何业务逻辑检查，按角色自动设置默认值。
 
 **关键字段：**
 - `maxConcurrency`：此成员最多同时执行的任务数（默认 3）
 - `assignedRoleIds`：JSON 数组，绑定的 AgentRole ID 列表（决定此成员可以执行哪些角色的任务）
 - `expertise`：专长标签（用于 Decision 路由和 Agent 升级匹配）
-- `notifyLevel`：通知级别（all / critical / assigned / none）
+- `decisionScope`：决策范围（all / assigned / none），**服务端强制执行**——路由时排除 `none`，提交意见时校验权限
+- `notifyLevel`：通知级别（all / critical / assigned / none），**服务端强制执行**——`inboxNotifyMembers` 按此字段过滤通知接收者
 - `availability`：可用性（active / away / delegate）
-- `delegateTo`：委托给哪个成员
+- `delegateTo`：委托给哪个成员（Decision 路由和 Task 分配均追踪委托链，最多 3 跳）
+- `lawAuthority` / `goalAuthority`：按角色自动设置默认值，**服务端未强制执行**，UI 不再单独展示
+
+**删除成员的级联清理：** 删除 WorldMember 时，在事务内自动清除所有悬挂引用：
+- `Task.assignedMemberId` → null
+- `Decision.assignedTo` → null
+- `WorldMember.delegateTo`（指向被删除成员的委托链）→ null
+- `AgentMessage.toMemberId` → null
 
 **零配置兼容：** 无 WorldMember 记录时，项目 owner 自动获得 implicit owner 全权限（maxConcurrency=10），单用户场景完全不受影响。
 
@@ -658,7 +669,7 @@ Planner Session 关键约束：
    - **worldBaseline**：当前世界宪法摘要（narrative + 重要 laws）
    - **roleIdentity**：该 Task 分配角色的身份指令（`roleType` 对应 AgentRole.description）
    - **branchPolicy**：分支策略提示（需在独立分支工作、完成后提 PR）
-3. **成员分配与并发检查**：对每个任务，`taskAssignMember` 根据 `roleType` 找到绑定了该角色的最闲成员（WorldMember），写入 `assignedMemberId`。然后检查该成员的 `maxConcurrency`，若活跃任务数已达上限，任务状态设为 `queued`。无显式成员时回退到 implicit owner（maxConcurrency=10）。
+3. **成员分配与并发检查**：对每个任务，`taskAssignMember` 根据 `roleType` 找到绑定了该角色的最闲成员（WorldMember），写入 `assignedMemberId`。若最佳候选成员的 `availability` 为 `delegate`，则追踪 `delegateTo` 委托链（最多 3 跳），将任务分配给委托目标。然后检查该成员的 `maxConcurrency`，若活跃任务数已达上限，任务状态设为 `queued`。无显式成员时回退到 implicit owner（maxConcurrency=10）。
 4. 对通过并发检查的任务发送 `buildTaskTriggerEphemeral` → CLI 启动执行 Session；排队任务等待槽位释放后自动派发
 5. Goal 状态更新为 `in_progress`
 6. 调用 `goalProgressUpdate()` 触发初始进度计算
@@ -770,8 +781,8 @@ POST /v1/projects/:id/goals/:goalId/replan
 ### 6.4 项目 → 成员 Tab（WorldMembersTab）
 
 显示内容：
-- 团队成员列表（角色、专长标签、可用性状态灯）
-- 成员编辑表单：角色、专长、maxConcurrency 选择器（1/2/3/5/10）、通知级别、可用性
+- 团队成员列表（角色徽章、已绑定 AgentRole 名称标签、专长标签、可用性状态灯、非 owner 卡片上的删除按钮）
+- 成员编辑表单：权限级别（owner/admin/member/observer）、绑定 Agent 角色（多选芯片）、专长标签、决策范围（decisionScope）、maxConcurrency 选择器（1/2/3/5/10）、通知级别、可用性
 
 ### 6.5 其他相关页面
 
@@ -1061,8 +1072,9 @@ CLI TaskRunner
 调度流程：
 1. Planner 返回 `suggestedRole`（如 "builder"）
 2. `taskAssignMember` 找到绑定了该角色的所有成员，选最闲的
-3. 检查该成员的 `maxConcurrency`，超限则排队
-4. 任务完成后 `dispatchQueuedTasksForMember` 自动派发队列中的下一个任务
+3. 若最佳成员的 `availability` 为 `delegate`，追踪 `delegateTo` 委托链（最多 3 跳）分配给委托目标
+4. 检查该成员的 `maxConcurrency`，超限则排队
+5. 任务完成后 `dispatchQueuedTasksForMember` 自动派发队列中的下一个任务
 
 单人场景（无 WorldMember 记录）：自动回退到 implicit owner（maxConcurrency=10），行为与之前完全相同。
 
